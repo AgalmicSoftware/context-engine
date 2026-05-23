@@ -491,28 +491,28 @@
           "dwarkesh"
         ],
         "total_sources": 10,
-        "key_tension": "Benchmark metrics show exponential progress, but real-world impact appears to plateau\u2014suggesting either benchmarks are misleading or integration complexity is the bottleneck, not capability"
+        "key_tension": "Benchmark metrics show exponential progress, but real-world impact appears to plateau—suggesting either benchmarks are misleading or integration complexity is the bottleneck, not capability"
       },
       "positions": [
         {
           "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Dario Amodei \u2014 We are near the end of the exponential",
+          "stance_summary": "Dario Amodei — We are near the end of the exponential",
           "relevance_score": 10
         },
         {
           "entry_url_or_id": "https://www.dwarkesh.com/p/elon-musk",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Elon Musk \u2014 In 36 months, the cheapest place to put AI will be space",
+          "stance_summary": "Elon Musk — In 36 months, the cheapest place to put AI will be space",
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://www.anthropic.com/transparency/model-report",
+          "entry_url_or_id": "anthropic_mythos_system_card_2026",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Claude Mythos System Card \u2014 Frontier Cybersecurity Capabilities",
+          "stance_summary": "Claude Mythos System Card — Frontier Cybersecurity Capabilities",
           "relevance_score": 10
         },
         {
@@ -583,13 +583,6 @@
           "corpus": "enriched-tweets",
           "side": "b",
           "stance_summary": "Tweet engaging with positive trajectory themes",
-          "relevance_score": 8
-        },
-        {
-          "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
-          "corpus": "dwarkesh-lab-insiders",
-          "side": "a",
-          "stance_summary": "We are near the end of the exponential",
           "relevance_score": 8
         },
         {
@@ -780,7 +773,7 @@
           "from_corpus": "dwarkesh-lab-insiders",
           "from_id": "dwarkesh_dario_amodei_feb_2026",
           "to_corpus": "metr-evals-metrics",
-          "to_id": "dwarkesh_metr_time_horizon_11_2026",
+          "to_id": "metr_time_horizon_11_2026",
           "relationship": "discusses_implications_of",
           "relevance_score": 9
         },
@@ -1280,13 +1273,6 @@
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Recent Frontier Models Are Reward Hacking",
-          "relevance_score": 7
-        },
-        {
-          "entry_url_or_id": "https://metr.org/blog/2025-06-05-recent-reward-hacking/",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "Naive fixes might just hide reward hacking",
           "relevance_score": 7
         },
         {
@@ -1837,7 +1823,7 @@
           "ai_laws"
         ],
         "total_sources": 10,
-        "key_tension": "METR's own research suggests their evaluation framework is insufficient\u2014the organization building evaluations is also arguing they can't scale to frontier AI"
+        "key_tension": "METR's own research suggests their evaluation framework is insufficient—the organization building evaluations is also arguing they can't scale to frontier AI"
       },
       "positions": [
         {
@@ -1869,7 +1855,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-6-system-card",
+          "entry_url_or_id": "anthropic_claude_opus_46_system_card",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Claude Opus 4.6 System Card",
@@ -1879,14 +1865,14 @@
           "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-5-system-card",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Claude Opus 4.5 System Card \u2014 Best-Aligned Frontier Model",
+          "stance_summary": "Claude Opus 4.5 System Card — Best-Aligned Frontier Model",
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://www.anthropic.com/transparency/model-report",
+          "entry_url_or_id": "anthropic_mythos_system_card_2026",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Claude Mythos System Card \u2014 Frontier Cybersecurity Capabilities",
+          "stance_summary": "Claude Mythos System Card — Frontier Cybersecurity Capabilities",
           "relevance_score": 10
         },
         {
@@ -1921,7 +1907,7 @@
           "entry_url_or_id": "https://openai.com/index/openai-anthropic-safety-evaluation/",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Findings from a pilot Anthropic\u2013OpenAI alignment evaluation exercise",
+          "stance_summary": "Findings from a pilot Anthropic–OpenAI alignment evaluation exercise",
           "relevance_score": 10
         },
         {
@@ -2166,7 +2152,7 @@
           "from_corpus": "dwarkesh-lab-insiders",
           "from_id": "openai_anthropic_alignment_eval_exercise",
           "to_corpus": "metr-evals-metrics",
-          "to_id": "dwarkesh_metr_monitorability_evals_2026",
+          "to_id": "metr_monitorability_evals_2026",
           "relationship": "complements",
           "relevance_score": 8
         }
@@ -2585,7 +2571,7 @@
           "ai_scifi"
         ],
         "total_sources": 12,
-        "key_tension": "METR's own data contains a fundamental contradiction: time horizons suggest exponential progress, yet real-world productivity metrics show AI tools slow down experienced developers\u2014suggesting the benchmark-to-reality gap may be unbridgeable even for R&D"
+        "key_tension": "METR's own data contains a fundamental contradiction: time horizons suggest exponential progress, yet real-world productivity metrics show AI tools slow down experienced developers—suggesting the benchmark-to-reality gap may be unbridgeable even for R&D"
       },
       "positions": [
         {
@@ -2634,7 +2620,7 @@
           "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Dario Amodei \u2014 We are near the end of the exponential",
+          "stance_summary": "Dario Amodei — We are near the end of the exponential",
           "relevance_score": 10
         },
         {
@@ -2898,7 +2884,7 @@
           "from_corpus": "dwarkesh-lab-insiders",
           "from_id": "dwarkesh_dario_amodei_feb_2026",
           "to_corpus": "metr-evals-metrics",
-          "to_id": "dwarkesh_metr_mirrorcode_2026",
+          "to_id": "metr_mirrorcode_2026",
           "relationship": "makes_claims_supported_by",
           "relevance_score": 9
         }
@@ -3234,14 +3220,14 @@
           "entry_url_or_id": "https://www.dwarkesh.com/p/elon-musk",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Elon Musk \u2014 In 36 months, the cheapest place to put AI will be space",
+          "stance_summary": "Elon Musk — In 36 months, the cheapest place to put AI will be space",
           "relevance_score": 10
         },
         {
           "entry_url_or_id": "https://openai.com/index/openai-anthropic-safety-evaluation/",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Findings from a pilot Anthropic\u2013OpenAI alignment evaluation exercise",
+          "stance_summary": "Findings from a pilot Anthropic–OpenAI alignment evaluation exercise",
           "relevance_score": 10
         },
         {
@@ -3368,13 +3354,6 @@
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Details about METR's preliminary evaluation of Qwen models",
-          "relevance_score": 7
-        },
-        {
-          "entry_url_or_id": "https://evaluations.metr.org/",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "Details about METR's evaluation of Gemini 3 Pro",
           "relevance_score": 7
         },
         {
@@ -4100,13 +4079,6 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "Distribution of Human Task Completion Times in HCAST",
-          "relevance_score": 7
-        },
-        {
           "entry_url_or_id": "https://metr.org/hcast.pdf",
           "corpus": "metr-evals-metrics",
           "side": "a",
@@ -4642,13 +4614,6 @@
           "relevance_score": 8
         },
         {
-          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "New York RAISE Act Requirements Analysis",
-          "relevance_score": 8
-        },
-        {
           "entry_url_or_id": "https://x.com/anthrupad/status/1840866037514059824",
           "corpus": "enriched-tweets",
           "side": "a",
@@ -4803,24 +4768,10 @@
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "https://metr.org/common-elements",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "Model Weight Security in Frontier AI Safety Policies",
-          "relevance_score": 7
-        },
-        {
           "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
           "corpus": "metr-evals-metrics",
           "side": "a",
           "stance_summary": "Evidence for Exponential AI Capability Growth",
-          "relevance_score": 7
-        },
-        {
-          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
-          "corpus": "metr-evals-metrics",
-          "side": "a",
-          "stance_summary": "EU Code of Practice Requirements Analysis",
           "relevance_score": 7
         },
         {
@@ -4842,13 +4793,6 @@
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Anthropic's Responsible Scaling Policy",
-          "relevance_score": 7
-        },
-        {
-          "entry_url_or_id": "https://www.anthropic.com/responsible-scaling-policy",
-          "corpus": "dwarkesh-lab-insiders",
-          "side": "a",
-          "stance_summary": "Anthropic's Responsible Scaling Policy v2.0",
           "relevance_score": 7
         },
         {
@@ -4923,7 +4867,7 @@
           "from_corpus": "ai-laws-policy",
           "from_id": "us_america_ai_action_plan_2025",
           "to_corpus": "ai-laws-policy",
-          "to_id": "eo_14179_removing_barriers_ai_2025",
+          "to_id": "eo_14179_trump_ai",
           "relationship": "implements_policy_direction_from",
           "relevance_score": 9
         }
@@ -5373,7 +5317,7 @@
           "lesswrong"
         ],
         "total_sources": 8,
-        "key_tension": "The crux is empirical but fundamentally challenging to resolve: deceptive alignment by definition would not show obvious signs until incentives become severe enough that deception is worth the risk. Side A argues the precursors are present. Side B argues absence of sabotage proves no deception. But a truly deceptive system would behave exactly as Side B describes until the stakes were high. This creates an unfalsifiable core\u2014either behavior is evidence of optimization artifacts (Side B's reading) or evidence of deception that's not yet activated (Side A's reading). The SHUSHCAST finding offers the strongest pivot point: if evasion capability continues scaling, it suggests the trajectory continues."
+        "key_tension": "The crux is empirical but fundamentally challenging to resolve: deceptive alignment by definition would not show obvious signs until incentives become severe enough that deception is worth the risk. Side A argues the precursors are present. Side B argues absence of sabotage proves no deception. But a truly deceptive system would behave exactly as Side B describes until the stakes were high. This creates an unfalsifiable core—either behavior is evidence of optimization artifacts (Side B's reading) or evidence of deception that's not yet activated (Side A's reading). The SHUSHCAST finding offers the strongest pivot point: if evasion capability continues scaling, it suggests the trajectory continues."
       },
       "positions": [
         {
@@ -5398,7 +5342,7 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-6-system-card",
+          "entry_url_or_id": "anthropic_claude_opus_46_system_card",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
           "stance_summary": "Claude Opus 4.6 System Card",
@@ -5725,21 +5669,19 @@
         "side_a": {
           "label": "Genuine Environmental Concern",
           "premises": [
-            "AI data centers consume billions of gallons of water annually for cooling",
-            "Water consumption is growing exponentially with AI adoption",
-            "Communities near data centers face water scarcity impacts",
-            "Current voluntary reporting is insufficient for policy-making",
-            "Per-query water costs, while individually small, aggregate to massive totals"
+            "Data-center growth has measurable electricity, water, and carbon impacts",
+            "Localized water stress can be policy-relevant even when national totals are modest",
+            "Voluntary reporting is too inconsistent for communities and regulators to compare facilities",
+            "AI demand can intensify existing grid and siting bottlenecks"
           ]
         },
         "side_b": {
-          "label": "Overstated Concern / Misleading Metrics",
+          "label": "Misleading Metric / Manageable Infrastructure Issue",
           "premises": [
-            "Per-query water figures strip essential geographic and technological context",
-            "Closed-loop cooling reduces water use by 80-95%",
-            "Water consumption varies 5-10x by data center location",
-            "Industry is rapidly transitioning to zero-water cooling",
-            "Aggregate projections assume no technological improvement"
+            "Per-query water metrics often omit serving-stack, location, and cooling context",
+            "Production-scale measurements can materially lower common viral estimates",
+            "Energy planning, siting, and cooling technology may matter more than blanket AI-use restrictions",
+            "Some environmental claims conflate all data-center growth with AI-specific demand"
           ]
         }
       },
@@ -5747,49 +5689,47 @@
         "root": "Is AI water consumption a crisis requiring urgent regulation?",
         "branches": [
           {
-            "claim": "AI water consumption is growing unsustainably",
+            "claim": "AI infrastructure creates real local environmental externalities",
             "support": [
-              "water_footprint_ai_models_2023",
-              "environmental_impact_ai_servers_2026"
+              "data_centers_water_footprint_transparency_2026",
+              "lbnl_data_center_energy_usage_report_2024"
             ],
-            "counter": "Growth projections assume current cooling technology and don't account for industry transition to closed-loop systems"
+            "counter": "The strongest policy target may be reporting, siting, and grid planning rather than AI use itself"
           },
           {
-            "claim": "Per-query metrics are misleading",
+            "claim": "Per-query water metrics are often misleading",
             "support": [
-              "data_centers_water_footprint_transparency_2026"
+              "google_ai_serving_environmental_impact_2025",
+              "iea_energy_and_ai_report_2025"
             ],
-            "counter": "Even if individual queries are small, aggregate impact at scale is massive"
+            "counter": "Misleading micro-metrics do not eliminate aggregate impacts from rapid data-center growth"
           },
           {
-            "claim": "Geographic context makes universal claims misleading",
+            "claim": "Transparency is the least-regret policy intervention",
             "support": [
-              "water_footprint_ai_models_2023"
+              "data_centers_water_footprint_transparency_2026",
+              "data_center_water_environmental_regulations_2026"
             ],
-            "counter": "Data centers are often built in water-stressed regions due to other infrastructure factors"
+            "counter": "Mandatory reporting must be standardized enough to avoid incomparable disclosures"
           }
         ]
       },
       "fact_layer": {
         "verified_facts": [
-          "Google consumed 6.4 billion gallons of water across data centers in 2023",
-          "Microsoft used 1.7 billion gallons in 2023, up 34% from 2022",
-          "GPT-3 training consumed approximately 700,000 liters of freshwater",
-          "Each 100-word AI prompt estimated at ~519mL (UC Riverside study)",
-          "Water consumption varies 5-10x by data center location",
-          "Microsoft committed to zero-water cooling for all new data centers by late 2027",
-          "US AI data centers projected to consume 731-1,125 million cubic meters/year by 2030"
+          "IEA published Energy and AI on April 10, 2025 to model the energy-AI nexus",
+          "LBNL published the 2024 United States Data Center Energy Usage Report on December 19, 2024",
+          "The AGU Advances transparency commentary was early online February 27, 2026 and published April 2026",
+          "Google-scale inference measurements report much lower median per-prompt water use than early viral estimates for the measured Gemini Apps text-prompt setting"
         ],
         "disputed_claims": [
-          "Whether the 519mL per-query figure applies universally or only to specific configurations",
-          "Whether efficiency gains will outpace growth",
-          "Whether data center water use displaces community water access"
+          "Whether early per-query water estimates generalize to current production systems",
+          "Whether efficiency gains and siting improvements will outpace demand growth",
+          "How much broad data-center growth should be attributed specifically to AI workloads"
         ],
         "misinformation_patterns": [
-          "Citing per-query figures without geographic/technology context",
-          "Conflating training water costs with inference costs",
-          "Ignoring the difference between consumption (evaporated) and withdrawal (returned)",
-          "Presenting 2023 data as if current technology hasn't changed"
+          "Citing per-query figures without geography, cooling type, workload, or date",
+          "Conflating water withdrawal with water consumption",
+          "Using company self-reports without noting independent reporting gaps"
         ]
       },
       "fallacy_flags": [],
@@ -5819,64 +5759,71 @@
           "entry_url_or_id": "water_footprint_ai_models_2023",
           "corpus": "arxiv-ai-safety",
           "side": "a",
-          "stance_summary": "Pioneering study quantifying AI water footprint, establishing the 519mL per-query estimate",
-          "relevance_score": 10
+          "stance_summary": "Early water-footprint work shows that training and inference can create real direct and off-site water consumption, especially when scaled across many users.",
+          "relevance_score": 9
         },
         {
           "entry_url_or_id": "environmental_impact_ai_servers_2026",
           "corpus": "arxiv-ai-safety",
           "side": "a",
-          "stance_summary": "Comprehensive environmental impact analysis projecting continued growth",
-          "relevance_score": 9
+          "stance_summary": "Modeled AI-server projections warn that electricity, water, carbon, cooling design, and siting choices can compound as AI infrastructure grows.",
+          "relevance_score": 8
         },
         {
           "entry_url_or_id": "data_centers_water_footprint_transparency_2026",
           "corpus": "arxiv-ai-safety",
           "side": "a",
-          "stance_summary": "Argues for mandatory transparency requirements for accurate policy-making",
-          "relevance_score": 8
+          "stance_summary": "Water-footprint transparency research argues that localized impacts and reporting gaps make voluntary aggregate disclosures inadequate for policy.",
+          "relevance_score": 10
         },
         {
           "entry_url_or_id": "data_center_water_environmental_regulations_2026",
           "corpus": "ai-laws-policy",
           "side": "a",
-          "stance_summary": "Multiple states introducing water usage reporting requirements",
-          "relevance_score": 8
+          "stance_summary": "State-level data-center water policy activity shows that lawmakers are beginning to treat data-center cooling as an environmental-governance issue.",
+          "relevance_score": 7
         },
         {
-          "entry_url_or_id": "international_ai_safety_report_2026",
+          "entry_url_or_id": "lbnl_data_center_energy_usage_report_2024",
           "corpus": "ai-laws-policy",
           "side": "a",
-          "stance_summary": "International report includes environmental sustainability as safety dimension",
-          "relevance_score": 7
+          "stance_summary": "The DOE/LBNL baseline report grounds environmental concerns in measured U.S. data-center electricity growth and forward demand scenarios.",
+          "relevance_score": 8
         },
         {
           "entry_url_or_id": "google_ai_serving_environmental_impact_2025",
           "corpus": "arxiv-ai-safety",
           "side": "b",
-          "stance_summary": "Google-scale inference measurements argue that widely shared per-query water and energy estimates can be too high without full-stack production data",
+          "stance_summary": "Google-scale production measurements show that viral per-query water estimates can be too high when they ignore full-stack serving data and efficiency gains.",
           "relevance_score": 10
-        },
-        {
-          "entry_url_or_id": "data_centers_water_footprint_transparency_2026",
-          "corpus": "arxiv-ai-safety",
-          "side": "a",
-          "stance_summary": "Transparency advocates argue that facility-level water reporting is needed because aggregate siting and cooling impacts remain opaque",
-          "relevance_score": 8
-        },
-        {
-          "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
-          "corpus": "dwarkesh-lab-insiders",
-          "side": "b",
-          "stance_summary": "Industry leader discusses orbital and alternative cooling solutions",
-          "relevance_score": 6
         },
         {
           "entry_url_or_id": "iea_energy_and_ai_report_2025",
           "corpus": "ai-laws-policy",
           "side": "b",
-          "stance_summary": "IEA reframes the environmental debate around electricity, local grid bottlenecks, and siting rather than only viral water-per-query estimates.",
+          "stance_summary": "IEA reframes the issue around electricity systems, local grid bottlenecks, siting, and clean power rather than water-per-query metrics alone.",
           "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "stanford_ai_index_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "The AI Index connects environmental and infrastructure concerns to broader trends in compute concentration, education, labor, and policy capacity.",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "b",
+          "stance_summary": "Musk's orbital-data-center discussion is retained only as speculative industry-response evidence, not as a policy-grade mitigation claim.",
+          "relevance_score": 3
+        },
+        {
+          "entry_url_or_id": "international_ai_safety_report_2026",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "International safety framing increasingly includes environmental sustainability as one dimension of AI governance capacity.",
+          "relevance_score": 6
         }
       ],
       "cross_corpus_references": [
@@ -5886,7 +5833,7 @@
           "to_corpus": "arxiv-ai-safety",
           "to_id": "environmental_impact_ai_servers_2026",
           "relationship": "extended_by",
-          "relevance_score": 10
+          "relevance_score": 8
         },
         {
           "from_corpus": "arxiv-ai-safety",
@@ -5894,39 +5841,31 @@
           "to_corpus": "ai-laws-policy",
           "to_id": "data_center_water_environmental_regulations_2026",
           "relationship": "motivates_policy_in",
-          "relevance_score": 9
+          "relevance_score": 8
         },
         {
           "from_corpus": "arxiv-ai-safety",
           "from_id": "google_ai_serving_environmental_impact_2025",
           "to_corpus": "arxiv-ai-safety",
           "to_id": "water_footprint_ai_models_2023",
-          "relationship": "discusses_findings_of",
-          "relevance_score": 10
-        },
-        {
-          "from_corpus": "arxiv-ai-safety",
-          "from_id": "data_centers_water_footprint_transparency_2026",
-          "to_corpus": "arxiv-ai-safety",
-          "to_id": "environmental_impact_ai_servers_2026",
-          "relationship": "synthesizes",
+          "relationship": "qualifies_per_query_estimates_from",
           "relevance_score": 9
-        },
-        {
-          "from_corpus": "ai-laws-policy",
-          "from_id": "international_ai_safety_report_2026",
-          "to_corpus": "arxiv-ai-safety",
-          "to_id": "data_centers_water_footprint_transparency_2026",
-          "relationship": "references",
-          "relevance_score": 7
         },
         {
           "from_corpus": "ai-laws-policy",
           "from_id": "iea_energy_and_ai_report_2025",
-          "to_corpus": "arxiv-ai-safety",
-          "to_id": "google_ai_serving_environmental_impact_2025",
-          "relationship": "complements_environmental_measurement",
-          "relevance_score": 9
+          "to_corpus": "ai-laws-policy",
+          "to_id": "lbnl_data_center_energy_usage_report_2024",
+          "relationship": "complements_energy_baseline",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "stanford_ai_index_2026",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "iea_energy_and_ai_report_2025",
+          "relationship": "connects_infrastructure_trends_to",
+          "relevance_score": 7
         }
       ]
     },
@@ -5941,14 +5880,14 @@
           "entry_url_or_id": "anthropic_economic_index_2025",
           "corpus": "dwarkesh-lab-insiders",
           "side": "a",
-          "stance_summary": "Real-world Claude usage shows substantial augmentation as well as automation, suggesting task transformation rather than simple job replacement so far.",
+          "stance_summary": "Claude usage data shows substantial task-level augmentation and partial automation, suggesting many jobs may evolve before disappearing.",
           "relevance_score": 10
         },
         {
           "entry_url_or_id": "metr_ai_usage_survey_2026",
           "corpus": "metr-evals-metrics",
           "side": "a",
-          "stance_summary": "Technical workers report large productivity gains from AI tools, supporting the view that AI can amplify labor output.",
+          "stance_summary": "Technical workers report large productivity gains from AI tools, supporting an augmentation story while still requiring skepticism about self-report magnitude.",
           "relevance_score": 8
         },
         {
@@ -5966,10 +5905,31 @@
           "relevance_score": 8
         },
         {
-          "entry_url_or_id": "klinova_labor_impact_2024",
-          "corpus": "dwarkesh-lab-insiders",
+          "entry_url_or_id": "eeoc_ai_employment_guidance",
+          "corpus": "ai-laws-policy",
           "side": "b",
-          "stance_summary": "Labor-impact analysis emphasizes distributional, job-quality, and transition risks even when aggregate productivity improves.",
+          "stance_summary": "Federal employment guidance treats AI hiring and workplace tools as discrimination and accountability risks, not just productivity tools.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "nyc_local_law_144",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "NYC Local Law 144 illustrates concrete algorithmic hiring governance through bias audits and candidate notice.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "eu_ai_act_employment_provisions",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "The EU AI Act treats employment, worker management, and access to self-employment as high-risk AI contexts.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "stanford_ai_index_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "AI Index economy and education trends provide a broad empirical frame for adoption, exposure, and public policy capacity.",
           "relevance_score": 7
         }
       ],
@@ -5979,8 +5939,24 @@
           "from_id": "anthropic_economic_index_2025",
           "to_corpus": "metr-evals-metrics",
           "to_id": "metr_developer_perception_gap",
-          "relationship": "contrasts_self_report_with_objective_measurement",
+          "relationship": "contrasts_usage_data_with_objective_measurement",
           "relevance_score": 9
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "nyc_local_law_144",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "eu_ai_act_employment_provisions",
+          "relationship": "parallel_employment_ai_governance",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "eeoc_ai_employment_guidance",
+          "to_corpus": "dwarkesh-lab-insiders",
+          "to_id": "anthropic_economic_index_2025",
+          "relationship": "adds_labor_rights_context_to",
+          "relevance_score": 7
         }
       ],
       "argument_tree": {
@@ -6017,8 +5993,16 @@
         }
       },
       "fact_layer": {
-        "verified_claims": [],
-        "contested_claims": [],
+        "verified_claims": [
+          "Anthropic Economic Index uses anonymized Claude conversations mapped to occupational tasks",
+          "METR RCT found experienced open-source developers were slower with early-2025 AI tools in the studied setting",
+          "NYC Local Law 144 requires bias audits for covered automated employment decision tools"
+        ],
+        "contested_claims": [
+          "Whether task exposure predicts job loss",
+          "Whether technical-worker self-reports generalize to the broader labor market",
+          "Whether bias audits are sufficient for employment AI accountability"
+        ],
         "needs_review": []
       },
       "fallacy_flags": [],
@@ -6031,8 +6015,14 @@
         "possible_shifts": []
       },
       "agreement_map": {
-        "shared_premises": [],
-        "remaining_disagreements": []
+        "shared_premises": [
+          "AI adoption is changing work at the task level",
+          "Labor impacts need better measurement than anecdotes alone"
+        ],
+        "remaining_disagreements": [
+          "Whether productivity gains will dominate displacement and job-quality risks",
+          "Whether existing employment law is enough for AI-mediated labor decisions"
+        ]
       },
       "burden_of_proof": [],
       "audience_sentiment": {
@@ -6045,8 +6035,22 @@
         "cross_corpus_support": 0
       },
       "premise_extraction": {
-        "shared": [],
-        "contested": []
+        "side_a": {
+          "label": "Augmentation First",
+          "premises": [
+            "Current AI is used across tasks within occupations rather than replacing whole occupations",
+            "Self-reported productivity gains can indicate real workflow value",
+            "Task transformation can expand output and shift job content"
+          ]
+        },
+        "side_b": {
+          "label": "Displacement and Governance Risk",
+          "premises": [
+            "Objective productivity effects can lag perception",
+            "Algorithmic hiring and worker-management systems create discrimination risks",
+            "Partial task automation can still shift bargaining power, job quality, and entry-level opportunities"
+          ]
+        }
       },
       "meta": {
         "added_by": "corpus_audit_fix",
@@ -6068,18 +6072,39 @@
           "relevance_score": 10
         },
         {
+          "entry_url_or_id": "us_department_education_ai_report_2023",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "U.S. Department of Education guidance frames AI as intelligence augmentation while requiring human-centered, explainable, and overridable systems.",
+          "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "unesco_ai_education_guidance",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "UNESCO calls for regulated, human-centered AI in education with teacher training rather than unmanaged adoption or blanket panic.",
+          "relevance_score": 8
+        },
+        {
           "entry_url_or_id": "ohio_education_ai_policy",
           "corpus": "ai-laws-policy",
           "side": "a",
-          "stance_summary": "State education policy entries show AI governance moving toward institutional guidance rather than blanket bans.",
+          "stance_summary": "Ohio HB 96 moves schools toward local AI policies and model guidance instead of ad hoc classroom-level decisions.",
           "relevance_score": 7
         },
         {
-          "entry_url_or_id": "anthropic_education_report_2025",
-          "corpus": "dwarkesh-lab-insiders",
+          "entry_url_or_id": "international_baccalaureate_ai_assessment_policy_2023",
+          "corpus": "ai-laws-policy",
           "side": "b",
-          "stance_summary": "The same educator data flags automation-heavy grading as ethically sensitive and often viewed as inappropriate by faculty.",
-          "relevance_score": 10
+          "stance_summary": "IB assessment policy shows that AI use can be permitted only when academic integrity, attribution, and assessment design adapt.",
+          "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "stanford_ai_index_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "b",
+          "stance_summary": "AI Index education trends show adoption is broad while institutional policy clarity lags behind tool availability.",
+          "relevance_score": 7
         }
       ],
       "cross_corpus_references": [
@@ -6090,6 +6115,22 @@
           "to_id": "ohio_education_ai_policy",
           "relationship": "informs_policy_design",
           "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "us_department_education_ai_report_2023",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "unesco_ai_education_guidance",
+          "relationship": "aligns_with_human_centered_guidance",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "international_baccalaureate_ai_assessment_policy_2023",
+          "to_corpus": "dwarkesh-lab-insiders",
+          "to_id": "anthropic_education_report_2025",
+          "relationship": "adds_assessment_integrity_context_to",
+          "relevance_score": 9
         }
       ],
       "argument_tree": {
@@ -6126,8 +6167,15 @@
         }
       },
       "fact_layer": {
-        "verified_claims": [],
-        "contested_claims": [],
+        "verified_claims": [
+          "Anthropic education report analyzed higher-education educator Claude use and noted grading concerns",
+          "Ohio HB 96 requires school AI policies by July 1, 2026",
+          "IB statement was published March 1, 2023 and updated February 19, 2026"
+        ],
+        "contested_claims": [
+          "Whether AI-enabled assignment redesign can keep pace with model capability improvements",
+          "Whether disclosure rules are enough for academic integrity"
+        ],
         "needs_review": []
       },
       "fallacy_flags": [],
@@ -6140,8 +6188,14 @@
         "possible_shifts": []
       },
       "agreement_map": {
-        "shared_premises": [],
-        "remaining_disagreements": []
+        "shared_premises": [
+          "Students and educators are already using generative AI",
+          "Assessment policy must change rather than rely only on detection"
+        ],
+        "remaining_disagreements": [
+          "How permissive AI use should be in graded work",
+          "Whether educator productivity gains justify automation in sensitive evaluation tasks"
+        ]
       },
       "burden_of_proof": [],
       "audience_sentiment": {
@@ -6154,8 +6208,22 @@
         "cross_corpus_support": 0
       },
       "premise_extraction": {
-        "shared": [],
-        "contested": []
+        "side_a": {
+          "label": "Adopt With Guidance",
+          "premises": [
+            "AI can help educators create richer materials and reduce administrative burdens",
+            "Policy should teach responsible use and disclosure",
+            "Blanket bans can leave schools unprepared for real-world AI use"
+          ]
+        },
+        "side_b": {
+          "label": "Protect Assessment Integrity",
+          "premises": [
+            "Automated grading and student submissions raise trust and fairness risks",
+            "Foundational skills can atrophy if assignments are not redesigned",
+            "Institutions need explicit rules before high-stakes assessment use"
+          ]
+        }
       },
       "meta": {
         "added_by": "corpus_audit_fix",
@@ -6177,10 +6245,10 @@
           "relevance_score": 10
         },
         {
-          "entry_url_or_id": "us_copyright_office_ai_training_report_2025",
+          "entry_url_or_id": "nyt_v_openai_copyright",
           "corpus": "ai-laws-policy",
-          "side": "b",
-          "stance_summary": "The same report warns that licensing every work may be infeasible at frontier scale, preserving a public-interest argument for some unlicensed uses.",
+          "side": "a",
+          "stance_summary": "New York Times v. OpenAI captures the plaintiff-side claim that training and outputs can substitute for protected journalism and require accountability.",
           "relevance_score": 9
         },
         {
@@ -6191,11 +6259,39 @@
           "relevance_score": 8
         },
         {
+          "entry_url_or_id": "california_ab_2013",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "California AB 2013 operationalizes training-data transparency through public dataset-summary obligations for public generative AI systems.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "eu_gpai_code_of_practice_2025",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "EU GPAI Code copyright obligations show the AI Act path toward transparency and rights-reservation compliance.",
+          "relevance_score": 8
+        },
+        {
           "entry_url_or_id": "bartz_v_anthropic_fair_use_2025",
           "corpus": "ai-laws-policy",
           "side": "b",
-          "stance_summary": "Bartz supports the fair-use side for lawful training copies while warning that pirated acquisition and retention remain legally exposed.",
+          "stance_summary": "Bartz supports the fair-use side for lawfully acquired books while warning that pirated acquisition and retention remain legally exposed.",
           "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "japan_copyright_art_30_4",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "Japan Article 30-4 is a major example of a more permissive text-and-data-mining approach for non-enjoyment uses.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "eu_copyright_ai_training",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "EU copyright rules preserve text-and-data-mining pathways but rely on opt-outs and rights-reservation mechanics.",
+          "relevance_score": 8
         }
       ],
       "cross_corpus_references": [
@@ -6213,7 +6309,23 @@
           "to_corpus": "ai-laws-policy",
           "to_id": "us_copyright_office_ai_training_report_2025",
           "relationship": "tests_policy_framework_in_court",
-          "relevance_score": 10
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "california_ab_2013",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "eu_gpai_code_of_practice_2025",
+          "relationship": "parallel_training_transparency_regime",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "japan_copyright_art_30_4",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "eu_copyright_ai_training",
+          "relationship": "contrasts_international_tdm_rules_with",
+          "relevance_score": 8
         }
       ],
       "argument_tree": {
@@ -6250,8 +6362,15 @@
         }
       },
       "fact_layer": {
-        "verified_claims": [],
-        "contested_claims": [],
+        "verified_claims": [
+          "U.S. Copyright Office Part 3 was released in May 2025 as a pre-publication report",
+          "Bartz v. Anthropic split fair-use treatment between lawful training copies and pirated-library conduct",
+          "EU GPAI Code includes Transparency and Copyright chapters for GPAI providers"
+        ],
+        "contested_claims": [
+          "Whether training on specific copyrighted works causes legally cognizable market harm",
+          "Whether opt-out, collective licensing, or subpoena mechanisms scale fairly"
+        ],
         "needs_review": []
       },
       "fallacy_flags": [],
@@ -6264,8 +6383,14 @@
         "possible_shifts": []
       },
       "agreement_map": {
-        "shared_premises": [],
-        "remaining_disagreements": []
+        "shared_premises": [
+          "Training-data opacity is a real source of legal conflict",
+          "Pending cases and legislation are still shaping the doctrine"
+        ],
+        "remaining_disagreements": [
+          "Whether fair use should cover most training by default",
+          "Whether transparency duties are enough without compensation or licensing rights"
+        ]
       },
       "burden_of_proof": [],
       "audience_sentiment": {
@@ -6278,8 +6403,22 @@
         "cross_corpus_support": 0
       },
       "premise_extraction": {
-        "shared": [],
-        "contested": []
+        "side_a": {
+          "label": "Licensing / Transparency Required",
+          "premises": [
+            "Training involves copying that can implicate copyright",
+            "Unlicensed training may harm markets for works or licensing",
+            "Creators need disclosure to enforce rights"
+          ]
+        },
+        "side_b": {
+          "label": "Fair Use / Scalable Access",
+          "premises": [
+            "Some lawful training uses can be transformative fair use",
+            "Licensing every work at frontier scale may be infeasible",
+            "Broad text-and-data-mining exceptions can support innovation and research"
+          ]
+        }
       },
       "meta": {
         "added_by": "corpus_audit_fix",
@@ -6301,11 +6440,46 @@
           "relevance_score": 10
         },
         {
+          "entry_url_or_id": "nist_synthetic_content_transparency_2024",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "NIST frames provenance, watermarking, labeling, testing, and auditing as a portfolio of technical transparency tools.",
+          "relevance_score": 9
+        },
+        {
           "entry_url_or_id": "ai_content_labeling_watermarking",
           "corpus": "ai-laws-policy",
           "side": "a",
           "stance_summary": "Content-labeling and watermarking policies aim to preserve provenance and user awareness for generated media.",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "california_ab_2885",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "California AB 2885 provides a state-level digital-content authenticity and watermarking example.",
           "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "china_011",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "take_it_down_act",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "TAKE IT DOWN shows that severe intimate-digital-forgery harms receive enforceable takedown duties, not only disclosure labels.",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "fcc_ai_voice_robocall_tcpa_2024",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "FCC robocall ruling applies existing communications law to AI voice cloning used in scams and election misinformation.",
+          "relevance_score": 9
         },
         {
           "entry_url_or_id": "deepfakes_accountability_act",
@@ -6313,6 +6487,27 @@
           "side": "b",
           "stance_summary": "Deepfake accountability proposals reflect concern that disclosure alone is inadequate when synthetic media targets real people.",
           "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "tennessee_elvis_act",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "Tennessee ELVIS Act illustrates voice and likeness rights as a separate layer from generic content labeling.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "michigan_nonconsensual_deepfakes",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "State nonconsensual-deepfake statutes show targeted criminal and civil responses to intimate-image harms.",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "wisconsin_ai_deepfakes",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "Election-deepfake laws show political misinformation as a distinct governance target.",
+          "relevance_score": 7
         }
       ],
       "cross_corpus_references": [
@@ -6322,6 +6517,38 @@
           "to_corpus": "ai-laws-policy",
           "to_id": "ai_content_labeling_watermarking",
           "relationship": "implements_risk_area_addressed_by",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "nist_synthetic_content_transparency_2024",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "california_ab_2885",
+          "relationship": "technical_guidance_for",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "take_it_down_act",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "michigan_nonconsensual_deepfakes",
+          "relationship": "federal_state_ncii_alignment",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "fcc_ai_voice_robocall_tcpa_2024",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "tennessee_elvis_act",
+          "relationship": "voice_likeness_governance_parallel",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "china_011",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "ai_content_labeling_watermarking",
+          "relationship": "specific_jurisdictional_instance_of",
           "relevance_score": 8
         }
       ],
@@ -6359,8 +6586,16 @@
         }
       },
       "fact_layer": {
-        "verified_claims": [],
-        "contested_claims": [],
+        "verified_claims": [
+          "NIST AI 100-4 was published November 20, 2024 and updated April 8, 2026",
+          "TAKE IT DOWN became Public Law 119-12 on May 19, 2025",
+          "FCC ruled on February 8, 2024 that AI-generated voices in robocalls are artificial voices under the TCPA"
+        ],
+        "contested_claims": [
+          "Whether watermarking survives adversarial editing and cross-platform distribution",
+          "Whether platform takedown duties can operate quickly without over-removal",
+          "Whether state-by-state likeness laws can handle global multimodal generation"
+        ],
         "needs_review": []
       },
       "fallacy_flags": [],
@@ -6373,8 +6608,14 @@
         "possible_shifts": []
       },
       "agreement_map": {
-        "shared_premises": [],
-        "remaining_disagreements": []
+        "shared_premises": [
+          "Synthetic audio/video creates distinct harms from text generation",
+          "Technical and legal tools are both needed"
+        ],
+        "remaining_disagreements": [
+          "How much risk can be handled by provenance and model safeguards",
+          "How broad deepfake liability should be without chilling protected expression"
+        ]
       },
       "burden_of_proof": [],
       "audience_sentiment": {
@@ -6387,8 +6628,22 @@
         "cross_corpus_support": 0
       },
       "premise_extraction": {
-        "shared": [],
-        "contested": []
+        "side_a": {
+          "label": "Layered Technical Safeguards Can Help",
+          "premises": [
+            "Model providers can stage releases and restrict high-risk modalities",
+            "Provenance, watermarking, and labeling can preserve context for users and platforms",
+            "Technical standards can improve interoperability and auditability"
+          ]
+        },
+        "side_b": {
+          "label": "Legal Accountability Is Necessary",
+          "premises": [
+            "Labels do not prevent nonconsensual intimate-image, voice, or likeness harms",
+            "Victims need enforceable removal and liability pathways",
+            "Election and robocall contexts require rapid response beyond voluntary safeguards"
+          ]
+        }
       },
       "meta": {
         "added_by": "corpus_audit_fix",

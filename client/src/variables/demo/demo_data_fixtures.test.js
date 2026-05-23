@@ -92,7 +92,7 @@ describe('demo data fixture cleanup', () => {
       ai_laws_policy: 20,
       arxiv_ai_safety: 20,
       lesswrong_posts: 20,
-      cross_corpus: 8,
+      cross_corpus: 13,
       dwarkesh_lab_insiders: 20,
       ai_scifi_books: 20,
       metr_evals_metrics: 15,
@@ -212,7 +212,7 @@ describe('demo data fixture cleanup', () => {
 
     visit(debateMapData);
 
-    expect(leafNodeIds).toHaveLength(40);
+    expect(leafNodeIds).toHaveLength(41);
     expect(leafNodeIds.filter((nodeId) => !coveredNodeIds.has(nodeId))).toEqual([]);
   });
 

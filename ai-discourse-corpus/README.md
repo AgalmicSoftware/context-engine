@@ -14,8 +14,8 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `cross-corpus-debates.json` | 13 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
 | `dwarkesh-lab-insiders-corpus.json` | 149 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
 | `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
-| `lesswrong-posts-corpus.json` | 202 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
-| `metr-evals-metrics-corpus.json` | 86 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
+| `lesswrong-posts-corpus.json` | 211 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
+| `metr-evals-metrics-corpus.json` | 95 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
 | `loophole-historical-cases.json` | 40 | Mirrored copy of Context Engine's Loophole historical-case dataset, generated via the methodology from [brendanhogan/loophole](https://github.com/brendanhogan/loophole). Explores regulatory edge cases through adversarial scenario generation. |
 
 ## Format

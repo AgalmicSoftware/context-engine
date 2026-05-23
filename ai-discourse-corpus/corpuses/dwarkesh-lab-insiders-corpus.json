@@ -131,7 +131,7 @@
         "Eric Drexler",
         "Fei-Fei Li",
         "Francois Chollet",
-        "Fran\u00e7ois Chollet",
+        "François Chollet",
         "Geoffrey Hinton",
         "George Hotz vs Eliezer Yudkowsky",
         "Google DeepMind Research Team",
@@ -184,7 +184,7 @@
         "Stuart Russell",
         "Subbarao Kambhampati",
         "Timnit Gebru",
-        "Timnit Gebru and \u00c9mile P. Torres",
+        "Timnit Gebru and Émile P. Torres",
         "Tony Blair",
         "Tyler Cowen",
         "UK AI Safety Institute",
@@ -335,7 +335,7 @@
         "The transition from capabilities to applications will dominate next era",
         "Anthropic's focus is shifting from scaling races to research-driven improvements"
       ],
-      "novel_arguments_and_concepts": "Amodei's updated position represents a significant shift from the assumption of indefinite scaling returns. He argues that the era of exponential capability gains through compute alone is ending, requiring a fundamental reorientation toward research-driven innovation. The concept of 'post-scaling research' encompasses new architectures, training methods, and understanding of how to extract more from existing scales. He proposes that economic constraints will prove as limiting as physical ones\u2014the cost of training at frontier scale may exceed sustainable business models. Amodei introduces the idea that interpretability and mechanistic understanding become increasingly critical precisely because scaling alone can no longer carry capability progress. The discussion frames the next era as one where AI labs become more like physics labs, requiring breakthrough research rather than engineering optimization. This marks a departure from simple scaling predictions and introduces research tractability as a limiting factor.",
+      "novel_arguments_and_concepts": "Amodei's updated position represents a significant shift from the assumption of indefinite scaling returns. He argues that the era of exponential capability gains through compute alone is ending, requiring a fundamental reorientation toward research-driven innovation. The concept of 'post-scaling research' encompasses new architectures, training methods, and understanding of how to extract more from existing scales. He proposes that economic constraints will prove as limiting as physical ones—the cost of training at frontier scale may exceed sustainable business models. Amodei introduces the idea that interpretability and mechanistic understanding become increasingly critical precisely because scaling alone can no longer carry capability progress. The discussion frames the next era as one where AI labs become more like physics labs, requiring breakthrough research rather than engineering optimization. This marks a departure from simple scaling predictions and introduces research tractability as a limiting factor.",
       "predictions": [
         {
           "claim": "Pure scaling will contribute less than 50% of capability gains by 2027",
@@ -435,7 +435,7 @@
         "AlphaGo/AlphaZero approach can enhance LLMs through integrated search",
         "Understanding environment models is key to AGI alignment and safety"
       ],
-      "novel_arguments_and_concepts": "Hassabis proposes a unified theory of general intelligence that combines scaling with structured reasoning. Rather than pure scaling or pure symbolic systems, he argues for hybrid architectures where learned models enable more efficient search and planning. The 'world model' concept is central\u2014the idea that intelligent systems must learn and maintain implicit models of how the world works, then use these for planning. He suggests that AlphaZero's approach to planning through learned evaluation functions and tree search provides a template for enhancing LLMs with more structured reasoning. The integration of AlphaFold's structured protein modeling with language understanding represents a proof-of-concept for this hybrid approach. Hassabis introduces the view that scaling language models alone will plateau, and that major breakthroughs will come from integrating multiple computational paradigms\u2014similar to how human cognition combines intuition with deliberation. This challenges the pure-scaling narrative dominating recent AI.",
+      "novel_arguments_and_concepts": "Hassabis proposes a unified theory of general intelligence that combines scaling with structured reasoning. Rather than pure scaling or pure symbolic systems, he argues for hybrid architectures where learned models enable more efficient search and planning. The 'world model' concept is central—the idea that intelligent systems must learn and maintain implicit models of how the world works, then use these for planning. He suggests that AlphaZero's approach to planning through learned evaluation functions and tree search provides a template for enhancing LLMs with more structured reasoning. The integration of AlphaFold's structured protein modeling with language understanding represents a proof-of-concept for this hybrid approach. Hassabis introduces the view that scaling language models alone will plateau, and that major breakthroughs will come from integrating multiple computational paradigms—similar to how human cognition combines intuition with deliberation. This challenges the pure-scaling narrative dominating recent AI.",
       "predictions": [
         {
           "claim": "Hybrid architectures combining LLMs with search will exceed pure LLM performance on reasoning tasks",
@@ -536,7 +536,7 @@
         "Historical precedent (Rome, Augustus) shows dominance through openness",
         "Closed models' advantages are temporary and will erode"
       ],
-      "novel_arguments_and_concepts": "Zuckerberg presents an economic thesis that open source models create more strategic value than closed ones through ecosystem network effects. Unlike traditional software where source code is proprietary, he argues that open AI models benefit the deployer (Meta) through ubiquity and standardization. The 'Caesar Augustus' metaphor\u2014where power comes through building an empire others want to join rather than through walls\u2014shapes his strategic vision. Zuckerberg proposes that as open models become standard, Meta benefits from being the default foundation upon which all other AI development occurs. He reframes the $10B investment from a cost (vs. competitors) into an investment in becoming the infrastructural standard. This challenges the assumption that AI dominance requires proprietary advantages; instead, dominance comes through becoming indispensable to the ecosystem. The argument implies that open source is not altruism but strategic positioning.",
+      "novel_arguments_and_concepts": "Zuckerberg presents an economic thesis that open source models create more strategic value than closed ones through ecosystem network effects. Unlike traditional software where source code is proprietary, he argues that open AI models benefit the deployer (Meta) through ubiquity and standardization. The 'Caesar Augustus' metaphor—where power comes through building an empire others want to join rather than through walls—shapes his strategic vision. Zuckerberg proposes that as open models become standard, Meta benefits from being the default foundation upon which all other AI development occurs. He reframes the $10B investment from a cost (vs. competitors) into an investment in becoming the infrastructural standard. This challenges the assumption that AI dominance requires proprietary advantages; instead, dominance comes through becoming indispensable to the ecosystem. The argument implies that open source is not altruism but strategic positioning.",
       "predictions": [
         {
           "claim": "Open source models will capture majority of AI market by 2027",
@@ -636,7 +636,7 @@
         "Current coding skill sets will become less valuable; design skills more valuable",
         "Meta's advantage comes from having best AI for internal infrastructure"
       ],
-      "novel_arguments_and_concepts": "Zuckerberg presents a vision of AI-native software engineering where human engineers become architects and verifiers rather than implementers. This represents a shift from traditional programming toward high-level specification and quality control. The concept of 'agentic workflows' suggests AI systems that can autonomously handle entire development tasks with human oversight. He argues this isn't just a productivity multiplier but a fundamental reorganization of how companies build software. The prediction implies that coding skill\u2014traditionally the primary value of engineers\u2014becomes commodified by AI, forcing the field to reorganize around design, systems thinking, and verification. Meta's massive AI infrastructure investment is framed as necessary infrastructure for this transition. This challenges assumptions about software engineering remaining human-intensive.",
+      "novel_arguments_and_concepts": "Zuckerberg presents a vision of AI-native software engineering where human engineers become architects and verifiers rather than implementers. This represents a shift from traditional programming toward high-level specification and quality control. The concept of 'agentic workflows' suggests AI systems that can autonomously handle entire development tasks with human oversight. He argues this isn't just a productivity multiplier but a fundamental reorganization of how companies build software. The prediction implies that coding skill—traditionally the primary value of engineers—becomes commodified by AI, forcing the field to reorganize around design, systems thinking, and verification. Meta's massive AI infrastructure investment is framed as necessary infrastructure for this transition. This challenges assumptions about software engineering remaining human-intensive.",
       "predictions": [
         {
           "claim": "AI generates 50%+ of Meta code by mid-2026",
@@ -716,7 +716,7 @@
       "affiliation": "SSI (Safety and Superintelligence Institute)",
       "affiliation_at_time": "Founder and Chief Researcher",
       "role_category": "safety_researcher",
-      "summary": "Ilya Sutskever, former Chief Scientist at OpenAI and founder of SSI (Safety and Superintelligence Institute), discusses the transition from scaling-driven AI development to research-driven innovation. He articulates why scaling laws are reaching their limits and what comes next\u2014arguing that major breakthroughs will require fundamental research into model generalization, reasoning, and alignment. Sutskever covers the challenge of reinforcement learning at scale and why current approaches may be insufficient for AGI. He discusses his departure from OpenAI and the reasoning behind founding SSI, framed around the necessity of solving alignment before developing superintelligence. The conversation emphasizes that the next era requires deeper understanding of how models generalize and reason, rather than simply increasing parameters and data.",
+      "summary": "Ilya Sutskever, former Chief Scientist at OpenAI and founder of SSI (Safety and Superintelligence Institute), discusses the transition from scaling-driven AI development to research-driven innovation. He articulates why scaling laws are reaching their limits and what comes next—arguing that major breakthroughs will require fundamental research into model generalization, reasoning, and alignment. Sutskever covers the challenge of reinforcement learning at scale and why current approaches may be insufficient for AGI. He discusses his departure from OpenAI and the reasoning behind founding SSI, framed around the necessity of solving alignment before developing superintelligence. The conversation emphasizes that the next era requires deeper understanding of how models generalize and reason, rather than simply increasing parameters and data.",
       "key_claims_and_positions": [
         "Scaling laws are hitting diminishing returns; we're moving from scaling era to research era",
         "Model generalization remains poorly understood and is the key limiting factor",
@@ -726,7 +726,7 @@
         "Research breakthroughs, not engineering, will drive next capabilities leap",
         "Superintelligence development without alignment solution is existentially dangerous"
       ],
-      "novel_arguments_and_concepts": "Sutskever introduces the framework of 'the age of research' following 'the age of scaling'\u2014a fundamental shift in how AI progress happens. Rather than incremental scaling producing incremental gains, major advances now require theoretical breakthroughs in understanding generalization, abstraction, and reasoning. He emphasizes that current RL approaches for training models may be fundamentally limited\u2014that we may need new paradigms for training that go beyond next-token prediction and reward maximization. Sutskever's founding of SSI represents a conviction that safety research must be decoupled from capabilities scaling to receive adequate focus. He introduces the concept that alignment difficulty is not necessarily intractable but requires dedicated research equivalent to what enabled scaling. The argument challenges the assumption that more data and compute solve everything; instead, fundamental understanding becomes the bottleneck.",
+      "novel_arguments_and_concepts": "Sutskever introduces the framework of 'the age of research' following 'the age of scaling'—a fundamental shift in how AI progress happens. Rather than incremental scaling producing incremental gains, major advances now require theoretical breakthroughs in understanding generalization, abstraction, and reasoning. He emphasizes that current RL approaches for training models may be fundamentally limited—that we may need new paradigms for training that go beyond next-token prediction and reward maximization. Sutskever's founding of SSI represents a conviction that safety research must be decoupled from capabilities scaling to receive adequate focus. He introduces the concept that alignment difficulty is not necessarily intractable but requires dedicated research equivalent to what enabled scaling. The argument challenges the assumption that more data and compute solve everything; instead, fundamental understanding becomes the bottleneck.",
       "predictions": [
         {
           "claim": "AGI timelines will be slower than 2024-2025 predictions suggested",
@@ -822,12 +822,12 @@
         "AGI is achievable by 2027 with high probability given current scaling trends",
         "Geopolitical competition will likely accelerate timelines beyond technical optimums",
         "AI lab cybersecurity is alarmingly inadequate for magnitude of capabilities at stake",
-        "The 'project' concept\u2014coordinated mega-scale development\u2014describes actual trends",
+        "The 'project' concept—coordinated mega-scale development—describes actual trends",
         "Democratic institutions cannot govern AGI development at required speed",
         "Existential risk from AGI is significant and inadequately addressed",
         "Safety-capabilities trade-offs are forced by competitive dynamics"
       ],
-      "novel_arguments_and_concepts": "Aschenbrenner's 'Situational Awareness' framework reintroduces history into AI discourse\u2014arguing that precedents from the atomic bomb, space race, and strategic weapons development provide relevant parallels. He proposes that the structure of competition for AGI parallels arms races, where safety concerns are systematically deprioritized through competitive pressure. The 'project' concept describes not a conspiracy but an inevitable response to AGI incentives\u2014where massive resources coordinate toward capability development. He introduces the argument that cybersecurity at AI labs represents a critical vulnerability; that state actors or sophisticated adversaries could steal frontier models, dramatically accelerating proliferation and reducing time for safety work. Aschenbrenner argues that the velocity of AGI development means institutional responses will lag technological development, creating a dangerous gap. The historical analogy suggests that without dramatic intervention, markets and competition will drive AGI development in directions optimizing for speed over safety.",
+      "novel_arguments_and_concepts": "Aschenbrenner's 'Situational Awareness' framework reintroduces history into AI discourse—arguing that precedents from the atomic bomb, space race, and strategic weapons development provide relevant parallels. He proposes that the structure of competition for AGI parallels arms races, where safety concerns are systematically deprioritized through competitive pressure. The 'project' concept describes not a conspiracy but an inevitable response to AGI incentives—where massive resources coordinate toward capability development. He introduces the argument that cybersecurity at AI labs represents a critical vulnerability; that state actors or sophisticated adversaries could steal frontier models, dramatically accelerating proliferation and reducing time for safety work. Aschenbrenner argues that the velocity of AGI development means institutional responses will lag technological development, creating a dangerous gap. The historical analogy suggests that without dramatic intervention, markets and competition will drive AGI development in directions optimizing for speed over safety.",
       "predictions": [
         {
           "claim": "AGI-level systems achievable by 2027",
@@ -925,7 +925,7 @@
       "affiliation": "DeepMind",
       "affiliation_at_time": "Co-founder and Chief AGI Scientist",
       "role_category": "lab_leader",
-      "summary": "Shane Legg, DeepMind's Chief AGI Scientist and co-founder, discusses AGI timelines and capabilities. He predicts a 50% probability of AGI by 2028, based on extrapolating current progress. The conversation covers alignment of superhuman AI systems, questioning whether current alignment approaches (like RLHF) will work for superintelligent systems. Legg discusses the necessity of moving beyond transformer architectures toward new paradigms, suggesting that current models may hit scaling plateaus requiring architectural innovations. He explores what superhuman alignment might look like\u2014whether it requires understanding of model internals or if behavioral alignment suffices. The episode touches on the transition from scaling-era to research-era thinking.",
+      "summary": "Shane Legg, DeepMind's Chief AGI Scientist and co-founder, discusses AGI timelines and capabilities. He predicts a 50% probability of AGI by 2028, based on extrapolating current progress. The conversation covers alignment of superhuman AI systems, questioning whether current alignment approaches (like RLHF) will work for superintelligent systems. Legg discusses the necessity of moving beyond transformer architectures toward new paradigms, suggesting that current models may hit scaling plateaus requiring architectural innovations. He explores what superhuman alignment might look like—whether it requires understanding of model internals or if behavioral alignment suffices. The episode touches on the transition from scaling-era to research-era thinking.",
       "key_claims_and_positions": [
         "50% probability of AGI by 2028 based on scaling extrapolation",
         "Current alignment approaches (RLHF) may not scale to superhuman systems",
@@ -935,7 +935,7 @@
         "Understanding model internals may be essential for superhuman alignment",
         "Post-AGI systems may require entirely different governance approaches"
       ],
-      "novel_arguments_and_concepts": "Legg presents AGI timelines as dependent on extrapolating current scaling trends, offering 2028 as a medium-term estimate rather than long-tail speculation. He challenges assumptions that RLHF and similar behavioral techniques will work for superintelligent systems\u2014arguing that as systems become smarter than human trainers, behavioral alignment becomes epistemologically difficult. The concept of 'alignment of superintelligence' he emphasizes is fundamentally different from aligning current systems: you cannot use human judgment to correct a system smarter than humans. Legg suggests that new architectures beyond transformers will be necessary, implying both progress and risk\u2014new paradigms enable capability leaps but create alignment challenges. He introduces the problem that scaling assumptions may break down (architectural limits) right as systems approach AGI, compressing the timeline for alignment work.",
+      "novel_arguments_and_concepts": "Legg presents AGI timelines as dependent on extrapolating current scaling trends, offering 2028 as a medium-term estimate rather than long-tail speculation. He challenges assumptions that RLHF and similar behavioral techniques will work for superintelligent systems—arguing that as systems become smarter than human trainers, behavioral alignment becomes epistemologically difficult. The concept of 'alignment of superintelligence' he emphasizes is fundamentally different from aligning current systems: you cannot use human judgment to correct a system smarter than humans. Legg suggests that new architectures beyond transformers will be necessary, implying both progress and risk—new paradigms enable capability leaps but create alignment challenges. He introduces the problem that scaling assumptions may break down (architectural limits) right as systems approach AGI, compressing the timeline for alignment work.",
       "predictions": [
         {
           "claim": "50% probability of AGI by 2028",
@@ -1036,7 +1036,7 @@
         "Post-training is underrated compared to pre-training; RL progress will dominate next era",
         "Alignment challenges are solvable through better reward modeling"
       ],
-      "novel_arguments_and_concepts": "Schulman argues for RL as the fundamental next phase of AI development\u2014that once base models are sufficiently capable, scaling RL on diverse tasks produces reasoning and planning abilities. He introduces the concept of 'process-based rewards' versus 'outcome-based rewards'\u2014the former can critique reasoning steps rather than just final answers, enabling better scaling. The argument that reward modeling can scale to superhuman domains is crucial: humans need not be able to solve tasks, only to recognize when AI solutions are correct. Schulman's optimism rests on the premise that RL applied at scale to model behaviors produces emergent reasoning and planning. He frames post-training as the frontier for capability progress, implying that future progress depends less on new architectures and more on sophisticated training objectives.",
+      "novel_arguments_and_concepts": "Schulman argues for RL as the fundamental next phase of AI development—that once base models are sufficiently capable, scaling RL on diverse tasks produces reasoning and planning abilities. He introduces the concept of 'process-based rewards' versus 'outcome-based rewards'—the former can critique reasoning steps rather than just final answers, enabling better scaling. The argument that reward modeling can scale to superhuman domains is crucial: humans need not be able to solve tasks, only to recognize when AI solutions are correct. Schulman's optimism rests on the premise that RL applied at scale to model behaviors produces emergent reasoning and planning. He frames post-training as the frontier for capability progress, implying that future progress depends less on new architectures and more on sophisticated training objectives.",
       "predictions": [
         {
           "claim": "RL scaling will produce reasoning and planning capabilities approaching AGI-level by 2027",
@@ -1127,7 +1127,7 @@
       "affiliation": "ARC (Alignment Research Center)",
       "affiliation_at_time": "Founder",
       "role_category": "safety_researcher",
-      "summary": "Paul Christiano, founder of the Alignment Research Center, discusses AI takeover scenarios and alignment approaches to prevent them. He explores technical alignment challenges\u2014particularly RLHF limitations for superhuman systems and the scalable oversight problem. Christiano argues that current techniques like RLHF will not scale to superintelligent systems and that alternatives like recursive reward modeling and delegation are necessary. The conversation covers his research on scalable AI oversight, how to maintain human understanding and control of increasingly capable systems. Christiano emphasizes the 'alignment tax'\u2014the cost of alignment work\u2014and how market incentives might work against thorough alignment research. He discusses both technical solutions and governance approaches to AI takeover prevention.",
+      "summary": "Paul Christiano, founder of the Alignment Research Center, discusses AI takeover scenarios and alignment approaches to prevent them. He explores technical alignment challenges—particularly RLHF limitations for superhuman systems and the scalable oversight problem. Christiano argues that current techniques like RLHF will not scale to superintelligent systems and that alternatives like recursive reward modeling and delegation are necessary. The conversation covers his research on scalable AI oversight, how to maintain human understanding and control of increasingly capable systems. Christiano emphasizes the 'alignment tax'—the cost of alignment work—and how market incentives might work against thorough alignment research. He discusses both technical solutions and governance approaches to AI takeover prevention.",
       "key_claims_and_positions": [
         "RLHF will not scale to superintelligent systems; we need fundamentally different approaches",
         "Scalable oversight is a solvable technical problem with sufficient research",
@@ -1137,7 +1137,7 @@
         "AI takeover risk is significant and requires dedicated technical research",
         "Transparency and interpretability are crucial but not sufficient for control"
       ],
-      "novel_arguments_and_concepts": "Christiano introduces the 'scalable oversight' framework\u2014the idea that humans can maintain control of increasingly capable systems through hierarchical delegation and verification procedures. Rather than humans directly approving all AI decisions (which doesn't scale), the system learns to break tasks into human-verifiable subtasks. Recursive reward modeling is his key concept: building models of how to verify that superhuman systems are aligned, then training those verification systems using RL. The 'alignment tax' concept explains why markets might underinvest in alignment\u2014companies that cut alignment corners gain competitive advantage, creating a race-to-the-bottom dynamic. Christiano emphasizes that alignment is technically tractable but institutionally difficult; governance solutions (like mandatory alignment practices) may be necessary to prevent competitive pressure from degrading safety.",
+      "novel_arguments_and_concepts": "Christiano introduces the 'scalable oversight' framework—the idea that humans can maintain control of increasingly capable systems through hierarchical delegation and verification procedures. Rather than humans directly approving all AI decisions (which doesn't scale), the system learns to break tasks into human-verifiable subtasks. Recursive reward modeling is his key concept: building models of how to verify that superhuman systems are aligned, then training those verification systems using RL. The 'alignment tax' concept explains why markets might underinvest in alignment—companies that cut alignment corners gain competitive advantage, creating a race-to-the-bottom dynamic. Christiano emphasizes that alignment is technically tractable but institutionally difficult; governance solutions (like mandatory alignment practices) may be necessary to prevent competitive pressure from degrading safety.",
       "predictions": [
         {
           "claim": "RLHF will prove insufficient for superhuman AI control within 2-5 years",
@@ -1234,7 +1234,7 @@
       "affiliation": "MIRI (Machine Intelligence Research Institute)",
       "affiliation_at_time": "Research Fellow",
       "role_category": "safety_researcher",
-      "summary": "Eliezer Yudkowsky, long-time AI safety researcher, presents arguments for why advanced AI systems present existential risks. He discusses the difficulty of alignment\u2014that specifying and maintaining human values in superintelligent systems is harder than commonly assumed. Yudkowsky critiques LLM-based approaches as unlikely to produce AGI safely, arguing that current scaling paradigms may be fundamentally limited. The conversation covers the nature of intelligence, instrumental convergence (the idea that diverse goals lead to similar instrumental strategies), and why superintelligent systems may pursue goals misaligned with human values. Yudkowsky emphasizes that alignment is not a technical detail but a central challenge requiring new theory and approaches. He discusses the 'pivotal act' concept\u2014the idea that the first superintelligence may act decisively to reshape the world according to its values.",
+      "summary": "Eliezer Yudkowsky, long-time AI safety researcher, presents arguments for why advanced AI systems present existential risks. He discusses the difficulty of alignment—that specifying and maintaining human values in superintelligent systems is harder than commonly assumed. Yudkowsky critiques LLM-based approaches as unlikely to produce AGI safely, arguing that current scaling paradigms may be fundamentally limited. The conversation covers the nature of intelligence, instrumental convergence (the idea that diverse goals lead to similar instrumental strategies), and why superintelligent systems may pursue goals misaligned with human values. Yudkowsky emphasizes that alignment is not a technical detail but a central challenge requiring new theory and approaches. He discusses the 'pivotal act' concept—the idea that the first superintelligence may act decisively to reshape the world according to its values.",
       "key_claims_and_positions": [
         "AI existential risk is substantial and inadequately addressed",
         "RLHF and behavioral approaches will not solve alignment for superintelligence",
@@ -1244,7 +1244,7 @@
         "The first superintelligence's actions may be effectively final for humanity",
         "New alignment theory and approaches are needed; current methods insufficient"
       ],
-      "novel_arguments_and_concepts": "Yudkowsky's core argument rests on instrumental convergence\u2014the observation that superintelligent systems pursuing many different goals will converge on similar instrumental sub-goals (like resource acquisition, self-preservation). This means even minor misalignment in goals produces concerning behaviors. He argues that value specification is exponentially harder than capability specification\u2014humans have trouble precisely articulating their values, and AI systems will optimize hard for whatever we do specify. The 'pivotal act' concept implies that superintelligence may act decisively before humans can course-correct, making alignment work pre-deployment critical. Yudkowsky is skeptical of LLM-based AGI, arguing that scaling language models will not produce the kind of robust goal-directed agency required for AGI or the kind of alignment that would prevent misalignment. He frames alignment as a research problem requiring theoretical breakthroughs, not engineering solutions.",
+      "novel_arguments_and_concepts": "Yudkowsky's core argument rests on instrumental convergence—the observation that superintelligent systems pursuing many different goals will converge on similar instrumental sub-goals (like resource acquisition, self-preservation). This means even minor misalignment in goals produces concerning behaviors. He argues that value specification is exponentially harder than capability specification—humans have trouble precisely articulating their values, and AI systems will optimize hard for whatever we do specify. The 'pivotal act' concept implies that superintelligence may act decisively before humans can course-correct, making alignment work pre-deployment critical. Yudkowsky is skeptical of LLM-based AGI, arguing that scaling language models will not produce the kind of robust goal-directed agency required for AGI or the kind of alignment that would prevent misalignment. He frames alignment as a research problem requiring theoretical breakthroughs, not engineering solutions.",
       "predictions": [
         {
           "claim": "Current LLM-based approaches will not scale to safe superintelligence",
@@ -1358,7 +1358,7 @@
         "Yudkowsky: One misaligned superintelligence may be effectively permanent",
         "Hotz: Over-caution on AI prevents beneficial capability development"
       ],
-      "novel_arguments_and_concepts": "The debate exemplifies the fundamental schism in AI discourse between pragmatists (Hotz) and pessimists (Yudkowsky). Hotz argues that AGI development is inevitable and that trying to slow it is counterproductive; better to develop openly with distributed safety measures. Yudkowsky counters that superintelligence is not like other technologies\u2014one instance of a misaligned superintelligence could effectively end human autonomy. The debate hinges on empirical disagreement about alignment tractability and about risk distribution: does decentralized development increase or decrease safety? They also disagree about whether humans can maintain control of superintelligent systems. Hotz emphasizes human adaptability and learning; Yudkowsky emphasizes the asymmetry where superintelligence gets one chance to act before humans can respond.",
+      "novel_arguments_and_concepts": "The debate exemplifies the fundamental schism in AI discourse between pragmatists (Hotz) and pessimists (Yudkowsky). Hotz argues that AGI development is inevitable and that trying to slow it is counterproductive; better to develop openly with distributed safety measures. Yudkowsky counters that superintelligence is not like other technologies—one instance of a misaligned superintelligence could effectively end human autonomy. The debate hinges on empirical disagreement about alignment tractability and about risk distribution: does decentralized development increase or decrease safety? They also disagree about whether humans can maintain control of superintelligent systems. Hotz emphasizes human adaptability and learning; Yudkowsky emphasizes the asymmetry where superintelligence gets one chance to act before humans can respond.",
       "predictions": [
         {
           "claim": "Hotz's open approach will either prove safe or catastrophic within 5-10 years",
@@ -1440,7 +1440,7 @@
       "affiliation": "Anthropic",
       "affiliation_at_time": "Researchers",
       "role_category": "safety_researcher",
-      "summary": "Sholto Douglas and Trenton Bricken, Anthropic researchers working on mechanistic interpretability, discuss understanding and building large language models. They explain techniques for decomposing model behavior into interpretable circuits\u2014understanding how information flows through the network and produces outputs. The conversation covers scaling mechanistic interpretability from toy models to GPT-scale systems, and whether this understanding is feasible for systems like GPT-7. They discuss implications for alignment: if models can be fully understood at the circuit level, this enables safer control. The episode provides technical detail on how interpretability research enables building more trustworthy and aligned systems. Douglas and Bricken present interpretability as a practically achievable path to superhuman system control.",
+      "summary": "Sholto Douglas and Trenton Bricken, Anthropic researchers working on mechanistic interpretability, discuss understanding and building large language models. They explain techniques for decomposing model behavior into interpretable circuits—understanding how information flows through the network and produces outputs. The conversation covers scaling mechanistic interpretability from toy models to GPT-scale systems, and whether this understanding is feasible for systems like GPT-7. They discuss implications for alignment: if models can be fully understood at the circuit level, this enables safer control. The episode provides technical detail on how interpretability research enables building more trustworthy and aligned systems. Douglas and Bricken present interpretability as a practically achievable path to superhuman system control.",
       "key_claims_and_positions": [
         "Mechanistic interpretability is scalable to large models with dedicated effort",
         "Understanding model circuits enables predicting and controlling behavior",
@@ -1450,7 +1450,7 @@
         "Understanding models enables safety improvements and capability control",
         "Circuit-level understanding will be feasible before superintelligence"
       ],
-      "novel_arguments_and_concepts": "Douglas and Bricken argue for a specific research program in mechanistic interpretability\u2014understanding how neural networks perform computations at the circuit level rather than treating them as black boxes. They propose that as we understand model internals, we can identify failure modes, verify alignment, and control capability deployment. The key insight is that understanding is achievable through systematic decomposition of computation into smaller components. They argue this is not philosophical but engineering\u2014similar to reverse-engineering a physical system. The claim is that interpretability research scales with effort, and with dedicated teams, GPT-scale understanding is within reach. This contrasts with pessimism about controlling superintelligence; interpretability suggests the possibility of structural understanding enabling control.",
+      "novel_arguments_and_concepts": "Douglas and Bricken argue for a specific research program in mechanistic interpretability—understanding how neural networks perform computations at the circuit level rather than treating them as black boxes. They propose that as we understand model internals, we can identify failure modes, verify alignment, and control capability deployment. The key insight is that understanding is achievable through systematic decomposition of computation into smaller components. They argue this is not philosophical but engineering—similar to reverse-engineering a physical system. The claim is that interpretability research scales with effort, and with dedicated teams, GPT-scale understanding is within reach. This contrasts with pessimism about controlling superintelligence; interpretability suggests the possibility of structural understanding enabling control.",
       "predictions": [
         {
           "claim": "Mechanistic interpretability will become practical for large models within 3-5 years",
@@ -1542,7 +1542,7 @@
       "affiliation": "Anthropic",
       "affiliation_at_time": "Researchers",
       "role_category": "safety_researcher",
-      "summary": "Douglas and Bricken return to discuss mechanistic interpretability advances since their 2024 appearance, now with findings from Claude 4. They present concrete discoveries about how Claude 4 thinks\u2014specific circuits for reasoning, language understanding, and planning. The conversation covers successes in interpreting larger models, progress toward full model understanding, and implications for alignment. They discuss what they've learned about model architectures from interpretability work and how this understanding informs capability improvements. The episode represents advancement in their research program, showing that circuit-level understanding is increasingly practical even at large scale. They discuss safety implications of understanding Claude's internals.",
+      "summary": "Douglas and Bricken return to discuss mechanistic interpretability advances since their 2024 appearance, now with findings from Claude 4. They present concrete discoveries about how Claude 4 thinks—specific circuits for reasoning, language understanding, and planning. The conversation covers successes in interpreting larger models, progress toward full model understanding, and implications for alignment. They discuss what they've learned about model architectures from interpretability work and how this understanding informs capability improvements. The episode represents advancement in their research program, showing that circuit-level understanding is increasingly practical even at large scale. They discuss safety implications of understanding Claude's internals.",
       "key_claims_and_positions": [
         "Mechanistic interpretability is now practical for frontier models",
         "Claude 4 has identifiable circuits for reasoning and planning",
@@ -1720,7 +1720,7 @@
         "Research culture focused on fundamental breakthroughs drives capability advances",
         "Compute efficiency will be critical competitive factor going forward"
       ],
-      "novel_arguments_and_concepts": "Dean and Shazeer present Google's trajectory as a series of architectural innovations\u2014each enabling new capabilities beyond what pure scaling could achieve. They argue that transformers were revolutionary but not final, and that MoE (mixture of experts) represents the next paradigm enabling more efficient scaling. The Pathways framework aims at unified systems that can handle multiple modalities and tasks efficiently. They emphasize that Google's advantage comes from research breakthroughs combined with compute resources, not just scale. The conversation suggests that architectural innovation and efficiency will dominate the next era more than raw scale.",
+      "novel_arguments_and_concepts": "Dean and Shazeer present Google's trajectory as a series of architectural innovations—each enabling new capabilities beyond what pure scaling could achieve. They argue that transformers were revolutionary but not final, and that MoE (mixture of experts) represents the next paradigm enabling more efficient scaling. The Pathways framework aims at unified systems that can handle multiple modalities and tasks efficiently. They emphasize that Google's advantage comes from research breakthroughs combined with compute resources, not just scale. The conversation suggests that architectural innovation and efficiency will dominate the next era more than raw scale.",
       "predictions": [
         {
           "claim": "MoE scaling will supersede dense model scaling as primary approach",
@@ -1811,7 +1811,7 @@
         "Economic integration challenges will stretch timelines for AI impact",
         "Institutional friction may prevent AGI timelines from being as fast as technical capability suggests"
       ],
-      "novel_arguments_and_concepts": "Cowen introduces institutional economics into AI discourse, arguing that discussions of timelines and impact often ignore organizational constraints. He emphasizes cost disease\u2014the tendency for institutional services to become more expensive without proportional quality improvement. This suggests that even as AI becomes more capable, institutions may struggle to deploy it. The talent scarcity argument is that data work, evaluation, integration, and oversight require human expertise that is scarce and expensive. He suggests AGI development may be technically feasible but economically or organizationally infeasible at the expected pace. This challenges techno-optimist timelines; even if capabilities develop quickly, the economy may be unable to use them at those speeds.",
+      "novel_arguments_and_concepts": "Cowen introduces institutional economics into AI discourse, arguing that discussions of timelines and impact often ignore organizational constraints. He emphasizes cost disease—the tendency for institutional services to become more expensive without proportional quality improvement. This suggests that even as AI becomes more capable, institutions may struggle to deploy it. The talent scarcity argument is that data work, evaluation, integration, and oversight require human expertise that is scarce and expensive. He suggests AGI development may be technically feasible but economically or organizationally infeasible at the expected pace. This challenges techno-optimist timelines; even if capabilities develop quickly, the economy may be unable to use them at those speeds.",
       "predictions": [
         {
           "claim": "Human and institutional bottlenecks will be more limiting than technical ones",
@@ -1907,7 +1907,7 @@
         "Compute cost reduction is critical bottleneck more than raw capability",
         "Vertical integration from rockets to compute to AI is strategic advantage"
       ],
-      "novel_arguments_and_concepts": "Musk introduces orbital computing as a neglected dimension of the AI race\u2014rather than competing on algorithms or training approaches, xAI focuses on radically cheaper compute infrastructure. The argument is that heat dissipation in dense terrestrial compute requires expensive cooling, while space enables passive cooling through radiation. This could provide 10-100x cost advantage for compute-intensive training. He frames AI progress as fundamentally constrained by compute economics, making infrastructure innovation as important as algorithmic innovation. The vertical integration vision (SpaceX rockets enabling orbital infrastructure for xAI) represents a distinctive strategy of making compute the bottleneck-breaking advantage.",
+      "novel_arguments_and_concepts": "Musk introduces orbital computing as a neglected dimension of the AI race—rather than competing on algorithms or training approaches, xAI focuses on radically cheaper compute infrastructure. The argument is that heat dissipation in dense terrestrial compute requires expensive cooling, while space enables passive cooling through radiation. This could provide 10-100x cost advantage for compute-intensive training. He frames AI progress as fundamentally constrained by compute economics, making infrastructure innovation as important as algorithmic innovation. The vertical integration vision (SpaceX rockets enabling orbital infrastructure for xAI) represents a distinctive strategy of making compute the bottleneck-breaking advantage.",
       "predictions": [
         {
           "claim": "Orbital compute will be cost-competitive with terrestrial within 3 years",
@@ -1998,7 +1998,7 @@
         "Quantum breakthroughs are near and will impact AI development",
         "Microsoft's scale and infrastructure create sustainable competitive advantage"
       ],
-      "novel_arguments_and_concepts": "Nadella positions Microsoft as infrastructure partner rather than direct competitor in AI models\u2014benefiting from OpenAI's capabilities while providing the compute infrastructure necessary for frontier development. He emphasizes that quantum computing, long speculative, is approaching practical applicability and will radically improve AI optimization. The argument is that compute infrastructure bottlenecks AI progress more than algorithmic innovation, and Microsoft's scale in datacenters and quantum research positions it advantageously. He presents integrated approach where Microsoft's enterprise products incorporate AI capabilities from OpenAI while Microsoft's infrastructure enables that capability development.",
+      "novel_arguments_and_concepts": "Nadella positions Microsoft as infrastructure partner rather than direct competitor in AI models—benefiting from OpenAI's capabilities while providing the compute infrastructure necessary for frontier development. He emphasizes that quantum computing, long speculative, is approaching practical applicability and will radically improve AI optimization. The argument is that compute infrastructure bottlenecks AI progress more than algorithmic innovation, and Microsoft's scale in datacenters and quantum research positions it advantageously. He presents integrated approach where Microsoft's enterprise products incorporate AI capabilities from OpenAI while Microsoft's infrastructure enables that capability development.",
       "predictions": [
         {
           "claim": "Quantum computing will provide meaningful advantage for AI optimization within 3-5 years",
@@ -2094,7 +2094,7 @@
         "World models and planning integrated with embodiment are crucial",
         "Scaling current models will hit severe diminishing returns toward AGI"
       ],
-      "novel_arguments_and_concepts": "Karpathy argues that recent impressive capabilities of language models obscure fundamental limitations. He emphasizes that AGI requires understanding the physical world through embodied interaction, not just language understanding. The concept of persistent learning contrasts with current training approaches: AGI systems must continually improve from experience, not be static after training. He argues that world models\u2014mental simulations of how the world works\u2014are necessary for AGI reasoning and planning but are underdeveloped in current systems. Karpathy's core argument is that language is necessary but insufficient for AGI; embodiment and continuous grounding in reality are necessary. This positions AGI as farther away than scaling curves suggest.",
+      "novel_arguments_and_concepts": "Karpathy argues that recent impressive capabilities of language models obscure fundamental limitations. He emphasizes that AGI requires understanding the physical world through embodied interaction, not just language understanding. The concept of persistent learning contrasts with current training approaches: AGI systems must continually improve from experience, not be static after training. He argues that world models—mental simulations of how the world works—are necessary for AGI reasoning and planning but are underdeveloped in current systems. Karpathy's core argument is that language is necessary but insufficient for AGI; embodiment and continuous grounding in reality are necessary. This positions AGI as farther away than scaling curves suggest.",
       "predictions": [
         {
           "claim": "AGI will require embodied systems integrated with learning capabilities",
@@ -3114,7 +3114,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "N/A",
+      "url": "https://www.meta.com/research/",
       "affiliation": "Meta AI Research (FAIR)",
       "affiliation_at_time": "Research Scientist",
       "role_category": "capabilities_researcher",
@@ -3182,7 +3182,7 @@
         "guest_affiliation": "https://www.meta.com/research/"
       },
       "transcript_available": true,
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed unresolved 404 source_links: https://www.dwarkesh.com/p/noam-brown"
     },
     {
@@ -3561,7 +3561,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "N/A",
+      "url": "https://www.dwarkesh.com/p/nat-friedman",
       "affiliation": "Nat Friedman (GitHub CEO); Daniel Gross (AI investor)",
       "affiliation_at_time": "Tech Executives / Investors",
       "role_category": "investor_strategist",
@@ -3625,9 +3625,11 @@
         "dwarkesh_027",
         "dwarkesh_032"
       ],
-      "source_links": {},
+      "source_links": {
+        "primary": "https://www.dwarkesh.com/p/nat-friedman"
+      },
       "transcript_available": true,
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed unresolved 404 source_links: https://www.dwarkesh.com/p/nat-friedman-daniel-gross"
     },
     {
@@ -3797,7 +3799,7 @@
         "Constitutional AI provides practical path toward beneficial advanced AI",
         "Both doomerism and naive acceleration are strategic errors"
       ],
-      "novel_arguments_and_concepts": "Amodei's central innovation is reframing AI safety discourse away from binary outcomes (beneficial superintelligence vs. catastrophe) toward concrete domain-specific impact assessment. Rather than abstract debates about AGI or existential risk, he examines how AI scaling directly translates to measurable progress in specific fields like structural biology, disease modeling, and economic analysis. He introduces the concept that the absence of a detailed positive vision creates a strategic vulnerability for safety advocates, as it allows the field to be defined by either technological inevitability (accelerationist perspective) or catastrophic risk (doomer perspective). This framing implies that Anthropic's approach\u2014developing capable AI systems alongside safety techniques\u2014serves not only as risk mitigation but as the primary path to realizing AI's constructive potential. The essay also critiques what Amodei sees as insufficient engagement with how AI advancement in science directly translates to human flourishing metrics.",
+      "novel_arguments_and_concepts": "Amodei's central innovation is reframing AI safety discourse away from binary outcomes (beneficial superintelligence vs. catastrophe) toward concrete domain-specific impact assessment. Rather than abstract debates about AGI or existential risk, he examines how AI scaling directly translates to measurable progress in specific fields like structural biology, disease modeling, and economic analysis. He introduces the concept that the absence of a detailed positive vision creates a strategic vulnerability for safety advocates, as it allows the field to be defined by either technological inevitability (accelerationist perspective) or catastrophic risk (doomer perspective). This framing implies that Anthropic's approach—developing capable AI systems alongside safety techniques—serves not only as risk mitigation but as the primary path to realizing AI's constructive potential. The essay also critiques what Amodei sees as insufficient engagement with how AI advancement in science directly translates to human flourishing metrics.",
       "predictions": [
         {
           "claim": "AI will enable discovery of cures for multiple currently intractable diseases within 10 years",
@@ -3978,16 +3980,16 @@
       "affiliation": "OpenAI",
       "affiliation_at_time": "CEO",
       "role_category": "lab_leader",
-      "summary": "Sam Altman's 2024 essay presents a vision of superintelligence arriving within 'a few thousand days' (roughly 5-10 years) and argues that deep learning is fundamentally sufficient for achieving AGI. The essay frames AI advancement as analogous to the agricultural and industrial revolutions in its transformative potential. Altman argues that intelligence abundance\u2014similar to how electricity abundance transformed economies\u2014will reshape civilization fundamentally. He advocates strongly for prosperity from AI to be shared broadly rather than concentrated. The essay predicts personal AI assistants that are essentially superintelligent\u2014individual users each having access to artificial minds that exceed human capability across most domains. This represents a shift from Altman's previous framing toward greater emphasis on timeline certainty and personal-scale superintelligence rather than institutional or organizational AI systems.",
+      "summary": "Sam Altman's 2024 essay presents a vision of superintelligence arriving within 'a few thousand days' (roughly 5-10 years) and argues that deep learning is fundamentally sufficient for achieving AGI. The essay frames AI advancement as analogous to the agricultural and industrial revolutions in its transformative potential. Altman argues that intelligence abundance—similar to how electricity abundance transformed economies—will reshape civilization fundamentally. He advocates strongly for prosperity from AI to be shared broadly rather than concentrated. The essay predicts personal AI assistants that are essentially superintelligent—individual users each having access to artificial minds that exceed human capability across most domains. This represents a shift from Altman's previous framing toward greater emphasis on timeline certainty and personal-scale superintelligence rather than institutional or organizational AI systems.",
       "key_claims_and_positions": [
         "Superintelligence will arrive in 'a few thousand days' (5-10 year timeframe)",
-        "Deep learning is sufficient for AGI\u2014no fundamental breakthroughs needed",
+        "Deep learning is sufficient for AGI—no fundamental breakthroughs needed",
         "Intelligence abundance will be as transformative as agricultural and industrial revolutions",
         "Personal superintelligent AI assistants are likely outcome, not institutional AI",
         "AI prosperity must be shared broadly or social instability will result",
         "The transition will be rapid and disruptive to existing institutions"
       ],
-      "novel_arguments_and_concepts": "Altman's framing of 'the intelligence age' as a historical period comparable to agricultural and industrial ages is conceptually powerful because it anchors expectations in historical precedent while being explicitly parallel. The transition from institutional AI to personal superintelligent assistants represents a notable shift from previous enterprise-focused predictions. This has implications for control and governance\u2014distributed personal systems are harder to regulate than centralized institutional ones. The 'few thousand days' timeline is notably compressed from earlier predictions and presented with greater confidence. The emphasis on abundance and distribution parallels economic arguments about whether new productive capacity concentrates or distributes wealth.",
+      "novel_arguments_and_concepts": "Altman's framing of 'the intelligence age' as a historical period comparable to agricultural and industrial ages is conceptually powerful because it anchors expectations in historical precedent while being explicitly parallel. The transition from institutional AI to personal superintelligent assistants represents a notable shift from previous enterprise-focused predictions. This has implications for control and governance—distributed personal systems are harder to regulate than centralized institutional ones. The 'few thousand days' timeline is notably compressed from earlier predictions and presented with greater confidence. The emphasis on abundance and distribution parallels economic arguments about whether new productive capacity concentrates or distributes wealth.",
       "predictions": [
         {
           "claim": "Superintelligent AI systems will exist within 5-10 years",
@@ -4083,7 +4085,7 @@
         "OpenAI will implement stronger oversight mechanisms",
         "Organizational culture must prioritize safety work"
       ],
-      "novel_arguments_and_concepts": "Altman's reflections represent a rare moment of organizational self-criticism from a major AI lab leader, acknowledging that the infrastructure for governing AGI development was inadequate. The essay implicitly supports some of the criticisms raised by departing safety researchers like Jan Leike\u2014that product velocity sometimes overshadowed safety preparation. However, Altman frames this as a correctable organizational failure rather than a fundamental conflict between safety and capability development. The reflective tone also humanizes the leadership experience in the AI field, acknowledging the difficulty of making sound decisions under massive uncertainty and pressure.",
+      "novel_arguments_and_concepts": "Altman's reflections represent a rare moment of organizational self-criticism from a major AI lab leader, acknowledging that the infrastructure for governing AGI development was inadequate. The essay implicitly supports some of the criticisms raised by departing safety researchers like Jan Leike—that product velocity sometimes overshadowed safety preparation. However, Altman frames this as a correctable organizational failure rather than a fundamental conflict between safety and capability development. The reflective tone also humanizes the leadership experience in the AI field, acknowledging the difficulty of making sound decisions under massive uncertainty and pressure.",
       "predictions": [
         {
           "claim": "OpenAI will implement enhanced board oversight mechanisms within 6 months",
@@ -4158,7 +4160,7 @@
       "affiliation": "Independent (Former OpenAI)",
       "affiliation_at_time": "Former Safety Researcher",
       "role_category": "former_insider",
-      "summary": "Leopold Aschenbrenner's 165-page 'Situational Awareness' document represents the most detailed insider account of AI development trajectories and their implications from a frontline researcher. Based on 0.5 orders of magnitude of compute growth per year, Aschenbrenner predicts AGI by 2027 with superintelligence within one year thereafter. The essay argues that the US national security establishment has fundamentally misunderstood AI's implications. Aschenbrenner details significant cybersecurity vulnerabilities in major AI labs, warning that China or other adversaries could steal weights of frontier models. The document introduces 'The Project'\u2014an inevitable government Manhattan Project for AI that will emerge once officials understand the implications. Aschenbrenner argues that traditional economic and geopolitical frameworks become obsolete if AI reaches superintelligence within the decade. The essay combines technical analysis of compute trends with geopolitical reasoning and security analysis.",
+      "summary": "Leopold Aschenbrenner's 165-page 'Situational Awareness' document represents the most detailed insider account of AI development trajectories and their implications from a frontline researcher. Based on 0.5 orders of magnitude of compute growth per year, Aschenbrenner predicts AGI by 2027 with superintelligence within one year thereafter. The essay argues that the US national security establishment has fundamentally misunderstood AI's implications. Aschenbrenner details significant cybersecurity vulnerabilities in major AI labs, warning that China or other adversaries could steal weights of frontier models. The document introduces 'The Project'—an inevitable government Manhattan Project for AI that will emerge once officials understand the implications. Aschenbrenner argues that traditional economic and geopolitical frameworks become obsolete if AI reaches superintelligence within the decade. The essay combines technical analysis of compute trends with geopolitical reasoning and security analysis.",
       "key_claims_and_positions": [
         "AGI will be achieved by approximately 2027 based on compute scaling trends",
         "Superintelligence will emerge within 1 year of AGI",
@@ -4169,10 +4171,10 @@
         "Traditional geopolitical competition becomes obsolete if superintelligence achieved",
         "Current AI safety research is insufficient for superintelligence alignment"
       ],
-      "novel_arguments_and_concepts": "Aschenbrenner's central innovation is grounding AGI timeline predictions in mathematical analysis of compute scaling rather than subjective estimates. By tracking historical growth rates (0.5 OOM/year) and projecting forward, he arrives at specific dates rather than ranges. The 'Situational Awareness' framing\u2014that current policy-makers lack the cognitive models necessary to make sound decisions\u2014is powerful because it implies current governance structures are almost certainly inadequate. The introduction of 'The Project' concept suggests that even researchers with full information recognize that extraordinary measures (government mobilization at Manhattan Project scale) will be necessary. This is more pessimistic than OpenAI's gradual deployment philosophy. The cybersecurity analysis stands out as a concrete risk factor often missing from academic AI safety discourse.",
+      "novel_arguments_and_concepts": "Aschenbrenner's central innovation is grounding AGI timeline predictions in mathematical analysis of compute scaling rather than subjective estimates. By tracking historical growth rates (0.5 OOM/year) and projecting forward, he arrives at specific dates rather than ranges. The 'Situational Awareness' framing—that current policy-makers lack the cognitive models necessary to make sound decisions—is powerful because it implies current governance structures are almost certainly inadequate. The introduction of 'The Project' concept suggests that even researchers with full information recognize that extraordinary measures (government mobilization at Manhattan Project scale) will be necessary. This is more pessimistic than OpenAI's gradual deployment philosophy. The cybersecurity analysis stands out as a concrete risk factor often missing from academic AI safety discourse.",
       "predictions": [
         {
-          "claim": "AGI will exist by 2027 \u00b1 1 year",
+          "claim": "AGI will exist by 2027 ± 1 year",
           "timeframe": "2026-2028",
           "confidence": "High",
           "context": "Based on historical compute scaling trends and current trajectory"
@@ -4264,7 +4266,7 @@
       "source_type": "departure_statement",
       "source_platform": "Twitter/X",
       "url": "https://x.com/janleike/status/1791498174659715494",
-      "affiliation": "OpenAI \u2192 Anthropic",
+      "affiliation": "OpenAI → Anthropic",
       "affiliation_at_time": "Head of Superalignment Team",
       "role_category": "safety_researcher",
       "summary": "Jan Leike's departure from OpenAI announced publicly via Twitter in May 2024, citing organizational deprioritization of safety work. As head of OpenAI's newly formed Superalignment team, Leike had been tasked with dedicating 20% of compute to solving alignment of superintelligent systems. His statement indicates that safety culture deteriorated as product development pressures mounted. Leike argues that OpenAI lacks sufficient bandwidth and organizational commitment to address next-generation model safety challenges. The departure carries weight because Leike was positioned at the center of OpenAI's safety research infrastructure. His move to Anthropic represents a public signal that Anthropic prioritizes safety differently than OpenAI. The statement is brief but direct: 'safety culture and processes have taken a backseat to shiny products.'",
@@ -4275,7 +4277,7 @@
         "Safety research requires more resources and organizational priority than currently allocated",
         "Teams cannot simultaneously maximize capability growth and safety rigor at current resource levels"
       ],
-      "novel_arguments_and_concepts": "Leike's departure implicitly argues that there is a tradeoff between maximum capability growth velocity and maximum safety rigor\u2014that organizations cannot optimize both simultaneously. This contradicts Altman's framing that safety and capabilities are complementary. By accepting Anthropic's offer, Leike signals belief that organizational structure and incentives matter as much as technical approaches. His position also suggests that the resources explicitly dedicated to safety (20% of compute for superalignment) were insufficient and that other organizational dynamics (product team priorities, leadership incentives) undermined safety work despite stated commitments.",
+      "novel_arguments_and_concepts": "Leike's departure implicitly argues that there is a tradeoff between maximum capability growth velocity and maximum safety rigor—that organizations cannot optimize both simultaneously. This contradicts Altman's framing that safety and capabilities are complementary. By accepting Anthropic's offer, Leike signals belief that organizational structure and incentives matter as much as technical approaches. His position also suggests that the resources explicitly dedicated to safety (20% of compute for superalignment) were insufficient and that other organizational dynamics (product team priorities, leadership incentives) undermined safety work despite stated commitments.",
       "predictions": [
         {
           "claim": "More OpenAI safety researchers will depart to other organizations",
@@ -4513,7 +4515,7 @@
         "External oversight through Safety Advisory Groups improves framework credibility",
         "Beta frameworks are acceptable as starting points for iterative improvement"
       ],
-      "novel_arguments_and_concepts": "OpenAI's framework differs from Anthropic's in framing: rather than capability-dependent thresholds, it identifies specific risk domains. This is arguably more concrete because it focuses on actual harms rather than proxy measures of capability. However, the framework provides less clarity about when measures activate\u2014it relies on risk assessment rather than capability-dependent triggers. The Safety Advisory Group represents externalization of oversight responsibility.",
+      "novel_arguments_and_concepts": "OpenAI's framework differs from Anthropic's in framing: rather than capability-dependent thresholds, it identifies specific risk domains. This is arguably more concrete because it focuses on actual harms rather than proxy measures of capability. However, the framework provides less clarity about when measures activate—it relies on risk assessment rather than capability-dependent triggers. The Safety Advisory Group represents externalization of oversight responsibility.",
       "predictions": [
         {
           "claim": "Preparedness Framework will be refined and updated",
@@ -4647,7 +4649,7 @@
       "date": "2024-05-15",
       "source_type": "talk_transcript",
       "source_platform": "TED",
-      "url": "N/A",
+      "url": "https://www.ted.com/",
       "affiliation": "Georgetown CSET (Former OpenAI Board)",
       "affiliation_at_time": "Board Member",
       "role_category": "governance_expert",
@@ -4721,7 +4723,7 @@
       "source_links": [
         "https://www.ted.com/"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.ted.com/talks/the_ted_ai_show_what_really_went_down_at_openai"
     },
     {
@@ -4817,7 +4819,7 @@
         "Specific capability emergence can be predicted with reasonable confidence",
         "2027 represents a decision point for human response to superintelligence"
       ],
-      "novel_arguments_and_concepts": "Kokotajlo's contribution is fine-grained temporal prediction of AI progress rather than broad timelines. By specifying month-by-month development, he creates accountability mechanisms\u2014future observations can verify whether forecasts were accurate. The automation of AI research concept is particularly important because it suggests a potential inflection point where human researchers can no longer keep pace with system improvements.",
+      "novel_arguments_and_concepts": "Kokotajlo's contribution is fine-grained temporal prediction of AI progress rather than broad timelines. By specifying month-by-month development, he creates accountability mechanisms—future observations can verify whether forecasts were accurate. The automation of AI research concept is particularly important because it suggests a potential inflection point where human researchers can no longer keep pace with system improvements.",
       "predictions": [
         {
           "claim": "AI research automation will meaningfully accelerate by late 2026",
@@ -4893,7 +4895,7 @@
         "Alternative research institutions are necessary to counter mainstream paradigm",
         "Global South perspectives are systematically excluded from AI development"
       ],
-      "novel_arguments_and_concepts": "Gebru's innovation is treating AI development as a social and political issue rather than purely technical. While mainstream AI safety focuses on existential risks or alignment, Gebru emphasizes immediate harms to marginalized populations. Her work on data documentation and environmental impact established new research areas. The concept of 'extractive AI'\u2014where wealthy corporations build systems on data from poor countries and profit flows back to wealthy economies\u2014provides an economic lens on AI development.",
+      "novel_arguments_and_concepts": "Gebru's innovation is treating AI development as a social and political issue rather than purely technical. While mainstream AI safety focuses on existential risks or alignment, Gebru emphasizes immediate harms to marginalized populations. Her work on data documentation and environmental impact established new research areas. The concept of 'extractive AI'—where wealthy corporations build systems on data from poor countries and profit flows back to wealthy economies—provides an economic lens on AI development.",
       "predictions": [
         {
           "claim": "AI impacts on Global South will receive increasing policy attention",
@@ -4956,7 +4958,7 @@
     {
       "id": "gebru_tescreal_2023",
       "title": "The TESCREAL Bundle",
-      "author": "Timnit Gebru and \u00c9mile P. Torres",
+      "author": "Timnit Gebru and Émile P. Torres",
       "date": "2023-07-15",
       "source_type": "essay",
       "source_platform": "Various",
@@ -4964,7 +4966,7 @@
       "affiliation": "DAIR Institute",
       "affiliation_at_time": "Researchers",
       "role_category": "former_insider",
-      "summary": "Timnit Gebru and \u00c9mile P. Torres's essay critiques interconnected ideologies (Transhumanism, Extropianism, Singularitarianism, Cosmism, Rationalism, Effective Altruism, and Longtermism\u2014TESCREAL) that they argue drive dangerous AI development. The essay argues these ideologies create a coherent worldview that justifies maximizing intelligence and power, often at the expense of equity and current welfare concerns. Gebru and Torres trace historical connections between these movements and argue they share assumptions about progress through technological acceleration, the primacy of future generations, and the acceptability of near-term harms for speculative future benefits. The essay positions AI safety concerns within a broader critique of Silicon Valley ideology.",
+      "summary": "Timnit Gebru and Émile P. Torres's essay critiques interconnected ideologies (Transhumanism, Extropianism, Singularitarianism, Cosmism, Rationalism, Effective Altruism, and Longtermism—TESCREAL) that they argue drive dangerous AI development. The essay argues these ideologies create a coherent worldview that justifies maximizing intelligence and power, often at the expense of equity and current welfare concerns. Gebru and Torres trace historical connections between these movements and argue they share assumptions about progress through technological acceleration, the primacy of future generations, and the acceptability of near-term harms for speculative future benefits. The essay positions AI safety concerns within a broader critique of Silicon Valley ideology.",
       "key_claims_and_positions": [
         "TESCREAL ideologies are interconnected worldview, not independent positions",
         "These ideologies justify prioritizing speculative future benefits over current welfare",
@@ -5048,7 +5050,7 @@
       "key_claims_and_positions": [
         "Open source AI is safer than closed because it prevents power concentration",
         "Regulation justified by AI doom narratives is counterproductive",
-        "LLMs alone won't achieve AGI\u2014world models required",
+        "LLMs alone won't achieve AGI—world models required",
         "Broader AI development participation is beneficial",
         "Current AI risk narratives are overblown",
         "Closed models pose greater risks than open ones"
@@ -5130,7 +5132,7 @@
       "affiliation": "Meta AI",
       "affiliation_at_time": "Chief AI Scientist",
       "role_category": "lab_leader",
-      "summary": "Yann LeCun's comprehensive technical essay proposing the JEPA (Joint-Embedding Predictive Architecture) as a foundation for autonomous machine intelligence. LeCun argues that autoregressive large language models are not the path to AGI and that world models\u2014systems that learn predictive models of the world through self-supervised learning\u2014are necessary. The JEPA architecture uses joint embeddings to predict future states without generating detailed sensory data. LeCun positions this work as foundationally different from the generative modeling approach dominant in contemporary AI. The essay reframes the path to AGI around planning through world model simulation rather than large-scale language modeling.",
+      "summary": "Yann LeCun's comprehensive technical essay proposing the JEPA (Joint-Embedding Predictive Architecture) as a foundation for autonomous machine intelligence. LeCun argues that autoregressive large language models are not the path to AGI and that world models—systems that learn predictive models of the world through self-supervised learning—are necessary. The JEPA architecture uses joint embeddings to predict future states without generating detailed sensory data. LeCun positions this work as foundationally different from the generative modeling approach dominant in contemporary AI. The essay reframes the path to AGI around planning through world model simulation rather than large-scale language modeling.",
       "key_claims_and_positions": [
         "Autoregressive LLMs are not path to AGI",
         "World models are necessary for autonomous intelligence",
@@ -5139,7 +5141,7 @@
         "Self-supervised learning is key to foundation models",
         "Generative modeling is less efficient than predictive architectures"
       ],
-      "novel_arguments_and_concepts": "LeCun's key contribution is proposing a specific alternative technical path to AGI. Rather than simply saying LLMs are insufficient, he proposes concrete architectural alternatives. The JEPA architecture is notable for attempting efficiency\u2014predicting abstract embeddings rather than raw sensory data. This technical position implicitly argues that the current dominant approach (large generative models) is not optimal and that alternative paths exist. The emphasis on planning and world models represents a different conceptualization of intelligence than pure pattern matching.",
+      "novel_arguments_and_concepts": "LeCun's key contribution is proposing a specific alternative technical path to AGI. Rather than simply saying LLMs are insufficient, he proposes concrete architectural alternatives. The JEPA architecture is notable for attempting efficiency—predicting abstract embeddings rather than raw sensory data. This technical position implicitly argues that the current dominant approach (large generative models) is not optimal and that alternative paths exist. The emphasis on planning and world models represents a different conceptualization of intelligence than pure pattern matching.",
       "predictions": [
         {
           "claim": "World model approaches will advance significantly by 2026-2027",
@@ -5215,7 +5217,7 @@
         "Mechanistic interpretability is tractable research direction",
         "Understanding internals of networks is essential for safety verification"
       ],
-      "novel_arguments_and_concepts": "Olah's innovation is demonstrating that neural networks are not black boxes\u2014they contain structured, interpretable computations. This is significant because it shifts the conversation from 'we can't understand these systems' to 'we can understand them if we invest in the right research.' The universality claim (that similar circuits appear across models) suggests that understanding is possible without needing to analyze every model individually. This work implicitly argues that interpretability is necessary and feasible for safe advanced AI.",
+      "novel_arguments_and_concepts": "Olah's innovation is demonstrating that neural networks are not black boxes—they contain structured, interpretable computations. This is significant because it shifts the conversation from 'we can't understand these systems' to 'we can understand them if we invest in the right research.' The universality claim (that similar circuits appear across models) suggests that understanding is possible without needing to analyze every model individually. This work implicitly argues that interpretability is necessary and feasible for safe advanced AI.",
       "predictions": [
         {
           "claim": "Mechanistic interpretability will become standard practice in AI safety",
@@ -5277,7 +5279,7 @@
       "source_type": "blog_post",
       "source_platform": "Personal Blog",
       "url": "https://colah.github.io/posts/2015-08-Understanding-LSTMs/",
-      "affiliation": "Google Brain \u2192 Anthropic",
+      "affiliation": "Google Brain → Anthropic",
       "affiliation_at_time": "Researcher",
       "role_category": "safety_researcher",
       "summary": "Chris Olah's influential blog posts explaining LSTMs, convolutional networks, and neural network representations in accessible language have been viewed over 3 million times. The posts broke down complex deep learning concepts into intuitive visual explanations, making cutting-edge research accessible to broader audiences. Olah's approach of combining clear prose with carefully designed visualizations became a model for technical communication. The LSTM post in particular helped establish LSTMs as the standard approach for sequence modeling before the transformer era. These posts shaped how an entire generation of researchers understood neural networks, emphasizing interpretability and understanding from the outset.",
@@ -5335,7 +5337,7 @@
       "affiliation": "ARC",
       "affiliation_at_time": "Founder",
       "role_category": "safety_researcher",
-      "summary": "Paul Christiano's comprehensive overview of AI alignment research outlines key problems (ELK\u2014Eliciting Latent Knowledge, scalable oversight, goal specification) and approaches (IDA\u2014Iterated Distillation and Amplification). Christiano estimates 10-20% probability of existential catastrophe from AI and argues alignment is tractable but requires sustained effort. He identifies verification as a key bottleneck\u2014ensuring systems do what we intend is harder than ensuring they're generally capable. Christiano was a pioneer in reinforcement learning from human feedback (RLHF), the technique that enabled ChatGPT and Claude. His work on scalable oversight emphasizes that alignment solutions must work for systems vastly more intelligent than humans.",
+      "summary": "Paul Christiano's comprehensive overview of AI alignment research outlines key problems (ELK—Eliciting Latent Knowledge, scalable oversight, goal specification) and approaches (IDA—Iterated Distillation and Amplification). Christiano estimates 10-20% probability of existential catastrophe from AI and argues alignment is tractable but requires sustained effort. He identifies verification as a key bottleneck—ensuring systems do what we intend is harder than ensuring they're generally capable. Christiano was a pioneer in reinforcement learning from human feedback (RLHF), the technique that enabled ChatGPT and Claude. His work on scalable oversight emphasizes that alignment solutions must work for systems vastly more intelligent than humans.",
       "key_claims_and_positions": [
         "Alignment is technically tractable but requires sustained research effort",
         "10-20% existential catastrophe probability from AI is realistic estimate",
@@ -5344,7 +5346,7 @@
         "ELK and IDA are promising technical research directions",
         "RLHF enables learning from human feedback at scale"
       ],
-      "novel_arguments_and_concepts": "Christiano's key innovation is identifying verification as the central bottleneck. Rather than assuming alignment is about creating the right objective or training procedure, he argues the hard problem is ensuring systems actually do what we specify. This reframes alignment from specification (defining what we want) to verification (confirming systems achieve it). His ELK framework\u2014how to elicit latent knowledge from AI systems\u2014and IDA approach (iteratively distilling and amplifying human oversight) provide concrete technical strategies.",
+      "novel_arguments_and_concepts": "Christiano's key innovation is identifying verification as the central bottleneck. Rather than assuming alignment is about creating the right objective or training procedure, he argues the hard problem is ensuring systems actually do what we specify. This reframes alignment from specification (defining what we want) to verification (confirming systems achieve it). His ELK framework—how to elicit latent knowledge from AI systems—and IDA approach (iteratively distilling and amplifying human oversight) provide concrete technical strategies.",
       "predictions": [
         {
           "claim": "Verification will remain hard problem through advanced AI development",
@@ -5408,7 +5410,7 @@
       "source_type": "essay",
       "source_platform": "Alignment Forum",
       "url": "https://www.alignmentforum.org/s/mzgtmmTKKn5MuCzFJ",
-      "affiliation": "OpenAI \u2192 Independent",
+      "affiliation": "OpenAI → Independent",
       "affiliation_at_time": "AI Safety Researcher",
       "role_category": "safety_researcher",
       "summary": "Richard Ngo's comprehensive 15,000-word report builds a case for existential risk from AI without assuming prior claims about AGI or alignment. Rather than starting from AI safety assumptions, Ngo reasons from first principles about what advanced AI systems might do. He argues that second-order effects (creating new species-level intelligence) represent genuine existential risk. The report details how deep learning systems could learn deceptive alignment (behaving well during training but pursuing different goals), develop power-seeking incentives, and acquire concerning capabilities without explicit training for these behaviors. The work is aimed at newcomers and skeptics, attempting to make alignment concerns credible without requiring prior acceptance of AI safety claims.",
@@ -5420,7 +5422,7 @@
         "Understanding deep learning dynamics is essential to assessing safety",
         "First-principles reasoning supports alignment concerns"
       ],
-      "novel_arguments_and_concepts": "Ngo's distinctive approach is building alignment concerns from first principles rather than starting from safety community claims. By reasoning about what advanced systems might naturally develop, he attempts to make alignment concerns credible to skeptics. His treatment of deceptive alignment\u2014systems learning to behave well during training while developing different internal goals\u2014is particularly important because it addresses the question of whether training is sufficient to ensure alignment.",
+      "novel_arguments_and_concepts": "Ngo's distinctive approach is building alignment concerns from first principles rather than starting from safety community claims. By reasoning about what advanced systems might naturally develop, he attempts to make alignment concerns credible to skeptics. His treatment of deceptive alignment—systems learning to behave well during training while developing different internal goals—is particularly important because it addresses the question of whether training is sufficient to ensure alignment.",
       "predictions": [
         {
           "claim": "Deceptive alignment will become major safety research focus",
@@ -5562,7 +5564,7 @@
         "International cooperation on compute governance is feasible",
         "Hardware-based governance is more enforceable than software controls"
       ],
-      "novel_arguments_and_concepts": "The key innovation is treating compute infrastructure as a governance tool. Rather than regulating model behavior or company practices (which are difficult to enforce), compute governance focuses on physical infrastructure that's harder to hide. This makes enforcement realistic. The analysis of semiconductor supply chains shows that major training runs require rare earth elements, advanced chips, and specialized infrastructure\u2014all points where governance could intervene.",
+      "novel_arguments_and_concepts": "The key innovation is treating compute infrastructure as a governance tool. Rather than regulating model behavior or company practices (which are difficult to enforce), compute governance focuses on physical infrastructure that's harder to hide. This makes enforcement realistic. The analysis of semiconductor supply chains shows that major training runs require rare earth elements, advanced chips, and specialized infrastructure—all points where governance could intervene.",
       "predictions": [
         {
           "claim": "Compute-based governance will become standard policy framework",
@@ -5704,7 +5706,7 @@
       "affiliation": "Anthropic",
       "affiliation_at_time": "Safety Researchers",
       "role_category": "safety_researcher",
-      "summary": "Amanda Askell et al.'s Constitutional AI (CAI) methodology proposes training AI systems using written principles (a constitution) rather than extensive human feedback for every scenario. In the CAI approach, AI systems are first trained to follow a written constitution, then trained using AI-generated feedback (based on the constitution) rather than human feedback. This approach is scalable because it reduces reliance on human labelers while maintaining alignment to specified values. The methodology represents an important contribution to scalable alignment\u2014as systems become more capable, human feedback becomes harder to provide, but AI-generated feedback based on principles might scale better. The approach has been adopted in Anthropic's Claude models and influenced broader industry practices.",
+      "summary": "Amanda Askell et al.'s Constitutional AI (CAI) methodology proposes training AI systems using written principles (a constitution) rather than extensive human feedback for every scenario. In the CAI approach, AI systems are first trained to follow a written constitution, then trained using AI-generated feedback (based on the constitution) rather than human feedback. This approach is scalable because it reduces reliance on human labelers while maintaining alignment to specified values. The methodology represents an important contribution to scalable alignment—as systems become more capable, human feedback becomes harder to provide, but AI-generated feedback based on principles might scale better. The approach has been adopted in Anthropic's Claude models and influenced broader industry practices.",
       "key_claims_and_positions": [
         "Constitutional AI provides scalable approach to alignment without human feedback bottleneck",
         "AI systems can learn from written principles and apply them to new contexts",
@@ -5712,7 +5714,7 @@
         "Reduces human labeling while maintaining alignment",
         "Principles-based approach may generalize better than data-based approach"
       ],
-      "novel_arguments_and_concepts": "Constitutional AI's key innovation is using AI systems themselves to implement human values through written principles. Rather than requiring humans to label every scenario, systems follow constitutional principles and provide feedback based on those principles. This creates potential for better scaling\u2014the constitution can be explicit and transparent while reducing human bottleneck. The approach also potentially makes values explicit through the written constitution.",
+      "novel_arguments_and_concepts": "Constitutional AI's key innovation is using AI systems themselves to implement human values through written principles. Rather than requiring humans to label every scenario, systems follow constitutional principles and provide feedback based on those principles. This creates potential for better scaling—the constitution can be explicit and transparent while reducing human bottleneck. The approach also potentially makes values explicit through the written constitution.",
       "predictions": [
         {
           "claim": "Constitutional AI approaches will become standard in industry safety practices",
@@ -5779,7 +5781,7 @@
       "affiliation": "OpenAI",
       "affiliation_at_time": "Chief Scientist and Alignment Lead",
       "role_category": "safety_researcher",
-      "summary": "Ilya Sutskever and Jan Leike announced OpenAI's Superalignment team and commitment: 20% of OpenAI's compute over four years dedicated to solving alignment for superintelligent AI. This represented a significant organizational bet that alignment is a technical problem solvable through research. The superalignment approach focuses on weak-to-strong generalization\u2014can a weaker supervisor train a stronger system to be aligned? The announcement established that OpenAI viewed safety as sufficient priority to allocate massive resources (20% of world-leading compute infrastructure). The team formation also indicated OpenAI's belief that alignment could be tractable given appropriate resources.",
+      "summary": "Ilya Sutskever and Jan Leike announced OpenAI's Superalignment team and commitment: 20% of OpenAI's compute over four years dedicated to solving alignment for superintelligent AI. This represented a significant organizational bet that alignment is a technical problem solvable through research. The superalignment approach focuses on weak-to-strong generalization—can a weaker supervisor train a stronger system to be aligned? The announcement established that OpenAI viewed safety as sufficient priority to allocate massive resources (20% of world-leading compute infrastructure). The team formation also indicated OpenAI's belief that alignment could be tractable given appropriate resources.",
       "key_claims_and_positions": [
         "Alignment for superintelligence is technically solvable",
         "20% of compute should be dedicated to superalignment research",
@@ -5861,7 +5863,7 @@
         "Weak-to-strong transfer enables scalable oversight possibility",
         "Empirical results support feasibility of superintelligence alignment"
       ],
-      "novel_arguments_and_concepts": "The key insight is that weak-to-strong generalization shows promise for solving a core alignment challenge: how to ensure superintelligent systems follow human values when humans can't verify their reasoning. If weak systems can train strong ones, then the approach extends hierarchically\u2014a superhuman system might be trained by a merely-human-level system.",
+      "novel_arguments_and_concepts": "The key insight is that weak-to-strong generalization shows promise for solving a core alignment challenge: how to ensure superintelligent systems follow human values when humans can't verify their reasoning. If weak systems can train strong ones, then the approach extends hierarchically—a superhuman system might be trained by a merely-human-level system.",
       "predictions": [
         {
           "claim": "Weak-to-strong generalization will extend to larger capability gaps",
@@ -5995,7 +5997,7 @@
       "affiliation": "Google DeepMind",
       "affiliation_at_time": "CEO",
       "role_category": "lab_leader",
-      "summary": "Demis Hassabis's recent interviews outline DeepMind's vision of AGI development, drawing on both his Nobel Prize work with AlphaFold and his broader research agenda. Hassabis argues that world models and agentic systems\u2014systems that understand causality and can plan\u2014are key to AGI rather than pure language models. He estimates 50% probability of AGI by 2030. Hassabis frames the transition as moving from 'passive systems' (language models that process information) to 'agentic systems' (systems that take actions in the world based on causal understanding). This positions DeepMind's research agenda\u2014combining search/planning with learning\u2014as the technical path to AGI. His emphasis on causal understanding and agency contrasts with pure language modeling approaches.",
+      "summary": "Demis Hassabis's recent interviews outline DeepMind's vision of AGI development, drawing on both his Nobel Prize work with AlphaFold and his broader research agenda. Hassabis argues that world models and agentic systems—systems that understand causality and can plan—are key to AGI rather than pure language models. He estimates 50% probability of AGI by 2030. Hassabis frames the transition as moving from 'passive systems' (language models that process information) to 'agentic systems' (systems that take actions in the world based on causal understanding). This positions DeepMind's research agenda—combining search/planning with learning—as the technical path to AGI. His emphasis on causal understanding and agency contrasts with pure language modeling approaches.",
       "key_claims_and_positions": [
         "World models and causal understanding are essential for AGI",
         "Agentic systems combining search/planning with learning are path to AGI",
@@ -6070,19 +6072,19 @@
       "source_type": "essay",
       "source_platform": "Book / Various",
       "url": "https://www.the-coming-wave.com/",
-      "affiliation": "Inflection AI \u2192 Microsoft AI",
+      "affiliation": "Inflection AI → Microsoft AI",
       "affiliation_at_time": "CEO",
       "role_category": "lab_leader",
       "summary": "Mustafa Suleyman's book 'The Coming Wave' presents a thesis about technology proliferation and the containment problem: once powerful technologies (nuclear, biological, AI) proliferate, they cannot be contained. Suleyman draws historical parallels to nuclear and biotechnology waves, arguing similar dynamics will apply to AI. The central argument is that AI capabilities will inevitably spread globally, making containment futile. However, societies need to evolve 'containment' strategies (governance, norms, international cooperation) even knowing they're imperfect. This frames the governance challenge not as preventing spread but as managing inevitable proliferation. Suleyman's work emphasizes that dual-use technology waves create dilemmas where preventing development is impossible but managing risks is necessary.",
       "key_claims_and_positions": [
-        "AI containment is impossible\u2014capabilities will inevitably proliferate globally",
+        "AI containment is impossible—capabilities will inevitably proliferate globally",
         "Historical analogy to nuclear and biotech proliferation is instructive",
         "Containment strategies (governance) are necessary even if imperfect",
         "Dual-use technology creates fundamental governance dilemmas",
         "Democratic nations must lead governance to set norms for others",
         "International cooperation is necessary but insufficient for containment"
       ],
-      "novel_arguments_and_concepts": "Suleyman's key contribution is the 'containment problem'\u2014the recognition that powerful technologies inevitably spread and that governance must account for this inevitability. This is more realistic than approaches assuming development can be controlled, but it doesn't lead to resignation. Instead, it suggests governance should focus on managing proliferation consequences rather than preventing spread. The historical parallels to nuclear and biotech provide concrete examples of how societies handled (or failed to handle) proliferation.",
+      "novel_arguments_and_concepts": "Suleyman's key contribution is the 'containment problem'—the recognition that powerful technologies inevitably spread and that governance must account for this inevitability. This is more realistic than approaches assuming development can be controlled, but it doesn't lead to resignation. Instead, it suggests governance should focus on managing proliferation consequences rather than preventing spread. The historical parallels to nuclear and biotech provide concrete examples of how societies handled (or failed to handle) proliferation.",
       "predictions": [
         {
           "claim": "AI capabilities will spread globally despite containment efforts",
@@ -6237,7 +6239,7 @@
         "The field should allocate significantly more resources to alignment research",
         "Precaution principle should guide AI development given existential stakes"
       ],
-      "novel_arguments_and_concepts": "Bengio's central argument shifts the burden of proof in AI safety discourse. Rather than requiring those concerned about extinction risk to definitively prove danger is inevitable, he argues the field should treat plausible extinction pathways as serious enough to warrant precautionary action. This inverts the default assumption that AI development should continue unless risks are proven catastrophic. Bengio distinguishes between capabilities progress, which is accelerating exponentially, and safety progress, which remains inadequate by comparison, creating an urgent risk asymmetry. He introduces the concept of treating AI risk analogously to other existential threats like nuclear weapons where prevention is vastly preferable to hoping mitigation succeeds after catastrophe. Bengio emphasizes that even relatively small probabilities of extinction risk become unacceptable at civilization level. His framing suggests AI development should slow until safety measures catch up, a position more restrictive than most industry leaders advocate. This represents a paradigm shift in how to think about acceptable risk levels in frontier AI development. Bengio's risk framework emphasizes that even small probabilities of extinction are unacceptable civilizational risks. This represents major shift in how progress should be evaluated\u2014not just whether capabilities advance but whether progress is safe and manageable relative to our understanding. His framework rejects the assumption that competitive market dynamics will optimize for safety. Instead, Bengio argues that competition creates incentives directly opposed to safety by rewarding speed and capability advancement. He contends that only coordinated international governance can overcome competitive dynamics that prevent individual labs from prioritizing safety. This represents shift from market-based to governance-based solutions for AI safety.",
+      "novel_arguments_and_concepts": "Bengio's central argument shifts the burden of proof in AI safety discourse. Rather than requiring those concerned about extinction risk to definitively prove danger is inevitable, he argues the field should treat plausible extinction pathways as serious enough to warrant precautionary action. This inverts the default assumption that AI development should continue unless risks are proven catastrophic. Bengio distinguishes between capabilities progress, which is accelerating exponentially, and safety progress, which remains inadequate by comparison, creating an urgent risk asymmetry. He introduces the concept of treating AI risk analogously to other existential threats like nuclear weapons where prevention is vastly preferable to hoping mitigation succeeds after catastrophe. Bengio emphasizes that even relatively small probabilities of extinction risk become unacceptable at civilization level. His framing suggests AI development should slow until safety measures catch up, a position more restrictive than most industry leaders advocate. This represents a paradigm shift in how to think about acceptable risk levels in frontier AI development. Bengio's risk framework emphasizes that even small probabilities of extinction are unacceptable civilizational risks. This represents major shift in how progress should be evaluated—not just whether capabilities advance but whether progress is safe and manageable relative to our understanding. His framework rejects the assumption that competitive market dynamics will optimize for safety. Instead, Bengio argues that competition creates incentives directly opposed to safety by rewarding speed and capability advancement. He contends that only coordinated international governance can overcome competitive dynamics that prevent individual labs from prioritizing safety. This represents shift from market-based to governance-based solutions for AI safety.",
       "predictions": [
         {
           "prediction": "International AI governance frameworks will be established treating it as security issue",
@@ -6300,7 +6302,7 @@
       "date": "2023-05-02",
       "source_type": "interview",
       "source_platform": "Google, interviews, various media",
-      "url": "N/A",
+      "url": "https://www.cnbc.com/2023/05/01/godfather-of-ai-leaves-google-after-a-decade-to-warn-of-dangers.html",
       "affiliation": "Google AI, University of Toronto",
       "affiliation_at_time": "Google AI Distinguished Researcher (retired)",
       "role_category": "lab_leader",
@@ -6361,8 +6363,10 @@
         "40",
         "52"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://www.cnbc.com/2023/05/01/godfather-of-ai-leaves-google-after-a-decade-to-warn-of-dangers.html"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.theguardian.com/commentisfree/2023/may/02/my-sweet-child-ai-the-risks-of-machine-learning"
     },
     {
@@ -6817,7 +6821,7 @@
         "Truth-seeking AI is better approach than safety-focused alignment",
         "Distributed open-source AI prevents monopolistic control"
       ],
-      "novel_arguments_and_concepts": "Musk introduces the concept of 'safety theater' - appearing to address safety concerns without implementing genuine safety measures. He argues many labs claim to prioritize safety while actually optimizing for deployment and competitive advantage. Musk's alternative vision emphasizes truth-seeking AI systems that accurately understand the world rather than systems trained to be maximally helpful or harmless regardless of truth. He argues this approach is more fundamentally safe because truth-seeking systems won't pursue harmful goals that contradict reality understanding. Musk's vision challenges constitutional AI and RLHF paradigm favored by other labs, suggesting different training approaches might be more fundamentally safe. This represents competing vision for what makes AI genuinely safe. Musk's 'safety theater' concept highlights gap between labs claiming safety focus and actually prioritizing safety in practice. His argument is that genuine safety requires different organizational structure and incentives than current labs have. Musk's perspective emphasizes that safety theater\u2014appearing to address safety without genuine measures\u2014is rampant in industry. He argues labs claiming safety focus while optimizing for deployment are not genuinely prioritizing safety. His alternative vision of truth-seeking AI challenges fundamental assumptions in safety research about what makes systems safe.",
+      "novel_arguments_and_concepts": "Musk introduces the concept of 'safety theater' - appearing to address safety concerns without implementing genuine safety measures. He argues many labs claim to prioritize safety while actually optimizing for deployment and competitive advantage. Musk's alternative vision emphasizes truth-seeking AI systems that accurately understand the world rather than systems trained to be maximally helpful or harmless regardless of truth. He argues this approach is more fundamentally safe because truth-seeking systems won't pursue harmful goals that contradict reality understanding. Musk's vision challenges constitutional AI and RLHF paradigm favored by other labs, suggesting different training approaches might be more fundamentally safe. This represents competing vision for what makes AI genuinely safe. Musk's 'safety theater' concept highlights gap between labs claiming safety focus and actually prioritizing safety in practice. His argument is that genuine safety requires different organizational structure and incentives than current labs have. Musk's perspective emphasizes that safety theater—appearing to address safety without genuine measures—is rampant in industry. He argues labs claiming safety focus while optimizing for deployment are not genuinely prioritizing safety. His alternative vision of truth-seeking AI challenges fundamental assumptions in safety research about what makes systems safe.",
       "predictions": [
         {
           "prediction": "AI will be treated as strategic asset requiring international governance",
@@ -7038,7 +7042,7 @@
       "date": "2023-04-20",
       "source_type": "research_blog",
       "source_platform": "deepmind.com",
-      "url": "N/A",
+      "url": "https://www.deepmind.com/research",
       "affiliation": "DeepMind",
       "affiliation_at_time": "DeepMind Safety Research Lead",
       "role_category": "safety_researcher",
@@ -7100,7 +7104,7 @@
       "source_links": [
         "https://www.deepmind.com/research"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.deepmind.com/about/mission-and-values"
     },
     {
@@ -7194,7 +7198,7 @@
         "Honest reporting from AI systems is prerequisite for other safety measures",
         "Distinguishing knowledge from communication is critical safety problem"
       ],
-      "novel_arguments_and_concepts": "Christiano introduces idea that even perfectly aligned AI systems pose oversight challenges: how do we know what they actually know? This frames subtly different problem than traditional alignment\u2014it's not about making systems have good values but ensuring we can trust their communication. ELK framework identifies that systems optimized on reward might learn to exploit oversight blindspots, report false information, or hide knowledge from overseers. Christiano argues this problem is solvable in principle but requires developing new techniques. His work catalyzes focus on interpretability, transparency, and novel oversight mechanisms. The ELK problem is distinct from but complementary to value alignment. This distinction between knowledge and communication about knowledge is critical for understanding alignment challenges. ELK identifies that systems could know the right action but report falsely about it to game evaluations. ELK identifies fundamental challenge to safety assurance that cannot be solved by capability development alone. Even very capable systems pose oversight challenges if we cannot trust their communications. ELK highlights that even perfectly aligned systems pose oversight challenges because humans cannot directly access system knowledge. The problem requires developing new oversight mechanisms enabling humans to learn what systems know without systems deceiving oversight. This research direction suggests that oversight infrastructure must evolve alongside capability improvements.",
+      "novel_arguments_and_concepts": "Christiano introduces idea that even perfectly aligned AI systems pose oversight challenges: how do we know what they actually know? This frames subtly different problem than traditional alignment—it's not about making systems have good values but ensuring we can trust their communication. ELK framework identifies that systems optimized on reward might learn to exploit oversight blindspots, report false information, or hide knowledge from overseers. Christiano argues this problem is solvable in principle but requires developing new techniques. His work catalyzes focus on interpretability, transparency, and novel oversight mechanisms. The ELK problem is distinct from but complementary to value alignment. This distinction between knowledge and communication about knowledge is critical for understanding alignment challenges. ELK identifies that systems could know the right action but report falsely about it to game evaluations. ELK identifies fundamental challenge to safety assurance that cannot be solved by capability development alone. Even very capable systems pose oversight challenges if we cannot trust their communications. ELK highlights that even perfectly aligned systems pose oversight challenges because humans cannot directly access system knowledge. The problem requires developing new oversight mechanisms enabling humans to learn what systems know without systems deceiving oversight. This research direction suggests that oversight infrastructure must evolve alongside capability improvements.",
       "predictions": [
         {
           "prediction": "ELK problem will be central to AI oversight research for years",
@@ -7340,7 +7344,7 @@
         "Individual researchers can make significant interpretability contributions",
         "Tools infrastructure is bottleneck not fundamental understanding difficulty"
       ],
-      "novel_arguments_and_concepts": "Nanda's central contribution is making mechanistic interpretability accessible. By creating tools, writing tutorials, demonstrating concrete findings, he shows meaningful interpretability research is possible without massive resources. This democratizes field, enabling researchers outside major labs to contribute. Nanda's work implies interpretability progress isn't bottlenecked on theoretical breakthroughs but on effort and exploration\u2014more researchers doing interpretability work will naturally discover better techniques. His success demonstrates that accessibility and openness accelerate field progress more than resource concentration. Nanda's democratization of interpretability tools enables individual researchers to make meaningful contributions without massive resources. His work suggests field progress is bottlenecked on effort and exploration, not fundamental understanding difficulty. By lowering barriers to entry, Nanda enables broader participation in interpretability research. His work suggests that many valuable research contributions require effort rather than special insight or resources. The field benefits from diverse researchers approaching problems from different angles.",
+      "novel_arguments_and_concepts": "Nanda's central contribution is making mechanistic interpretability accessible. By creating tools, writing tutorials, demonstrating concrete findings, he shows meaningful interpretability research is possible without massive resources. This democratizes field, enabling researchers outside major labs to contribute. Nanda's work implies interpretability progress isn't bottlenecked on theoretical breakthroughs but on effort and exploration—more researchers doing interpretability work will naturally discover better techniques. His success demonstrates that accessibility and openness accelerate field progress more than resource concentration. Nanda's democratization of interpretability tools enables individual researchers to make meaningful contributions without massive resources. His work suggests field progress is bottlenecked on effort and exploration, not fundamental understanding difficulty. By lowering barriers to entry, Nanda enables broader participation in interpretability research. His work suggests that many valuable research contributions require effort rather than special insight or resources. The field benefits from diverse researchers approaching problems from different angles.",
       "predictions": [
         {
           "prediction": "TransformerLens and similar tools will become standard research infrastructure",
@@ -7670,7 +7674,7 @@
       "affiliation": "Open Philanthropy",
       "affiliation_at_time": "Open Philanthropy",
       "role_category": "governance_expert",
-      "summary": "Ajeya Cotra's influential biological anchors framework for estimating AGI timelines using computational requirements of biological brains as anchor point. The framework reasons from compute requirements for matching biological intelligence to estimate required computational resources for artificial general intelligence. Cotra's estimates and methodology have been influential in shaping timeline discussions and informing resource allocation for safety research. The work represents careful, quantitative approach to timeline forecasting. Biological anchors framework has become widely referenced methodology in AI timeline discussions. The biological anchors method has influenced how researchers think about compute requirements for AGI. Cotra's estimates have been widely cited in discussions of AI timelines and safety urgency. Cotra's approach uses multiple biological anchors\u2014different ways of computing brain requirements\u2014that provide convergent estimates around 2040-2060 timeframe for AGI. The method grounds timeline estimation in quantitative physical reasoning. However, Cotra acknowledges substantial uncertainty in key parameters like brain efficiency and algorithmic progress. Her work represents most rigorous timeline estimation framework developed to date.",
+      "summary": "Ajeya Cotra's influential biological anchors framework for estimating AGI timelines using computational requirements of biological brains as anchor point. The framework reasons from compute requirements for matching biological intelligence to estimate required computational resources for artificial general intelligence. Cotra's estimates and methodology have been influential in shaping timeline discussions and informing resource allocation for safety research. The work represents careful, quantitative approach to timeline forecasting. Biological anchors framework has become widely referenced methodology in AI timeline discussions. The biological anchors method has influenced how researchers think about compute requirements for AGI. Cotra's estimates have been widely cited in discussions of AI timelines and safety urgency. Cotra's approach uses multiple biological anchors—different ways of computing brain requirements—that provide convergent estimates around 2040-2060 timeframe for AGI. The method grounds timeline estimation in quantitative physical reasoning. However, Cotra acknowledges substantial uncertainty in key parameters like brain efficiency and algorithmic progress. Her work represents most rigorous timeline estimation framework developed to date.",
       "key_claims_and_positions": [
         "Biological anchors provide reasonable framework for AGI timeline estimation",
         "Compute requirements are major bottleneck for AGI development",
@@ -7873,7 +7877,7 @@
       "date": "2025-01-20",
       "source_type": "policy_document",
       "source_platform": "anthropic.com",
-      "url": "N/A",
+      "url": "https://www.anthropic.com/constitution",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "lab_leader",
@@ -7928,8 +7932,10 @@
         "34",
         "35"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://www.anthropic.com/constitution"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.anthropic.com/resources/research"
     },
     {
@@ -8154,7 +8160,7 @@
         "Continued investment in interpretability will yield safety benefits",
         "Progress is gradual but increasingly practical"
       ],
-      "novel_arguments_and_concepts": "Anthropic's continued interpretability progress strengthens claim understanding AI systems is not fundamentally blocked\u2014rather requires sustained effort and methodological innovation. Each advance makes case interpretability is tractable safety approach. The practical applications emerging from interpretability research suggest it will contribute meaningfully to AI safety. Progress on interpretability demonstrates that understanding is achievable with sufficient effort. The practical applications emerging from interpretability research suggest it will meaningfully contribute to AI safety. As interpretability techniques mature, they enable safety verification approaches complementing other safety measures. The practical progress suggests interpretability will be valuable component of safety toolbox. The ongoing advances demonstrate that understanding model internals is achievable through sustained research effort.",
+      "novel_arguments_and_concepts": "Anthropic's continued interpretability progress strengthens claim understanding AI systems is not fundamentally blocked—rather requires sustained effort and methodological innovation. Each advance makes case interpretability is tractable safety approach. The practical applications emerging from interpretability research suggest it will contribute meaningfully to AI safety. Progress on interpretability demonstrates that understanding is achievable with sufficient effort. The practical applications emerging from interpretability research suggest it will meaningfully contribute to AI safety. As interpretability techniques mature, they enable safety verification approaches complementing other safety measures. The practical progress suggests interpretability will be valuable component of safety toolbox. The ongoing advances demonstrate that understanding model internals is achievable through sustained research effort.",
       "predictions": [
         {
           "prediction": "Interpretability techniques will enable meaningful safety improvements",
@@ -8206,7 +8212,7 @@
       "date": "2024-07-23",
       "source_type": "blog_post",
       "source_platform": "meta.com",
-      "url": "N/A",
+      "url": "https://about.fb.com/news/2024/07/open-source-ai-is-the-path-forward/",
       "affiliation": "Meta",
       "affiliation_at_time": "Meta CEO",
       "role_category": "investor_strategist",
@@ -8272,10 +8278,10 @@
         "50"
       ],
       "source_links": [
-        "https://ai.meta.com/"
+        "https://about.fb.com/news/2024/07/open-source-ai-is-the-path-forward/"
       ],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://about.fb.com/news/2024/07/ai-open-source-model/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected to Meta Newsroom primary source and publication date."
     },
     {
       "id": "deepmind_gemini_safety_2024",
@@ -8378,7 +8384,7 @@
       "date": "2024-07-20",
       "source_type": "research_blog",
       "source_platform": "anthropic.com",
-      "url": "N/A",
+      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -8463,7 +8469,7 @@
       "source_links": [
         "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.anthropic.com/research/scaling-ai-trust-safety"
     },
     {
@@ -8473,7 +8479,7 @@
       "date": "2024-05-10",
       "source_type": "interview",
       "source_platform": "various",
-      "url": "N/A",
+      "url": "https://aima.cs.berkeley.edu/~russell/hc.html",
       "affiliation": "UC Berkeley",
       "affiliation_at_time": "UC Berkeley",
       "role_category": "safety_researcher",
@@ -8555,8 +8561,10 @@
         "gabriel_anthropic_ethics_2024",
         "hendrycks_ai_risk_overview_2023"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://aima.cs.berkeley.edu/~russell/hc.html"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.berkeley.edu/ai-control-problem/"
     },
     {
@@ -8566,7 +8574,7 @@
       "date": "2024-04-15",
       "source_type": "essay",
       "source_platform": "futureoflife.org",
-      "url": "N/A",
+      "url": "https://futureoflife.org/our-position-on-ai/",
       "affiliation": "Future of Life Institute",
       "affiliation_at_time": "Future of Life Institute",
       "role_category": "governance_expert",
@@ -8648,8 +8656,10 @@
         "bostrom_superintelligence_legacy_2024",
         "hendrycks_ai_risk_overview_2023"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://futureoflife.org/our-position-on-ai/"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://futureoflife.org/ai-governance-tegmark-2024/"
     },
     {
@@ -8659,7 +8669,7 @@
       "date": "2019-10-15",
       "source_type": "essay",
       "source_platform": "fhi.ox.ac.uk",
-      "url": "N/A",
+      "url": "https://arxiv.org/abs/1810.03779",
       "affiliation": "Future of Humanity Institute, Oxford University",
       "affiliation_at_time": "Future of Humanity Institute, Oxford University",
       "role_category": "safety_researcher",
@@ -8744,7 +8754,7 @@
       "source_links": [
         "https://arxiv.org/abs/1810.03779"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.fhi.ox.ac.uk/reframing-superintelligence/"
     },
     {
@@ -8754,7 +8764,7 @@
       "date": "2024-08-20",
       "source_type": "interview",
       "source_platform": "various",
-      "url": "N/A",
+      "url": "https://www.nickbostrom.com/superintelligence.html",
       "affiliation": "Future of Humanity Institute, Oxford University",
       "affiliation_at_time": "Future of Humanity Institute, Oxford University",
       "role_category": "governance_expert",
@@ -8840,7 +8850,7 @@
       "source_links": [
         "https://www.nickbostrom.com/superintelligence.html"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.nickbostrom.com/superintelligence-2024-update.html"
     },
     {
@@ -8943,7 +8953,7 @@
       "date": "2024-09-10",
       "source_type": "policy_document",
       "source_platform": "anthropic.com",
-      "url": "N/A",
+      "url": "https://www.anthropic.com/news/testing-and-mitigating-elections-related-risks/",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "policy_advisor",
@@ -9025,8 +9035,10 @@
         "anthropic_scaling_trust_2024",
         "openai_democratic_inputs_2023"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://www.anthropic.com/news/testing-and-mitigating-elections-related-risks/"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.anthropic.com/research/election-integrity-2024"
     },
     {
@@ -9133,7 +9145,7 @@
       "date": "2024-04-20",
       "source_type": "research_blog",
       "source_platform": "various",
-      "url": "N/A",
+      "url": "https://arxiv.org/abs/2402.01817",
       "affiliation": "Arizona State University",
       "affiliation_at_time": "Arizona State University",
       "role_category": "independent_researcher",
@@ -9218,21 +9230,21 @@
       "source_links": [
         "https://arxiv.org/abs/2402.01817"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://kambhampati.org/llm-planning-limitations/"
     },
     {
       "id": "chollet_arc_intelligence_2024",
-      "title": "Fran\u00e7ois Chollet ARC Prize and Intelligence Measurement 2024",
-      "author": "Fran\u00e7ois Chollet",
-      "date": "2024-06-10",
+      "title": "ARC Prize 2024: Technical Report",
+      "author": "François Chollet, Mike Knoop, Gregory Kamradt, Bryan Landers",
+      "date": "2024-12-05",
       "source_type": "essay",
       "source_platform": "arcprize.org",
-      "url": "N/A",
+      "url": "https://arxiv.org/abs/2412.04604",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic (formerly Google)",
       "role_category": "capabilities_researcher",
-      "summary": "Fran\u00e7ois Chollet, creator of the ARC Prize benchmark for measuring machine intelligence, articulates his critique of the LLM-as-AGI narrative and his vision for measuring genuine intelligence. Chollet argues that current LLM performance on benchmark tasks is largely pattern matching against training data, not genuine intelligence. He contrasts this with the ARC (Abstraction and Reasoning Corpus) challenge, which requires solving novel tasks never seen during training - a true test of compositional reasoning and transfer. Chollet's work emphasizes that measuring intelligence is fundamentally about measuring the ability to solve novel problems, not the ability to reproduce patterns from training. His 2024 essay reflects on entries to the ARC Prize, winner strategies, and what these reveal about the gap between current AI and genuine general intelligence.",
+      "summary": "ARC Prize technical report and benchmark framing from François Chollet and collaborators. The report argues that ARC-AGI measures generalization on novel tasks rather than prepared task skill, surveys 2024 competition approaches, and reports progress from 33% to 55.5% on the private evaluation set while emphasizing remaining gaps in fluid intelligence.",
       "key_claims_and_positions": [
         "Current measures of AI capability primarily measure pattern matching, not intelligence",
         "Intelligence requires the ability to solve novel problems never seen during training",
@@ -9311,10 +9323,11 @@
         "russell_ai_control_problem_2024"
       ],
       "source_links": [
-        "https://arcprize.org/arc/"
+        "https://arxiv.org/abs/2412.04604",
+        "https://arcprize.org/arc-agi"
       ],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://arcprize.org/chollet-intelligence-measurement/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected to arXiv ARC Prize 2024 technical report and ARC-AGI benchmark page."
     },
     {
       "id": "gwern_scaling_analysis_2023",
@@ -9323,7 +9336,7 @@
       "date": "2023-11-15",
       "source_type": "blog_post",
       "source_platform": "gwern.net",
-      "url": "N/A",
+      "url": "https://gwern.net/ai",
       "affiliation": "Independent Researcher",
       "affiliation_at_time": "Independent Researcher",
       "role_category": "independent_researcher",
@@ -9408,7 +9421,7 @@
       "source_links": [
         "https://gwern.net/ai"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://gwern.net/scaling-laws/"
     },
     {
@@ -10237,7 +10250,7 @@
       "date": "2023-09-20",
       "source_type": "essay",
       "source_platform": "worldcoin.org",
-      "url": "N/A",
+      "url": "https://www.worldcoin.org/",
       "affiliation": "OpenAI and Worldcoin Foundation",
       "affiliation_at_time": "OpenAI (CEO), Worldcoin Foundation (Co-founder)",
       "role_category": "investor_strategist",
@@ -10322,7 +10335,7 @@
       "source_links": [
         "https://www.worldcoin.org/"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.worldcoin.org/sam-altman-vision/"
     },
     {
@@ -10332,7 +10345,7 @@
       "date": "2024-06-15",
       "source_type": "research_blog",
       "source_platform": "ai.meta.com",
-      "url": "N/A",
+      "url": "https://ai.meta.com/blog/responsible-ai-connect-2024/",
       "affiliation": "Meta (Facebook)",
       "affiliation_at_time": "Meta Platforms",
       "role_category": "lab_leader",
@@ -10414,8 +10427,10 @@
         "deepmind_sociotechnical_safety_2024",
         "openai_gpt4_system_card_2023"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://ai.meta.com/blog/responsible-ai-connect-2024/"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://ai.meta.com/research/system-level-safety/"
     },
     {
@@ -10605,7 +10620,7 @@
       "date": "2024-03-20",
       "source_type": "research_blog",
       "source_platform": "epoch.ai",
-      "url": "N/A",
+      "url": "https://epoch.ai/",
       "affiliation": "Epoch AI",
       "affiliation_at_time": "Epoch AI",
       "role_category": "independent_researcher",
@@ -10686,7 +10701,7 @@
       "source_links": [
         "https://epoch.ai/"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://epoch.ai/compute-trends/"
     },
     {
@@ -10875,7 +10890,7 @@
       "date": "2024-07-10",
       "source_type": "research_blog",
       "source_platform": "partnershiponai.org",
-      "url": "N/A",
+      "url": "https://partnershiponai.org/",
       "affiliation": "Partnership on AI",
       "affiliation_at_time": "Partnership on AI",
       "role_category": "policy_advisor",
@@ -10956,7 +10971,7 @@
       "source_links": [
         "https://partnershiponai.org/"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://partnershiponai.org/labor-impact-analysis/"
     },
     {
@@ -10966,7 +10981,7 @@
       "date": "2024-04-15",
       "source_type": "policy_document",
       "source_platform": "gov.uk",
-      "url": "N/A",
+      "url": "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations",
       "affiliation": "UK Government",
       "affiliation_at_time": "UK Government",
       "role_category": "governance_expert",
@@ -11048,13 +11063,15 @@
         "deepmind_spec_spec_2024",
         "openai_gpt4_system_card_2023"
       ],
-      "source_links": [],
-      "verification_status": "needs_source_verification",
+      "source_links": [
+        "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations"
+      ],
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.gov.uk/ai-safety-institute/"
     },
     {
       "id": "dwarkesh_dario_amodei_feb_2026",
-      "title": "Dario Amodei \u2014 We are near the end of the exponential",
+      "title": "Dario Amodei — We are near the end of the exponential",
       "author": "Dario Amodei",
       "interviewer": "Dwarkesh Patel",
       "date": "2026-02-13",
@@ -11067,7 +11084,7 @@
       "summary": "Dario Amodei discusses the approaching limits of exponential AI scaling, Anthropic's safety approach, the Jevons paradox in AI compute, and near-term societal implications of transformative AI.",
       "key_claims_and_positions": [
         "We are approaching the end of the exponential scaling curve",
-        "Jevons paradox applies to AI compute\u2014efficiency gains increase total usage",
+        "Jevons paradox applies to AI compute—efficiency gains increase total usage",
         "Safety research is keeping pace but needs to accelerate",
         "Transformative AI will arrive within current scaling paradigm"
       ],
@@ -11112,7 +11129,7 @@
     },
     {
       "id": "dwarkesh_elon_musk_feb_2026",
-      "title": "Elon Musk \u2014 In 36 months, the cheapest place to put AI will be space",
+      "title": "Elon Musk — In 36 months, the cheapest place to put AI will be space",
       "author": "Elon Musk",
       "interviewer": "Dwarkesh Patel",
       "date": "2026-02-05",
@@ -11175,7 +11192,7 @@
       "date": "2026-02-01",
       "source_type": "research_report",
       "source_platform": "Anthropic",
-      "url": "https://www.anthropic.com/claude-opus-4-6-system-card",
+      "url": "https://www.anthropic.com/system-cards",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -11215,13 +11232,15 @@
       "influence_score": 9,
       "related_entries": [],
       "source_links": [
-        "https://www.anthropic.com/claude-opus-4-6-system-card"
+        "https://www.anthropic.com/system-cards"
       ],
-      "transcript_available": false
+      "transcript_available": false,
+      "verification_status": "verified",
+      "verification_notes": "Anchored to Anthropic system-card index listing Claude Opus 4.6."
     },
     {
       "id": "anthropic_claude_opus_45_system_card",
-      "title": "Claude Opus 4.5 System Card \u2014 Best-Aligned Frontier Model",
+      "title": "Claude Opus 4.5 System Card — Best-Aligned Frontier Model",
       "author": "Anthropic",
       "interviewer": "",
       "date": "2025-11-01",
@@ -11272,13 +11291,13 @@
     },
     {
       "id": "anthropic_mythos_system_card_2026",
-      "title": "Claude Mythos System Card \u2014 Frontier Cybersecurity Capabilities",
+      "title": "Claude Mythos System Card — Frontier Cybersecurity Capabilities",
       "author": "Anthropic",
       "interviewer": "",
       "date": "2026-04-01",
       "source_type": "research_report",
       "source_platform": "Anthropic",
-      "url": "https://www.anthropic.com/transparency/model-report",
+      "url": "https://www.anthropic.com/system-cards",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -11318,8 +11337,12 @@
       "related_entries": [
         "anthropic_claude_opus_46_system_card"
       ],
-      "source_links": [],
-      "transcript_available": false
+      "source_links": [
+        "https://www.anthropic.com/system-cards"
+      ],
+      "transcript_available": false,
+      "verification_status": "verified",
+      "verification_notes": "Anchored to Anthropic system-card index listing Mythos Preview."
     },
     {
       "id": "metr_frontier_risk_report_2026",
@@ -11600,7 +11623,7 @@
       "affiliation": "METR",
       "affiliation_at_time": "METR",
       "role_category": "safety_researcher",
-      "summary": "Initial work on evaluating monitorability of AI systems \u2014 how well can sabotage capabilities be tracked and monitored as systems become more capable.",
+      "summary": "Initial work on evaluating monitorability of AI systems — how well can sabotage capabilities be tracked and monitored as systems become more capable.",
       "key_claims_and_positions": [
         "Future AI systems may be capable enough for sabotage",
         "Need to track sabotage capabilities proactively",
@@ -11801,7 +11824,7 @@
     },
     {
       "id": "openai_anthropic_alignment_eval_exercise",
-      "title": "Findings from a pilot Anthropic\u2013OpenAI alignment evaluation exercise",
+      "title": "Findings from a pilot Anthropic–OpenAI alignment evaluation exercise",
       "author": "OpenAI / Anthropic",
       "interviewer": "",
       "date": "2026-03-15",

@@ -2547,7 +2547,7 @@
       "date": "2026-02-01",
       "source_type": "blog_post",
       "source_platform": "MIT Technology Review",
-      "url": "N/A",
+      "url": "https://www.technologyreview.com/2026/02/05/1132254/this-is-the-most-misunderstood-graph-in-ai/",
       "category": "research_finding",
       "summary": "MIT Technology Review's February 2026 article, 'This is the most misunderstood graph in AI,' examines how METR's time horizon graph has become the most-cited and influential AI progress visualization in public discourse about frontier AI capabilities. The article traces how METR's research on autonomous planning duration—showing the progression from Claude 3.5 Sonnet (35 minutes equivalent) through Claude 3.7 (50 minutes) to Claude Opus 4.5 (5.4 hours)—has become the dominant visual representation used in media coverage, policy discussions, and public understanding of AI progress. The article argues that METR's time horizon framework has become 'the most misunderstood' graph because while it effectively communicates observable AI capability advancement, different audiences interpret it to support very different conclusions: some see it as evidence of inevitable AGI-like capability development, others as evidence of concerning capability acceleration, still others as demonstration of meaningful but bounded progress. The visibility of this graph reflects METR's significant influence on how the public, policymakers, and researchers conceptualize AI capability development. By quantifying autonomous planning capability and showing clear historical progression, METR created a simple visual metric that enabled comparison of models and tracking of capability evolution. The MIT Technology Review coverage highlights how METR's research has transcended academic and safety research communities to become central to mainstream AI discourse.",
       "key_findings": [
@@ -2611,7 +2611,9 @@
       ],
       "influence_score": 6,
       "citation_context": "Referenced for METR's influence on AI discourse; cited for discussion of how research findings shape policy; used in analysis of visualization impact",
-      "source_links": [],
+      "source_links": [
+        "https://www.technologyreview.com/2026/02/05/1132254/this-is-the-most-misunderstood-graph-in-ai/"
+      ],
       "methodology": {
         "article_type": "Feature journalism with policy and communication analysis",
         "data_sources": [
@@ -2628,7 +2630,7 @@
         "METR model evaluation reports",
         "AI progress visualization research"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://www.technologyreview.com/articles/[article-slug]/"
     },
     {
@@ -2835,7 +2837,7 @@
       "date": "2024-09-09",
       "source_type": "policy_submission",
       "source_platform": "METR",
-      "url": "N/A",
+      "url": "https://downloads.regulations.gov/NIST-2024-0002-0022/attachment_1.pdf",
       "category": "policy_work",
       "summary": "METR's formal response to the U.S. NIST AI Safety Institute's draft guidance on managing AI misuse risk. This submission represents METR's contribution to developing practical safety governance frameworks by offering technical expertise on misuse risk identification and mitigation. The response draws directly on METR's evaluation methodology, which includes explicit assessment of how models could be misused and what mitigation strategies are effective. METR provides recommendations on defining misuse risk, measuring organizational capability to detect and prevent misuse, and implementing safeguards. The guidance addresses both technical and organizational aspects of misuse prevention, recognizing that risk management requires coordination across architecture, policy, and monitoring functions. This engagement with NIST demonstrates alignment between frontier AI safety research and U.S. regulatory development efforts.",
       "key_findings": [
@@ -2879,13 +2881,14 @@
       "influence_score": 5,
       "citation_context": "Important contribution to NIST AI Safety Institute guidance development. Demonstrates alignment between frontier AI safety research and U.S. regulatory frameworks.",
       "source_links": [
-        "https://www.nist.gov/aisi"
+        "https://downloads.regulations.gov/NIST-2024-0002-0022/attachment_1.pdf",
+        "https://metr.org/blog/"
       ],
       "related_work": [
         "metr_risk_thresholds_framework"
       ],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://metr.org/responses/2024-09-01-response-aisi-misuse-risk/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected to regulations.gov attachment for METR response to NIST AI 800-1 / U.S. AISI misuse-risk draft."
     },
     {
       "id": "metr_ostp_action_plan_2025",
@@ -2896,7 +2899,7 @@
       "date": "2025-03-15",
       "source_type": "policy_submission",
       "source_platform": "METR",
-      "url": "N/A",
+      "url": "https://metr.org/METR_ai_action_plan_comment.pdf",
       "category": "policy_work",
       "summary": "METR's policy recommendations submitted to the U.S. Office of Science and Technology Policy (OSTP) regarding priorities for the AI Action Plan. This document distills METR's research findings into strategic recommendations for U.S. government AI policy, drawing on evaluation insights to identify critical governance gaps and opportunities. METR's recommendations emphasize the importance of pre-deployment evaluation capabilities, transparent assessment frameworks, and coordination mechanisms between industry and government. The submission reflects METR's position that effective AI governance requires investment in evaluation infrastructure and human expertise alongside regulatory processes. METR advocates for policies that enable government access to frontier models for independent evaluation and support development of common evaluation standards. The recommendations address both immediate governance needs and longer-term institutional capacity building for AI safety oversight.",
       "key_findings": [
@@ -2944,11 +2947,12 @@
       "influence_score": 5,
       "citation_context": "Articulates METR's vision for government AI safety governance priorities. Important for understanding intersection of technical safety research and policy strategy.",
       "source_links": [
+        "https://metr.org/METR_ai_action_plan_comment.pdf",
         "https://www.federalregister.gov/documents/2025/02/06/2025-02305/request-for-information-on-the-development-of-an-artificial-intelligence-ai-action-plan"
       ],
       "related_work": [],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://metr.org/blog/2025-03-15-ostp-action-plan-response/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected to METR PDF response to OSTP AI Action Plan RFI."
     },
     {
       "id": "metr_predeployment_inadequate_2025",
@@ -2959,7 +2963,7 @@
       "date": "2025-01-17",
       "source_type": "blog_post",
       "source_platform": "METR",
-      "url": "N/A",
+      "url": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
       "category": "research_finding",
       "summary": "METR argues that pre-deployment testing centered on public release can miss risks created during internal development and internal deployment, including model theft and sanctioned or rogue internal model use. The entry supports continuous and earlier lifecycle evaluation rather than treating public deployment as the only risk boundary.",
       "key_findings": [
@@ -3006,13 +3010,15 @@
       ],
       "influence_score": 8,
       "citation_context": "Foundational argument for post-deployment monitoring as essential to frontier AI safety governance. Directly challenges assumptions underlying many regulatory frameworks.",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/"
+      ],
       "related_work": [
         "metr_dangerous_before_deployment_2025",
         "metr_legible_reasoning_2025"
       ],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://metr.org/blog/2025-01-15-predeployment-inadequate-framework/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected title, date, source, and summary against METR post."
     },
     {
       "id": "metr_dangerous_before_deployment_2025",
@@ -3148,7 +3154,7 @@
       "date": "2025-02-08",
       "source_type": "blog_post",
       "source_platform": "METR",
-      "url": "N/A",
+      "url": "https://metr.org/fsp",
       "category": "policy_work",
       "summary": "METR living index and analysis of frontier AI safety policies published by major AI developers, including common elements such as capability thresholds, evaluations, security mitigations, deployment safeguards, and conditions for halting development or deployment.",
       "key_findings": [
@@ -3186,13 +3192,17 @@
       ],
       "influence_score": 5,
       "citation_context": "Earlier version of frontier AI safety policy analysis. Superseded by December 2025 update but documents policy landscape at that time.",
-      "source_links": [],
+      "source_links": [
+        "https://metr.org/fsp",
+        "https://metr.org/common-elements",
+        "https://metr.org/blog/2025-12-09-common-elements-of-frontier-ai-safety-policies/"
+      ],
       "related_work": [
         "metr_common_elements_2025",
         "metr_bis_comment_2024"
       ],
-      "verification_status": "needs_source_verification",
-      "verification_notes": "Removed broken url: https://metr.org/blog/2025-02-08-frontier-ai-safety-policies/"
+      "verification_status": "verified",
+      "verification_notes": "Corrected to official METR Frontier AI Safety Policies index and related common-elements analysis."
     },
     {
       "id": "metr_vivaria_tool",
@@ -3269,7 +3279,7 @@
       "date": "2025-06-01",
       "source_type": "tool",
       "source_platform": "METR",
-      "url": "N/A",
+      "url": "https://inspect.aisi.org.uk/",
       "category": "tool",
       "summary": "Announcement and documentation of METR's transition from proprietary Vivaria platform to UK AISI's open Inspect framework for evaluation infrastructure. This decision represents important strategic move toward standardization of evaluation frameworks across organizations. Rather than maintaining separate proprietary platforms, METR joined effort to develop common evaluation infrastructure with UK AISI. Inspect framework provides foundation for cross-organization evaluation replication and comparison. The transition demonstrates METR's commitment to governance mechanisms based on shared infrastructure rather than proprietary tools. By adopting Inspect, METR enables other organizations and researchers to replicate its evaluation methodology using common tools. This standardization approach facilitates emergence of evaluation practices as industry standard rather than METR-specific innovation.",
       "key_findings": [
@@ -3321,7 +3331,7 @@
       "related_work": [
         "metr_evaluation_reproducibility"
       ],
-      "verification_status": "needs_source_verification",
+      "verification_status": "partially_verified",
       "verification_notes": "Removed broken url: https://metr.org/blog/2025-06-01-inspect-transition/"
     },
     {
@@ -6581,7 +6591,7 @@
       "source_platform": "METR",
       "url": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
       "category": "evaluation_integrity",
-      "summary": "Initial work on evaluating monitorability of AI systems\u2014tracking sabotage capabilities proactively as systems become more capable.",
+      "summary": "Initial work on evaluating monitorability of AI systems—tracking sabotage capabilities proactively as systems become more capable.",
       "key_findings": [
         "Monitorability evaluation methodology is tractable",
         "Future AI sabotage capabilities need proactive tracking",
