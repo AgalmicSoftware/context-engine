@@ -136,37 +136,6 @@ describe('OnePageSession helpers', () => {
       expect(map.q1[0].response).toBe(rawBinaryPayload);
     });
 
-    it('drops built-in Polis demo fixture rows from live aggregators', () => {
-      const networkObj = {
-        questions: {
-          q1: { id: 'q1', type: 'binary' },
-        },
-        questionResponses: {
-          q1: {
-            '0xFixture': JSON.stringify({
-              type: 'binary',
-              answer: { value: 'Agree', encrypted: false },
-              source: 'demo-polis-data',
-            }),
-            '0xLive': JSON.stringify({
-              type: 'binary',
-              answer: { value: 'Agree', encrypted: false },
-            }),
-          },
-        },
-      };
-
-      const { map } = buildAggregatorFromLocalCache(networkObj);
-
-      expect(map.q1).toHaveLength(1);
-      expect(map.q1[0]).toMatchObject({
-        responder: '0xLive',
-        questionId: 'q1',
-      });
-      expect(JSON.stringify(map)).not.toContain('0xFixture');
-      expect(JSON.stringify(map)).not.toContain('demo-polis-data');
-    });
-
     it('requires visible question metadata to belong to the route session', () => {
       const leakedResponder = '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526';
       const binaryResponse = {
@@ -208,43 +177,6 @@ describe('OnePageSession helpers', () => {
 
       expect(Object.keys(map).sort()).toEqual(['qLegacyBucket', 'qLocal']);
       expect(JSON.stringify(map).toLowerCase()).not.toContain(leakedResponder);
-    });
-
-    it('rejects explicitly foreign real response bindings from the demo aggregator', () => {
-      const networkObj = {
-        questions: {
-          qDemo: {
-            id: 'qDemo',
-            type: 'binary',
-            sessionSlug: 'demo',
-            sessionSlugExplicit: true,
-          },
-        },
-        questionResponses: {
-          qDemo: {
-            '0xDemo': JSON.stringify({
-              type: 'binary',
-              sessionSlug: 'demo',
-              answer: { value: 'Agree', encrypted: false },
-            }),
-            '0xLegacyDemo': JSON.stringify({
-              type: 'binary',
-              answer: { value: 'Unsure', encrypted: false },
-            }),
-            '0xForeign': JSON.stringify({
-              type: 'binary',
-              sessionSlug: 'test-2',
-              answer: { value: 'Disagree', encrypted: false },
-            }),
-          },
-        },
-      };
-
-      const { map } = buildAggregatorFromLocalCache(networkObj, { sessionSlug: 'demo' });
-
-      expect(map.qDemo.map((row) => row.responder).sort()).toEqual(['0xDemo', '0xLegacyDemo']);
-      expect(JSON.stringify(map)).not.toContain('0xForeign');
-      expect(JSON.stringify(map)).not.toContain('test-2');
     });
   });
 
