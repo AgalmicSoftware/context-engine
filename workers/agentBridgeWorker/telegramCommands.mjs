@@ -33,11 +33,26 @@ import { buildResultsImage } from './resultImage.mjs';
 import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
 import { normalizeSessionPolicy, resolveSessionInvocation } from './sessionPolicy.mjs';
 import {
+  addResponseExportAllowedAddress,
+  buildTelegramResponseExportArchive,
+  canManageResponseExportAllowlist,
+  canExportResponsesForTelegramUser,
+  findLatestResponseExportSessionSlugForTelegramUser,
+  listResponseExportAccess,
+  removeResponseExportAllowedAddress,
+} from './telegramResponseExport.mjs';
+import {
   normalizeTelegramGroup,
   normalizeTelegramMockUpdate,
   normalizeTelegramPrincipal,
 } from './telegramUpdates.mjs';
-import { answerTelegramCallbackQuery, editTelegramMessageText, sendTelegramMessage, sendTelegramPhoto } from './telegramSender.mjs';
+import {
+  answerTelegramCallbackQuery,
+  editTelegramMessageText,
+  sendTelegramDocument,
+  sendTelegramMessage,
+  sendTelegramPhoto,
+} from './telegramSender.mjs';
 
 const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
@@ -79,6 +94,10 @@ const COMMANDS = Object.freeze({
   POSE_QUESTION: '/pose_question',
   POSE_QUESTION_SHORT: '/q',
   RESULTS: '/results',
+  EXPORT_ALL: '/export_all',
+  EXPORT_ACCESS: '/export_access',
+  EXPORT_ALLOW: '/export_allow',
+  EXPORT_REVOKE: '/export_revoke',
   ATTACHMENTS: '/attachments',
   DOCS: '/docs',
   ME: '/me',
@@ -97,6 +116,10 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_drop_question': COMMANDS.POSE_QUESTION,
   '/drop_question': COMMANDS.POSE_QUESTION,
   '/ce_results': COMMANDS.RESULTS,
+  '/ce_export_all': COMMANDS.EXPORT_ALL,
+  '/ce_export_access': COMMANDS.EXPORT_ACCESS,
+  '/ce_export_allow': COMMANDS.EXPORT_ALLOW,
+  '/ce_export_revoke': COMMANDS.EXPORT_REVOKE,
   '/ce_attachments': COMMANDS.ATTACHMENTS,
   '/ce_docs': COMMANDS.DOCS,
   '/ce_me': COMMANDS.ME,
@@ -996,6 +1019,27 @@ async function resolveCommandSessionSlug({
   return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
+async function resolveResponseExportSessionSlug({
+  env = {},
+  normalized = {},
+  policy = {},
+  explicitSessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const explicit = sanitizeSessionSlug(explicitSessionSlug);
+  if (explicit) return explicit;
+  const privateBinding = await readPrivateSessionBinding(env, normalized);
+  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
+  const latestSubmittedSession = sanitizeSessionSlug(await findLatestResponseExportSessionSlugForTelegramUser({
+    env,
+    normalized,
+    createdAt,
+  }));
+  if (latestSubmittedSession) return latestSubmittedSession;
+  const binding = await readGroupSessionBinding(env, normalized);
+  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
+}
+
 async function makeCallbackButton({
   env = {},
   label = '',
@@ -1225,6 +1269,7 @@ function reply({
   messageId = '',
   text = '',
   photo = null,
+  document = null,
   replyMarkup = null,
   parseMode = '',
   screen = '',
@@ -1244,6 +1289,7 @@ function reply({
       messageId,
       text: preserveTextWhitespace ? String(text || '') : safeString(text),
       photo,
+      document,
       replyMarkup,
       parseMode: safeString(parseMode),
     },
@@ -1335,7 +1381,80 @@ function telegramVisibleSessions(policy = {}) {
     .filter(sessionVisibleInTelegram);
 }
 
+async function makeResponseExportButton({
+  env,
+  normalized,
+  policy,
+  sessionSlug = '',
+  seed = '',
+  createdAt,
+} = {}) {
+  if (!normalized.chat?.isPrivate) return null;
+  const resolvedSessionSlug = await resolveResponseExportSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlug,
+    createdAt,
+  });
+  const resolved = resolveSessionInvocation(policy, resolvedSessionSlug);
+  if (!resolved.ok) return null;
+  const allowed = await canExportResponsesForTelegramUser({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
+  if (!allowed.ok) return null;
+  return makeCallbackButton({
+    env,
+    label: 'export_all',
+    action: TELEGRAM_BRIDGE_ACTIONS.EXPORT_ALL_RESPONSES,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+    seed: seed || `export_all|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+}
+
+async function makeResponseExportAccessButton({
+  env,
+  normalized,
+  policy,
+  sessionSlug = '',
+  seed = '',
+  createdAt,
+} = {}) {
+  if (!normalized.chat?.isPrivate) return null;
+  const resolvedSessionSlug = await resolveResponseExportSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlug,
+    createdAt,
+  });
+  const resolved = resolveSessionInvocation(policy, resolvedSessionSlug);
+  if (!resolved.ok) return null;
+  const allowed = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
+  if (!allowed.ok) return null;
+  return makeCallbackButton({
+    env,
+    label: 'export_access',
+    action: TELEGRAM_BRIDGE_ACTIONS.MANAGE_RESPONSE_EXPORT_ACCESS,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+    seed: seed || `export_access|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+}
+
 async function buildHelpResponse({ normalized, command = COMMANDS.START, env, createdAt }) {
+  const policy = await loadSessionPolicy(env);
   const privateBinding = normalized.chat.isPrivate
     ? await readPrivateSessionBinding(env, normalized)
     : null;
@@ -1356,6 +1475,22 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
     miniAppButton.text = 'Mini App';
     keyboard.push([miniAppButton]);
   }
+  const exportButton = await makeResponseExportButton({
+    env,
+    normalized,
+    policy,
+    sessionSlug: privateBinding?.sessionSlug || '',
+    createdAt,
+  });
+  if (exportButton) keyboard.push([exportButton]);
+  const exportAccessButton = await makeResponseExportAccessButton({
+    env,
+    normalized,
+    policy,
+    sessionSlug: privateBinding?.sessionSlug || '',
+    createdAt,
+  });
+  if (exportAccessButton) keyboard.push([exportAccessButton]);
   return reply({
     chatId: normalized.chat.chatId,
     text: formatHelpText(),
@@ -2118,6 +2253,361 @@ async function buildResultsResponse({
   });
 }
 
+async function buildExportAllResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Response export is available in private chat only. Open a private chat with the bot and run /export_all.',
+      screen: 'response_export_private_required',
+      command,
+      normalized,
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveResponseExportSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || args[0],
+    createdAt,
+  });
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
+    });
+  }
+  const exported = await buildTelegramResponseExportArchive({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
+  if (!exported.ok) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Response export is not available for this account.',
+        `Reason: ${exported.reason || 'export_failed'}.`,
+        exported.accountAddress ? `Account: ${shortAddress(exported.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen: 'response_export_denied',
+      command,
+      normalized,
+      extra: {
+        reason: exported.reason || 'export_failed',
+        accountAddress: exported.accountAddress || '',
+        sessionSlug: resolved.session.sessionSlug,
+      },
+    });
+  }
+  return reply({
+    method: 'sendDocument',
+    chatId: normalized.chat.chatId,
+    text: [
+      `Response export for ${resolved.session.sessionSlug}.`,
+      `Payloads: ${exported.exportedPayloadCount}. Submit records: ${exported.submitRecordCount}.`,
+      exported.readErrorCount ? `Read errors: ${exported.readErrorCount}.` : '',
+    ].filter(Boolean).join('\n'),
+    document: exported.document,
+    screen: 'response_export',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      accountAddress: exported.accountAddress,
+      exportedPayloadCount: exported.exportedPayloadCount,
+      submitRecordCount: exported.submitRecordCount,
+      readErrorCount: exported.readErrorCount,
+    },
+  });
+}
+
+function parseExportAddressCommandArgs(args = []) {
+  const address = args.find((arg) => ADDRESS_RE.test(safeString(arg))) || '';
+  const sessionArg = args.find((arg) => safeString(arg) && safeString(arg) !== address) || '';
+  return { address, sessionSlug: sessionArg };
+}
+
+function formatExportAddressList(addresses = [], {
+  empty = 'None.',
+  includeMetadata = false,
+} = {}) {
+  const entries = Array.isArray(addresses) ? addresses : [];
+  if (!entries.length) return empty;
+  return entries.map((entry) => {
+    const address = typeof entry === 'string' ? entry : entry?.address;
+    const addedAt = typeof entry === 'string' ? '' : safeString(entry?.addedAt);
+    const suffix = includeMetadata && addedAt ? ` added ${addedAt}` : '';
+    return `- ${shortAddress(address)}${suffix}`;
+  }).join('\n');
+}
+
+async function buildExportAccessResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Response export access can be managed in private chat only.',
+      screen: 'response_export_access_private_required',
+      command,
+      normalized,
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || args[0],
+  });
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
+    });
+  }
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
+  if (!manager.ok) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Response export access can only be managed by a configured export admin.',
+        `Reason: ${manager.reason}.`,
+        manager.accountAddress ? `Account: ${shortAddress(manager.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen: 'response_export_access_denied',
+      command,
+      normalized,
+      extra: {
+        reason: manager.reason,
+        accountAddress: manager.accountAddress || '',
+        sessionSlug: resolved.session.sessionSlug,
+      },
+    });
+  }
+  const access = await listResponseExportAccess({ env, session: resolved.session });
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      `Export access for ${resolved.session.sessionSlug}`,
+      '',
+      'Configured admins:',
+      formatExportAddressList(access.configuredAdmins),
+      '',
+      'Additional exporters:',
+      formatExportAddressList(access.additionalExporters, { includeMetadata: true }),
+      '',
+      `Add: /export_allow 0x... ${resolved.session.sessionSlug}`,
+      `Remove: /export_revoke 0x... ${resolved.session.sessionSlug}`,
+    ].join('\n'),
+    screen: 'response_export_access',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      configuredAdminCount: access.configuredAdmins.length,
+      additionalExporterCount: access.additionalExporters.length,
+    },
+  });
+}
+
+async function buildExportAllowResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  createdAt,
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Response export access can be managed in private chat only.',
+      screen: 'response_export_access_private_required',
+      command,
+      normalized,
+    });
+  }
+  const parsed = parseExportAddressCommandArgs(args);
+  if (!parsed.address) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Usage: /export_allow 0xAddress [session]',
+      screen: 'response_export_access_usage',
+      command,
+      normalized,
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: parsed.sessionSlug,
+  });
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
+    });
+  }
+  const result = await addResponseExportAllowedAddress({
+    env,
+    normalized,
+    session: resolved.session,
+    address: parsed.address,
+    createdAt,
+  });
+  if (!result.ok) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Could not add response export access.',
+        `Reason: ${result.reason || 'response_export_access_update_failed'}.`,
+        result.accountAddress ? `Account: ${shortAddress(result.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen: 'response_export_access_denied',
+      command,
+      normalized,
+      extra: {
+        reason: result.reason || 'response_export_access_update_failed',
+        sessionSlug: resolved.session.sessionSlug,
+      },
+    });
+  }
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      result.added ? 'Added response export access.' : 'Response export access already existed.',
+      `Session: ${resolved.session.sessionSlug}`,
+      `Address: ${shortAddress(result.address)}`,
+      `Allowed exporters: ${result.allowedCount}`,
+    ].join('\n'),
+    screen: 'response_export_access_updated',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      address: result.address,
+      added: result.added,
+      allowedCount: result.allowedCount,
+    },
+  });
+}
+
+async function buildExportRevokeResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  createdAt,
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Response export access can be managed in private chat only.',
+      screen: 'response_export_access_private_required',
+      command,
+      normalized,
+    });
+  }
+  const parsed = parseExportAddressCommandArgs(args);
+  if (!parsed.address) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Usage: /export_revoke 0xAddress [session]',
+      screen: 'response_export_access_usage',
+      command,
+      normalized,
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: parsed.sessionSlug,
+  });
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
+    });
+  }
+  const result = await removeResponseExportAllowedAddress({
+    env,
+    normalized,
+    session: resolved.session,
+    address: parsed.address,
+    createdAt,
+  });
+  if (!result.ok) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Could not remove response export access.',
+        `Reason: ${result.reason || 'response_export_access_update_failed'}.`,
+        result.accountAddress ? `Account: ${shortAddress(result.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen: 'response_export_access_denied',
+      command,
+      normalized,
+      extra: {
+        reason: result.reason || 'response_export_access_update_failed',
+        sessionSlug: resolved.session.sessionSlug,
+      },
+    });
+  }
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      result.removed ? 'Removed response export access.' : 'Response export access was not present.',
+      `Session: ${resolved.session.sessionSlug}`,
+      `Address: ${shortAddress(result.address)}`,
+      `Allowed exporters: ${result.allowedCount}`,
+    ].join('\n'),
+    screen: 'response_export_access_updated',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      address: result.address,
+      removed: result.removed,
+      allowedCount: result.allowedCount,
+    },
+  });
+}
+
 async function buildPoseQuestionResponse({
   normalized,
   command,
@@ -2477,6 +2967,23 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     seed: `me|questions|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   });
+  const exportButton = await makeResponseExportButton({
+    env,
+    normalized,
+    policy,
+    seed: `me|export_all|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  const exportAccessButton = await makeResponseExportAccessButton({
+    env,
+    normalized,
+    policy,
+    seed: `me|export_access|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  const rows = [[questionButton]];
+  if (exportButton) rows.push([exportButton]);
+  if (exportAccessButton) rows.push([exportAccessButton]);
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -2490,7 +2997,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
       'Use /questions or /attachments.',
     ].join('\n'),
     replyMarkup: {
-      inline_keyboard: [[questionButton]],
+      inline_keyboard: rows,
     },
     parseMode: explorerUrl ? 'HTML' : '',
     screen: state.screen,
@@ -3046,6 +3553,24 @@ async function buildCallbackResponse({
       createdAt,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.EXPORT_ALL_RESPONSES) {
+    return attachCallbackQueryId(await buildExportAllResponse({
+      normalized,
+      command: 'callback:export_all',
+      env,
+      sessionSlugOverride: sessionSlug,
+      createdAt,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.MANAGE_RESPONSE_EXPORT_ACCESS) {
+    return attachCallbackQueryId(await buildExportAccessResponse({
+      normalized,
+      command: 'callback:export_access',
+      env,
+      sessionSlugOverride: sessionSlug,
+      createdAt,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS) {
     return attachCallbackQueryId(await buildDocsResponse({
       normalized,
@@ -3234,6 +3759,42 @@ export async function buildTelegramCommandResponse({
       createdAt,
     });
   }
+  if (parsed.command === COMMANDS.EXPORT_ALL) {
+    return buildExportAllResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.EXPORT_ACCESS) {
+    return buildExportAccessResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.EXPORT_ALLOW) {
+    return buildExportAllowResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.EXPORT_REVOKE) {
+    return buildExportRevokeResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
   if ([COMMANDS.ATTACHMENTS, COMMANDS.DOCS].includes(parsed.command)) {
     return buildDocsResponse({
       normalized,
@@ -3320,6 +3881,26 @@ export async function dispatchTelegramCommandResponse({
       botToken,
       chatId: response.chatId,
       photo: response.photo,
+      caption: response.text,
+      replyMarkup: response.replyMarkup,
+      parseMode: response.parseMode,
+      fetchImpl,
+    });
+    if (!sendResult?.ok) {
+      sendResult = await sendTelegramMessage({
+        botToken,
+        chatId: response.chatId,
+        text: response.text,
+        replyMarkup: response.replyMarkup,
+        parseMode: response.parseMode,
+        fetchImpl,
+      });
+    }
+  } else if (response.method === 'sendDocument' && response.document) {
+    sendResult = await sendTelegramDocument({
+      botToken,
+      chatId: response.chatId,
+      document: response.document,
       caption: response.text,
       replyMarkup: response.replyMarkup,
       parseMode: response.parseMode,

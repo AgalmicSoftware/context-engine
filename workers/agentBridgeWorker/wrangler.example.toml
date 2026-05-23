@@ -51,6 +51,10 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Optional Mini App overrides. Defaults to $AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app.
 # AGENT_BRIDGE_MINI_APP_URL = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev/telegram/mini-app"
 # AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS = "86400"
+# Optional root response export admins for /export_all and /export_allow.
+# Use managed Telegram ETH addresses only; leave unset to hide export controls
+# and deny export.
+# AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = "0x0000000000000000000000000000000000000000"
 # AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
 # AGENT_BRIDGE_RPC_TIMEOUT_MS = "5000"
 # AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS = "2500"

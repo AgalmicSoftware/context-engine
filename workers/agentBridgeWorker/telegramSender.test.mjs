@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   answerTelegramCallbackQuery,
   editTelegramMessageText,
+  sendTelegramDocument,
   sendTelegramMessage,
   telegramBotApiRequest,
 } from './telegramSender.mjs';
@@ -63,6 +64,35 @@ test('editTelegramMessageText wraps editMessageText with injected fetch', async 
     text: 'Updated',
     disable_web_page_preview: true,
   });
+});
+
+test('sendTelegramDocument uploads zip bytes through sendDocument', async () => {
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    return jsonResponse({ ok: true, result: { message_id: 789 } });
+  };
+
+  const result = await sendTelegramDocument({
+    botToken: '123456:test-token',
+    chatId: '42',
+    caption: 'Export ready',
+    document: {
+      bytes: Uint8Array.from([80, 75, 3, 4]),
+      filename: 'responses.zip',
+      contentType: 'application/zip',
+    },
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot123456:test-token/sendDocument');
+  const form = calls[0][1].body;
+  assert.equal(form.get('chat_id'), '42');
+  assert.equal(form.get('caption'), 'Export ready');
+  const file = form.get('document');
+  assert.equal(file.name, 'responses.zip');
+  assert.equal(file.type, 'application/zip');
 });
 
 test('answerTelegramCallbackQuery stops inline button spinners without leaking callback context', async () => {
