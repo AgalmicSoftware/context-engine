@@ -1031,11 +1031,12 @@ export function buildTelegramAgentSettingsOverviewState({
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     telegramReminders: normalizeBoolean(settings.telegramReminders, false),
+    showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
     settings: normalizedSettings,
-    editableFields: ['draftStyle', 'telegramReminders'],
+    editableFields: ['draftStyle', 'telegramReminders', 'showUnansweredFirst'],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.read',
       body: {
@@ -1055,6 +1056,7 @@ export function buildTelegramAgentSettingsEditState({
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     telegramReminders: normalizeBoolean(settings.telegramReminders, false),
+    showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
   });
   return buildTelegramScreenState('agent_settings_edit', {
     preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
@@ -1070,6 +1072,11 @@ export function buildTelegramAgentSettingsEditState({
       label: 'Telegram reminders',
       input: 'toggle',
       value: current.telegramReminders,
+    }, {
+      field: 'showUnansweredFirst',
+      label: 'Show un-answered questions first',
+      input: 'toggle',
+      value: current.showUnansweredFirst,
     }],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.update',
@@ -1548,8 +1555,8 @@ export function buildTelegramQuestionControls(question = {}, {
   if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
     controls.push(
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Agree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'agree', selectionMode: 'single' }),
-      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Disagree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'disagree', selectionMode: 'single' }),
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
     );
   } else if (questionType === QUESTION_TYPES.RATING) {
     const scale = {

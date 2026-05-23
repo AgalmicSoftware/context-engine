@@ -92,21 +92,39 @@ Private or gated question text is never posed to the group; group output shows a
 locked/encrypted state, carries any public SBT gate requirements, and routes
 eligible accounts to private chat or Mini App.
 
+The Telegram question list keeps full prompt text in the message body and uses
+compact `Pose <number>` buttons so Telegram does not truncate the prompts. It
+starts with `Questions (<shown>/<total>)` and omits extra instruction copy. A
+posed public question starts with the prompt text, omits redundant
+option/instruction text, and labels its return action `Other Questions`. Binary
+question buttons render `Agree` / `Disagree` on the first row and `Unsure`
+underneath.
+
+`/me` shows an abbreviated managed address as an inline chain-explorer link and
+renders known chains by name, for example `OP Sepolia Testnet (11155420)`.
+
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
 ## Bot Commands
 
 Core Telegram commands:
 
-- `/start` opens the help/action entry point or consumes an opaque private start
-  payload.
+- `/start` opens the help/action entry point with `Questions`, `Sessions`, and
+  `Mini App` controls. It includes a private-chat Mini App button when
+  configured, or consumes an opaque private start payload. If the user has not
+  selected a private session yet, the Mini App launch opens the session picker
+  first.
 - `/actions` and `/agent` open the generic agent action launcher. Group
   chat shows only public-safe labels plus private/Mini App launch controls.
 - `/settings` shows private settings state and an edit entry point. Group
   chat returns only a private-chat launch.
 - `/join <session>`, `/sessions`, `/questions`, `/q <number>`,
-  `/attachments`, `/docs`, `/me`, and `/account` keep their existing
-  session/question/document/account behavior.
+  `/results`, `/results consensus`, `/results group`, `/attachments`, `/docs`,
+  `/me`, and `/account` keep their existing session/question/document/account
+  behavior. Plain `/results` explains the `consensus` and `group` views and
+  renders buttons for both modes; mode-specific results attempt to upload a
+  rendered PNG card with a beeswarm view for consensus and a participant graph
+  for group results, using demo data until enough live overlap exists.
 
 `/create_agent` remains accepted as a compatibility command, but the bot and
 Mini App no longer advertise a `Create Agent` button. Joining a session derives
@@ -178,7 +196,11 @@ issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
 is required only when the session profile selects `lit_encrypted` and the
 payload itself is intentionally Lit/client encrypted. The default Cloudflare
 payload access mode is `worker_sbt_gate`, which is worker-enforced access
-control and not end-to-end encryption.
+control and not end-to-end encryption. `public_read` keeps canonical payloads
+in Cloudflare but serves read/list requests without wallet auth; writes still
+require the session worker. This is the intended mode for public Telegram
+question prompts that should behave the same in the bot, Mini App, and CE
+client.
 Cloudflare storage is for CE payloads such as session context, docs, media,
 questions, surveys, responses, and generated artifacts; it is not Telegram,
 user preference, or profile storage. Agent and Telegram-facing records should
@@ -246,7 +268,7 @@ Required values:
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
-| Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug |
+| Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
@@ -273,8 +295,8 @@ The live webhook route is `/telegram/webhook`. It rejects requests unless
 the configured webhook secret token. It parses real Telegram `message` and
 `callback_query` updates, handles `/start`, `/actions`, `/agent`,
 hidden `/create_agent` compatibility commands, `/settings`, `/join <session>`, `/sessions`,
-`/questions`, `/pose_question`, `/q`, `/attachments` or alias
-`/docs`, and `/me`, answers callback queries to clear Telegram's
+`/questions`, `/pose_question`, `/q`, `/results`, `/results consensus`, `/results group`,
+`/attachments` or alias `/docs`, and `/me`, answers callback queries to clear Telegram's
 inline-button loading state, and sends replies through an injected Telegram Bot
 API adapter. Unit tests use mocked `fetch` and fake bot tokens; real
 `TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
@@ -290,21 +312,27 @@ live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
 plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
 `/sessions` and `/join`. Those commands force a fresh registry read so new
 sessions are not hidden behind the short-lived Worker cache; capped registry
-lists use the newest session window. Group `/join <session>` also persists the
-chat's selected session in `AGENT_ACTION_KV`, so later `/questions`,
-`/q <number>`, and `/attachments` use that session without repeating
-the slug. Private `/join <session>` persists the selected session for that
-Telegram user as well, so private `/questions` and `/q <number>` use
-the same session unless a command supplies an explicit slug. `/docs` remains
-a compatibility alias.
+lists use the newest session window. `/sessions` displays only
+Telegram-contributable sessions (`telegramBridgeEnabled=true` and
+`managedAccountSubmitAllowed=true`), hides `e2e`-named smoke-test sessions as a
+temporary cleanup heuristic, and paginates tall inline-keyboard lists with
+`Load Next`. Group
+`/join <session>` also persists the chat's selected session in
+`AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, and `/attachments` use
+that session without repeating the slug. Private `/join <session>` persists the
+selected session for that Telegram user as well, so private `/questions` and
+`/q <number>` use the same session unless a command supplies an explicit slug.
+`/docs` remains a compatibility alias.
 
 Question lists default to live mode. Bot messages show at most five question
-rows at a time, separate displayed rows with a blank line, hide question IDs
-from user-facing copy, and add an `Open Mini App` control when
-`AGENT_BRIDGE_PUBLIC_URL` or `AGENT_BRIDGE_MINI_APP_URL` is configured. Private
-chat uses Telegram's inline `web_app` button directly; group chat deep-links the
-participant to private chat first because Telegram only allows `web_app` inline
-buttons there. The presentation order keeps answerable public questions ahead of
+rows at a time, separate displayed rows with a blank line, keep safe prompt or
+status text in the message body, use compact `Pose <number>` buttons, add a
+`Load Next` button when additional rows are available, and hide question IDs
+from user-facing copy. Payload-unavailable rows say that the question prompt
+failed to load, SBT/worker-gated rows say `Requires session access`, and
+Lit-encrypted rows say `Encrypted question`. The first `/start` screen links to
+the Mini App session picker; `/questions` itself stays focused on posing
+questions. The presentation order keeps answerable public questions ahead of
 true locked rows, and keeps payload-unavailable placeholders last so broken
 recent payloads do not hide usable questions. The
 Telegram worker owns a worker-local
@@ -313,7 +341,10 @@ materialized question index for Telegram/agent delivery: it scans scoped
 question records in memory plus `AGENT_ACTION_KV`, and resumes from the indexed
 block range instead of rescanning the whole session on every command. Registry
 reads fall through empty/stale RPC tuple responses to the additive fallback RPC,
-and Arweave metadata/payload reads try multiple gateways. On a cold session it
+Arweave metadata/payload reads try multiple gateways, and Cloudflare-backed
+question pointers are read through the configured session worker `/storage/read`
+route with a managed demo account when the session storage profile selects
+Cloudflare. On a cold session it
 returns the first available question records as soon as they are loaded, then
 uses the Worker background task lane to finish indexing the full session block
 window. When a loaded question payload explicitly names a different session
@@ -325,7 +356,8 @@ proof that the question was encrypted. When the payload is reachable but masked
 by Lit/SBT encryption, the bot and Mini App label it as encrypted and surface
 the public SBT addresses required to decrypt without exposing plaintext.
 Payload-unavailable cache records are retried from the on-chain pointer on
-refresh, and stale unavailable caches are refreshed before the bot returns them.
+refresh, and unavailable caches are refreshed before the bot returns them even
+when the cache TTL has not expired.
 RPC/log/hash failures are reported as source errors instead of cached as empty
 lists. Session scans prefer metadata
 `blockLimits.start`; when metadata is unavailable, the Worker derives a scoped
@@ -355,6 +387,7 @@ Question cache controls:
 | `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300` |
 | `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY` | Concurrent payload reads while materializing question records; default `4` |
 | `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS` | Maximum log chunks scanned before replying on a cold Telegram request; default `1`, with the rest completed through Worker background indexing |
+| `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND` | Optional debug override for question payload pointers. Leave unset in normal deployments so session metadata selects Arweave or Cloudflare |
 | `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` | Recent-block fallback window used only when `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`; default `130000` |
 | `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs |
 | `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN` | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke |
@@ -389,6 +422,8 @@ The Worker serves a v0 Telegram Mini App at:
 GET  /telegram/mini-app
 GET  /telegram/mini-app/api/state?launch=<opaque-cecb-id>
 POST /telegram/mini-app/api/draft
+POST /telegram/mini-app/api/clear-drafts
+POST /telegram/mini-app/api/transcribe
 POST /telegram/mini-app/api/settings
 ```
 
@@ -420,11 +455,52 @@ defaults to 24 hours.
 Current v0 scope:
 
 - Agent/account/settings action surface backed by the catalog, including safe
-  settings inputs for `draftStyle` and `telegramReminders`.
+  settings inputs for `draftStyle` and `telegramReminders`. The Mini App keeps
+  `showUnansweredFirst` as a local filter preference behind the filter button.
+- Start and joined-session launches expose the same session picker directly
+  under the Mini App title. The picker
+  lists Telegram-enabled sessions only, supports multi-select, keeps the joined
+  session preselected when present, and then loads questions across the selected
+  sessions with each question action still scoped to its server-side session
+  context. If a launch points at a session that is no longer selectable by the
+  deployed session policy, the Mini App falls back to the session picker rather
+  than attempting a mismatched session-worker login. When the user continues
+  with a selected session set, the picker collapses into a compact top summary;
+  joined-session launches start in that collapsed state.
 - Native freeform, binary, rating, and multichoice answer forms rendered inline
-  on each displayed question card, with a five-question pager styled after the
-  CE pile response flow. The Mini App does not render question IDs or a
-  `Create Agent` launcher; settings are opened from the top-right gear button.
+  on each displayed question card in one document-scroll question list. The Mini
+  App does not render question IDs or a `Create Agent` launcher; filters and
+  settings are opened from the top-right filter and gear buttons.
+  Session question count text is intentionally a single answerable-question
+  count rather than a split loaded/indexed diagnostic.
+- The filter panel includes unanswered-first ordering, question type filters,
+  and a compact AI-style question search that ranks matching loaded prompts.
+  The search field can also use the microphone icon; transcribed search text is
+  applied to the loaded-question filter immediately.
+- Additional comments include microphone/stop icon buttons. The Mini App first
+  records with `MediaRecorder`, shows recording/transcription/error feedback in
+  the comments textarea rather than duplicating it in the status bar, and sends
+  the audio to
+  `POST /telegram/mini-app/api/transcribe`, which validates Telegram init data,
+  checks `sponsoredAiAllowed`, and forwards the audio to the session worker
+  `/transcribe` route with the managed Telegram account. Comment dictation
+  verifies the server-side question action; AI-search dictation can use a
+  selected session slug without a question action. The final authenticated
+  transcribe upload omits the browser `Origin` header because it is a
+  server-to-server request and session worker CORS allowlists are for browser
+  callers. If a single-tenant session
+  worker rejects the Telegram session slug because its own
+  `DEFAULT_SESSION_SLUG` differs, the bridge retries worker auth without an
+  explicit slug so the worker can use its configured tenant. Operators can also
+  set per-session `workerSessionSlug` / `sessionWorkerSlug` in
+  `AGENT_BRIDGE_SESSION_POLICY_JSON`. Browser Web Speech remains a fallback for
+  webviews without `MediaRecorder`.
+- Previously saved draft answers are returned by state as
+  `draftAnswersByQuestionKey` and hydrate the matching question cards on load.
+  The gear/settings panel also lists saved draft response labels and can clear
+  visible saved drafts through `POST /telegram/mini-app/api/clear-drafts`. The
+  filter panel's `showUnansweredFirst` preference defaults to true and orders
+  saved answered questions after unanswered questions on first load.
 - The Mini App keeps polling state while no answerable questions are available
   and questions are still empty, the question source reports an error, or only
   payload-unavailable question rows are present. Mixed answerable/unavailable
@@ -438,17 +514,32 @@ Current v0 scope:
   a worker URL and Surveys address, and session policy allows managed Telegram
   demo submit. The worker authenticates the managed account to the session
   worker, requests faucet gas when `sponsoredFaucetAllowed=true`,
-  uploads the response payload through the session worker, and calls
-  `Surveys.submitResponses`. If direct submit is not configured, it creates the
-  same Worker-local submit request with an opaque request ID and canonical
+  uploads the response payload through the session worker `/storage/upload`
+  route, waits briefly for newly requested faucet gas to appear on the managed
+  account, and calls `Surveys.submitResponses` with the returned
+  bytes32-compatible storage reference. The session worker chooses Cloudflare or
+  Arweave from the session storage profile. Transaction broadcast tries the
+  configured default RPC first, then additive fallback RPC URLs such as
+  `ADDITIONAL_RPC_URL`. If
+  direct submit is not configured, it creates the same Worker-local submit
+  request with an opaque request ID and canonical
   `/api/agent/responses/submit-request` handoff as before. Exact answer replays
   for the same Telegram user, session, and question reuse the same idempotent
-  request ID; changed answers create distinct records.
-- Worker login uses `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, then
-  `LOCAL_AUTH_ORIGIN`, then `AGENT_BRIDGE_PUBLIC_URL`, before falling back to
-  `http://localhost:7391`. Direct-submit auth failures return a stable reason
-  plus the upstream worker stage/detail so deployment origin or gate mistakes are
-  visible in the Mini App without exposing secrets.
+  request ID; changed answers create distinct records. Failed direct-submit
+  records are retried on the next identical submit instead of replaying a stale
+  auth or broadcast failure.
+- Worker login first honors per-session `workerLoginOrigin` /
+  `sessionWorkerLoginOrigin` and `allowOrigins`, then tries
+  `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, `LOCAL_AUTH_ORIGIN`, and
+  `AGENT_BRIDGE_PUBLIC_URL`. If a session worker rejects one candidate with
+  `Origin not allowed` or a trusted-login origin error, the bridge retries with
+  standard Context Engine origins such as `http://localhost:3000`,
+  `https://contextengine.xyz`, and `http://localhost:7391`. Direct-submit auth
+  failures return a stable reason plus the upstream worker stage/detail so
+  deployment origin or gate mistakes are visible in the Mini App without
+  exposing secrets. Deploy metadata includes the Cloudflare
+  `global_fetch_strictly_public` compatibility flag because the live bridge
+  authenticates to a session Worker over its public `workers.dev` URL.
 - Payload-unavailable questions stay retryable/unanswered; true private or gated
   questions stay locked until the canonical private/gated decrypt path is
   available.
@@ -586,7 +677,8 @@ IDs.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
 9. Smoke Telegram private chat `/start`, `/actions`,
    `/settings`, group `/join <session>`, `/sessions`, `/questions`,
-   `/q <number>`, `/attachments`, and private `/me`.
+   `/q <number>`, `/results consensus`, `/results group`, `/attachments`, and
+   private `/me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
     private keys, RPC secrets, document paths, or private/gated text.
@@ -627,9 +719,10 @@ Still mocked or contract-only for this first smoke:
 - `deploy:plan` creates no KV, R2, D1, Durable Object, Worker upload, secret, or
   webhook resources; the only optional live call is account lookup. Use
   `deploy:apply -- --apply` for the live resource and webhook path.
-- Live public question reads use the Telegram worker-local cache for now; docs
-  still use configured demo fixtures unless the canonical `/api/agent/*`
-  session contract is wired for that route.
+- Live public question reads use the Telegram worker-local materialized cache
+  for now; the cache can hydrate Arweave or Cloudflare-backed question payloads,
+  but docs still use configured demo fixtures unless the canonical
+  `/api/agent/*` session contract is wired for that route.
 - Agent account/settings endpoints are scaffolded request envelopes only:
   `/api/agent/accounts/create-request`, `/api/agent/accounts/me`,
   `/api/agent/settings`, and `/api/agent/settings/update-request` still need the
@@ -668,6 +761,13 @@ worker URL is configured. Faucet results are kept in response metadata and logs
 rather than shown in Telegram copy. If policy or worker configuration does not
 allow faucet, or the session worker lacks a usable faucet key/route, join still
 succeeds without funding.
+
+Mini App direct-submit retries also request faucet gas and wait for a non-zero
+managed-account balance before broadcasting the answer transaction. The wait is
+tunable with `AGENT_BRIDGE_FAUCET_BALANCE_WAIT_ATTEMPTS` and
+`AGENT_BRIDGE_FAUCET_BALANCE_WAIT_MS`; failed direct-submit records remain
+retryable so a first-click funding race does not permanently poison the
+idempotency key.
 
 ## Mock OpenClaw Forwarding
 

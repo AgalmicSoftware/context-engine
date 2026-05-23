@@ -192,6 +192,100 @@ test('listCachedSessionQuestionsForBridge reads live public questions and writes
   assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), true);
 });
 
+test('listCachedSessionQuestionsForBridge reads Cloudflare question storage through session worker auth', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const questionId = `0x${'21'.repeat(32)}`;
+  const pointerBytes = `0x${'31'.repeat(32)}`;
+  const storageId = __test__sessionQuestions.hexToBase64url(pointerBytes);
+  const calls = [];
+  const env = baseEnv({
+    AGENT_BRIDGE_QUESTION_STORAGE_BACKEND: 'cloudflare',
+    CE_SESSION_WORKER_BASE_URL: 'https://session.example',
+    DEMO_SIGNER_ROOT_SECRET: 'root-a',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+  });
+  const fetchImpl = async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token', exp: 2000000000 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).startsWith('https://session.example/storage/read')) {
+      assert.equal(new URL(String(url)).searchParams.get('id'), storageId);
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      return new Response(JSON.stringify({
+        id: questionId,
+        sessionSlug: 'demo',
+        type: 'freeform',
+        prompt: 'Question from Cloudflare storage?',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const body = JSON.parse(init.body || '{}');
+    const data = String(body.params?.[0]?.data || '');
+    if (body.method === 'eth_blockNumber') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x64' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_getLogs') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: [{
+          address: '0x1111111111111111111111111111111111111111',
+          topics: [__test__sessionQuestions.QUESTIONS_ADDED_TOPIC0],
+          data: encodeQuestionsAddedData([questionId], []),
+        }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (
+      body.method === 'eth_call' &&
+      data.startsWith(__test__sessionQuestions.SELECTORS.getQuestionHash)
+    ) {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: pointerBytes }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected ${body.method || url}`);
+  };
+
+  const result = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionStorageBackend, 'cloudflare');
+  assert.equal(result.questionCount, 1);
+  assert.equal(result.questions[0].prompt, 'Question from Cloudflare storage?');
+  assert.equal(result.questions[0].arweaveTxId, undefined);
+  assert.deepEqual(result.questions[0].storageRef, {
+    backend: 'cloudflare',
+    id: storageId,
+    resource: 'questions',
+    uri: `/storage/read?id=${encodeURIComponent(storageId)}`,
+  });
+  assert.equal(calls.filter((call) => call.url.endsWith('/auth/nonce')).length, 1);
+  assert.equal(calls.filter((call) => call.url.startsWith('https://session.example/storage/read')).length, 1);
+});
+
 test('normalizeQuestionPayload preserves CE question type and treats sessionName as display metadata', () => {
   const questionId = `0x${'91'.repeat(32)}`;
   const normalized = __test__sessionQuestions.normalizeQuestionPayload({
@@ -1424,7 +1518,7 @@ test('listCachedSessionQuestionsForBridge keeps on-chain question IDs when paylo
   assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), true);
 });
 
-test('listCachedSessionQuestionsForBridge retries payload-unavailable cache records before returning stale cache', async () => {
+test('listCachedSessionQuestionsForBridge retries payload-unavailable KV cache before returning it', async () => {
   __test__sessionQuestions.questionMemoryCache.clear();
   const questionId = `0x${'77'.repeat(32)}`;
   const pointerBytes = `0x${'78'.repeat(32)}`;
@@ -1434,7 +1528,7 @@ test('listCachedSessionQuestionsForBridge retries payload-unavailable cache reco
     reason: 'live_questions_indexed',
     sessionSlug: 'demo',
     source: 'telegram_worker_question_index',
-    cachedAtMs: 1,
+    cachedAtMs: Date.now(),
     chainId: '11155420',
     surveysAddress: '0x1111111111111111111111111111111111111111',
     indexedFromBlock: 90,

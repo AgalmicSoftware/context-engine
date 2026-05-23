@@ -480,7 +480,7 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
   return {
     main_module: 'worker.js',
     compatibility_date: safeString(config.compatibilityDate || DEFAULT_COMPATIBILITY_DATE),
-    compatibility_flags: ['nodejs_compat'],
+    compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
     bindings,
     migrations: {
       old_tag: '',

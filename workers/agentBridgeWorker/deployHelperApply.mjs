@@ -30,6 +30,7 @@ const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'sessions', description: 'List available sessions' },
   { command: 'questions', description: 'View session questions' },
   { command: 'q', description: 'Pose a question by number' },
+  { command: 'results', description: 'View consensus or group results' },
   { command: 'attachments', description: 'View session files' },
   { command: 'docs', description: 'View session files' },
   { command: 'me', description: 'View your account' },

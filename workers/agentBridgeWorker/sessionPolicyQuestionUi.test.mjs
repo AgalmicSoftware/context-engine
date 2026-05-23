@@ -48,6 +48,21 @@ test('session policy resolves defaults and invocation by slug or name', () => {
   assert.equal(resolveSessionInvocation(policy, 'Alpha Room').session.sessionSlug, 'alpha');
   assert.equal(resolveSessionInvocation(policy, 'beta').reason, 'telegram_bridge_disabled');
   assert.equal(resolveSessionInvocation(policy, 'missing').reason, 'session_not_linked');
+
+  const workerSlugPolicy = normalizeSessionPolicy({
+    defaultSessionSlug: 'telegram-demo-2',
+    sessions: [{
+      sessionSlug: 'telegram-demo-2',
+      workerSessionSlug: 'custom-13-may-2026',
+      workerLoginOrigin: 'http://localhost:3000',
+      allowOrigins: ['http://localhost:3000', 'https://contextengine.xyz'],
+      telegramBridgeEnabled: true,
+    }],
+  });
+  const workerSlugSession = resolveSessionInvocation(workerSlugPolicy, 'telegram-demo-2').session;
+  assert.equal(workerSlugSession.workerSessionSlug, 'custom-13-may-2026');
+  assert.equal(workerSlugSession.workerLoginOrigin, 'http://localhost:3000');
+  assert.deepEqual(workerSlugSession.allowOrigins, ['http://localhost:3000', 'https://contextengine.xyz']);
 });
 
 test('SBT join and sponsored resources follow session policy without exposing secrets', () => {
@@ -163,7 +178,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     binary.controls
       .filter((control) => control.controlType === 'agree_unsure_disagree')
       .map((control) => control.label),
-    ['Agree', 'Unsure', 'Disagree'],
+    ['Agree', 'Disagree', 'Unsure'],
   );
   assert.equal(singleChoice.selectionMode, 'single');
   assert.equal(singleChoice.controls.filter((control) => control.controlType === 'single_select').length, 2);

@@ -1,4 +1,9 @@
 import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registrySessions.mjs';
+import { deriveManagedDemoAccount } from './managedAccounts.mjs';
+import {
+  authenticateSessionWorker,
+  resolveSessionWorkerUrl,
+} from './onChainResponses.mjs';
 
 const DEFAULT_CHAIN_ID = '11155420';
 const ARWEAVE_GATEWAY = 'https://ar-io.dev';
@@ -13,6 +18,10 @@ const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
 const QUESTION_CACHE_PREFIX = 'telegram:questions:v5:';
 const questionMemoryCache = new Map();
 const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
+const STORAGE_BACKENDS = Object.freeze({
+  ARWEAVE: 'arweave',
+  CLOUDFLARE: 'cloudflare',
+});
 
 const SURVEYS_BY_CHAIN = Object.freeze({
   '11155420': '0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A',
@@ -55,6 +64,61 @@ function normalizeBlock(value) {
 
 function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
+}
+
+function normalizeStorageBackend(value = '') {
+  const backend = lower(value);
+  if (backend === 'cloudflare' || backend === 'cf' || backend === 'r2') return STORAGE_BACKENDS.CLOUDFLARE;
+  return STORAGE_BACKENDS.ARWEAVE;
+}
+
+function resolveQuestionStorageBackend(session = {}, env = {}) {
+  const metadata = session.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
+    ? session.metadata
+    : {};
+  const profile = metadata.storageProfile && typeof metadata.storageProfile === 'object' && !Array.isArray(metadata.storageProfile)
+    ? metadata.storageProfile
+    : {};
+  return normalizeStorageBackend(
+    env.AGENT_BRIDGE_QUESTION_STORAGE_BACKEND ||
+    profile.questionsBackend ||
+    profile.questionBackend ||
+    profile.backend ||
+    metadata.questionStorageBackend ||
+    metadata.storageBackend
+  );
+}
+
+function storageRefForPointer(pointerId = '', resource = 'questions', backend = STORAGE_BACKENDS.ARWEAVE) {
+  const id = safeString(pointerId);
+  if (!id) return null;
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE) {
+    return {
+      backend: STORAGE_BACKENDS.CLOUDFLARE,
+      id,
+      resource,
+      uri: `/storage/read?id=${encodeURIComponent(id)}`,
+    };
+  }
+  return {
+    backend: STORAGE_BACKENDS.ARWEAVE,
+    id,
+    resource,
+    uri: `ar://${id}`,
+  };
+}
+
+function loginOriginForWorker(env = {}) {
+  const configured = safeString(
+    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN ||
+    env.LOCAL_AUTH_ORIGIN ||
+    env.AGENT_BRIDGE_PUBLIC_URL
+  );
+  try {
+    return new URL(configured || 'http://localhost:7391').origin;
+  } catch {
+    return 'http://localhost:7391';
+  }
 }
 
 function rpcTimeoutMs(env = {}) {
@@ -341,6 +405,70 @@ async function fetchArweaveJson(pointerId = '', {
   return null;
 }
 
+async function buildCloudflareQuestionStorageAuth({
+  env = {},
+  session = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const sessionSlug = safeString(session.slug || session.sessionSlug || env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG);
+  const workerUrl = resolveSessionWorkerUrl(env, session);
+  if (!workerUrl || !sessionSlug) return { ok: false, reason: 'session_worker_url_missing' };
+  const principal = {
+    telegramUserId: `question-indexer:${sessionSlug}`,
+    username: 'question-indexer',
+  };
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+  });
+  return authenticateSessionWorker({
+    env,
+    session: { ...session, sessionSlug },
+    account,
+    principal,
+    workerUrl,
+    fetchImpl,
+  });
+}
+
+async function fetchCloudflareStorageJson(pointerId = '', {
+  env = {},
+  session = {},
+  getAuth,
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS,
+} = {}) {
+  const id = safeString(pointerId);
+  if (!id || typeof fetchImpl !== 'function') return null;
+  const auth = typeof getAuth === 'function'
+    ? await getAuth()
+    : await buildCloudflareQuestionStorageAuth({ env, session, fetchImpl });
+  if (!auth?.ok || !auth.token || !auth.workerUrl) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error('Cloudflare storage fetch timed out')), timeoutMs);
+  try {
+    const url = new URL(`${auth.workerUrl}/storage/read`);
+    url.searchParams.set('id', id);
+    const response = await fetchImpl(url.toString(), {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json',
+        Origin: loginOriginForWorker(env),
+        Authorization: `Bearer ${auth.token}`,
+      },
+    });
+    if (!response?.ok) return null;
+    const payload = await response.json().catch(() => null);
+    return payload && typeof payload === 'object' && !Array.isArray(payload) ? payload : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchSessionMetadata(metadataURI = '', {
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
@@ -389,6 +517,7 @@ async function fetchSessionConfigForQuestions({
   const registryAddress = resolveSessionRegistryAddress(env);
   const session = {
     slug: lower(sessionSlug),
+    sessionSlug: lower(sessionSlug),
     chainId,
     metadataURI: '',
     metadata: null,
@@ -397,6 +526,7 @@ async function fetchSessionConfigForQuestions({
       end: envEnd,
     },
     surveysAddress: configuredSurveysAddress || fallbackSurveysAddress,
+    sessionWorkerUrl: safeString(env.CE_SESSION_WORKER_BASE_URL || env.AGENT_BRIDGE_SESSION_WORKER_URL || env.SESSION_WORKER_URL),
   };
   if (configuredSurveysAddress && (envStart != null || envFlagEnabled(env.AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY))) {
     return session;
@@ -412,6 +542,7 @@ async function fetchSessionConfigForQuestions({
   });
   if (!tuple?.slug) return session;
   session.slug = lower(tuple.slug);
+  session.sessionSlug = session.slug;
   session.chainId = normalizeChainId(tuple.chainId || chainId);
   session.metadataURI = tuple.metadataURI;
   session.surveysAddress = configuredSurveysAddress || resolveSurveysAddress(env, session.chainId);
@@ -428,6 +559,13 @@ async function fetchSessionConfigForQuestions({
     session.surveysAddress = configuredSurveysAddress ||
       resolveMetadataSurveysAddress(metadata) ||
       resolveSurveysAddress(env, session.chainId);
+    session.sessionWorkerUrl = safeString(
+      metadata.sessionWorkerUrl ||
+      metadata.workerUrl ||
+      metadata.corsWorkerUrl ||
+      metadata.CE_SESSION_WORKER_BASE_URL ||
+      session.sessionWorkerUrl
+    );
   }
   if (session.blockLimits.start == null && envStart == null) {
     const createdBlock = await fetchSessionCreatedBlock({
@@ -758,6 +896,7 @@ function normalizeQuestionPayloadRoot(payload = {}) {
 function normalizeQuestionPayload(payload = {}, {
   questionId = '',
   pointerId = '',
+  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
   sessionSlug = '',
   fallbackSessionSlug = '',
 } = {}) {
@@ -798,8 +937,8 @@ function normalizeQuestionPayload(payload = {}, {
       : {}),
     source: 'live_session_question',
     sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
-    arweaveTxId: pointerId,
-    storageRef: pointerId ? { backend: 'arweave', id: pointerId, resource: 'questions', uri: `ar://${pointerId}` } : null,
+    ...(pointerBackend === STORAGE_BACKENDS.ARWEAVE ? { arweaveTxId: pointerId } : {}),
+    storageRef: storageRefForPointer(pointerId, 'questions', pointerBackend),
   };
   return normalized;
 }
@@ -807,6 +946,7 @@ function normalizeQuestionPayload(payload = {}, {
 function lockedQuestionPlaceholder({
   questionId = '',
   pointerId = '',
+  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
   sessionSlug = '',
   reason = 'question_payload_unavailable',
 } = {}) {
@@ -826,8 +966,8 @@ function lockedQuestionPlaceholder({
     payloadUnavailableReason: safeString(reason) || 'question_payload_unavailable',
     source: 'live_session_question',
     sessionSlug: lower(sessionSlug),
-    arweaveTxId: pointerId,
-    storageRef: pointerId ? { backend: 'arweave', id: pointerId, resource: 'questions', uri: `ar://${pointerId}` } : null,
+    ...(pointerBackend === STORAGE_BACKENDS.ARWEAVE ? { arweaveTxId: pointerId } : {}),
+    storageRef: storageRefForPointer(pointerId, 'questions', pointerBackend),
   };
 }
 
@@ -835,7 +975,10 @@ async function fetchQuestionPayload({
   rpcUrls = [],
   surveysAddress = '',
   questionId = '',
+  session = {},
   sessionSlug = '',
+  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
+  getCloudflareAuth = null,
   env = {},
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
@@ -854,9 +997,17 @@ async function fetchQuestionPayload({
   if (!pointerBytes || pointerBytes === ZERO_BYTES32) return null;
   const pointerId = hexToBase64url(pointerBytes);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(pointerId)) return null;
-  const payload = await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
+  const payload = pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
+    ? await fetchCloudflareStorageJson(pointerId, {
+      env,
+      session,
+      getAuth: getCloudflareAuth,
+      fetchImpl,
+      timeoutMs,
+    })
+    : await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
+    return lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug });
   }
   const payloadSessionSlug = normalizePayloadSessionSlug(payload);
   const requestedSessionSlug = lower(sessionSlug);
@@ -872,10 +1023,11 @@ async function fetchQuestionPayload({
   return normalizeQuestionPayload(payload, {
     questionId: id,
     pointerId,
+    pointerBackend,
     sessionSlug,
     fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
   }) ||
-    lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
+    lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug });
 }
 
 function cacheTtlSeconds(env = {}) {
@@ -1030,7 +1182,10 @@ async function fetchQuestionPayloads({
   rpcUrls = [],
   surveysAddress = '',
   questionIds = [],
+  session = {},
   sessionSlug = '',
+  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
+  getCloudflareAuth = null,
   seenQuestionIds = new Set(),
   env = {},
   fetchImpl = globalThis.fetch,
@@ -1054,7 +1209,10 @@ async function fetchQuestionPayloads({
         rpcUrls,
         surveysAddress,
         questionId: id,
+        session,
         sessionSlug,
+        pointerBackend,
+        getCloudflareAuth,
         env,
         fetchImpl,
         timeoutMs: questionPayloadTimeoutMs(env),
@@ -1080,7 +1238,10 @@ async function fetchQuestionPayloads({
 async function scanQuestionRange({
   rpcUrls = [],
   surveysAddress = '',
+  session = {},
   sessionSlug = '',
+  pointerBackend = STORAGE_BACKENDS.ARWEAVE,
+  getCloudflareAuth = null,
   fromBlock = 0,
   toBlock = 0,
   seenQuestionIds = new Set(),
@@ -1153,7 +1314,10 @@ async function scanQuestionRange({
       rpcUrls,
       surveysAddress,
       questionIds: chunkIds,
+      session,
       sessionSlug,
+      pointerBackend,
+      getCloudflareAuth,
       seenQuestionIds,
       env,
       fetchImpl,
@@ -1224,6 +1388,23 @@ async function refreshSessionQuestionIndex({
   if (!surveysAddress) {
     return { ok: false, reason: 'surveys_address_missing', sessionSlug: slug, questions: [] };
   }
+  const pointerBackend = resolveQuestionStorageBackend(session, env);
+  let cloudflareAuthPromise = null;
+  const getCloudflareAuth = pointerBackend === STORAGE_BACKENDS.CLOUDFLARE
+    ? () => {
+        if (!cloudflareAuthPromise) {
+          cloudflareAuthPromise = buildCloudflareQuestionStorageAuth({
+            env,
+            session: { ...session, sessionSlug: slug },
+            fetchImpl,
+          }).catch((error) => ({
+            ok: false,
+            reason: safeString(error?.message || error) || 'cloudflare_question_auth_failed',
+          }));
+        }
+        return cloudflareAuthPromise;
+      }
+    : null;
 
   let currentBlock = 0;
   try {
@@ -1272,7 +1453,10 @@ async function refreshSessionQuestionIndex({
       rpcUrls,
       surveysAddress,
       questionIds: retryQuestionIds,
+      session,
       sessionSlug: slug,
+      pointerBackend,
+      getCloudflareAuth,
       seenQuestionIds,
       env,
       fetchImpl,
@@ -1321,7 +1505,10 @@ async function refreshSessionQuestionIndex({
     const rangeResult = await scanQuestionRange({
       rpcUrls,
       surveysAddress,
+      session,
       sessionSlug: slug,
+      pointerBackend,
+      getCloudflareAuth,
       fromBlock: range.fromBlock,
       toBlock: range.toBlock,
       seenQuestionIds,
@@ -1388,6 +1575,7 @@ async function refreshSessionQuestionIndex({
     cachedAtMs: Date.now(),
     chainId: normalizeChainId(session.chainId),
     surveysAddress,
+    questionStorageBackend: pointerBackend,
     scanWindow,
     indexedFromBlock,
     indexedToBlock,
@@ -1421,14 +1609,16 @@ export async function listCachedSessionQuestionsForBridge({
   const key = cacheKey(slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), 'memory', slug);
   if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds) && !cacheNeedsImmediateScopeRefresh(memory)) {
-    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: memory, fetchImpl });
-    return memory;
+    if (!hasPayloadUnavailableQuestions(memory)) {
+      scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: memory, fetchImpl });
+      return memory;
+    }
   }
   const kv = await readKvQuestionIndex(env, key);
   if (!forceRefresh && kv && isFreshQuestionIndex(kv, ttlSeconds)) {
     questionMemoryCache.set(key, kv);
     const cached = scopedCachedIndexForReturn(kv, 'kv', slug);
-    if (!cacheNeedsImmediateScopeRefresh(cached)) {
+    if (!cacheNeedsImmediateScopeRefresh(cached) && !hasPayloadUnavailableQuestions(cached)) {
       scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: cached, fetchImpl });
       return cached;
     }

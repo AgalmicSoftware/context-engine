@@ -176,6 +176,7 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
     if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')) {
       const body = JSON.parse(options.body || '{}');
       assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
+      assert.equal(body.commands.some((command) => command.command === 'results'), true);
       assert.equal(body.commands.some((command) => command.command.startsWith('ce_')), false);
       return jsonResponse({ ok: true, result: true, description: 'Commands were set' });
     }

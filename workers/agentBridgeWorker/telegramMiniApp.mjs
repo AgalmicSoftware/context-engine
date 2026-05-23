@@ -7,7 +7,11 @@ import {
   listAgentApiCapabilities,
 } from './agentApiCatalog.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
-import { submitTelegramResponseOnChain } from './onChainResponses.mjs';
+import {
+  authenticateSessionWorker,
+  resolveSessionWorkerUrl,
+  submitTelegramResponseOnChain,
+} from './onChainResponses.mjs';
 import { buildOpaqueActionId, createTelegramCallbackAction, parseOpaqueActionId } from './opaqueActions.mjs';
 import {
   buildTelegramAgentSettingsEditState,
@@ -15,14 +19,19 @@ import {
   buildTelegramPoseQuestionState,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
-import { resolveSessionInvocation } from './sessionPolicy.mjs';
+import {
+  evaluateSponsoredResourceEligibility,
+  resolveSessionInvocation,
+} from './sessionPolicy.mjs';
 import {
   loadQuestionsForSession,
   loadSessionPolicy,
+  deleteAnswerDraft,
   persistActionRecord,
   persistAnswerDraft,
   questionId as readQuestionId,
   readActionRecord,
+  readAnswerDraft,
   shortQuestionId,
 } from './telegramCommands.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
@@ -293,7 +302,8 @@ function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   if (![TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE].includes(launchRecord.action)) {
     return false;
   }
-  if (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug) return false;
+  if (launchRef.sessionPicker !== true && (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug)) return false;
+  if (launchRef.sessionPicker === true && !questionSessionSlug) return false;
   if (launchQuestionId && questionId && lower(launchQuestionId) !== lower(questionId)) return false;
   return true;
 }
@@ -336,6 +346,17 @@ function normalizeAgentSettingsInput(settings = {}) {
       patch.telegramReminders = ['true', '1', 'yes', 'on'].includes(normalized);
     }
   }
+  if (Object.hasOwn(input, 'showUnansweredFirst')) {
+    if (input.showUnansweredFirst === true || input.showUnansweredFirst === false) {
+      patch.showUnansweredFirst = input.showUnansweredFirst;
+    } else {
+      const normalized = lower(input.showUnansweredFirst);
+      if (!['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(normalized)) {
+        return { ok: false, reason: 'show_unanswered_first_invalid' };
+      }
+      patch.showUnansweredFirst = ['true', '1', 'yes', 'on'].includes(normalized);
+    }
+  }
   if (!Object.keys(patch).length) {
     return { ok: false, reason: 'settings_patch_required' };
   }
@@ -345,6 +366,7 @@ function normalizeAgentSettingsInput(settings = {}) {
     publicSummary: {
       ...(Object.hasOwn(patch, 'draftStyle') ? { draftStyle: patch.draftStyle } : {}),
       ...(Object.hasOwn(patch, 'telegramReminders') ? { telegramReminders: patch.telegramReminders } : {}),
+      ...(Object.hasOwn(patch, 'showUnansweredFirst') ? { showUnansweredFirst: patch.showUnansweredFirst } : {}),
     },
   };
 }
@@ -357,6 +379,7 @@ function defaultAgentSettingsState({
     settings: {
       draftStyle: 'balanced',
       telegramReminders: false,
+      showUnansweredFirst: true,
     },
     sessionSlug,
     createdAt,
@@ -450,9 +473,10 @@ async function miniQuestionFromRecord({
     card,
     createdAt,
   });
-  return {
+  const output = {
     index,
     displayIndex: index + 1,
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
     questionKey,
     activeFromLaunch: Boolean(launchQuestionId && qid && lower(qid) === lower(launchQuestionId)),
     questionType: safeString(card.questionType || group.questionType || 'freeform'),
@@ -476,6 +500,11 @@ async function miniQuestionFromRecord({
       ? 'payload_unavailable'
       : locked ? safeString(group.status || 'locked_unavailable') : 'answerable',
   };
+  Object.defineProperty(output, 'questionId', {
+    value: qid,
+    enumerable: false,
+  });
+  return output;
 }
 
 function launchSessionSlug(record = {}, env = {}) {
@@ -485,6 +514,129 @@ function launchSessionSlug(record = {}, env = {}) {
     env.DEFAULT_SESSION_SLUG ||
     'general'
   ) || 'general';
+}
+
+function normalizeSessionSlugList(value = '') {
+  const seen = new Set();
+  const slugs = safeString(value)
+    .split(',')
+    .map(sanitizeSessionSlug)
+    .filter(Boolean)
+    .filter((slug) => {
+      if (seen.has(slug)) return false;
+      seen.add(slug);
+      return true;
+    });
+  return slugs;
+}
+
+function sessionPickerEnabled(record = {}) {
+  return record?.serverContextRef?.sessionPicker === true;
+}
+
+function linkedPolicySessions(policy = {}) {
+  return (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : [])
+    .map((session) => ({
+      sessionSlug: sanitizeSessionSlug(session.sessionSlug),
+      sessionName: safeString(session.sessionName || session.sessionSlug),
+      default: session.default === true,
+      telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
+    }))
+    .filter((session) => {
+      if (!session.sessionSlug || !session.telegramBridgeEnabled) return false;
+      const label = `${session.sessionSlug} ${session.sessionName}`;
+      // Temporary smoke-test hygiene: hide old E2E registry spam until session
+      // metadata has a durable production flag for Telegram visibility.
+      return !(/\be2e\b|e2e/i.test(label));
+    });
+}
+
+function buildMiniAppSessionPicker(policy = {}, selectedSessionSlugs = []) {
+  const selected = new Set(selectedSessionSlugs.map(sanitizeSessionSlug).filter(Boolean));
+  return {
+    enabled: true,
+    required: selected.size === 0,
+    multiSelect: true,
+    initiallyCollapsed: selected.size > 0,
+    selectedSessionSlugs: [...selected],
+    sessions: linkedPolicySessions(policy).map((session) => ({
+      ...session,
+      selected: selected.has(session.sessionSlug),
+    })),
+  };
+}
+
+function miniAnswerFromSavedDraft(draft = {}, question = {}) {
+  const rawValue = safeString(draft.answerValue || draft.answerLabel);
+  const parsed = safeJsonParse(rawValue, null);
+  const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? parsed
+    : {
+      questionType: draft.controlType || question.questionType,
+      value: rawValue,
+      text: rawValue,
+      label: draft.answerLabel,
+    };
+  const comments = safeString(source.comments || source.additionalComments);
+  if (question.questionType === 'multichoice' || source.questionType === 'multichoice') {
+    const values = Array.isArray(source.values)
+      ? source.values.map(safeString).filter(Boolean)
+      : [source.value || rawValue].map(safeString).filter(Boolean);
+    return { values, comments };
+  }
+  if (question.questionType === 'freeform' || source.questionType === 'freeform') {
+    return { text: safeString(source.text || source.value || rawValue), comments };
+  }
+  if (question.questionType === 'rating' || source.questionType === 'rating') {
+    const value = Number(source.value ?? rawValue);
+    return { value: Number.isFinite(value) ? value : rawValue, comments };
+  }
+  return { value: lower(source.value || rawValue), comments };
+}
+
+async function loadSavedMiniAppDrafts({
+  env = {},
+  auth = {},
+  sessionSlug = '',
+  questions = [],
+} = {}) {
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  if (!telegramUserId) return { savedDrafts: [], draftAnswersByQuestionKey: {} };
+  const normalized = {
+    user: { telegramUserId },
+    chat: { chatId: safeString(auth.chatInstance || auth.queryId || telegramUserId) },
+  };
+  const entries = await Promise.all(questions.map(async (question) => {
+    const questionSessionSlug = sanitizeSessionSlug(question.sessionSlug || sessionSlug);
+    const draft = await readAnswerDraft({
+      env,
+      normalized,
+      sessionSlug: questionSessionSlug,
+      selectedQuestionId: question.questionId,
+    });
+    if (!draft) return null;
+    return {
+      question,
+      draft,
+      answer: miniAnswerFromSavedDraft(draft, question),
+    };
+  }));
+  const saved = entries.filter(Boolean);
+  const draftAnswersByQuestionKey = {};
+  for (const entry of saved) {
+    draftAnswersByQuestionKey[entry.question.questionKey] = entry.answer;
+  }
+  return {
+    draftAnswersByQuestionKey,
+    savedDrafts: saved.map((entry) => ({
+      questionKey: entry.question.questionKey,
+      displayIndex: entry.question.displayIndex,
+      sessionSlug: entry.question.sessionSlug || sessionSlug,
+      prompt: entry.question.prompt || entry.question.title || '',
+      answerLabel: safeString(entry.draft.answerLabel),
+      selectedAt: safeString(entry.draft.selectedAt),
+    })),
+  };
 }
 
 async function buildMiniAppState({
@@ -567,23 +719,127 @@ async function buildMiniAppState({
       },
     };
   }
-  const sessionSlug = launchSessionSlug(launchRecord, env);
+  const policy = await loadSessionPolicy(env);
+  const linkedSessions = linkedPolicySessions(policy);
+  const linkedSessionLookup = new Set(linkedSessions.map((session) => session.sessionSlug));
+  const launchRequestsPicker = sessionPickerEnabled(launchRecord);
+  const pickerSelection = normalizeSessionSlugList(url.searchParams.get('sessions') || url.searchParams.get('sessionSlugs'));
+  const launchSlug = launchSessionSlug(launchRecord, env);
+  const selectedSessionSlugs = (
+    pickerSelection.length
+      ? pickerSelection
+      : (launchRequestsPicker ? [] : [launchSlug])
+  ).filter((slug) => linkedSessionLookup.has(slug));
+  const launchSlugUnavailable = !launchRequestsPicker && launchSlug && !linkedSessionLookup.has(launchSlug);
+  const effectivePickerEnabled = linkedSessions.length > 0 || launchRequestsPicker || launchSlugUnavailable;
+  const effectiveSelectedSessionSlugs = launchSlugUnavailable ? [] : selectedSessionSlugs;
+  const sessionPicker = effectivePickerEnabled
+    ? buildMiniAppSessionPicker(policy, effectiveSelectedSessionSlugs)
+    : { enabled: false, required: false, multiSelect: false, selectedSessionSlugs: [], sessions: [] };
+  if (effectivePickerEnabled && effectiveSelectedSessionSlugs.length === 0) {
+    const agentSettings = defaultAgentSettingsState({ sessionSlug: '', createdAt });
+    return {
+      ok: true,
+      app: 'ce-telegram-mini-app',
+      auth: authSummary,
+      launch: {
+        ok: Boolean(launchRecord),
+        launch,
+        reason: launchRecord ? 'launch_action_loaded' : 'launch_action_missing_or_expired',
+      },
+      session: {
+        sessionSlug: '',
+        title: 'Select sessions',
+      },
+      sessionPicker,
+      selectedSessionSlugs: [],
+      questions: [],
+      savedDrafts: [],
+      draftAnswersByQuestionKey: {},
+      activeQuestionKey: '',
+      questionCount: 0,
+      availableQuestionCount: 0,
+      unavailableQuestionCount: 0,
+      lockedQuestionCount: 0,
+      discoveredQuestionCount: 0,
+      skippedQuestionCount: 0,
+      questionIndexComplete: true,
+      pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
+      questionSource: 'session_picker',
+      questionSourceReason: 'session_selection_required',
+      sourceOk: true,
+      sourceError: '',
+      agent: {
+        actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
+          .map((capability) => ({
+            id: capability.id,
+            label: capability.label,
+            category: capability.category,
+            method: capability.method,
+            path: capability.path,
+            handoffStatus: capability.handoffStatus,
+            requiredFields: capability.requiredFields,
+            miniAppRoutes: capability.miniAppRoutes,
+          })),
+        account: {
+          mode: 'managed_telegram_demo',
+          createAction: 'agent.account.create',
+          canonicalApiRequest: buildCanonicalAgentRequest({
+            capabilityId: 'agent.account.create',
+            body: {
+              telegramPrincipalRef: 'telegram_principal_ref',
+              accountMode: 'managed_telegram_demo',
+              session: '',
+              idempotencyKey: 'provided_on_submit',
+            },
+          }),
+        },
+        settings: agentSettings,
+      },
+    };
+  }
+  const sessionSlug = effectiveSelectedSessionSlugs[0] || launchSessionSlug(launchRecord, env);
   const launchQuestionId = safeString(launchRecord?.serverContextRef?.questionId);
-  const loaded = await loadQuestionsForSession(env, sessionSlug, { waitUntil });
-  const sourceQuestions = Array.isArray(loaded.questions) ? loaded.questions : [];
-  const questions = await Promise.all(sourceQuestions.map((question, index) => miniQuestionFromRecord({
-    env,
-    sessionSlug,
-    question,
-    index,
-    launchQuestionId,
-    createdAt,
+  const loadedEntries = await Promise.all(effectiveSelectedSessionSlugs.map(async (slug) => ({
+    sessionSlug: slug,
+    loaded: await loadQuestionsForSession(env, slug, { waitUntil }),
   })));
+  let questionIndex = 0;
+  const questionGroups = await Promise.all(loadedEntries.map(async ({ sessionSlug: slug, loaded }) => {
+    const sourceQuestions = Array.isArray(loaded.questions) ? loaded.questions : [];
+    return Promise.all(sourceQuestions.map((question) => miniQuestionFromRecord({
+      env,
+      sessionSlug: slug,
+      question,
+      index: questionIndex++,
+      launchQuestionId,
+      createdAt,
+    })));
+  }));
+  const questions = questionGroups.flat();
+  const availableQuestionCount = questions.filter((question) => question?.canAnswer).length;
+  const unavailableQuestionCount = questions.filter((question) => question?.payloadUnavailable === true).length;
+  const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
+  const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
+    sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
+  ), 0) || questions.length;
   const activeQuestionKey = questions.find((question) => question.activeFromLaunch)?.questionKey ||
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
     '';
+  const savedDraftState = await loadSavedMiniAppDrafts({
+    env,
+    auth,
+    sessionSlug,
+    questions,
+  });
   const agentSettings = defaultAgentSettingsState({ sessionSlug, createdAt });
+  const selectedSessionTitles = effectiveSelectedSessionSlugs.map((slug) => (
+    linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug
+  ));
+  const sourceOk = loadedEntries.every((entry) => entry.loaded.ok !== false);
+  const sourceReasons = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.reason)).filter(Boolean))];
+  const sourceNames = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.source)).filter(Boolean))];
   return {
     ok: true,
     app: 'ce-telegram-mini-app',
@@ -595,16 +851,28 @@ async function buildMiniAppState({
     },
     session: {
       sessionSlug,
-      title: sessionSlug,
+      title: selectedSessionTitles.length > 1 ? `${selectedSessionTitles.length} sessions` : (selectedSessionTitles[0] || sessionSlug),
     },
+    sessionPicker,
+    selectedSessionSlugs: effectiveSelectedSessionSlugs,
     questions,
+    savedDrafts: savedDraftState.savedDrafts,
+    draftAnswersByQuestionKey: savedDraftState.draftAnswersByQuestionKey,
     activeQuestionKey,
     questionCount: questions.length,
+    availableQuestionCount,
+    unavailableQuestionCount,
+    lockedQuestionCount,
+    discoveredQuestionCount,
+    skippedQuestionCount: loadedEntries.reduce((sum, entry) => (
+      sum + (Number(entry.loaded.skippedSessionMismatchCount || entry.loaded.scopedOutQuestionCount || 0) || 0)
+    ), 0),
+    questionIndexComplete: loadedEntries.every((entry) => entry.loaded.complete !== false),
     pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
-    questionSource: loaded.source || 'telegram_worker_question_cache',
-    questionSourceReason: loaded.reason || '',
-    sourceOk: loaded.ok !== false,
-    sourceError: loaded.ok === false ? (loaded.reason || 'question_source_unavailable') : '',
+    questionSource: sourceNames.length === 1 ? sourceNames[0] : 'multi_session_question_cache',
+    questionSourceReason: sourceReasons.join(', '),
+    sourceOk,
+    sourceError: sourceOk ? '' : (sourceReasons.join(', ') || 'question_source_unavailable'),
     agent: {
       actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
         .map((capability) => ({
@@ -657,6 +925,19 @@ function submitFailureMessage(result = {}) {
     detail,
     message: detail ? `${message} Detail: ${detail}` : message,
   };
+}
+
+function audioFileExtension(file = {}) {
+  const name = safeString(file?.name).toLowerCase();
+  const ext = name.match(/\.([a-z0-9]{2,6})$/)?.[1];
+  if (ext) return ext;
+  const mime = safeString(file?.type).toLowerCase();
+  if (mime.includes('webm')) return 'webm';
+  if (mime.includes('ogg')) return 'ogg';
+  if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+  if (mime.includes('mp4')) return 'mp4';
+  if (mime.includes('wav')) return 'wav';
+  return 'webm';
 }
 
 function normalizeChoiceValues(answer = {}) {
@@ -737,7 +1018,11 @@ async function persistSubmitRequest({
   const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
     ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
     : null;
-  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+  const retryExistingDirectFailure = existing &&
+    typeof existing === 'object' &&
+    !Array.isArray(existing) &&
+    existing.status === 'direct_submit_failed';
+  if (existing && typeof existing === 'object' && !Array.isArray(existing) && !retryExistingDirectFailure) {
     return {
       ok: true,
       requestId,
@@ -999,6 +1284,7 @@ async function handleDraftRequest({
     answerLabel: normalizedAnswer.label,
     answerValue: JSON.stringify(normalizedAnswer.answer),
     controlType: safeString(questionRef.questionType),
+    submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
     createdAt,
   });
   if (!saved.ok) {
@@ -1037,6 +1323,210 @@ async function handleDraftRequest({
       submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
     },
     submitRequest,
+  });
+}
+
+async function handleClearDraftsRequest({
+  request,
+  env = {},
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) {
+    return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  }
+  if (!safeString(auth.user?.telegramUserId)) {
+    return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  }
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const questionKeys = Array.isArray(body.questionKeys)
+    ? body.questionKeys.map(safeString).filter(Boolean)
+    : [];
+  if (!questionKeys.length) {
+    return json({ ok: false, error: 'question_keys_required' }, { status: 400 });
+  }
+
+  let launchRecord = null;
+  if (auth.authMode === 'telegram') {
+    launchRecord = await resolveLaunchRecord(env, launch);
+    if (!launchRecord) {
+      return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
+    }
+  }
+
+  const normalized = {
+    user: { telegramUserId: safeString(auth.user.telegramUserId) },
+    chat: { chatId: safeString(auth.chatInstance || auth.queryId || auth.user.telegramUserId) },
+  };
+  let clearedCount = 0;
+  const clearedQuestionKeys = [];
+  for (const questionKey of questionKeys) {
+    const parsed = parseOpaqueActionId(questionKey);
+    if (!parsed.ok) continue;
+    const record = await readActionRecord(env, parsed.actionId);
+    const questionRef = record?.serverContextRef || {};
+    if (
+      !record ||
+      record.action !== TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE ||
+      record.lane !== TELEGRAM_CHAT_LANES.MINI_APP ||
+      record.miniAppQuestionAction !== true
+    ) {
+      continue;
+    }
+    if (auth.authMode === 'telegram' && !miniAppLaunchMatchesQuestion(launchRecord, questionRef)) {
+      continue;
+    }
+    const deleted = await deleteAnswerDraft({
+      env,
+      normalized,
+      sessionSlug: questionRef.sessionSlug,
+      selectedQuestionId: questionRef.questionId,
+    });
+    if (deleted.ok) {
+      clearedCount += 1;
+      clearedQuestionKeys.push(questionKey);
+    }
+  }
+
+  return json({
+    ok: true,
+    status: 'drafts_cleared',
+    clearedCount,
+    clearedQuestionKeys,
+  });
+}
+
+async function handleTranscribeRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) {
+    return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  }
+  if (!safeString(auth.user?.telegramUserId)) {
+    return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  }
+  const form = await request.formData().catch(() => null);
+  if (!form || typeof form.get !== 'function') {
+    return json({ ok: false, error: 'Expected multipart/form-data.' }, { status: 400 });
+  }
+  const audio = form.get('audio') || form.get('file');
+  if (!audio || typeof audio === 'string' || typeof audio.arrayBuffer !== 'function') {
+    return json({ ok: false, error: 'audio_file_required' }, { status: 400 });
+  }
+
+  const url = new URL(request.url);
+  const launch = safeString(form.get('launch') || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const questionKey = safeString(form.get('questionKey'));
+  let questionRef = null;
+  let sessionSlugHint = sanitizeSessionSlug(form.get('sessionSlug') || '');
+  if (questionKey) {
+    const parsed = parseOpaqueActionId(questionKey);
+    if (!parsed.ok) {
+      return json({ ok: false, error: 'question_action_invalid' }, { status: 400 });
+    }
+    const record = await readActionRecord(env, parsed.actionId);
+    questionRef = record?.serverContextRef || {};
+    if (
+      !record ||
+      record.action !== TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE ||
+      record.lane !== TELEGRAM_CHAT_LANES.MINI_APP ||
+      record.miniAppQuestionAction !== true
+    ) {
+      return json({ ok: false, error: 'question_action_expired' }, { status: 404 });
+    }
+    sessionSlugHint = sanitizeSessionSlug(questionRef.sessionSlug || sessionSlugHint);
+  }
+
+  let launchRecord = null;
+  if (auth.authMode === 'telegram') {
+    launchRecord = await resolveLaunchRecord(env, launch);
+    if (!launchRecord) {
+      return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
+    }
+    if (questionRef && !miniAppLaunchMatchesQuestion(launchRecord, questionRef)) {
+      return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
+    }
+    if (!questionRef) {
+      const launchRef = launchRecord.serverContextRef || {};
+      const launchSessionSlug = sanitizeSessionSlug(launchRef.sessionSlug || '');
+      if (!sessionSlugHint) sessionSlugHint = launchSessionSlug;
+      if (
+        launchRef.sessionPicker !== true &&
+        launchSessionSlug &&
+        sessionSlugHint &&
+        launchSessionSlug !== sessionSlugHint
+      ) {
+        return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
+      }
+    }
+  }
+
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sessionSlugHint);
+  if (!resolved.ok) {
+    return json({ ok: false, error: resolved.reason || 'session_not_available' }, { status: 403 });
+  }
+  const eligibility = evaluateSponsoredResourceEligibility(resolved.session, {
+    resource: 'ai',
+    requestedRisk: 'submit',
+    riskCeiling: policy.riskCeiling,
+  });
+  if (!eligibility.ok) {
+    return json({ ok: false, error: eligibility.reason || 'session_ai_not_allowed' }, { status: 403 });
+  }
+
+  const workerUrl = resolveSessionWorkerUrl(env, resolved.session);
+  if (!workerUrl) {
+    return json({ ok: false, error: 'session_worker_url_missing' }, { status: 503 });
+  }
+
+  const principal = normalizeTelegramPrincipal(auth.user || {});
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
+  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
+  const sessionAuth = await authenticateSessionWorker({
+    env,
+    session: resolved.session,
+    account,
+    principal,
+    workerUrl,
+    fetchImpl,
+    now: createdAt ? new Date(createdAt) : new Date(),
+  }).catch((error) => ({ ok: false, reason: safeString(error?.message || error) || 'worker_auth_failed' }));
+  if (!sessionAuth.ok || !sessionAuth.token) {
+    return json({ ok: false, error: sessionAuth.reason || 'worker_auth_failed' }, { status: 503 });
+  }
+
+  const upstream = new FormData();
+  const model = safeString(form.get('model') || env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
+  upstream.append('file', audio, audio.name || `telegram-comment.${audioFileExtension(audio)}`);
+  upstream.append('model', model);
+  const response = await fetchImpl(`${sessionAuth.workerUrl}/transcribe`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionAuth.token}`,
+    },
+    body: upstream,
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response?.ok) {
+    return json({
+      ok: false,
+      error: safeString(body?.error || body?.message || response?.status) || 'transcription_failed',
+    }, { status: response?.status || 502 });
+  }
+  return json({
+    ok: true,
+    text: safeString(body?.text),
   });
 }
 
@@ -1120,21 +1610,33 @@ function telegramMiniAppHtml() {
       --shadow-light: #2d3274;
     }
     * { box-sizing: border-box; }
+    html {
+      min-height: 100%;
+      overflow-y: auto;
+      overscroll-behavior-y: auto;
+    }
     body {
       margin: 0;
-      min-height: 100vh;
+      min-height: 100%;
       font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text);
       background: var(--bg);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-y: auto;
     }
     button, input, textarea { font: inherit; }
     button { cursor: pointer; }
     .app {
-      min-height: 100vh;
+      min-height: var(--tg-viewport-height, 100dvh);
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto;
+      align-content: start;
       padding: max(16px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
       gap: 14px;
+      overflow-x: hidden;
+      overflow-y: visible;
+      overscroll-behavior-y: auto;
     }
     header { display: grid; gap: 8px; }
     .headerBar {
@@ -1142,6 +1644,12 @@ function telegramMiniAppHtml() {
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+    }
+    .headerActions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
     }
     h1 { margin: 0; font-size: 20px; line-height: 1.15; letter-spacing: 0; }
     .iconButton {
@@ -1162,6 +1670,13 @@ function telegramMiniAppHtml() {
       fill: currentColor;
       display: block;
     }
+    .iconButton svg.filterIcon {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .settingsPanel select {
@@ -1172,29 +1687,116 @@ function telegramMiniAppHtml() {
       color: var(--text);
       padding: 8px 10px;
     }
-    .settingsPanel {
+    .settingsPanel,
+    .filterPanel {
       display: none;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--surface);
       padding: 12px;
       gap: 10px;
-      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: end;
     }
-    .settingsPanel.open { display: grid; }
+    .settingsPanel { grid-template-columns: minmax(0, 1fr) auto auto; }
+    .filterPanel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: center;
+    }
+    .settingsPanel.open, .filterPanel.open { display: grid; }
+    .savedDrafts {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--line);
+      padding-top: 10px;
+      max-height: 24vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .savedDrafts strong { color: var(--text); font-size: 13px; }
+    .savedDrafts div { overflow-wrap: anywhere; }
+    .savedDraftsHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .savedDraftsHeader strong { min-width: 0; }
     .field { display: grid; gap: 5px; }
     .field label { color: var(--muted); font-size: 12px; }
     .toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; color: var(--text); }
+    .filterControls { display: grid; gap: 10px; }
+    .filterSearchRow { display: grid; grid-template-columns: minmax(0, 1fr) 44px auto auto; gap: 8px; }
+    .filterSearchRow input {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      color: var(--text);
+      padding: 8px 10px;
+    }
+    .typeFilters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .typeFilter {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .filterSummary { color: var(--muted); font-size: 12px; min-height: 18px; }
+    .sectionTitle { color: var(--text); font-size: 13px; font-weight: 700; }
     .layout {
       display: grid;
       gap: 12px;
       min-height: 0;
+      overflow-y: visible;
+      overflow-x: hidden;
+      touch-action: auto;
     }
+    .sessionPicker {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 14px;
+      gap: 10px;
+    }
+    .sessionPicker.open { display: grid; }
+    .sessionPickerHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .sessionSummary {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+    .sessionPickerBody { display: grid; gap: 10px; }
+    .sessionPicker.collapsed .sessionPickerBody { display: none; }
+    .sessionOptions { display: grid; gap: 8px; }
+    .sessionOption {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .sessionOption input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .sessionActions { display: flex; justify-content: flex-end; }
     .questionStack { display: grid; gap: 12px; min-height: 0; }
     .questionMeta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    .pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
-    .pager button, .secondary {
+    .secondary {
       min-height: 36px;
       border: 1px solid var(--line);
       border-radius: 7px;
@@ -1217,7 +1819,7 @@ function telegramMiniAppHtml() {
     .cardHead { padding: 16px; border-bottom: 1px solid var(--line); }
     .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
     .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; }
-    .cardActions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+    .cardActions { display: grid; grid-template-columns: minmax(96px, 3fr) minmax(0, 7fr); gap: 8px; }
     .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .choices { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
@@ -1282,16 +1884,43 @@ function telegramMiniAppHtml() {
       background: rgba(255, 255, 255, 0.06);
       color: var(--text);
     }
-    .locked { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 12px; background: rgba(255, 255, 255, 0.04); }
-    footer {
-      position: sticky;
-      bottom: 0;
+    .commentBox {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      gap: 10px;
-      padding-top: 6px;
-      background: var(--bg);
+      grid-template-columns: minmax(0, 3fr) minmax(56px, 1fr);
+      gap: 8px;
+      align-items: stretch;
     }
+    .commentActions { display: grid; align-items: stretch; }
+    .micButton {
+      width: 100%;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .micButton svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      display: block;
+    }
+    .commentActions .micButton {
+      height: 100%;
+      min-height: 104px;
+    }
+    textarea.micFeedback,
+    .filterSearchRow input.micFeedback {
+      border-color: var(--accent-2);
+      color: var(--muted);
+    }
+    .micButton[aria-pressed="true"] {
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+      box-shadow: 0 0 12px rgba(44, 195, 255, 0.24);
+    }
+    .locked { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 12px; background: rgba(255, 255, 255, 0.04); }
     .primary {
       min-height: 44px;
       border: 1px solid var(--accent);
@@ -1306,8 +1935,8 @@ function telegramMiniAppHtml() {
     .ok { color: var(--ok); }
     .error { color: var(--danger); white-space: pre-wrap; }
     @media (max-width: 760px) {
-      footer { grid-template-columns: 1fr; }
-      .settingsPanel { grid-template-columns: 1fr; }
+      .settingsPanel, .filterPanel { grid-template-columns: 1fr; }
+      .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto auto; }
     }
   </style>
 </head>
@@ -1316,14 +1945,58 @@ function telegramMiniAppHtml() {
     <header>
       <div class="headerBar">
         <h1>Context Engine</h1>
-        <button class="iconButton" id="showSettings" type="button" aria-label="Settings" title="Settings">
-          <svg aria-hidden="true" focusable="false" viewBox="0 0 512 512">
-            <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
-          </svg>
-        </button>
+        <div class="headerActions">
+          <button class="iconButton" id="showFilter" type="button" aria-label="Filter" title="Filter">
+            <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
+            </svg>
+          </button>
+          <button class="iconButton" id="showSettings" type="button" aria-label="Settings" title="Settings">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 512 512">
+              <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
+            </svg>
+          </button>
+        </div>
       </div>
+      <section class="sessionPicker" id="sessionPicker" aria-label="Sessions">
+        <div class="sessionPickerHeader">
+          <div>
+            <div class="sectionTitle">Sessions</div>
+            <div class="sessionSummary" id="sessionSummary"></div>
+          </div>
+          <button class="secondary" id="toggleSessions" type="button">Change</button>
+        </div>
+        <div class="sessionPickerBody" id="sessionPickerBody">
+          <div class="sessionOptions" id="sessionOptions"></div>
+          <div class="sessionActions">
+            <button class="primary" id="continueSessions" type="button">Continue</button>
+          </div>
+        </div>
+      </section>
       <div class="meta" id="meta"></div>
       <div class="status" id="status">Loading...</div>
+      <section class="filterPanel" id="filterPanel" aria-label="Question filters">
+        <div class="filterControls">
+          <label class="toggle">
+            <input id="filterUnansweredFirst" type="checkbox" checked>
+            <span>Show un-answered questions first</span>
+          </label>
+          <div class="field">
+            <label>Question type</label>
+            <div class="typeFilters" id="questionTypeFilters"></div>
+          </div>
+          <div class="field">
+            <label for="filterAiSearch">AI search</label>
+            <div class="filterSearchRow">
+              <input id="filterAiSearch" type="search" placeholder="Describe questions to find">
+              <button class="secondary micButton" id="filterAiSearchMic" type="button" aria-label="Dictate AI search" aria-pressed="false"></button>
+              <button class="secondary" id="applyAiSearch" type="button">Search</button>
+              <button class="secondary" id="clearAiSearch" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="filterSummary" id="filterSummary"></div>
+        </div>
+      </section>
       <section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">
         <div class="field">
           <label for="draftStyle">Draft style</label>
@@ -1334,20 +2007,13 @@ function telegramMiniAppHtml() {
           <span>Reminders</span>
         </label>
         <button class="primary" id="saveSettings" type="button">Save</button>
+        <div class="savedDrafts" id="savedDrafts"></div>
+        <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
       </section>
     </header>
     <section class="layout">
       <section class="questionStack" id="questionStack" aria-label="Questions"></section>
-      <section class="pager" aria-label="Question pages">
-        <button id="prev" type="button">Previous</button>
-        <span id="page"></span>
-        <button id="next" type="button">Next</button>
-      </section>
     </section>
-    <footer>
-      <button class="secondary" id="save" type="button">Save Draft</button>
-      <button class="primary" id="submit" type="button">Submit</button>
-    </footer>
   </main>
   <script>
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -1355,35 +2021,149 @@ function telegramMiniAppHtml() {
       tg.ready();
       if (typeof tg.expand === 'function') tg.expand();
     }
+    function syncTelegramViewportHeight() {
+      const height = tg && Number(tg.viewportStableHeight || tg.viewportHeight);
+      if (Number.isFinite(height) && height > 0) {
+        document.documentElement.style.setProperty('--tg-viewport-height', height + 'px');
+      }
+    }
+    syncTelegramViewportHeight();
+    if (tg && typeof tg.onEvent === 'function') tg.onEvent('viewportChanged', syncTelegramViewportHeight);
     const params = new URLSearchParams(location.search);
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
     const QUESTION_RETRY_DELAY_MS = 4000;
-    const state = { data: null, activeKey: '', page: 0, drafts: {}, retryTimer: null, submitting: false };
+    const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
+    const readShowUnansweredFirst = () => {
+      try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
+    };
+    const writeShowUnansweredFirst = (value) => {
+      try { window.localStorage.setItem(SHOW_UNANSWERED_STORAGE_KEY, value ? 'true' : 'false'); } catch {}
+    };
+    const state = {
+      data: null,
+      activeKey: '',
+      drafts: {},
+      retryTimer: null,
+      submitting: false,
+      selectedSessionSlugs: new Set(),
+      savedAnswerKeys: new Set(),
+      showUnansweredFirst: readShowUnansweredFirst(),
+      selectedQuestionTypes: new Set(),
+      aiDraftQuery: '',
+      aiSearchQuery: '',
+      sessionPickerCollapsed: false,
+      sessionPickerInitialized: false,
+      loadedOnce: false,
+    };
     const el = {
       meta: document.getElementById('meta'),
       status: document.getElementById('status'),
+      sessionPicker: document.getElementById('sessionPicker'),
+      sessionSummary: document.getElementById('sessionSummary'),
+      toggleSessions: document.getElementById('toggleSessions'),
+      sessionPickerBody: document.getElementById('sessionPickerBody'),
+      sessionOptions: document.getElementById('sessionOptions'),
+      continueSessions: document.getElementById('continueSessions'),
       questionStack: document.getElementById('questionStack'),
-      page: document.getElementById('page'),
-      prev: document.getElementById('prev'),
-      next: document.getElementById('next'),
-      save: document.getElementById('save'),
-      submit: document.getElementById('submit'),
+      showFilter: document.getElementById('showFilter'),
+      filterPanel: document.getElementById('filterPanel'),
+      filterUnansweredFirst: document.getElementById('filterUnansweredFirst'),
+      questionTypeFilters: document.getElementById('questionTypeFilters'),
+      filterAiSearch: document.getElementById('filterAiSearch'),
+      filterAiSearchMic: document.getElementById('filterAiSearchMic'),
+      applyAiSearch: document.getElementById('applyAiSearch'),
+      clearAiSearch: document.getElementById('clearAiSearch'),
+      filterSummary: document.getElementById('filterSummary'),
       showSettings: document.getElementById('showSettings'),
       settingsPanel: document.getElementById('settingsPanel'),
       draftStyle: document.getElementById('draftStyle'),
       telegramReminders: document.getElementById('telegramReminders'),
       saveSettings: document.getElementById('saveSettings'),
+      savedDrafts: document.getElementById('savedDrafts'),
+      clearDrafts: document.getElementById('clearDrafts'),
     };
-    const headers = () => {
-      const out = { 'content-type': 'application/json' };
+    const MIC_ICON = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"></path><path d="M17 11a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21a1 1 0 1 1-2 0v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"></path></svg>';
+    const STOP_ICON = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M7 7h10v10H7z"></path></svg>';
+    el.filterAiSearchMic.dataset.idleLabel = 'Dictate AI search';
+    el.filterAiSearchMic.dataset.stopLabel = 'Stop recording AI search';
+    el.filterAiSearchMic.innerHTML = MIC_ICON;
+    const headers = ({ json = true } = {}) => {
+      const out = json ? { 'content-type': 'application/json' } : {};
       if (tg && tg.initData) out['x-telegram-init-data'] = tg.initData;
       return out;
     };
+    const selectedSessionQuery = () => Array.from(state.selectedSessionSlugs).filter(Boolean).join(',');
     const activeQuestion = () => (state.data?.questions || []).find((question) => question.questionKey === state.activeKey) || null;
     const draftFor = (question) => {
       if (!question) return {};
       state.drafts[question.questionKey] = state.drafts[question.questionKey] || {};
       return state.drafts[question.questionKey];
+    };
+    const questionAnswered = (question) => {
+      if (state.savedAnswerKeys.has(question?.questionKey)) return true;
+      return false;
+    };
+    const questionTypeLabel = (type) => ({
+      agree_unsure_disagree: 'Agree / Unsure / Disagree',
+      freeform: 'Freeform',
+      rating: 'Rating',
+      multichoice: 'Multiple choice',
+    })[String(type || '')] || String(type || 'Question');
+    const questionSearchText = (question) => [
+      question.prompt,
+      question.title,
+      question.questionType,
+      question.sessionName,
+      Array.isArray(question.options) ? question.options.join(' ') : '',
+    ].map((value) => String(value || '').toLowerCase()).join(' ');
+    const searchTokens = (query) => String(query || '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length > 1);
+    const aiSearchScore = (question, query) => {
+      const tokens = searchTokens(query);
+      if (!tokens.length) return 0;
+      const text = questionSearchText(question);
+      let score = 0;
+      tokens.forEach((token) => {
+        if (text.includes(token)) score += token.length + 2;
+        else if (token.length > 4 && text.includes(token.slice(0, -1))) score += 2;
+      });
+      return score;
+    };
+    const questionMatchesFilters = (question) => {
+      if (state.selectedQuestionTypes.size && !state.selectedQuestionTypes.has(question.questionType)) return false;
+      if (state.aiSearchQuery && aiSearchScore(question, state.aiSearchQuery) <= 0) return false;
+      return true;
+    };
+    const filteredQuestionEntries = () => (state.data?.questions || [])
+      .map((question, index) => ({ question, index, score: aiSearchScore(question, state.aiSearchQuery) }))
+      .filter(({ question }) => questionMatchesFilters(question));
+    const orderedQuestions = () => {
+      const questions = filteredQuestionEntries();
+      if (state.aiSearchQuery) {
+        questions.sort((left, right) => (
+          right.score - left.score ||
+          Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
+          left.index - right.index
+        ));
+        return questions.map((entry) => entry.question);
+      }
+      if (state.showUnansweredFirst) {
+        questions.sort((left, right) => (
+          Number(questionAnswered(left.question)) - Number(questionAnswered(right.question)) ||
+          left.index - right.index
+        ));
+      }
+      return questions.map((entry) => entry.question);
+    };
+    const firstPreferredQuestionKey = () => {
+      const questions = orderedQuestions();
+      return questions.find((question) => question.canAnswer && !questionAnswered(question))?.questionKey ||
+        questions.find((question) => question.canAnswer)?.questionKey ||
+        questions[0]?.questionKey ||
+        '';
     };
     const activate = (question) => {
       if (question?.questionKey) state.activeKey = question.questionKey;
@@ -1393,6 +2173,7 @@ function telegramMiniAppHtml() {
       el.status.textContent = message || '';
     };
     function shouldRetryQuestions(data) {
+      if (data?.sessionPicker?.required === true) return false;
       const questions = Array.isArray(data?.questions) ? data.questions : [];
       const answerableCount = questions.filter((question) => question?.canAnswer).length;
       const unavailableCount = questions.filter((question) => question?.payloadUnavailable === true).length;
@@ -1415,21 +2196,70 @@ function telegramMiniAppHtml() {
     }
     function setSubmitBusy(isBusy, triggerButton = null) {
       state.submitting = isBusy;
-      [el.submit, triggerButton].filter(Boolean).forEach((button) => {
+      [triggerButton].filter(Boolean).forEach((button) => {
         button.disabled = isBusy || !activeQuestion()?.canAnswer;
         button.textContent = isBusy ? 'Submitting...' : 'Submit';
         button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
       });
       if (!isBusy) updateFooterControls();
     }
+    function renderSessionPicker() {
+      const picker = state.data?.sessionPicker || {};
+      const open = picker.enabled === true && (picker.sessions || []).length > 0;
+      el.sessionPicker.classList.toggle('open', open);
+      el.sessionPicker.classList.toggle('collapsed', open && state.sessionPickerCollapsed);
+      el.sessionOptions.innerHTML = '';
+      if (!open) return;
+      if (!state.sessionPickerInitialized) {
+        state.sessionPickerCollapsed = picker.required === true ? false : picker.initiallyCollapsed === true;
+        state.sessionPickerInitialized = true;
+        el.sessionPicker.classList.toggle('collapsed', state.sessionPickerCollapsed);
+      }
+      if (picker.required === true) {
+        state.sessionPickerCollapsed = false;
+        el.sessionPicker.classList.remove('collapsed');
+      }
+      const selectedSessions = (picker.sessions || []).filter((session) => (
+        state.selectedSessionSlugs.has(session.sessionSlug) || session.selected === true
+      ));
+      const selectedNames = selectedSessions.map((session) => session.sessionName || session.sessionSlug);
+      el.sessionSummary.textContent = selectedNames.length
+        ? selectedNames.slice(0, 2).join(', ') + (selectedNames.length > 2 ? ' +' + (selectedNames.length - 2) : '')
+        : 'No sessions selected';
+      el.toggleSessions.textContent = state.sessionPickerCollapsed ? 'Change' : 'Collapse';
+      el.toggleSessions.disabled = picker.required === true && state.selectedSessionSlugs.size === 0;
+      (picker.sessions || []).forEach((session) => {
+        const label = document.createElement('label');
+        label.className = 'sessionOption';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = session.sessionSlug;
+        input.checked = state.selectedSessionSlugs.has(session.sessionSlug) || session.selected === true;
+        input.onchange = () => {
+          if (input.checked) state.selectedSessionSlugs.add(session.sessionSlug);
+          else state.selectedSessionSlugs.delete(session.sessionSlug);
+          el.continueSessions.disabled = state.selectedSessionSlugs.size === 0;
+          renderSessionPicker();
+        };
+        const name = document.createElement('span');
+        name.textContent = session.sessionName || session.sessionSlug;
+        label.append(input, name);
+        el.sessionOptions.appendChild(label);
+      });
+      el.continueSessions.disabled = state.selectedSessionSlugs.size === 0;
+    }
     function renderQuestionStack() {
-      const questions = state.data?.questions || [];
-      const pageSize = state.data?.pageSize || 5;
-      const pageCount = Math.max(1, Math.ceil(questions.length / pageSize));
-      state.page = Math.min(state.page, pageCount - 1);
-      const visible = questions.slice(state.page * pageSize, state.page * pageSize + pageSize);
+      const questions = orderedQuestions();
       el.questionStack.innerHTML = '';
-      visible.forEach((question) => {
+      if (!questions.length) {
+        const empty = document.createElement('div');
+        empty.className = 'locked';
+        empty.textContent = 'No questions match the current filters.';
+        el.questionStack.appendChild(empty);
+        updateFooterControls();
+        return;
+      }
+      questions.forEach((question) => {
         const card = document.createElement('article');
         card.className = 'card';
         card.dataset.active = question.questionKey === state.activeKey ? 'true' : 'false';
@@ -1449,9 +2279,6 @@ function telegramMiniAppHtml() {
         card.append(head, body);
         el.questionStack.appendChild(card);
       });
-      el.page.textContent = questions.length ? (state.page + 1) + ' / ' + pageCount : '0 / 0';
-      el.prev.disabled = state.page <= 0;
-      el.next.disabled = state.page >= pageCount - 1;
       updateFooterControls();
     }
     function selectValue(question, value) {
@@ -1540,15 +2367,38 @@ function telegramMiniAppHtml() {
         };
         mount.appendChild(input);
       }
+      const commentBox = document.createElement('div');
+      commentBox.className = 'commentBox';
       const comments = document.createElement('textarea');
       comments.placeholder = 'Additional comments';
       comments.value = draft.comments || '';
       comments.oninput = () => {
+        if (comments.dataset.micFeedbackActive === 'true') {
+          comments.classList.remove('micFeedback');
+          delete comments.dataset.micFeedbackActive;
+          comments.placeholder = comments.dataset.originalPlaceholder || 'Additional comments';
+        }
         activate(question);
         draft.comments = comments.value;
         updateFooterControls();
       };
-      mount.appendChild(comments);
+      const commentActions = document.createElement('div');
+      commentActions.className = 'commentActions';
+      const mic = document.createElement('button');
+      mic.type = 'button';
+      mic.className = 'secondary micButton';
+      mic.innerHTML = MIC_ICON;
+      mic.dataset.idleLabel = 'Dictate additional comments';
+      mic.dataset.stopLabel = 'Stop recording additional comments';
+      mic.setAttribute('aria-label', 'Dictate additional comments');
+      mic.setAttribute('aria-pressed', 'false');
+      mic.onclick = (event) => {
+        event.stopPropagation();
+        startCommentDictation(question, comments, mic);
+      };
+      commentActions.appendChild(mic);
+      commentBox.append(comments, commentActions);
+      mount.appendChild(commentBox);
       const actions = document.createElement('div');
       actions.className = 'cardActions';
       const save = document.createElement('button');
@@ -1570,17 +2420,384 @@ function telegramMiniAppHtml() {
       actions.append(save, submit);
       mount.appendChild(actions);
     }
+    let activeDictation = null;
+    function setCommentMicFeedback(question, textarea, message) {
+      const draft = draftFor(question);
+      if (!textarea.dataset.originalPlaceholder) {
+        textarea.dataset.originalPlaceholder = textarea.placeholder || 'Additional comments';
+      }
+      textarea.placeholder = message;
+      if (!String(draft.comments || textarea.value || '').trim() || textarea.dataset.micFeedbackActive === 'true') {
+        textarea.dataset.micFeedbackActive = 'true';
+        textarea.classList.add('micFeedback');
+        textarea.value = message;
+      }
+    }
+    function clearCommentMicFeedback(question, textarea) {
+      if (textarea.dataset.micFeedbackActive === 'true') {
+        textarea.value = draftFor(question).comments || '';
+      }
+      textarea.classList.remove('micFeedback');
+      delete textarea.dataset.micFeedbackActive;
+      textarea.placeholder = textarea.dataset.originalPlaceholder || 'Additional comments';
+    }
+    function appendCommentTranscript(question, textarea, transcript) {
+      const text = String(transcript || '').trim();
+      if (!text) return;
+      const draft = draftFor(question);
+      const base = textarea.dataset.micFeedbackActive === 'true' ? (draft.comments || '') : textarea.value;
+      clearCommentMicFeedback(question, textarea);
+      const prefix = base && !base.endsWith(' ') ? ' ' : '';
+      textarea.value = base + prefix + text;
+      draft.comments = textarea.value;
+      activate(question);
+      updateFooterControls();
+    }
+    function showCommentMicError(question, textarea, error) {
+      const message = 'Could not transcribe: ' + String(error || 'transcription_failed');
+      setCommentMicFeedback(question, textarea, message);
+    }
+    function setMicIcon(button, recording = false) {
+      if (!button) return;
+      button.innerHTML = recording ? STOP_ICON : MIC_ICON;
+      button.setAttribute('aria-label', recording
+        ? (button.dataset.stopLabel || 'Stop recording')
+        : (button.dataset.idleLabel || 'Dictate'));
+    }
+    function resetMicButton(button) {
+      if (!button) return;
+      button.disabled = false;
+      setMicIcon(button, false);
+      button.setAttribute('aria-pressed', 'false');
+    }
+    function supportedAudioMimeType() {
+      const recorder = window.MediaRecorder;
+      if (!recorder || typeof recorder.isTypeSupported !== 'function') return '';
+      return [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/ogg;codecs=opus',
+        'audio/mp4',
+      ].find((type) => recorder.isTypeSupported(type)) || '';
+    }
+    function selectedTranscribeSessionSlug() {
+      return Array.from(state.selectedSessionSlugs).find(Boolean) ||
+        (Array.isArray(state.data?.selectedSessionSlugs) ? state.data.selectedSessionSlugs.find(Boolean) : '') ||
+        state.data?.session?.sessionSlug ||
+        '';
+    }
+    async function transcribeAudio({ questionKey = '', sessionSlug = '', blob } = {}) {
+      const form = new FormData();
+      form.append('launch', launch);
+      if (questionKey) form.append('questionKey', questionKey);
+      if (sessionSlug) form.append('sessionSlug', sessionSlug);
+      form.append('audio', blob, blob.type && blob.type.includes('ogg') ? 'comment.ogg' : 'comment.webm');
+      const response = await fetch('/telegram/mini-app/api/transcribe', {
+        method: 'POST',
+        headers: headers({ json: false }),
+        body: form,
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error || 'transcription_failed');
+      }
+      if (!String(body.text || '').trim()) {
+        throw new Error('empty_transcript');
+      }
+      return String(body.text || '').trim();
+    }
+    async function transcribeCommentAudio(question, textarea, blob) {
+      const text = await transcribeAudio({
+        questionKey: question.questionKey,
+        sessionSlug: question.sessionSlug || selectedTranscribeSessionSlug(),
+        blob,
+      });
+      appendCommentTranscript(question, textarea, text);
+    }
+    function setSearchMicFeedback(message) {
+      if (!el.filterAiSearch.dataset.originalPlaceholder) {
+        el.filterAiSearch.dataset.originalPlaceholder = el.filterAiSearch.placeholder || 'Describe questions to find';
+      }
+      el.filterAiSearch.placeholder = message;
+      if (!String(state.aiDraftQuery || el.filterAiSearch.value || '').trim() || el.filterAiSearch.dataset.micFeedbackActive === 'true') {
+        el.filterAiSearch.dataset.micFeedbackActive = 'true';
+        el.filterAiSearch.classList.add('micFeedback');
+        el.filterAiSearch.value = message;
+        state.aiDraftQuery = message;
+      }
+    }
+    function clearSearchMicFeedback() {
+      if (el.filterAiSearch.dataset.micFeedbackActive === 'true') {
+        el.filterAiSearch.value = '';
+        state.aiDraftQuery = '';
+      }
+      el.filterAiSearch.classList.remove('micFeedback');
+      delete el.filterAiSearch.dataset.micFeedbackActive;
+      el.filterAiSearch.placeholder = el.filterAiSearch.dataset.originalPlaceholder || 'Describe questions to find';
+    }
+    function applySearchTranscript(transcript) {
+      const text = String(transcript || '').trim();
+      if (!text) return;
+      clearSearchMicFeedback();
+      el.filterAiSearch.value = text;
+      state.aiDraftQuery = text;
+      state.aiSearchQuery = text;
+      render();
+    }
+    function showSearchMicError(error) {
+      setSearchMicFeedback('Could not transcribe: ' + String(error || 'transcription_failed'));
+    }
+    async function transcribeSearchAudio(blob) {
+      const text = await transcribeAudio({
+        sessionSlug: selectedTranscribeSessionSlug(),
+        blob,
+      });
+      applySearchTranscript(text);
+    }
+    function startSpeechRecognitionFallback(question, textarea, button) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showCommentMicError(question, textarea, 'Microphone dictation is not available in this Telegram webview.');
+        return false;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      button.disabled = true;
+      setMicIcon(button, true);
+      button.setAttribute('aria-pressed', 'true');
+      setCommentMicFeedback(question, textarea, 'Listening...');
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results || [])
+          .map((result) => result?.[0]?.transcript || '')
+          .join(' ')
+          .trim();
+        appendCommentTranscript(question, textarea, transcript);
+      };
+      recognition.onerror = () => {
+        showCommentMicError(question, textarea, 'Could not capture microphone input.');
+      };
+      recognition.onend = () => resetMicButton(button);
+      try {
+        recognition.start();
+        return true;
+      } catch {
+        resetMicButton(button);
+        return false;
+      }
+    }
+    async function startCommentDictation(question, textarea, button) {
+      if (activeDictation) {
+        const current = activeDictation;
+        activeDictation = null;
+        current.recorder?.state === 'recording' && current.recorder.stop();
+        resetMicButton(current.button);
+        if (typeof current.setTranscribing === 'function') current.setTranscribing();
+        else setCommentMicFeedback(current.question || question, current.textarea || textarea, 'Transcribing microphone audio...');
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        startSpeechRecognitionFallback(question, textarea, button);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const chunks = [];
+        const mimeType = supportedAudioMimeType();
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        activeDictation = {
+          recorder,
+          stream,
+          button,
+          question,
+          textarea,
+          questionKey: question.questionKey,
+          setTranscribing: () => setCommentMicFeedback(question, textarea, 'Transcribing microphone audio...'),
+        };
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => {
+          showCommentMicError(question, textarea, 'Could not capture microphone input.');
+          stream.getTracks().forEach((track) => track.stop());
+          activeDictation = null;
+          resetMicButton(button);
+        };
+        recorder.onstop = async () => {
+          activeDictation = null;
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
+          resetMicButton(button);
+          if (!blob.size) {
+            showCommentMicError(question, textarea, 'No microphone audio captured.');
+            return;
+          }
+          try {
+            setCommentMicFeedback(question, textarea, 'Transcribing microphone audio...');
+            await transcribeCommentAudio(question, textarea, blob);
+          } catch (error) {
+            showCommentMicError(question, textarea, error.message || error);
+          }
+        };
+        button.disabled = false;
+        setMicIcon(button, true);
+        button.setAttribute('aria-pressed', 'true');
+        recorder.start();
+        setCommentMicFeedback(question, textarea, 'Recording comment. Tap stop when finished.');
+      } catch (error) {
+        resetMicButton(button);
+        showCommentMicError(question, textarea, error.message || error);
+      }
+    }
+    function startSearchSpeechRecognitionFallback(button) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showSearchMicError('Microphone dictation is not available in this Telegram webview.');
+        return false;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      button.disabled = true;
+      setMicIcon(button, true);
+      button.setAttribute('aria-pressed', 'true');
+      setSearchMicFeedback('Listening...');
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results || [])
+          .map((result) => result?.[0]?.transcript || '')
+          .join(' ')
+          .trim();
+        applySearchTranscript(transcript);
+      };
+      recognition.onerror = () => {
+        showSearchMicError('Could not capture microphone input.');
+      };
+      recognition.onend = () => resetMicButton(button);
+      try {
+        recognition.start();
+        return true;
+      } catch {
+        resetMicButton(button);
+        return false;
+      }
+    }
+    async function startSearchDictation(button) {
+      if (activeDictation) {
+        const current = activeDictation;
+        activeDictation = null;
+        current.recorder?.state === 'recording' && current.recorder.stop();
+        resetMicButton(current.button);
+        if (typeof current.setTranscribing === 'function') current.setTranscribing();
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        startSearchSpeechRecognitionFallback(button);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const chunks = [];
+        const mimeType = supportedAudioMimeType();
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        activeDictation = {
+          recorder,
+          stream,
+          button,
+          setTranscribing: () => setSearchMicFeedback('Transcribing search audio...'),
+        };
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => {
+          showSearchMicError('Could not capture microphone input.');
+          stream.getTracks().forEach((track) => track.stop());
+          activeDictation = null;
+          resetMicButton(button);
+        };
+        recorder.onstop = async () => {
+          activeDictation = null;
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
+          resetMicButton(button);
+          if (!blob.size) {
+            showSearchMicError('No microphone audio captured.');
+            return;
+          }
+          try {
+            setSearchMicFeedback('Transcribing search audio...');
+            await transcribeSearchAudio(blob);
+          } catch (error) {
+            showSearchMicError(error.message || error);
+          }
+        };
+        button.disabled = false;
+        setMicIcon(button, true);
+        button.setAttribute('aria-pressed', 'true');
+        recorder.start();
+        setSearchMicFeedback('Recording search. Tap stop when finished.');
+      } catch (error) {
+        resetMicButton(button);
+        showSearchMicError(error.message || error);
+      }
+    }
     function updateFooterControls() {
-      const question = activeQuestion();
-      const disabled = !question?.canAnswer;
-      el.save.disabled = disabled;
-      el.submit.disabled = disabled || state.submitting;
+      return null;
+    }
+    function questionCountText(data) {
+      if (data?.sessionPicker?.required === true) return 'Select sessions';
+      const loaded = Number(data?.questionCount || 0);
+      const available = Number(data?.availableQuestionCount ?? loaded);
+      return available + ' questions';
     }
     function render() {
       const data = state.data;
-      el.meta.textContent = data ? [data.session.title, data.questionCount + ' questions'].join(' | ') : '';
+      el.meta.textContent = data ? questionCountText(data) : '';
+      renderSessionPicker();
+      renderFilters();
       renderAgentSettings();
       renderQuestionStack();
+    }
+    function renderFilters() {
+      el.filterUnansweredFirst.checked = state.showUnansweredFirst;
+      el.filterAiSearch.value = state.aiDraftQuery;
+      const questions = Array.isArray(state.data?.questions) ? state.data.questions : [];
+      const typeEntries = [...new Set(questions.map((question) => question.questionType).filter(Boolean))]
+        .sort((left, right) => questionTypeLabel(left).localeCompare(questionTypeLabel(right)));
+      el.questionTypeFilters.innerHTML = '';
+      if (!typeEntries.length) {
+        const empty = document.createElement('span');
+        empty.className = 'filterSummary';
+        empty.textContent = 'No question types loaded.';
+        el.questionTypeFilters.appendChild(empty);
+      } else {
+        typeEntries.forEach((type) => {
+          const label = document.createElement('label');
+          label.className = 'typeFilter';
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.value = type;
+          input.checked = state.selectedQuestionTypes.has(type);
+          input.onchange = () => {
+            if (input.checked) state.selectedQuestionTypes.add(type);
+            else state.selectedQuestionTypes.delete(type);
+            render();
+          };
+          const text = document.createElement('span');
+          text.textContent = questionTypeLabel(type);
+          label.append(input, text);
+          el.questionTypeFilters.appendChild(label);
+        });
+      }
+      const total = questions.length;
+      const shown = filteredQuestionEntries().length;
+      const active = [];
+      if (state.selectedQuestionTypes.size) active.push(Array.from(state.selectedQuestionTypes).map(questionTypeLabel).join(', '));
+      if (state.aiSearchQuery) active.push('AI "' + state.aiSearchQuery + '"');
+      el.filterSummary.textContent = active.length
+        ? shown + ' of ' + total + ' questions match: ' + active.join(' | ')
+        : total + ' questions loaded.';
     }
     function renderAgentSettings() {
       const settings = state.data?.agent?.settings || {};
@@ -1598,6 +2815,26 @@ function telegramMiniAppHtml() {
         el.draftStyle.appendChild(opt);
       });
       el.telegramReminders.checked = values.telegramReminders === true;
+      const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
+      el.savedDrafts.innerHTML = '';
+      const header = document.createElement('div');
+      header.className = 'savedDraftsHeader';
+      const title = document.createElement('strong');
+      title.textContent = 'Saved draft responses';
+      header.appendChild(title);
+      el.savedDrafts.appendChild(header);
+      el.clearDrafts.disabled = savedDrafts.length === 0;
+      if (!savedDrafts.length) {
+        const empty = document.createElement('div');
+        empty.textContent = 'No saved drafts yet.';
+        el.savedDrafts.appendChild(empty);
+      } else {
+        savedDrafts.forEach((draft) => {
+          const row = document.createElement('div');
+          row.textContent = 'Q' + draft.displayIndex + ': ' + draft.answerLabel;
+          el.savedDrafts.appendChild(row);
+        });
+      }
     }
     function answerPayload(question) {
       const draft = draftFor(question);
@@ -1640,6 +2877,8 @@ function telegramMiniAppHtml() {
         return;
       }
       setStatus(['submit_request_created', 'direct_submitted'].includes(body.status) ? 'Submitted.' : 'Draft saved.', 'ok');
+      state.savedAnswerKeys.add(question.questionKey);
+      render();
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
     async function sendSettings() {
@@ -1667,11 +2906,51 @@ function telegramMiniAppHtml() {
       setStatus('Settings saved.', 'ok');
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
+    async function clearSavedDrafts() {
+      const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
+      const questionKeys = savedDrafts.map((draft) => draft.questionKey).filter(Boolean);
+      if (!questionKeys.length) return;
+      el.clearDrafts.disabled = true;
+      setStatus('Clearing drafts...');
+      let response;
+      let body;
+      try {
+        response = await fetch('/telegram/mini-app/api/clear-drafts', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, questionKeys }),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch (error) {
+        setStatus('Could not clear drafts.', 'error');
+        el.clearDrafts.disabled = false;
+        return;
+      }
+      if (!response.ok || !body.ok) {
+        setStatus(body.error || 'Could not clear drafts.', 'error');
+        el.clearDrafts.disabled = false;
+        return;
+      }
+      (body.clearedQuestionKeys || questionKeys).forEach((questionKey) => {
+        state.savedAnswerKeys.delete(questionKey);
+        delete state.drafts[questionKey];
+      });
+      if (Array.isArray(state.data?.savedDrafts)) state.data.savedDrafts = [];
+      if (state.data?.draftAnswersByQuestionKey) state.data.draftAnswersByQuestionKey = {};
+      state.activeKey = firstPreferredQuestionKey();
+      setStatus('Drafts cleared.', 'ok');
+      render();
+      if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+    }
     async function load({ retry = false } = {}) {
       let response;
       let body;
       try {
-        response = await fetch('/telegram/mini-app/api/state?launch=' + encodeURIComponent(launch), {
+        const stateUrl = new URL('/telegram/mini-app/api/state', location.origin);
+        stateUrl.searchParams.set('launch', launch);
+        const sessions = selectedSessionQuery();
+        if (sessions) stateUrl.searchParams.set('sessions', sessions);
+        response = await fetch(stateUrl.pathname + stateUrl.search, {
           headers: headers(),
         });
         body = await response.json().catch(() => ({}));
@@ -1686,9 +2965,21 @@ function telegramMiniAppHtml() {
         return;
       }
       state.data = body;
+      if (body.sessionPicker?.enabled === true && !state.selectedSessionSlugs.size) {
+        (body.sessionPicker.selectedSessionSlugs || []).forEach((slug) => state.selectedSessionSlugs.add(slug));
+      }
+      const serverDrafts = body.draftAnswersByQuestionKey || {};
+      Object.entries(serverDrafts).forEach(([questionKey, draft]) => {
+        state.savedAnswerKeys.add(questionKey);
+        if (!state.drafts[questionKey] || Object.keys(state.drafts[questionKey]).length === 0) {
+          state.drafts[questionKey] = { ...(draft || {}) };
+        }
+      });
       const questions = Array.isArray(body.questions) ? body.questions : [];
       if (!questions.some((question) => question.questionKey === state.activeKey)) {
-        state.activeKey = body.activeQuestionKey || '';
+        state.activeKey = firstPreferredQuestionKey() || body.activeQuestionKey || '';
+      } else if (!state.loadedOnce && state.showUnansweredFirst) {
+        state.activeKey = firstPreferredQuestionKey() || body.activeQuestionKey || state.activeKey;
       }
       if (shouldRetryQuestions(body)) {
         setStatus(body.sourceError || (retry ? 'Questions are still loading. Retrying...' : 'Questions are loading. Retrying...'), body.sourceOk ? '' : 'error');
@@ -1698,13 +2989,61 @@ function telegramMiniAppHtml() {
         setStatus('');
       }
       render();
+      state.loadedOnce = true;
     }
-    el.prev.onclick = () => { state.page -= 1; render(); };
-    el.next.onclick = () => { state.page += 1; render(); };
-    el.save.onclick = () => sendAnswer(false);
-    el.submit.onclick = () => sendAnswer(true, activeQuestion(), el.submit);
+    el.continueSessions.onclick = () => {
+      if (!state.selectedSessionSlugs.size) return;
+      state.activeKey = '';
+      state.loadedOnce = false;
+      state.sessionPickerCollapsed = true;
+      state.sessionPickerInitialized = true;
+      load();
+    };
+    el.toggleSessions.onclick = () => {
+      const picker = state.data?.sessionPicker || {};
+      if (picker.required === true && !state.selectedSessionSlugs.size) return;
+      state.sessionPickerCollapsed = !state.sessionPickerCollapsed;
+      renderSessionPicker();
+    };
+    el.showFilter.onclick = () => { el.filterPanel.classList.toggle('open'); };
     el.showSettings.onclick = () => { el.settingsPanel.classList.toggle('open'); };
+    el.filterUnansweredFirst.onchange = () => {
+      state.showUnansweredFirst = el.filterUnansweredFirst.checked;
+      writeShowUnansweredFirst(state.showUnansweredFirst);
+      render();
+    };
+    el.filterAiSearch.oninput = () => {
+      if (el.filterAiSearch.dataset.micFeedbackActive === 'true') {
+        el.filterAiSearch.classList.remove('micFeedback');
+        delete el.filterAiSearch.dataset.micFeedbackActive;
+        el.filterAiSearch.placeholder = el.filterAiSearch.dataset.originalPlaceholder || 'Describe questions to find';
+      }
+      state.aiDraftQuery = el.filterAiSearch.value;
+      state.aiSearchQuery = state.aiDraftQuery.trim();
+      render();
+    };
+    el.filterAiSearch.onkeydown = (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        state.aiDraftQuery = el.filterAiSearch.value;
+        state.aiSearchQuery = state.aiDraftQuery.trim();
+        render();
+      }
+    };
+    el.applyAiSearch.onclick = () => {
+      state.aiDraftQuery = el.filterAiSearch.value;
+      state.aiSearchQuery = state.aiDraftQuery.trim();
+      render();
+    };
+    el.clearAiSearch.onclick = () => {
+      state.aiDraftQuery = '';
+      state.aiSearchQuery = '';
+      clearSearchMicFeedback();
+      render();
+    };
+    el.filterAiSearchMic.onclick = () => startSearchDictation(el.filterAiSearchMic);
     el.saveSettings.onclick = () => sendSettings();
+    el.clearDrafts.onclick = () => clearSavedDrafts();
     load();
   </script>
 </body>
@@ -1730,6 +3069,12 @@ export async function handleTelegramMiniAppRequest({
   }
   if (url.pathname === '/telegram/mini-app/api/draft' && request.method === 'POST') {
     return handleDraftRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/clear-drafts' && request.method === 'POST') {
+    return handleClearDraftsRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/transcribe' && request.method === 'POST') {
+    return handleTranscribeRequest({ request, env });
   }
   if (url.pathname === '/telegram/mini-app/api/settings' && request.method === 'POST') {
     return handleSettingsRequest({ request, env });

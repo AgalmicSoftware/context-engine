@@ -20,6 +20,20 @@ class MemoryKv {
   async get(key) {
     return this.store.get(key) || null;
   }
+
+  async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+    const keys = Array.from(this.store.keys())
+      .filter((key) => String(key).startsWith(prefix))
+      .sort();
+    const start = cursor ? Number(cursor) || 0 : 0;
+    const page = keys.slice(start, start + limit);
+    const next = start + page.length;
+    return {
+      keys: page.map((name) => ({ name })),
+      list_complete: next >= keys.length,
+      cursor: next >= keys.length ? undefined : String(next),
+    };
+  }
 }
 
 function baseEnv(overrides = {}) {
@@ -134,8 +148,11 @@ function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
         headers: { 'content-type': 'application/json' },
       });
     }
-    if (String(url).endsWith('/arweave/upload')) {
-      return new Response(JSON.stringify({ id: txId }), {
+    if (String(url).endsWith('/storage/upload')) {
+      return new Response(JSON.stringify({
+        id: txId,
+        storageRef: { backend: 'arweave', id: txId, resource: 'responses' },
+      }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -351,7 +368,7 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   }
 });
 
-test('/sessions uses live SessionRegistry slugs when no demo session policy is configured', async () => {
+test('/sessions uses live SessionRegistry slugs and hides E2E noise when no demo session policy is configured', async () => {
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/sessions'),
     env: {
@@ -359,16 +376,17 @@ test('/sessions uses live SessionRegistry slugs when no demo session policy is c
       DEFAULT_CHAIN_ID: '11155420',
       DEFAULT_RPC_URL: 'https://public-rpc.example',
       ADDITIONAL_RPC_URL: 'https://infura.example/op-sepolia',
-      REGISTRY_FETCH: registryFetchForSlugs(['alpha', 'beta-room']),
+      REGISTRY_FETCH: registryFetchForSlugs(['alpha', 'e2e-smoke-noise', 'beta-room']),
     },
     now: '2026-05-08T12:00:00.000Z',
   });
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'group_session_card');
-  assert.match(result.response.text, /Available sessions:/);
+  assert.match(result.response.text, /Sessions \(2\/2\)/);
   assert.match(result.response.text, /- alpha \(alpha\)/);
   assert.match(result.response.text, /- beta-room \(beta-room\)/);
+  assert.equal(result.response.text.includes('e2e-smoke-noise'), false);
   assert.equal(result.response.text.includes('general'), false);
 });
 
@@ -399,6 +417,87 @@ test('/sessions bypasses stale registry cache so newly registered sessions show 
   assert.match(fresh.response.text, /- new-beta \(new-beta\)/);
 });
 
+test('/sessions paginates tall Telegram session lists', async () => {
+  const env = {
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://paged-sessions-rpc.example',
+    REGISTRY_FETCH: registryFetchForSlugs(['one', 'two', 'three', 'four', 'five', 'six']),
+    AGENT_ACTION_KV: new MemoryKv(),
+  };
+  const first = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const buttons = flattenButtons(first.response.replyMarkup);
+  const loadNext = buttons.find((button) => button.text === 'Load Next');
+  assert.match(first.response.text, /Sessions \(5\/6\)/);
+  assert.equal(first.response.text.includes('- six (six)'), false);
+  assert.equal(buttons.filter((button) => button.callback_data).length, 6);
+
+  const second = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7007,
+      callback_query: {
+        id: 'session-page-next',
+        data: loadNext.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 57,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  assert.match(second.response.text, /Sessions \(6\/6\)/);
+  assert.match(second.response.text, /- six \(six\)/);
+  assert.equal(flattenButtons(second.response.replyMarkup).some((button) => button.text === 'Load Next'), false);
+});
+
+test('/sessions lists only Telegram-contributable sessions', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: false,
+        },
+        {
+          sessionSlug: 'gamma',
+          sessionName: 'Gamma Session',
+          telegramBridgeEnabled: false,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(result.response.text, /Sessions \(1\/1\)/);
+  assert.match(result.response.text, /- alpha \(Alpha Session\)/);
+  assert.equal(result.response.text.includes('Beta Session'), false);
+  assert.equal(result.response.text.includes('Gamma Session'), false);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session']);
+});
+
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
@@ -427,11 +526,16 @@ test('/questions and callback dispatch list questions without leaking locked pro
 
   assert.equal(callback.ok, true);
   assert.equal(callback.response.method, 'editMessageText');
-  assert.match(callback.response.text, /Questions for alpha/);
-  assert.match(callback.response.text, /1\. What should Alpha decide next\?\n\n2\. Encrypted question/);
+  assert.match(callback.response.text, /^Questions \(2\/2\)\n\n1\. What should Alpha decide next\?/);
+  assert.equal(callback.response.text.includes('Choose a question'), false);
+  assert.deepEqual(flattenButtons(callback.response.replyMarkup).map((button) => button.text), [
+    'Pose 1',
+    'Pose 2',
+  ]);
   assert.equal(callback.response.text.includes('q-readiness'), false);
   assert.equal(callback.response.text.includes('q-locked'), false);
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
+  assert.match(callback.response.text, /2\. Requires session access/);
 });
 
 test('/questions handles bytes32 question IDs without putting them in opaque seeds', async () => {
@@ -459,12 +563,17 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'question_list');
-  assert.match(result.response.text, /1\. Can bytes32 question IDs render\?\n\n2\. Encrypted question/);
+  assert.match(result.response.text, /^Questions \(2\/2\)\n\n1\. Can bytes32 question IDs render\?/);
   assert.equal(result.response.text.includes('0x12121212'), false);
   assert.equal(result.response.text.includes('0x34343434'), false);
   assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
+  assert.match(result.response.text, /2\. Encrypted question/);
   const buttons = flattenButtons(result.response.replyMarkup);
   assert.equal(buttons.length, 2);
+  assert.deepEqual(buttons.map((button) => button.text), [
+    'Pose 1',
+    'Pose 2',
+  ]);
   for (const button of buttons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
@@ -472,7 +581,7 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   }
 });
 
-test('/questions caps Telegram rows at five and deep-links group Mini App launches through private chat', async () => {
+test('/questions caps Telegram rows at five and keeps the chat page minimal', async () => {
   const questions = Array.from({ length: 7 }, (_value, index) => ({
     questionId: `q-${index + 1}`,
     questionType: index % 2 === 0 ? 'freeform' : 'rating',
@@ -489,9 +598,9 @@ test('/questions caps Telegram rows at five and deep-links group Mini App launch
   });
 
   assert.equal(result.ok, true);
-  assert.match(result.response.text, /Showing 5 of 7/);
-  assert.match(result.response.text, /Open the Mini App for the full queue/);
-  assert.match(result.response.text, /1\. Question 1 prompt\n\n2\. Question 2 prompt/);
+  assert.match(result.response.text, /^Questions \(5\/7\)\n\n1\. Question 1 prompt/);
+  assert.equal(result.response.text.includes('Open the Mini App for the full queue'), false);
+  assert.equal(result.response.text.includes('5. Question 5 prompt'), true);
   assert.equal(result.response.text.includes('Question 6 prompt'), false);
 
   const buttons = flattenButtons(result.response.replyMarkup);
@@ -502,38 +611,32 @@ test('/questions caps Telegram rows at five and deep-links group Mini App launch
     'Pose 4',
     'Pose 5',
   ]);
-  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
-  assert.equal(miniApp.web_app, undefined);
-  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
-  assert.equal(miniApp.url.includes('alpha'), false);
-  assert.equal(miniApp.url.includes('q-1'), false);
+  const loadNext = buttons.find((button) => button.text === 'Load Next');
+  assert.match(loadNext.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
 
-  const launch = launchFromButton(miniApp);
-  const repeated = await buildTelegramCommandResponse({
-    update: groupMessage('/questions alpha'),
-    env,
-    now: '2026-05-08T12:00:00.000Z',
-  });
-  const repeatedLaunch = launchFromButton(flattenButtons(repeated.response.replyMarkup)
-    .find((button) => button.text === 'Open Mini App'));
-  const privateStart = await buildTelegramCommandResponse({
-    update: privateMessage(`/start ${launch}`),
+  const nextPage = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7008,
+      callback_query: {
+        id: 'question-page-next',
+        data: loadNext.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 58,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
-  const privateMiniApp = flattenButtons(privateStart.response.replyMarkup)
-    .find((button) => button.text === 'Open Mini App');
-
-  assert.equal(privateStart.ok, true);
-  assert.equal(privateStart.screen, 'private_start');
-  assert.match(launch, /^cecb_[a-f0-9]{32}$/);
-  assert.match(repeatedLaunch, /^cecb_[a-f0-9]{32}$/);
-  assert.notEqual(repeatedLaunch, launch);
-  assert.match(privateMiniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
-  assert.equal(new URL(privateMiniApp.web_app.url).searchParams.get('launch'), launch);
+  assert.match(nextPage.response.text, /^Questions \(7\/7\)\n\n6\. Question 6 prompt/);
+  assert.equal(nextPage.response.text.includes('7. Question 7 prompt'), true);
+  assert.equal(flattenButtons(nextPage.response.replyMarkup).some((button) => button.text === 'Load Next'), false);
 });
 
-test('/questions uses Telegram web_app buttons directly in private chat', async () => {
+test('/questions omits Mini App buttons in private chat', async () => {
   const result = await buildTelegramCommandResponse({
     update: privateMessage('/questions alpha'),
     env: baseEnv({
@@ -544,12 +647,8 @@ test('/questions uses Telegram web_app buttons directly in private chat', async 
     }),
     now: '2026-05-08T12:00:00.000Z',
   });
-  const miniApp = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Open Mini App');
-
   assert.equal(result.ok, true);
-  assert.equal(miniApp.url, undefined);
-  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Open Mini App'), false);
 });
 
 test('/questions prioritizes answerable questions before payload-unavailable rows', async () => {
@@ -599,7 +698,12 @@ test('/questions prioritizes answerable questions before payload-unavailable row
   });
 
   assert.equal(result.ok, true);
-  assert.match(result.response.text, /1\. How much do you trust this result\?\n\n2\. Question unavailable/);
+  assert.match(result.response.text, /^Questions \(2\/2\)\n\n1\. How much do you trust this result\?/);
+  assert.match(result.response.text, /2\. Failed to load question prompt\./);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).slice(0, 2).map((button) => button.text), [
+    'Pose 1',
+    'Pose 2',
+  ]);
   assert.equal(result.response.text.includes('0x22222222'), false);
   assert.equal(result.response.text.includes('0x11111111'), false);
   assert.equal(posed.ok, true);
@@ -640,8 +744,13 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   });
 
   assert.equal(list.ok, true);
-  assert.match(list.response.text, /1\. Encrypted question/);
-  assert.match(list.response.text, /2\. Question unavailable/);
+  assert.match(list.response.text, /^Questions \(2\/2\)/);
+  assert.match(list.response.text, /Failed to load question prompt\./);
+  assert.match(list.response.text, /Encrypted question/);
+  assert.deepEqual(flattenButtons(list.response.replyMarkup).slice(0, 2).map((button) => button.text), [
+    'Pose 1',
+    'Pose 2',
+  ]);
   assert.equal(list.response.text.includes('0x78787878'), false);
   assert.equal(list.response.text.includes('0x90909090'), false);
   assert.equal(list.response.text.includes('Encrypted prompt must not leak'), false);
@@ -654,6 +763,197 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
   assert.equal(posed.payloadUnavailable, true);
   assert.equal(posed.posed, false);
+});
+
+test('/results consensus shows top difference questions from submitted records', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-diff',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the group block launch?',
+      },
+      {
+        questionId: 'q-same',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the group publish the summary?',
+      },
+    ]),
+  });
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '1',
+    questionId: 'q-diff',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true, txHash: `0x${'12'.repeat(32)}` },
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '2',
+    questionId: 'q-diff',
+    answer: { label: 'Disagree', value: 'disagree' },
+    onChain: { ok: true, txHash: `0x${'34'.repeat(32)}` },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '3',
+    questionId: 'q-same',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true, txHash: `0x${'56'.repeat(32)}` },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/results consensus'),
+    env,
+    now: '2026-05-08T12:01:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'results_consensus');
+  assert.equal(result.response.method, 'sendPhoto');
+  assert.equal(result.response.photo.contentType, 'image/png');
+  assert.deepEqual(Array.from(result.response.photo.bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.match(result.response.text, /^Beeswarm/);
+  assert.match(result.response.text, /Live responses: 3/);
+  assert.match(result.response.text, /1\. ● Should the group block launch\?/);
+  assert.match(result.response.text, /Agree 1 \| Disagree 1/);
+  assert.equal(result.response.text.includes('Demo mode'), false);
+});
+
+test('/results group shows participant graph with question legend', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-1', questionType: 'freeform', prompt: 'First prompt?' },
+      { questionId: 'q-2', questionType: 'freeform', prompt: 'Second prompt?' },
+    ]),
+  });
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    questionId: 'q-1',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    questionId: 'q-2',
+    answer: { label: 'Unsure', value: 'unsure' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '43',
+    questionId: 'q-1',
+    answer: { label: 'Disagree', value: 'disagree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '43',
+    questionId: 'q-2',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  }));
+
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/results group'),
+    env,
+    now: '2026-05-08T12:01:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'results_group');
+  assert.equal(result.response.method, 'sendPhoto');
+  assert.equal(result.response.photo.contentType, 'image/png');
+  assert.match(result.response.text, /^Participants graph/);
+  assert.match(result.response.text, /Responses: 4/);
+  assert.match(result.response.text, /P1 -> Q1:Agree, Q2:Unsure/);
+  assert.match(result.response.text, /P2 -> Q1:Disagree, Q2:Agree/);
+  assert.match(result.response.text, /1\. First prompt\?/);
+});
+
+test('/results without arguments explains available result views', async () => {
+  const env = baseEnv();
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/results'),
+    env,
+    now: '2026-05-08T12:01:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'results_options');
+  assert.equal(result.response.method, 'sendMessage');
+  assert.match(result.response.text, /^Results/);
+  assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
+  assert.match(result.response.text, /Group: shows participant answer patterns/);
+  assert.match(result.response.text, /\/results \[ consensus \| group \]/);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group']);
+});
+
+test('dispatchTelegramCommandResponse uploads rendered result photos and falls back to text on media failure', async () => {
+  const commandResponse = await buildTelegramCommandResponse({
+    update: groupMessage('/results consensus'),
+    env: baseEnv(),
+    now: '2026-05-08T12:01:00.000Z',
+  });
+  const calls = [];
+  const fetchMock = async (url, init = {}) => {
+    calls.push({ url, init });
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 77 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env: baseEnv(),
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://api.telegram.org/bot123456:test-token/sendPhoto');
+  assert.equal(calls[0].init.body.get('chat_id'), '-100123');
+  assert.equal(calls[0].init.body.get('photo').type, 'image/png');
+
+  const fallbackCalls = [];
+  const fallbackFetch = async (url, init = {}) => {
+    fallbackCalls.push({ url, init });
+    if (String(url).endsWith('/sendPhoto')) {
+      return new Response(JSON.stringify({ ok: false, description: 'bad photo' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 78 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const fallback = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env: baseEnv(),
+    fetchImpl: fallbackFetch,
+  });
+
+  assert.equal(fallback.telegram.ok, true);
+  assert.deepEqual(fallbackCalls.map((call) => String(call.url).split('/').pop()), ['sendPhoto', 'sendMessage']);
 });
 
 test('/questions does not invent demo questions when live question cache is empty', async () => {
@@ -689,7 +989,7 @@ test('/questions does not invent demo questions when live question cache is empt
   assert.equal(result.ok, true);
   assert.equal(result.questionCount, 0);
   assert.equal(result.questionSourceReason, 'live_questions_empty');
-  assert.match(result.response.text, /No public questions are available yet/);
+  assert.equal(result.response.text, 'Questions (0/0)\n\nNo questions are available.');
   assert.equal(result.response.text.includes('q-readiness'), false);
   assert.equal(result.response.text.includes('What should Alpha decide next'), false);
 });
@@ -709,7 +1009,7 @@ test('/questions reports live source failures without caching them as empty list
   assert.equal(result.ok, true);
   assert.equal(result.questionCount, 0);
   assert.equal(result.questionSourceReason, 'question_rpc_url_missing');
-  assert.match(result.response.text, /Question source is missing RPC config/);
+  assert.equal(result.response.text, 'Questions (0/0)\n\nQuestion source is missing RPC config.');
   assert.equal(result.response.text.includes('No public questions are available yet'), false);
 });
 
@@ -781,10 +1081,11 @@ test('group session binding makes later question and doc commands use the joined
   assert.match(joined.response.text, /Use \/attachments for session files/);
   assert.equal(joined.response.text.includes('/me'), false);
   assert.equal(joined.response.text.includes('Use /questions'), false);
-  assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
+  assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
-  assert.match(posed.response.text, /Question for demo:/);
+  assert.equal(posed.response.text.startsWith('Question for demo:'), false);
+  assert.match(posed.response.text, /^What should Demo decide next\?/);
   assert.match(docs.response.text, /Attachments for demo/);
   assert.match(docs.response.text, /Demo brief/);
 });
@@ -843,15 +1144,15 @@ test('private session join makes later question commands use the selected sessio
   });
 
   assert.equal(joined.sessionSlug, 'demo');
-  assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
+  assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
-  assert.match(posed.response.text, /Question for demo:/);
-  assert.match(posed.response.text, /What should Demo decide next/);
+  assert.equal(posed.response.text.startsWith('Question for demo:'), false);
+  assert.match(posed.response.text, /^What should Demo decide next\?/);
 });
 
-test('session join prefetches questions immediately in the background', async () => {
+test('private session join reports available question count after bounded prefetch', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -895,12 +1196,21 @@ test('session join prefetches questions immediately in the background', async ()
   assert.deepEqual(joined.questionPrefetch, {
     scheduled: true,
     sessionSlug: 'demo',
+    ok: true,
+    reason: 'fixture_questions_loaded',
+    questionCount: 1,
+    availableQuestionCount: 1,
+    unavailableQuestionCount: 0,
+    lockedQuestionCount: 0,
+    discoveredQuestionCount: 1,
+    complete: true,
   });
-  assert.equal(waited.length, 1);
+  assert.match(joined.response.text, /Questions: 1\./);
+  assert.equal(waited.length, 0);
   await Promise.all(waited);
 });
 
-test('group session join prefetches questions immediately in the background', async () => {
+test('group session join reports available question count after bounded prefetch', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'demo',
@@ -936,8 +1246,17 @@ test('group session join prefetches questions immediately in the background', as
   assert.deepEqual(joined.questionPrefetch, {
     scheduled: true,
     sessionSlug: 'demo',
+    ok: true,
+    reason: 'fixture_questions_loaded',
+    questionCount: 1,
+    availableQuestionCount: 1,
+    unavailableQuestionCount: 0,
+    lockedQuestionCount: 0,
+    discoveredQuestionCount: 1,
+    complete: true,
   });
-  assert.equal(waited.length, 1);
+  assert.match(joined.response.text, /Questions: 1\./);
+  assert.equal(waited.length, 0);
   await Promise.all(waited);
 });
 
@@ -1045,8 +1364,8 @@ test('/sessions callback switches the group session used by later question comma
   });
 
   assert.equal(selected.sessionSlug, 'demo');
-  assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
+  assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
 });
@@ -1081,8 +1400,9 @@ test('group Pose Question callback opens a choose-question menu instead of posin
   assert.equal(callback.response.method, 'editMessageText');
   assert.equal(callback.response.messageId, '56');
   assert.equal(callback.screen, 'question_list');
-  assert.match(callback.response.text, /Choose a question to pose to the group/);
-  assert.match(callback.response.text, /1\. What should Alpha decide next/);
+  assert.match(callback.response.text, /^Questions \(2\/2\)\n\n1\. What should Alpha decide next\?/);
+  assert.equal(callback.response.text.includes('Choose a question'), false);
+  assert.equal(flattenButtons(callback.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(callback.response.text.includes('q-readiness'), false);
   assert.equal(callback.response.text.startsWith('Question for alpha:'), false);
 });
@@ -1155,10 +1475,16 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   });
 
   assert.equal(binary.ok, true);
-  assert.match(binary.response.text, /Tap an answer to submit from Telegram/);
+  assert.equal(binary.response.text, 'Should Demo adopt this proposal?');
+  assert.equal(binary.response.text.includes('Options:'), false);
+  assert.equal(binary.response.text.includes('Tap an answer'), false);
   assert.deepEqual(
     flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Agree', 'Unsure', 'Disagree']
+    ['Agree', 'Disagree', 'Unsure']
+  );
+  assert.deepEqual(
+    binary.response.replyMarkup.inline_keyboard.slice(0, 3).map((row) => row.map((button) => button.text)),
+    [['Agree', 'Disagree'], ['Unsure'], ['Other Questions']],
   );
   assert.deepEqual(
     flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),
@@ -1386,8 +1712,59 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'my_account');
   assert.match(result.response.text, /Account/);
-  assert.match(result.response.text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
+  assert.match(result.response.text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
+  assert.match(result.response.text, /Chain: OP Sepolia Testnet \(11155420\)/);
+  assert.equal(result.response.parseMode, 'HTML');
+  const addressButton = flattenButtons(result.response.replyMarkup)
+    .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
+  assert.equal(addressButton, undefined);
+  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'View Questions'), true);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/start includes a Mini App button that opens the session picker before a private session is selected', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'setup_welcome');
+  const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
+  assert.deepEqual(buttonLabels, ['Questions', 'Sessions', 'Mini App']);
+  assert.equal(result.response.text.includes('/results [ consensus | group ]'), true);
+  assert.equal(buttonLabels.includes('Agent Actions'), false);
+  assert.equal(buttonLabels.includes('Attachments'), false);
+  const miniApp = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Mini App');
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.miniAppLaunch, true);
+  assert.equal(record.action, 'view_questions');
+  assert.equal(record.serverContextRef.sessionPicker, true);
+  assert.equal(record.serverContextRef.sessionSlug, undefined);
+});
+
+test('group /start includes a Mini App deep link to the session picker', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'setup_welcome');
+  const miniApp = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Mini App');
+  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  const launch = new URL(miniApp.url).searchParams.get('start');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.miniAppLaunch, true);
+  assert.equal(record.serverContextRef.sessionPicker, true);
 });
 
 test('dispatchTelegramCommandResponse uses mocked fetch and does not require real Telegram credentials', async () => {

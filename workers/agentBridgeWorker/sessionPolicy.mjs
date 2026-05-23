@@ -106,6 +106,31 @@ export function normalizeSessionPolicy(input = {}) {
       input.ceSessionWorkerBaseUrl ||
       input.CE_SESSION_WORKER_BASE_URL
     ) || null,
+    workerSessionSlug: safeString(
+      session.workerSessionSlug ||
+      session.sessionWorkerSlug ||
+      session.ceSessionWorkerSessionSlug ||
+      session.sessionWorkerSessionSlug ||
+      input.workerSessionSlug ||
+      input.sessionWorkerSlug ||
+      input.ceSessionWorkerSessionSlug ||
+      input.sessionWorkerSessionSlug
+    ).toLowerCase() || null,
+    workerLoginOrigin: safeString(
+      session.workerLoginOrigin ||
+      session.sessionWorkerLoginOrigin ||
+      session.ceSessionWorkerLoginOrigin ||
+      session.loginOrigin ||
+      input.workerLoginOrigin ||
+      input.sessionWorkerLoginOrigin ||
+      input.ceSessionWorkerLoginOrigin ||
+      input.loginOrigin
+    ) || null,
+    allowOrigins: (Array.isArray(session.allowOrigins)
+      ? session.allowOrigins
+      : (Array.isArray(input.allowOrigins) ? input.allowOrigins : []))
+      .map(safeString)
+      .filter(Boolean),
     surveysAddress: safeString(
       session.surveysAddress ||
       session.surveyAddress ||

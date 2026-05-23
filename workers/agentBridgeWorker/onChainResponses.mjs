@@ -45,24 +45,65 @@ function normalizeBaseUrl(value = '') {
   const text = safeString(value).replace(/\/+$/, '');
   if (!text) return '';
   try {
-    return new URL(text).toString().replace(/\/+$/, '');
+    const url = new URL(text);
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/+$/, '');
   } catch {
     return '';
   }
 }
 
-function resolveLoginOrigin(env = {}) {
+function normalizeOrigin(value = '') {
+  const text = safeString(value);
+  if (!text) return '';
+  try {
+    return new URL(text).origin;
+  } catch {
+    return '';
+  }
+}
+
+function appendUniqueOrigin(out = [], seen = new Set(), value = '') {
+  const origin = normalizeOrigin(value);
+  if (!origin || seen.has(origin)) return;
+  seen.add(origin);
+  out.push(origin);
+}
+
+function resolveLoginOriginCandidates(env = {}, session = {}) {
   const configured = safeString(
     env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN ||
     env.LOCAL_AUTH_ORIGIN ||
     env.AGENT_BRIDGE_PUBLIC_URL
   );
-  const origin = configured || DEFAULT_LOGIN_ORIGIN;
-  try {
-    return new URL(origin).origin;
-  } catch {
-    return DEFAULT_LOGIN_ORIGIN;
-  }
+  const seen = new Set();
+  const origins = [];
+  appendUniqueOrigin(origins, seen, session.workerLoginOrigin);
+  appendUniqueOrigin(origins, seen, session.sessionWorkerLoginOrigin);
+  appendUniqueOrigin(origins, seen, session.ceSessionWorkerLoginOrigin);
+  appendUniqueOrigin(origins, seen, session.loginOrigin);
+  (Array.isArray(session.allowOrigins) ? session.allowOrigins : [])
+    .forEach((origin) => appendUniqueOrigin(origins, seen, origin));
+  appendUniqueOrigin(origins, seen, configured || DEFAULT_LOGIN_ORIGIN);
+  [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://contextengine.xyz',
+    'https://www.contextengine.xyz',
+    DEFAULT_LOGIN_ORIGIN,
+    'http://127.0.0.1:7391',
+  ].forEach((origin) => appendUniqueOrigin(origins, seen, origin));
+  return origins.length ? origins : [DEFAULT_LOGIN_ORIGIN];
+}
+
+function resolveLoginOrigin(env = {}, session = {}) {
+  return resolveLoginOriginCandidates(env, session)[0] || DEFAULT_LOGIN_ORIGIN;
+}
+
+function isOriginAuthError(error = null) {
+  return /Origin not allowed|Untrusted worker login origin|Missing Origin for worker login|SIWE uri origin does not match request Origin/i
+    .test(safeString(error?.message || error));
 }
 
 export function directSubmitFeatureEnabled(env = {}) {
@@ -100,19 +141,186 @@ export function resolveSurveysAddress(env = {}, session = {}) {
   return ADDRESS_RE.test(address) ? ethers.utils.getAddress(address) : '';
 }
 
-function resolveRpcUrl(env = {}, session = {}) {
-  return safeString(
-    session.rpcUrl ||
-    session.defaultRpcUrl ||
-    env.AGENT_BRIDGE_RPC_URL ||
-    env.DEFAULT_RPC_URL ||
-    env.RPC_URL
-  );
+function splitRpcUrls(value = '') {
+  return safeString(value)
+    .split(/[\s,]+/)
+    .map(safeString)
+    .filter(Boolean);
+}
+
+function resolveRpcUrls(env = {}, session = {}) {
+  const ordered = [
+    session.rpcUrl,
+    session.defaultRpcUrl,
+    env.AGENT_BRIDGE_RPC_URL,
+    env.DEFAULT_RPC_URL,
+    env.RPC_URL,
+    session.additionalRpcUrl,
+    session.fallbackRpcUrl,
+    env.AGENT_BRIDGE_ADDITIONAL_RPC_URL,
+    env.ADDITIONAL_RPC_URL,
+  ].flatMap(splitRpcUrls);
+  const seen = new Set();
+  return ordered.filter((url) => {
+    const key = lower(url);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function normalizeChainId(env = {}, session = {}) {
   const value = Number(session.chainId || env.DEFAULT_CHAIN_ID || 11155420);
   return Number.isInteger(value) && value > 0 ? value : 11155420;
+}
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function faucetBalanceWaitConfig(env = {}) {
+  return {
+    attempts: Math.min(20, positiveInteger(env.AGENT_BRIDGE_FAUCET_BALANCE_WAIT_ATTEMPTS, 6)),
+    intervalMs: Math.min(5000, positiveInteger(env.AGENT_BRIDGE_FAUCET_BALANCE_WAIT_MS, 1000)),
+  };
+}
+
+async function sleepMs(ms = 0) {
+  if (!ms) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function rpcConnection(rpcUrl = '', fetchImpl = null) {
+  return typeof fetchImpl === 'function'
+    ? { url: rpcUrl, fetch: fetchImpl }
+    : rpcUrl;
+}
+
+function rpcQuantity(value, ethersLib = ethers) {
+  const hex = ethersLib.BigNumber.from(value).toHexString();
+  return ethersLib.utils.hexStripZeros(hex) || '0x0';
+}
+
+async function rpcJsonFetch(fetchImpl, rpcUrl = '', method = '', params = []) {
+  const response = await fetchImpl(rpcUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method,
+      params,
+    }),
+  });
+  const body = await parseJsonResponse(response);
+  if (!response?.ok || body?.error) {
+    const detail = safeString(body?.error?.message || body?.error || response?.status) || 'rpc_request_failed';
+    throw new Error(`${method}_failed: ${detail}`);
+  }
+  return body?.result;
+}
+
+async function selectReadyRpcUrl({
+  rpcUrls = [],
+  chainId = 11155420,
+  fetchImpl = globalThis.fetch,
+  ethersLib = ethers,
+} = {}) {
+  let lastError = null;
+  for (const rpcUrl of rpcUrls) {
+    try {
+      const remoteChainId = ethersLib.BigNumber.from(await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_chainId', [])).toNumber();
+      if (remoteChainId !== Number(chainId)) {
+        throw new Error(`chain_id_mismatch:${remoteChainId}`);
+      }
+      return rpcUrl;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`rpc_network_unavailable: ${safeString(lastError?.message || lastError) || 'all_rpc_urls_failed'}`);
+}
+
+async function waitForAccountBalance({
+  fetchImpl = globalThis.fetch,
+  rpcUrls = [],
+  chainId = 11155420,
+  accountAddress = '',
+  attempts = 6,
+  intervalMs = 1000,
+  ethersLib = ethers,
+} = {}) {
+  if (!attempts) return { ok: false, skipped: true, reason: 'balance_wait_disabled' };
+  const rpcUrl = await selectReadyRpcUrl({ rpcUrls, chainId, fetchImpl, ethersLib });
+  const address = ethersLib.utils.getAddress(accountAddress);
+  let lastBalance = ethersLib.BigNumber.from(0);
+  let lastError = null;
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      lastBalance = ethersLib.BigNumber.from(await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_getBalance', [address, 'latest']));
+      if (!lastBalance.isZero()) {
+        return {
+          ok: true,
+          attempts: i + 1,
+          balanceWei: rpcQuantity(lastBalance, ethersLib),
+        };
+      }
+    } catch (error) {
+      lastError = error;
+    }
+    if (i < attempts - 1) await sleepMs(intervalMs);
+  }
+  return {
+    ok: false,
+    reason: 'balance_wait_timeout',
+    attempts,
+    balanceWei: rpcQuantity(lastBalance, ethersLib),
+    ...(lastError ? { error: safeString(lastError?.message || lastError) } : {}),
+  };
+}
+
+async function broadcastSubmitResponsesWithRpc({
+  fetchImpl = globalThis.fetch,
+  rpcUrls = [],
+  chainId = 11155420,
+  privateKey = '',
+  accountAddress = '',
+  surveysAddress = '',
+  questionId = '',
+  responseHash = '',
+  ethersLib = ethers,
+} = {}) {
+  const rpcUrl = await selectReadyRpcUrl({ rpcUrls, chainId, fetchImpl, ethersLib });
+  const iface = new ethersLib.utils.Interface(SUBMIT_RESPONSES_ABI);
+  const data = iface.encodeFunctionData('submitResponses', [[questionId], [responseHash], HASH_ZERO, HASH_ZERO]);
+  const from = ethersLib.utils.getAddress(accountAddress);
+  const nonce = ethersLib.BigNumber.from(await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_getTransactionCount', [from, 'pending']));
+  const gasPrice = ethersLib.BigNumber.from(await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_gasPrice', []));
+  const estimate = ethersLib.BigNumber.from(await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_estimateGas', [{
+    from,
+    to: surveysAddress,
+    data,
+    value: '0x0',
+  }]));
+  const gasLimit = estimate.mul(13).div(10);
+  const wallet = new ethersLib.Wallet(privateKey);
+  const rawTx = await wallet.signTransaction({
+    chainId,
+    to: surveysAddress,
+    data,
+    value: 0,
+    nonce: nonce.toNumber(),
+    gasLimit,
+    gasPrice,
+  });
+  const txHash = await rpcJsonFetch(fetchImpl, rpcUrl, 'eth_sendRawTransaction', [rawTx]);
+  return {
+    txHash: safeString(txHash),
+    rpcUrl,
+    gasLimit: rpcQuantity(gasLimit, ethersLib),
+    gasPrice: rpcQuantity(gasPrice, ethersLib),
+  };
 }
 
 async function parseJsonResponse(response) {
@@ -124,15 +332,46 @@ async function parseJsonResponse(response) {
   }
 }
 
+async function parseTextResponse(response) {
+  if (!response || typeof response.text !== 'function') return '';
+  try {
+    return safeString(await response.text()).replace(/\s+/g, ' ').slice(0, 240);
+  } catch {
+    return '';
+  }
+}
+
+async function parseResponseBody(response) {
+  if (!response) return { json: {}, text: '' };
+  const clone = typeof response.clone === 'function' ? response.clone() : null;
+  const json = await parseJsonResponse(response);
+  const text = Object.keys(json).length ? '' : await parseTextResponse(clone || response);
+  return { json, text };
+}
+
+function publicFetchTarget(url = '') {
+  const text = safeString(url);
+  try {
+    const parsed = new URL(text);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return text.split('?')[0].slice(0, 240);
+  }
+}
+
 async function checkedJsonFetch(fetchImpl, url, init = {}, {
   tokenField = '',
   errorPrefix = 'request_failed',
 } = {}) {
   const response = await fetchImpl(url, init);
-  const body = await parseJsonResponse(response);
+  const { json: body, text } = await parseResponseBody(response);
   if (!response?.ok || (tokenField && !body?.[tokenField])) {
-    const upstream = safeString(body?.error || body?.reason || response?.status);
-    throw new Error(`${errorPrefix}: ${upstream || 'upstream_error'}`);
+    const upstream = safeString(body?.error || body?.reason || body?.message || text);
+    const status = safeString(response?.status);
+    const detail = upstream
+      ? (status && upstream !== status ? `${upstream} (${status})` : upstream)
+      : (status || 'upstream_error');
+    throw new Error(`${errorPrefix}: ${detail} at ${publicFetchTarget(url)}`);
   }
   return { response, body };
 }
@@ -177,50 +416,76 @@ export async function authenticateSessionWorker({
     return { ok: false, reason: safeString(error?.message || error) || 'managed_wallet_unavailable' };
   }
 
-  const origin = resolveLoginOrigin(env);
-  const sessionSlug = safeString(session.sessionSlug || session.slug);
-  const nonce = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/nonce`, {
-    method: 'POST',
-    headers: jsonHeaders(origin),
-    body: JSON.stringify({ address: wallet.address, sessionSlug }),
-  }, {
-    tokenField: 'nonce',
-    errorPrefix: 'worker_nonce_failed',
-  }).then(({ body }) => body.nonce).catch((error) => {
-    throw new Error(safeString(error?.message || error) || 'worker_nonce_failed');
-  });
-
   const issuedAt = now instanceof Date ? now : new Date(now);
   const expiresAt = new Date(issuedAt.getTime() + 24 * 60 * 60 * 1000);
-  const originUrl = new URL(origin);
-  const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
-    + `${wallet.address}\n\nSign in to Context Engine.\n\n`
-    + `URI: ${origin}\nVersion: 1\nChain ID: ${normalizeChainId(env, session)}`
-    + `\nNonce: ${nonce}`
-    + `\nIssued At: ${issuedAt.toISOString()}`
-    + `\nExpiration Time: ${expiresAt.toISOString()}`;
-  const signature = await wallet.signMessage(message);
-  const login = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/login`, {
-    method: 'POST',
-    headers: jsonHeaders(origin),
-    body: JSON.stringify({
-      address: wallet.address,
-      message,
-      signature,
-      sessionSlug,
-    }),
-  }, {
-    tokenField: 'token',
-    errorPrefix: 'worker_login_failed',
-  }).then(({ body }) => body);
+  const configuredWorkerSlug = safeString(
+    session.workerSessionSlug ||
+    session.sessionWorkerSlug ||
+    session.ceSessionWorkerSessionSlug ||
+    session.sessionWorkerSessionSlug
+  );
+  const fallbackSlug = safeString(session.sessionSlug || session.slug);
+  const sessionSlugCandidates = [configuredWorkerSlug || fallbackSlug];
+  if (sessionSlugCandidates[0]) sessionSlugCandidates.push('');
+  const originCandidates = resolveLoginOriginCandidates(env, session);
+  let lastAuthError = null;
+  for (const origin of originCandidates) {
+    const originUrl = new URL(origin);
+    for (const authSessionSlug of sessionSlugCandidates) {
+      try {
+        const nonce = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/nonce`, {
+          method: 'POST',
+          headers: jsonHeaders(origin),
+          body: JSON.stringify({
+            address: wallet.address,
+            ...(authSessionSlug ? { sessionSlug: authSessionSlug } : {}),
+          }),
+        }, {
+          tokenField: 'nonce',
+          errorPrefix: 'worker_nonce_failed',
+        }).then(({ body }) => body.nonce);
 
-  return {
-    ok: true,
-    token: login.token,
-    exp: login.exp || null,
-    workerUrl: baseUrl,
-    accountAddress: wallet.address,
-  };
+        const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
+          + `${wallet.address}\n\nSign in to Context Engine.\n\n`
+          + `URI: ${origin}\nVersion: 1\nChain ID: ${normalizeChainId(env, session)}`
+          + `\nNonce: ${nonce}`
+          + `\nIssued At: ${issuedAt.toISOString()}`
+          + `\nExpiration Time: ${expiresAt.toISOString()}`;
+        const signature = await wallet.signMessage(message);
+        const login = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/login`, {
+          method: 'POST',
+          headers: jsonHeaders(origin),
+          body: JSON.stringify({
+            address: wallet.address,
+            message,
+            signature,
+            ...(authSessionSlug ? { sessionSlug: authSessionSlug } : {}),
+          }),
+        }, {
+          tokenField: 'token',
+          errorPrefix: 'worker_login_failed',
+        }).then(({ body }) => body);
+
+        return {
+          ok: true,
+          token: login.token,
+          exp: login.exp || null,
+          workerUrl: baseUrl,
+          accountAddress: wallet.address,
+          origin,
+        };
+      } catch (error) {
+        lastAuthError = error;
+        const message = safeString(error?.message || error);
+        const shouldRetryWithoutSlug = authSessionSlug && /sessionSlug does not match worker session/i.test(message);
+        if (shouldRetryWithoutSlug) continue;
+        if (isOriginAuthError(error)) break;
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(safeString(lastAuthError?.message || lastAuthError) || 'worker_auth_failed');
 }
 
 export async function requestManagedAccountFaucetOnJoin({
@@ -273,7 +538,7 @@ export async function requestSessionWorkerFaucet({
   const response = await fetchImpl(`${login.workerUrl}/`, {
     method: 'POST',
     headers: {
-      ...jsonHeaders(resolveLoginOrigin(env)),
+      ...jsonHeaders(login.origin || resolveLoginOrigin(env, session)),
       Authorization: `Bearer ${login.token}`,
     },
     body: JSON.stringify({
@@ -402,24 +667,29 @@ async function uploadResponsePayload({
   token,
   payload,
 } = {}) {
-  const response = await fetchImpl(`${workerUrl}/arweave/upload`, {
+  const response = await fetchImpl(`${workerUrl}/storage/upload`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      data: JSON.stringify(payload),
+      data: payload,
       contentType: 'application/json',
+      resource: 'responses',
     }),
   });
   const body = await parseJsonResponse(response);
   if (!response?.ok) {
-    throw new Error(`arweave_upload_failed: ${safeString(body?.error || response?.status)}`);
+    throw new Error(`storage_upload_failed: ${safeString(body?.error || response?.status)}`);
   }
-  const txId = safeString(body?.id || body?.txId || body?.transactionId);
-  if (!txId) throw new Error('arweave_upload_missing_transaction_id');
-  return txId;
+  const id = safeString(body?.storageRef?.id || body?.id || body?.txId || body?.transactionId);
+  if (!id) throw new Error('storage_upload_missing_id');
+  return {
+    id,
+    storageRef: body?.storageRef || null,
+    backend: safeString(body?.storageRef?.backend || body?.backend || ''),
+  };
 }
 
 export async function submitTelegramResponseOnChain({
@@ -452,8 +722,8 @@ export async function submitTelegramResponseOnChain({
   if (!workerUrl) return { ok: false, skipped: true, reason: 'session_worker_url_missing' };
   const surveysAddress = resolveSurveysAddress(env, session);
   if (!surveysAddress) return { ok: false, skipped: true, reason: 'surveys_address_missing' };
-  const rpcUrl = resolveRpcUrl(env, session);
-  if (!rpcUrl && !contractFactory) return { ok: false, skipped: true, reason: 'rpc_url_missing' };
+  const rpcUrls = resolveRpcUrls(env, session);
+  if (!rpcUrls.length && !contractFactory) return { ok: false, skipped: true, reason: 'rpc_url_missing' };
 
   let auth;
   try {
@@ -472,7 +742,7 @@ export async function submitTelegramResponseOnChain({
   }
   if (!auth.ok) return { ...auth, reason: auth.reason || 'worker_auth_failed' };
 
-  const faucet = session.sponsoredFaucetAllowed === true
+  let faucet = session.sponsoredFaucetAllowed === true
     ? await requestSessionWorkerFaucet({
       env,
       session,
@@ -500,20 +770,55 @@ export async function submitTelegramResponseOnChain({
       accountAddress: auth.accountAddress,
       createdAt,
     });
-    const arweaveTxId = await uploadResponsePayload({
+    const storageUpload = await uploadResponsePayload({
       fetchImpl,
       workerUrl,
       token: auth.token,
       payload,
     });
-    const responseHash = base64urlToHex(arweaveTxId);
-    const provider = rpcUrl ? new ethersLib.providers.JsonRpcProvider(rpcUrl, normalizeChainId(env, session)) : null;
-    const signer = provider ? new ethersLib.Wallet(privateKey, provider) : new ethersLib.Wallet(privateKey);
-    const contract = typeof contractFactory === 'function'
-      ? contractFactory({ surveysAddress, abi: SUBMIT_RESPONSES_ABI, signer, ethersLib })
-      : new ethersLib.Contract(surveysAddress, SUBMIT_RESPONSES_ABI, signer);
-    const tx = await contract.submitResponses([qid], [responseHash], HASH_ZERO, HASH_ZERO);
-    const receipt = typeof tx?.wait === 'function' ? await tx.wait() : null;
+    const responseHash = base64urlToHex(storageUpload.id);
+    const storageBackend = lower(storageUpload.backend || storageUpload.storageRef?.backend);
+    const chainId = normalizeChainId(env, session);
+    let tx = null;
+    let receipt = null;
+    if (typeof contractFactory === 'function') {
+      const provider = rpcUrls[0]
+        ? new ethersLib.providers.JsonRpcProvider(rpcConnection(rpcUrls[0], fetchImpl), chainId)
+        : null;
+      const signer = provider ? new ethersLib.Wallet(privateKey, provider) : new ethersLib.Wallet(privateKey);
+      const contract = contractFactory({ surveysAddress, abi: SUBMIT_RESPONSES_ABI, signer, ethersLib });
+      tx = await contract.submitResponses([qid], [responseHash], HASH_ZERO, HASH_ZERO);
+      receipt = typeof tx?.wait === 'function' ? await tx.wait() : null;
+    } else {
+      if (faucet?.ok === true && faucet.skipped !== true) {
+        const waitConfig = faucetBalanceWaitConfig(env);
+        const balanceWait = await waitForAccountBalance({
+          fetchImpl,
+          rpcUrls,
+          chainId,
+          accountAddress: auth.accountAddress,
+          attempts: waitConfig.attempts,
+          intervalMs: waitConfig.intervalMs,
+          ethersLib,
+        }).catch((error) => ({
+          ok: false,
+          reason: 'balance_wait_failed',
+          error: safeString(error?.message || error),
+        }));
+        faucet = { ...faucet, balanceWait };
+      }
+      tx = await broadcastSubmitResponsesWithRpc({
+        fetchImpl,
+        rpcUrls,
+        chainId,
+        privateKey,
+        accountAddress: auth.accountAddress,
+        surveysAddress,
+        questionId: qid,
+        responseHash,
+        ethersLib,
+      });
+    }
     return {
       ok: true,
       action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
@@ -522,12 +827,14 @@ export async function submitTelegramResponseOnChain({
       sessionSlug,
       questionId: qid,
       accountAddress: auth.accountAddress,
-      txHash: tx?.hash || receipt?.transactionHash || null,
+      txHash: tx?.hash || tx?.txHash || receipt?.transactionHash || null,
       blockNumber: receipt?.blockNumber ?? null,
-      arweaveTxId,
+      storageRef: storageUpload.storageRef,
+      storageId: storageUpload.id,
+      ...(storageBackend === 'cloudflare' ? {} : { arweaveTxId: storageUpload.id }),
       responseHash,
       surveysAddress,
-      chainId: normalizeChainId(env, session),
+      chainId,
       faucet,
     };
   } catch (error) {
@@ -548,7 +855,11 @@ export async function submitTelegramResponseOnChain({
 export const __test__onChainResponses = {
   HASH_ZERO,
   SUBMIT_RESPONSES_ABI,
+  broadcastSubmitResponsesWithRpc,
   normalizeAnswerForPayload,
+  resolveRpcUrls,
   resolveLoginOrigin,
+  selectReadyRpcUrl,
+  waitForAccountBalance,
   uploadResponsePayload,
 };
