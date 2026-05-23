@@ -218,20 +218,14 @@ Private suite flags for `scripts/run-e2e-suite.js`:
 - `E2E_SUITE_INCLUDE_DOCS=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
 - `E2E_SUITE_INCLUDE_SBT=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
   - Includes `ai:test-sbt-create:variants`, `ai:test-sbt-metadata-locks`, `ai:test-sbt-collect:variants`, and `ai:test-sbt-contract:boundaries`
-- `E2E_SUITE_INCLUDE_SESSION_SETUP=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_PROFILE_SBT_MULTI=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_PROFILE_ACTIVITY_MULTI=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_ADMIN=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s test:e2e`
-- `E2E_SUITE_CONTINUE=1 npm run -s test:e2e` (run all steps, then exit non-zero if any failed)
+- `E2E_SUITE_INCLUDE_SESSION_SETUP=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_PROFILE_SBT_MULTI=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_PROFILE_ACTIVITY_MULTI=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_ADMIN=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_CONTINUE=1 npm run -s ai:node -- scripts/run-e2e-suite.js` (run all steps, then exit non-zero if any failed)
 - Full private suites create a fresh session target by default before child steps. When `CLOUDFLARE_API_TOKEN` is set, the default fresh profile is `custom-worker-secrets-v1` so the target session gets its own worker and slug-scoped secrets. Without a token the fallback profile is `default-worker-minimal-v1`, which is only appropriate when the shared/default worker accepts the target session slug. Set `E2E_SUITE_ENSURE_SESSION=0` to skip setup, `E2E_SUITE_REUSE_SESSION_TARGET=1` to reuse `SESSION_SLUG` or the latest active target, or `E2E_SUITE_SESSION_PROFILE=...` to choose explicitly.
-
-Manual full-session sequence:
-1. Create a custom-worker session with `ai:test-session-setup:custom-worker-secrets`.
-2. Resolve the session target from the setup artifact: `slug`, `adminUrl`, metadata URI, and the deployed `sessionCorsWorker` URL. If the setup artifact omits `workerUrl`, read the on-chain SessionRegistry `corsWorkerUrl` for that slug.
-3. Run downstream authoring/response commands with `SESSION_SLUG=<slug>` and `SESSION_WORKER_URL=<worker-url>`.
-4. For the response matrix, also set `SURVEY_RESPONSE_REUSE_SESSION_SLUG=1` unless passing `--session-slug <slug>`.
 
 Navigation is included in the public smoke via `scripts/vite-navigation-smoke.js`.
 
@@ -329,7 +323,7 @@ To verify real provider wiring (non-deterministic output, slower, can fail if yo
 - Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
   - `SESSION_SLUG=<existing-session-slug> E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
-  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
+  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s ai:node -- scripts/run-e2e-suite.js`
 
 ### Agent Mode (JSON-driven)
 
