@@ -310,6 +310,20 @@ function loadWorkerToken(slug) {
   catch { return null; }
 }
 
+function loadValidatedWorkerToken(slug, walletAddress = '') {
+  const tokenStr = loadWorkerToken(slug);
+  if (!tokenStr) return null;
+  const validation = validateWorkerToken(tokenStr, {
+    session: slug,
+    walletAddress,
+  });
+  if (!validation.ok) {
+    debug(`[auth] Ignoring invalid worker token for ${slug}: ${validation.error}`);
+    return null;
+  }
+  return tokenStr;
+}
+
 function getWorkerTokenStatus(slug, walletAddress = '') {
   const tokenStr = loadWorkerToken(slug);
   if (!tokenStr) {
@@ -422,6 +436,20 @@ function loadAgentRequestByIdempotencyKey(walletAddress = '', idempotencyKey = '
   if (!normalizedKey) return null;
   return loadAgentRequestsForWallet(walletAddress)
     .find((entry) => normalizeAgentIdempotencyKey(entry?.idempotencyKey) === normalizedKey) || null;
+}
+
+function agentRequestMatchesSession(request = {}, sessionSlug = '') {
+  const requestedSession = String(sessionSlug || '').trim().toLowerCase();
+  if (!requestedSession) return true;
+  if (String(request?.session || '').trim().toLowerCase() === requestedSession) return true;
+
+  const requestedSessions = [
+    ...(Array.isArray(request?.requestedSessions) ? request.requestedSessions : []),
+    ...(Array.isArray(request?.payload?.requestedSessions) ? request.payload.requestedSessions : []),
+  ];
+  return requestedSessions.some((entry) => (
+    String(entry || '').trim().toLowerCase() === requestedSession
+  ));
 }
 
 function saveAgentGrant(record = {}) {
@@ -1319,7 +1347,7 @@ async function requestFaucetWorkerTransfer({ slug, recipientAddress, requestBody
     : getCorsWorkerUrl;
   const fetchImpl = typeof deps.fetch === 'function' ? deps.fetch : fetch;
   const workerUrl = await resolveWorkerUrl(slug);
-  const workerToken = loadWorkerToken(slug);
+  const workerToken = loadValidatedWorkerToken(slug, recipientAddress);
   if (!workerUrl || !workerToken) {
     return {
       workerUrl,
@@ -1425,7 +1453,7 @@ async function authenticateWithWorker(slug, walletAddress, privateKey, deps = {}
 }
 
 async function ensureWorkerToken(slug, walletAddress, deps = {}) {
-  const existing = loadWorkerToken(slug);
+  const existing = loadValidatedWorkerToken(slug, walletAddress);
   if (existing) return existing;
   const privateKey = getStoredPrivateKeyFromFile();
   if (!privateKey) return null;
@@ -1441,16 +1469,16 @@ async function ensureWorkerToken(slug, walletAddress, deps = {}) {
   }
 }
 
-function findFirstSessionWithWorkerToken(slugs = []) {
+function findFirstSessionWithWorkerToken(slugs = [], walletAddress = '') {
   for (const slug of slugs) {
-    if (loadWorkerToken(slug)) return slug;
+    if (loadValidatedWorkerToken(slug, walletAddress)) return slug;
   }
   return '';
 }
 
 async function autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps = {}) {
   const selectedSessions = getConfiguredSessions(hookConfig);
-  let slug = findFirstSessionWithWorkerToken(selectedSessions);
+  let slug = findFirstSessionWithWorkerToken(selectedSessions, walletAddress);
   if (!slug && selectedSessions.length > 0) {
     const privateKey = getStoredPrivateKeyFromFile();
     if (privateKey) {
@@ -1966,10 +1994,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         auth.payload?.sub || '',
       ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
       const requests = loadAgentRequestsForWallet(auth.payload?.sub || '')
-        .filter((request) => (
-          !sessionValidation.slug
-          || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
-        ))
+        .filter((request) => agentRequestMatchesSession(request, sessionValidation.slug))
         .map((request) => summarizeAgentRequestForRead(request).summary);
       const requestStatusCounts = summarizeAgentRequestStatusCounts(requests);
       return json(res, 200, buildAgentOk({
@@ -3161,6 +3186,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
               stored.submitted = true;
               stored.txHash = result.txHash;
               stored.blockNumber = result.blockNumber ?? null;
+              const storageRef = buildStorageRefFromResult(result, 0);
+              const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+              stored.arweaveTxId = getLegacyArweaveTxId({
+                storageRef,
+                arweaveTxId: result.arweaveTxIds?.[0],
+              }) || null;
+              stored.storageRef = storageRef || null;
+              stored.surveyArweaveTxId = getLegacyArweaveTxId({
+                storageRef: surveyStorageRef,
+                arweaveTxId: result.surveyArweaveTxId,
+              }) || null;
+              stored.surveyStorageRef = surveyStorageRef || null;
               stored.submittedAt = new Date().toISOString();
               writeSecureFile(file, JSON.stringify(stored, null, 2));
               debug(`[router] Auto-submitted response ${canonicalQuestionId} → tx ${result.txHash}`);

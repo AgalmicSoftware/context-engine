@@ -361,6 +361,11 @@ test('local JWT issuance auto-faucets in background for the first selected sessi
   const hookStateDir = resolve(root, 'hook-state');
   const workerTokensDir = resolve(dataDir, 'worker-tokens');
   const walletAddress = DEFAULT_TEST_WALLET_ADDRESS;
+  const betaWorkerToken = buildWorkerToken({
+    sub: walletAddress,
+    slug: 'beta',
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
 
   mkdirSync(workerTokensDir, { recursive: true });
   mkdirSync(hookStateDir, { recursive: true });
@@ -371,7 +376,7 @@ test('local JWT issuance auto-faucets in background for the first selected sessi
       selectedSessions: ['alpha', 'beta'],
     }, null, 2),
   );
-  writeFileSync(resolve(workerTokensDir, 'beta.jwt'), 'worker-token-value');
+  writeFileSync(resolve(workerTokensDir, 'beta.jwt'), betaWorkerToken);
 
   const prevDataDir = process.env.CE_CC_DATA_DIR;
   const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
@@ -434,7 +439,7 @@ test('local JWT issuance auto-faucets in background for the first selected sessi
     await flushBackgroundWork();
 
     assert.equal(fetchArgs.init.method, 'POST');
-    assert.equal(fetchArgs.init.headers.Authorization, 'Bearer worker-token-value');
+    assert.equal(fetchArgs.init.headers.Authorization, `Bearer ${betaWorkerToken}`);
     assert.deepEqual(
       JSON.parse(fetchArgs.init.body),
       { action: 'request_test_eth', to: walletAddress.toLowerCase() },
@@ -459,6 +464,11 @@ test('local JWT issuance skips auto-faucet when wallet balance is above threshol
   const hookStateDir = resolve(root, 'hook-state');
   const workerTokensDir = resolve(dataDir, 'worker-tokens');
   const walletAddress = DEFAULT_TEST_WALLET_ADDRESS;
+  const alphaWorkerToken = buildWorkerToken({
+    sub: walletAddress,
+    slug: 'alpha',
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
 
   mkdirSync(workerTokensDir, { recursive: true });
   mkdirSync(hookStateDir, { recursive: true });
@@ -469,7 +479,7 @@ test('local JWT issuance skips auto-faucet when wallet balance is above threshol
       selectedSessions: ['alpha'],
     }, null, 2),
   );
-  writeFileSync(resolve(workerTokensDir, 'alpha.jwt'), 'worker-token-value');
+  writeFileSync(resolve(workerTokensDir, 'alpha.jwt'), alphaWorkerToken);
 
   const prevDataDir = process.env.CE_CC_DATA_DIR;
   const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
@@ -677,6 +687,11 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
   const wallet = ethers.Wallet.createRandom();
   const walletAddress = wallet.address.toLowerCase();
   const questionId = `0x${'ab'.repeat(32)}`;
+  const freshWorkerToken = buildWorkerToken({
+    sub: walletAddress,
+    slug: session,
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
 
   mkdirSync(dataDir, { recursive: true });
   mkdirSync(hookStateDir, { recursive: true });
@@ -761,13 +776,13 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
             assert.equal(parsed.message.includes(`Nonce: nonce-123`), true);
             assert.equal(parsed.message.includes('localhost:7391 wants you to sign in'), true);
             assert.equal(parsed.message.includes('URI: http://localhost:7391'), true);
-            return new Response(JSON.stringify({ token: 'worker-token-fresh' }), {
+            return new Response(JSON.stringify({ token: freshWorkerToken }), {
               status: 200,
               headers: { 'Content-Type': 'application/json' },
             });
           }
           if (url === `https://worker.example.com/base/${session}`) {
-            assert.equal(init?.headers?.Authorization, 'Bearer worker-token-fresh');
+            assert.equal(init?.headers?.Authorization, `Bearer ${freshWorkerToken}`);
             return new Response(JSON.stringify({ amountEth: '0.05', txHash: '0xfaucet123' }), {
               status: 200,
               headers: { 'Content-Type': 'application/json' },
@@ -778,7 +793,13 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
         submitOnChain: async (pending, slug, workerToken) => {
           submitInvocation = { pending, slug, workerToken };
           resolveSubmit();
-          return { ok: true, txHash: '0xsubmit123', count: pending.length };
+          return {
+            ok: true,
+            txHash: '0xsubmit123',
+            count: pending.length,
+            arweaveTxIds: ['tx-respond-auto'],
+            surveyArweaveTxId: 'survey-respond-auto',
+          };
         },
       },
     );
@@ -806,6 +827,26 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
     await submitDone;
     await flushBackgroundWork();
 
+    const storedAutoResponse = JSON.parse(
+      readFileSync(resolve(dataDir, 'responses', session, `${questionId}.json`), 'utf8'),
+    );
+    assert.equal(storedAutoResponse.submitted, true);
+    assert.equal(storedAutoResponse.txHash, '0xsubmit123');
+    assert.equal(storedAutoResponse.arweaveTxId, 'tx-respond-auto');
+    assert.deepEqual(storedAutoResponse.storageRef, {
+      backend: 'arweave',
+      id: 'tx-respond-auto',
+      uri: 'ar://tx-respond-auto',
+      resource: 'responses',
+    });
+    assert.equal(storedAutoResponse.surveyArweaveTxId, 'survey-respond-auto');
+    assert.deepEqual(storedAutoResponse.surveyStorageRef, {
+      backend: 'arweave',
+      id: 'survey-respond-auto',
+      uri: 'ar://survey-respond-auto',
+      resource: 'responses',
+    });
+
     assert.deepEqual(
       fetchCalls.map((entry) => entry.url),
       [
@@ -815,7 +856,7 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
       ],
     );
     assert.equal(submitInvocation?.slug, session);
-    assert.equal(submitInvocation?.workerToken, 'worker-token-fresh');
+    assert.equal(submitInvocation?.workerToken, freshWorkerToken);
     assert.equal(submitInvocation?.pending.length, 1);
     assert.equal(submitInvocation?.pending[0].questionId, questionId);
 
@@ -824,7 +865,7 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
     );
     assert.equal(storedResponse.submitted, true);
     assert.equal(storedResponse.txHash, '0xsubmit123');
-    assert.equal(readFileSync(resolve(dataDir, 'worker-tokens', `${session}.jwt`), 'utf8').trim(), 'worker-token-fresh');
+    assert.equal(readFileSync(resolve(dataDir, 'worker-tokens', `${session}.jwt`), 'utf8').trim(), freshWorkerToken);
     assertSecureMode(resolve(dataDir, 'worker-tokens', `${session}.jwt`));
     assert.equal(
       logs.some((entry) => entry.includes('[submit] Balance low (0.0005 ETH), requesting faucet funds...')),
@@ -869,7 +910,14 @@ test('respond returns pending=true when auto-submit exceeds the await timeout', 
   // Pre-stage a worker token so ensureWorkerToken returns synchronously and we
   // exercise only the submitOnChain await timeout path.
   mkdirSync(resolve(dataDir, 'worker-tokens'), { recursive: true });
-  writeFileSync(resolve(dataDir, 'worker-tokens', `${session}.jwt`), 'worker-token-pre-staged');
+  writeFileSync(
+    resolve(dataDir, 'worker-tokens', `${session}.jwt`),
+    buildWorkerToken({
+      sub: walletAddress,
+      slug: session,
+      exp: Math.floor(Date.now() / 1000) + 600,
+    }),
+  );
 
   const prevDataDir = process.env.CE_CC_DATA_DIR;
   const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
@@ -2043,9 +2091,14 @@ test('faucet proxy forwards worker status and body as-is', async () => {
   const hookStateDir = resolve(root, 'hook-state');
   const workerTokensDir = resolve(dataDir, 'worker-tokens');
   const walletAddress = DEFAULT_TEST_WALLET_ADDRESS;
+  const workerToken = buildWorkerToken({
+    sub: walletAddress,
+    slug: 'test-10',
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
   mkdirSync(workerTokensDir, { recursive: true });
   mkdirSync(hookStateDir, { recursive: true });
-  writeFileSync(resolve(workerTokensDir, 'test-10.jwt'), 'worker-token-value');
+  writeFileSync(resolve(workerTokensDir, 'test-10.jwt'), workerToken);
 
   const prevDataDir = process.env.CE_CC_DATA_DIR;
   const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
@@ -2081,7 +2134,7 @@ test('faucet proxy forwards worker status and body as-is', async () => {
 
     assert.equal(fetchArgs.input, 'https://worker.example.com/base/test-10');
     assert.equal(fetchArgs.init.method, 'POST');
-    assert.equal(fetchArgs.init.headers.Authorization, 'Bearer worker-token-value');
+    assert.equal(fetchArgs.init.headers.Authorization, `Bearer ${workerToken}`);
     assert.deepEqual(
       JSON.parse(fetchArgs.init.body),
       { action: 'request_test_eth', to: walletAddress.toLowerCase() },
@@ -2106,9 +2159,14 @@ test('faucet proxy forwards optional SBT proof payload fields to the worker', as
   const sbtAddress = '0x2222222222222222222222222222222222222222';
   const hashedPassword = `0x${'ab'.repeat(32)}`;
   const signature = `0x${'cd'.repeat(65)}`;
+  const workerToken = buildWorkerToken({
+    sub: walletAddress,
+    slug: 'test-10',
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
   mkdirSync(workerTokensDir, { recursive: true });
   mkdirSync(hookStateDir, { recursive: true });
-  writeFileSync(resolve(workerTokensDir, 'test-10.jwt'), 'worker-token-value');
+  writeFileSync(resolve(workerTokensDir, 'test-10.jwt'), workerToken);
 
   const prevDataDir = process.env.CE_CC_DATA_DIR;
   const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
@@ -3068,6 +3126,77 @@ test('submit-onchain rejects when no worker token is stored instead of reusing t
         submitOnChain: async () => {
           submitCalled = true;
           throw new Error('submitOnChain should not be called without a worker token');
+        },
+      },
+    );
+
+    assert.equal(submitCalled, false);
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(
+      JSON.parse(res.body || '{}'),
+      { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' },
+    );
+  } finally {
+    if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
+    else process.env.CE_CC_DATA_DIR = prevDataDir;
+    if (prevHookStateDir == null) delete process.env.CE_CC_HOOK_STATE_DIR;
+    else process.env.CE_CC_HOOK_STATE_DIR = prevHookStateDir;
+  }
+});
+
+test('submit-onchain rejects mismatched stored worker tokens before submission', async () => {
+  const root = mkdtempSync(resolve(tmpdir(), 'ce-router-submit-onchain-mismatched-worker-token-'));
+  const dataDir = resolve(root, 'data');
+  const hookStateDir = resolve(root, 'hook-state');
+  const responsesDir = resolve(dataDir, 'responses', 'alpha');
+  const workerTokensDir = resolve(dataDir, 'worker-tokens');
+  const walletAddress = DEFAULT_TEST_WALLET_ADDRESS;
+  const otherWallet = ethers.Wallet.createRandom();
+  const questionId = '0x' + 'bc'.repeat(32);
+  mkdirSync(responsesDir, { recursive: true });
+  mkdirSync(workerTokensDir, { recursive: true });
+  mkdirSync(hookStateDir, { recursive: true });
+  writeFileSync(
+    resolve(responsesDir, `${questionId}.json`),
+    JSON.stringify({
+      questionId,
+      respondent: walletAddress,
+      answer: 'hello',
+      submitted: false,
+    }, null, 2),
+  );
+  writeFileSync(
+    resolve(workerTokensDir, 'alpha.jwt'),
+    buildWorkerToken({
+      sub: otherWallet.address,
+      slug: 'alpha',
+      exp: Math.floor(Date.now() / 1000) + 600,
+    }),
+  );
+
+  const prevDataDir = process.env.CE_CC_DATA_DIR;
+  const prevHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
+  process.env.CE_CC_DATA_DIR = dataDir;
+  process.env.CE_CC_HOOK_STATE_DIR = hookStateDir;
+
+  let submitCalled = false;
+  try {
+    const { handleRoute } = await importFresh(ROUTER_MODULE_PATH);
+    const token = await issueLocalJwt(handleRoute, walletAddress);
+    const res = makeMockRes();
+    await handleRoute(
+      makeLoopbackReq({ authorization: `Bearer ${token}` }),
+      res,
+      {
+        url: new URL('http://localhost:7391/api/responses/submit-onchain'),
+        method: 'POST',
+        body: { session: 'alpha' },
+      },
+      {
+        canSubmit: () => ({ ready: true, hasKey: true, hasContract: true }),
+        submitOnChain: async () => {
+          submitCalled = true;
+          throw new Error('submitOnChain should not receive a mismatched worker token');
         },
       },
     );

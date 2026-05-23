@@ -37,7 +37,7 @@ Initial Telegram-facing capabilities:
 | Capability | Canonical request | Safe Telegram lanes | Status |
 | --- | --- | --- | --- |
 | Action menu | `GET /api/agent/actions` | group, private, Mini App | catalog scaffold |
-| Managed demo account setup | `POST /api/agent/accounts/create-request` | private, Mini App | hidden compatibility command; pending canonical handoff |
+| Managed demo account setup | `POST /api/agent/accounts/create` | private, Mini App | implemented canonical handoff |
 | Account summary | `GET /api/agent/accounts/me` | private, Mini App | worker-local until canonical |
 | Settings overview | `GET /api/agent/settings` | private, Mini App | planned contract-only |
 | Settings update | `POST /api/agent/settings/update-request` | private, Mini App | pending canonical handoff |
@@ -729,10 +729,11 @@ Still mocked or contract-only for this first smoke:
   for now; the cache can hydrate Arweave or Cloudflare-backed question payloads,
   but docs still use configured demo fixtures unless the canonical
   `/api/agent/*` session contract is wired for that route.
-- Agent account/settings endpoints are scaffolded request envelopes only:
-  `/api/agent/accounts/create-request`, `/api/agent/accounts/me`,
-  `/api/agent/settings`, and `/api/agent/settings/update-request` still need the
-  canonical backend implementation.
+- Agent account/settings endpoints are scaffolded request envelopes except for
+  managed account creation: `/api/agent/accounts/create` is implemented by
+  CE-CC, while `/api/agent/accounts/me`, `/api/agent/settings`, and
+  `/api/agent/settings/update-request` still need the canonical backend
+  implementation.
 - SBT command states can describe public/password join and create-group request
   envelopes, but the Mini App SBT inventory/group display and live claim/create
   execution are still planned work.
