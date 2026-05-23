@@ -658,7 +658,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.state.filterLoading).toBe(false);
   });
 
-  it('polls question-mode results across list scope on /session routes', () => {
+  it('keeps question-mode polling scoped to the /session route slug', () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
     try {
@@ -717,13 +717,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
       const changed = subject.pollLocalStorageForUpdates();
 
-      expect(changed).toBe(true);
-      expect(subject.state.questionLocalBlock).toBe(11);
-      expect(subject.state.responseLocalBlock).toBe(13);
-      expect(subject.state.cachedQuestionsCount).toBe(2);
-      expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+      expect(changed).toBe(false);
+      expect(subject.state.questionLocalBlock).toBe(5);
+      expect(subject.state.responseLocalBlock).toBe(7);
+      expect(subject.state.cachedQuestionsCount).toBe(1);
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
       expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
       expect(peekSpy.mock.calls.filter((args) => args[0] === 'surveysCache')).toHaveLength(0);
     } finally {
       window.history.replaceState({}, '', priorUrl);

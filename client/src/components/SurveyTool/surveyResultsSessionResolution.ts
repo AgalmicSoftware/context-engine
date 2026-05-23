@@ -158,6 +158,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
   getAllSessionSlugs = () => [],
 }: SurveyResultsQuestionReadScopeInput = {}): SurveyResultsQuestionReadScope => {
   const routeSlug = resolveSessionSlugFromPathname(pathname);
+  const hasRouteSessionPin = routeSlug !== null;
   const baseSlug = canonicalizeSessionSlug(
     resolveSurveyResultsExplicitSessionSlug({
       search,
@@ -169,6 +170,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
   );
   const shouldFanOut = (
     sessionSlugPinned !== true &&
+    !hasRouteSessionPin &&
     !hasExplicitSessionQueryPin(search) &&
     String(viewMode || '').trim().toLowerCase() === 'questions'
   );

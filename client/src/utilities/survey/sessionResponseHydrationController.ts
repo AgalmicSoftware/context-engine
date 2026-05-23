@@ -210,42 +210,10 @@ const hasHydratedQuestionMetadata = (value: unknown): boolean => (
   isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
 );
 
-const buildPendingQuestionMetadataPlaceholder = (
-  qid: unknown,
-  slug: unknown,
-  existing: unknown = null
-): CacheRecord | null => {
-  const id = String(qid || '').trim().toLowerCase();
-  if (!id) return null;
-
-  const existingQuestion = isRecord(existing) ? existing : {};
-  const sessionName = String(existingQuestion.sessionName || slug || '').trim();
-  const encryption = isRecord(existingQuestion.encryption)
-    ? existingQuestion.encryption
-    : {
-      enabled: true,
-      status: 'metadata-pending',
-      targets: {
-        questions: true,
-      },
-    };
-
-  return {
-    ...existingQuestion,
-    id,
-    type: String(existingQuestion.type || '').trim() || 'freeform',
-    prompt: '[encrypted]',
-    tags: Array.isArray(existingQuestion.tags) ? existingQuestion.tags : [],
-    ...(sessionName ? { sessionName } : {}),
-    encryption,
-    __ceQuestionMetadataPending: true,
-  };
-};
-
 const seedPendingQuestionMetadataFromResponse = (
   net: QuestionCacheNetworkNode,
   qid: unknown,
-  slug: unknown
+  _slug: unknown
 ): boolean => {
   const questionId = String(qid || '').trim().toLowerCase();
   if (!questionId || !net || typeof net !== 'object') return false;
@@ -268,14 +236,6 @@ const seedPendingQuestionMetadataFromResponse = (
       message: 'Question response discovered before question metadata; awaiting Arweave hydration.',
     };
     changed = true;
-  }
-
-  if (!isPendingQuestionMetadataPlaceholder(existingQuestion)) {
-    const placeholder = buildPendingQuestionMetadataPlaceholder(questionId, slug, existingQuestion);
-    if (placeholder) {
-      net.questions[questionId] = placeholder;
-      changed = true;
-    }
   }
 
   return changed;

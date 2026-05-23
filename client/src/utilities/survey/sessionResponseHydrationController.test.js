@@ -598,13 +598,7 @@ describe('createSessionResponseHydrationController', () => {
       expect(storedQuestionsCache?.[NETWORK_ID]?.pendingQuestionMetadata?.[QUESTION_ID_A]).toEqual(
         expect.objectContaining({ state: 'discovered-from-response' })
       );
-      expect(storedQuestionsCache?.[NETWORK_ID]?.questions?.[QUESTION_ID_A]).toEqual(
-        expect.objectContaining({
-          id: QUESTION_ID_A,
-          prompt: '[encrypted]',
-          __ceQuestionMetadataPending: true,
-        })
-      );
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questions?.[QUESTION_ID_A]).toBeUndefined();
     });
 
     it('keeps responses ready and clamps the final watermark when a managed questionsCache write returns false', async () => {
@@ -872,13 +866,7 @@ describe('createSessionResponseHydrationController', () => {
       expect(storedQuestionsCache?.[NETWORK_ID]?.pendingQuestionMetadata?.[QUESTION_ID_A]).toEqual(
         expect.objectContaining({ state: 'discovered-from-response' })
       );
-      expect(storedQuestionsCache?.[NETWORK_ID]?.questions?.[QUESTION_ID_A]).toEqual(
-        expect.objectContaining({
-          id: QUESTION_ID_A,
-          prompt: '[encrypted]',
-          __ceQuestionMetadataPending: true,
-        })
-      );
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questions?.[QUESTION_ID_A]).toBeUndefined();
       expect(userResponses).toContainEqual({
         questionId: QUESTION_ID_A,
         responder: RESPONDER_LOWER,
