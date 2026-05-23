@@ -253,6 +253,59 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     expect(window.location.search).toBe('');
   });
 
+  it('allows Cloudflare session file uploads before sessionIdHex resolves', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    mockUploadDocLibraryFile.mockResolvedValueOnce({
+      txId: 'cf_pending_session',
+      storageRef: {
+        backend: 'cloudflare',
+        id: 'cf_pending_session',
+        resource: 'docsContext',
+      },
+      tagMap: {
+        'CE-DocStorage': 'cloudflare',
+        'CE-DocName': 'cloudflare-upload.txt',
+      },
+      data: { size: 5, type: 'text/plain' },
+    });
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
+        mode="session"
+      />
+    );
+
+    const file = new File(['cloud'], 'cloudflare-upload.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        sessionSlug: 'edge',
+        sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+        tags: expect.arrayContaining([
+          expect.objectContaining({ name: 'CE-DocStorage', value: 'cloudflare' }),
+        ]),
+      }));
+    });
+    expect(screen.queryByText('Session ID is unavailable; cannot upload session docs.')).not.toBeInTheDocument();
+  });
+
   it('requires encrypted uploads for lit-arweave session document storage', async () => {
     mockResolveDocLibraryProvider.mockReturnValue('lit-arweave');
     const saveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));

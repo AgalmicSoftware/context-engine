@@ -1012,7 +1012,7 @@ export function buildTelegramAgentAccountCreateState({
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.account.create',
       body: {
-        telegramPrincipalRef: 'telegram_principal_ref',
+        telegramPrincipalId: 'telegram_principal_id',
         accountMode: safeString(account.accountMode || account.mode || 'managed_telegram_demo'),
         session: safeString(sessionSlug),
         deploymentRef: 'agent_bridge_deployment_ref',

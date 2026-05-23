@@ -314,7 +314,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(Object.hasOwn(state.questions[0], 'idShort'), false);
   assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,48}$/);
   assert.equal(state.agent.actions.some((action) => action.id === 'agent.settings.update'), true);
-  assert.equal(state.agent.account.canonicalApiRequest.path, '/api/agent/accounts/create-request');
+  assert.equal(state.agent.account.canonicalApiRequest.path, '/api/agent/accounts/create');
   assert.equal(state.agent.settings.values.draftStyle, 'balanced');
   assert.equal(state.agent.settings.edit.canonicalApiRequest.path, '/api/agent/settings/update-request');
 

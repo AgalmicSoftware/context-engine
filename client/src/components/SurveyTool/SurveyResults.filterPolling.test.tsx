@@ -530,6 +530,67 @@ describe('SurveyResults question-mode polling and filter state', () => {
     peekSpy.mockRestore();
   });
 
+  it('polls question cache using networkChainId when wallet network is unavailable', () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      network: null,
+      networkChainId: 84532,
+    }));
+
+    const questionBucket = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: { q1: { id: 'q1' }, q2: { id: 'q2' } },
+      questionResponses: {},
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      return {};
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      cachedQuestionsCount: 0,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(true);
+    expect(subject.state.cachedQuestionsCount).toBe(2);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+    peekSpy.mockRestore();
+  });
+
+  it('fetches and renders question results using networkChainId without wallet network', async () => {
+    const subject = createSubject({
+      network: null,
+      networkChainId: 84532,
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 1,
+    };
+    subject.fetchQuestionModeResponses = jest.fn(async () => undefined);
+    subject.fetchSurveyModeResponses = jest.fn(async () => undefined);
+
+    await subject.fetchResponses();
+
+    expect(subject.fetchQuestionModeResponses).toHaveBeenCalledTimes(1);
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.renderQuestionIDsTable({ q1: [] }, { q1: { id: 'q1', prompt: 'Prompt' } })).not.toBeNull();
+  });
+
   it('suppresses no-op filter activity state writes', () => {
     const subject = createSubject({});
     subject.state = {

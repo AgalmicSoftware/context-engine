@@ -1797,7 +1797,7 @@ class SurveyResults extends Component<any, any> {
     this.stopLocalStoragePolling();
 
     // If unmounting while still open, remove "/results" from the URL
-    if (this.props.isOpen) {
+    if (this.props.isOpen && !this.props.preventUrlChange) {
       const currentPath = window.location.pathname;
       if (currentPath.includes('/results')) {
         let newPath = currentPath.replace('/results', '').replace(/\/+$/, '');
@@ -2416,7 +2416,7 @@ class SurveyResults extends Component<any, any> {
 
 pollLocalStorageForUpdates(): boolean {
   return measureSync('ce.surveyResults.pollLocalStorageForUpdates', () => {
-    if (!this.props.network || !this.props.network.id) return false;
+    if (!this.hasEffectiveNetworkId()) return false;
     const slug = this.getEffectiveSlug();
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
     if (!netIdStr) return false;
@@ -2590,8 +2590,16 @@ getNetworkQuestionsForCurrentContext = (): Record<string, SurveyResultsQuestionR
   return networkData.questions;
 };
 
+getEffectiveNetworkId = (): unknown => (
+  this.props.network?.id ?? this.props.networkChainId ?? ''
+);
+
+hasEffectiveNetworkId = (): boolean => (
+  String(this.getEffectiveNetworkId() ?? '').trim() !== ''
+);
+
 fetchResponses = async (): Promise<void> => {
-if (!this.props.network || !this.props.network.id) {
+if (!this.hasEffectiveNetworkId()) {
   surveyLog.error('Network ID is undefined in fetchResponses. Cannot proceed.');
   return;
 }
@@ -2839,7 +2847,7 @@ let csvContent = '';
 let header = '';
 const csvRows: string[] = [];
 
-if (!this.props.network || !this.props.network.id) {
+if (!this.hasEffectiveNetworkId()) {
   this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
   return '';
 }
@@ -2955,7 +2963,7 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
   const latest = new Map<string, SurveyResultsCsvLatestEntry>();
   const passthroughRows: string[] = [];
 
-  Object.values(dataToExport).forEach((responsesArray) => {
+  Object.entries(dataToExport).forEach(([questionIdFromBucket, responsesArray]) => {
     const rows = Array.isArray(responsesArray) ? responsesArray as SurveyResultsCsvResponseEntry[] : [];
     rows.forEach((respObj) => {
       const parsed = this.parseResponse(respObj.response) as SurveyResultsResponseRecord | null;
@@ -2968,7 +2976,7 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
         responderAddress = toSurveyResultsRecord(respObj.responder).address as string;
       }
 
-      const qid = getResponseQuestionId(parsed);
+      const qid = getResponseQuestionId(parsed) || String(questionIdFromBucket || '');
       const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
       let optionsString = '';
       if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
@@ -3127,7 +3135,7 @@ return JSON.stringify(
 }
 
 generateQuestionsCSV = (): string => {
-if (!this.props.network || !this.props.network.id) {
+if (!this.hasEffectiveNetworkId()) {
   this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
   return '';
 }
@@ -4508,7 +4516,7 @@ return entries;
 };
 
 renderQuestionIDsTable = (questionMap: unknown, preNetworkQuestions: unknown): React.ReactNode => {
-if (!this.props.network || !this.props.network.id) return null;
+if (!this.hasEffectiveNetworkId()) return null;
 const networkQuestions = preNetworkQuestions || this.getNetworkQuestionsForCurrentContext();
 const questionEntries = this.getMemoizedQuestionTableEntries(questionMap, networkQuestions);
 const { questionIdSortBy, questionIdSortAsc } = this.state;

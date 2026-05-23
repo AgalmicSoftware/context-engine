@@ -285,12 +285,13 @@ test('agent create and settings commands route group inputs private and model ca
 
   assert.equal(privateCreate.screen, 'agent_account_create');
   assert.match(privateCreate.response.text, /Agent account/);
-  assert.match(privateCreate.response.text, /Canonical: POST \/api\/agent\/accounts\/create-request/);
-  assert.equal(privateCreate.canonicalApiRequest.path, '/api/agent/accounts/create-request');
-  assert.equal(privateCreate.canonicalApiRequest.status, 'pending_canonical_handoff');
+  assert.match(privateCreate.response.text, /Canonical: POST \/api\/agent\/accounts\/create/);
+  assert.equal(privateCreate.canonicalApiRequest.path, '/api/agent/accounts/create');
+  assert.equal(privateCreate.canonicalApiRequest.status, 'implemented');
+  assert.deepEqual(privateCreate.canonicalApiRequest.missingRequiredFields, []);
   assert.equal(JSON.stringify(privateCreate).includes('unit-root'), false);
   assert.equal(agentRequests.length, 1);
-  assert.equal(agentRequests[0].canonicalApiRequest.path, '/api/agent/accounts/create-request');
+  assert.equal(agentRequests[0].canonicalApiRequest.path, '/api/agent/accounts/create');
 
   assert.equal(groupSettings.screen, 'agent_settings_overview');
   assert.equal(groupSettings.privateChatRequired, true);

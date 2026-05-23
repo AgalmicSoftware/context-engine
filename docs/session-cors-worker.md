@@ -236,7 +236,7 @@ Authenticated clients can use the worker as the session storage boundary:
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 `storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
 
@@ -263,7 +263,8 @@ Vars:
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
-- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
+- `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
+- `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
