@@ -6,7 +6,7 @@ import {
   handleTelegramMiniAppRequest,
   validateTelegramMiniAppInitData,
 } from './telegramMiniApp.mjs';
-import { persistAnswerDraft } from './telegramCommands.mjs';
+import { persistAnswerDraft, SUBMIT_REQUEST_KV_PREFIX } from './telegramCommands.mjs';
 
 class MemoryKv {
   constructor() {
@@ -23,6 +23,15 @@ class MemoryKv {
 
   async delete(key) {
     this.store.delete(key);
+  }
+
+  async list({ prefix = '', limit = 1000 } = {}) {
+    const keys = Array.from(this.store.keys())
+      .filter((key) => key.startsWith(prefix))
+      .sort()
+      .slice(0, limit)
+      .map((name) => ({ name }));
+    return { keys, list_complete: true };
   }
 }
 
@@ -127,11 +136,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="questionTypeFilters"/);
   assert.match(html, /id="filterAiSearch"/);
   assert.match(html, /id="filterAiSearchMic"[^>]*aria-label="Dictate AI search"/);
-  assert.match(html, /id="applyAiSearch"/);
-  assert.match(html, /id="clearAiSearch"/);
+  assert.equal(html.includes('id="applyAiSearch"'), false);
+  assert.match(html, /id="clearAiSearch"[^>]*hidden/);
   assert.match(html, /id="filterSummary"/);
   assert.match(html, /AI search/);
   assert.match(html, /Question type/);
+  assert.match(html, /--filter-accent: #2cc3ff;/);
+  assert.match(html, /--settings-accent: #ffd166;/);
+  assert.match(html, /\.filterButton\.active \{[\s\S]*background: var\(--filter-accent\);/);
+  assert.match(html, /\.settingsButton\.active \{[\s\S]*background: var\(--settings-accent\);/);
   assert.match(html, /viewBox="0 0 512 512"/);
   assert.match(html, /id="sessionPicker"/);
   assert.match(html, /id="sessionSummary"/);
@@ -140,6 +153,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.sessionPicker\.collapsed \.sessionPickerBody \{ display: none; \}/);
   assert.match(html, /<div class="sectionTitle">Sessions<\/div>/);
   assert.match(html, /id="continueSessions"/);
+  assert.equal(html.includes('id="groupsPicker"'), false);
+  assert.equal(html.includes('function renderGroupsPicker()'), false);
   assert.match(html, /id="filterUnansweredFirst"/);
   assert.equal(html.includes('id="showUnansweredFirst"'), false);
   assert.match(html, /Show un-answered questions first/);
@@ -173,6 +188,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /Dictate AI search/);
   assert.match(html, /const MIC_ICON = '<svg/);
   assert.match(html, /const STOP_ICON = '<svg/);
+  assert.match(html, /\.commentActions \.micButton svg \{[\s\S]*width: 30px;[\s\S]*height: 30px;/);
   assert.match(html, /Transcribing microphone audio/);
   assert.match(html, /Transcribing search audio/);
   assert.match(html, /function setCommentMicFeedback/);
@@ -192,7 +208,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /SHOW_UNANSWERED_STORAGE_KEY/);
   assert.match(html, /function renderSessionPicker\(\)/);
   assert.match(html, /const orderedQuestions = \(\) => \{/);
-  assert.match(html, /state\.aiSearchQuery = state\.aiDraftQuery\.trim\(\);[\s\S]*render\(\);/);
+  assert.match(html, /\/telegram\/mini-app\/api\/search/);
+  assert.match(html, /function scheduleAiSearch/);
+  assert.match(html, /state\.aiSearchQuery = state\.aiDraftQuery\.trim\(\);[\s\S]*scheduleAiSearch\(\);/);
   assert.match(html, /const answerableCount = questions\.filter\(\(question\) => question\?\.canAnswer\)\.length;/);
   assert.match(html, /const unavailableCount = questions\.filter\(\(question\) => question\?\.payloadUnavailable === true\)\.length;/);
   assert.match(html, /function questionCountText\(data\)/);
@@ -453,6 +471,190 @@ test('Mini App clear drafts endpoint deletes saved draft answers for visible que
   });
   assert.equal(after.savedDrafts.length, 0);
   assert.deepEqual(after.draftAnswersByQuestionKey, {});
+});
+
+test('Mini App clear drafts leaves submitted answer history intact', async () => {
+  const kv = new MemoryKv();
+  const questionId = 'q-submitted-history';
+  await persistAnswerDraft({
+    env: { AGENT_ACTION_KV: kv },
+    normalized: { user: { telegramUserId: 'preview-user' }, chat: { chatId: 'preview-user' } },
+    sessionSlug: 'alpha',
+    selectedQuestionId: questionId,
+    answerLabel: 'Agree',
+    answerValue: JSON.stringify({ questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' }),
+    controlType: 'agree_unsure_disagree',
+    submitLane: 'telegram_mini_app',
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}submitted-history`, JSON.stringify({
+    version: 1,
+    requestId: 'submitted-history',
+    status: 'direct_submitted',
+    lane: 'telegram_mini_app',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: { value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should submitted answers survive clear drafts?',
+    }]),
+  };
+  const before = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+  });
+  const questionKey = before.questions[0].questionKey;
+
+  assert.deepEqual(before.submittedAnswerKeys, [questionKey]);
+  assert.equal(before.submittedAnswers[0].answerLabel, 'Agree');
+  assert.equal(before.savedDrafts.length, 0);
+  assert.deepEqual(before.draftAnswersByQuestionKey, {});
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/clear-drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ questionKeys: [questionKey] }),
+    }),
+    env,
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+
+  const after = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+  });
+  assert.deepEqual(after.submittedAnswerKeys, [questionKey]);
+  assert.equal(after.submittedAnswers[0].answerLabel, 'Agree');
+  assert.equal(after.savedDrafts.length, 0);
+});
+
+test('Mini App search falls back to semantic food-preference matching when AI is unavailable', async () => {
+  const env = {
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        sponsoredAiAllowed: false,
+      }],
+    }),
+  };
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/search', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        query: 'questions about food preference',
+        questions: [
+          { questionKey: 'q-temperature', prompt: 'Should the office be warmer?' },
+          { questionKey: 'q-pizza', prompt: 'Which pizza should the team order for lunch?' },
+        ],
+      }),
+    }),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.source, 'semantic_fallback');
+  assert.equal(body.results[0].key, 'q-pizza');
+});
+
+test('Mini App search ranks questions through the session worker AI route when allowed', async () => {
+  const env = {
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
+    DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  };
+  const calls = [];
+  env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
+    const target = String(url);
+    calls.push({ url: target, init });
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/ai')) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      const body = JSON.parse(init.body);
+      assert.equal(body.provider, 'openai');
+      assert.equal(body.model, 'gpt-5');
+      assert.deepEqual(body.response_format, { type: 'json_object' });
+      assert.match(body.messages[1].content, /food preference/);
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          matches: [{ key: 'q-pizza', score: 96, reason: 'pizza preference' }],
+        }),
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected_url' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/search', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        query: 'food preference',
+        questions: [
+          { questionKey: 'q-pets', prompt: 'Should pets be allowed in the office?' },
+          { questionKey: 'q-pizza', prompt: 'Which pizza topping should we choose?' },
+        ],
+      }),
+    }),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.source, 'ai');
+  assert.deepEqual(body.results, [{ key: 'q-pizza', score: 96, rank: 1, reason: 'pizza preference' }]);
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
 });
 
 test('Mini App transcribe endpoint forwards microphone audio through the session worker', async () => {
