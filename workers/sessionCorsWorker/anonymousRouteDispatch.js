@@ -25,7 +25,24 @@ export const dispatchAnonymousRoute = async ({
     slug,
     config,
     headers,
+    env,
   } = anonymousContext || {};
+
+  if (
+    (path === '/storage/read' || path === '/storage/list') &&
+    typeof deps?.storageRoute === 'function'
+  ) {
+    return deps.storageRoute({
+      path,
+      method: request?.method || 'GET',
+      request,
+      env: env || {},
+      config,
+      slug,
+      uploaderAddress: '',
+      baseHeaders: headers,
+    });
+  }
 
   if (path === '/transcribe') {
     const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });

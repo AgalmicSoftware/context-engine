@@ -45,6 +45,19 @@ describe('sessionStorageConfig', () => {
     expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
   });
 
+  test('marks Cloudflare public_read mode as non-Lit and non-SBT-gated', () => {
+    const sessionConfig = {
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { mode: 'public_read' },
+      },
+    };
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'questions' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(requiresLitForSessionStorage(sessionConfig, { resource: 'questions' })).toBe(false);
+    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+  });
+
   test('keeps explicitly staged Cloudflare resources on legacy Arweave fallback', () => {
     const sessionConfig = {
       storageProfile: {

@@ -435,6 +435,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
       normalizeSecretValue: 'normalizeSecretValue',
       putSessionSecrets: 'putSessionSecrets',
       dispatchAnonymousRoute: 'dispatchAnonymousRoute',
+      storageRoute: 'storageRoute',
       readAiRequestPayload: 'readAiRequestPayload',
       validateAnonymousAiRequest: 'validateAnonymousAiRequest',
       dispatchAuthenticatedRoute: 'dispatchAuthenticatedRoute',

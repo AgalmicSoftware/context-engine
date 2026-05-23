@@ -69,6 +69,20 @@ test('getSessionSecrets unwraps v1 session secrets envelopes', async () => {
   assert.deepEqual(result, rawSecrets);
 });
 
+test('getSessionSecrets unwraps legacy versioned session secret envelopes', async () => {
+  const rawSecrets = { faucetPrivateKey: '0xfaucet' };
+
+  const result = await getSessionSecrets({ GROUP_KV: {} }, 'session-a', {
+    getKvJson: async () => ({
+      version: 1,
+      secrets: rawSecrets,
+      updatedAt: '2026-05-21T23:00:00.000Z',
+    }),
+  });
+
+  assert.deepEqual(result, rawSecrets);
+});
+
 test('putSessionConfig rejects invalid normalized configs before writing to KV', async () => {
   let putCalled = false;
 

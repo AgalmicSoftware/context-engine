@@ -199,6 +199,7 @@ export const readSessionStorageBlob = async ({
     context,
     workerUrl: baseUrl,
     allowDemoFallback: defaultStrictAllowDemoFallback(),
+    preferAnonymous: true,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -222,6 +223,7 @@ export const listSessionStorageRefs = async ({
     context,
     workerUrl: baseUrl,
     allowDemoFallback: defaultStrictAllowDemoFallback(),
+    preferAnonymous: true,
   });
   const body = await response.json().catch(() => ({})) as UnknownRecord;
   if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);

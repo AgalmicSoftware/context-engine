@@ -53,6 +53,7 @@ test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring
         assert.equal(value.anonymousContext, anonymousContext);
         assert.equal(value.env, env);
         assert.equal(value.deps.dispatchAnonymousRoute, 'dispatchAnonymousRoute');
+        assert.equal(value.deps.storageRoute, 'storageRoute');
         assert.equal(value.deps.readTranscribeRequestPayload, 'readTranscribeRequestPayload');
         assert.equal(value.deps.evaluateAnonymousRouteAccess, 'evaluateAnonymousRouteAccess');
         assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
@@ -74,6 +75,7 @@ test('dispatchAnonymousRouteEntryWithWorkerDeps preserves anonymous entry wiring
       resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
       checkRateLimit: 'checkRateLimit',
       dispatchAnonymousRoute: 'dispatchAnonymousRoute',
+      storageRoute: 'storageRoute',
       readTranscribeRequestPayload: 'readTranscribeRequestPayload',
       evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
       getSessionSecrets: 'getSessionSecrets',

@@ -28,6 +28,9 @@ export const unwrapSessionSecretsEnvelope = (value) => {
   if (isSessionSecretsEnvelope(value)) {
     return cloneRecord(value.secrets);
   }
+  if (Number(value.version || 0) === SESSION_SECRETS_ENVELOPE_VERSION && isRecord(value.secrets)) {
+    return cloneRecord(value.secrets);
+  }
   return cloneRecord(value);
 };
 
