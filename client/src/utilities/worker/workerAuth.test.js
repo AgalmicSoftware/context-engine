@@ -1388,6 +1388,32 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(authedHeaders.get('Authorization')).toBe('Bearer token-1');
   });
 
+  it('does not retry worker login when authenticated storage read is denied by SBT gate', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' })) // auth/nonce
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 })) // auth/login
+      .mockResolvedValueOnce(jsonResp(403, { error: 'Access denied: Cloudflare worker SBT gate failed.' })); // authed fetch
+
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/storage/read?id=cf_ref',
+      { method: 'GET' },
+      {
+        sessionSlug: 'alpha',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 84532,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+    const authedHeaders = new Headers(global.fetch.mock.calls[2][1].headers);
+    expect(authedHeaders.get('Authorization')).toBe('Bearer token-1');
+  });
+
   it('clears the active token cache entry and aborts auth retry when the store account switches', async () => {
     const mockStore = require('../../store.js').default;
     const cacheKey = `ce:workerToken:v1:${normalizeWorkerUrl('https://worker.example')}::${TEST_ADDRESS}`;

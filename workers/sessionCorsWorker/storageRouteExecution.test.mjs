@@ -513,923 +513,136 @@ for (const resource of ['questions', 'surveys', 'responses']) {
 	});
 }
 
-test('storageRoute binds response list metadata to the authenticated uploader', async () => {
-	const kv = createMockKv();
-	const uploaderAddress = '0x0000000000000000000000000000000000000aBc';
-	const config = {
-		storageProfile: {
-			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'none', encryption: 'none' },
-		},
-	};
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: {
-					questionID: 'question-a',
-					responder: '0x0000000000000000000000000000000000000bad',
-					answer: { value: true },
-				},
-				contentType: 'application/json',
-				resource: 'responses',
-			}),
-		}),
-		env: { CE_STORAGE_INDEX_KV: kv },
-		config,
-		slug: 'session-a',
-		uploaderAddress,
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-07-22T12:00:00.000Z'),
-		},
-	});
-	assert.equal(uploadResponse.status, 200);
-
-	const listResponse = await storageRoute({
-		path: '/storage/list',
-		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=responses'),
-		env: { CE_STORAGE_INDEX_KV: kv },
-		config,
-		slug: 'session-a',
-		uploaderAddress: '',
-		baseHeaders: {},
-		deps: { json },
-	});
-	const listed = await readJson(listResponse);
-
-	assert.equal(listResponse.status, 200);
-	assert.equal(listed.items[0].metadata.responder, uploaderAddress.toLowerCase());
-	assert.equal(Object.hasOwn(listed.items[0].storageRef, 'responder'), false);
-});
-
-for (const contentType of ['application/json; charset=utf-8', 'application/ld+json']) {
-	test(`storageRoute serializes Cloudflare JSON object uploads for ${contentType}`, async () => {
-		const r2 = createMockR2();
-		const kv = createMockKv();
-		const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
-		const uploadResponse = await storageRoute({
-			path: '/storage/upload',
-			method: 'POST',
-			request: new Request('https://worker.example/storage/upload', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					data: { title: 'JSON payload', count: 1 },
-					contentType,
-					resource: 'questions',
-				}),
-			}),
-			env,
-			config: CLOUDFLARE_WORKER_GATE_CONFIG,
-			slug: 'session-a',
-			uploaderAddress: '0xabc',
-			baseHeaders: {},
-			deps: {
-				json,
-				randomBytes: fixedRandomBytes,
-				now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-			},
-		});
-
-		const uploadBody = await readJson(uploadResponse);
-		assert.equal(uploadResponse.status, 200);
-		assert.equal(uploadBody.storageRef.contentType, contentType);
-
-		const readResponse = await storageRoute({
-			path: '/storage/read',
-			method: 'GET',
-			request: new Request(`https://worker.example/storage/read?id=${encodeURIComponent(uploadBody.storageRef.id)}`),
-			env,
-			config: CLOUDFLARE_WORKER_GATE_CONFIG,
-			slug: 'session-a',
-			uploaderAddress: '0xabc',
-			baseHeaders: {},
-			deps: { json },
-		});
-
-		assert.equal(readResponse.status, 200);
-		assert.equal(await readResponse.text(), '{"title":"JSON payload","count":1}');
-	});
-}
-
 test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavailable', async () => {
-	const kv = createMockKv();
-	const env = { CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question from KV storage?', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question from KV storage?', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
 
-	const uploadBody = await readJson(uploadResponse);
-	assert.equal(uploadResponse.status, 200);
-	assert.equal(uploadBody.storageRef.backend, 'cloudflare');
-	assert.equal(uploadBody.storageRef.id, CF_ID);
-	assert.equal(uploadBody.storageRef.resource, 'questions');
-	assert.doesNotMatch(JSON.stringify(uploadBody), /ce-storage-payload|sessions\/session-a\/storage|bucket|token|secret/i);
-	assert.equal(kv.store.has(`ce-storage-payload:session-a:${CF_ID}`), true);
+  const uploadBody = await readJson(uploadResponse);
+  assert.equal(uploadResponse.status, 200);
+  assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+  assert.equal(uploadBody.storageRef.id, CF_ID);
+  assert.equal(uploadBody.storageRef.resource, 'questions');
+  assert.doesNotMatch(JSON.stringify(uploadBody), /ce-storage-payload|sessions\/session-a\/storage|bucket|token|secret/i);
+  assert.equal(kv.store.has(`ce-storage-payload:session-a:${CF_ID}`), true);
 
-	const readResponse = await storageRoute({
-		path: '/storage/read',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: new Headers({ 'Access-Control-Allow-Origin': 'https://contextengine.sh' }),
-		deps: { json },
-	});
-	assert.equal(readResponse.status, 200);
-	assert.equal(readResponse.headers.get('Access-Control-Allow-Origin'), 'https://contextengine.sh');
-	assert.equal(readResponse.headers.get('X-CE-Storage-Backend'), 'cloudflare');
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Question from KV storage?', ok: true });
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(readResponse.status, 200);
+  assert.equal(readResponse.headers.get('X-CE-Storage-Backend'), 'cloudflare');
+  assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Question from KV storage?', ok: true });
 
-	const listResponse = await storageRoute({
-		path: '/storage/list',
-		method: 'GET',
-		request: new Request('https://worker.example/storage/list?resource=questions'),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-	const listed = await readJson(listResponse);
-	assert.equal(listed.items.length, 1);
-	assert.equal(listed.items[0].storageRef.id, CF_ID);
-	assert.equal(listed.items[0].metadata.payloadAccessMode, 'worker_sbt_gate');
-	assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
-});
-
-for (const resource of ['media', 'images']) {
-	test(`storageRoute rejects encoded KV-only ${resource} values before any payload or index write`, async () => {
-		const kv = createMockKv();
-		const response = await storageRoute({
-			path: '/storage/upload',
-			method: 'POST',
-			request: new Request('https://worker.example/storage/upload', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					data: 'x'.repeat(900),
-					contentType: 'application/octet-stream',
-					resource,
-				}),
-			}),
-			env: { CE_STORAGE_INDEX_KV: kv, CE_MAX_UPLOAD_BYTES: '4096' },
-			config: CLOUDFLARE_WORKER_GATE_CONFIG,
-			slug: 'session-a',
-			uploaderAddress: '0xabc',
-			baseHeaders: {},
-			deps: {
-				json,
-				maxKvValueBytes: 1024,
-				randomBytes: fixedRandomBytes,
-				now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-			},
-		});
-		const body = await readJson(response);
-
-		assert.equal(response.status, 413);
-		assert.match(body.error, /KV storage payload too large after encoding/);
-		assert.equal(kv.store.size, 0);
-	});
-}
-
-test('storageRoute applies the final KV value cap after worker-envelope expansion', async () => {
-	const kv = createMockKv();
-	const env = {
-		CE_STORAGE_INDEX_KV: kv,
-		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
-		CE_MAX_UPLOAD_BYTES: '4096',
-	};
-	let config = createEnvelopeConfig();
-	attachSessionCoordinator(env, (nextConfig) => {
-		config = nextConfig;
-	});
-	const response = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: 'encrypted media payload',
-				contentType: 'application/octet-stream',
-				resource: 'media',
-			}),
-		}),
-		env,
-		config,
-		slug: 'session-a',
-		uploaderAddress: '0x0000000000000000000000000000000000000abc',
-		baseHeaders: {},
-		deps: {
-			json,
-			maxKvValueBytes: 700,
-			randomBytes: createSequenceRandomBytes(),
-			putSessionConfig: async (_env, _slug, nextConfig) => {
-				config = nextConfig;
-			},
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-	const body = await readJson(response);
-
-	assert.equal(response.status, 413);
-	assert.match(body.error, /KV storage payload too large after encoding/);
-	assert.equal(kv.store.size, 0);
-});
-
-test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payload storage', async () => {
-	const kv = createMockKv();
-	const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Aliased KV storage works', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-
-	assert.equal(uploadResponse.status, 200);
-	const uploadBody = await readJson(uploadResponse);
-	assert.equal(uploadBody.storageRef.backend, 'cloudflare');
-	assert.equal(kv.store.has(`ce-storage-payload:session-a:${uploadBody.storageRef.id}`), true);
-
-	const readResponse = await storageRoute({
-		path: '/storage/read',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-
-	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
-});
-
-test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
-	const kv = createMockKv();
-	const env = { CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question from Web Crypto entropy?', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			getRandomValues: fixedGetRandomValues,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-
-	const uploadBody = await readJson(uploadResponse);
-	assert.equal(uploadResponse.status, 200);
-	assert.equal(uploadBody.storageRef.backend, 'cloudflare');
-	assert.equal(uploadBody.storageRef.id, CF_ID);
-	assert.equal(kv.store.has(`ce-storage-payload:session-a:${CF_ID}`), true);
-});
-
-test('storageRoute fails closed when Cloudflare storage ref entropy is unavailable', async () => {
-	const r2 = createMockR2();
-	const kv = createMockKv();
-	const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question without entropy?', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			getRandomValues: null,
-		},
-	});
-
-	const body = await readJson(uploadResponse);
-	assert.equal(uploadResponse.status, 500);
-	assert.match(body.error, /Secure randomness is required/);
-	assert.equal(r2.store.size, 0);
-	assert.equal(kv.store.size, 0);
-});
-
-test('storageRoute rejects short injected Cloudflare storage ref entropy without Web Crypto fallback', async () => {
-	const r2 = createMockR2();
-	const kv = createMockKv();
-	const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question with short entropy?', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: shortRandomBytes,
-			getRandomValues: null,
-		},
-	});
-
-	const body = await readJson(uploadResponse);
-	assert.equal(uploadResponse.status, 500);
-	assert.match(body.error, /Secure randomness is required/);
-	assert.equal(r2.store.size, 0);
-	assert.equal(kv.store.size, 0);
-});
-
-test('storageRoute reads Cloudflare list resource from POST JSON body', async () => {
-	const kv = createMockKv();
-	const env = { CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question body resource', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-	const uploadBody = await readJson(uploadResponse);
-
-	const listResponse = await storageRoute({
-		path: '/storage/list',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/list', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ resource: 'questions' }),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-
-	const listed = await readJson(listResponse);
-	assert.equal(listResponse.status, 200);
-	assert.equal(listed.items.length, 1);
-	assert.equal(listed.items[0].storageRef.id, uploadBody.storageRef.id);
-	assert.equal(listed.items[0].storageRef.resource, 'questions');
-});
-
-test('storageRoute gives Cloudflare list query resource precedence over POST body', async () => {
-	const kv = createMockKv();
-	const env = { CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Question query resource', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-	const uploadBody = await readJson(uploadResponse);
-
-	const listResponse = await storageRoute({
-		path: '/storage/list',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/list?resource=questions', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ resource: 'docsContext' }),
-		}),
-		env,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-
-	const listed = await readJson(listResponse);
-	assert.equal(listResponse.status, 200);
-	assert.equal(listed.items.length, 1);
-	assert.equal(listed.items[0].storageRef.id, uploadBody.storageRef.id);
-	assert.equal(listed.items[0].storageRef.resource, 'questions');
-});
-
-test('storageRoute rejects invalid Cloudflare list POST JSON body', async () => {
-	const response = await storageRoute({
-		path: '/storage/list',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/list', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: '{',
-		}),
-		env: { CE_STORAGE_INDEX_KV: createMockKv() },
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-
-	assert.equal(response.status, 400);
-	assert.equal((await readJson(response)).error, 'Invalid JSON.');
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const listed = await readJson(listResponse);
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].storageRef.id, CF_ID);
+  assert.equal(listed.items[0].metadata.payloadAccessMode, 'worker_sbt_gate');
+  assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
 });
 
 test('storageRoute reads legacy KV payloads after an R2 binding is added', async () => {
-	const kv = createMockKv();
-	const uploadEnv = { CE_STORAGE_INDEX_KV: kv };
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: { prompt: 'Still in KV after R2 attach', ok: true },
-				contentType: 'application/json',
-				resource: 'questions',
-			}),
-		}),
-		env: uploadEnv,
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: fixedRandomBytes,
-			now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-		},
-	});
-	const uploadBody = await readJson(uploadResponse);
+  const kv = createMockKv();
+  const uploadEnv = { CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Still in KV after R2 attach', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env: uploadEnv,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const uploadBody = await readJson(uploadResponse);
 
-	const readResponse = await storageRoute({
-		path: '/storage/read',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
-		env: { CE_STORAGE_R2: createMockR2(), CE_STORAGE_INDEX_KV: kv },
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
+    env: { CE_STORAGE_R2: createMockR2(), CE_STORAGE_INDEX_KV: kv },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
 
-	assert.equal(readResponse.status, 200);
-	assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Still in KV after R2 attach', ok: true });
+  assert.equal(readResponse.status, 200);
+  assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Still in KV after R2 attach', ok: true });
 });
 
 test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload storage is configured', async () => {
-	const response = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'missing storage', resource: 'questions' }),
-		}),
-		env: {},
-		config: CLOUDFLARE_WORKER_GATE_CONFIG,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json },
-	});
-	assert.equal(response.status, 501);
-	assert.equal((await readJson(response)).error, 'Cloudflare storage binding not configured.');
-});
-
-test('storageRoute fails closed when authoritative R2 index metadata is unavailable', async () => {
-	const publicConfig = {
-		storageProfile: {
-			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'none', encryption: 'none' },
-		},
-	};
-	const indexFailures = [
-		['null', async () => null, 404, 'Storage object not found.'],
-		['malformed', async () => '{"id":', 503, 'Cloudflare storage index metadata is unavailable.'],
-		[
-			'thrown',
-			async () => {
-				throw new Error('index unavailable');
-			},
-			503,
-			'Cloudflare storage index metadata is unavailable.',
-		],
-		[
-			'wrong id',
-			async () => JSON.stringify({ id: 'wrong-id', resource: 'docsContext' }),
-			503,
-			'Cloudflare storage index metadata is unavailable.',
-		],
-		[
-			'wrong resource',
-			async () => JSON.stringify({ id: CF_ID, resource: 'questions' }),
-			503,
-			'Cloudflare storage index metadata is unavailable.',
-		],
-	];
-
-	for (const [label, get, status, error] of indexFailures) {
-		const r2 = createMockR2();
-		await r2.put(`sessions/session-a/storage/${CF_ID}`, new TextEncoder().encode('must stay private'), {
-			httpMetadata: { contentType: 'text/plain' },
-			customMetadata: {
-				id: CF_ID,
-				resource: 'docsContext',
-				payloadAccessMode: 'public_read',
-				payloadAccessControl: JSON.stringify({ gate: 'none', encryption: 'none' }),
-			},
-		});
-		const storedObject = r2.store.get(`sessions/session-a/storage/${CF_ID}`);
-		const readArrayBuffer = storedObject.arrayBuffer.bind(storedObject);
-		let payloadRead = false;
-		storedObject.arrayBuffer = async () => {
-			payloadRead = true;
-			return readArrayBuffer();
-		};
-
-		const response = await storageRoute({
-			path: '/storage/read',
-			method: 'GET',
-			request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
-			env: { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: { get } },
-			config: publicConfig,
-			slug: 'session-a',
-			uploaderAddress: '',
-			baseHeaders: {},
-			deps: { json },
-		});
-		const body = await readJson(response);
-
-		assert.equal(response.status, status, label);
-		assert.equal(body.error, error, label);
-		assert.equal(payloadRead, false, label);
-		assert.doesNotMatch(JSON.stringify(body), /must stay private/, label);
-	}
-});
-
-test('storageRoute authorizes R2 bytes from the valid index row instead of coarse custom metadata', async () => {
-	const r2 = createMockR2();
-	await r2.put(`sessions/session-a/storage/${CF_ID}`, new TextEncoder().encode('indexed private payload'), {
-		httpMetadata: { contentType: 'text/plain' },
-		customMetadata: {
-			id: CF_ID,
-			resource: 'docsContext',
-			payloadAccessMode: 'public_read',
-			payloadAccessControl: JSON.stringify({ gate: 'none', encryption: 'none' }),
-		},
-	});
-	const storedObject = r2.store.get(`sessions/session-a/storage/${CF_ID}`);
-	const readArrayBuffer = storedObject.arrayBuffer.bind(storedObject);
-	const readText = storedObject.text.bind(storedObject);
-	let arrayBufferReads = 0;
-	let textReads = 0;
-	storedObject.arrayBuffer = async () => {
-		arrayBufferReads += 1;
-		return readArrayBuffer();
-	};
-	storedObject.text = async () => {
-		textReads += 1;
-		return readText();
-	};
-	const indexedMetadata = {
-		id: CF_ID,
-		backend: 'cloudflare',
-		resource: 'docsContext',
-		contentType: 'text/plain',
-		payloadAccessControl: { gate: 'none', encryption: 'none' },
-		accessConditions: {
-			match: 'all',
-			conditions: [{ kind: 'worker_role', role: 'admin' }],
-		},
-	};
-	const env = {
-		CE_STORAGE_R2: r2,
-		CE_STORAGE_INDEX_KV: {
-			get: async () => JSON.stringify(indexedMetadata),
-		},
-	};
-	const config = {
-		adminAddress: '0x0000000000000000000000000000000000000abc',
-		storageProfile: {
-			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'none', encryption: 'none' },
-		},
-	};
-	const read = (uploaderAddress) =>
-		storageRoute({
-			path: '/storage/read',
-			method: 'GET',
-			request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
-			env,
-			config,
-			slug: 'session-a',
-			uploaderAddress,
-			baseHeaders: {},
-			deps: { json },
-		});
-
-	const deniedResponse = await read('');
-	assert.equal(deniedResponse.status, 403);
-	assert.equal(arrayBufferReads, 0);
-	assert.equal(textReads, 0);
-	assert.doesNotMatch(JSON.stringify(await readJson(deniedResponse)), /indexed private payload/);
-
-	const allowedResponse = await read('0x0000000000000000000000000000000000000abc');
-	assert.equal(allowedResponse.status, 200);
-	assert.equal(await allowedResponse.text(), 'indexed private payload');
-	assert.equal(arrayBufferReads, 1);
-	assert.equal(textReads, 0);
-});
-
-test('storageRoute rejects per-item-conditioned R2 uploads without an index binding', async () => {
-	const r2 = createMockR2();
-	const response = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				data: 'conditioned payload',
-				contentType: 'text/plain',
-				resource: 'docsContext',
-				accessConditions: {
-					match: 'all',
-					conditions: [{ kind: 'worker_role', role: 'admin' }],
-				},
-			}),
-		}),
-		env: { CE_STORAGE_R2: r2 },
-		config: {
-			adminAddress: '0x0000000000000000000000000000000000000abc',
-			storageProfile: {
-				backend: 'cloudflare',
-				payloadAccessControl: { gate: 'none', encryption: 'none' },
-			},
-		},
-		slug: 'session-a',
-		uploaderAddress: '0x0000000000000000000000000000000000000abc',
-		baseHeaders: {},
-		deps: { json, randomBytes: fixedRandomBytes },
-	});
-
-	assert.equal(response.status, 501);
-	assert.equal((await readJson(response)).error, 'Cloudflare R2 storage requires an index KV binding.');
-	assert.equal(r2.store.size, 0);
-});
-
-test('storageRoute rejects R2-only worker-envelope uploads before key or object writes', async () => {
-	const r2 = createMockR2();
-	let randomCalls = 0;
-	let coordinatorCalls = 0;
-	const response = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'must not be written', resource: 'docsContext' }),
-		}),
-		env: {
-			CE_STORAGE_R2: r2,
-			CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
-			CE_SESSION_COORDINATOR: {
-				idFromName: () => {
-					coordinatorCalls += 1;
-					return 'must-not-coordinate';
-				},
-				get: () => ({ fetch: async () => new Response(null, { status: 500 }) }),
-			},
-		},
-		config: createEnvelopeConfig(),
-		slug: 'session-a',
-		uploaderAddress: '0x0000000000000000000000000000000000000abc',
-		baseHeaders: {},
-		deps: {
-			json,
-			randomBytes: () => {
-				randomCalls += 1;
-				return fixedRandomBytes();
-			},
-		},
-	});
-
-	assert.equal(response.status, 501);
-	assert.equal((await readJson(response)).error, 'Cloudflare R2 storage requires an index KV binding.');
-	assert.equal(randomCalls, 0);
-	assert.equal(coordinatorCalls, 0);
-	assert.equal(r2.store.size, 0);
-});
-
-test('storageRoute rejects R2 uploads when the index binding cannot read persisted metadata', async () => {
-	const r2 = createMockR2();
-	let indexWrites = 0;
-	const response = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'unreadable index', contentType: 'text/plain', resource: 'docsContext' }),
-		}),
-		env: {
-			CE_STORAGE_R2: r2,
-			CE_STORAGE_INDEX_KV: {
-				put: async () => {
-					indexWrites += 1;
-				},
-			},
-		},
-		config: {
-			storageProfile: {
-				backend: 'cloudflare',
-				payloadAccessControl: { gate: 'none', encryption: 'none' },
-			},
-		},
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json, randomBytes: fixedRandomBytes },
-	});
-
-	assert.equal(response.status, 501);
-	assert.equal((await readJson(response)).error, 'Cloudflare R2 storage requires an index KV binding.');
-	assert.equal(indexWrites, 0);
-	assert.equal(r2.store.size, 0);
-});
-
-test('storageRoute rejects coarse public R2-only uploads and reads without an index binding', async () => {
-	const r2 = createMockR2();
-	const config = {
-		storageProfile: {
-			backend: 'cloudflare',
-			payloadAccessControl: { gate: 'none', encryption: 'none' },
-		},
-	};
-	const uploadResponse = await storageRoute({
-		path: '/storage/upload',
-		method: 'POST',
-		request: new Request('https://worker.example/storage/upload', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ data: 'coarse public payload', contentType: 'text/plain', resource: 'docsContext' }),
-		}),
-		env: { CE_STORAGE_R2: r2 },
-		config,
-		slug: 'session-a',
-		uploaderAddress: '0xabc',
-		baseHeaders: {},
-		deps: { json, randomBytes: fixedRandomBytes },
-	});
-	const uploadBody = await readJson(uploadResponse);
-	assert.equal(uploadResponse.status, 501);
-	assert.equal(uploadBody.error, 'Cloudflare R2 storage requires an index KV binding.');
-	assert.equal(r2.store.size, 0);
-
-	await r2.put(`sessions/session-a/storage/${CF_ID}`, new TextEncoder().encode('legacy payload'), {
-		httpMetadata: { contentType: 'text/plain' },
-		customMetadata: {
-			id: CF_ID,
-			resource: 'docsContext',
-			payloadAccessMode: 'public_read',
-			payloadAccessControl: JSON.stringify({ gate: 'none', encryption: 'none' }),
-		},
-	});
-	const storedObject = r2.store.get(`sessions/session-a/storage/${CF_ID}`);
-	const readArrayBuffer = storedObject.arrayBuffer.bind(storedObject);
-	let payloadRead = false;
-	storedObject.arrayBuffer = async () => {
-		payloadRead = true;
-		return readArrayBuffer();
-	};
-
-	const readResponse = await storageRoute({
-		path: '/storage/read',
-		method: 'GET',
-		request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
-		env: { CE_STORAGE_R2: r2 },
-		config,
-		slug: 'session-a',
-		uploaderAddress: '',
-		baseHeaders: {},
-		deps: { json },
-	});
-
-	const readBody = await readJson(readResponse);
-	assert.equal(readResponse.status, 501);
-	assert.equal(readBody.error, 'Cloudflare R2 storage requires an index KV binding.');
-	assert.equal(payloadRead, false);
-	assert.doesNotMatch(JSON.stringify(readBody), /legacy payload/);
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'missing storage', resource: 'questions' }),
+    }),
+    env: {},
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(response.status, 501);
+  assert.equal((await readJson(response)).error, 'Cloudflare storage binding not configured.');
 });
 
 test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads them back', async () => {
@@ -1554,6 +767,70 @@ test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check f
   const denied = await readJson(readResponse);
   assert.equal(readResponse.status, 403);
   assert.equal(denied.error, 'Access denied: Cloudflare worker SBT gate failed.');
+});
+
+test('storageRoute allows public_read Cloudflare reads and lists without requester auth', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const publicConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'public_read' },
+    },
+  };
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'public question', contentType: 'text/plain', resource: 'questions' }),
+    }),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const uploadBody = await readJson(uploadResponse);
+
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(readResponse.status, 200);
+  assert.equal(readResponse.headers.get('X-CE-Payload-Access-Mode'), 'public_read');
+  assert.equal(await readResponse.text(), 'public question');
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=questions'),
+    env,
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const listed = await readJson(listResponse);
+  assert.equal(listResponse.status, 200);
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].metadata.payloadAccessMode, 'public_read');
 });
 
 test('storageRoute scaffold rejects plaintext Cloudflare lit_encrypted uploads', async () => {

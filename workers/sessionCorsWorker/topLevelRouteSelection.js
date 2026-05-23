@@ -72,12 +72,5 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
-  if (!hasTrimmedAuthorization && path === '/groups/list' && method === 'GET') {
-    return {
-      kind: 'anonymous',
-      anonymousRoute: 'groups',
-    };
-  }
-
   return { kind: 'authenticated' };
 };

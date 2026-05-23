@@ -32,21 +32,6 @@ export const dispatchAnonymousRoute = async ({
     env,
   } = anonymousContext || {};
 
-  if (path === '/groups/list') {
-    const dispatchPublicWorkerGroupListRequest =
-      deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequestBoundary;
-    return dispatchPublicWorkerGroupListRequest({
-      request,
-      config,
-      env,
-      slug,
-      baseHeaders: headers,
-      deps: {
-        json: deps?.json,
-      },
-    });
-  }
-
   if (
     (path === '/storage/read' || path === '/storage/list') &&
     typeof deps?.storageRoute === 'function'
@@ -62,13 +47,6 @@ export const dispatchAnonymousRoute = async ({
       baseHeaders: headers,
     });
   }
-  const endedResponse = buildSessionEndedResponse({
-    config,
-    headers,
-    json: deps?.json,
-    now: deps?.now,
-  });
-  if (endedResponse) return endedResponse;
 
   if (path === '/transcribe') {
     const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });
