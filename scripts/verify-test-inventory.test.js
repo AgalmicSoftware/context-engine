@@ -10,11 +10,10 @@ const {
   ROOT_JEST_TEST_FILES,
   ROOT_LOCAL_CHAIN_TEST_FILES,
   ROOT_NODE_TEST_FILES,
-  ROOT_OPTIONAL_NODE_TEST_FILES,
 } = require('./testInventoryConfig');
 const { verifyTestInventory } = require('./verify-test-inventory');
 
-const PRIVATE_STRIPPED_TEST_FIXTURE = 'tests/root/private-runtime.private.test.mjs';
+const PRIVATE_STRIPPED_TEST_FIXTURE = 'test/private-runtime.private.test.mjs';
 
 function writeFile(rootDir, relativePath, content = '// fixture\n') {
   const absolutePath = path.join(rootDir, relativePath);
@@ -61,32 +60,10 @@ function writeInventoryFixture(rootDir, overrides = {}) {
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-      'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
-      'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
-      'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
+      'test:ci': 'npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
       'test:node': 'node scripts/run-node-tests.js',
     },
     ...(overrides.packageJson || {}),
-  });
-  writeJson(rootDir, 'scripts/ci-gates.json', {
-    schemaVersion: 1,
-    profiles: {
-      ci: ['root-jest', 'workers'],
-    },
-    gates: {
-      'root-jest': {
-        commands: [{ label: 'root', command: 'npm', args: ['run', 'test:root:jest'] }],
-      },
-      workers: {
-        commands: [{ label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] }],
-      },
-      'wiring-and-release': {
-        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
-      },
-      release: {
-        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
-      },
-    },
   });
 }
 
@@ -98,9 +75,6 @@ test('verifyTestInventory tolerates stripped public copies without private runti
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir, { includePrivateRuntime: false });
 
-    ROOT_OPTIONAL_NODE_TEST_FILES.forEach((relativePath) => {
-      assert.equal(fs.existsSync(path.join(rootDir, relativePath)), false);
-    });
     assert.deepEqual(verifyTestInventory(rootDir), []);
   });
 });
@@ -108,21 +82,10 @@ test('verifyTestInventory tolerates stripped public copies without private runti
 test('verifyTestInventory flags unclassified root tests', () => {
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir);
-    writeFile(rootDir, 'tests/root/new-unwired.test.js');
+    writeFile(rootDir, 'test/new-unwired.test.js');
 
     assert.deepEqual(verifyTestInventory(rootDir), [
-      'unclassified root test files: tests/root/new-unwired.test.js',
-    ]);
-  });
-});
-
-test('verifyTestInventory flags recursively nested unclassified root tests', () => {
-  withTempRepo((rootDir) => {
-    writeInventoryFixture(rootDir);
-    writeFile(rootDir, 'tests/root/nested/new-unwired.test.mjs');
-
-    assert.deepEqual(verifyTestInventory(rootDir), [
-      'unclassified root test files: tests/root/nested/new-unwired.test.mjs',
+      'unclassified root test files: test/new-unwired.test.js',
     ]);
   });
 });
@@ -136,10 +99,8 @@ test('verifyTestInventory rejects root scripts that expose non-public worker pat
             ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
           }`,
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-          'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
           'test:private-worker': 'node --test workers/privateWorker/*.test.mjs',
-          'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
-          'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
+          'test:ci': 'npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
           'test:node': 'node scripts/run-node-tests.js',
         },
       },

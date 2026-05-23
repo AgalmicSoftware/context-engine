@@ -6,13 +6,8 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const {
   ROOT_NODE_TEST_FILES,
-  ROOT_OPTIONAL_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
 } = require('./testInventoryConfig');
-const {
-  createStripMatcher,
-  loadStripPatterns,
-} = require('./verify-public-release-surface');
 
 const STATIC_NODE_TEST_FILES = ROOT_NODE_TEST_FILES;
 
@@ -62,10 +57,11 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
   });
 
   files.push(
-    ...readOptionalTestDir(rootDir, path.join('tests', 'root'), { recursive: true })
+    ...readOptionalTestDir(rootDir, 'test')
       .filter((relativePath) => ROOT_PRIVATE_STRIPPED_TEST_FILE_RE.test(relativePath)),
   );
-  files.push(...readOptionalTestDir(rootDir, 'scripts', { recursive: true }));
+  files.push(...readOptionalTestDir(rootDir, 'scripts'));
+  files.push(...readOptionalTestDir(rootDir, path.join('scripts', 'lib', 'e2e')));
 
   const uniqueFiles = [...new Set(files)];
 

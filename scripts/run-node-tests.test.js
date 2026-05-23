@@ -30,14 +30,14 @@ function withTempRepo(run) {
 
 test('collectNodeTestFiles recursively includes classified root, script, and shared-worker tests', () => {
   withTempRepo((rootDir) => {
-    writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
-    writeFile(rootDir, 'tests/root/client.package.test.js');
-    writeFile(rootDir, 'tests/root/deployHelperOrigins.test.mjs');
-    writeFile(rootDir, 'tests/root/e2eTestIds.compat.test.js');
-    writeFile(rootDir, 'tests/root/rpcDefaults.compat.test.js');
-    writeFile(rootDir, 'tests/root/sessionCorsWorker.faucet-proof.test.mjs');
-    writeFile(rootDir, 'tests/root/private-runtime.private.test.mjs');
-    writeFile(rootDir, 'scripts/pre-push-guard.test.js');
+    writeFile(rootDir, 'test/arweave-metadata-uri.test.js');
+    writeFile(rootDir, 'test/client.package.test.js');
+    writeFile(rootDir, 'test/deployHelperOrigins.test.mjs');
+    writeFile(rootDir, 'test/e2eTestIds.compat.test.js');
+    writeFile(rootDir, 'test/rpcDefaults.compat.test.js');
+    writeFile(rootDir, 'test/sessionCorsWorker.faucet-proof.test.mjs');
+    writeFile(rootDir, 'test/sessionCorsWorker.package.test.js');
+    writeFile(rootDir, 'test/private-runtime.private.test.mjs');
     writeFile(rootDir, 'scripts/verify-test-wiring.test.js');
     writeFile(rootDir, 'scripts/verify-public-release-pii.test.js');
     writeFile(rootDir, 'scripts/run-node-tests.test.js');
@@ -51,17 +51,16 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
     writeFile(rootDir, 'workers/shared/provenance/manifest.test.mjs');
 
     assert.deepEqual(collectNodeTestFiles(rootDir), [
-      'tests/root/arweave-metadata-uri.test.js',
-      'tests/root/client.package.test.js',
-      'tests/root/deployHelperOrigins.test.mjs',
-      'tests/root/e2eTestIds.compat.test.js',
-      'tests/root/rpcDefaults.compat.test.js',
-      'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
-      path.join('workers', 'shared', 'deployHelperEndpointConfig.test.mjs'),
-      path.join('workers', 'shared', 'provenance', 'manifest.test.mjs'),
-      path.join('scripts', 'e2e', 'cloudflare', 'session-worker-ui.test.js'),
-      path.join('scripts', 'e2e', 'cloudflare', 'worker-login-result.test.js'),
-      'tests/root/private-runtime.private.test.mjs',
+      'test/arweave-metadata-uri.test.js',
+      'test/client.package.test.js',
+      'test/deployHelperOrigins.test.mjs',
+      'test/e2eTestIds.compat.test.js',
+      'test/rpcDefaults.compat.test.js',
+      'test/sessionCorsWorker.faucet-proof.test.mjs',
+      'test/sessionCorsWorker.package.test.js',
+      'test/private-runtime.private.test.mjs',
+      path.join('scripts', 'run-node-tests.test.js'),
+      path.join('scripts', 'verify-test-wiring.test.js'),
       path.join('scripts', 'lib', 'e2e', 'network-default-consumers.test.js'),
       path.join('scripts', 'lib', 'e2e', 'tx.test.js'),
       path.join('scripts', 'lib', 'e2e', 'worker-auth.test.js'),

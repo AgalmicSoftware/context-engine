@@ -76,6 +76,7 @@ scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
+test/*.private.test.*
 artifacts
 private-pack.manifest.json
 Demo Integration Package
@@ -101,6 +102,7 @@ contextEngine-cc/TODO
 .e2e-cache
 docs/codebase-*.md
 docs/assets/codebase-*
+test/*.private.test.*
 EOF
 }
 
@@ -146,17 +148,7 @@ scripts/test-*.ui.js
 scripts/seed-*.js
 scripts/e2e
 scripts/lib/e2e
-scripts/lib/passkey-wallet-derivation.js
-scripts/start-playwright-server.js
-scripts/run-contextengine-cc-tests.js
-scripts/run-contextengine-cc-tests.test.js
-scripts/e2e-env-example.test.js
-scripts/vendor-cecc-ethers-bundle.js
-scripts/restore-private-pack.sh
-scripts/audit-diff.sh
-scripts/audit-full.sh
-scripts/dependency-audit-hotspots.test.js
-tests/root/*.private.test.*
+test/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 ai-discourse-corpus/corpuses/_*.js
