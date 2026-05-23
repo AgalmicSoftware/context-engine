@@ -135,6 +135,49 @@ describe('OnePageSession helpers', () => {
       expect(map.q1).toHaveLength(1);
       expect(map.q1[0].response).toBe(rawBinaryPayload);
     });
+
+    it('requires visible question metadata to belong to the route session', () => {
+      const leakedResponder = '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526';
+      const binaryResponse = {
+        type: 'binary',
+        answer: { value: 'yes', encrypted: false },
+      };
+      const networkObj = {
+        questions: {
+          qLocal: { id: 'qLocal', type: 'binary', sessionSlug: 'edge' },
+          qLegacyBucket: {
+            id: 'qLegacyBucket',
+            type: 'binary',
+            sessionSlug: 'demo',
+            sessionSlugExplicit: false,
+          },
+          qForeignImplicit: { id: 'qForeignImplicit', type: 'binary', sessionSlug: 'demo' },
+          qForeignExplicit: {
+            id: 'qForeignExplicit',
+            type: 'binary',
+            sessionSlug: 'demo',
+            sessionSlugExplicit: true,
+          },
+          qPending: {
+            id: 'qPending',
+            type: 'binary',
+            __ceQuestionMetadataPending: true,
+          },
+        },
+        questionResponses: {
+          qLocal: { '0xLocal': binaryResponse },
+          qLegacyBucket: { '0xLegacy': binaryResponse },
+          qForeignImplicit: { [leakedResponder]: binaryResponse },
+          qForeignExplicit: { [leakedResponder]: binaryResponse },
+          qPending: { [leakedResponder]: binaryResponse },
+        },
+      };
+
+      const { map } = buildAggregatorFromLocalCache(networkObj, { sessionSlug: 'edge' });
+
+      expect(Object.keys(map).sort()).toEqual(['qLegacyBucket', 'qLocal']);
+      expect(JSON.stringify(map).toLowerCase()).not.toContain(leakedResponder);
+    });
   });
 
   describe('computeAggregatorSourceSnapshotSignature', () => {

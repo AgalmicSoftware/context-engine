@@ -93,6 +93,16 @@ const isPendingQuestionMetadataPlaceholder = (question: any = null) => (
   !!question && typeof question === 'object' && question.__ceQuestionMetadataPending === true
 );
 
+const hasOwn = (obj: any, key: PropertyKey) => (
+  !!obj && Object.prototype.hasOwnProperty.call(obj, key)
+);
+
+const getQuestionSessionSlugExplicitSignature = (question: any = {}) => {
+  if (question?.sessionSlugExplicit === true) return 'explicit';
+  if (question?.sessionSlugExplicit === false) return 'bucket';
+  return 'implicit';
+};
+
 const hasVisibleQuestionMetadataForAggregator = (
   questions: any = {},
   qId: any = '',
@@ -103,8 +113,9 @@ const hasVisibleQuestionMetadataForAggregator = (
   if (!lowerQid) return false;
   const question = questions[lowerQid] || questions[qId];
   if (!question || typeof question !== 'object' || isPendingQuestionMetadataPlaceholder(question)) return false;
-  if (question.sessionSlugExplicit === true) {
-    return normalizeAggregatorSessionSlug(question.sessionSlug || '') === normalizeAggregatorSessionSlug(sessionSlug || '');
+  const normalizedQuestionSlug = normalizeAggregatorSessionSlug(question.sessionSlug || '');
+  if (hasOwn(question, 'sessionSlug') && normalizedQuestionSlug && question.sessionSlugExplicit !== false) {
+    return normalizedQuestionSlug === normalizeAggregatorSessionSlug(sessionSlug || '');
   }
   return true;
 };
@@ -119,7 +130,7 @@ export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) 
     hash = hashMix(hash, qid);
     hash = hashMix(hash, isPendingQuestionMetadataPlaceholder(question) ? 'pending' : 'ready');
     hash = hashMix(hash, question?.sessionSlug || '');
-    hash = hashMix(hash, question?.sessionSlugExplicit === true ? 'explicit' : 'implicit');
+    hash = hashMix(hash, getQuestionSessionSlugExplicitSignature(question));
   });
   return `${qids.length}:${hash >>> 0}`;
 };
