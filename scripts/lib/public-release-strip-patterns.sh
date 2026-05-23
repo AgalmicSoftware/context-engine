@@ -48,6 +48,7 @@ scripts/capture-ux-*
 scripts/run-agent-bridge-worker-tests.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
+test/*.private.test.*
 artifacts
 tests/artifacts
 private-pack.manifest.json
@@ -72,6 +73,7 @@ contextEngine-cc/TODO
 .e2e-cache
 docs/codebase-*.md
 docs/assets/codebase-*
+test/*.private.test.*
 EOF
 }
 
@@ -113,8 +115,6 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
-scripts/run-agent-bridge-worker-tests.js
-scripts/vendor-cecc-ethers-bundle.js
 test/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
