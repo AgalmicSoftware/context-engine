@@ -170,6 +170,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
   );
   const shouldFanOut = (
     sessionSlugPinned !== true &&
+    !hasRouteSessionPin &&
     !hasExplicitSessionQueryPin(search) &&
     String(viewMode || '').trim().toLowerCase() === 'questions'
   );

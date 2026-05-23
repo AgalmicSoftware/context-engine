@@ -1,5 +1,4 @@
 import { createLogger } from 'utilities/logging.js';
-import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 
 const demoLog = createLogger('demo');
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
@@ -94,16 +93,6 @@ const isPendingQuestionMetadataPlaceholder = (question: any = null) => (
   !!question && typeof question === 'object' && question.__ceQuestionMetadataPending === true
 );
 
-const hasOwn = (obj: any, key: PropertyKey) => (
-  !!obj && Object.prototype.hasOwnProperty.call(obj, key)
-);
-
-const getQuestionSessionSlugExplicitSignature = (question: any = {}) => {
-  if (question?.sessionSlugExplicit === true) return 'explicit';
-  if (question?.sessionSlugExplicit === false) return 'bucket';
-  return 'implicit';
-};
-
 const hasVisibleQuestionMetadataForAggregator = (
   questions: any = {},
   qId: any = '',
@@ -114,18 +103,11 @@ const hasVisibleQuestionMetadataForAggregator = (
   if (!lowerQid) return false;
   const question = questions[lowerQid] || questions[qId];
   if (!question || typeof question !== 'object' || isPendingQuestionMetadataPlaceholder(question)) return false;
-  const normalizedQuestionSlug = normalizeAggregatorSessionSlug(question.sessionSlug || '');
-  if (hasOwn(question, 'sessionSlug') && normalizedQuestionSlug && question.sessionSlugExplicit !== false) {
-    return normalizedQuestionSlug === normalizeAggregatorSessionSlug(sessionSlug || '');
+  if (question.sessionSlugExplicit === true) {
+    return normalizeAggregatorSessionSlug(question.sessionSlug || '') === normalizeAggregatorSessionSlug(sessionSlug || '');
   }
   return true;
 };
-
-const isDemoPolisFixtureResponse = (response: any = null) => (
-  !!response &&
-  typeof response === 'object' &&
-  response.source === 'demo-polis-data'
-);
 
 export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) => {
   if (!questions || typeof questions !== 'object') return '0:0';
@@ -137,7 +119,7 @@ export const computeAggregatorQuestionMetadataSignature = (questions: any = {}) 
     hash = hashMix(hash, qid);
     hash = hashMix(hash, isPendingQuestionMetadataPlaceholder(question) ? 'pending' : 'ready');
     hash = hashMix(hash, question?.sessionSlug || '');
-    hash = hashMix(hash, getQuestionSessionSlugExplicitSignature(question));
+    hash = hashMix(hash, question?.sessionSlugExplicit === true ? 'explicit' : 'implicit');
   });
   return `${qids.length}:${hash >>> 0}`;
 };
@@ -187,8 +169,6 @@ export function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
         parsed = null;
       }
       if (!parsed) return;
-      if (isDemoPolisFixtureResponse(parsed)) return;
-      if (!isResponseAllowedForSessionSlug(parsed, sessionSlug)) return;
 
       const isBinary = parsed?.type === 'binary';
       const ans = parsed?.answer;

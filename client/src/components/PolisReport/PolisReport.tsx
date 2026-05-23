@@ -40,8 +40,6 @@ import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
-import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
@@ -372,18 +370,6 @@ function resolvePolisDemoDatasetsBySlug(options: { datasetsBySlug?: unknown; dem
   }
   return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
 }
-
-const dedupePolisReadSlugs = (values: unknown[] = []) => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  (Array.isArray(values) ? values : []).forEach((value) => {
-    const normalized = normalizeSessionSlug(value);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  return out;
-};
 
 const resolvePolisReadSlugs = (baseSlug: unknown = '') => {
   const normalizedBaseSlug = normalizeSessionSlug(baseSlug);

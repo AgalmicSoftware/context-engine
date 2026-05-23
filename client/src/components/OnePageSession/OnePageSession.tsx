@@ -47,6 +47,12 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
+import {
+  buildAggregatorFromLocalCache,
+  computeAggregatorDataSignature,
+  computeAggregatorQuestionMetadataSignature,
+  computeAggregatorSourceSnapshotSignature,
+} from './onePageSessionAggregator';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -112,88 +118,6 @@ const bumpPerfCounter = (key: any, inc: any = 1) => {
     const scope = globalState.__CE_PERF_COUNTERS__[ONE_PAGE_DEMO_PERF_SCOPE];
     scope[key] = Number(scope[key] || 0) + Number(inc || 0);
   } catch (e) { void e; /* fallback: perf counter update. */ }
-};
-
-const hashMix = (seed: any, text: any) => {
-  let h = Number(seed) >>> 0;
-  const str = String(text || '');
-  for (let i = 0; i < str.length; i += 1) {
-    h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0;
-  }
-  return h >>> 0;
-};
-
-const computeAggregatorDataSignature = (map: any = {}) => {
-  if (!map || typeof map !== 'object') return '0:0:0';
-  const qids = Object.keys(map).sort();
-  if (qids.length === 0) return '0:0:0';
-  let hash = 2166136261;
-  let totalEntries = 0;
-  qids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const rows = Array.isArray(map[qid]) ? map[qid] : [];
-    const rowSignatures = rows
-      .map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
-      .sort();
-    totalEntries += rowSignatures.length;
-    rowSignatures.forEach((rowSig: any) => {
-      hash = hashMix(hash, rowSig);
-    });
-  });
-  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
-};
-
-const computeAggregatorDataSignatureFromRows = (qids: any = [], rowSignaturesByQuestion: any = {}) => {
-  const normalizedQids = Array.isArray(qids) ? qids.filter(Boolean).sort() : [];
-  if (normalizedQids.length === 0) return '0:0:0';
-  let hash = 2166136261;
-  let totalEntries = 0;
-  normalizedQids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const rowSignatures = Array.isArray(rowSignaturesByQuestion?.[qid])
-      ? [...rowSignaturesByQuestion[qid]].sort()
-      : [];
-    totalEntries += rowSignatures.length;
-    rowSignatures.forEach((rowSig: any) => {
-      hash = hashMix(hash, rowSig);
-    });
-  });
-  return `${normalizedQids.length}:${totalEntries}:${hash >>> 0}`;
-};
-
-const computeAggregatorSourceSnapshotSignature = (questionResponses: any = {}) => {
-  if (!questionResponses || typeof questionResponses !== 'object') return '0:0:0';
-  const qids = Object.keys(questionResponses);
-  if (qids.length === 0) return '0:0:0';
-
-  let hash = 2166136261;
-  let totalEntries = 0;
-
-  qids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const responderMap = questionResponses[qid];
-    if (!responderMap || typeof responderMap !== 'object') return;
-    const responders = Object.keys(responderMap);
-    totalEntries += responders.length;
-    responders.forEach((resAddr: any) => {
-      hash = hashMix(hash, resAddr);
-      const rawResponse = responderMap[resAddr];
-      if (typeof rawResponse === 'string') {
-        hash = hashMix(hash, rawResponse);
-        return;
-      }
-      const answer = rawResponse?.answer;
-      hash = hashMix(hash, rawResponse?.type || '');
-      hash = hashMix(hash, answer?.value ?? '');
-      hash = hashMix(hash, answer?.encrypted ? '1' : '0');
-      hash = hashMix(hash, answer?.encryptedPortion || '');
-      // Include rating fields so results recompute when score inputs change.
-      hash = hashMix(hash, rawResponse?.importance ?? '');
-      hash = hashMix(hash, rawResponse?.conviction ?? '');
-    });
-  });
-
-  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
 };
 
 const buildOnePageSessionEmptyFilterState = () => ({
@@ -276,77 +200,6 @@ function hasCachedCreateSbtForm(slug: any = '') {
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   } as any);
-}
-
-// Top-level helper (outside the class)
-function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
-  if (!networkObj) return { map: {}, dirty: false };
-  const parseMemo = opts?.parseMemo instanceof Map ? opts.parseMemo : null;
-  const questionResponses = networkObj.questionResponses || {};
-  const aggregatorMap: Record<string, any> = {};
-  const rowSignaturesByQuestion: Record<string, any> = {};
-  let dirty = false;
-
-  Object.keys(questionResponses).forEach((qId: any) => {
-    const responderMap = questionResponses[qId] || {};
-    aggregatorMap[qId] = [];
-    rowSignaturesByQuestion[qId] = [];
-    Object.keys(responderMap).forEach((resAddr: any) => {
-      let parsed;
-      let rawResponseString = '';
-      try {
-        const rawResponse = responderMap[resAddr];
-        if (typeof rawResponse === 'string') {
-          rawResponseString = rawResponse;
-          if (parseMemo && parseMemo.has(rawResponse)) {
-            parsed = parseMemo.get(rawResponse);
-            parseMemo.delete(rawResponse);
-            parseMemo.set(rawResponse, parsed);
-          } else {
-            parsed = JSON.parse(rawResponse);
-            if (parseMemo) {
-              parseMemo.set(rawResponse, parsed);
-              while (parseMemo.size > AGGREGATOR_PARSE_MEMO_MAX) {
-                const oldest = parseMemo.keys().next().value;
-                if (!oldest) break;
-                parseMemo.delete(oldest);
-              }
-            }
-          }
-        } else {
-          parsed = rawResponse;
-        }
-      } catch {
-        try { delete responderMap[resAddr]; dirty = true; } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-        parsed = null;
-      }
-      if (!parsed) return;
-
-      const isBinary = parsed?.type === 'binary';
-      const ans = parsed?.answer;
-      const isEnc = !!(ans?.encrypted || ans?.encryptedPortion);
-      const isMasked = ans?.value === '*';
-
-      if (isBinary && ans && !isEnc && !isMasked) {
-        const responseJson = rawResponseString || JSON.stringify(parsed);
-        aggregatorMap[qId].push({
-          responder: resAddr,
-          questionId: qId,
-          response: responseJson,
-        });
-        rowSignaturesByQuestion[qId].push(`${resAddr}|${responseJson}`);
-      }
-    });
-  });
-
-  return {
-    map: aggregatorMap,
-    dirty,
-    signature: computeAggregatorDataSignatureFromRows(
-      Object.keys(aggregatorMap),
-      rowSignaturesByQuestion,
-    ),
-  };
 }
 
 export {
@@ -1006,12 +859,22 @@ class OnePageSession extends Component<any, any> {
           return;
         }
 
-        const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
+        const sourceSig = [
+          computeAggregatorSourceSnapshotSignature(qCache[netIdStr]?.questionResponses || {}),
+          computeAggregatorQuestionMetadataSignature(qCache[netIdStr]?.questions || {}),
+        ].join('|');
+        const sourceSigKey = `${slug}|${netIdStr}|${sourceSig}`;
         if (sourceSigKey === this._aggregatorSourceSigKey) {
           bumpPerfCounter('aggregatorSourceSkips');
           return;
         }
-        applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
+
+        const { map, dirty, signature } = buildAggregatorFromLocalCache(qCache[netIdStr], {
+          parseMemo: this._aggregatorResponseParseMemo,
+          sessionSlug: slug,
+        });
+        if (dirty) { void writeCache('questionsCache', slug, qCache); }
+        applyAggregatorData(map, signature, sourceSigKey);
       } catch (err) {
         demoLog.error("Error building aggregator in OnePageSession:", err);
         applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
