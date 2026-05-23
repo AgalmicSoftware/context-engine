@@ -457,7 +457,7 @@ test('/sessions paginates tall Telegram session lists', async () => {
   assert.equal(flattenButtons(second.response.replyMarkup).some((button) => button.text === 'Load Next'), false);
 });
 
-test('/sessions lists only Telegram-contributable sessions', async () => {
+test('/sessions lists only Telegram-enabled sessions', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -491,11 +491,11 @@ test('/sessions lists only Telegram-contributable sessions', async () => {
   });
 
   assert.equal(result.ok, true);
-  assert.match(result.response.text, /Sessions \(1\/1\)/);
+  assert.match(result.response.text, /Sessions \(2\/2\)/);
   assert.match(result.response.text, /- alpha \(Alpha Session\)/);
-  assert.equal(result.response.text.includes('Beta Session'), false);
+  assert.match(result.response.text, /- beta \(Beta Session\)/);
   assert.equal(result.response.text.includes('Gamma Session'), false);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session']);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
 });
 
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
@@ -903,6 +903,69 @@ test('/results without arguments explains available result views', async () => {
   assert.match(result.response.text, /Group: shows participant answer patterns/);
   assert.match(result.response.text, /\/results \[ consensus \| group \]/);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group']);
+});
+
+test('/results uses the joined Telegram-enabled session without requiring SBT joins', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: false,
+          requiredSbtGroups: [{ groupId: 'beta-sbt', name: 'Beta SBT', joinMode: 'public' }],
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { sessionSlug: 'alpha', questionId: 'q-alpha', questionType: 'freeform', prompt: 'Alpha prompt?' },
+      { sessionSlug: 'beta', questionId: 'q-beta', questionType: 'freeform', prompt: 'Beta results prompt?' },
+    ]),
+  });
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const betaButton = flattenButtons(sessions.response.replyMarkup)
+    .find((button) => button.text === 'Beta Session');
+  const selected = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7011,
+      callback_query: {
+        id: 'callback-select-beta',
+        data: betaButton.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const results = await buildTelegramCommandResponse({
+    update: groupMessage('/results consensus'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(selected.sessionSlug, 'beta');
+  assert.equal(results.ok, true);
+  assert.equal(results.screen, 'results_consensus');
+  assert.equal(results.response.method, 'sendPhoto');
+  assert.equal(results.sessionSlug, 'beta');
+  assert.match(results.response.text, /Beta results prompt\?/);
 });
 
 test('dispatchTelegramCommandResponse uploads rendered result photos and falls back to text on media failure', async () => {
@@ -1733,10 +1796,13 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
   const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
-  assert.deepEqual(buttonLabels, ['Questions', 'Sessions', 'Mini App']);
+  assert.deepEqual(buttonLabels, ['Mini App']);
   assert.equal(result.response.text.includes('/results [ consensus | group ]'), true);
-  assert.equal(buttonLabels.includes('Agent Actions'), false);
-  assert.equal(buttonLabels.includes('Attachments'), false);
+  assert.equal(result.response.text.includes('/actions'), false);
+  assert.equal(result.response.text.includes('/settings'), false);
+  assert.equal(result.response.text.includes('/join'), false);
+  assert.equal(result.response.text.includes('/sessions - list linked sessions'), true);
+  assert.equal(result.response.text.includes('/questions - view session questions'), true);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
@@ -1758,6 +1824,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App']);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
   assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);

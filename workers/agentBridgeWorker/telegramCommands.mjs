@@ -1313,9 +1313,6 @@ function formatHelpText() {
   return [
     'Context Engine',
     '',
-    '/actions - open the agent action menu',
-    '/settings - view or edit agent settings',
-    '/join <session> - link this chat to a session',
     '/sessions - list linked sessions',
     '/questions - view session questions',
     '/q <number> - pose a question',
@@ -1330,7 +1327,7 @@ function sessionVisibleInTelegram(session = {}) {
   // Temporary smoke-test hygiene: hide old E2E registry spam until session metadata
   // has a durable production flag for Telegram visibility.
   if (/\be2e\b|e2e/i.test(name)) return false;
-  return session.telegramBridgeEnabled === true && session.managedAccountSubmitAllowed === true;
+  return session.telegramBridgeEnabled === true;
 }
 
 function telegramVisibleSessions(policy = {}) {
@@ -1339,8 +1336,6 @@ function telegramVisibleSessions(policy = {}) {
 }
 
 async function buildHelpResponse({ normalized, command = COMMANDS.START, env, createdAt }) {
-  const policy = await loadSessionPolicy(env);
-  const sessionSlug = await resolveCommandSessionSlug({ env, normalized, policy });
   const privateBinding = normalized.chat.isPrivate
     ? await readPrivateSessionBinding(env, normalized)
     : null;
@@ -1356,26 +1351,7 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
     privateChat: normalized.chat.isPrivate,
     botUsername: env.TELEGRAM_BOT_USERNAME,
   });
-  const keyboard = [[
-    await makeCallbackButton({
-      env,
-      label: 'Questions',
-      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-      lane: normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-      serverContextRef: { sessionSlug },
-      seed: `help|questions|${sessionSlug}|${normalized.updateId}`,
-      createdAt,
-    }),
-    await makeCallbackButton({
-      env,
-      label: 'Sessions',
-      action: TELEGRAM_BRIDGE_ACTIONS.LIST_SESSIONS,
-      lane: normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-      serverContextRef: { pageOffset: 0 },
-      seed: `help|sessions|${normalized.updateId}`,
-      createdAt,
-    }),
-  ]];
+  const keyboard = [];
   if (miniAppButton) {
     miniAppButton.text = 'Mini App';
     keyboard.push([miniAppButton]);
@@ -1383,7 +1359,7 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
   return reply({
     chatId: normalized.chat.chatId,
     text: formatHelpText(),
-    replyMarkup: { inline_keyboard: keyboard },
+    replyMarkup: keyboard.length ? { inline_keyboard: keyboard } : null,
     screen: 'setup_welcome',
     command,
     normalized,
@@ -1436,7 +1412,7 @@ async function buildSessionsResponse({
       '',
       ...(visibleSessions.length
         ? visibleSessions.map((session) => `- ${session.sessionSlug} (${sessionLabel(session)})`)
-        : ['No Telegram-contributable sessions are available.']),
+        : ['No Telegram-enabled sessions are available.']),
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
     screen: 'group_session_card',
@@ -2839,7 +2815,7 @@ function buildMiniAppStartResponse({
       text: [
         'Open the Mini App from a private chat with the bot.',
         '',
-        'Use /join <session> in private chat to continue.',
+        'Use /sessions in private chat to continue.',
       ].join('\n'),
       screen: 'private_start',
       command,
@@ -2900,7 +2876,7 @@ async function buildStartPayloadResponse({
       text: [
         'This private start link is no longer active.',
         '',
-        'Run /sessions or /join <session> to continue.',
+        'Run /sessions to continue.',
       ].join('\n'),
       screen: 'private_start',
       command,

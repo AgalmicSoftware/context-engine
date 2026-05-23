@@ -177,6 +177,9 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
       const body = JSON.parse(options.body || '{}');
       assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
       assert.equal(body.commands.some((command) => command.command === 'results'), true);
+      assert.equal(body.commands.some((command) => command.command === 'actions'), false);
+      assert.equal(body.commands.some((command) => command.command === 'settings'), false);
+      assert.equal(body.commands.some((command) => command.command === 'join'), false);
       assert.equal(body.commands.some((command) => command.command.startsWith('ce_')), false);
       return jsonResponse({ ok: true, result: true, description: 'Commands were set' });
     }
@@ -216,6 +219,9 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')), true);
   assert.equal(result.telegram.commands.count > 0, true);
   assert.equal(result.telegram.commands.commands.includes('sessions'), true);
+  assert.equal(result.telegram.commands.commands.includes('actions'), false);
+  assert.equal(result.telegram.commands.commands.includes('settings'), false);
+  assert.equal(result.telegram.commands.commands.includes('join'), false);
   assert.equal(JSON.stringify(result).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(result).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(result).includes('demo-root-secret'), false);

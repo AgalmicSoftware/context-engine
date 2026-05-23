@@ -24,9 +24,6 @@ const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const require = createRequire(import.meta.url);
 const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'start', description: 'Open the Context Engine bot' },
-  { command: 'actions', description: 'Open the action menu' },
-  { command: 'settings', description: 'View or edit bot settings' },
-  { command: 'join', description: 'Link this chat to a session' },
   { command: 'sessions', description: 'List available sessions' },
   { command: 'questions', description: 'View session questions' },
   { command: 'q', description: 'Pose a question by number' },

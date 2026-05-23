@@ -109,22 +109,20 @@ Account-created screens do not include `Open in CE`. Optional onboarding uses: `
 
 Core Telegram commands:
 
-- `/start` opens the help/action entry point with `Questions`, `Sessions`, and
-  `Mini App` controls. It includes a private-chat Mini App button when
-  configured, or consumes an opaque private start payload. If the user has not
-  selected a private session yet, the Mini App launch opens the session picker
-  first.
-- `/actions` and `/agent` open the generic agent action launcher. Group
-  chat shows only public-safe labels plus private/Mini App launch controls.
-- `/settings` shows private settings state and an edit entry point. Group
-  chat returns only a private-chat launch.
-- `/join <session>`, `/sessions`, `/questions`, `/q <number>`,
+- `/start` opens the concise help entry point and shows only the `Mini App`
+  control when configured. `Questions` and `Sessions` remain available as
+  commands rather than welcome-screen buttons. If the user has not selected a
+  private session yet, the Mini App launch opens the session picker first.
+- `/sessions`, `/questions`, `/q <number>`,
   `/results`, `/results consensus`, `/results group`, `/attachments`, `/docs`,
   `/me`, and `/account` keep their existing session/question/document/account
   behavior. Plain `/results` explains the `consensus` and `group` views and
   renders buttons for both modes; mode-specific results attempt to upload a
   rendered PNG card with a beeswarm view for consensus and a participant graph
   for group results, using demo data until enough live overlap exists.
+- `/actions`, `/settings`, and `/join <session>` remain accepted for backward
+  compatibility, but `/start` and the registered Telegram command menu no
+  longer advertise them. Session selection is through `/sessions`.
 
 `/create_agent` remains accepted as a compatibility command, but the bot and
 Mini App no longer advertise a `Create Agent` button. Joining a session derives
@@ -278,7 +276,9 @@ Required values:
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
 `deploy:apply -- --apply` sets the webhook and Telegram slash-command menu
-automatically. For manual webhook diagnosis, the equivalent Telegram API call is:
+automatically. The visible command menu advertises the active
+session/question/result/account commands and omits legacy `actions`, `settings`,
+and `join`. For manual webhook diagnosis, the equivalent Telegram API call is:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
@@ -313,15 +313,15 @@ plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
 `/sessions` and `/join`. Those commands force a fresh registry read so new
 sessions are not hidden behind the short-lived Worker cache; capped registry
 lists use the newest session window. `/sessions` displays only
-Telegram-contributable sessions (`telegramBridgeEnabled=true` and
-`managedAccountSubmitAllowed=true`), hides `e2e`-named smoke-test sessions as a
-temporary cleanup heuristic, and paginates tall inline-keyboard lists with
-`Load Next`. Group
+Telegram-enabled sessions (`telegramBridgeEnabled=true`), hides `e2e`-named
+smoke-test sessions as a temporary cleanup heuristic, and paginates tall
+inline-keyboard lists with `Load Next`. Group
 `/join <session>` also persists the chat's selected session in
-`AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, and `/attachments` use
-that session without repeating the slug. Private `/join <session>` persists the
-selected session for that Telegram user as well, so private `/questions` and
-`/q <number>` use the same session unless a command supplies an explicit slug.
+`AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, `/results`, and
+`/attachments` use that session without repeating the slug. Private
+`/join <session>` persists the selected session for that Telegram user as well,
+so private `/questions`, `/q <number>`, and `/results` use the same session
+unless a command supplies an explicit slug.
 `/docs` remains a compatibility alias.
 
 Question lists default to live mode. Bot messages show at most five question
@@ -424,6 +424,7 @@ GET  /telegram/mini-app/api/state?launch=<opaque-cecb-id>
 POST /telegram/mini-app/api/draft
 POST /telegram/mini-app/api/clear-drafts
 POST /telegram/mini-app/api/transcribe
+POST /telegram/mini-app/api/search
 POST /telegram/mini-app/api/settings
 ```
 
@@ -473,10 +474,13 @@ Current v0 scope:
   settings are opened from the top-right filter and gear buttons.
   Session question count text is intentionally a single answerable-question
   count rather than a split loaded/indexed diagnostic.
-- The filter panel includes unanswered-first ordering, question type filters,
-  and a compact AI-style question search that ranks matching loaded prompts.
-  The search field can also use the microphone icon; transcribed search text is
-  applied to the loaded-question filter immediately.
+- The filter panel includes unanswered-first ordering, question type filters
+  including freeform questions, and an AI-backed question search that ranks
+  matching loaded prompts through the session worker `/ai` route when sponsored
+  AI is available. It falls back to local semantic keyword matching when AI is
+  unavailable, auto-applies as the user types, and only shows `Clear` when
+  there is search text. The search field can also use the microphone icon;
+  transcribed search text is applied to the loaded-question filter immediately.
 - Additional comments include microphone/stop icon buttons. The Mini App first
   records with `MediaRecorder`, shows recording/transcription/error feedback in
   the comments textarea rather than duplicating it in the status bar, and sends
@@ -498,9 +502,11 @@ Current v0 scope:
 - Previously saved draft answers are returned by state as
   `draftAnswersByQuestionKey` and hydrate the matching question cards on load.
   The gear/settings panel also lists saved draft response labels and can clear
-  visible saved drafts through `POST /telegram/mini-app/api/clear-drafts`. The
-  filter panel's `showUnansweredFirst` preference defaults to true and orders
-  saved answered questions after unanswered questions on first load.
+  visible saved drafts through `POST /telegram/mini-app/api/clear-drafts`.
+  Submitted-answer history is tracked separately from drafts, so clearing
+  drafts only removes unsubmitted answers. The filter panel's
+  `showUnansweredFirst` preference defaults to true and orders saved or
+  submitted answered questions after unanswered questions on first load.
 - The Mini App keeps polling state while no answerable questions are available
   and questions are still empty, the question source reports an error, or only
   payload-unavailable question rows are present. Mixed answerable/unavailable
