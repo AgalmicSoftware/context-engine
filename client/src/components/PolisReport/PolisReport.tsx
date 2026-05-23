@@ -40,16 +40,11 @@ import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
 import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
 } from '../SurveyTool/surveyToolUtils.js';
-import {
-  readSessionScanScope,
-  readSessionScanSlugs,
-} from '../../utilities/session/sessionScanScope.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 
 /**************************************************************
@@ -345,36 +340,8 @@ function resolvePolisDemoDatasetsBySlug(options: { datasetsBySlug?: unknown; dem
   return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
 }
 
-const dedupePolisReadSlugs = (values: unknown[] = []) => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  (Array.isArray(values) ? values : []).forEach((value) => {
-    const normalized = normalizeSessionSlug(value);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  return out;
-};
-
 const resolvePolisReadSlugs = (baseSlug: unknown = '') => {
   const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
-  let isSessionRoute = false;
-  try {
-    const pathname = (typeof window !== 'undefined' && window.location?.pathname) || '';
-    isSessionRoute = pathname.startsWith('/session/');
-  } catch (e) { void e; /* fallback: route scope detection. */ }
-  if (!isSessionRoute) {
-    return [normalizedBaseSlug];
-  }
-
-  const scopeMode = String(readSessionScanScope() || '').trim().toLowerCase();
-  if (scopeMode === 'list') {
-    return dedupePolisReadSlugs([normalizedBaseSlug, ...readSessionScanSlugs()]);
-  }
-  if (scopeMode === 'all') {
-    return dedupePolisReadSlugs([normalizedBaseSlug, ...getAllSessionSlugs()]);
-  }
   return [normalizedBaseSlug];
 };
 

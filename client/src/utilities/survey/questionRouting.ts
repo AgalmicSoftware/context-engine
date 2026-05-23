@@ -229,7 +229,7 @@ export const resolveQuestionPayloadAccessMode = (
     normalizePayloadAccessModeValue(storageRef.payloadAccessMode) ||
     normalizePayloadAccessModeValue(storageRef.accessControlMode);
   if (explicitMode) return explicitMode;
-  const cfg = normalizeSessionStorageConfig(sessionConfig);
+  const cfg = normalizeSessionStorageConfig(sessionConfig as any);
   return cfg.payloadAccessControl.mode;
 };
 

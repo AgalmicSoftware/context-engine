@@ -171,6 +171,7 @@ type SurveyResultsScopeContextInput = {
   viewMode?: unknown;
 };
 type SurveyResultsQuestionRecord = SurveyResultsRecord & {
+  __ceQuestionMetadataPending?: unknown;
   id?: unknown;
   sessionSlug?: unknown;
   sessionSlugExplicit?: unknown;
@@ -745,6 +746,10 @@ const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionReco
   hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
 );
 
+const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean => (
+  !!question && question.__ceQuestionMetadataPending === true
+);
+
 const resolveScopedQuestionSessionSlug = (
   question: SurveyResultsQuestionRecord = {},
   bucketSlug: unknown = ''
@@ -772,6 +777,7 @@ const shouldKeepScopedQuestion = ({
     );
   if (!scopeSet.size) return true;
   const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
+  if (isPendingQuestionMetadataPlaceholder(question)) return false;
   if (requireAuthoritativeBinding) {
     return hasAuthoritativeQuestionSessionSlug(question) && scopeSet.has(normalizedQuestionSlug);
   }
