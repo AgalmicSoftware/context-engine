@@ -120,6 +120,19 @@ Core Telegram commands:
   renders buttons for both modes; mode-specific results attempt to upload a
   rendered PNG card with a beeswarm view for consensus and a participant graph
   for group results, using demo data until enough live overlap exists.
+- `/export_all [session]` is private-chat only and sends a zip archive of
+  Cloudflare-backed response payloads for the selected session. The caller's
+  managed Telegram ETH address must be allowlisted with
+  `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` or the session policy fields
+  `responseExportAllowedAddresses` / `telegramResponseExportAllowedAddresses`.
+  Allowlisted accounts also see an `export_all` inline button in private bot
+  surfaces such as `/start` and `/me`.
+- `/export_access [session]`, `/export_allow 0xAddress [session]`, and
+  `/export_revoke 0xAddress [session]` are private-chat only admin commands for
+  response export access. Only addresses configured in the Worker env or session
+  policy are root export admins; admins can add or remove additional exporters
+  in Worker KV without redeploying. Added exporters can run `/export_all` but
+  cannot add other exporters.
 - `/actions`, `/settings`, and `/join <session>` remain accepted for backward
   compatibility, but `/start` and the registered Telegram command menu no
   longer advertise them. Session selection is through `/sessions`.
@@ -267,6 +280,7 @@ Required values:
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
 | Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
+| Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
@@ -534,6 +548,18 @@ Current v0 scope:
   request ID; changed answers create distinct records. Failed direct-submit
   records are retried on the next identical submit instead of replaying a stale
   auth or broadcast failure.
+- `/export_all` authenticates the caller's managed Telegram wallet to the
+  session worker, lists Cloudflare `responses` storage refs, reads each payload,
+  joins the payloads with Worker-local `telegram:submit-request:*` metadata when
+  available, and sends a zip archive containing `manifest.json`,
+  `storage-items.json`, `telegram-submit-records.json`, `responses.json`, and
+  per-response JSON/text files. The route is disabled for non-allowlisted
+  managed ETH addresses and is useful only for sessions whose storage profile
+  resolves to Cloudflare.
+- Configured export admins can manage additional session-scoped exporters with
+  `/export_allow` and `/export_revoke`. These managed grants are stored under
+  `telegram:response-export-allowlist:v1:<sessionSlug>` in `AGENT_ACTION_KV`;
+  they grant export only, not admin delegation.
 - Worker login first honors per-session `workerLoginOrigin` /
   `sessionWorkerLoginOrigin` and `allowOrigins`, then tries
   `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, `LOCAL_AUTH_ORIGIN`, and

@@ -6,6 +6,7 @@ import {
   dispatchTelegramCommandResponse,
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
+import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 
 class MemoryKv {
@@ -107,15 +108,39 @@ function groupMessage(text) {
 }
 
 function privateMessage(text) {
+  return privateMessageFrom(text);
+}
+
+function privateMessageFrom(text, {
+  telegramUserId = '42',
+  username = 'participant',
+} = {}) {
   return {
     update_id: 7002,
     message: {
       message_id: 12,
       text,
-      chat: { id: 42, type: 'private' },
-      from: { id: 42, username: 'participant' },
+      chat: { id: Number(telegramUserId), type: 'private' },
+      from: { id: Number(telegramUserId), username },
     },
   };
+}
+
+async function managedAccountAddressFor({
+  telegramUserId = '42',
+  username = 'participant',
+} = {}, env = baseEnv(), now = '2026-05-08T12:00:00.000Z') {
+  const account = await deriveManagedDemoAccount({
+    principal: { telegramUserId, username },
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    createdAt: now,
+  });
+  return account.accountAddress;
+}
+
+async function privateManagedAccountAddress(env = baseEnv(), now = '2026-05-08T12:00:00.000Z') {
+  return managedAccountAddressFor({}, env, now);
 }
 
 function word(value) {
@@ -967,6 +992,343 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
   assert.equal(results.response.method, 'sendPhoto');
   assert.equal(results.sessionSlug, 'beta');
   assert.match(results.response.text, /Beta results prompt\?/);
+});
+
+test('/export_all sends a zip for the allowlisted Telegram managed wallet', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const storageId = arweaveId(33);
+  const calls = [];
+  const kv = new MemoryKv();
+  await kv.put('telegram:submit-request:export-one', JSON.stringify({
+    version: 1,
+    requestId: 'export-one',
+    status: 'direct_submitted',
+    action: 'direct_submit_response',
+    lane: 'telegram_private_account',
+    telegramUserId: '42',
+    chatId: '42',
+    sessionSlug: 'alpha',
+    questionId: `0x${'12'.repeat(32)}`,
+    answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+    onChain: {
+      ok: true,
+      status: 'direct_submitted',
+      accountAddress,
+      txHash: `0x${'34'.repeat(32)}`,
+      storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
+      storageId,
+      responseHash: `0x${'56'.repeat(32)}`,
+      chainId: 11155420,
+    },
+    createdAt: now,
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+  });
+  env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
+    const target = String(url);
+    calls.push({ url: target, init });
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/storage/list?resource=responses')) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      return new Response(JSON.stringify({
+        items: [{
+          storageRef: { backend: 'cloudflare', id: storageId, resource: 'responses' },
+          metadata: { resource: 'responses', contentType: 'application/json', createdAt: now },
+        }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith(`/storage/read?id=${encodeURIComponent(storageId)}`)) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      return new Response(JSON.stringify({
+        sessionSlug: 'alpha',
+        questionId: `0x${'12'.repeat(32)}`,
+        response: { value: 'agree', label: 'Agree' },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected_url' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/export_all'),
+    env,
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'response_export');
+  assert.equal(result.response.method, 'sendDocument');
+  assert.equal(result.response.document.filename, 'context-engine-alpha-responses.zip');
+  assert.equal(result.response.document.contentType, 'application/zip');
+  assert.deepEqual(Array.from(result.response.document.bytes.slice(0, 4)), [80, 75, 3, 4]);
+  assert.equal(result.exportedPayloadCount, 1);
+  assert.equal(result.submitRecordCount, 1);
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
+    '/auth/nonce',
+    '/auth/login',
+    '/storage/list',
+    '/storage/read',
+  ]);
+});
+
+test('/export_all denies non-allowlisted Telegram managed wallets', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: `0x${'11'.repeat(20)}`,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        sessionWorkerUrl: 'https://session.example',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+  });
+
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/export_all'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'response_export_denied');
+  assert.equal(result.response.method, 'sendMessage');
+  assert.match(result.response.text, /response_export_address_not_allowed/);
+});
+
+test('/start and /me show export controls only to the configured export admin', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const allowedEnv = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        sessionWorkerUrl: 'https://session.example',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+  });
+  const deniedEnv = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: `0x${'11'.repeat(20)}`,
+  });
+
+  const allowedStart = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env: allowedEnv,
+    now,
+  });
+  const allowedMe = await buildTelegramCommandResponse({
+    update: privateMessage('/me'),
+    env: allowedEnv,
+    now,
+  });
+  const deniedStart = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env: deniedEnv,
+    now,
+  });
+
+  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'export_all', 'export_access']);
+  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), true);
+  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), true);
+  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App']);
+});
+
+test('/start export_all targets the latest submitted session before the registry default', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const kv = new MemoryKv();
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  await kv.put('telegram:submit-request:latest-export-session', JSON.stringify({
+    requestId: 'latest-export-session',
+    status: 'direct_submitted',
+    sessionSlug: 'telegram-demo-2',
+    telegramUserId: '42',
+    onChain: {
+      ok: true,
+      accountAddress,
+      storageRef: { backend: 'cloudflare', id: arweaveId(44), resource: 'responses' },
+    },
+    createdAt: now,
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'test-session',
+      sessions: [
+        {
+          sessionSlug: 'test-session',
+          sessionName: 'Registry First Session',
+          telegramBridgeEnabled: true,
+          sessionWorkerUrl: 'https://session.example',
+        },
+        {
+          sessionSlug: 'telegram-demo-2',
+          sessionName: 'Telegram Demo 2',
+          telegramBridgeEnabled: true,
+          sessionWorkerUrl: 'https://session.example',
+          storageProfile: { backend: 'cloudflare' },
+        },
+      ],
+    }),
+  });
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now,
+  });
+  const exportButton = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'export_all');
+  const actionRecord = JSON.parse(await kv.get(`telegram:action:${exportButton.callback_data}`));
+
+  assert.equal(actionRecord.serverContextRef.sessionSlug, 'telegram-demo-2');
+});
+
+test('configured export admin can grant and revoke another Telegram managed wallet export access', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const kv = new MemoryKv();
+  const adminAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const guestAddress = await managedAccountAddressFor({
+    telegramUserId: '43',
+    username: 'guest',
+  }, baseEnv(), now);
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        sessionWorkerUrl: 'https://session.example',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+  });
+  env.AGENT_BRIDGE_FETCH = async (url) => {
+    const target = String(url);
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/storage/list?resource=responses')) {
+      return new Response(JSON.stringify({ items: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected_url' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const grant = await buildTelegramCommandResponse({
+    update: privateMessage(`/export_allow ${guestAddress} alpha`),
+    env,
+    now,
+  });
+  const guestStart = await buildTelegramCommandResponse({
+    update: privateMessageFrom('/start', { telegramUserId: '43', username: 'guest' }),
+    env,
+    now,
+  });
+  const guestExport = await buildTelegramCommandResponse({
+    update: privateMessageFrom('/export_all alpha', { telegramUserId: '43', username: 'guest' }),
+    env,
+    now,
+  });
+  const guestGrantAttempt = await buildTelegramCommandResponse({
+    update: privateMessageFrom(`/export_allow 0x${'22'.repeat(20)} alpha`, { telegramUserId: '43', username: 'guest' }),
+    env,
+    now,
+  });
+  const guestAfterRootDisabled = await buildTelegramCommandResponse({
+    update: privateMessageFrom('/export_all alpha', { telegramUserId: '43', username: 'guest' }),
+    env: {
+      ...env,
+      AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: '',
+    },
+    now,
+  });
+  const revoke = await buildTelegramCommandResponse({
+    update: privateMessage(`/export_revoke ${guestAddress} alpha`),
+    env,
+    now,
+  });
+  const guestAfterRevoke = await buildTelegramCommandResponse({
+    update: privateMessageFrom('/export_all alpha', { telegramUserId: '43', username: 'guest' }),
+    env,
+    now,
+  });
+
+  assert.equal(grant.screen, 'response_export_access_updated');
+  assert.equal(grant.added, true);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'export_all']);
+  assert.equal(guestExport.screen, 'response_export');
+  assert.equal(guestExport.response.method, 'sendDocument');
+  assert.equal(guestGrantAttempt.screen, 'response_export_access_denied');
+  assert.match(guestGrantAttempt.response.text, /response_export_admin_required/);
+  assert.equal(guestAfterRootDisabled.screen, 'response_export_denied');
+  assert.match(guestAfterRootDisabled.response.text, /response_export_allowlist_empty/);
+  assert.equal(revoke.screen, 'response_export_access_updated');
+  assert.equal(revoke.removed, true);
+  assert.equal(guestAfterRevoke.screen, 'response_export_denied');
 });
 
 test('dispatchTelegramCommandResponse uploads rendered result photos and falls back to text on media failure', async () => {

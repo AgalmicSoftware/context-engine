@@ -189,6 +189,39 @@ export async function sendTelegramPhoto({
   });
 }
 
+export async function sendTelegramDocument({
+  botToken = '',
+  chatId = '',
+  document = null,
+  caption = '',
+  replyMarkup = null,
+  parseMode = '',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const form = new FormData();
+  form.append('chat_id', safeString(chatId));
+  const documentBytes = document?.bytes instanceof Uint8Array ? document.bytes : null;
+  if (documentBytes) {
+    form.append(
+      'document',
+      new Blob([documentBytes], { type: safeString(document.contentType) || 'application/octet-stream' }),
+      safeString(document.filename) || 'export.zip'
+    );
+  } else {
+    form.append('document', safeString(document?.url || document));
+  }
+  const captionText = safeString(caption).slice(0, 1024);
+  if (captionText) form.append('caption', captionText);
+  if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
+  if (safeString(parseMode)) form.append('parse_mode', safeString(parseMode));
+  return telegramBotApiFormDataRequest({
+    botToken,
+    method: 'sendDocument',
+    formData: form,
+    fetchImpl,
+  });
+}
+
 export async function editTelegramMessageText({
   botToken = '',
   chatId = '',

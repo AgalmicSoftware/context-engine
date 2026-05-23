@@ -48,8 +48,11 @@ test('parseAgentBridgeEnvText treats template placeholders as literal values', (
 
 test('deploy apply dry-run performs no Cloudflare or Telegram calls', async () => {
   const calls = [];
+  const exportAdmin = `0x${'ab'.repeat(20)}`;
   const result = await executeAgentBridgeDeployApply({
-    env: completeEnv(),
+    env: completeEnv({
+      AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: exportAdmin,
+    }),
     fetchImpl: async (...args) => {
       calls.push(args);
       throw new Error('dry-run must not fetch');
@@ -63,6 +66,11 @@ test('deploy apply dry-run performs no Cloudflare or Telegram calls', async () =
   assert.equal(JSON.stringify(result).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(result).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(result).includes('demo-root-secret'), false);
+  const uploadCall = result.plan.remainingDirectApiCalls.find((call) => call.purpose.includes('Upload agentBridgeWorker module'));
+  const bindings = uploadCall.multipartMetadata.bindings;
+  assert.equal(bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES' && binding.text === exportAdmin
+  )), true);
 });
 
 test('deploy apply validation rejects placeholder session worker URLs before mutation', async () => {
