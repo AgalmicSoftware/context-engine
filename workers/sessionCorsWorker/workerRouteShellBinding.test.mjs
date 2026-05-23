@@ -393,6 +393,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
             resolveAnonymousRateIdentity: 'resolveAnonymousRateIdentity',
             checkRateLimit: 'checkRateLimit',
             dispatchAnonymousRoute: 'dispatchAnonymousRoute',
+            storageRoute: 'storageRoute',
             readTranscribeRequestPayload: 'readTranscribeRequestPayload',
             evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
             getSessionSecrets: 'getSessionSecrets',

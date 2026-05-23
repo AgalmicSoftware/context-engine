@@ -321,7 +321,7 @@ embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/join`, `/questions`,
-`/pose_question`, `/q`, deprecated `/drop_question`, `/docs`,
+`/pose_question`, `/q`, `/results consensus`, `/results group`, deprecated `/drop_question`, `/docs`,
 `/generate_questions`, `/me`, `/account`,
 `/sbt <sbt-address-or-group-id-or-link>`,
 `/join_sbt <sbt-address-or-invite-code-or-link>`,
@@ -337,9 +337,12 @@ and routes participants without a configured account to private account setup.
 `View Questions` pulls existing session questions through
 `GET /api/agent/questions`. `Pose Question` lets an allowed user choose one
 existing or generated question and pose it to the group. Group output for
-public questions may include question text and answer labels; private,
-SBT-gated, or Lit-encrypted questions show a locked/unavailable group state and
-resolve only in private chat or Mini App for eligible accounts.
+public questions starts with the question text and keeps answer choices on
+buttons rather than duplicating them in message copy. The question list keeps
+full prompt text in the message body, uses compact `Pose <number>` buttons, and
+starts with `Questions (<shown>/<total>)`. Private, SBT-gated, or Lit-encrypted
+questions show a locked/unavailable group state and resolve only in private chat
+or Mini App for eligible accounts.
 
 Telegram SBT screens are transport contracts over canonical CE SBT actions:
 
@@ -359,8 +362,10 @@ Telegram SBT screens are transport contracts over canonical CE SBT actions:
   eligible, routes password/invite collection to private chat or Mini App,
   routes wallet/passkey/non-public gates to full CE account linking, and exposes
   `Retry Join Session` after the gate is satisfied.
-- `My Account` and `Joined SBTs`: show managed address, joined sessions, joined
-  SBT summaries, and private export/restore controls.
+- `My Account` and `Joined SBTs`: show managed address, known chain names with
+  chain IDs, joined sessions, joined SBT summaries, and private export/restore
+  controls. The managed address can link to a chain explorer when the chain is
+  recognized.
 
 Public SBT addresses, group ids, and share links may appear in group commands.
 Passwords, invite credentials, wallet proofs, and private eligibility checks are

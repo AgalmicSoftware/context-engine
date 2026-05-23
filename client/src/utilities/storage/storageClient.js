@@ -153,6 +153,7 @@ export const readSessionStorageBlob = async ({ storageRef, sessionSlug = '', ses
     context,
     workerUrl: baseUrl,
     allowDemoFallback: defaultStrictAllowDemoFallback(),
+    preferAnonymous: true,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -170,6 +171,7 @@ export const listSessionStorageRefs = async ({ sessionSlug = '', sessionConfig =
     context,
     workerUrl: baseUrl,
     allowDemoFallback: defaultStrictAllowDemoFallback(),
+    preferAnonymous: true,
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body?.error || `Storage list failed (${response.status}).`);

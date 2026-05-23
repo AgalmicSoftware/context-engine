@@ -37,6 +37,7 @@ export const dispatchAnonymousRouteEntryWithWorkerDeps = async ({
           env,
           deps: {
             dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
+            storageRoute: deps?.storageRoute,
             readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
             evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
             getSessionSecrets: deps?.getSessionSecrets,

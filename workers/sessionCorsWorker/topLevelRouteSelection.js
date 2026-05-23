@@ -55,5 +55,18 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
+  if (
+    !hasTrimmedAuthorization &&
+    (
+      (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
+      (path === '/storage/list' && (method === 'GET' || method === 'POST'))
+    )
+  ) {
+    return {
+      kind: 'anonymous',
+      anonymousRoute: 'storage',
+    };
+  }
+
   return { kind: 'authenticated' };
 };

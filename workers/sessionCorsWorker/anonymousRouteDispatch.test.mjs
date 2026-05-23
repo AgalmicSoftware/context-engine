@@ -12,6 +12,34 @@ const createAnonymousContext = () => ({
   headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
 });
 
+test('dispatchAnonymousRoute forwards public storage reads to storageRoute without requester auth', async () => {
+  const request = new Request('https://worker.example/storage/read?id=ref1', { method: 'GET' });
+  const response = new Response('public payload');
+
+  const result = await dispatchAnonymousRoute({
+    path: '/storage/read',
+    request,
+    anonymousContext: {
+      ...createAnonymousContext(),
+      env: { CE_STORAGE_R2: 'binding' },
+    },
+    deps: {
+      storageRoute: async (value) => {
+        assert.equal(value.path, '/storage/read');
+        assert.equal(value.method, 'GET');
+        assert.equal(value.request, request);
+        assert.equal(value.slug, 'session-a');
+        assert.equal(value.uploaderAddress, '');
+        assert.deepEqual(value.env, { CE_STORAGE_R2: 'binding' });
+        return response;
+      },
+      json: () => null,
+    },
+  });
+
+  assert.equal(result, response);
+});
+
 test('dispatchAnonymousRoute preserves transcribe parse error passthrough', async () => {
   let accessCalled = false;
 

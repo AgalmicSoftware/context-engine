@@ -51,6 +51,7 @@ export const resolveWorkerRouteRuntimeInput = ({
     normalizeSecretValue: deps?.normalizeSecretValue,
     putSessionSecrets: deps?.putSessionSecrets,
     dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
+    storageRoute: deps?.storageRoute,
     readAiRequestPayload: deps?.readAiRequestPayload,
     validateAnonymousAiRequest: deps?.validateAnonymousAiRequest,
     dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,

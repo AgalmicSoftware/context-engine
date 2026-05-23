@@ -19,6 +19,7 @@ export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
 });
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
@@ -39,6 +40,13 @@ const trim = (value: unknown): string => (typeof value === 'string' ? value : va
 const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
 export const normalizeSessionStoragePayloadAccessMode = (value: unknown): string => {
   const normalized = trim(value).toLowerCase();
+  if (
+    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    normalized === 'public' ||
+    normalized === 'public-read'
+  ) {
+    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
   if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   }
@@ -50,13 +58,16 @@ export const buildSessionStoragePayloadAccessControl = (
 ): AnyRecord => {
   const normalizedMode = normalizeSessionStoragePayloadAccessMode(mode);
   const litEncrypted = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  const publicRead = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   return {
     mode: normalizedMode,
-    enforcement: litEncrypted ? 'lit_access_control_conditions' : 'session_worker_sbt_gate',
+    enforcement: litEncrypted
+      ? 'lit_access_control_conditions'
+      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : 'Worker-enforced SBT access control',
+      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
     resources: { ...SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES },
   };
 };
@@ -159,7 +170,9 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       ...normalized.sbtGatedAccess,
       litRequired: payloadAccessControl.litRequired
         ? 'required_for_cloudflare_payload_encryption'
-        : 'not_required_worker_enforced',
+        : (payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
+          ? 'not_required_public_read'
+          : 'not_required_worker_enforced'),
     };
     normalized.cloudflare = {
       primitives: SESSION_STORAGE_CLOUDFLARE_PRIMITIVES,
