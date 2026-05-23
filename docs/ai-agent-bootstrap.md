@@ -31,8 +31,8 @@ It does two things:
   - `workers/agentBridgeWorker/agentApiCatalog.mjs`
   - `workers/agentBridgeWorker/telegramCommands.mjs`
   - `workers/agentBridgeWorker/telegramMiniApp.mjs`
-  - commands: `/actions`, `/create_agent`, `/settings`, `/join`, `/questions`, `/q`, `/attachments`, `/me`
-  - Mini App APIs: `GET /telegram/mini-app/api/state`, `POST /telegram/mini-app/api/draft`, `POST /telegram/mini-app/api/settings`
+  - commands: `/actions`, `/create_agent`, `/settings`, `/join`, `/questions`, `/q`, `/results consensus`, `/results group`, `/attachments`, `/me`
+  - Mini App APIs: `GET /telegram/mini-app/api/state`, `POST /telegram/mini-app/api/draft`, `POST /telegram/mini-app/api/clear-drafts`, `POST /telegram/mini-app/api/transcribe`, `POST /telegram/mini-app/api/settings`
   - canonical boundary: cataloged `/api/agent/*` request envelopes; no secrets or private inputs in callback data, deep links, logs, or group messages
 - Local Claude Code companion:
   - `contextEngine-cc/README.md`

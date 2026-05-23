@@ -14,12 +14,20 @@ export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
 });
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
 
 const normalizePayloadAccessMode = (value) => {
   const normalized = toStr(value).trim().toLowerCase();
+  if (
+    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    normalized === 'public' ||
+    normalized === 'public-read'
+  ) {
+    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
   if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   }
@@ -90,4 +98,9 @@ export const usesCloudflareSessionStorage = (sessionConfig = null, opts = {}) =>
 export const usesWorkerSbtGateCloudflareStorage = (sessionConfig = null, opts = {}) => (
   usesCloudflareSessionStorage(sessionConfig, opts) &&
   normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
+);
+
+export const usesPublicReadCloudflareStorage = (sessionConfig = null, opts = {}) => (
+  usesCloudflareSessionStorage(sessionConfig, opts) &&
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
 );

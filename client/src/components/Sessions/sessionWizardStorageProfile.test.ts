@@ -85,4 +85,18 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.sbtGatedAccess.litRequired).toBe('required_for_cloudflare_payload_encryption');
     expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
   });
+
+  test('models public_read Cloudflare payload access without Lit or SBT-gated reads', () => {
+    const profile = normalizeSessionStorageProfileConfig({
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'public_read' },
+    });
+
+    expect(profile.payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+    expect(profile.payloadAccessControl.enforcement).toBe('session_worker_public_read');
+    expect(profile.payloadAccessControl.litRequired).toBe(false);
+    expect(profile.payloadAccessControl.label).toBe('Public-read Cloudflare payloads');
+    expect(profile.sbtGatedAccess.litRequired).toBe('not_required_public_read');
+    expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+  });
 });

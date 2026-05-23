@@ -16,6 +16,7 @@ const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(
 const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
 const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 const PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
@@ -72,6 +73,24 @@ const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: ge
 const buildObjectKey = ({ slug, id }) => `sessions/${safeSlugPart(slug)}/storage/${id}`;
 const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:${id}`;
 const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:`;
+const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
+const readKvPayloadEnvelope = async ({ index, slug, id }) => {
+  if (!index || typeof index.get !== 'function') return null;
+  try {
+    const envelope = JSON.parse(await index.get(buildPayloadKey({ slug, id })) || 'null');
+    return envelope && isObj(envelope?.metadata) ? envelope : null;
+  } catch {
+    return null;
+  }
+};
+const base64urlToBytes = (value) => {
+  const text = trim(value);
+  if (!text) return new Uint8Array();
+  const base64 = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(base64, 'base64'));
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
 
 const normalizeTagsForMetadata = (tagsInput) => {
   let tags = tagsInput;
@@ -167,6 +186,9 @@ const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncr
 
 const normalizePayloadAccessMode = (value) => {
   const normalized = trim(value).toLowerCase();
+  if (normalized === PAYLOAD_ACCESS_MODES.PUBLIC_READ || normalized === 'public' || normalized === 'public-read') {
+    return PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
   if (normalized === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) return PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   return PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
 };
@@ -251,6 +273,7 @@ const authorizeCloudflareStorageAccess = async ({
   deps,
 }) => {
   const access = resolvePayloadAccessControl(config);
+  if (access.mode === PAYLOAD_ACCESS_MODES.PUBLIC_READ) return { ok: true, mode: access.mode };
   if (access.mode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) return { ok: true, mode: access.mode };
   const address = trim(requesterAddress);
   if (!address) {
@@ -332,7 +355,10 @@ const handleArweaveStorageUpload = async ({ request, config, slug, uploaderAddre
 
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payload, baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
-  if (!r2 || typeof r2.put !== 'function') {
+  const index = getStorageIndexBinding(env);
+  const canWriteR2 = !!r2 && typeof r2.put === 'function';
+  const canWriteKvPayload = !!index && typeof index.put === 'function';
+  if (!canWriteR2 && !canWriteKvPayload) {
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
   const access = await authorizeCloudflareStorageAccess({
@@ -361,6 +387,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
   const createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
   const objectKey = buildObjectKey({ slug, id });
   const resource = trim(payload.resource) || 'docsContext';
+  const storageLayer = canWriteR2 ? 'r2' : 'kv';
   const metadata = {
     id,
     backend: STORAGE_BACKENDS.CLOUDFLARE,
@@ -372,6 +399,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     size: payload.bytes?.length || 0,
     createdAt,
     payloadAccessMode: payloadAccess.mode,
+    storageLayer,
   };
   assertNoCloudflarePrivateMaterial({
     id,
@@ -383,17 +411,23 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     payloadAccessMode: payloadAccess.mode,
   });
 
-  await r2.put(objectKey, payload.bytes, {
-    httpMetadata: { contentType: metadata.contentType },
-    customMetadata: {
-      id,
-      resource,
-      encrypted: metadata.encrypted ? 'true' : 'false',
-      payloadAccessMode: payloadAccess.mode,
-    },
-  });
+  if (canWriteR2) {
+    await r2.put(objectKey, payload.bytes, {
+      httpMetadata: { contentType: metadata.contentType },
+      customMetadata: {
+        id,
+        resource,
+        encrypted: metadata.encrypted ? 'true' : 'false',
+        payloadAccessMode: payloadAccess.mode,
+      },
+    });
+  } else {
+    await index.put(buildPayloadKey({ slug, id }), JSON.stringify({
+      metadata,
+      payloadBase64url: bytesToBase64url(payload.bytes || new Uint8Array()),
+    }));
+  }
 
-  const index = getStorageIndexBinding(env);
   if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), JSON.stringify(metadata));
   }
@@ -422,12 +456,41 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   const id = await readRequestId({ request, url });
   if (!isSafeCloudflareStorageRefId(id)) return responseJson(deps, { error: 'Invalid storage id.' }, 400, baseHeaders);
   const r2 = getStorageR2Binding(env);
-  if (!r2 || typeof r2.get !== 'function') {
+  const index = getStorageIndexBinding(env);
+  const canReadR2 = !!r2 && typeof r2.get === 'function';
+  const canReadKvPayload = !!index && typeof index.get === 'function';
+  if (!canReadR2 && !canReadKvPayload) {
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
-  const object = await r2.get(buildObjectKey({ slug, id }));
-  if (!object) return responseJson(deps, { error: 'Storage object not found.' }, 404, baseHeaders);
-  const resource = trim(object?.customMetadata?.resource) || 'docsContext';
+  let object = null;
+  let metadata = null;
+  let body = null;
+  if (canReadR2) {
+    object = await r2.get(buildObjectKey({ slug, id }));
+    if (object) {
+      metadata = {
+        resource: trim(object?.customMetadata?.resource) || 'docsContext',
+        contentType: trim(object?.httpMetadata?.contentType || object?.customMetadata?.contentType) || 'application/octet-stream',
+      };
+      body = object?.body || object;
+      if (typeof object?.arrayBuffer === 'function') {
+        body = await object.arrayBuffer();
+      } else if (typeof object?.text === 'function') {
+        body = await object.text();
+      }
+    }
+  }
+  if (!object && canReadKvPayload) {
+    const envelope = await readKvPayloadEnvelope({ index, slug, id });
+    if (!envelope || !isObj(envelope?.metadata)) {
+      return responseJson(deps, { error: 'Storage object not found.' }, 404, baseHeaders);
+    }
+    metadata = envelope.metadata;
+    body = base64urlToBytes(envelope.payloadBase64url);
+  } else if (!object && !canReadKvPayload) {
+    return responseJson(deps, { error: 'Storage object not found.' }, 404, baseHeaders);
+  }
+  const resource = trim(metadata?.resource) || 'docsContext';
   const access = await authorizeCloudflareStorageAccess({
     config,
     slug,
@@ -437,13 +500,7 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
     deps,
   });
   if (!access.ok) return access.response;
-  const contentType = trim(object?.httpMetadata?.contentType || object?.customMetadata?.contentType) || 'application/octet-stream';
-  let body = object?.body || object;
-  if (typeof object?.arrayBuffer === 'function') {
-    body = await object.arrayBuffer();
-  } else if (typeof object?.text === 'function') {
-    body = await object.text();
-  }
+  const contentType = trim(metadata?.contentType) || 'application/octet-stream';
   return new Response(body, {
     status: 200,
     headers: {
