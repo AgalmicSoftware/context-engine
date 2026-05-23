@@ -126,7 +126,14 @@ Core Telegram commands:
   `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` or the session policy fields
   `responseExportAllowedAddresses` / `telegramResponseExportAllowedAddresses`.
   Allowlisted accounts also see an `export_all` inline button in private bot
-  surfaces such as `/start` and `/me`.
+  surfaces such as `/start` and `/me`. If the selected session has Telegram
+  submit records but the session worker cannot list Cloudflare payload bytes
+  because it resolves to a non-Cloudflare tenant, the export still sends a
+  partial zip with `responses.json` synthesized from the Cloudflare KV submit
+  records, `telegram-submit-records.json`, and a manifest entry for the
+  storage-list error. Each synthesized response keeps its submit status,
+  answer, question id, account/storage refs, and timestamp so failed and
+  direct-submitted attempts are distinguishable.
 - `/export_access [session]`, `/export_allow 0xAddress [session]`, and
   `/export_revoke 0xAddress [session]` are private-chat only admin commands for
   response export access. Only addresses configured in the Worker env or session
@@ -329,13 +336,20 @@ sessions are not hidden behind the short-lived Worker cache; capped registry
 lists use the newest session window. `/sessions` displays only
 Telegram-enabled sessions (`telegramBridgeEnabled=true`), hides `e2e`-named
 smoke-test sessions as a temporary cleanup heuristic, and paginates tall
-inline-keyboard lists with `Load Next`. Group
-`/join <session>` also persists the chat's selected session in
+inline-keyboard lists with `Load Next`. Group session selection through
+`/sessions` or `/join <session>` persists the chat's selected session in
 `AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, `/results`, and
-`/attachments` use that session without repeating the slug. Private
-`/join <session>` persists the selected session for that Telegram user as well,
-so private `/questions`, `/q <number>`, and `/results` use the same session
-unless a command supplies an explicit slug.
+`/attachments` use that session without repeating the slug. It also stores that
+selected session for the Telegram user who made the selection, so their private
+bot and Mini App flows start from the same session. Private `/join <session>`
+persists the selected session for that Telegram user as well, so private
+`/questions`, `/q <number>`, and `/results` use the same session unless a
+command supplies an explicit slug. When a participant answers a posed group
+question before opening a private chat, the worker derives or reuses their
+managed Telegram demo account on demand and binds that question's session to
+the user. If a session cannot direct-submit because policy, gate, faucet, or
+worker auth is missing, the worker still stores the draft/submit request and
+routes follow-up setup through private chat or the Mini App.
 `/docs` remains a compatibility alias.
 
 Question lists default to live mode. Bot messages show at most five question

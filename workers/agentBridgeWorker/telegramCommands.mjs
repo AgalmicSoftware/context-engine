@@ -699,13 +699,13 @@ function privateSessionBindingKey(normalized = {}) {
   return telegramUserId ? `${PRIVATE_SESSION_KV_PREFIX}${telegramUserId}` : '';
 }
 
-async function persistPrivateSessionBinding({
+async function persistTelegramUserSessionBinding({
   env = {},
   normalized = {},
   session = {},
   createdAt = null,
+  source = 'private_chat',
 } = {}) {
-  if (!normalized.chat?.isPrivate) return { ok: false, reason: 'not_private_chat' };
   const key = privateSessionBindingKey(normalized);
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
@@ -716,13 +716,34 @@ async function persistPrivateSessionBinding({
     sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
     sessionName: sessionLabel(session),
     selectedAt: createdAt || nowIso(),
+    source: safeString(source) || 'private_chat',
   };
+  if (!normalized.chat?.isPrivate) {
+    record.sourceChatId = safeString(normalized.chat?.chatId);
+  }
   if (!record.sessionSlug) return { ok: false, reason: 'session_slug_missing' };
-  assertNoSecretShape(record, 'Telegram private session bindings must not serialize secrets.');
+  if (!record.telegramUserId) return { ok: false, reason: 'telegram_user_missing' };
+  assertNoSecretShape(record, 'Telegram user session bindings must not serialize secrets.');
   await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
   });
   return { ok: true, sessionSlug: record.sessionSlug };
+}
+
+async function persistPrivateSessionBinding({
+  env = {},
+  normalized = {},
+  session = {},
+  createdAt = null,
+} = {}) {
+  if (!normalized.chat?.isPrivate) return { ok: false, reason: 'not_private_chat' };
+  return persistTelegramUserSessionBinding({
+    env,
+    normalized,
+    session,
+    createdAt,
+    source: 'private_chat',
+  });
 }
 
 async function readPrivateSessionBinding(env = {}, normalized = {}) {
@@ -1748,12 +1769,23 @@ async function buildJoinResponse({
   }
 
   const group = normalizeTelegramGroup(normalized);
-  await persistGroupSessionBinding({
+  const groupSessionBinding = await persistGroupSessionBinding({
     env,
     normalized,
     session: resolved.session,
     createdAt,
   });
+  const userSessionBinding = await persistTelegramUserSessionBinding({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+    source: 'group_session_select',
+  }).catch((error) => ({
+    ok: false,
+    reason: 'user_session_binding_failed',
+    error: safeString(error?.message || error),
+  }));
   const questionPrefetch = await prefetchQuestionsForJoinedSession({
     env,
     sessionSlug: resolved.session.sessionSlug,
@@ -1818,7 +1850,12 @@ async function buildJoinResponse({
     screen: state.screen,
     command,
     normalized,
-    extra: { sessionSlug: resolved.session.sessionSlug, questionPrefetch },
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      groupSessionBinding,
+      userSessionBinding,
+      questionPrefetch,
+    },
   });
 }
 
@@ -2316,7 +2353,9 @@ async function buildExportAllResponse({
     chatId: normalized.chat.chatId,
     text: [
       `Response export for ${resolved.session.sessionSlug}.`,
-      `Payloads: ${exported.exportedPayloadCount}. Submit records: ${exported.submitRecordCount}.`,
+      `Responses: ${exported.exportedPayloadCount}. Submit records: ${exported.submitRecordCount}.`,
+      exported.synthesizedFromSubmitRecords ? 'Responses were exported from Telegram submit records.' : '',
+      exported.partial ? `Storage payloads unavailable: ${exported.storageUnavailableReason || 'storage_list_failed'}.` : '',
       exported.readErrorCount ? `Read errors: ${exported.readErrorCount}.` : '',
     ].filter(Boolean).join('\n'),
     document: exported.document,
@@ -2328,6 +2367,9 @@ async function buildExportAllResponse({
       accountAddress: exported.accountAddress,
       exportedPayloadCount: exported.exportedPayloadCount,
       submitRecordCount: exported.submitRecordCount,
+      partial: exported.partial === true,
+      synthesizedFromSubmitRecords: exported.synthesizedFromSubmitRecords === true,
+      storageUnavailableReason: exported.storageUnavailableReason || '',
       readErrorCount: exported.readErrorCount,
     },
   });
@@ -2769,6 +2811,23 @@ async function buildAnswerDraftResponse({
     controlType,
     createdAt,
   });
+  const userSessionBinding = saved.ok
+    ? await (async () => {
+      const policy = await loadSessionPolicy(env);
+      const resolved = resolveSessionInvocation(policy, sessionSlug);
+      return persistTelegramUserSessionBinding({
+        env,
+        normalized,
+        session: resolved.ok ? resolved.session : { sessionSlug },
+        createdAt,
+        source: normalized.chat?.isPrivate ? 'private_answer' : 'group_answer',
+      });
+    })().catch((error) => ({
+      ok: false,
+      reason: 'user_session_binding_failed',
+      error: safeString(error?.message || error),
+    }))
+    : null;
   const submitted = saved.ok
     ? await persistTelegramSubmitRequest({
       env,
@@ -2798,6 +2857,8 @@ async function buildAnswerDraftResponse({
       sessionSlug,
       questionId: selectedQuestionId,
       answerDraftSaved: saved.ok === true,
+      userSessionBound: userSessionBinding?.ok === true,
+      userSessionBinding,
       submitRequestCreated: submitted?.ok === true,
       submitRequest: submitted?.ok ? submitted : null,
       onChainSubmitted: submitted?.status === 'direct_submitted',

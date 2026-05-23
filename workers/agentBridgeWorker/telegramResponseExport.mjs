@@ -379,6 +379,46 @@ function storageIdFromItem(item = {}) {
   return safeString(item.storageRef?.id || item.id || item.storageId);
 }
 
+function responsePayloadsFromSubmitRecords(submitRecords = []) {
+  return (Array.isArray(submitRecords) ? submitRecords : []).map((record, index) => {
+    const storageRef = record.onChain?.storageRef || (
+      record.onChain?.storageId
+        ? { backend: 'cloudflare', id: record.onChain.storageId, resource: 'responses' }
+        : { backend: 'telegram-submit-record', id: record.requestId || `submit-record-${index + 1}`, resource: 'responses' }
+    );
+    return {
+      storageRef,
+      metadata: {
+        source: 'telegram-submit-record',
+        status: record.status,
+        action: record.action,
+        createdAt: record.createdAt,
+      },
+      submitRecord: record,
+      payload: {
+        type: 'telegram_response_record',
+        version: 1,
+        source: 'telegram-submit-record',
+        requestId: record.requestId,
+        idempotencyKey: record.idempotencyKey,
+        status: record.status,
+        action: record.action,
+        lane: record.lane,
+        telegramUserId: record.telegramUserId,
+        chatId: record.chatId,
+        sessionSlug: record.sessionSlug,
+        questionId: record.questionId,
+        questionIdShort: record.questionIdShort,
+        answer: record.answer,
+        onChain: record.onChain,
+        createdAt: record.createdAt,
+      },
+      contentType: 'application/json',
+      synthesizedFromSubmitRecord: true,
+    };
+  });
+}
+
 function safeFilePart(value = '') {
   return safeString(value).replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80) || 'item';
 }
@@ -441,26 +481,112 @@ export async function buildTelegramResponseExportArchive({
     };
   }
 
+  const submitRecords = await listTelegramSubmitRecordsForSession(env, session.sessionSlug);
+  const buildArchive = ({
+    storageItems = [],
+    responsePayloads = [],
+    readErrors = [],
+    storageListError = null,
+    partial = false,
+  } = {}) => {
+    const synthesizedPayloads = responsePayloads.length
+      ? []
+      : responsePayloadsFromSubmitRecords(submitRecords);
+    const exportedPayloads = responsePayloads.length ? responsePayloads : synthesizedPayloads;
+    const manifest = {
+      type: 'telegram_response_export',
+      version: 1,
+      exportedAt: safeString(createdAt),
+      sessionSlug: safeString(session.sessionSlug),
+      sessionName: safeString(session.sessionName),
+      exporterAccountAddress: authorization.accountAddress,
+      storageItemCount: storageItems.length,
+      exportedPayloadCount: exportedPayloads.length,
+      submitRecordCount: submitRecords.length,
+      partial: partial === true,
+      synthesizedFromSubmitRecords: synthesizedPayloads.length > 0,
+      storageListError,
+      readErrors,
+    };
+    const files = [
+      { path: 'manifest.json', content: jsonText(manifest) },
+      { path: 'storage-items.json', content: jsonText(storageItems) },
+      { path: 'telegram-submit-records.json', content: jsonText(submitRecords) },
+      {
+        path: 'responses.json',
+        content: jsonText(exportedPayloads.map(({ rawBytes, ...entry }) => entry)),
+      },
+    ];
+    if (storageListError) {
+      files.push({ path: 'storage-list-error.json', content: jsonText(storageListError) });
+    }
+    exportedPayloads.forEach((entry, index) => {
+      const id = storageIdFromItem(entry);
+      const fileBase = `${String(index + 1).padStart(3, '0')}-${safeFilePart(id || entry.storageRef?.id)}`;
+      const isJson = entry.payload && typeof entry.payload === 'object';
+      files.push({
+        path: `responses/${fileBase}${isJson ? '.json' : '.txt'}`,
+        content: isJson ? jsonText(entry.payload) : (entry.payload || new TextDecoder().decode(entry.rawBytes)),
+      });
+    });
+
+    const bytes = buildZipArchive(files);
+    return {
+      ok: true,
+      partial: partial === true,
+      storageUnavailableReason: safeString(storageListError?.reason),
+      accountAddress: authorization.accountAddress,
+      sessionSlug: safeString(session.sessionSlug),
+      exportedPayloadCount: exportedPayloads.length,
+      submitRecordCount: submitRecords.length,
+      synthesizedFromSubmitRecords: synthesizedPayloads.length > 0,
+      readErrorCount: readErrors.length,
+      document: {
+        bytes,
+        filename: `context-engine-${safeFilePart(session.sessionSlug)}-responses.zip`,
+        contentType: 'application/zip',
+      },
+    };
+  };
+  const fallbackArchive = (reason = 'storage_list_failed', extra = {}) => {
+    const normalizedReason = safeString(reason) || 'storage_list_failed';
+    if (!submitRecords.length) {
+      return {
+        ok: false,
+        reason: normalizedReason,
+        accountAddress: authorization.accountAddress,
+      };
+    }
+    return buildArchive({
+      partial: true,
+      storageListError: {
+        reason: normalizedReason,
+        ...extra,
+      },
+    });
+  };
+
   const workerUrl = resolveSessionWorkerUrl(env, session);
   if (!workerUrl) {
-    return { ok: false, reason: 'session_worker_url_missing', accountAddress: authorization.accountAddress };
+    return fallbackArchive('session_worker_url_missing');
   }
   const principal = normalizeTelegramPrincipal(normalized);
-  const auth = await authenticateSessionWorker({
-    env,
-    session,
-    account: authorization.account,
-    principal,
-    workerUrl,
-    fetchImpl,
-    now: createdAt ? new Date(createdAt) : new Date(),
-  });
+  let auth;
+  try {
+    auth = await authenticateSessionWorker({
+      env,
+      session,
+      account: authorization.account,
+      principal,
+      workerUrl,
+      fetchImpl,
+      now: createdAt ? new Date(createdAt) : new Date(),
+    });
+  } catch (error) {
+    return fallbackArchive(safeString(error?.message || error) || 'worker_auth_failed');
+  }
   if (!auth.ok || !auth.token) {
-    return {
-      ok: false,
-      reason: auth.reason || 'worker_auth_failed',
-      accountAddress: authorization.accountAddress,
-    };
+    return fallbackArchive(auth.reason || 'worker_auth_failed');
   }
 
   const listResponse = await fetchImpl(`${auth.workerUrl}/storage/list?resource=responses`, {
@@ -469,15 +595,12 @@ export async function buildTelegramResponseExportArchive({
   });
   const listBody = await listResponse.json().catch(() => ({}));
   if (!listResponse?.ok) {
-    return {
-      ok: false,
-      reason: safeString(listBody?.error || listResponse?.status) || 'storage_list_failed',
-      accountAddress: authorization.accountAddress,
-    };
+    return fallbackArchive(safeString(listBody?.error || listResponse?.status) || 'storage_list_failed', {
+      status: listResponse?.status || 0,
+    });
   }
 
   const storageItems = Array.isArray(listBody.items) ? listBody.items : [];
-  const submitRecords = await listTelegramSubmitRecordsForSession(env, session.sessionSlug);
   const submitRecordsByStorageId = new Map();
   submitRecords.forEach((record) => {
     const id = safeString(record.onChain?.storageRef?.id || record.onChain?.storageId);
@@ -510,49 +633,5 @@ export async function buildTelegramResponseExportArchive({
     });
   }
 
-  const manifest = {
-    type: 'telegram_response_export',
-    version: 1,
-    exportedAt: safeString(createdAt),
-    sessionSlug: safeString(session.sessionSlug),
-    sessionName: safeString(session.sessionName),
-    exporterAccountAddress: authorization.accountAddress,
-    storageItemCount: storageItems.length,
-    exportedPayloadCount: responsePayloads.length,
-    submitRecordCount: submitRecords.length,
-    readErrors,
-  };
-  const files = [
-    { path: 'manifest.json', content: jsonText(manifest) },
-    { path: 'storage-items.json', content: jsonText(storageItems) },
-    { path: 'telegram-submit-records.json', content: jsonText(submitRecords) },
-    {
-      path: 'responses.json',
-      content: jsonText(responsePayloads.map(({ rawBytes, ...entry }) => entry)),
-    },
-  ];
-  responsePayloads.forEach((entry, index) => {
-    const id = storageIdFromItem(entry);
-    const fileBase = `${String(index + 1).padStart(3, '0')}-${safeFilePart(id || entry.storageRef?.id)}`;
-    const isJson = entry.payload && typeof entry.payload === 'object';
-    files.push({
-      path: `responses/${fileBase}${isJson ? '.json' : '.txt'}`,
-      content: isJson ? jsonText(entry.payload) : (entry.payload || new TextDecoder().decode(entry.rawBytes)),
-    });
-  });
-
-  const bytes = buildZipArchive(files);
-  return {
-    ok: true,
-    accountAddress: authorization.accountAddress,
-    sessionSlug: safeString(session.sessionSlug),
-    exportedPayloadCount: responsePayloads.length,
-    submitRecordCount: submitRecords.length,
-    readErrorCount: readErrors.length,
-    document: {
-      bytes,
-      filename: `context-engine-${safeFilePart(session.sessionSlug)}-responses.zip`,
-      contentType: 'application/zip',
-    },
-  };
+  return buildArchive({ storageItems, responsePayloads, readErrors });
 }
