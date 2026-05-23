@@ -846,7 +846,7 @@ describe('OnePageSession view gating', () => {
         if (namespace !== 'questionsCache') return {};
         if (slug === 'edge') {
           return {
-            84532: {
+            '84532': {
               questions: {
                 q1: { id: 'q1', prompt: 'Edge prompt', type: 'binary' },
                 qPending: {

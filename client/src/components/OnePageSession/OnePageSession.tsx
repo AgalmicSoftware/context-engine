@@ -34,96 +34,37 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
-import { clearAgentClientLoginEnvelope, readAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
-import {
-  envelopeAllowsSubmit,
-  loadQuestions as loadTelegramQuestions,
-  loadResultsDataset as loadTelegramResultsDataset,
-  submitAnswer as submitTelegramAnswer,
-} from '../../utilities/session/telegramSessionBackend';
-import { isTelegramAgentAuthFailure } from '../../utilities/session/telegramAgentData';
 import {
   buildAggregatorFromLocalCache,
   computeAggregatorDataSignature,
   computeAggregatorQuestionMetadataSignature,
   computeAggregatorSourceSnapshotSignature,
 } from './onePageSessionAggregator';
-import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
-import {
-  buildCurrentSessionConfigRequest,
-  getAgentClientLoginEnvelopeMemoryKey,
-  isOnePageTelegramBackendMode,
-  normalizeOnePageSessionSlug,
-  resolveAgentClientLoginIdentityTarget,
-  resolveCurrentSessionSlugForProps,
-  resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
-  type OnePageSessionPropsLike,
-} from './onePageSessionTelegramController';
-import {
-  buildInitialTelegramState,
-  createOnePageSessionTelegramActions,
-  type OnePageSessionTelegramState,
-} from './onePageSessionTelegramActions';
-import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
-import {
-  buildOnePageSessionCanonicalBaseUrl,
-  buildOnePageSessionRawResultsRoute,
-  resolveOnePageSessionAggregatorCacheScope,
-  resolveOnePageSessionRouteUiState,
-} from './onePageSessionRouteRuntime';
-import {
-  closeStaleSbtGroupEditor,
-  hasCachedCreateSbtForm,
-  hasCachedOnChainSbtGroup,
-  sessionSupportsOnChainSbt,
-  shouldKickoffSbtUniverseScan,
-} from './onePageSessionSbtGroupRuntime';
-import {
-  buildSbtAutoMintCredentialCleanPath,
-  clearUnsupportedSbtAutoMintState,
-  hasSbtAutoMintCredential,
-  initializeSbtAutoMintRuntime,
-  sanitizeSbtAutoMintQueryForStorage,
-} from './onePageSessionAutoMintRuntime';
-import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
-import {
-  workerCanonicalCacheIdentityMatches,
-  withWorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  buildAggregatorFallbackQuestions,
-  getUniqueAggregatorCandidateSlugs,
-  mergeAggregatorResultRows,
-  resolveOnePageSessionSurveySlug,
-  resolveOnePageSessionWorkerCacheIdentity,
-  scopeAggregatorNetworkNodeToQuestionPool,
-  shouldUseBuiltInDemoAggregatorFallback,
-} from './onePageSessionAggregatorCacheRuntime';
+
+const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
+const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
+const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
+const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
+const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
+const CorpusViewer = React.lazy(() => import('../DemoViews/CorpusViewer'));
+const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
+const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
-type OnePageGlobalState = typeof globalThis & {
-  ENABLE_CE_UI_PERF_STATS?: boolean;
-  ENABLE_CE_DEBUG_COUNTERS?: boolean;
-  __CE_DEBUG_COUNTERS__?: boolean;
-  __CE_PERF_COUNTERS__?: Record<string, Record<string, number>>;
-};
-type OnePageSbtCacheEntry = Record<string, unknown> & {
-  burnedAddresses?: unknown[];
-  burnedCountByAddress?: Record<string, unknown>;
-  countsLoaded?: boolean;
-  countsScanCheckpoint?: Record<string, unknown> | null;
-  mintedAddresses?: unknown[];
-  mintedCountByAddress?: Record<string, unknown>;
-  sbtInfo?: Record<string, unknown> & {
-    tokenURI?: unknown;
-  };
-};
-type OnePageSbtNetworkCache = Record<string, unknown> & {
-  sbtList?: Record<string, OnePageSbtCacheEntry>;
-};
-type OnePageSbtCache = Record<string, OnePageSbtNetworkCache>;
-const globalState = globalThis as OnePageGlobalState;
+const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
+const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
+  activeCorpusKey: 'cross_corpus',
+  activeCorpusLabel: 'Cross-Corpus',
+  loadStatus: 'idle',
+  loadButtonLabel: 'Load full corpus',
+  disableLoadButton: false,
+  error: '',
+});
+const globalState: any = globalThis as any;
+const contractScriptsAny: any = contractScripts as any;
+const DebateMapAny: any = DebateMap;
 
 const getErrorMessage = (error: unknown, fallback = 'Unknown error') =>
   error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
@@ -162,9 +103,7 @@ const bumpPerfCounter = (key: string, inc: number = 1) => {
     }
     const scope = globalState.__CE_PERF_COUNTERS__[ONE_PAGE_DEMO_PERF_SCOPE];
     scope[key] = Number(scope[key] || 0) + Number(inc || 0);
-  } catch (e) {
-    void e; /* fallback: perf counter update. */
-  }
+  } catch (e) { void e; /* fallback: perf counter update. */ }
 };
 
 const buildOnePageSessionEmptyFilterState = () => ({
@@ -182,8 +121,64 @@ const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
   return Object.keys(normalized).length > 0 ? normalized : buildOnePageSessionEmptyFilterState();
 };
 
-const serializeOnePageSessionFilterState = (value: unknown = {}) =>
-  serializeFilterState(normalizeOnePageSessionFilterState(value));
+const serializeOnePageSessionFilterState = (value: any = {}) => (
+  serializeFilterState(normalizeOnePageSessionFilterState(value))
+);
+
+const normalizeOnePageSessionSlug = (value: any = '') => {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'general' ? '' : normalized;
+};
+
+const resolveOnePageSessionRouteUiState = (props: any = {}) => {
+  const autoOpenResults = props.routeAutoOpenResults === true;
+  const showQuestions = autoOpenResults || props.routeQuestionsOpen === true;
+  return {
+    showQuestions,
+    autoOpenResults,
+  };
+};
+const buildOnePageSessionPublicRoute = (pathname: any = '') => {
+  const normalizedPath = String(pathname || '').trim();
+  const basePath = readPublicUrlBasePath();
+  if (!normalizedPath) return basePath || '/';
+  return `${basePath}${normalizedPath}` || normalizedPath;
+};
+
+const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
+  try {
+    const slug = resolveEffectiveSlug(props);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.pathname = buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`);
+    nextUrl.searchParams.delete('sessionSlug');
+    nextUrl.searchParams.delete('s');
+    if (slug) {
+      nextUrl.searchParams.set('session', slug);
+    } else {
+      nextUrl.searchParams.delete('session');
+    }
+    return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+  } catch (_) {
+    const slug = resolveEffectiveSlug(props);
+    return `${buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`)}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
+  }
+};
+
+// Group helpers (for cross-group cache lookups)
+
+function hasCachedCreateSbtForm(slug: any = '') {
+  return hasCachedCreateSbtFormCache({
+    sessionSlug: slug,
+    migrateLegacyToSessionKey: true,
+    clearInvalid: true,
+  } as any);
+}
+
+export {
+  buildAggregatorFromLocalCache,
+  computeAggregatorSourceSnapshotSignature,
+  hasCachedCreateSbtForm,
+};
 
 export { buildAggregatorFromLocalCache, computeAggregatorSourceSnapshotSignature, hasCachedCreateSbtForm };
 
@@ -856,98 +851,25 @@ class OnePageSession extends Component<any, any> {
           let sawCandidateCache = false;
           let sawNetworkCache = false;
 
-          for (const slug of candidateSlugs) {
-            let qCache = peekCacheSync('questionsCache', slug) || {};
-            if (!qCache || typeof qCache !== 'object') qCache = {};
-            if (Object.keys(qCache).length === 0) {
-              sourceSigParts.push(`${slug || '__general__'}:empty-cache`);
-              continue;
-            }
-            sawCandidateCache = true;
-
-            const networkNode = qCache[netIdStr];
-            if (!networkNode) {
-              sourceSigParts.push(`${slug || '__general__'}:missing-net`);
-              continue;
-            }
-            if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
-              sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
-              continue;
-            }
-            sawNetworkCache = true;
-
-            const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-            const networkNodeForAggregation = useBuiltInDemoFallback
-              ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
-              : networkNode;
-
-            sourceSigParts.push(
-              [
-                slug || '__general__',
-                computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
-                computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
-              ].join(':'),
-            );
-
-            const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
-              parseMemo: this._aggregatorResponseParseMemo,
-              sessionSlug: slug,
-            });
-            mergeAggregatorResultRows(aggregateMap, map);
-            if (dirty) {
-              if (workerCacheIdentity) {
-                qCache[netIdStr] = withWorkerCanonicalCacheIdentity(
-                  networkNode,
-                  workerCacheIdentity,
-                ) as typeof networkNode;
-              }
-              void writeCache('questionsCache', slug, qCache);
-            }
-          }
-
-          if (!sawCandidateCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|empty-cache`,
-            );
-            return;
-          }
-
-          if (!sawNetworkCache) {
-            applyAggregatorData(
-              {},
-              '0:0:0',
-              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-                workerCacheIdentity?.key || ''
-              }|${sourceSigParts.join('|') || 'missing-net'}`,
-            );
-            return;
-          }
-
-          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
-            workerCacheIdentity?.key || ''
-          }|${sourceSigParts.join('|')}`;
-          if (sourceSigKey === this._aggregatorSourceSigKey) {
-            bumpPerfCounter('aggregatorSourceSkips');
-            return;
-          }
-          applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
-        } catch (err) {
-          demoLog.error('Error building aggregator in OnePageSession:', err);
-          applyAggregatorData(
-            {},
-            '0:0:0',
-            `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|error`,
-          );
+        const sourceSig = [
+          computeAggregatorSourceSnapshotSignature(qCache[netIdStr]?.questionResponses || {}),
+          computeAggregatorQuestionMetadataSignature(qCache[netIdStr]?.questions || {}),
+        ].join('|');
+        const sourceSigKey = `${slug}|${netIdStr}|${sourceSig}`;
+        if (sourceSigKey === this._aggregatorSourceSigKey) {
+          bumpPerfCounter('aggregatorSourceSkips');
+          return;
         }
-      } else {
-        const netIdStr = cacheScope;
-        applyAggregatorData(
-          {},
-          '0:0:0',
-          `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|not-ready`,
-        );
+
+        const { map, dirty, signature } = buildAggregatorFromLocalCache(qCache[netIdStr], {
+          parseMemo: this._aggregatorResponseParseMemo,
+          sessionSlug: slug,
+        });
+        if (dirty) { void writeCache('questionsCache', slug, qCache); }
+        applyAggregatorData(map, signature, sourceSigKey);
+      } catch (err) {
+        demoLog.error("Error building aggregator in OnePageSession:", err);
+        applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|error`);
       }
     });
 

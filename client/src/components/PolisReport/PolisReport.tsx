@@ -34,79 +34,19 @@ import {
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
-} from '../SurveyTool/surveyToolUtils';
-import type {
-  BooleanMap,
-  EmbeddingChoice,
-  NumberMap,
-  PolisAnalysisCacheByKey,
-  PolisAnalysisErrorsByKey,
-  PolisCommentStat,
-  PolisPoint,
-  PolisRepQuestionsMap,
-  PolisReportProps,
-  PolisSbtSelection,
-  PolisStats,
-  PolisVote,
-  PrecomputedDemoClusterState,
-  RatingMatrix,
-  RatingMatrixBuildResult,
-  StringMap,
-  UnknownRecord,
-} from './polisReportRuntime';
+} from '../SurveyTool/surveyToolUtils.js';
+import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
+
+/**************************************************************
+ * Helper: tiny identicon ("blockie") generator with no deps
+ * Produces a symmetric 8x8 grid identicon as a data URL.
+ **************************************************************/
+import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import {
-  DEFAULT_EXPLORATORY_CLUSTER_COUNT,
-  DEFAULT_POLIS_DEMO_DATA,
-  OPINION_GROUPS_TOOLTIP_TEXT,
-  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
-  PolisBoxPlot,
-  REPORT_DEFAULT_EMBEDDING_LABEL,
-  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
-  analyzeClusterOpinionsTyped,
-  applyFilterStateToAggregator,
-  buildClusterAnalysisDataKey,
-  buildPolisDemoDatasetsBySlug,
-  buildPolisReportPdfFilename,
-  buildPrecomputedDemoClusterState,
-  buildRatingMatrixFromDemo,
-  buildRatingMatrixFromRealData,
-  clusterUMAPPointsKmeansTyped,
-  d3Report,
-  doUMAPTyped,
-  formatBlockchainNetworkLabel,
-  formatSuperscriptNumber,
-  getErrorMessage,
-  getPolisDemoDatasetForSlug as getPolisDemoDatasetForSlugRuntime,
-  getPolisHistoricalParticipantAvatar,
-  getPolisHistoricalParticipantBlockie,
-  getRenderableParticipantList,
-  getUTCDataTimestamp,
-  resolveExploratoryClusterCount,
-  resolveJsPdfConstructor,
-  shouldAutoEnablePolisDemoData,
-} from './polisReportRuntime';
-export {
-  OPINION_GROUPS_TOOLTIP_TEXT,
-  PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
-  PolisBoxPlot,
-  PolisQuestionHoverCard,
-  REPORT_DEFAULT_EMBEDDING_LABEL,
-  REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
-  applyFilterStateToAggregator,
-  buildClusterAnalysisDataKey,
-  buildPolisReportPdfFilename,
-  buildPrecomputedDemoClusterState,
-  buildRatingMatrixFromDemo,
-  buildRatingMatrixFromRealData,
-  formatBlockchainNetworkLabel,
-  getPolisHistoricalParticipantAvatar,
-  getRenderableParticipantList,
-  normalizePolisBinaryVote,
-  resolveExploratoryClusterCount,
-  resolveJsPdfConstructor,
-  resolvePrecomputedClusterDifference,
-  shouldAutoEnablePolisDemoData,
-} from './polisReportRuntime';
+  getHistoricalFigureAvatarOrBlockie,
+  getHistoricalFigureBlockie,
+} from 'utilities/ui/historicalFigureAvatars.js';
+import { createLogger } from 'utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
 
@@ -390,36 +330,8 @@ function resolvePolisDemoDatasetsBySlug(options: { datasetsBySlug?: unknown; dem
   return buildPolisDemoDatasetsBySlug(options?.demoDataBySlug);
 }
 
-const dedupePolisReadSlugs = (values: unknown[] = []) => {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  (Array.isArray(values) ? values : []).forEach((value) => {
-    const normalized = normalizeSessionSlug(value);
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  return out;
-};
-
 const resolvePolisReadSlugs = (baseSlug: unknown = '') => {
   const normalizedBaseSlug = normalizeSessionSlug(baseSlug);
-  let isSessionRoute = false;
-  try {
-    const pathname = (typeof window !== 'undefined' && window.location?.pathname) || '';
-    isSessionRoute = pathname.startsWith('/session/');
-  } catch (e) { void e; /* fallback: route scope detection. */ }
-  if (!isSessionRoute) {
-    return [normalizedBaseSlug];
-  }
-
-  const scopeMode = String(readSessionScanScope() || '').trim().toLowerCase();
-  if (scopeMode === 'list') {
-    return dedupePolisReadSlugs([normalizedBaseSlug, ...readSessionScanSlugs()]);
-  }
-  if (scopeMode === 'all') {
-    return dedupePolisReadSlugs([normalizedBaseSlug, ...getAllSessionSlugs()]);
-  }
   return [normalizedBaseSlug];
 };
 

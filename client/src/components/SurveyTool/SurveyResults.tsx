@@ -126,6 +126,14 @@ type SurveyResultsScopeContextInput = {
   state?: SurveyResultsRecord;
   viewMode?: unknown;
 };
+type SurveyResultsQuestionRecord = SurveyResultsRecord & {
+  __ceQuestionMetadataPending?: unknown;
+  id?: unknown;
+  sessionSlug?: unknown;
+  sessionSlugExplicit?: unknown;
+};
+type SurveyResultsQuestionResponsesByResponder = Record<string, unknown>;
+type SurveyResultsQuestionResponsesByQuestion = Record<string, SurveyResultsQuestionResponsesByResponder>;
 type SurveyResultsSummaryAnswerField = SurveyResultsRecord & {
   encrypted?: unknown;
   value?: unknown;
@@ -428,7 +436,404 @@ const scheduleMicrotask = (cb: unknown): void => {
   Promise.resolve().then(task);
 };
 
-type SurveyResultsInstanceFields = {
+/**
+* Helper that merges aggregator keys in lowercase, ensuring zero-response question IDs are included.
+*/
+function unifyAggregatorWithAllQuestionIDs(
+  baseAggregator: Record<string, unknown[]> = {},
+  allKnownQuestionIds: string[] = []
+): Record<string, unknown[]> {
+  const loweredMap: Record<string, unknown[]> = {};
+  for (const key of Object.keys(baseAggregator)) {
+    const lowerKey = key.toLowerCase();
+    if (!loweredMap[lowerKey]) {
+      loweredMap[lowerKey] = baseAggregator[key];
+    } else {
+      loweredMap[lowerKey] = loweredMap[lowerKey].concat(baseAggregator[key]);
+    }
+  }
+  for (const qId of allKnownQuestionIds) {
+    const qLower = qId.toLowerCase();
+    if (!loweredMap[qLower]) {
+      loweredMap[qLower] = [];
+    }
+  }
+  return loweredMap;
+}
+
+/** Prefix-preserver used by SurveySelector */
+const readPathSearch = (path: unknown = ''): string => {
+  const value = String(path || '');
+  const queryIndex = value.indexOf('?');
+  return queryIndex >= 0 ? value.slice(queryIndex) : '';
+};
+
+const hasExplicitSessionQueryPinInPath = (path: unknown = ''): boolean => {
+  const search = readPathSearch(path);
+  return (
+    parseQuestionSessionSlugFromSearch(search) !== null ||
+    parseQuestionSessionIdFromSearch(search) !== null
+  );
+};
+
+function applyExistingGroupPrefix(newPath: string) {
+  try {
+    if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
+    const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
+    const pathOnly = p.split('?')[0].split('#')[0];
+    const segs = pathOnly.split('/').filter(Boolean);
+    const RESERVED: Set<string> = new Set(['questions','question','survey','surveys']);
+    if (segs.length >= 2 && !RESERVED.has(segs[0])) {
+      const base = `/${segs[0]}/${segs[1]}`;
+      if (!newPath.startsWith(base)) {
+        return `${base}${newPath.startsWith('/') ? '' : '/'}${newPath}`;
+      }
+    }
+  } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
+  return newPath;
+}
+
+function resolveNetBucketReadOnly(cacheObj: unknown, netIdStr: unknown, fallbackValue: unknown): unknown {
+  const fallback = fallbackValue === undefined ? {} : fallbackValue;
+  if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
+  const bucket = (cacheObj as SurveyResultsRecord)[String(netIdStr)];
+  return (bucket && typeof bucket === 'object') ? bucket : fallback;
+}
+
+const EMPTY_SCOPED_QUESTION_NETWORK_DATA = Object.freeze({
+  questions: {},
+  questionResponses: {},
+  questionsLatestBlock: 0,
+  questionResponsesLatestBlock: 0,
+}) as SurveyResultsScopedQuestionNetworkData;
+
+function mergeQuestionResponsesByQuestion(
+  accumulator: SurveyResultsQuestionResponsesByQuestion = {},
+  questionResponses: unknown = {},
+  options: SurveyResultsQuestionResponseMergeOptions = {}
+): SurveyResultsQuestionResponsesByQuestion {
+  const target = (accumulator && typeof accumulator === 'object') ? accumulator : {};
+  const source = (
+    questionResponses && typeof questionResponses === 'object'
+      ? questionResponses as SurveyResultsQuestionResponsesByQuestion
+      : {}
+  );
+  const allowedQuestionIds = options.allowedQuestionIds instanceof Set
+    ? options.allowedQuestionIds
+    : null;
+  Object.keys(source).forEach((questionId) => {
+    const lowerQuestionId = String(questionId || '').trim().toLowerCase();
+    if (!lowerQuestionId) return;
+    if (allowedQuestionIds && !allowedQuestionIds.has(lowerQuestionId)) return;
+    const responderMap = source[questionId];
+    if (!responderMap || typeof responderMap !== 'object') return;
+    if (!target[lowerQuestionId] || typeof target[lowerQuestionId] !== 'object') {
+      target[lowerQuestionId] = {};
+    }
+    const targetResponderMap = target[lowerQuestionId];
+    Object.keys(responderMap).forEach((responder) => {
+      targetResponderMap[responder] = responderMap[responder];
+    });
+  });
+  return target;
+}
+
+const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionRecord = {}): boolean => (
+  hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
+);
+
+const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean => (
+  !!question && question.__ceQuestionMetadataPending === true
+);
+
+const resolveScopedQuestionSessionSlug = (
+  question: SurveyResultsQuestionRecord = {},
+  bucketSlug: unknown = ''
+): string => {
+  const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
+  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
+  if (hasAuthoritativeQuestionSessionSlug(question)) return normalizedQuestionSlug;
+  if (hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === false) {
+    return normalizedBucketSlug;
+  }
+  return normalizedQuestionSlug || normalizedBucketSlug;
+};
+
+const shouldKeepScopedQuestion = ({
+  question = {},
+  bucketSlug = '',
+  allowedScopeSlugs = [],
+  requireAuthoritativeBinding = false,
+}: SurveyResultsScopedQuestionOptions = {}): boolean => {
+  const scopeSet = allowedScopeSlugs instanceof Set
+    ? allowedScopeSlugs
+    : new Set(
+      (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : [])
+        .map((slug) => normalizeSessionSlug(slug || ''))
+    );
+  if (!scopeSet.size) return true;
+  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
+  if (isPendingQuestionMetadataPlaceholder(question)) return false;
+  if (requireAuthoritativeBinding) {
+    return hasAuthoritativeQuestionSessionSlug(question) && scopeSet.has(normalizedQuestionSlug);
+  }
+  return scopeSet.has(resolveScopedQuestionSessionSlug(question, bucketSlug));
+};
+
+function mergeScopedQuestionNetworkData(
+  networkEntries: SurveyResultsScopedQuestionNetworkEntry[] = [],
+  options: SurveyResultsScopedQuestionNetworkOptions = {}
+): SurveyResultsScopedQuestionNetworkData {
+  if (!Array.isArray(networkEntries) || networkEntries.length === 0) {
+    return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
+  }
+
+  const mergedQuestions: Record<string, SurveyResultsQuestionRecord> = {};
+  const mergedQuestionResponses: SurveyResultsQuestionResponsesByQuestion = {};
+  const allowedScopeSlugs = options.allowedScopeSlugs instanceof Set
+    ? options.allowedScopeSlugs
+    : new Set(
+      (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : [])
+        .map((slug) => normalizeSessionSlug(slug || ''))
+    );
+  const requireAuthoritativeBinding = options.requireAuthoritativeBinding === true;
+  let questionsLatestBlock = 0;
+  let questionResponsesLatestBlock = 0;
+
+  networkEntries.forEach(({ slug = '', bucket = {} }) => {
+    const questionBucket = (
+      bucket && typeof bucket === 'object'
+        ? bucket as SurveyResultsQuestionBucketRecord
+        : {}
+    );
+    const allowedQuestionIds: Set<string> = new Set();
+    const questions = (
+      questionBucket.questions && typeof questionBucket.questions === 'object'
+        ? questionBucket.questions
+        : {}
+    );
+    Object.keys(questions).forEach((questionId) => {
+      const lowerQuestionId = String(questionId || '').trim().toLowerCase();
+      if (!lowerQuestionId) return;
+      const question = questions[questionId] || {};
+      if (!shouldKeepScopedQuestion({
+        question,
+        bucketSlug: slug,
+        allowedScopeSlugs,
+        requireAuthoritativeBinding,
+      })) return;
+      allowedQuestionIds.add(lowerQuestionId);
+      if (Object.prototype.hasOwnProperty.call(mergedQuestions, lowerQuestionId)) return;
+      mergedQuestions[lowerQuestionId] = {
+        id: question?.id || questionId,
+        ...(question || {}),
+        sessionSlug: resolveScopedQuestionSessionSlug(question, slug),
+      };
+    });
+
+    mergeQuestionResponsesByQuestion(
+      mergedQuestionResponses,
+      questionBucket.questionResponses || {},
+      { allowedQuestionIds }
+    );
+    questionsLatestBlock = Math.max(questionsLatestBlock, Number(questionBucket.questionsLatestBlock || 0));
+    questionResponsesLatestBlock = Math.max(
+      questionResponsesLatestBlock,
+      Number(questionBucket.questionResponsesLatestBlock || 0)
+    );
+  });
+
+  return {
+    questions: mergedQuestions,
+    questionResponses: mergedQuestionResponses,
+    questionsLatestBlock,
+    questionResponsesLatestBlock,
+  };
+}
+
+const normalizeNonceKey = (value: unknown): number | null => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const hasOwn = (obj: unknown, key: PropertyKey): boolean => (
+  !!obj && Object.prototype.hasOwnProperty.call(obj, key)
+);
+
+const normalizeGateSbtEntries = (
+  gate: SurveyResultsGateRecord | null = null
+): SurveyResultsGateEntry[] => {
+  const out: SurveyResultsGateEntry[] = [];
+  const seen: Set<string> = new Set();
+  const push = (address: unknown, label: unknown = ''): void => {
+    const normalizedAddress = typeof address === 'string'
+      ? address.trim()
+      : address == null
+        ? ''
+        : String(address).trim();
+    if (!normalizedAddress) return;
+    const key = normalizedAddress.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({
+      address: normalizedAddress,
+      label: typeof label === 'string' ? label.trim() : '',
+    });
+  };
+
+  if (Array.isArray(gate?.sbts)) {
+    gate.sbts.forEach((entry: unknown) => {
+      if (typeof entry === 'string') {
+        push(entry);
+        return;
+      }
+      const entryRecord = entry as SurveyResultsGateRecord | null | undefined;
+      push(
+        entryRecord?.address || entryRecord?.sbtAddress || '',
+        entryRecord?.label || entryRecord?.name || entryRecord?.title || ''
+      );
+    });
+  }
+
+  if (Array.isArray(gate?.sbtAddresses)) {
+    gate.sbtAddresses.forEach((address: unknown) => push(address));
+  }
+  if (gate?.sbtAddress) push(gate.sbtAddress);
+
+  return out;
+};
+
+const hasEnvelopeShape = (value: unknown): value is SurveyResultsEncryptedFieldRecord => {
+  if (!value || typeof value !== 'object') return false;
+  return [
+    'ciphertext',
+    'encryptedString',
+    'encryptedData',
+    'dataToEncryptHash',
+    'accessControlConditions',
+    'chain',
+    'iv',
+    'salt',
+  ].some((key) => hasOwn(value, key));
+};
+
+const extractEnvelopeCandidate = (
+  field: SurveyResultsEncryptedFieldRecord | null | undefined
+): unknown | null => {
+  if (!field || typeof field !== 'object') return null;
+
+  const directEnvelope = field.encryptedPortion || field.envelope || field.encryptedEnvelope || null;
+  if (typeof directEnvelope === 'string' && directEnvelope.trim()) return directEnvelope.trim();
+  if (directEnvelope && typeof directEnvelope === 'object') return directEnvelope;
+
+  if (field.payload && typeof field.payload === 'object' && hasEnvelopeShape(field.payload)) {
+    return field.payload;
+  }
+  if (field.valueEnvelope && typeof field.valueEnvelope === 'object' && hasEnvelopeShape(field.valueEnvelope)) {
+    return field.valueEnvelope;
+  }
+
+  if (hasEnvelopeShape(field)) return field;
+  return null;
+};
+
+const hasVisibleFieldValue = (field: SurveyResultsEncryptedFieldRecord | null | undefined): boolean => {
+  if (!field || typeof field !== 'object' || !hasOwn(field, 'value')) return false;
+  if (field.value === '*') return false;
+  if (field.value === null || field.value === undefined) return false;
+  return true;
+};
+
+const isLockedEncryptedField = (field: SurveyResultsEncryptedFieldRecord | null | undefined): boolean => {
+  if (!field || typeof field !== 'object') return false;
+  const flaggedLocked = field.locked === true;
+  const flaggedEncrypted = field.isEncrypted === true || field.encrypted === true;
+  const envelope = extractEnvelopeCandidate(field);
+  if (!flaggedLocked && !flaggedEncrypted && !envelope) return false;
+  if (flaggedLocked) return true;
+  return !hasVisibleFieldValue(field);
+};
+
+const getFieldEncryptionAudience = (field: SurveyResultsEncryptedFieldRecord | null | undefined): string => (
+  typeof field === 'object' && field
+    ? String(field.encryptionAudience || '').trim().toLowerCase()
+    : ''
+);
+
+const isBannerEligibleLockedField = (field: SurveyResultsEncryptedFieldRecord | null | undefined): boolean => (
+  isLockedEncryptedField(field) && getFieldEncryptionAudience(field) !== 'self'
+);
+
+const normalizeGateText = (value: unknown): string => {
+  const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
+  if (!raw) return '';
+  if (/^\[object\s+object\]$/i.test(raw)) return '';
+  return raw;
+};
+
+const buildLockedResponseSignature = (response: SurveyResultsResponseRecord = {}): string => stableSerializeSignatureValue({
+  questionId: response?.questionID || response?.questionId || '',
+  timestamp: response?.timeStamp || response?.timestamp || 0,
+  answerHash: response?.answer?.hash || '',
+  additionalHash: response?.additional?.hash || '',
+  answerValue: response?.answer?.value,
+  additionalValue: response?.additional?.value,
+  answerEncrypted: response?.answer?.encrypted,
+  additionalEncrypted: response?.additional?.encrypted,
+  answerEnvelope: extractEnvelopeCandidate(response?.answer),
+  additionalEnvelope: extractEnvelopeCandidate(response?.additional),
+  importanceEncrypted: response?.importanceEncrypted || '',
+  convictionEncrypted: response?.convictionEncrypted || '',
+});
+
+const getFilterStateSignature = (
+  filterState: unknown
+): string => serializeFilterState(filterState as SurveyResultsRecord | null | undefined) || '';
+const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknown): boolean => {
+  if (currentValue === nextValue) return true;
+  if (currentValue == null || nextValue == null) return currentValue === nextValue;
+  if (typeof currentValue !== 'object' && typeof nextValue !== 'object') {
+    return currentValue === nextValue;
+  }
+  return stableSerializeSignatureValue(currentValue) === stableSerializeSignatureValue(nextValue);
+};
+
+const getConvictionValue = (obj: SurveyResultsResponseRecord | null | undefined): unknown => {
+  if (!obj || typeof obj !== 'object') return '';
+  if (obj.conviction !== undefined && obj.conviction !== null) return obj.conviction;
+  if (obj.importance !== undefined && obj.importance !== null) return obj.importance;
+  return '';
+};
+
+const getResponseQuestionId = (obj: SurveyResultsResponseRecord | null | undefined): string => (
+  String(obj?.questionID || obj?.questionId || '').trim()
+);
+
+const getResponseQuestionPrompt = (
+  obj: SurveyResultsResponseRecord | null | undefined,
+  questionData: SurveyResultsRecord | null = null
+): unknown => (
+  obj?.prompt || questionData?.prompt || ''
+);
+
+const getResponseQuestionType = (
+  obj: SurveyResultsResponseRecord | null | undefined,
+  questionData: SurveyResultsRecord | null = null
+): unknown => (
+  obj?.type || questionData?.type || ''
+);
+
+
+/**
+ * A single place to generate the DOM id used
+ * by every question-card element.
+ *  – always lower-cases the questionId
+ *  – strips characters that are invalid in an HTML id
+ */
+const getQuestionCardDomId = (questionId: string = ''): string =>
+  `questionCard-${questionId.toLowerCase()}`;
+
+class SurveyResults extends Component<any, any> {
   _syncLoadingStartedAt: number | null;
   _scrollMutationObserver: MutationObserver | null;
   _scrollToQuestionRetryTimer: ReturnType<typeof setTimeout> | null;

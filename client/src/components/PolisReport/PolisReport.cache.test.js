@@ -604,10 +604,26 @@ describe('PolisReport cache read options', () => {
       );
 
       expect(out).toEqual({});
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('sbtCache', 'edge', { clone: false });
-      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith('sbtCache', 'alpha', { clone: false });
+      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
+        'questionsCache',
+        'edge',
+        { clone: false }
+      );
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
+        'questionsCache',
+        'alpha',
+        { clone: false }
+      );
+      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
+        'sbtCache',
+        'edge',
+        { clone: false }
+      );
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
+        'sbtCache',
+        'alpha',
+        { clone: false }
+      );
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
