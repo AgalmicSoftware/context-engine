@@ -1105,6 +1105,88 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
   ]);
 });
 
+test('/export_all falls back to Telegram submit records when storage payload listing is unavailable', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const kv = new MemoryKv();
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  await kv.put('telegram:submit-request:storage-list-fallback', JSON.stringify({
+    requestId: 'storage-list-fallback',
+    action: 'submit_response',
+    status: 'direct_submitted',
+    lane: 'telegram_private_account',
+    sessionSlug: 'telegram-demo-2',
+    telegramUserId: '42',
+    questionId: `0x${'12'.repeat(32)}`,
+    questionIdShort: '0x121212...1212',
+    answer: { label: 'Agree', value: 'agree', controlType: 'binary' },
+    onChain: {
+      ok: true,
+      accountAddress,
+      storageRef: { backend: 'cloudflare', id: arweaveId(51), resource: 'responses' },
+    },
+    createdAt: now,
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'telegram-demo-2',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'telegram-demo-2',
+        sessionName: 'Telegram Demo 2',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  });
+  env.AGENT_BRIDGE_FETCH = async (url) => {
+    const target = String(url);
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/storage/list?resource=responses')) {
+      return new Response(JSON.stringify({
+        error: 'Storage route read/list is only available for Cloudflare storage.',
+      }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected_url' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/export_all telegram-demo-2'),
+    env,
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'response_export');
+  assert.equal(result.response.method, 'sendDocument');
+  assert.equal(result.exportedPayloadCount, 1);
+  assert.equal(result.submitRecordCount, 1);
+  assert.equal(result.partial, true);
+  assert.equal(result.synthesizedFromSubmitRecords, true);
+  assert.match(result.response.text, /Responses were exported from Telegram submit records\./);
+  assert.match(result.response.text, /Storage payloads unavailable: Storage route read\/list is only available for Cloudflare storage\./);
+  assert.equal(result.response.document.filename, 'context-engine-telegram-demo-2-responses.zip');
+});
+
 test('/export_all denies non-allowlisted Telegram managed wallets', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: `0x${'11'.repeat(20)}`,
@@ -1504,6 +1586,12 @@ test('group session binding makes later question and doc commands use the joined
   });
 
   assert.equal(joined.sessionSlug, 'demo');
+  assert.equal(joined.groupSessionBinding.ok, true);
+  assert.equal(joined.userSessionBinding.ok, true);
+  const joinedUserBinding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(joinedUserBinding.sessionSlug, 'demo');
+  assert.equal(joinedUserBinding.source, 'group_session_select');
+  assert.equal(joinedUserBinding.sourceChatId, '-100123');
   assert.match(joined.response.text, /Use \/attachments for session files/);
   assert.equal(joined.response.text.includes('/me'), false);
   assert.equal(joined.response.text.includes('Use /questions'), false);
@@ -1790,6 +1878,10 @@ test('/sessions callback switches the group session used by later question comma
   });
 
   assert.equal(selected.sessionSlug, 'demo');
+  assert.equal(selected.userSessionBinding.ok, true);
+  const selectedUserBinding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(selectedUserBinding.sessionSlug, 'demo');
+  assert.equal(selectedUserBinding.source, 'group_session_select');
   assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
   assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
@@ -1947,12 +2039,17 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(saved.ok, true);
   assert.equal(saved.response, null);
   assert.equal(saved.answerDraftSaved, true);
+  assert.equal(saved.userSessionBound, true);
   assert.equal(saved.submitRequestCreated, true);
   assert.equal(saved.submitRequest.status, 'submit_request_created');
   assert.equal(saved.submitRequest.canonicalApiRequest.path, '/api/agent/responses/submit-request');
   assert.equal(saved.submitRequest.replayed, false);
   assert.match(saved.submitRequest.idempotencyKey, /^telegram_bot_submit:42:alpha:/);
   assert.equal(saved.callbackAnswerText, 'Submitted.');
+  const answerUserBinding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(answerUserBinding.sessionSlug, 'alpha');
+  assert.equal(answerUserBinding.source, 'group_answer');
+  assert.equal(answerUserBinding.sourceChatId, '-100123');
 
   const draftRecords = Array.from(env.AGENT_ACTION_KV.store.values())
     .map((value) => JSON.parse(value))
