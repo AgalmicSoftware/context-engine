@@ -141,6 +141,7 @@ import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
   pickBetterQuestionPayload,
+  resolveQuestionPayloadDisplayState,
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
 import {
@@ -2807,11 +2808,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(question?.id || '').trim().toLowerCase();
     const promptText = question?.prompt || 'Question';
     const promptMasked = this.isMaskedPromptText(promptText);
+    const payloadDisplay = this.getQuestionPayloadDisplayState(question);
     const promptReloading = this.isQuestionFieldBusy(qid, 'prompt');
-    const promptTitle =
-      !this.props.loginComplete || !this.props.account
+    const promptTitle = payloadDisplay.requiresAuth && (!this.props.loginComplete || !this.props.account)
         ? 'Login required to decrypt gated prompts.'
-        : 'Decrypt gated prompt';
+        : (payloadDisplay.actionTitle || 'Decrypt gated prompt');
+    const promptLabel = promptMasked ? (payloadDisplay.label || promptText) : promptText;
+    const promptBusyLabel = payloadDisplay.busyLabel || 'Decrypting...';
 
     return (
       <div className={styles.promptTitleBlock}>
@@ -2830,10 +2833,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               {promptReloading ? (
                 <span className={styles.maskedPromptLoading}>
                   <FontAwesomeIcon icon={faSpinner} spin className={styles.maskedPromptLoadingSpinner} />
-                  <span>Decrypting...</span>
+                  <span>{promptBusyLabel}</span>
                 </span>
               ) : (
-                promptText
+                promptLabel
               )}
             </button>
           ) : (
@@ -3220,6 +3223,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   isQuestionPromptMasked = (question) => isQuestionPromptMasked(question);
 
+  getQuestionPayloadDisplayState = (question) => {
+    const slug = normalizeSessionSlugValue(
+      question?.sessionSlug ||
+      question?.sessionName ||
+      this._getEffectiveDraftSlug() ||
+      resolveEffectiveSlug(this.props)
+    );
+    const sessionConfig = slug ? (resolveExplicitSessionContext(slug).sessionConfig || null) : null;
+    return resolveQuestionPayloadDisplayState(question, sessionConfig);
+  };
+
   getAnswerLockDisplayState = ({
     field,
     masked,
@@ -3256,20 +3270,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(question?.id || '').trim().toLowerCase();
     const promptReloading = qid ? this.isQuestionFieldBusy(qid, 'prompt') : false;
     const canReloadPrompt = qid && this.isQuestionPromptMasked(question);
+    const payloadDisplay = this.getQuestionPayloadDisplayState(question);
+    const actionTitle = payloadDisplay.requiresAuth && (!this.props.loginComplete || !this.props.account)
+      ? 'Login required to decrypt gated prompts.'
+      : (payloadDisplay.actionTitle || 'Decrypt gated prompt');
 
     return (
       <GatedPromptNotice
         questionId={question.id}
         tooltipId={tooltipId}
         tooltipText={tooltipText}
+        leadingText={payloadDisplay.noticeLeadingText}
+        statusText={payloadDisplay.noticeStatusText}
+        suffix={payloadDisplay.noticeSuffix}
         actionBusy={promptReloading}
         actionDisabled={promptReloading}
+        actionLabel={payloadDisplay.actionLabel || 'Decrypt Prompt'}
         actionTestId={E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE}
-        actionTitle={
-          !this.props.loginComplete || !this.props.account
-            ? 'Login required to decrypt gated prompts.'
-            : 'Decrypt gated prompt'
-        }
+        actionTitle={actionTitle}
         onAction={canReloadPrompt ? () => this.handleReloadMaskedPrompt(qid) : undefined}
       />
     );
