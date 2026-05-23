@@ -1040,9 +1040,18 @@ const shouldRetryAnonymousWithoutRateId = async ({ workerUrl, anonymousHeaders, 
 
 const AUTH_OR_GATE_DENIAL_PATTERNS = [
   /missing authorization header/i,
+  /missing requester address for worker sbt gate/i,
   /token missing .* scope/i,
   /token does not match requested session slug/i,
   /token expired/i,
+];
+
+const AUTHENTICATED_RETRY_DENIAL_PATTERNS = [
+  /missing authorization header/i,
+  /token missing .* scope/i,
+  /token does not match requested session slug/i,
+  /token expired/i,
+  /invalid token/i,
 ];
 
 const shouldFallbackForAnonymousDeny = (normalizedError) => {
@@ -1131,6 +1140,15 @@ const shouldFallbackToAuthenticatedFlow = async (
   return AUTH_OR_GATE_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
 };
 
+const shouldRetryAuthenticatedResponse = async (response) => {
+  const status = Number(response?.status || 0);
+  if (status === 401) return true;
+  if (status !== 403) return false;
+  const errorMessage = await readResponseErrorMessage(response);
+  if (!errorMessage) return false;
+  return AUTHENTICATED_RETRY_DENIAL_PATTERNS.some((pattern) => pattern.test(errorMessage));
+};
+
 export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   const resolvedSession = resolveWorkerSessionContext({
     sessionSlug: opts.sessionSlug,
@@ -1193,7 +1211,7 @@ export const fetchWorkerWithAuth = async (url, options = {}, opts = {}) => {
   }
   const headers = mergeHeaders(options.headers, authHeaders);
   const response = await fetch(url, { ...options, headers });
-  if ((response.status === 401 || response.status === 403) && opts.retry !== false) {
+  if ((response.status === 401 || response.status === 403) && opts.retry !== false && await shouldRetryAuthenticatedResponse(response)) {
     await clearWorkerSessionToken({
       requestContext: authRequestContext,
       sessionSlug: slug,

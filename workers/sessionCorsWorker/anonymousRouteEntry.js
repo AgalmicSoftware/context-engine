@@ -48,6 +48,7 @@ export const dispatchAnonymousRouteEntry = async ({
       slug,
       config,
       headers,
+      env,
     },
   });
 };

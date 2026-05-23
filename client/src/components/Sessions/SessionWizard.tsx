@@ -2781,6 +2781,10 @@ const SessionWizard = ({
                   >
                     {[
                       {
+                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
+                        label: 'Public read',
+                      },
+                      {
                         mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
                         label: 'Worker SBT gate',
                       },
@@ -2804,7 +2808,11 @@ const SessionWizard = ({
                       );
                     })}
                   </div>
-                  {storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ? (
+                  {storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? (
+                    <div className={styles.helperText}>
+                      Public-read mode stores canonical payloads in Cloudflare and serves reads through the session worker without wallet auth. Writes still require an authenticated session worker request.
+                    </div>
+                  ) : storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ? (
                     <div className={styles.helperText}>
                       Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes. Lit credentials are required; plaintext Cloudflare uploads are rejected until the Lit envelope path supplies payloadEncrypted data.
                     </div>

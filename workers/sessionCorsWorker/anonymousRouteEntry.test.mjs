@@ -192,6 +192,7 @@ test('dispatchAnonymousRouteEntry dispatches anonymous route with resolved slug,
             slug: 'session-a',
             config,
             headers,
+            env: { GROUP_KV: {} },
           },
         });
         return response;

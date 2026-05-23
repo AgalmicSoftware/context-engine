@@ -41,9 +41,14 @@ describe('SessionWizard worker resource rendering', () => {
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Public read' }));
+    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/serves reads through the session worker without wallet auth/i)).toBeInTheDocument();
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {

@@ -130,3 +130,35 @@ test('resolveTopLevelRouteSelection preserves trimmed authorization behavior for
     { kind: 'authenticated' }
   );
 });
+
+test('resolveTopLevelRouteSelection lets storage reads try anonymous public-read first', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/storage/read',
+      method: 'GET',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'storage' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/storage/list',
+      method: 'POST',
+      request: createRequestWithHeaderValue('   '),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'storage' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/storage/read',
+      method: 'GET',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'authenticated' }
+  );
+});
