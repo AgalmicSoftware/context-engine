@@ -42,7 +42,9 @@ Arweave is public and permanent. Use non-identifying payloads only.
      - `E2E_OPENAI_KEY` when running real deploy verification with `E2E_AI_MOCK=0`
    - Ensure the deterministic wallet you use (derived from `PASSKEY_RAW_ID_B64URL`) is funded on the target chain.
    - For multi-wallet Polis seeding, keep walletA funded; walletB/C/D/E are auto-topped-up by the runner when below threshold.
-3. Run `npm run -s test:e2e` (suite) or any `ai:*` command; the scripts auto-load `.env.e2e.local`, then `.env.e2e`.
+3. Run `npm run -s test:e2e` for the public navigation smoke, or any private
+   `ai:*` workflow command; the scripts auto-load `.env.e2e.local`, then
+   `.env.e2e`.
 
 Committed E2E scripts do not read fallback secrets from `.e2e-secrets/*`; use env, `.env.e2e.local`, `.env.e2e`, or `E2E_ENV_FILE`.
 
@@ -193,26 +195,27 @@ Cache validity is conservative (example checks include TTL, chainId/sessionSlug 
 
 ### Suite
 
-- `npm run -s test:e2e` (core suite; Playwright reuse)
-- `npm run -s test:e2e:quick` (alias for the encryption-gates suite)
-- `npm run -s test:e2e:quick:stability` (repeat the quick suite `E2E_STABILITY_RUNS` times; default `3`)
+- `npm run -s test:e2e` (public navigation/style smoke)
+- `npm run -s test:e2e:quick` (alias for the same public smoke)
+- `npm run -s test:e2e:quick:stability` (repeat the public smoke `E2E_STABILITY_RUNS` times; default `3`)
+- `npm run -s ai:test-e2e:encryption-gates` (private core encryption/gated-decrypt suite; Playwright reuse)
 - The suite runners prefer a shared Chromium server for stability and speed, but if `launchServer` fails on the host they now fall back to normal per-step browser launches instead of aborting before the first step.
 
-Suite flags:
-- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_DOCS=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_SBT=1 npm run -s test:e2e`
+Private suite flags for `scripts/run-e2e-suite.js`:
+- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_DOCS=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_SBT=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
   - Includes `ai:test-sbt-create:variants`, `ai:test-sbt-metadata-locks`, `ai:test-sbt-collect:variants`, and `ai:test-sbt-contract:boundaries`
-- `E2E_SUITE_INCLUDE_SESSION_SETUP=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_PROFILE_SBT_MULTI=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_PROFILE_ACTIVITY_MULTI=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_ADMIN=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s test:e2e`
-- `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s test:e2e`
-- `E2E_SUITE_CONTINUE=1 npm run -s test:e2e` (run all steps, then exit non-zero if any failed)
+- `E2E_SUITE_INCLUDE_SESSION_SETUP=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_PROFILE_SBT_MULTI=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_PROFILE_ACTIVITY_MULTI=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_ADMIN=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
+- `E2E_SUITE_CONTINUE=1 npm run -s ai:node -- scripts/run-e2e-suite.js` (run all steps, then exit non-zero if any failed)
 - Full private suites create a fresh session target by default before child steps. When `CLOUDFLARE_API_TOKEN` is set, the default fresh profile is `custom-worker-secrets-v1` so the target session gets its own worker and slug-scoped secrets. Without a token the fallback profile is `default-worker-minimal-v1`, which is only appropriate when the shared/default worker accepts the target session slug. Set `E2E_SUITE_ENSURE_SESSION=0` to skip setup, `E2E_SUITE_REUSE_SESSION_TARGET=1` to reuse `SESSION_SLUG` or the latest active target, or `E2E_SUITE_SESSION_PROFILE=...` to choose explicitly.
 
-Navigation is included in the default suite via `scripts/test-navigation-smoke.js`.
+Navigation is included in the public smoke via `scripts/vite-navigation-smoke.js`.
 
 ### Session Wizard
 
@@ -308,7 +311,7 @@ To verify real provider wiring (non-deterministic output, slower, can fail if yo
 - Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
   - `SESSION_SLUG=<existing-session-slug> E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
-  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
+  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s ai:node -- scripts/run-e2e-suite.js`
 
 ### Agent Mode (JSON-driven)
 
@@ -355,7 +358,7 @@ These are intentionally gate-modifying runners you can slot into larger sequence
 - `npm run -s ai:test-admin:gate-update` (updates the SessionRegistry default gate on-chain via the `/admin` UI as the admin wallet and asserts it is disabled for a non-admin wallet)
 
 Optional suite preflight:
-- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s test:e2e`
+- `E2E_SUITE_PREFLIGHT_GATES=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
   - runs `ai:test-gates:any-all` before the 3-flow encryption-gates suite.
 
 ## Artifacts
@@ -365,7 +368,7 @@ Each runner writes:
 - Screenshot: `artifacts/screenshots/<flow>-<runTag>.png`
 - Error screenshot (UI failures): `artifacts/screenshots/<flow>-<runTag>-error.png`
 
-The suite runner (`npm run -s test:e2e`) also writes a suite-level report:
+The private suite runner (`npm run -s ai:node -- scripts/run-e2e-suite.js`) also writes a suite-level report:
 - `artifacts/e2e-suites/e2e-suite-<runTag>.json`
 
 RPC measurement fields:
