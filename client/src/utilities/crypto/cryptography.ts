@@ -688,21 +688,23 @@ const signEip712V4 = async (providerLike, a, b, c) => {
 
 /**
  * Compute a deterministic 32-byte context hash for AAD + HKDF info.
- * Includes chainId, account (author), surveyId, qId.
+ * Includes chainId, account (author), surveyId, qId, and response field slot.
  */
-const computeContext = ({ chainId, account, surveyId, qId }) => {
+const computeContext = ({ chainId, account, surveyId, qId, fieldKey }) => {
   const cid = chainId === 0 || chainId ? String(chainId) : '';
   const acct = safeLower(account || '');
   const sid = safeLower(surveyId || utils.hexZeroPad('0x0', 32));
   const q = safeLower(qId || '');
-  return utils.keccak256(utf8e(`rxc|v1|chain:${cid}|acct:${acct}|survey:${sid}|qid:${q}`));
+  const field = safeLower(fieldKey || '');
+  return utils.keccak256(utf8e(`rxc|v1|chain:${cid}|acct:${acct}|survey:${sid}|qid:${q}|field:${field}`));
 };
 
-const buildAAD = ({ contextHex, chainId, surveyId, qId }) => ({
+const buildAAD = ({ contextHex, chainId, surveyId, qId, fieldKey }) => ({
   context: contextHex,
   chainId: chainId ?? null,
   surveyId: surveyId ?? null,
   qId: qId ?? null,
+  fieldKey: fieldKey ?? null,
 });
 
 /* ---------------------- Canonical encoders (commit) ---------------------- */
@@ -1259,7 +1261,7 @@ const parseEnvelope = (jsonStr) => {
 
 const normalizeBindingValue = (value) => safeLower(value == null ? '' : String(value));
 
-const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } = {}) => {
+const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId, expectedFieldKey } = {}) => {
   if (!env || !isObj(env.aad)) return;
 
   if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
@@ -1277,6 +1279,19 @@ const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId } = {}) =>
       throw new Error('Encrypted payload is bound to a different survey field.');
     }
   }
+
+  if (
+    expectedFieldKey !== undefined &&
+    expectedFieldKey !== null &&
+    env.aad.fieldKey !== undefined &&
+    env.aad.fieldKey !== null
+  ) {
+    const actualFieldKey = normalizeBindingValue(env.aad.fieldKey);
+    const boundFieldKey = normalizeBindingValue(expectedFieldKey);
+    if (actualFieldKey !== boundFieldKey) {
+      throw new Error('Encrypted payload is bound to a different survey field.');
+    }
+  }
 };
 
 /* ------------------------- field encryption (v1) -------------------------- */
@@ -1291,15 +1306,16 @@ const encryptField = async ({
   chainId,
   surveyId,
   qId,
+  fieldKey,
   kind,
   value,
   questionPool,
   litOpts,
   hasher,
 }) => {
-  const contextHex = computeContext({ chainId, account, surveyId, qId });
+  const contextHex = computeContext({ chainId, account, surveyId, qId, fieldKey });
   assertBytes32Hex(contextHex);
-  const aadObj = buildAAD({ contextHex, chainId, surveyId, qId });
+  const aadObj = buildAAD({ contextHex, chainId, surveyId, qId, fieldKey });
   const aadBytes = utf8e(stableStringify(aadObj));
 
   // Resolve options for canonicalization (multichoice), and compute commitments
@@ -1491,11 +1507,12 @@ const decryptEnvelopeToValue = async ({
   preferLitRecipients = false,
   expectedSurveyId,
   expectedQId,
+  expectedFieldKey,
 }) => {
   perfDebugDecryptEnvelope('attempt');
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
   const env = parseEnvelope(jsonStr);
-  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId });
+  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
   const cacheKey = buildDecryptEnvelopeCacheKey({
     jsonStr,
     account,
@@ -1617,6 +1634,7 @@ const encryptMultipleAnswers = async (surveyState, optsOrPubKey, extraOpts) => {
       chainId,
       surveyId,
       qId,
+      fieldKey: fieldKind,
       kind,
       value: fieldObj.value,
       questionPool,
@@ -1680,7 +1698,7 @@ const decryptMultipleAnswers = async (slice, questionPool, a, b, c = {}) => {
   let decryptedCount = 0;
   let firstErr = null;
 
-  const tryField = async (qId, fieldObj) => {
+  const tryField = async (qId, fieldKey, fieldObj) => {
     if (!fieldObj || fieldObj.value !== '*') return null;
     if (!fieldObj.encryptedPortion) {
       maskedCount += 1;
@@ -1699,13 +1717,14 @@ const decryptMultipleAnswers = async (slice, questionPool, a, b, c = {}) => {
       litOpts,
       expectedSurveyId: surveyId,
       expectedQId: qId,
+      expectedFieldKey: fieldKey,
     });
     return { value, zkSalt };
   };
 
   for (const qId of Object.keys(slice.answers || {})) {
     // eslint-disable-next-line no-loop-func
-    const entry = await tryField(qId, slice.answers[qId]).catch((err) => {
+    const entry = await tryField(qId, 'answer', slice.answers[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;
     });
@@ -1716,7 +1735,7 @@ const decryptMultipleAnswers = async (slice, questionPool, a, b, c = {}) => {
   }
   for (const qId of Object.keys(slice.additionalComments || {})) {
     // eslint-disable-next-line no-loop-func
-    const entry = await tryField(qId, slice.additionalComments[qId]).catch((err) => {
+    const entry = await tryField(qId, 'additional', slice.additionalComments[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;
     });
@@ -1784,6 +1803,7 @@ const decryptSingleField = async (slice, qId, fieldToDecrypt, a, b, c = {}) => {
         litOpts,
         expectedSurveyId: surveyId,
         expectedQId: qId,
+        expectedFieldKey: 'answer',
       });
       out.answers[qId] = { value, zkSalt };
     } catch (err) {
@@ -1805,6 +1825,7 @@ const decryptSingleField = async (slice, qId, fieldToDecrypt, a, b, c = {}) => {
         litOpts,
         expectedSurveyId: surveyId,
         expectedQId: qId,
+        expectedFieldKey: 'additional',
       });
       out.additionalComments[qId] = { value, zkSalt };
     } catch (err) {

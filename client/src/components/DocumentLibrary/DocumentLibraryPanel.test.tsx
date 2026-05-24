@@ -166,6 +166,111 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
     });
   });
 
+  it('blocks encrypted custom-audience uploads when access conditions cannot be built', async () => {
+    mockResolveDocUploadsGate.mockReturnValue({
+      gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 84532, mode: 0 },
+      lookupStatus: 'ok',
+      sbtAddresses: ['0x00000000000000000000000000000000000000bb'],
+      chainId: 84532,
+      mode: 'any',
+      hasRecipients: true,
+    });
+    mockGetGlobalLitHooks.mockReturnValue({
+      saveKey: jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' })),
+    });
+    mockBuildSbtAccessControlConditions.mockReturnValue(null);
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'7'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toHaveAttribute('data-ce-locked', 'true');
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_AUDIENCE_CUSTOM));
+
+    const file = new File(['secret'], 'secret.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(await screen.findByText('Add at least one SBT address to encrypt.')).toBeInTheDocument();
+    expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
+  });
+
+  it('omits plaintext file metadata tags from encrypted uploads', async () => {
+    mockResolveDocUploadsGate.mockReturnValue({
+      gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 84532, mode: 0 },
+      lookupStatus: 'ok',
+      sbtAddresses: ['0x00000000000000000000000000000000000000bb'],
+      chainId: 84532,
+      mode: 'any',
+      hasRecipients: true,
+    });
+    mockGetGlobalLitHooks.mockReturnValue({
+      saveKey: jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' })),
+    });
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toHaveAttribute('data-ce-locked', 'true');
+    });
+
+    const file = new File(['confidential contents'], 'secret-plan.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    });
+    const uploadArgs = mockUploadDocLibraryFile.mock.calls[0][0];
+    const tags = uploadArgs.tags || [];
+    expect(tags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
+      expect.objectContaining({ name: 'CE-DocKind', value: 'file' }),
+    ]));
+    expect(tags.map((tag: { name: string }) => tag.name)).not.toEqual(expect.arrayContaining([
+      'CE-DocName',
+      'CE-DocMime',
+      'CE-DocSize',
+    ]));
+    expect(JSON.stringify(tags)).not.toContain('secret-plan');
+  });
+
   it('uses scoped Lit hooks for OP Sepolia session-gate uploads when Chipotle credentials stay server-side', async () => {
     mockResolveDocUploadsGate.mockReturnValue({
       gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 11155420, mode: 0 },
