@@ -119,7 +119,10 @@ Core Telegram commands:
   behavior. Plain `/results` explains the `consensus` and `group` views and
   renders buttons for both modes; mode-specific results attempt to upload a
   rendered PNG card with a beeswarm view for consensus and a participant graph
-  for group results, using demo data until enough live overlap exists.
+  for group results, using demo data until enough live overlap exists. The
+  beeswarm view pages through the top three differentiating questions at a
+  time, and the participant graph exposes per-group analysis buttons that use
+  the selected session worker's sponsored AI route when available.
 - `/export_all [session]` is private-chat only and sends a zip archive of
   Cloudflare-backed response payloads for the selected session. The caller's
   managed Telegram ETH address must be allowlisted with

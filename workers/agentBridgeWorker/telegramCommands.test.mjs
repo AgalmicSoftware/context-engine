@@ -795,44 +795,50 @@ test('/results consensus shows top difference questions from submitted records',
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
-        questionId: 'q-diff',
+        questionId: 'q-a',
         questionType: 'agree_unsure_disagree',
         prompt: 'Should the group block launch?',
       },
       {
-        questionId: 'q-same',
+        questionId: 'q-b',
         questionType: 'agree_unsure_disagree',
         prompt: 'Should the group publish the summary?',
       },
+      {
+        questionId: 'q-c',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the group add a risk review?',
+      },
+      {
+        questionId: 'q-d',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the group run another pilot?',
+      },
     ]),
   });
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '1',
-    questionId: 'q-diff',
-    answer: { label: 'Agree', value: 'agree' },
-    onChain: { ok: true, txHash: `0x${'12'.repeat(32)}` },
-    createdAt: '2026-05-08T12:00:00.000Z',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '2',
-    questionId: 'q-diff',
-    answer: { label: 'Disagree', value: 'disagree' },
-    onChain: { ok: true, txHash: `0x${'34'.repeat(32)}` },
-    createdAt: '2026-05-08T12:00:01.000Z',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug: 'alpha',
-    telegramUserId: '3',
-    questionId: 'q-same',
-    answer: { label: 'Agree', value: 'agree' },
-    onChain: { ok: true, txHash: `0x${'56'.repeat(32)}` },
-    createdAt: '2026-05-08T12:00:02.000Z',
-  }));
+  let counter = 0;
+  async function putResponse(questionId, telegramUserId, label) {
+    counter += 1;
+    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId,
+      questionId,
+      answer: { label, value: label.toLowerCase() },
+      onChain: { ok: true, txHash: `0x${String(counter).padStart(2, '0').repeat(32)}` },
+      createdAt: `2026-05-08T12:00:${String(counter).padStart(2, '0')}.000Z`,
+    }));
+  }
+  await putResponse('q-a', '1', 'Agree');
+  await putResponse('q-a', '2', 'Agree');
+  await putResponse('q-a', '3', 'Disagree');
+  await putResponse('q-a', '4', 'Disagree');
+  await putResponse('q-b', '1', 'Agree');
+  await putResponse('q-b', '2', 'Disagree');
+  await putResponse('q-c', '1', 'Agree');
+  await putResponse('q-c', '2', 'Disagree');
+  await putResponse('q-d', '1', 'Agree');
+  await putResponse('q-d', '2', 'Disagree');
 
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/results consensus'),
@@ -846,10 +852,39 @@ test('/results consensus shows top difference questions from submitted records',
   assert.equal(result.response.photo.contentType, 'image/png');
   assert.deepEqual(Array.from(result.response.photo.bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.match(result.response.text, /^Beeswarm/);
-  assert.match(result.response.text, /Live responses: 3/);
+  assert.match(result.response.text, /Live responses: 10/);
+  assert.match(result.response.text, /Most difference 1-3 of 4/);
   assert.match(result.response.text, /1\. ● Should the group block launch\?/);
-  assert.match(result.response.text, /Agree 1 \| Disagree 1/);
+  assert.match(result.response.text, /Agree 2 \| Disagree 2/);
+  assert.match(result.response.text, /2\. ● Should the group add a risk review\?/);
+  assert.match(result.response.text, /3\. ● Should the group publish the summary\?/);
+  assert.equal(result.response.text.includes('Should the group run another pilot?'), false);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Next 3']);
   assert.equal(result.response.text.includes('Demo mode'), false);
+
+  const nextButton = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Next 3');
+  const next = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7010,
+      callback_query: {
+        id: 'callback-results-next',
+        data: nextButton.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 72,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:01:01.000Z',
+  });
+
+  assert.equal(next.ok, true);
+  assert.equal(next.screen, 'results_consensus');
+  assert.match(next.response.text, /Most difference 4-4 of 4/);
+  assert.match(next.response.text, /4\. ● Should the group run another pilot\?/);
+  assert.deepEqual(flattenButtons(next.response.replyMarkup).map((button) => button.text), ['Previous 3']);
 });
 
 test('/results group shows participant graph with question legend', async () => {
@@ -908,9 +943,141 @@ test('/results group shows participant graph with question legend', async () => 
   assert.equal(result.response.photo.contentType, 'image/png');
   assert.match(result.response.text, /^Participants graph/);
   assert.match(result.response.text, /Responses: 4/);
+  assert.match(result.response.text, /Choose a group to analyze\./);
   assert.match(result.response.text, /P1 -> Q1:Agree, Q2:Unsure/);
   assert.match(result.response.text, /P2 -> Q1:Disagree, Q2:Agree/);
   assert.match(result.response.text, /1\. First prompt\?/);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), [
+    'Analyze Group 1',
+    'Analyze Group 2',
+  ]);
+});
+
+test('/results group analysis callback uses session worker AI for the selected participant group', async () => {
+  const calls = [];
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session-worker.example',
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-1', questionType: 'agree_unsure_disagree', prompt: 'Should Alpha ship quickly?' },
+      { questionId: 'q-2', questionType: 'agree_unsure_disagree', prompt: 'Should Alpha pause for review?' },
+    ]),
+  });
+  env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
+    const target = String(url);
+    calls.push({ url: target, init });
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token', exp: 2000000000 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/ai')) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      const body = JSON.parse(init.body || '{}');
+      assert.match(body.messages?.[1]?.content || '', /Top statements/);
+      return new Response(JSON.stringify({
+        completion: JSON.stringify({
+          name: 'Launch Balancers',
+          short: 'They support moving forward while still noticing review tradeoffs.',
+          long: 'This group is more favorable toward shipping quickly than the overall room. Its strongest distinction is willingness to proceed while others hold more concern.',
+        }),
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected route' }), {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:one', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    questionId: 'q-1',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:two', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    questionId: 'q-2',
+    answer: { label: 'Agree', value: 'agree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '43',
+    questionId: 'q-1',
+    answer: { label: 'Disagree', value: 'disagree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:four', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '43',
+    questionId: 'q-2',
+    answer: { label: 'Disagree', value: 'disagree' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  }));
+
+  const graph = await buildTelegramCommandResponse({
+    update: groupMessage('/results group'),
+    env,
+    now: '2026-05-08T12:01:00.000Z',
+  });
+  const analyze = flattenButtons(graph.response.replyMarkup)
+    .find((button) => button.text === 'Analyze Group 1');
+  const analysis = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7012,
+      callback_query: {
+        id: 'callback-analyze-group',
+        data: analyze.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 73,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:01:01.000Z',
+  });
+
+  assert.equal(analysis.ok, true);
+  assert.equal(analysis.screen, 'results_group_analysis');
+  assert.match(analysis.response.text, /^Group 1: Launch Balancers/);
+  assert.match(analysis.response.text, /They support moving forward/);
+  assert.match(analysis.response.text, /more favorable toward shipping quickly/);
+  assert.equal(analysis.response.text.includes('AI analysis unavailable'), false);
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
+  assert.deepEqual(flattenButtons(analysis.response.replyMarkup).map((button) => button.text), ['Participants graph']);
 });
 
 test('/results without arguments explains available result views', async () => {
