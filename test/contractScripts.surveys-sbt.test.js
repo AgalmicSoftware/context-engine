@@ -362,7 +362,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       documentURLs: ['https://example.example.test/context-engine'],
       groupName,
       sessionName: groupName,
-      sessionSlug: groupName,
+      sessionSlug: groupName.toLowerCase(),
     });
     expect(surveyPayload.creationBlock).toBe(creationBlock);
     expect(firstQuestionPayload).toMatchObject({
@@ -375,7 +375,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       associatedSurveyId: surveyId,
       groupName,
       sessionName: groupName,
-      sessionSlug: groupName,
+      sessionSlug: groupName.toLowerCase(),
     });
     expect(secondQuestionPayload).toMatchObject({
       id: questionIds[1],
@@ -386,7 +386,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       associatedSurveyId: surveyId,
       groupName,
       sessionName: groupName,
-      sessionSlug: groupName,
+      sessionSlug: groupName.toLowerCase(),
     });
 
     const storedSurvey = await contractScripts.getSurveyDataById('none', surveyId, groupCfg, {
@@ -439,7 +439,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       associatedSurveyId: ethers.constants.HashZero,
       groupName,
       sessionName: groupName,
-      sessionSlug: groupName,
+      sessionSlug: groupName.toLowerCase(),
     });
 
     const questionResponses = [

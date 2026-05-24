@@ -731,7 +731,7 @@ const signEip712V4 = async (
  * Compute a deterministic 32-byte context hash for AAD + HKDF info.
  * Includes chainId, account (author), surveyId, qId, and response field slot.
  */
-const computeContext = ({ chainId, account, surveyId, qId, fieldKey }: SurveyContextInput) => {
+const computeContext = ({ chainId, account, surveyId, qId, fieldKey }) => {
   const cid = chainId === 0 || chainId ? String(chainId) : '';
   const acct = safeLower(account || '');
   const sid = safeLower(surveyId || utils.hexZeroPad('0x0', 32));
@@ -740,7 +740,7 @@ const computeContext = ({ chainId, account, surveyId, qId, fieldKey }: SurveyCon
   return utils.keccak256(utf8e(`rxc|v1|chain:${cid}|acct:${acct}|survey:${sid}|qid:${q}|field:${field}`));
 };
 
-const buildAAD = ({ contextHex, chainId, surveyId, qId, fieldKey }: SurveyContextInput & { contextHex: string }) => ({
+const buildAAD = ({ contextHex, chainId, surveyId, qId, fieldKey }) => ({
   context: contextHex,
   chainId: chainId ?? null,
   surveyId: surveyId ?? null,
@@ -1347,14 +1347,7 @@ const parseEnvelope = (jsonStr: string): Envelope => {
 
 const normalizeBindingValue = (value: unknown) => safeLower(value == null ? '' : String(value));
 
-const validateEnvelopeBinding = (
-  env: Envelope,
-  { expectedSurveyId, expectedQId, expectedFieldKey }: {
-    expectedSurveyId?: unknown;
-    expectedQId?: unknown;
-    expectedFieldKey?: unknown;
-  } = {}
-) => {
+const validateEnvelopeBinding = (env, { expectedSurveyId, expectedQId, expectedFieldKey } = {}) => {
   if (!env || !isObj(env.aad)) return;
 
   if (expectedSurveyId !== undefined && expectedSurveyId !== null) {
@@ -1614,21 +1607,11 @@ const decryptEnvelopeToValue = async ({
   expectedSurveyId,
   expectedQId,
   expectedFieldKey,
-}: {
-  envelopeJson: unknown;
-  account?: string;
-  chainId: ChainIdInput;
-  providerLike: ProviderLike;
-  litOpts?: LitOptions;
-  preferLitRecipients?: boolean;
-  expectedSurveyId?: unknown;
-  expectedQId?: unknown;
-  expectedFieldKey?: unknown;
-}): Promise<DecryptEnvelopeResult> => {
+}) => {
   perfDebugDecryptEnvelope('attempt');
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
   const env = parseEnvelope(jsonStr);
-  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId });
+  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
   const cacheKey = buildDecryptEnvelopeCacheKey({
     jsonStr,
     account,
@@ -1832,11 +1815,7 @@ const decryptMultipleAnswers = async (
   let decryptedCount = 0;
   let firstErr: Error | null = null;
 
-  const tryField = async (
-    qId: string,
-    fieldKey: 'answer' | 'additional',
-    fieldObj?: CryptoFieldEntry
-  ): Promise<CryptoFieldEntry | null> => {
+  const tryField = async (qId, fieldKey, fieldObj) => {
     if (!fieldObj || fieldObj.value !== '*') return null;
     if (!fieldObj.encryptedPortion) {
       maskedCount += 1;
@@ -1863,7 +1842,7 @@ const decryptMultipleAnswers = async (
   const answers = slice.answers || {};
   for (const qId of Object.keys(answers)) {
     // eslint-disable-next-line no-loop-func
-    const entry = await tryField(qId, 'answer', answers[qId]).catch((err) => {
+    const entry = await tryField(qId, 'answer', slice.answers[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;
     });
@@ -1875,7 +1854,7 @@ const decryptMultipleAnswers = async (
   const additionalComments = slice.additionalComments || {};
   for (const qId of Object.keys(additionalComments)) {
     // eslint-disable-next-line no-loop-func
-    const entry = await tryField(qId, 'additional', additionalComments[qId]).catch((err) => {
+    const entry = await tryField(qId, 'additional', slice.additionalComments[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;
     });

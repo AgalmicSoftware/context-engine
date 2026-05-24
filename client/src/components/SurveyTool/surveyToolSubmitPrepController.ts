@@ -142,26 +142,29 @@ export const verifyEncryptionIntegrity = (
 
   const limitSet = onlyTheseQids ? new Set(Array.from(onlyTheseQids)) : null;
 
-  if (stateToCheck && stateToCheck.answers) {
-    for (const qId in stateToCheck.answers) {
-      if (limitSet && !limitSet.has(qId)) continue;
-      const answer = stateToCheck.answers[qId];
-      const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
+  const qidsToCheck = new Set([
+    ...Object.keys(stateToCheck.answers || {}),
+    ...Object.keys(stateToCheck.additionalComments || {}),
+  ]);
 
-      if (answer && answer.encrypted && !answer.encryptedPortion && answer.value !== '*') {
-        failures.push(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
-        verificationPassed = false;
-      }
-      if (
-        additional &&
-        additional.encrypted &&
-        !additional.encryptedPortion &&
-        additional.value !== '*' &&
-        hasMeaningfulFieldValue(additional)
-      ) {
-        failures.push(`Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`);
-        verificationPassed = false;
-      }
+  for (const qId of qidsToCheck) {
+    if (limitSet && !limitSet.has(qId)) continue;
+    const answer = stateToCheck.answers ? stateToCheck.answers[qId] : null;
+    const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
+
+    if (answer && answer.encrypted && !answer.encryptedPortion && answer.value !== '*') {
+      failures.push(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
+      verificationPassed = false;
+    }
+    if (
+      additional &&
+      additional.encrypted &&
+      !additional.encryptedPortion &&
+      additional.value !== '*' &&
+      hasMeaningfulFieldValue(additional)
+    ) {
+      failures.push(`Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`);
+      verificationPassed = false;
     }
   }
 
