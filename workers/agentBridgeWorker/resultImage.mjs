@@ -1,23 +1,27 @@
 const WIDTH = 1080;
 const HEIGHT = 720;
-const BG = [20, 24, 58, 255];
-const PANEL = [38, 43, 96, 255];
 const TEXT = [248, 250, 255, 255];
-const MUTED = [166, 174, 210, 255];
-const ACCENT = [98, 255, 191, 255];
-const LINE = [78, 85, 150, 255];
 const BLUE = [44, 195, 255, 255];
-const YELLOW = [255, 225, 108, 255];
-const RED = [255, 138, 122, 255];
-const GREEN = [129, 199, 132, 255];
-const SOFT = [30, 35, 82, 255];
 const WHITE = [255, 255, 255, 255];
 const BLACK = [20, 24, 35, 255];
 const GRID = [220, 224, 235, 255];
 const SLATE = [86, 96, 118, 255];
-const STEEL = [70, 130, 180, 255];
 const ORANGE = [255, 153, 0, 255];
-const PURPLE = [148, 103, 189, 255];
+const LIGHT_BG = [247, 249, 252, 255];
+const CARD_BORDER = [225, 230, 238, 255];
+const PILL_BG = [249, 251, 255, 255];
+const SOFT_GREEN = [229, 248, 236, 255];
+const SOFT_BLUE = [232, 243, 255, 255];
+const SOFT_YELLOW = [255, 247, 226, 255];
+const AGREE_GREEN = [18, 181, 105, 255];
+const UNSURE_YELLOW = [245, 181, 0, 255];
+const DISAGREE_RED = [255, 68, 61, 255];
+const GROUP_COLORS = Object.freeze([
+  [31, 119, 214, 255],
+  [255, 159, 28, 255],
+  [22, 163, 74, 255],
+  [168, 85, 247, 255],
+]);
 
 const FONT = Object.freeze({
   A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
@@ -101,6 +105,16 @@ function strokeRect(pixels, width, x, y, w, h, color) {
   fillRect(pixels, width, x + w - 2, y, 2, h, color);
 }
 
+function fillRoundRect(pixels, width, x, y, w, h, radius, color) {
+  const r = Math.max(0, Math.round(radius));
+  fillRect(pixels, width, x + r, y, w - 2 * r, h, color);
+  fillRect(pixels, width, x, y + r, w, h - 2 * r, color);
+  fillCircle(pixels, width, x + r, y + r, r, color);
+  fillCircle(pixels, width, x + w - r - 1, y + r, r, color);
+  fillCircle(pixels, width, x + r, y + h - r - 1, r, color);
+  fillCircle(pixels, width, x + w - r - 1, y + h - r - 1, r, color);
+}
+
 function drawLine(pixels, width, x1, y1, x2, y2, color) {
   let x = Math.round(x1);
   let y = Math.round(y1);
@@ -178,6 +192,49 @@ function drawText(pixels, width, text, x, y, scale = 3, color = TEXT) {
   return cursor;
 }
 
+function textPixelWidth(text = '', scale = 3) {
+  return normalizeText(text).length * 6 * scale;
+}
+
+function drawPill(pixels, width, text, x, y, {
+  scale = 2,
+  color = BLACK,
+  fill = PILL_BG,
+  border = CARD_BORDER,
+  dot = null,
+  padX = 14,
+  h = 38,
+} = {}) {
+  const dotW = dot ? 24 : 0;
+  const pillW = padX * 2 + dotW + textPixelWidth(text, scale);
+  fillRoundRect(pixels, width, x, y, pillW, h, 8, fill);
+  strokeRect(pixels, width, x, y, pillW, h, border);
+  let textX = x + padX;
+  if (dot) {
+    fillCircle(pixels, width, x + padX + 7, y + Math.round(h / 2), 7, dot);
+    textX += dotW;
+  }
+  drawText(pixels, width, text, textX, y + Math.round((h - 7 * scale) / 2), scale, color);
+  return pillW;
+}
+
+function answerKind(label = '') {
+  const normalized = String(label || '').toLowerCase();
+  if (/disagree|no|against|block|low|false|oppose|reject/.test(normalized)) return 'disagree';
+  if (/unsure|maybe|neutral|mixed|unknown|abstain/.test(normalized)) return 'unsure';
+  if (/agree|yes|for|support|high|true|approve/.test(normalized)) return 'agree';
+  return 'unsure';
+}
+
+function answerCounts(answers = []) {
+  const counts = { agree: 0, unsure: 0, disagree: 0 };
+  for (const answer of answers || []) {
+    const label = typeof answer === 'string' ? answer : answer?.label;
+    counts[answerKind(label)] += 1;
+  }
+  return { ...counts, total: counts.agree + counts.unsure + counts.disagree };
+}
+
 function wrapText(value = '', maxChars = 52) {
   const words = normalizeText(value).split(/\s+/).filter(Boolean);
   const lines = [];
@@ -213,14 +270,6 @@ function answerPosition(label = '') {
   return 0.22 + ((hashText(normalized) % 560) / 1000);
 }
 
-function answerColor(label = '') {
-  const normalized = String(label || '').toLowerCase();
-  if (/disagree|no|against|block|low/.test(normalized)) return RED;
-  if (/unsure|maybe|neutral|mixed|unknown/.test(normalized)) return YELLOW;
-  if (/agree|yes|for|support|high/.test(normalized)) return GREEN;
-  return BLUE;
-}
-
 function demoBeeswarmRows() {
   return [
     { label: 'Q1', prompt: 'Office pets', answers: ['Agree', 'Agree', 'Agree', 'Unsure', 'Disagree', 'Disagree', 'Agree', 'Unsure'] },
@@ -238,100 +287,216 @@ function demoParticipants() {
   ];
 }
 
+function drawResultsHeader(pixels, width, {
+  title = 'Consensus',
+  sessionTitle = '',
+  responseCount = 0,
+  demo = false,
+} = {}) {
+  drawText(pixels, width, title, 58, 50, 4, BLACK);
+  const demoX = 58 + textPixelWidth(title, 4) + 30;
+  const demoW = drawPill(pixels, width, demo ? 'DEMO DATA' : 'LIVE', demoX, 42, {
+    dot: demo ? AGREE_GREEN : BLUE,
+    color: SLATE,
+  });
+  drawPill(pixels, width, `${Number(responseCount || 0)} RESPONSES`, demoX + demoW + 22, 42, {
+    fill: PILL_BG,
+    color: SLATE,
+  });
+  const session = sessionTitle || 'SESSION';
+  const sessionLabel = session.length > 16 ? `${session.slice(0, 13)}...` : session;
+  const sessionW = textPixelWidth(sessionLabel, 2) + 34;
+  drawPill(pixels, width, sessionLabel, WIDTH - 58 - sessionW, 42, {
+    fill: PILL_BG,
+    color: SLATE,
+    padX: 14,
+  });
+  drawLine(pixels, width, 40, 112, WIDTH - 40, 112, CARD_BORDER);
+}
+
+function drawLegend(pixels, width, x, y) {
+  fillCircle(pixels, width, x, y + 8, 7, AGREE_GREEN);
+  drawText(pixels, width, 'AGREE', x + 18, y, 2, SLATE);
+  fillCircle(pixels, width, x + 138, y + 8, 7, UNSURE_YELLOW);
+  drawText(pixels, width, 'UNSURE', x + 156, y, 2, SLATE);
+  fillCircle(pixels, width, x + 294, y + 8, 7, DISAGREE_RED);
+  drawText(pixels, width, 'DISAGREE', x + 312, y, 2, SLATE);
+}
+
+function drawDistributionBar(pixels, width, x, y, w, h, counts = {}) {
+  const total = Math.max(1, counts.total || counts.agree + counts.unsure + counts.disagree || 0);
+  const agreeW = Math.round((counts.agree / total) * w);
+  const unsureW = Math.round((counts.unsure / total) * w);
+  const disagreeW = Math.max(0, w - agreeW - unsureW);
+  fillRoundRect(pixels, width, x, y, w, h, 7, GRID);
+  if (agreeW > 0) fillRect(pixels, width, x, y, agreeW, h, AGREE_GREEN);
+  if (unsureW > 0) fillRect(pixels, width, x + agreeW, y, unsureW, h, UNSURE_YELLOW);
+  if (disagreeW > 0) fillRect(pixels, width, x + agreeW + unsureW, y, disagreeW, h, DISAGREE_RED);
+  strokeRect(pixels, width, x, y, w, h, WHITE);
+  const segments = [
+    { label: `${Math.round((counts.agree / total) * 100)}%`, x, w: agreeW, color: WHITE },
+    { label: `${Math.round((counts.unsure / total) * 100)}%`, x: x + agreeW, w: unsureW, color: BLACK },
+    { label: `${Math.round((counts.disagree / total) * 100)}%`, x: x + agreeW + unsureW, w: disagreeW, color: WHITE },
+  ];
+  for (const segment of segments) {
+    if (segment.w < 58) continue;
+    drawText(
+      pixels,
+      width,
+      segment.label,
+      segment.x + Math.round((segment.w - textPixelWidth(segment.label, 2)) / 2),
+      y + Math.round((h - 14) / 2),
+      2,
+      segment.color
+    );
+  }
+}
+
 function drawBeeswarm(pixels, width, rows = []) {
   const sourceRows = Array.isArray(rows) && rows.length ? rows : demoBeeswarmRows();
-  const chartX = 82;
-  const chartY = 214;
-  const chartW = WIDTH - 164;
-  const chartH = 394;
-  const axisY = chartY + chartH - 54;
-  const left = chartX + 52;
-  const right = chartX + chartW - 52;
-  fillRect(pixels, width, chartX, chartY, chartW, chartH, WHITE);
-  strokeRect(pixels, width, chartX, chartY, chartW, chartH, GRID);
-  drawText(pixels, width, 'COMMUNITY QUESTION BEESWARM', chartX + 24, chartY + 20, 3, BLACK);
-  drawLine(pixels, width, left, axisY, right, axisY, GRID);
-  drawText(pixels, width, 'CONSENSUS', left, axisY + 18, 2, SLATE);
-  drawText(pixels, width, 'DIFFERENCE', right - 108, axisY + 18, 2, SLATE);
-  const points = sourceRows.slice(0, 9).map((row, index) => {
-    const answers = Array.isArray(row.answers) ? row.answers : [];
-    const agree = answers.filter((answer) => /agree|yes|support|high/i.test(typeof answer === 'string' ? answer : answer?.label)).length;
-    const disagree = answers.filter((answer) => /disagree|no|against|low/i.test(typeof answer === 'string' ? answer : answer?.label)).length;
-    const unsure = Math.max(0, answers.length - agree - disagree);
-    const total = Math.max(1, answers.length);
-    const extremity = Math.min(1, Math.abs(agree - disagree) / total);
+  const tableX = 40;
+  const headerY = 138;
+  drawText(pixels, width, 'QUESTION', tableX + 22, headerY, 2, SLATE);
+  drawText(pixels, width, 'RESPONSE DISTRIBUTION', tableX + 360, headerY, 2, SLATE);
+  drawLine(pixels, width, tableX, 176, WIDTH - 40, 176, CARD_BORDER);
+
+  sourceRows.slice(0, 3).forEach((row, index) => {
+    const y = 202 + index * 136;
+    const label = row.label || `Q${index + 1}`;
+    const badgeFill = index === 0 ? SOFT_GREEN : index === 1 ? SOFT_BLUE : SOFT_YELLOW;
+    const badgeText = index === 0 ? AGREE_GREEN : index === 1 ? BLUE : ORANGE;
+    fillRoundRect(pixels, width, tableX + 8, y + 16, 58, 50, 8, badgeFill);
+    strokeRect(pixels, width, tableX + 8, y + 16, 58, 50, CARD_BORDER);
+    drawText(pixels, width, label, tableX + 20, y + 30, 3, badgeText);
+    wrapText(row.prompt || '', 24).slice(0, 3).forEach((line, lineIndex) => {
+      drawText(pixels, width, line, tableX + 88, y + 6 + lineIndex * 26, 2, BLACK);
+    });
+    const counts = answerCounts(row.answers || []);
+    const barX = tableX + 360;
+    drawDistributionBar(pixels, width, barX, y + 10, 610, 38, counts);
+    const countY = y + 64;
+    fillCircle(pixels, width, barX + 38, countY + 8, 7, AGREE_GREEN);
+    drawText(pixels, width, String(counts.agree), barX + 58, countY, 2, BLACK);
+    fillCircle(pixels, width, barX + 178, countY + 8, 7, UNSURE_YELLOW);
+    drawText(pixels, width, String(counts.unsure), barX + 198, countY, 2, BLACK);
+    fillCircle(pixels, width, barX + 318, countY + 8, 7, DISAGREE_RED);
+    drawText(pixels, width, String(counts.disagree), barX + 338, countY, 2, BLACK);
+    if (index < 2) drawLine(pixels, width, tableX, y + 112, WIDTH - 40, y + 112, CARD_BORDER);
+  });
+  drawLegend(pixels, width, 330, 650);
+}
+
+function groupForParticipant(participant = {}, groups = [], index = 0) {
+  const alias = String(participant.participant || `P${index + 1}`);
+  const groupIndex = groups.findIndex((group) => Array.isArray(group.aliases) && group.aliases.includes(alias));
+  return groupIndex >= 0 ? groupIndex : index % Math.max(1, groups.length || 1);
+}
+
+function participantGraphLayout(participants = [], groups = [], centerX = 0, centerY = 0) {
+  const groupCount = Math.max(1, groups.length || 2);
+  const groupCenters = Array.from({ length: groupCount }, (_, index) => {
+    const angle = -Math.PI / 2 + (index * Math.PI * 2) / groupCount;
     return {
-      row,
-      agree,
-      disagree,
-      unsure,
-      total,
-      x: left + Math.round((right - left) * extremity),
-      y: chartY + 92 + ((index * 47) % 210),
-      label: row.label || `Q${index + 1}`,
+      x: centerX + Math.round(Math.cos(angle) * 86),
+      y: centerY + Math.round(Math.sin(angle) * 70),
     };
   });
-  points.forEach((point, index) => {
-    const active = index === 0;
-    fillCircle(pixels, width, point.x, point.y, active ? 13 : 10, active ? ORANGE : STEEL);
-    fillCircle(pixels, width, point.x, point.y, 4, WHITE);
-    drawText(pixels, width, point.label, point.x + 15, point.y - 9, 2, BLACK);
-    const barX = Math.min(right - 120, point.x + 15);
-    const barY = point.y + 13;
-    const barW = 96;
-    const agreeW = Math.round((point.agree / point.total) * barW);
-    const unsureW = Math.round((point.unsure / point.total) * barW);
-    fillRect(pixels, width, barX, barY, barW, 5, GRID);
-    fillRect(pixels, width, barX, barY, agreeW, 5, GREEN);
-    fillRect(pixels, width, barX + agreeW, barY, unsureW, 5, YELLOW);
-    fillRect(pixels, width, barX + agreeW + unsureW, barY, Math.max(0, barW - agreeW - unsureW), 5, RED);
-  });
-  points.slice(0, 3).forEach((point, index) => {
-    const label = wrapText(`${point.label}: ${point.row.prompt || ''}`, 52)[0];
-    drawText(pixels, width, label, chartX + 24, chartY + 286 + index * 26, 2, BLACK);
+  return participants.slice(0, 10).map((participant, index) => {
+    const groupIndex = groupForParticipant(participant, groups, index);
+    const answers = Array.isArray(participant.answers) ? participant.answers : [];
+    const avg = answers.reduce((sum, answer) => sum + answerPosition(answer.label), 0) / Math.max(1, answers.length);
+    const localAngle = (index * 2.35) + (avg * Math.PI);
+    const localDistance = 18 + Math.round(avg * 34);
+    return {
+      participant,
+      groupIndex,
+      x: groupCenters[groupIndex % groupCenters.length].x + Math.round(Math.cos(localAngle) * localDistance),
+      y: groupCenters[groupIndex % groupCenters.length].y + Math.round(Math.sin(localAngle) * localDistance),
+    };
   });
 }
 
-function drawParticipantGraph(pixels, width, participants = []) {
+function drawParticipantGroupLines(pixels, width, layout = []) {
+  const byGroup = new Map();
+  for (const point of layout) {
+    if (!byGroup.has(point.groupIndex)) byGroup.set(point.groupIndex, []);
+    byGroup.get(point.groupIndex).push(point);
+  }
+  for (const [groupIndex, points] of byGroup.entries()) {
+    const color = GROUP_COLORS[groupIndex % GROUP_COLORS.length];
+    if (points.length === 1) {
+      strokeCircle(pixels, width, points[0].x, points[0].y, 22, color);
+      continue;
+    }
+    const sorted = [...points].sort((left, right) => (
+      Math.atan2(left.y, left.x) - Math.atan2(right.y, right.x)
+    ));
+    for (let index = 0; index < sorted.length; index += 1) {
+      const current = sorted[index];
+      const next = sorted[(index + 1) % sorted.length];
+      if (sorted.length < 3 && index > 0) continue;
+      drawLine(pixels, width, current.x, current.y, next.x, next.y, color);
+    }
+  }
+}
+
+function drawParticipantGraph(pixels, width, participants = [], groups = []) {
   const sourceParticipants = Array.isArray(participants) && participants.length ? participants : demoParticipants();
   const questions = Array.from(new Set(sourceParticipants.flatMap((participant) => (
     (participant.answers || []).map((answer) => answer.question).filter(Boolean)
   )))).slice(0, 5);
-  const chartX = 82;
-  const chartY = 214;
-  const chartW = WIDTH - 164;
-  const chartH = 394;
+  const chartX = 58;
+  const chartY = 130;
+  const chartW = WIDTH - 116;
+  const chartH = 410;
   const centerX = chartX + Math.round(chartW / 2);
-  const centerY = chartY + Math.round(chartH / 2) + 10;
-  const radius = 150;
-  fillRect(pixels, width, chartX, chartY, chartW, chartH, WHITE);
-  strokeRect(pixels, width, chartX, chartY, chartW, chartH, GRID);
-  drawText(pixels, width, 'PARTICIPANTS GRAPH', chartX + 24, chartY + 20, 3, BLACK);
-  strokeCircle(pixels, width, centerX, centerY, radius, GRID);
-  strokeCircle(pixels, width, centerX, centerY, Math.round(radius / 2), GRID);
-  drawLine(pixels, width, centerX - radius - 32, centerY, centerX + radius + 32, centerY, GRID);
-  drawLine(pixels, width, centerX, centerY - radius - 24, centerX, centerY + radius + 24, GRID);
-  const colors = [STEEL, ORANGE, GREEN, PURPLE, RED];
-  sourceParticipants.slice(0, 8).forEach((participant, index) => {
-    const answers = Array.isArray(participant.answers) ? participant.answers : [];
-    const avg = answers.reduce((sum, answer) => sum + answerPosition(answer.label), 0) / Math.max(1, answers.length);
-    const angle = ((index / Math.max(1, sourceParticipants.length)) * Math.PI * 2) + (avg * Math.PI);
-    const distance = 42 + Math.round(avg * 104);
-    const px = centerX + Math.round(Math.cos(angle) * distance);
-    const py = centerY + Math.round(Math.sin(angle) * distance);
+  const centerY = chartY + Math.round(chartH / 2) - 8;
+  const radius = 172;
+  strokeCircle(pixels, width, centerX, centerY, radius, CARD_BORDER);
+  strokeCircle(pixels, width, centerX, centerY, Math.round(radius / 2), CARD_BORDER);
+  drawLine(pixels, width, centerX - radius - 30, centerY, centerX + radius + 30, centerY, CARD_BORDER);
+  drawLine(pixels, width, centerX, centerY - radius - 20, centerX, centerY + radius + 20, CARD_BORDER);
+  const layout = participantGraphLayout(sourceParticipants, groups, centerX, centerY);
+  drawParticipantGroupLines(pixels, width, layout);
+  layout.forEach((point, index) => {
+    const participant = point.participant;
     const label = participant.participant || `P${index + 1}`;
-    fillCircle(pixels, width, px, py, 9, colors[index % colors.length]);
-    drawText(pixels, width, label, px + 12, py - 8, 2, BLACK);
+    const color = GROUP_COLORS[point.groupIndex % GROUP_COLORS.length];
+    fillCircle(pixels, width, point.x, point.y, 12, color);
+    fillCircle(pixels, width, point.x, point.y, 4, WHITE);
+    drawText(pixels, width, label, point.x + 15, point.y - 8, 2, BLACK);
   });
   questions.slice(0, 5).forEach((question, index) => {
     const angle = ((index / Math.max(1, questions.length)) * Math.PI * 2) - Math.PI / 2;
     const px = centerX + Math.round(Math.cos(angle) * (radius - 18));
     const py = centerY + Math.round(Math.sin(angle) * (radius - 18));
-    fillCircle(pixels, width, px, py, 5, BLACK);
-    drawText(pixels, width, question, px + 9, py - 7, 2, BLACK);
+    fillCircle(pixels, width, px, py, 7, BLACK);
+    drawText(pixels, width, question, px + 12, py - 8, 2, BLACK);
   });
-  drawText(pixels, width, 'COLORED POINTS = PARTICIPANTS', chartX + 24, chartY + 318, 2, BLACK);
-  drawText(pixels, width, 'BLACK POINTS = QUESTIONS', chartX + 24, chartY + 344, 2, BLACK);
+  fillCircle(pixels, width, 76, 512, 7, GROUP_COLORS[0]);
+  drawText(pixels, width, 'PARTICIPANTS', 96, 503, 2, SLATE);
+  fillCircle(pixels, width, 252, 512, 7, BLACK);
+  drawText(pixels, width, 'QUESTIONS', 272, 503, 2, SLATE);
+
+  const summaryGroups = (Array.isArray(groups) && groups.length ? groups : [
+    { label: 'Group 1', theme: 'similar answer pattern', aliases: ['P1', 'P3'] },
+    { label: 'Group 2', theme: 'contrasting answer pattern', aliases: ['P2'] },
+  ]).slice(0, 3);
+  summaryGroups.forEach((group, index) => {
+    const cardW = summaryGroups.length > 2 ? 300 : 430;
+    const x = 58 + index * (cardW + 24);
+    const y = 570;
+    const color = GROUP_COLORS[index % GROUP_COLORS.length];
+    fillRoundRect(pixels, width, x, y, cardW, 104, 10, WHITE);
+    strokeRect(pixels, width, x, y, cardW, 104, CARD_BORDER);
+    fillCircle(pixels, width, x + 24, y + 28, 10, color);
+    drawText(pixels, width, group.label || `GROUP ${index + 1}`, x + 42, y + 18, 2, color);
+    const aliases = Array.isArray(group.aliases) ? group.aliases.slice(0, 4).join(' ') : '';
+    drawText(pixels, width, aliases || 'PARTICIPANTS', x + 24, y + 54, 2, BLACK);
+    wrapText(group.theme || 'CONNECTED BY SIMILAR VOTES', 30).slice(0, 1).forEach((line) => {
+      drawText(pixels, width, line, x + 24, y + 78, 2, SLATE);
+    });
+  });
 }
 
 function adler32(bytes) {
@@ -440,38 +605,25 @@ export function buildResultsImage({
   lines = [],
   beeswarmRows = [],
   participants = [],
+  groups = [],
 } = {}) {
   const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
-  fillRect(pixels, WIDTH, 0, 0, WIDTH, HEIGHT, BG);
-  fillRect(pixels, WIDTH, 34, 34, WIDTH - 68, HEIGHT - 68, PANEL);
-  strokeRect(pixels, WIDTH, 34, 34, WIDTH - 68, HEIGHT - 68, LINE);
-  fillRect(pixels, WIDTH, 34, 34, 10, HEIGHT - 68, ACCENT);
-
-  drawText(pixels, WIDTH, mode === 'group' ? 'PARTICIPANT RESULTS' : 'BEESWARM RESULTS', 72, 72, 5, TEXT);
-  drawText(pixels, WIDTH, sessionTitle || 'SESSION RESULTS', 74, 126, 3, MUTED);
-  drawText(
-    pixels,
-    WIDTH,
-    `${demo ? 'DEMO' : 'LIVE'} / RESPONSES ${Number(responseCount || 0)}`,
-    74,
-    164,
-    3,
-    demo ? [255, 225, 108, 255] : ACCENT
-  );
+  fillRect(pixels, WIDTH, 0, 0, WIDTH, HEIGHT, LIGHT_BG);
+  fillRoundRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, 14, WHITE);
+  strokeRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, CARD_BORDER);
+  drawResultsHeader(pixels, WIDTH, {
+    title: mode === 'group' ? 'PARTICIPANTS' : 'CONSENSUS',
+    sessionTitle,
+    responseCount,
+    demo,
+  });
 
   if (mode === 'group') {
-    drawParticipantGraph(pixels, WIDTH, participants);
+    drawParticipantGraph(pixels, WIDTH, participants, groups);
   } else {
     drawBeeswarm(pixels, WIDTH, beeswarmRows);
   }
-
-  const captionLines = lines
-    .slice(0, 3)
-    .flatMap((line) => wrapText(line, 44))
-    .slice(0, 3);
-  captionLines.forEach((line, index) => {
-    drawText(pixels, WIDTH, line, 74, 628 + index * 24, 2, index === 0 ? TEXT : MUTED);
-  });
+  void lines;
 
   return {
     bytes: encodePng(pixels, WIDTH, HEIGHT),
