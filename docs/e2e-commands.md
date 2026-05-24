@@ -86,7 +86,11 @@ Porto-style test wallet.
 For repeatable runs across machines, keep E2E configuration in a local file:
 
 1. `cp .env.e2e.example .env.e2e`
-2. Fill required values (`RPC_URL`, `SESSION_WORKER_URL`, and `ARWEAVE_JWK_PATH` for doc flows).
+2. Fill common values:
+   - `RPC_URL`
+   - `ARWEAVE_JWK_PATH` for Arweave/doc/manual-follow-up flows
+   - For fresh full private runs, set `CLOUDFLARE_API_TOKEN` and let session setup create the session worker URL
+   - For reuse-only runs, set both `SESSION_SLUG` and `SESSION_WORKER_URL` from a recent successful E2E session setup
 3. Run any `ai:*` command normally (scripts auto-load `.env.e2e.local`, then `.env.e2e`).
 
 For OP Sepolia on-chain runs, the built-in fallback is the first public RPC from the shared manifest. Set `RPC_URL` to your own reliable endpoint for longer E2E or seed runs because public RPCs can rate-limit or time out.
@@ -202,6 +206,17 @@ Session slug handoff options:
   - `npm run -s ai:test-doc-library:url-records -- --session-slug <slug>`
   - `npm run -s ai:test-gate-revocation:decrypt -- --session-slug <slug>`
   - `npm run -s ai:test-worker-scopes:matrix -- --session-slug <slug>`
+
+Full-session worker handoff:
+
+- Fresh full E2E runs should generate their own worker URL by starting with `npm run -s ai:test-session-setup:custom-worker-secrets`.
+- Feed both values from that successful setup into later steps:
+  - `SESSION_SLUG=<slug>`
+  - `SESSION_WORKER_URL=<sessionCorsWorker URL>`
+- If the setup artifact does not include `workerUrl`, read the on-chain SessionRegistry `corsWorkerUrl` for that slug and use that worker URL.
+- Reuse an existing worker only when it came from a recent successful E2E session setup and still authenticates for the same `SESSION_SLUG`.
+- For `ai:test-survey-response:encryption-matrix`, set `SURVEY_RESPONSE_REUSE_SESSION_SLUG=1` or pass `--session-slug <slug>`; otherwise the runner may generate a fresh slug instead of using the established worker-backed session.
+- Do not use the shared demo/default worker as the worker URL for a newly generated full response run unless that worker was explicitly established for the same slug.
 
 Useful env vars for `ai:wallet`:
 

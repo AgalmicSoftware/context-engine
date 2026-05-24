@@ -33,7 +33,6 @@ Arweave is public and permanent. Use non-identifying payloads only.
 1. `cp .env.e2e.example .env.e2e`
 2. Set common values:
    - `RPC_URL`
-   - `SESSION_WORKER_URL` (recommended for determinism; legacy `WORKER_URL` still works when it is clearly a sessionCorsWorker)
    - `ARWEAVE_JWK_PATH` (required for doc upload/decrypt flows)
      - Verify the configured key with `npm run -s arweave:jwk:inspect -- --expect-address <known-address>`
    - For Session Wizard custom-worker flows:
@@ -162,10 +161,11 @@ Runners that need the CORS worker will resolve a base URL in this order:
 4. Shared global fallback from client config (`CLOUDFLARE_CORS_WORKER_URL` in `client/src/variables/appConfig.js`, used for general/default-session fallback)
 
 Reuse-first behavior:
-- If `SESSION_WORKER_URL` is set and works, runners will reuse it.
+- If `SESSION_WORKER_URL` is set and works for the active `SESSION_SLUG`, runners will reuse it.
 - `WORKER_URL` remains a legacy session-worker alias. If it looks like an agent bridge URL, normal session-worker E2E ignores it and leaves it available as `AGENT_BRIDGE_PUBLIC_URL`.
 - Set `E2E_ALLOW_WORKER_URL_AGENT_BRIDGE=1` only for explicit bridge tests that intentionally overload `WORKER_URL`.
 - Keep Telegram/agent bridge endpoints in `AGENT_BRIDGE_PUBLIC_URL`; do not use them as session-worker inputs for the normal suite.
+- Full encrypted/gated response runs should not rely on the shared global fallback/default demo worker. Either create a new custom-worker session target in the same run or reuse a recent E2E-created target with both `SESSION_SLUG` and `SESSION_WORKER_URL` set.
 
 Bootstrap behavior:
 - Runners probe `/auth/nonce` + `/auth/login` for the admin/holder wallet used by the flow.
@@ -226,6 +226,12 @@ Private suite flags for `scripts/run-e2e-suite.js`:
 - `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s ai:node -- scripts/run-e2e-suite.js`
 - `E2E_SUITE_CONTINUE=1 npm run -s ai:node -- scripts/run-e2e-suite.js` (run all steps, then exit non-zero if any failed)
 - Full private suites create a fresh session target by default before child steps. When `CLOUDFLARE_API_TOKEN` is set, the default fresh profile is `custom-worker-secrets-v1` so the target session gets its own worker and slug-scoped secrets. Without a token the fallback profile is `default-worker-minimal-v1`, which is only appropriate when the shared/default worker accepts the target session slug. Set `E2E_SUITE_ENSURE_SESSION=0` to skip setup, `E2E_SUITE_REUSE_SESSION_TARGET=1` to reuse `SESSION_SLUG` or the latest active target, or `E2E_SUITE_SESSION_PROFILE=...` to choose explicitly.
+
+Manual full-session sequence:
+1. Create a custom-worker session with `ai:test-session-setup:custom-worker-secrets`.
+2. Resolve the session target from the setup artifact: `slug`, `adminUrl`, metadata URI, and the deployed `sessionCorsWorker` URL. If the setup artifact omits `workerUrl`, read the on-chain SessionRegistry `corsWorkerUrl` for that slug.
+3. Run downstream authoring/response commands with `SESSION_SLUG=<slug>` and `SESSION_WORKER_URL=<worker-url>`.
+4. For the response matrix, also set `SURVEY_RESPONSE_REUSE_SESSION_SLUG=1` unless passing `--session-slug <slug>`.
 
 Navigation is included in the public smoke via `scripts/vite-navigation-smoke.js`.
 
