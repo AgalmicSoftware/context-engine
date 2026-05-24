@@ -2739,6 +2739,7 @@ async function buildResultsResponse({
       demo,
       lines,
       participants: graph.participants,
+      groups: graph.groups,
     });
     return reply({
       method: 'sendPhoto',

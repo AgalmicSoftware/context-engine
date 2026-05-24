@@ -118,10 +118,12 @@ Core Telegram commands:
   `/me`, and `/account` keep their existing session/question/document/account
   behavior. Plain `/results` explains the `consensus` and `group` views and
   renders buttons for both modes; mode-specific results attempt to upload a
-  rendered PNG card with a beeswarm view for consensus and a participant graph
+  rendered PNG card with a compact white consensus view and participant graph
   for group results, using demo data until enough live overlap exists. The
-  beeswarm view pages through the top three differentiating questions at a
-  time, and the participant graph exposes per-group analysis buttons that use
+  consensus view pages through the top three differentiating questions at a
+  time and renders client-style agree/unsure/disagree distribution bars. The
+  participant graph connects same-group participant dots and exposes per-group
+  analysis buttons that use
   the selected session worker's sponsored AI route when available.
 - `/export_all [session]` is private-chat only and sends a zip archive of
   Cloudflare-backed response payloads for the selected session. The caller's
