@@ -318,6 +318,12 @@ async function main() {
       localStorage.setItem('porto_session_v1', JSON.stringify(portoSessionRecord));
     } catch (_) {}
 
+    // Match the shared E2E browser seed so cold-loading /session/<slug> does not
+    // open the onboarding overlay over the create controls.
+    try { localStorage.setItem('firstVisit', 'false'); } catch (_) {}
+    try { sessionStorage.setItem('firstVisit', 'false'); } catch (_) {}
+    try { sessionStorage.setItem('hasRedirectedToDemo', 'true'); } catch (_) {}
+
     // Optional: force local Arweave key for this run so CreateSurvey uploads do not depend on
     // session-sponsored worker secrets.
     if (resourceKeysSeed && typeof resourceKeysSeed === 'object') {
