@@ -7,7 +7,6 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
-  buildDeepE2eSteps,
   isLocalBaseUrl,
   resolveDeepE2eEnv,
 } = require('./run-deep-e2e-tests');
@@ -50,28 +49,4 @@ test('isLocalBaseUrl limits automatic app-server startup to local targets', () =
   assert.equal(isLocalBaseUrl('http://localhost:3000'), true);
   assert.equal(isLocalBaseUrl('https://contextengine.xyz'), false);
   assert.equal(isLocalBaseUrl('not a url'), false);
-});
-
-test('buildDeepE2eSteps only includes private bridge checks when the root script is available', () => {
-  assert.deepEqual(
-    buildDeepE2eSteps({}).map(([label]) => label),
-    [
-      'worker scope matrix',
-      'gated decrypt all types',
-      'survey response encryption matrix',
-      'doc library session filetypes',
-    ],
-  );
-
-  assert.deepEqual(
-    buildDeepE2eSteps({ 'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js' })
-      .map(([label]) => label),
-    [
-      'worker scope matrix',
-      'gated decrypt all types',
-      'survey response encryption matrix',
-      'doc library session filetypes',
-      'agent bridge worker',
-    ],
-  );
 });

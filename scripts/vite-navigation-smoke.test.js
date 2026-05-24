@@ -8,6 +8,7 @@ const {
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   normalizeBaseUrl,
+  normalizeLayoutProbeSelectors,
   normalizeRoutes,
   resolveViewport,
   routeUrl,
@@ -25,6 +26,18 @@ test('normalizeRoutes accepts comma-separated routes and adds leading slashes', 
 test('resolveViewport supports the maintained mobile smoke alias', () => {
   assert.deepEqual(resolveViewport('mobile'), { width: 390, height: 844 });
   assert.deepEqual(resolveViewport('desktop'), { width: 1440, height: 1000 });
+});
+
+test('normalizeLayoutProbeSelectors keeps default browser layout checks and accepts overrides', () => {
+  assert.ok(normalizeLayoutProbeSelectors().includes('[data-testid="ce-survey-submit"]'));
+  assert.deepEqual(
+    normalizeLayoutProbeSelectors('[data-testid="a"], [data-testid="b"]'),
+    ['[data-testid="a"]', '[data-testid="b"]']
+  );
+  assert.deepEqual(
+    normalizeLayoutProbeSelectors([' [data-testid="c"] ', '']),
+    ['[data-testid="c"]']
+  );
 });
 
 test('routeUrl joins normalized app URLs and routes', () => {
@@ -64,6 +77,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
       }],
       unexpectedConsoleIssues: [{ type: 'error', text: 'TypeError: boom' }],
       pageErrors: ['ReferenceError: boom'],
+      layoutIssues: ['ce-survey-submit: visible text appears clipped'],
     },
   ]);
 
@@ -76,6 +90,7 @@ test('summarizeFailures catches Vite-sensitive render, style, and asset failures
     '/session/demo: failed script http://127.0.0.1:3000/src/main.tsx (net::ERR_FAILED)',
     '/session/demo: console error: TypeError: boom',
     '/session/demo: page error: ReferenceError: boom',
+    '/session/demo: layout issue: ce-survey-submit: visible text appears clipped',
   ]);
 });
 
@@ -96,6 +111,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: [],
       unexpectedConsoleIssues: [],
       pageErrors: [],
+      layoutIssues: [],
       missingText: [],
     }],
   }), {
@@ -113,6 +129,7 @@ test('compactSmokeSummary keeps success output focused on route health', () => {
       unexpectedFailedRequests: 0,
       unexpectedConsoleIssues: 0,
       pageErrors: 0,
+      layoutIssues: 0,
       missingText: [],
     }],
     failures: [],
