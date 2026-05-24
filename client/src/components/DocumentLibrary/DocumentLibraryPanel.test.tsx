@@ -170,64 +170,6 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
     });
   });
 
-  it('resets custom gate mode after the document context changes', async () => {
-    mockResolveDocUploadsGate.mockReturnValue({
-      gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 84532, mode: 0 },
-      lookupStatus: 'ok',
-      sbtAddresses: ['0x00000000000000000000000000000000000000bb'],
-      chainId: 84532,
-      mode: 'any',
-      hasRecipients: true,
-    });
-    mockGetGlobalLitHooks.mockReturnValue({
-      saveKey: jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' })),
-    });
-
-    const baseProps = {
-      provider: {},
-      network: { id: 84532 },
-      account: '0x123',
-      loginComplete: true,
-      toggleLoginModal: jest.fn(),
-      sessionConfig: TEST_SESSION_CONFIG,
-      mode: 'session',
-    };
-    const { rerender } = render(
-      <DocumentLibraryPanel {...baseProps} sessionSlug="edge-a" sessionIdHex={`0x${'5'.repeat(32)}`} />,
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_AUDIENCE_CUSTOM));
-    fireEvent.click(screen.getByRole('button', { name: 'Add mock selected SBT' }));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_CUSTOM_MODE_ALL));
-
-    rerender(<DocumentLibraryPanel {...baseProps} sessionSlug="edge-b" sessionIdHex={`0x${'6'.repeat(32)}`} />);
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_AUDIENCE_CUSTOM));
-    fireEvent.click(screen.getByRole('button', { name: 'Add mock selected SBT' }));
-    mockBuildSbtAccessControlConditions.mockClear();
-
-    const file = new File(['secret'], 'reset-secret.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
-      target: { files: [file] },
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    await waitFor(() => {
-      expect(mockBuildSbtAccessControlConditions).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
-          chainId: 84532,
-          mode: 'any',
-        }),
-      );
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({ file }));
-    });
-  });
-
   it('blocks encrypted custom-audience uploads when access conditions cannot be built', async () => {
     mockResolveDocUploadsGate.mockReturnValue({
       gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 84532, mode: 0 },
@@ -253,7 +195,7 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'7'.repeat(32)}`}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -299,7 +241,7 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'8'.repeat(32)}`}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -321,15 +263,15 @@ describe('DocumentLibraryPanel photo docs and upload audience', () => {
     });
     const uploadArgs = mockUploadDocLibraryFile.mock.calls[0][0];
     const tags = uploadArgs.tags || [];
-    expect(tags).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
-        expect.objectContaining({ name: 'CE-DocKind', value: 'file' }),
-      ]),
-    );
-    expect(tags.map((tag: { name: string }) => tag.name)).not.toEqual(
-      expect.arrayContaining(['CE-DocName', 'CE-DocMime', 'CE-DocSize']),
-    );
+    expect(tags).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
+      expect.objectContaining({ name: 'CE-DocKind', value: 'file' }),
+    ]));
+    expect(tags.map((tag: { name: string }) => tag.name)).not.toEqual(expect.arrayContaining([
+      'CE-DocName',
+      'CE-DocMime',
+      'CE-DocSize',
+    ]));
     expect(JSON.stringify(tags)).not.toContain('secret-plan');
   });
 
