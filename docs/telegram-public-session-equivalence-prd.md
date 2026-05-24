@@ -1,5 +1,7 @@
 # Telegram Public Session Equivalence PRD
 
+Related PRD: [Telegram Response Export Scope](./telegram-response-export-scope-prd.md)
+
 ## Problem
 
 Publicly viewable sessions should behave consistently across the CE client,

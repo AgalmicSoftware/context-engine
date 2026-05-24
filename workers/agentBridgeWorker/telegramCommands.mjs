@@ -7,7 +7,9 @@ import {
 import { listDocumentsForSession, summarizeDocumentForGroup } from './docLibrary.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
+  authenticateSessionWorker,
   requestManagedAccountFaucetOnJoin,
+  resolveSessionWorkerUrl,
   submitTelegramResponseOnChain,
 } from './onChainResponses.mjs';
 import {
@@ -31,7 +33,11 @@ import { assertNoSecretShape } from './redaction.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
 import { buildResultsImage } from './resultImage.mjs';
 import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
-import { normalizeSessionPolicy, resolveSessionInvocation } from './sessionPolicy.mjs';
+import {
+  evaluateSponsoredResourceEligibility,
+  normalizeSessionPolicy,
+  resolveSessionInvocation,
+} from './sessionPolicy.mjs';
 import {
   addResponseExportAllowedAddress,
   buildTelegramResponseExportArchive,
@@ -65,6 +71,7 @@ const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
+const TELEGRAM_RESULTS_PAGE_SIZE = 3;
 const TELEGRAM_BUTTON_LABEL_MAX_BYTES = 64;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const ANSWER_BUTTON_CONTROL_TYPES = new Set([
@@ -2005,6 +2012,7 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
       telegramUserId: safeString(record.telegramUserId),
       questionId: safeString(record.questionId),
       label: normalizeResultAnswerLabel(record.answer?.label || record.answer?.value || record.answer?.text),
+      value: safeString(record.answer?.value || record.answer?.text || record.answer?.label),
       txHash: safeString(record.onChain?.txHash),
     }))
     .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
@@ -2056,18 +2064,28 @@ function summarizeQuestionResults(records = [], questions = []) {
 }
 
 function demoDifferenceRows(questions = []) {
-  const prompts = questions.length ? questions.map(questionText) : [
+  const fallbackPrompts = [
     'Arriving 10 minutes early is better than arriving exactly on time.',
     'A supply-chain risk review should block launch when evidence is incomplete.',
     'Participants should explain uncertainty before choosing Agree or Disagree.',
+    'The team should prioritize speed over extra review for this pilot.',
+    'Food preference questions help make the session easier to discuss.',
+    'Results should be shared publicly once enough people respond.',
   ];
-  return prompts.slice(0, 3).map((prompt, index) => ({
+  const prompts = [
+    ...(questions.length ? questions.map(questionText) : []),
+    ...fallbackPrompts,
+  ].filter(Boolean);
+  return prompts.slice(0, 6).map((prompt, index) => ({
     prompt,
-    counts: index === 0
-      ? [['Agree', 4], ['Disagree', 4], ['Unsure', 2]]
-      : index === 1
-      ? [['Agree', 5], ['Disagree', 3], ['Unsure', 2]]
-      : [['Agree', 3], ['Disagree', 3], ['Unsure', 4]],
+    counts: [
+      [['Agree', 4], ['Disagree', 4], ['Unsure', 2]],
+      [['Agree', 5], ['Disagree', 3], ['Unsure', 2]],
+      [['Agree', 3], ['Disagree', 3], ['Unsure', 4]],
+      [['Agree', 6], ['Disagree', 3], ['Unsure', 1]],
+      [['Agree', 2], ['Disagree', 5], ['Unsure', 3]],
+      [['Agree', 4], ['Disagree', 2], ['Unsure', 4]],
+    ][index] || [['Agree', 3], ['Disagree', 3], ['Unsure', 4]],
     total: 10,
     demo: true,
   }));
@@ -2087,8 +2105,404 @@ function formatCounts(counts = []) {
   return counts.map(([label, count]) => `${label} ${count}`).join(' | ');
 }
 
+function extractJsonObject(text = '') {
+  const raw = safeString(text);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {}
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+function extractAiText(body = {}) {
+  if (typeof body === 'string') return body;
+  const direct = safeString(body?.completion || body?.output_text || body?.text || body?.content);
+  if (direct) return direct;
+  const choiceText = safeString(body?.choices?.[0]?.message?.content || body?.choices?.[0]?.text);
+  if (choiceText) return choiceText;
+  const outputContent = Array.isArray(body?.output)
+    ? body.output.flatMap((item) => Array.isArray(item?.content) ? item.content : [])
+    : [];
+  return safeString(outputContent.map((item) => item?.text || item?.content || '').filter(Boolean).join('\n'));
+}
+
+function buildGroupAnalysisPrompt(group = {}, groups = []) {
+  const allGroupsData = {
+    clusterCount: groups.length,
+    sizes: Object.fromEntries(groups.map((item, index) => [String(index + 1), item.size])),
+    previousNames: [],
+    nameUniqueness: true,
+  };
+  const clusterData = {
+    clusterIndex: Number(String(group.groupId || '').replace(/\D+/g, '')) || 1,
+    clusterSize: group.size,
+    totalClusters: groups.length,
+    topStatements: group.topStatements,
+  };
+  return `
+We have grouped participants into ${allGroupsData.clusterCount || 'N'} opinion clusters.
+Each cluster represents people whose voting patterns on statements are similar.
+
+You are analyzing cluster #${clusterData.clusterIndex} of size ${clusterData.clusterSize || '?'}.
+For this cluster, here are the most representative statements with per-cluster vs overall agreement.
+
+Top statements (JSON):
+${JSON.stringify(clusterData.topStatements || [], null, 2)}
+
+All-clusters context (JSON, optional):
+${JSON.stringify(allGroupsData, null, 2)}
+
+TASK:
+1) Give this cluster a brief, neutral NAME (2-4 words). No slurs or niche jargon.
+2) Write a SHORT one-sentence tagline about what unites the cluster.
+3) Write a LONG 2-4 sentence overview explaining what distinguishes them from others.
+
+STRICT OUTPUT (JSON only, no extra text):
+{
+  "name": "<2-4 words label>",
+  "short": "<single-sentence tagline>",
+  "long": "<2-4 sentences>"
+}`.trim();
+}
+
+function localGroupAnalysis(group = {}) {
+  const top = (group.topStatements || []).slice(0, 3).map((statement) => (
+    `${statement.label}: ${statement.prompt} (${statement.cluster.agreeRate}% agree, ${statement.cluster.disagreeRate}% disagree)`
+  ));
+  return {
+    name: `${group.label} ${group.theme || ''}`.trim(),
+    short: `This group trends toward ${group.theme || 'a distinct answer pattern'} across the strongest differentiating questions.`,
+    long: top.length
+      ? `Most distinguishing positions: ${top.join('; ')}.`
+      : 'There is not enough question overlap to summarize distinctive positions yet.',
+  };
+}
+
+async function analyzeParticipantResultGroup({
+  env = {},
+  normalized = {},
+  policy = {},
+  session = {},
+  group = {},
+  groups = [],
+  createdAt = null,
+} = {}) {
+  const fallback = localGroupAnalysis(group);
+  if (group.demo === true) {
+    return { ok: true, reason: 'demo_group_analysis', analysis: fallback };
+  }
+  const eligibility = evaluateSponsoredResourceEligibility(session, {
+    resource: 'ai',
+    requestedRisk: RISK_CEILINGS.SUBMIT,
+    riskCeiling: policy.riskCeiling,
+  });
+  const workerUrl = resolveSessionWorkerUrl(env, session);
+  if (!eligibility.ok || !workerUrl) {
+    return {
+      ok: false,
+      reason: eligibility.reason || 'session_worker_url_missing',
+      analysis: fallback,
+    };
+  }
+  const principal = normalizeTelegramPrincipal(normalized);
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    createdAt,
+  });
+  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
+  try {
+    const sessionAuth = await authenticateSessionWorker({
+      env,
+      session,
+      account,
+      principal,
+      workerUrl,
+      fetchImpl,
+      now: createdAt ? new Date(createdAt) : new Date(),
+    });
+    if (!sessionAuth.ok || !sessionAuth.token) {
+      return {
+        ok: false,
+        reason: sessionAuth.reason || 'worker_auth_failed',
+        analysis: fallback,
+      };
+    }
+    const response = await fetchImpl(`${sessionAuth.workerUrl}/ai`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        Authorization: `Bearer ${sessionAuth.token}`,
+      },
+      body: JSON.stringify({
+        provider: 'openai',
+        model: safeString(env.AGENT_BRIDGE_CLUSTER_ANALYSIS_MODEL || env.AGENT_BRIDGE_AI_SEARCH_MODEL || 'gpt-5'),
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert survey analyst. You write neutral, helpful summaries of opinion clusters.',
+          },
+          {
+            role: 'user',
+            content: buildGroupAnalysisPrompt(group, groups),
+          },
+        ],
+        max_output_tokens: 700,
+        response_format: { type: 'json_object' },
+        temperature: 0,
+      }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response?.ok) {
+      return {
+        ok: false,
+        reason: safeString(body?.error || body?.message || response?.status) || 'ai_group_analysis_failed',
+        analysis: fallback,
+      };
+    }
+    const parsed = extractJsonObject(extractAiText(body));
+    return {
+      ok: Boolean(parsed),
+      reason: parsed ? '' : 'ai_response_parse_failed',
+      analysis: parsed ? {
+        name: safeString(parsed.name) || fallback.name,
+        short: safeString(parsed.short) || fallback.short,
+        long: safeString(parsed.long) || fallback.long,
+      } : fallback,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: safeString(error?.message || error) || 'ai_group_analysis_failed',
+      analysis: fallback,
+    };
+  }
+}
+
+async function buildConsensusPageButtons({
+  env = {},
+  sessionSlug = '',
+  pageOffset = 0,
+  totalRows = 0,
+  createdAt = null,
+} = {}) {
+  const buttons = [];
+  const offset = nonNegativeInteger(pageOffset);
+  if (offset > 0) {
+    const previousOffset = Math.max(0, offset - TELEGRAM_RESULTS_PAGE_SIZE);
+    buttons.push(await makeCallbackButton({
+      env,
+      label: 'Previous 3',
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_RESULTS,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      serverContextRef: { sessionSlug, resultMode: 'consensus', pageOffset: previousOffset },
+      seed: `results|consensus|${sessionSlug}|${previousOffset}`,
+      createdAt,
+    }));
+  }
+  if (offset + TELEGRAM_RESULTS_PAGE_SIZE < totalRows) {
+    const nextOffset = offset + TELEGRAM_RESULTS_PAGE_SIZE;
+    buttons.push(await makeCallbackButton({
+      env,
+      label: 'Next 3',
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_RESULTS,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      serverContextRef: { sessionSlug, resultMode: 'consensus', pageOffset: nextOffset },
+      seed: `results|consensus|${sessionSlug}|${nextOffset}`,
+      createdAt,
+    }));
+  }
+  return buttons.length ? [buttons] : null;
+}
+
+async function buildGroupAnalysisButtons({
+  env = {},
+  sessionSlug = '',
+  groups = [],
+  createdAt = null,
+} = {}) {
+  const buttons = [];
+  for (const group of groups) {
+    buttons.push(await makeCallbackButton({
+      env,
+      label: `Analyze ${group.label}`,
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_RESULTS,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      serverContextRef: { sessionSlug, resultMode: 'group_analysis', groupId: group.groupId },
+      seed: `results|group_analysis|${sessionSlug}|${group.groupId}`,
+      createdAt,
+    }));
+  }
+  const rows = [];
+  for (let index = 0; index < buttons.length; index += 2) {
+    rows.push(buttons.slice(index, index + 2));
+  }
+  return rows;
+}
+
 function participantAlias(id = '', index = 0) {
   return `P${index + 1}`;
+}
+
+function nonNegativeInteger(value = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+}
+
+function answerScore(label = '', value = '') {
+  const text = lower(value || label);
+  if (!text) return 0;
+  if (/\b(agree|yes|true|support|approve)\b/.test(text)) return 1;
+  if (/\b(disagree|no|false|oppose|reject)\b/.test(text)) return -1;
+  if (/\b(unsure|unknown|neutral|mixed|abstain)\b/.test(text)) return 0;
+  const numeric = Number(text.match(/-?\d+(?:\.\d+)?/)?.[0]);
+  if (!Number.isFinite(numeric)) return 0;
+  if (numeric >= 1 && numeric <= 5) return Math.max(-1, Math.min(1, (numeric - 3) / 2));
+  if (numeric >= 0 && numeric <= 10) return Math.max(-1, Math.min(1, (numeric - 5) / 5));
+  return Math.max(-1, Math.min(1, numeric));
+}
+
+function averageAnswerScore(records = []) {
+  const scored = records
+    .map((record) => answerScore(record.label, record.value))
+    .filter((score) => Number.isFinite(score));
+  if (!scored.length) return 0;
+  return scored.reduce((sum, score) => sum + score, 0) / scored.length;
+}
+
+function countResultVotes(records = []) {
+  const counts = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
+  for (const record of records) {
+    const score = answerScore(record.label, record.value);
+    if (score > 0.25) counts.agree += 1;
+    else if (score < -0.25) counts.disagree += 1;
+    else counts.unsure += 1;
+    counts.responded += 1;
+  }
+  return {
+    ...counts,
+    agreeRate: counts.responded ? Number(((counts.agree * 100) / counts.responded).toFixed(1)) : 0,
+    disagreeRate: counts.responded ? Number(((counts.disagree * 100) / counts.responded).toFixed(1)) : 0,
+    unsureRate: counts.responded ? Number(((counts.unsure * 100) / counts.responded).toFixed(1)) : 0,
+  };
+}
+
+function groupBucketForScore(score = 0) {
+  if (score > 0.25) return { bucketId: 'support', theme: 'higher agreement' };
+  if (score < -0.25) return { bucketId: 'concern', theme: 'higher disagreement' };
+  return { bucketId: 'mixed', theme: 'mixed or unsure' };
+}
+
+function buildParticipantResultGroups({
+  records = [],
+  participantIds = [],
+  aliases = new Map(),
+  questionIds = [],
+  questionIndex = new Map(),
+  promptMap = new Map(),
+} = {}) {
+  const buckets = new Map();
+  for (const id of participantIds) {
+    const participantRecords = records.filter((record) => record.telegramUserId === id);
+    const score = averageAnswerScore(participantRecords);
+    const bucket = groupBucketForScore(score);
+    if (!buckets.has(bucket.bucketId)) {
+      buckets.set(bucket.bucketId, {
+        bucketId: bucket.bucketId,
+        theme: bucket.theme,
+        participantIds: [],
+        scoreTotal: 0,
+      });
+    }
+    const item = buckets.get(bucket.bucketId);
+    item.participantIds.push(id);
+    item.scoreTotal += score;
+  }
+
+  return Array.from(buckets.values())
+    .filter((bucket) => bucket.participantIds.length)
+    .sort((left, right) => (
+      (right.scoreTotal / right.participantIds.length) -
+      (left.scoreTotal / left.participantIds.length) ||
+      right.participantIds.length - left.participantIds.length ||
+      left.theme.localeCompare(right.theme)
+    ))
+    .map((bucket, index) => {
+      const participantSet = new Set(bucket.participantIds);
+      const clusterRecords = records.filter((record) => participantSet.has(record.telegramUserId));
+      const topStatements = questionIds.map((id, questionNumber) => {
+        const clusterQuestionRecords = clusterRecords.filter((record) => record.questionId === id);
+        const overallQuestionRecords = records.filter((record) => record.questionId === id);
+        const clusterAverage = averageAnswerScore(clusterQuestionRecords);
+        const overallAverage = averageAnswerScore(overallQuestionRecords);
+        return {
+          label: questionIndex.get(id) || `Q${questionNumber + 1}`,
+          questionIndex: questionNumber,
+          prompt: promptMap.get(id) || shortQuestionId(id),
+          cluster: countResultVotes(clusterQuestionRecords),
+          overall: countResultVotes(overallQuestionRecords),
+          differenceScore: Number(Math.abs(clusterAverage - overallAverage).toFixed(3)),
+        };
+      })
+        .filter((statement) => statement.cluster.responded > 0)
+        .sort((left, right) => (
+          right.differenceScore - left.differenceScore ||
+          right.cluster.responded - left.cluster.responded ||
+          left.prompt.localeCompare(right.prompt)
+        ))
+        .slice(0, 5);
+      return {
+        groupId: `group-${index + 1}`,
+        label: `Group ${index + 1}`,
+        theme: bucket.theme,
+        size: bucket.participantIds.length,
+        aliases: bucket.participantIds.map((id) => aliases.get(id)).filter(Boolean),
+        averageScore: Number((bucket.scoreTotal / bucket.participantIds.length).toFixed(3)),
+        topStatements,
+      };
+    });
+}
+
+function buildDemoParticipantGraph(questions = []) {
+  const rows = demoDifferenceRows(questions).slice(0, 5);
+  const demoQuestions = rows.map((row, index) => ({
+    questionId: `demo-q-${index + 1}`,
+    prompt: row.prompt,
+  }));
+  const demoRecords = [
+    ['demo-1', 'demo-q-1', 'Agree'],
+    ['demo-1', 'demo-q-2', 'Agree'],
+    ['demo-1', 'demo-q-3', 'Unsure'],
+    ['demo-2', 'demo-q-1', 'Agree'],
+    ['demo-2', 'demo-q-2', 'Unsure'],
+    ['demo-2', 'demo-q-3', 'Agree'],
+    ['demo-3', 'demo-q-1', 'Disagree'],
+    ['demo-3', 'demo-q-2', 'Disagree'],
+    ['demo-3', 'demo-q-3', 'Unsure'],
+    ['demo-4', 'demo-q-1', 'Unsure'],
+    ['demo-4', 'demo-q-2', 'Disagree'],
+    ['demo-4', 'demo-q-3', 'Disagree'],
+  ].map(([telegramUserId, questionId, label], index) => ({
+    telegramUserId,
+    questionId,
+    label,
+    value: lower(label),
+    createdAt: `demo-${index + 1}`,
+  }));
+  const graph = buildParticipantGraph(demoRecords, demoQuestions);
+  return {
+    ...graph,
+    groups: graph.groups.map((group) => ({ ...group, demo: true })),
+  };
 }
 
 function buildParticipantGraph(records = [], questions = []) {
@@ -2113,7 +2527,22 @@ function buildParticipantGraph(records = [], questions = []) {
         label: record.label,
       })),
   }));
-  return { lines, legend, participants: imageParticipants, participantCount: participants.length, questionCount: questionIds.length };
+  const groups = buildParticipantResultGroups({
+    records,
+    participantIds: participants,
+    aliases,
+    questionIds,
+    questionIndex,
+    promptMap,
+  });
+  return {
+    lines,
+    legend,
+    participants: imageParticipants,
+    groups,
+    participantCount: participants.length,
+    questionCount: questionIds.length,
+  };
 }
 
 async function buildResultsModeButtons({
@@ -2209,7 +2638,7 @@ async function buildResultsResponse({
       createdAt,
     });
   }
-  if (!['consensus', 'group'].includes(mode)) {
+  if (!['consensus', 'group', 'group_analysis'].includes(mode)) {
     return buildResultsOptionsResponse({
       normalized,
       command,
@@ -2222,22 +2651,84 @@ async function buildResultsResponse({
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
   const questions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
   const records = await loadSubmittedResultRecords(env, resolved.session.sessionSlug);
+  if (mode === 'group_analysis') {
+    const liveGraph = buildParticipantGraph(records, questions);
+    const hasEnoughLiveGraph = records.length >= 4 && liveGraph.participantCount >= 2 && liveGraph.questionCount >= 2;
+    const graph = hasEnoughLiveGraph ? liveGraph : buildDemoParticipantGraph(questions);
+    const groupId = safeString(args[1] || '');
+    const group = graph.groups.find((item) => item.groupId === groupId) || null;
+    if (!group) {
+      return reply({
+        chatId: normalized.chat.chatId,
+        text: 'Group analysis is not available yet. Run /results group after at least two participants answer overlapping questions.',
+        screen: 'results_group_analysis_unavailable',
+        command,
+        normalized,
+        extra: { sessionSlug: resolved.session.sessionSlug, resultMode: mode },
+      });
+    }
+    const ai = await analyzeParticipantResultGroup({
+      env,
+      normalized,
+      policy,
+      session: resolved.session,
+      group,
+      groups: graph.groups,
+      createdAt,
+    });
+    const lines = [
+      `${group.label}: ${ai.analysis.name || group.theme}`,
+      `Participants: ${group.size} (${group.aliases.join(', ') || 'anonymous'})`,
+      '',
+      ai.analysis.short,
+      '',
+      ai.analysis.long,
+      ...(ai.ok ? [] : ['', `AI analysis unavailable: ${ai.reason || 'unknown_error'}`]),
+    ].filter((line) => safeString(line));
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: lines.join('\n'),
+      replyMarkup: {
+        inline_keyboard: [[
+          await makeCallbackButton({
+            env,
+            label: 'Participants graph',
+            action: TELEGRAM_BRIDGE_ACTIONS.VIEW_RESULTS,
+            lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+            serverContextRef: { sessionSlug: resolved.session.sessionSlug, resultMode: 'group' },
+            seed: `results|group|${resolved.session.sessionSlug}`,
+            createdAt,
+          }),
+        ]],
+      },
+      screen: 'results_group_analysis',
+      command,
+      normalized,
+      extra: {
+        sessionSlug: resolved.session.sessionSlug,
+        resultMode: mode,
+        groupId: group.groupId,
+        aiOk: ai.ok,
+      },
+    });
+  }
   if (mode === 'group') {
-    const graph = buildParticipantGraph(records, questions);
-    const hasEnoughLiveGraph = records.length >= 4 && graph.participantCount >= 2 && graph.questionCount >= 2;
+    const liveGraph = buildParticipantGraph(records, questions);
+    const hasEnoughLiveGraph = records.length >= 4 && liveGraph.participantCount >= 2 && liveGraph.questionCount >= 2;
     const demo = !hasEnoughLiveGraph;
+    const graph = demo ? buildDemoParticipantGraph(questions) : liveGraph;
     const lines = demo
       ? [
         'Participants graph (demo data)',
         'Demo mode until enough live submissions are available.',
-        'P1 -> Q1:Agree, Q2:Unsure',
-        'P2 -> Q1:Disagree, Q2:Agree',
-        '',
-        ...demoDifferenceRows(questions).map((row, index) => `${index + 1}. ${row.prompt}`),
+        'Choose a group to analyze.',
+        ...graph.lines,
+        ...(graph.legend.length ? ['', ...graph.legend] : []),
       ]
       : [
         'Participants graph',
         `Responses: ${records.length}`,
+        ...(graph.groups.length ? ['Choose a group to analyze.'] : []),
         ...graph.lines,
         ...(graph.legend.length ? ['', ...graph.legend] : []),
       ];
@@ -2247,13 +2738,21 @@ async function buildResultsResponse({
       responseCount: records.length,
       demo,
       lines,
-      participants: demo ? [] : graph.participants,
+      participants: graph.participants,
     });
     return reply({
       method: 'sendPhoto',
       chatId: normalized.chat.chatId,
       text: lines.join('\n'),
       photo: image,
+      replyMarkup: !graph.groups.length ? null : {
+        inline_keyboard: await buildGroupAnalysisButtons({
+          env,
+          sessionSlug: resolved.session.sessionSlug,
+          groups: graph.groups,
+          createdAt,
+        }),
+      },
       screen: 'results_group',
       command,
       normalized,
@@ -2261,14 +2760,19 @@ async function buildResultsResponse({
     });
   }
   const summaries = summarizeQuestionResults(records, questions);
-  const liveDifference = summaries.filter((summary) => summary.hasDifference && summary.total >= 2).slice(0, 3);
-  const demo = liveDifference.length === 0;
-  const rows = demo ? demoDifferenceRows(questions) : liveDifference;
+  const allLiveDifference = summaries.filter((summary) => summary.hasDifference && summary.total >= 2);
+  const demo = allLiveDifference.length === 0;
+  const allRows = demo ? demoDifferenceRows(questions) : allLiveDifference;
+  const requestedOffset = nonNegativeInteger(args[1] || 0);
+  const pageOffset = allRows.length
+    ? Math.min(requestedOffset, Math.max(0, allRows.length - 1))
+    : 0;
+  const rows = allRows.slice(pageOffset, pageOffset + TELEGRAM_RESULTS_PAGE_SIZE);
   const lines = [
     demo ? 'Beeswarm (demo data)' : 'Beeswarm',
     ...(demo ? ['Demo mode until enough overlapping live responses are available.'] : [`Live responses: ${records.length}`]),
-    'Most difference',
-    ...rows.map((row, index) => `${index + 1}. ● ${row.prompt}\n   ${formatCounts(row.counts)}`),
+    `Most difference ${pageOffset + 1}-${pageOffset + rows.length} of ${allRows.length}`,
+    ...rows.map((row, index) => `${pageOffset + index + 1}. ● ${row.prompt}\n   ${formatCounts(row.counts)}`),
   ];
   const image = buildResultsImage({
     mode,
@@ -2278,15 +2782,30 @@ async function buildResultsResponse({
     lines,
     beeswarmRows: beeswarmRowsFromResultRows(rows),
   });
+  const consensusButtons = await buildConsensusPageButtons({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    pageOffset,
+    totalRows: allRows.length,
+    createdAt,
+  });
   return reply({
     method: 'sendPhoto',
     chatId: normalized.chat.chatId,
     text: lines.join('\n'),
     photo: image,
+    replyMarkup: consensusButtons ? { inline_keyboard: consensusButtons } : null,
     screen: 'results_consensus',
     command,
     normalized,
-    extra: { sessionSlug: resolved.session.sessionSlug, resultMode: mode, responseCount: records.length, demo },
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      resultMode: mode,
+      responseCount: records.length,
+      demo,
+      pageOffset,
+      resultCount: allRows.length,
+    },
   });
 }
 
@@ -3607,7 +4126,12 @@ async function buildCallbackResponse({
       normalized,
       command: 'callback:view_results',
       env,
-      args: [record.serverContextRef?.resultMode || ''],
+      args: [
+        record.serverContextRef?.resultMode || '',
+        record.serverContextRef?.resultMode === 'group_analysis'
+          ? record.serverContextRef?.groupId || ''
+          : record.serverContextRef?.pageOffset || 0,
+      ],
       sessionSlugOverride: sessionSlug,
       method,
       messageId,
