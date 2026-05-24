@@ -17,6 +17,15 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/about': ['Context Engine'],
   '/contracts': ['Contract'],
 });
+const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
+  '[data-testid="ce-survey-submit"]',
+  '[data-testid="ce-create-submit"]',
+  '[data-testid="ce-doc-upload-file-button"]',
+  '[data-testid="ce-doc-url-add-button"]',
+  '[data-testid="ce-doc-lock-toggle"]',
+  '[data-testid="ce-session-listening-start"]',
+  '[data-testid="ce-session-listening-stop"]',
+]);
 
 function normalizeBaseUrl(rawBaseUrl = DEFAULT_BASE_URL) {
   const url = new URL(rawBaseUrl);
@@ -40,6 +49,15 @@ function resolveViewport(rawViewport = process.env.PLAYWRIGHT_VIEWPORT) {
   }
 
   return { width: 1440, height: 1000 };
+}
+
+function normalizeLayoutProbeSelectors(rawSelectors = process.env.SMOKE_LAYOUT_PROBE_SELECTORS) {
+  if (Array.isArray(rawSelectors)) {
+    return rawSelectors.map((selector) => String(selector || '').trim()).filter(Boolean);
+  }
+  const raw = String(rawSelectors || '').trim();
+  if (!raw) return [...DEFAULT_LAYOUT_PROBE_SELECTORS];
+  return raw.split(',').map((selector) => selector.trim()).filter(Boolean);
 }
 
 function isAllowedFailedRequest(requestUrl, baseUrl) {
@@ -120,12 +138,64 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   await page.waitForSelector('#root', { state: 'attached', timeout: options.timeoutMs || 15000 });
   await page.waitForTimeout(options.settleMs || 2500);
 
-  const info = await page.evaluate(() => {
+  const layoutProbeSelectors = options.layoutProbeSelectors || normalizeLayoutProbeSelectors();
+  const info = await page.evaluate((selectors) => {
     const root = document.querySelector('#root');
     const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
     const styleTags = document.querySelectorAll('style').length;
     const linkedStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
       .map((link) => link.href);
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const isInViewport = (rect) => (
+      rect.bottom > 0 &&
+      rect.right > 0 &&
+      rect.top < viewportHeight &&
+      rect.left < viewportWidth
+    );
+    const labelFor = (element, selector) => (
+      element.getAttribute('data-testid') ||
+      element.getAttribute('aria-label') ||
+      element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 80) ||
+      selector
+    );
+    const layoutIssues = [];
+
+    (Array.isArray(selectors) ? selectors : []).forEach((selector) => {
+      let elements = [];
+      try {
+        elements = Array.from(document.querySelectorAll(selector));
+      } catch (_error) {
+        layoutIssues.push(`${selector}: invalid layout probe selector`);
+        return;
+      }
+      elements.forEach((element) => {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || 1) === 0) return;
+        const rect = element.getBoundingClientRect();
+        if (!isInViewport(rect)) return;
+
+        const label = labelFor(element, selector);
+        if (rect.width < 1 || rect.height < 1) {
+          layoutIssues.push(`${label}: visible control has a zero-sized box`);
+          return;
+        }
+        const text = element.textContent?.replace(/\s+/g, ' ').trim() || '';
+        const clipsInlineText = (
+          text &&
+          (style.overflowX === 'hidden' || style.textOverflow === 'ellipsis') &&
+          element.scrollWidth > Math.ceil(rect.width) + 2
+        );
+        const clipsBlockText = (
+          text &&
+          style.overflowY === 'hidden' &&
+          element.scrollHeight > Math.ceil(rect.height) + 2
+        );
+        if (clipsInlineText || clipsBlockText) {
+          layoutIssues.push(`${label}: visible text appears clipped`);
+        }
+      });
+    });
 
     return {
       title: document.title,
@@ -133,8 +203,9 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       bodyTextLength: bodyText.length,
       bodyTextPreview: bodyText.slice(0, 240),
       styleCount: styleTags + linkedStyles.length,
+      layoutIssues,
     };
-  });
+  }, layoutProbeSelectors);
 
   await page.close();
 
@@ -192,6 +263,9 @@ function summarizeFailures(results) {
     result.pageErrors.forEach((error) => {
       failures.push(`${result.route}: page error: ${error}`);
     });
+    (result.layoutIssues || []).forEach((issue) => {
+      failures.push(`${result.route}: layout issue: ${issue}`);
+    });
   });
 
   return failures;
@@ -213,6 +287,7 @@ function compactSmokeSummary(summary) {
       unexpectedFailedRequests: result.unexpectedFailedRequests.length,
       unexpectedConsoleIssues: result.unexpectedConsoleIssues.length,
       pageErrors: result.pageErrors.length,
+      layoutIssues: (result.layoutIssues || []).length,
       missingText: result.missingText,
     })),
     failures: summary.failures,
@@ -239,6 +314,7 @@ async function runSmoke(options = {}) {
         settleMs: options.settleMs,
         timeoutMs: options.timeoutMs,
         viewport,
+        layoutProbeSelectors: options.layoutProbeSelectors,
       }));
     }
 
@@ -273,6 +349,7 @@ if (require.main === module) {
 
 module.exports = {
   DEFAULT_BASE_URL,
+  DEFAULT_LAYOUT_PROBE_SELECTORS,
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
@@ -280,6 +357,7 @@ module.exports = {
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   normalizeBaseUrl,
+  normalizeLayoutProbeSelectors,
   normalizeRoutes,
   resolveViewport,
   routeUrl,

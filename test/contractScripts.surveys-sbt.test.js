@@ -338,7 +338,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       },
     ];
 
-    await contractScripts.addSurveyWithQuestions(
+    const surveyCreateResult = await contractScripts.addSurveyWithQuestions(
       'wagmi',
       surveyId,
       surveyData,
@@ -347,11 +347,72 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       groupCfg
     );
 
-    expect(findArweavePayload((payload) => payload.surveyID === surveyId)).toBeTruthy();
-    expect(findArweavePayload((payload) => payload.id === questionIds[0])).toBeTruthy();
+    expect(surveyCreateResult?.receipt).toBeTruthy();
+    expect(surveyCreateResult?.surveyArweaveTxId).toBeTruthy();
+    expect(surveyCreateResult?.uploadedQuestions).toHaveLength(2);
+
+    const surveyPayload = findArweavePayload((payload) => payload.surveyID === surveyId);
+    const firstQuestionPayload = findArweavePayload((payload) => payload.id === questionIds[0]);
+    const secondQuestionPayload = findArweavePayload((payload) => payload.id === questionIds[1]);
+    expect(surveyPayload).toMatchObject({
+      surveyID: surveyId,
+      title: 'ContextEngine Research Sprint',
+      questionIDs: questionIds,
+      creator: account,
+      documentURLs: ['https://example.example.test/context-engine'],
+      groupName,
+      sessionName: groupName,
+      sessionSlug: groupName.toLowerCase(),
+    });
+    expect(surveyPayload.creationBlock).toBe(creationBlock);
+    expect(firstQuestionPayload).toMatchObject({
+      id: questionIds[0],
+      type: 'multichoice',
+      prompt: 'Which features matter most to you?',
+      options: ['Privacy', 'Speed', 'Integrations'],
+      tags: ['product', 'priorities'],
+      creator: account,
+      associatedSurveyId: surveyId,
+      groupName,
+      sessionName: groupName,
+      sessionSlug: groupName.toLowerCase(),
+    });
+    expect(secondQuestionPayload).toMatchObject({
+      id: questionIds[1],
+      type: 'binary',
+      prompt: 'Would you join the next sprint?',
+      tags: ['community'],
+      creator: account,
+      associatedSurveyId: surveyId,
+      groupName,
+      sessionName: groupName,
+      sessionSlug: groupName.toLowerCase(),
+    });
+
+    const storedSurvey = await contractScripts.getSurveyDataById('none', surveyId, groupCfg, {
+      throwOnFailure: true,
+      forceArweaveFetch: true,
+    });
+    expect(storedSurvey).toMatchObject({
+      surveyID: surveyId,
+      title: surveyData.title,
+      questionIDs: questionIds,
+    });
+
+    const storedFirstQuestion = await contractScripts.getQuestionData('none', questionIds[0], groupCfg, {
+      throwOnFailure: true,
+      forceArweaveFetch: true,
+    });
+    expect(storedFirstQuestion).toMatchObject({
+      id: questionIds[0],
+      type: 'multichoice',
+      prompt: questionData[0].prompt,
+      options: ['Privacy', 'Speed', 'Integrations'],
+      associatedSurveyId: surveyId,
+    });
 
     const standaloneQuestionId = 'question-standalone';
-    await contractScripts.addQuestions(
+    const standaloneCreateResult = await contractScripts.addQuestions(
       'wagmi',
       [standaloneQuestionId],
       [{
@@ -366,6 +427,20 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       [ethers.constants.HashZero],
       groupCfg
     );
+    expect(standaloneCreateResult?.receipt).toBeTruthy();
+    expect(standaloneCreateResult?.uploadedQuestions).toHaveLength(1);
+    const standaloneQuestionPayload = findArweavePayload((payload) => payload.id === standaloneQuestionId);
+    expect(standaloneQuestionPayload).toMatchObject({
+      id: standaloneQuestionId,
+      type: 'freeform',
+      prompt: 'Standalone',
+      tags: [],
+      creator: account,
+      associatedSurveyId: ethers.constants.HashZero,
+      groupName,
+      sessionName: groupName,
+      sessionSlug: groupName.toLowerCase(),
+    });
 
     const questionResponses = [
       {
@@ -418,7 +493,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       responses: questionResponses,
     };
 
-    await contractScripts.submitResponses(
+    const submitReceipt = await contractScripts.submitResponses(
       'wagmi',
       questionIds,
       questionResponses,
@@ -427,8 +502,89 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       groupCfg
     );
 
-    expect(findArweavePayload((payload) => payload.surveyID === surveyId && Array.isArray(payload.responses))).toBeTruthy();
-    expect(findArweavePayload((payload) => payload.questionID === questionIds[0])).toBeTruthy();
+    expect(submitReceipt).toBeTruthy();
+
+    const surveyResponsePayload = findArweavePayload((payload) => payload.surveyID === surveyId && Array.isArray(payload.responses));
+    const firstQuestionResponsePayload = findArweavePayload((payload) => payload.questionID === questionIds[0]);
+    const secondQuestionResponsePayload = findArweavePayload((payload) => payload.questionID === questionIds[1]);
+    expect(surveyResponsePayload).toMatchObject({
+      surveyTitle: surveyData.title,
+      surveyID: surveyId,
+      responder: account,
+      groupName,
+      responses: expect.arrayContaining([
+        expect.objectContaining({
+          questionID: questionIds[0],
+          answer: expect.objectContaining({ value: ['Privacy', 'Speed'], encrypted: false }),
+          additional: expect.objectContaining({ value: 'Privacy is critical.', encrypted: false }),
+        }),
+        expect.objectContaining({
+          questionID: questionIds[1],
+          answer: expect.objectContaining({ value: true, encrypted: false }),
+        }),
+      ]),
+    });
+    expect(surveyResponsePayload.responses).toHaveLength(2);
+    expect(firstQuestionResponsePayload).toMatchObject({
+      questionID: questionIds[0],
+      responder: account,
+      type: 'multichoice',
+      prompt: questionData[0].prompt,
+      conviction: 3,
+      importance: 2,
+      answer: expect.objectContaining({
+        value: ['Privacy', 'Speed'],
+        encrypted: false,
+      }),
+      additional: expect.objectContaining({
+        value: 'Privacy is critical.',
+        encrypted: false,
+      }),
+    });
+    expect(secondQuestionResponsePayload).toMatchObject({
+      questionID: questionIds[1],
+      responder: account,
+      type: 'binary',
+      prompt: questionData[1].prompt,
+      conviction: 1,
+      importance: 1,
+      answer: expect.objectContaining({
+        value: true,
+        encrypted: false,
+      }),
+    });
+
+    const firstResponseHash = await contractScripts.getResponseHash('none', account, questionIds[0], groupCfg, {
+      throwOnError: true,
+    });
+    const surveyResponseHash = await contractScripts.getResponseHash('none', account, surveyId, groupCfg, {
+      throwOnError: true,
+    });
+    expect(firstResponseHash).toBeTruthy();
+    expect(surveyResponseHash).toBeTruthy();
+
+    const storedFirstResponse = await contractScripts.getResponse('none', account, questionIds[0], groupCfg, {
+      throwOnFailure: true,
+      forceArweaveFetch: true,
+    });
+    const storedSurveyResponse = await contractScripts.getSurveyResponse('none', account, surveyId, groupCfg, {
+      throwOnFailure: true,
+      forceArweaveFetch: true,
+    });
+    expect(storedFirstResponse).toMatchObject({
+      questionID: questionIds[0],
+      responder: account,
+      answer: expect.objectContaining({ value: ['Privacy', 'Speed'] }),
+      additional: expect.objectContaining({ value: 'Privacy is critical.' }),
+    });
+    expect(storedSurveyResponse).toMatchObject({
+      surveyID: surveyId,
+      responder: account,
+      responses: expect.arrayContaining([
+        expect.objectContaining({ questionID: questionIds[0] }),
+        expect.objectContaining({ questionID: questionIds[1] }),
+      ]),
+    });
   });
 
   it('creates a public SBT and mints via contractScripts', async () => {
