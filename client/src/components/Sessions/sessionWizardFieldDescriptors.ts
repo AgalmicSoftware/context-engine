@@ -128,6 +128,7 @@ export const SESSION_WIZARD_HIDDEN_FIELDS = new Set([
   'perMemberSpendLimits',
   'corsWorkerUrl',
   'fieldEditors',
+  'telegramOnly',
   'sessionInfoEncrypted',
   'networkChainId',
   'rpc',
