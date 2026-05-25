@@ -65,15 +65,50 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
+  activeCorpusKey: 'cross_corpus',
+  activeCorpusLabel: 'Cross-Corpus',
+  loadStatus: 'idle',
+  loadButtonLabel: 'Load full corpus',
+  disableLoadButton: false,
+  error: '',
+});
+type UnknownRecord = Record<string, unknown>;
 
-const isTelegramOnlySessionConfig = (metadata: any) => (
-  metadata?.telegramOnly === true ||
-  metadata?.telegram_only === true ||
-  metadata?.sessionMode === 'telegram_only' ||
-  metadata?.telegramMode === 'telegram_only' ||
-  metadata?.telegram?.only === true ||
-  metadata?.telegram?.mode === 'telegram_only'
+const toUnknownRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
 );
+
+const globalState: any = globalThis as any;
+const contractScriptsAny: any = contractScripts as any;
+const DebateMapAny: any = DebateMap;
+
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof error.message === 'string'
+    ? error.message
+    : fallback
+);
+
+const resolveAutoFeatureBySessionSlug = (metadata: any) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
+
+const isTelegramOnlySessionConfig = (metadata: unknown) => {
+  const config = toUnknownRecord(metadata);
+  const telegramConfig = toUnknownRecord(config.telegram);
+  return (
+    config.telegramOnly === true ||
+    config.telegram_only === true ||
+    config.sessionMode === 'telegram_only' ||
+    config.telegramMode === 'telegram_only' ||
+    telegramConfig.only === true ||
+    telegramConfig.mode === 'telegram_only'
+  );
+};
 
 const isPerfCountersEnabled = () => {
   try {
