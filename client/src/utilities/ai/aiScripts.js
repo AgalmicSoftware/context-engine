@@ -808,13 +808,17 @@ export const analyzeSurveyResponses = async (responses, opts = {}) => {
 export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts = {}) {
   const throwOnError = !!opts?.throwOnError;
   try {
-    const questionListStr = questionList
-      .map((q, idx) => `Q${idx + 1}: ID=${q.id}, Prompt="${q.prompt}"`)
-      .join('\n');
+    const candidates = (Array.isArray(questionList) ? questionList : [])
+      .map((q) => ({
+        id: String(q?.id || '').trim(),
+        prompt: String(q?.prompt || ''),
+      }))
+      .filter((q) => q.id.trim());
+    const questionListJson = JSON.stringify(candidates, null, 2);
 
     const finalPrompt = rankQuestionsPrompt
-      .replace('{{userQuery}}', userQuery)
-      .replace('{{questionListStr}}', questionListStr)
+      .replace('{{userQueryJson}}', JSON.stringify(String(userQuery || '')))
+      .replace('{{questionListJson}}', questionListJson)
       .replace('{{topX}}', String(topX));
 
     const rawOutput = await callAI(finalPrompt.trim(), {
@@ -837,7 +841,16 @@ export async function rankQuestionsAI(userQuery, questionList, topX = 10, opts =
       return [];
     }
 
-    const ids = parsed.selectedQuestionIDs.filter((id) => typeof id === 'string' && id.trim() !== '');
+    const allowedIds = new Set(candidates.map((q) => q.id));
+    const seenIds = new Set();
+    const ids = parsed.selectedQuestionIDs
+      .filter((id) => typeof id === 'string' && id.trim() !== '')
+      .map((id) => id.trim())
+      .filter((id) => {
+        if (!allowedIds.has(id) || seenIds.has(id)) return false;
+        seenIds.add(id);
+        return true;
+      });
 
     return ids.length > topX ? ids.slice(0, topX) : ids;
   } catch (error) {
