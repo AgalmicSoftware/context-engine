@@ -14,7 +14,10 @@ describe('DecryptActionChip', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Decrypt Answer' }));
+    const button = screen.getByRole('button', { name: 'Decrypt Answer' });
+    expect(button).toHaveClass('decryptQuestionButton');
+
+    fireEvent.click(button);
 
     expect(onClick).toHaveBeenCalledTimes(1);
   });
