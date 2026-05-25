@@ -43,15 +43,6 @@ type RootState = {
 };
 
 class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
-  static propTypes = {
-    fetchSessionState: PropTypes.func.isRequired,
-    account: PropTypes.string,
-    provider: PropTypes.string,
-    visible: PropTypes.bool,
-    optOutAndEmailBottom: PropTypes.bool,
-    closeExplainerFunction: PropTypes.func.isRequired,
-  };
-
   state: GreetingModalState = {
     rulesModalOpen: false,
     userOptsOutMetrics: false,
