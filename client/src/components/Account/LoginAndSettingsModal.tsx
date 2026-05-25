@@ -93,6 +93,10 @@ import {
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
+import {
+  formatSponsoredStatusMeta,
+  getSponsoredKeyAliases,
+} from './loginSettingsSponsoredStatusHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -175,26 +179,17 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
-type SponsoredSessionEntry = Record<string, unknown> & {
-  slug: string;
-  label: string;
-  sponsoredKeys: Record<string, unknown>;
-  isActive?: boolean;
-  inRpcScope?: boolean;
-};
-
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
 const uniqueList = <T = unknown>(values: T[] = []) => (
   Array.from(
-    new Set((Array.isArray(values) ? values : []).filter((value): value is T => value !== undefined && value !== null)),
-  );
-const readChainIdLike = (value: ChainIdLike): unknown =>
-  value && typeof value === 'object' ? (value.id ?? value.chainId ?? 0) : 0;
-const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
-  value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
+    new Set(
+      (Array.isArray(values) ? values : []).filter((value): value is T => value !== undefined && value !== null)
+    )
+  )
+);
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },

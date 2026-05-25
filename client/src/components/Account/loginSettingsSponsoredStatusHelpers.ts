@@ -1,69 +1,19 @@
-type SponsoredStatusEntry = Record<string, unknown> & {
+type SponsoredStatusEntry = Record<string, any> & {
   status?: string;
 };
-
-type SponsorSessionDisplayEntry = Record<string, unknown> & {
-  isActive?: boolean;
-  label?: string;
-};
-
-export type SponsoredAccessRecord = Record<string, SponsoredStatusEntry | null | undefined>;
-type SponsoredKeysRecord = Record<string, unknown>;
-type WorkerResourcePresenceRecord = Partial<Record<'ai' | 'arweave' | 'rpc' | 'txGas', boolean>>;
-type SponsorSessionsRecord = Record<string, unknown> & {
-  byResource?: Record<string, readonly SponsorSessionDisplayEntry[]>;
-};
-
-type SponsorshipCardArgs = {
-  activeSession?: unknown;
-  key: string;
-  sponsoredAccess?: SponsoredAccessRecord;
-  sponsorSessions?: SponsorSessionsRecord;
-  title: string;
-  gateKind?: 'sbt' | 'session';
-};
-
-type ResourceSponsorHintArgs = {
-  resourceKey?: string;
-  resourceLabel?: string;
-  sponsoredKeys?: SponsoredKeysRecord;
-  sponsorSessions?: SponsorSessionsRecord;
-};
-
-const SETTINGS_SPONSORSHIP_RESOURCES = Object.freeze([
-  { key: 'ai', title: 'AI' },
-  { key: 'arweave', title: 'Arweave' },
-  { key: 'rpc', title: 'RPC' },
-  { key: 'txGas', title: 'Tx gas' },
-]);
 
 export const getSponsoredKeyAliases = (resourceKey: string = ''): string[] => {
   if (resourceKey === 'txGas') return ['faucet', 'txGas'];
   return [resourceKey];
 };
 
-export const mergeWorkerResourcePresenceIntoSponsoredKeys = (
-  sponsoredKeys: SponsoredKeysRecord = {},
-  presence: WorkerResourcePresenceRecord | null = null,
-): SponsoredKeysRecord => {
-  const merged = { ...(sponsoredKeys || {}) };
-  if (!presence) return merged;
-  (['ai', 'arweave', 'rpc', 'txGas'] as const).forEach((resourceKey) => {
-    const aliases = getSponsoredKeyAliases(resourceKey);
-    aliases.forEach((alias) => {
-      if (presence[resourceKey] === true) merged[alias] = true;
-      else if (presence[resourceKey] === false) delete merged[alias];
-    });
-  });
-  return merged;
-};
-
 export const formatSponsoredStatusMeta = (
   entry: SponsoredStatusEntry | null = null,
-  hasActiveSponsor: boolean = false,
-  gateKind: 'sbt' | 'session' = 'session',
+  hasActiveSponsor: boolean = false
 ) => {
-  const status = entry?.status === 'unresolved' ? 'error' : entry?.status || 'no-gate';
+  const status = entry?.status === 'unresolved'
+    ? 'error'
+    : (entry?.status || 'no-gate');
   if (!hasActiveSponsor) {
     return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
   }
@@ -71,110 +21,19 @@ export const formatSponsoredStatusMeta = (
     return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
   }
   if (status === 'denied') {
-    return {
-      label: 'Gate locked',
-      tone: 'warn',
-      detail:
-        gateKind === 'sbt'
-          ? 'Sponsored key exists, but this wallet does not satisfy the SBT gate.'
-          : 'Sponsored key exists, but this identity does not satisfy the configured session gate.',
-    };
+    return { label: 'Gate locked', tone: 'warn', detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.' };
   }
   if (status === 'needs-wallet') {
-    return {
-      label: 'Connect wallet',
-      tone: 'warn',
-      detail: 'Connect a wallet to evaluate the sponsor gate for this session.',
-    };
+    return { label: 'Connect wallet', tone: 'warn', detail: 'Connect a wallet to evaluate the sponsor gate for this session.' };
   }
   if (status === 'invalid-gate') {
     return { label: 'Invalid gate', tone: 'warn', detail: 'This sponsor gate configuration is incomplete.' };
   }
   if (status === 'unknown' || status === 'error') {
-    return {
-      label: 'Check unavailable',
-      tone: 'muted',
-      detail: 'We could not confirm gate access for the active-session sponsor.',
-    };
+    return { label: 'Check unavailable', tone: 'muted', detail: 'We could not confirm gate access for the active-session sponsor.' };
   }
   if (status === 'no-gate' && hasActiveSponsor) {
-    return {
-      label: 'Sponsored',
-      tone: 'ok',
-      detail:
-        gateKind === 'sbt'
-          ? 'A sponsor key is configured and does not require an SBT gate.'
-          : 'A sponsor key is configured and does not require an additional session gate.',
-    };
+    return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
   }
   return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
-};
-
-export const buildLoginSettingsSponsorshipCard = ({
-  activeSession = null,
-  key,
-  sponsoredAccess = {},
-  sponsorSessions = {},
-  title,
-  gateKind = 'session',
-}: SponsorshipCardArgs) => {
-  const sessions = sponsorSessions.byResource?.[key] || [];
-  const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
-  const otherSponsorSessions = sessions.filter((entry) => !entry?.isActive);
-  const access = sponsoredAccess[key] || null;
-  return {
-    key,
-    title,
-    status: formatSponsoredStatusMeta(access, !!activeSponsorSession, gateKind),
-    access,
-    activeSession,
-    activeSponsorSession,
-    otherSponsorSessions,
-    sessions,
-  };
-};
-
-export const buildLoginSettingsSponsorshipCards = ({
-  activeSession = null,
-  sponsoredAccess = {},
-  sponsorSessions = {},
-  resourceKeys = SETTINGS_SPONSORSHIP_RESOURCES.map(({ key }) => key),
-  gateKind = 'session',
-}: {
-  activeSession?: unknown;
-  sponsoredAccess?: SponsoredAccessRecord;
-  sponsorSessions?: SponsorSessionsRecord;
-  resourceKeys?: readonly string[];
-  gateKind?: 'sbt' | 'session';
-} = {}) =>
-  SETTINGS_SPONSORSHIP_RESOURCES.filter(({ key }) => resourceKeys.includes(key)).map(({ key, title }) =>
-    buildLoginSettingsSponsorshipCard({
-      activeSession,
-      key,
-      sponsoredAccess,
-      sponsorSessions,
-      title,
-      gateKind,
-    }),
-  );
-
-export const formatResourceSponsorHint = ({
-  resourceKey = '',
-  resourceLabel = '',
-  sponsoredKeys = {},
-  sponsorSessions = {},
-}: ResourceSponsorHintArgs = {}) => {
-  const label = resourceLabel || resourceKey || 'resource';
-  const activeHasSponsor = getSponsoredKeyAliases(resourceKey).some((alias) => !!sponsoredKeys?.[alias]);
-  const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || []).filter((entry) => !entry?.isActive);
-  if (activeHasSponsor) {
-    if (!otherSessions.length) {
-      return `${label} sponsor is configured for the active session.`;
-    }
-    return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}.`;
-  }
-  if (otherSessions.length) {
-    return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}. Switch sessions to use one.`;
-  }
-  return `No active-session ${label} sponsor configured.`;
 };
