@@ -155,6 +155,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="continueSessions"/);
   assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
+  assert.match(html, /id="resultViewLevels"[^>]*aria-label="Results exposure levels"/);
   assert.match(html, /id="consensusResults"/);
   assert.match(html, /id="divisiveResults"/);
   assert.match(html, /id="resultGroups"/);
@@ -649,7 +650,13 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: { anonymizedGroupsEnabled: true },
+      }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -685,6 +692,13 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(body.sessionSlug, 'alpha');
   assert.equal(body.responseCount, 5);
   assert.equal(body.binaryQuestionCount, 2);
+  assert.equal(body.exposure.participantLevel, 4);
+  assert.equal(body.viewLevels.find((level) => level.key === 'aggregate_results').enabled, true);
+  assert.equal(body.viewLevels.find((level) => level.key === 'anonymized_groups').enabled, true);
+  assert.equal(body.publicSnapshot.type, 'ce_public_results_snapshot');
+  assert.equal(body.publicSnapshot.audience, 'telegram_participant');
+  assert.equal(body.publicSnapshot.counts.responsesGiven, 5);
+  assert.equal(body.publicSnapshot.aggregateResults.consensus[0].questionId, 'q-consensus');
   assert.equal(body.questions.consensus[0].questionId, 'q-consensus');
   assert.equal(body.questions.divisive[0].questionId, 'q-divisive');
   assert.equal(body.questions.divisive[0].counts.Disagree, 1);
@@ -708,6 +722,95 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(analysisBody.ok, true);
   assert.equal(analysisBody.group.groupId, body.groups[0].groupId);
   assert.match(analysisBody.analysis.short, /group/i);
+});
+
+test('Mini App results hides level 4 group views unless an admin enables anonymized groups', async () => {
+  const kv = new MemoryKv();
+  const submitRecords = [
+    ['r1', 'user-a', 'q-consensus', { value: 'agree', label: 'Agree' }],
+    ['r2', 'user-b', 'q-consensus', { value: 'agree', label: 'Agree' }],
+    ['r3', 'user-a', 'q-divisive', { value: 'agree', label: 'Agree' }],
+    ['r4', 'user-b', 'q-divisive', { value: 'disagree', label: 'Disagree' }],
+  ];
+  for (const [id, telegramUserId, questionId, answer] of submitRecords) {
+    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+      version: 1,
+      requestId: id,
+      status: 'direct_submitted',
+      lane: 'telegram_mini_app',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer,
+      createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
+    }));
+  }
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-consensus',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the team keep the current plan?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-divisive',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the team change the launch date?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-unavailable',
+        questionType: 'agree_unsure_disagree',
+      },
+    ]),
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha'),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.exposure.participantLevel, 3);
+  assert.equal(body.counts.questionsSubmitted, 3);
+  assert.equal(body.counts.answerableQuestions, 2);
+  assert.equal(body.groupView.enabled, false);
+  assert.equal(body.groupView.reason, 'level_4_anonymized_groups_admin_disabled');
+  assert.deepEqual(body.groups, []);
+  assert.equal(body.publicSnapshot.aggregateResults.consensus.length > 0, true);
+  assert.equal(body.publicSnapshot.anonymizedGroups.enabled, false);
+  assert.equal(body.viewLevels.find((level) => level.key === 'aggregate_results').enabled, true);
+  assert.equal(body.viewLevels.find((level) => level.key === 'anonymized_groups').status, 'admin_can_enable');
+
+  const analysisResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'analyze_group',
+        sessionSlug: 'alpha',
+        groupId: 'group-1',
+      }),
+    }),
+    env,
+  });
+  const analysisBody = await analysisResponse.json();
+
+  assert.equal(analysisResponse.status, 403);
+  assert.equal(analysisBody.ok, false);
+  assert.equal(analysisBody.error, 'level_4_anonymized_groups_admin_disabled');
+  assert.equal(analysisBody.summary.groupView.enabled, false);
 });
 
 test('Mini App search falls back to semantic food-preference matching when AI is unavailable', async () => {

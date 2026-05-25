@@ -2,6 +2,7 @@
 
 Related PRD: [Telegram Response Export Scope](./telegram-response-export-scope-prd.md)
 Related PRD: [Telegram Cloudflare 500-User Scale](./telegram-cloudflare-500-user-scale-prd.md)
+Related PRD: [Telegram Results Exposure Levels](./telegram-results-exposure-levels-prd.md)
 
 ## Problem
 
@@ -99,6 +100,12 @@ surface-specific paths.
   patterns and qualitative evidence, including additional comments and freeform
   responses, when available. Qualitative text should inform neutral summaries
   but must not introduce identifying details.
+- Telegram-only result visibility is governed by the exposure-level contract in
+  the Telegram Results Exposure Levels PRD. For the Edge City demo, Telegram
+  participants may see level 3 aggregate results by default. Level 4 anonymized
+  group views require explicit admin enablement. The normal CE client must not
+  consume this Telegram-only result surface until a public/anonymized client
+  route is designed and reviewed.
 
 ## Mode Taxonomy
 
@@ -129,6 +136,7 @@ Telegram-only path blur into normal public CE sessions.
 | Cloudflare `lit_encrypted` ineligible viewer | Shows `Encrypted` | Shows encrypted/required SBT message | Shows encrypted/required SBT message |
 | Payload missing/indexing | Shows `Unavailable` with retry/refresh affordance | Shows unavailable/retry state | Shows unavailable/retry state |
 | Temporary Telegram results | Hidden until fuller client parity | Joined Telegram-enabled sessions can view result cards | Joined Telegram-enabled sessions can view result cards when exposed |
+| Telegram-only result exposure levels | No client-side implementation yet | Level 3 aggregate results by default; level 4 group views only when admin-enabled | Same participant exposure contract as bot/Mini App results API |
 | Temporary Telegram question authoring and preference drafts | Hidden until permission parity is standardized | Telegram-native joined group/bound user can add/pose questions and authorize agent drafts | Draft review only; submission still requires user action |
 | `telegram_only` Cloudflare-native session | Shows `Telegram-only session` notice | Listed and answered in Telegram without chain question discovery | Listed and answered in Mini App without chain question discovery |
 

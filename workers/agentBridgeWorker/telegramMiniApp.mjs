@@ -61,6 +61,32 @@ const AGREE_UNSURE_DISAGREE_LABELS = Object.freeze({
   unsure: 'Unsure',
   disagree: 'Disagree',
 });
+const RESULT_VIEW_LEVELS = Object.freeze([
+  {
+    level: 1,
+    key: 'metrics',
+    label: 'Metrics',
+    description: 'Question, response, and participant counts.',
+  },
+  {
+    level: 2,
+    key: 'published_questions',
+    label: 'Published questions',
+    description: 'Admin-approved question text for public display.',
+  },
+  {
+    level: 3,
+    key: 'aggregate_results',
+    label: 'Aggregate results',
+    description: 'Consensus and divisive question summaries.',
+  },
+  {
+    level: 4,
+    key: 'anonymized_groups',
+    label: 'Anonymized groups',
+    description: 'Group clusters and AI summaries without user identifiers.',
+  },
+]);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -93,6 +119,36 @@ function normalizePositiveInteger(value, fallback) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw <= 0) return fallback;
   return Math.floor(raw);
+}
+
+function miniResultsExposurePolicy(session = {}) {
+  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+    ? session.resultsExposure
+    : {};
+  return {
+    metricsEnabled: exposure.metricsEnabled !== false,
+    publishedQuestionsEnabled: exposure.publishedQuestionsEnabled === true,
+    aggregateResultsEnabled: exposure.aggregateResultsEnabled !== false,
+    anonymizedGroupsEnabled: exposure.anonymizedGroupsEnabled === true,
+    minGroupSize: normalizePositiveInteger(exposure.minGroupSize, 2),
+  };
+}
+
+function miniResultsLevelState(exposure = {}) {
+  const enabled = {
+    metrics: exposure.metricsEnabled !== false,
+    published_questions: exposure.publishedQuestionsEnabled === true,
+    aggregate_results: exposure.aggregateResultsEnabled !== false,
+    anonymized_groups: exposure.anonymizedGroupsEnabled === true,
+  };
+  return RESULT_VIEW_LEVELS.map((definition) => ({
+    ...definition,
+    enabled: enabled[definition.key] === true,
+    participantVisible: enabled[definition.key] === true,
+    status: enabled[definition.key] === true
+      ? 'available'
+      : (definition.key === 'anonymized_groups' ? 'admin_can_enable' : 'admin_disabled'),
+  }));
 }
 
 function sanitizeSessionSlug(value = '') {
@@ -1939,47 +1995,112 @@ async function buildMiniAppResultsSummary({
   session = {},
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
+  const exposure = miniResultsExposurePolicy(session);
+  const viewLevels = miniResultsLevelState(exposure);
   const loadedQuestions = await loadQuestionsForSession(env, sessionSlug);
   const questions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
   const records = await loadSubmittedResultRecords(env, sessionSlug);
   const consensusQuestions = consensusQuestionsForResults(questions);
   const consensusQuestionIds = new Set(consensusQuestions.map(readQuestionId).filter(Boolean));
   const consensusRecords = records.filter((record) => consensusQuestionIds.has(record.questionId));
-  const summaries = summarizeQuestionResults(consensusRecords, consensusQuestions)
-    .filter((summary) => Number(summary.total || 0) > 0);
-  const divisive = summaries.slice()
-    .sort((left, right) => (
-      right.differenceScore - left.differenceScore ||
-      right.total - left.total ||
-      left.prompt.localeCompare(right.prompt)
-    ))
-    .slice(0, 5)
-    .map(miniResultQuestionRow);
-  const consensus = summaries.slice()
-    .sort((left, right) => (
-      left.differenceScore - right.differenceScore ||
-      right.total - left.total ||
-      left.prompt.localeCompare(right.prompt)
-    ))
-    .slice(0, 5)
-    .map(miniResultQuestionRow);
+  const summaries = exposure.aggregateResultsEnabled
+    ? summarizeQuestionResults(consensusRecords, consensusQuestions)
+      .filter((summary) => Number(summary.total || 0) > 0)
+    : [];
+  const divisive = exposure.aggregateResultsEnabled
+    ? summaries.slice()
+      .sort((left, right) => (
+        right.differenceScore - left.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
+      .slice(0, 5)
+      .map(miniResultQuestionRow)
+    : [];
+  const consensus = exposure.aggregateResultsEnabled
+    ? summaries.slice()
+      .sort((left, right) => (
+        left.differenceScore - right.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
+      .slice(0, 5)
+      .map(miniResultQuestionRow)
+    : [];
   const graph = buildParticipantGraph(records, questions);
+  const rawGroups = Array.isArray(graph.groups) ? graph.groups : [];
+  const exposedGroups = exposure.anonymizedGroupsEnabled
+    ? rawGroups
+      .filter((group) => Number(group.size || 0) >= exposure.minGroupSize)
+      .map(miniResultGroup)
+    : [];
+  const counts = {
+    questionsSubmitted: questions.length,
+    answerableQuestions: questions.filter((question) => !question.payloadUnavailable && !question.locked).length,
+    responsesGiven: records.length,
+    uniqueParticipants: Number(graph.participantCount || 0) || 0,
+    binaryQuestions: consensusQuestions.length,
+    aggregateRows: summaries.length,
+  };
+  const publicSnapshot = {
+    type: 'ce_public_results_snapshot',
+    version: 1,
+    audience: 'telegram_participant',
+    session: {
+      sessionSlug,
+      sessionName: safeString(session.sessionName || session.name || sessionSlug),
+      mode: session.telegramOnly === true ? 'telegram_only' : safeString(session.sessionMode || 'telegram_enabled'),
+    },
+    exposure: {
+      participantLevel: exposure.anonymizedGroupsEnabled ? 4 : (exposure.aggregateResultsEnabled ? 3 : 1),
+      levels: viewLevels,
+      redactions: [
+        'telegram_user_ids',
+        'wallet_addresses',
+        'raw_response_records',
+      ],
+      minGroupSize: exposure.minGroupSize,
+    },
+    counts,
+    aggregateResults: {
+      enabled: exposure.aggregateResultsEnabled,
+      consensus,
+      divisive,
+    },
+    anonymizedGroups: {
+      enabled: exposure.anonymizedGroupsEnabled,
+      groups: exposedGroups,
+    },
+  };
   return {
     ok: true,
     sessionSlug,
     sessionName: safeString(session.sessionName || session.name || sessionSlug),
-    responseCount: records.length,
-    participantCount: Number(graph.participantCount || 0) || 0,
-    questionCount: questions.length,
-    binaryQuestionCount: consensusQuestions.length,
-    consensusQuestionCount: summaries.length,
+    responseCount: counts.responsesGiven,
+    participantCount: counts.uniqueParticipants,
+    questionCount: counts.questionsSubmitted,
+    binaryQuestionCount: counts.binaryQuestions,
+    consensusQuestionCount: counts.aggregateRows,
     source: loadedQuestions.source || 'telegram_worker_question_cache',
     sourceReason: loadedQuestions.reason || '',
+    exposure: publicSnapshot.exposure,
+    viewLevels,
+    counts,
     questions: {
       consensus,
       divisive,
     },
-    groups: (Array.isArray(graph.groups) ? graph.groups : []).map(miniResultGroup),
+    groupView: {
+      enabled: exposure.anonymizedGroupsEnabled,
+      status: exposure.anonymizedGroupsEnabled ? 'available' : 'admin_can_enable',
+      reason: exposure.anonymizedGroupsEnabled ? '' : 'level_4_anonymized_groups_admin_disabled',
+      minGroupSize: exposure.minGroupSize,
+      hiddenGroupCount: exposure.anonymizedGroupsEnabled
+        ? Math.max(0, rawGroups.length - exposedGroups.length)
+        : null,
+    },
+    groups: exposedGroups,
+    publicSnapshot,
   };
 }
 
@@ -2002,7 +2123,17 @@ async function handleResultsRequest({
     await loadSubmittedResultRecords(env, context.session.sessionSlug),
     (await loadQuestionsForSession(env, context.session.sessionSlug)).questions || []
   );
-  const group = (Array.isArray(liveGraph.groups) ? liveGraph.groups : []).find((item) => item.groupId === groupId);
+  const exposure = miniResultsExposurePolicy(context.session);
+  if (exposure.anonymizedGroupsEnabled !== true) {
+    return json({
+      ok: false,
+      error: 'level_4_anonymized_groups_admin_disabled',
+      summary,
+    }, { status: 403 });
+  }
+  const group = (Array.isArray(liveGraph.groups) ? liveGraph.groups : [])
+    .filter((item) => Number(item.size || 0) >= exposure.minGroupSize)
+    .find((item) => item.groupId === groupId);
   if (!group) {
     return json({ ok: false, error: 'group_not_found', summary }, { status: 404 });
   }
@@ -2392,10 +2523,31 @@ function telegramMiniAppHtml() {
       justify-content: space-between;
       gap: 10px;
     }
-    .resultsSessionOptions, .resultGroups {
+    .resultsSessionOptions, .resultGroups, .resultViewLevels {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+    .resultLevel {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 9px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 12px;
+    }
+    .resultLevel.available {
+      border-color: rgba(98, 255, 191, 0.44);
+      color: var(--text);
+      background: rgba(98, 255, 191, 0.12);
+    }
+    .resultLevel.admin {
+      border-color: rgba(255, 209, 102, 0.42);
+      color: var(--settings-accent);
+      background: rgba(255, 209, 102, 0.1);
     }
     .resultColumns {
       display: grid;
@@ -2773,6 +2925,7 @@ function telegramMiniAppHtml() {
           <button class="secondary" id="refreshResults" type="button">Refresh</button>
         </div>
         <div class="resultsSessionOptions" id="resultsSessionOptions"></div>
+        <div class="resultViewLevels" id="resultViewLevels" aria-label="Results exposure levels"></div>
         <div class="filterSummary" id="resultsSummary"></div>
         <div class="resultColumns">
           <section class="resultSection" aria-label="Most consensus questions">
@@ -2893,6 +3046,7 @@ function telegramMiniAppHtml() {
       resultsPanel: document.getElementById('resultsPanel'),
       refreshResults: document.getElementById('refreshResults'),
       resultsSessionOptions: document.getElementById('resultsSessionOptions'),
+      resultViewLevels: document.getElementById('resultViewLevels'),
       resultsSummary: document.getElementById('resultsSummary'),
       consensusResults: document.getElementById('consensusResults'),
       divisiveResults: document.getElementById('divisiveResults'),
@@ -3977,9 +4131,27 @@ function telegramMiniAppHtml() {
         mount.appendChild(item);
       });
     }
+    function renderResultViewLevels() {
+      el.resultViewLevels.innerHTML = '';
+      const levels = Array.isArray(state.resultsData?.viewLevels)
+        ? state.resultsData.viewLevels
+        : [];
+      if (!levels.length) return;
+      levels.forEach((level) => {
+        const chip = document.createElement('span');
+        chip.className = 'resultLevel ' + (level.enabled ? 'available' : 'admin');
+        chip.textContent = level.level + '. ' + level.label + (level.enabled ? '' : ' - admin');
+        chip.title = level.description || '';
+        el.resultViewLevels.appendChild(chip);
+      });
+    }
     function renderResultGroups(groups) {
       el.resultGroups.innerHTML = '';
       el.groupAnalysis.innerHTML = '';
+      if (state.resultsData?.groupView?.enabled === false) {
+        appendEmptyResult(el.resultGroups, 'Anonymized group view is level 4 and needs admin enablement.');
+        return;
+      }
       if (!groups.length) {
         appendEmptyResult(el.resultGroups, 'Not enough participant response data for groups yet.');
         return;
@@ -4052,6 +4224,7 @@ function telegramMiniAppHtml() {
       }
       const consensusRows = state.resultsData?.questions?.consensus || [];
       const divisiveRows = state.resultsData?.questions?.divisive || [];
+      renderResultViewLevels();
       renderResultRows(el.consensusResults, consensusRows, 'No binary question responses yet.', 'consensus');
       renderResultRows(el.divisiveResults, divisiveRows, 'No divisive binary question responses yet.', 'divisive');
       renderResultGroups(state.resultsData?.groups || []);
