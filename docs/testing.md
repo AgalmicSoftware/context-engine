@@ -50,8 +50,7 @@ auxiliary pages under `client/src/components/Agent`,
 `client/src/components/Bookmarks`, and `client/src/components/Sponsor`.
 Shell support coverage also includes `client/src/components/ErrorBoundary` and
 `client/src/components/RightSidebar`, and dev/E2E support coverage includes
-`client/src/components/E2E`. Telegram demo setup coverage includes
-`client/src/components/TelegramDemoSetup`, and gate UI coverage includes
+`client/src/components/E2E`. Gate UI coverage includes
 `client/src/components/Gates`. Community tab coverage includes
 `client/src/components/CommunityTab`, Polis report coverage includes
 `client/src/components/PolisReport`, and DebateMap coverage includes

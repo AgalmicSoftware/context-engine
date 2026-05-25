@@ -26,7 +26,6 @@ const expectedLintCommand = [
   '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
   '"src/components/RightSidebar/**/*.{ts,tsx}"',
   '"src/components/E2E/**/*.{ts,tsx}"',
-  '"src/components/TelegramDemoSetup/**/*.{ts,tsx}"',
   '"src/components/Gates/**/*.{ts,tsx}"',
   '"src/components/CommunityTab/**/*.{ts,tsx}"',
   '"src/components/PolisReport/**/*.{ts,tsx}"',
@@ -60,7 +59,6 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
-    expect(eslintConfig).toContain("const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");

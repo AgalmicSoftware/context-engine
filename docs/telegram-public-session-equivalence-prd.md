@@ -69,6 +69,10 @@ surface-specific paths.
 - `telegramOnly = true` writes `sessionMode = "telegram_only"` metadata and
   causes the normal `/session/<slug>` client route to show a
   `Telegram-only session` notice instead of rendering questions/results.
+- The public CE client must not expose Telegram bot setup UX yet. The former
+  `/telegram-demo-setup` route and component should remain absent from public
+  release until the Telegram setup flow is standardized, documented, and ready
+  for supported operators.
 - Telegram-only question loading must prefer preloaded Cloudflare/session-policy
   question lists over chain event scans. Chain-backed public session parity is
   still covered by the normal equivalence matrix below.
