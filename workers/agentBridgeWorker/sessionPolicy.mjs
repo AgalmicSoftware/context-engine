@@ -74,6 +74,22 @@ function plainObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function normalizeLightweightGroups(session = {}) {
+  const groups = Array.isArray(session.lightweightGroups)
+    ? session.lightweightGroups
+    : (
+      Array.isArray(session.telegramGroups)
+        ? session.telegramGroups
+        : (Array.isArray(session.telegramOnlyGroups) ? session.telegramOnlyGroups : [])
+    );
+  return groups
+    .filter(plainObject)
+    .map((group) => ({
+      ...group,
+      options: Array.isArray(group.options) ? group.options.slice() : [],
+    }));
+}
+
 function normalizePositiveInteger(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
@@ -155,6 +171,7 @@ export function normalizeSessionPolicy(input = {}) {
     sponsoredFaucetAllowed: session.sponsoredFaucetAllowed === true,
     sbtJoinModes: Array.isArray(session.sbtJoinModes) ? session.sbtJoinModes.slice() : ['public'],
     requiredSbtGroups: normalizeRequiredSbtGroups(session),
+    lightweightGroups: normalizeLightweightGroups(session),
     resultsExposure: normalizeResultsExposurePolicy(session),
     questionAuthoringPermissionMode: safeString(
       session.questionAuthoringPermissionMode ||

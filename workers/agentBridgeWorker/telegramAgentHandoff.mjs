@@ -11,6 +11,11 @@ import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoring
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
+import {
+  loadTelegramLightweightGroups,
+  persistTelegramChildSession,
+  persistTelegramLightweightGroupProposal,
+} from './telegramGroups.mjs';
 
 function safeString(value) {
   return String(value || '').trim();
@@ -388,6 +393,57 @@ async function handlePoseRequest({
   }, { status: commandResponse.ok === true ? 200 : 400 });
 }
 
+function telegramOnlyRouteGuard(context = {}) {
+  if (context.session?.telegramOnly === true) return null;
+  return json({
+    ok: false,
+    reason: 'telegram_only_session_required',
+    sessionSlug: context.session?.sessionSlug || '',
+  }, { status: 403 });
+}
+
+async function handleGroupsRequest({ env = {}, context = {} } = {}) {
+  const guard = telegramOnlyRouteGuard(context);
+  if (guard) return guard;
+  const groups = await loadTelegramLightweightGroups({
+    env,
+    session: context.session,
+    telegramUserId: context.normalized.user.telegramUserId,
+  });
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    permissionMode: context.permission.mode,
+    groups,
+  });
+}
+
+async function handleGroupProposalRequest({ env = {}, context = {}, input = {} } = {}) {
+  const guard = telegramOnlyRouteGuard(context);
+  if (guard) return guard;
+  const saved = await persistTelegramLightweightGroupProposal({
+    env,
+    session: context.session,
+    normalized: context.normalized,
+    input,
+    createdAt: input.createdAt || null,
+  });
+  return json(saved, { status: saved.ok ? 200 : 400 });
+}
+
+async function handleChildSessionRequest({ env = {}, context = {}, input = {} } = {}) {
+  const guard = telegramOnlyRouteGuard(context);
+  if (guard) return guard;
+  const saved = await persistTelegramChildSession({
+    env,
+    parentSession: context.session,
+    normalized: context.normalized,
+    input,
+    createdAt: input.createdAt || null,
+  });
+  return json(saved, { status: saved.ok ? 200 : 400 });
+}
+
 export async function handleTelegramAgentHandoffRequest({
   request,
   env = {},
@@ -411,6 +467,15 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/questions/pose' && request.method === 'POST') {
     return handlePoseRequest({ env, context, input, fetchImpl });
+  }
+  if (url.pathname === '/telegram/agent/api/groups' && request.method === 'GET') {
+    return handleGroupsRequest({ env, context });
+  }
+  if (url.pathname === '/telegram/agent/api/groups/propose' && request.method === 'POST') {
+    return handleGroupProposalRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/sessions/child' && request.method === 'POST') {
+    return handleChildSessionRequest({ env, context, input });
   }
   return json({ ok: false, reason: 'telegram_agent_route_not_found' }, { status: 404 });
 }
