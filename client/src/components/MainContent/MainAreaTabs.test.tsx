@@ -52,13 +52,18 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
 
 describe('MainAreaTabs', () => {
   it('omits the empty Votes tab while keeping the Tool Explorer tab available', async () => {
-    render(<MainAreaTabs {...createProps()} />);
+    const { container } = render(<MainAreaTabs {...createProps()} />);
 
     expect(screen.queryByText('Votes')).not.toBeInTheDocument();
     expect(screen.getByText('Latest')).toBeInTheDocument();
     expect(screen.getByText('Community')).toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByText('Welcome')).toBeInTheDocument();
+    expect(container.querySelector('.mainAreaTabsAlt')).toBeInTheDocument();
+    expect(container.querySelector('.mainTabsCard')).toBeInTheDocument();
+    expect(container.querySelector('.mainTabsCardHeader')).toBeInTheDocument();
+    expect(container.querySelector('.mainAreaCardBody')).toBeInTheDocument();
+    expect(container.querySelectorAll('.navTabIcon')).toHaveLength(4);
     expect(await screen.findByTestId('mock-tool-explorer')).toBeInTheDocument();
     expect(screen.getByTestId('mock-tool-explorer')).toHaveAttribute('data-demo-surface-mode', 'true');
   });
