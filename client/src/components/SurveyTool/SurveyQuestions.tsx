@@ -3393,7 +3393,7 @@ export class SurveyQuestions extends Component {
     cardIcons,
   }) => (
     <Card key={cardKey} className={styles.fullQuestionCard}>
-      <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
+      <CardBody className={`${styles.questionTitleBody} ${styles.fullQuestionBody}`}>
         <FullQuestionHeader>
           {this.renderPromptWithManualDecrypt(question)}
           {cardIcons}
