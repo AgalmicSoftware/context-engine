@@ -24,7 +24,6 @@ const typedShellSupportComponentFiles = [
   'src/components/RightSidebar/**/*.{ts,tsx}',
 ];
 const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}'];
-const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}'];
 const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}'];
 const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}'];
 const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}'];
@@ -162,17 +161,6 @@ export default [
   },
   {
     files: typedDevSupportComponentFiles,
-    languageOptions: sharedLanguageOptions,
-    plugins: reactPlugins,
-    settings: reactSettings,
-    rules: {
-      ...sharedRules,
-      ...reactRules,
-      'no-undef': 'off',
-    },
-  },
-  {
-    files: typedTelegramDemoSetupComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,

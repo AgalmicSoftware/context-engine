@@ -276,7 +276,6 @@ import {
   SponsorPage as SponsorPageRaw,
   SurveyPage as SurveyPageRaw,
   SurveyTool as SurveyToolRaw,
-  TelegramDemoSetupPage as TelegramDemoSetupPageRaw,
   TagPage as TagPageRaw,
   UserPage as UserPageRaw,
 } from './routeLazyComponents.js';
@@ -395,7 +394,6 @@ const SimulatedUserPage = SimulatedUserPageRaw as unknown as MainSiteRouteCompon
 const SponsorPage = SponsorPageRaw as unknown as MainSiteRouteComponent;
 const SurveyPage = SurveyPageRaw as unknown as MainSiteRouteComponent;
 const SurveyTool = SurveyToolRaw as unknown as MainSiteRouteComponent;
-const TelegramDemoSetupPage = TelegramDemoSetupPageRaw as unknown as MainSiteRouteComponent;
 const TagPage = TagPageRaw as unknown as MainSiteRouteComponent;
 const UserPage = UserPageRaw as unknown as MainSiteRouteComponent;
 
@@ -5164,14 +5162,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
   };
 
-  _renderTelegramDemoSetupRoute = (ctx: RouteRenderCtx) => (
-    <Suspense fallback={<LazyFallback label="Loading Telegram Demo Setup..." />}>
-      <RouteErrorBoundary resetKey={ctx.fullPath}>
-        <TelegramDemoSetupPage activeSessionSlug={ctx.defaultSlug} />
-      </RouteErrorBoundary>
-    </Suspense>
-  );
-
   _renderSimUserRoute = (fullPath: string, defaultSessionNetwork: ReturnType<typeof _getSessionNetwork>) => {
     const simUsername = fullPath.slice(4);
     return (
@@ -6271,9 +6261,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
     if (fullPath === "/agent" || fullPath === "/agent/") {
       return this._renderAgentRoute();
-    }
-    if (fullPath === "/telegram-demo-setup" || fullPath === "/telegram-demo-setup/") {
-      return this._renderTelegramDemoSetupRoute(ctx);
     }
     if (firstPathSegment === "session") {
       return this._renderSessionRoute(ctx);
