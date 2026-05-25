@@ -23,13 +23,6 @@ type FooterProps = {
 };
 
 class Footer extends React.Component<FooterProps> {
-  static propTypes = {
-    changeFocusedTab: PropTypes.func.isRequired,
-    toggleLoginModal: PropTypes.func.isRequired,
-    focusedTab: PropTypes.number,
-    loginModalToggled: PropTypes.bool,
-  };
-
   clickedSettingsLink = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     this.props.toggleLoginModal(true)
