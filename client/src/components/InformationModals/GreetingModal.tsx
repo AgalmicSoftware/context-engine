@@ -1,6 +1,5 @@
 /** @file GreetingModal.tsx */
 import React, { Component } from "react";
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { fetchSessionState } from '../../actions/sessionStateActions.js';
 import { createLogger } from '../../utilities/logging';
@@ -44,15 +43,6 @@ type RootState = {
 };
 
 class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
-  static propTypes = {
-    fetchSessionState: PropTypes.func.isRequired,
-    account: PropTypes.string,
-    provider: PropTypes.string,
-    visible: PropTypes.bool,
-    optOutAndEmailBottom: PropTypes.bool,
-    closeExplainerFunction: PropTypes.func.isRequired,
-  };
-
   state: GreetingModalState = {
     rulesModalOpen: false,
     userOptsOutMetrics: false,
