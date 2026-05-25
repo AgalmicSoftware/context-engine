@@ -75,6 +75,14 @@ const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
   disableLoadButton: false,
   error: '',
 });
+type UnknownRecord = Record<string, unknown>;
+
+const toUnknownRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+);
+
 const globalState: any = globalThis as any;
 const contractScriptsAny: any = contractScripts as any;
 const DebateMapAny: any = DebateMap;
@@ -91,14 +99,18 @@ const resolveAutoFeatureBySessionSlug = (metadata: any) => (
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
 
-const isTelegramOnlySessionConfig = (metadata: any) => (
-  metadata?.telegramOnly === true ||
-  metadata?.telegram_only === true ||
-  metadata?.sessionMode === 'telegram_only' ||
-  metadata?.telegramMode === 'telegram_only' ||
-  metadata?.telegram?.only === true ||
-  metadata?.telegram?.mode === 'telegram_only'
-);
+const isTelegramOnlySessionConfig = (metadata: unknown) => {
+  const config = toUnknownRecord(metadata);
+  const telegramConfig = toUnknownRecord(config.telegram);
+  return (
+    config.telegramOnly === true ||
+    config.telegram_only === true ||
+    config.sessionMode === 'telegram_only' ||
+    config.telegramMode === 'telegram_only' ||
+    telegramConfig.only === true ||
+    telegramConfig.mode === 'telegram_only'
+  );
+};
 
 const isPerfCountersEnabled = () => {
   try {
