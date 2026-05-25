@@ -1,0 +1,129 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import test from 'node:test';
+
+import {
+  collectTypeDebt,
+  compareTypeDebtCounts,
+  countTypeDebtInText,
+  createZeroCounts,
+  isProductionTypeScriptFile,
+  runTypeDebtRatchet,
+} from './check-type-debt-ratchet.mjs';
+
+function writeFile(rootDir, relativePath, contents) {
+  const absolutePath = path.join(rootDir, relativePath);
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  fs.writeFileSync(absolutePath, contents);
+}
+
+function withTempGitRepo(run) {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-type-debt-'));
+  try {
+    execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+    return run(rootDir);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+}
+
+test('countTypeDebtInText counts each tracked debt marker', () => {
+  const counts = countTypeDebtInText(`
+// @ts-nocheck
+const value: any = input as any;
+type AsyncValue = Promise<any>;
+type ListValue = Array<any>;
+type MapValue = Record<string, any>;
+`);
+
+  assert.equal(counts.tsNocheck, 1);
+  assert.equal(counts.colonAny, 1);
+  assert.equal(counts.asAny, 1);
+  assert.equal(counts.promiseAny, 1);
+  assert.equal(counts.arrayAny, 1);
+  assert.equal(counts.recordAny, 1);
+});
+
+test('isProductionTypeScriptFile excludes tests and test utilities', () => {
+  assert.equal(isProductionTypeScriptFile('client/src/components/App.tsx'), true);
+  assert.equal(isProductionTypeScriptFile('client/src/components/App.test.tsx'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/components/App.spec.ts'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/setupTests.ts'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/__tests__/App.tsx'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/testing/render.tsx'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/utilities/testUtils.ts'), false);
+  assert.equal(isProductionTypeScriptFile('client/src/utilities/e2eTestIds.ts'), true);
+  assert.equal(isProductionTypeScriptFile('scripts/check-type-debt-ratchet.mjs'), false);
+});
+
+test('collectTypeDebt only scans tracked production TS and TSX source files', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'client/src/components/Production.tsx', 'const value: any = input as any;\n');
+    writeFile(rootDir, 'client/src/components/Production.test.tsx', 'const value: any = input as any;\n');
+    writeFile(rootDir, 'client/src/utilities/testUtils.ts', 'const value: any = input as any;\n');
+    writeFile(rootDir, 'client/src/components/Production.jsx', 'const value = input;\n');
+    execFileSync('git', ['add', 'client/src'], { cwd: rootDir, stdio: 'ignore' });
+
+    const debt = collectTypeDebt({ rootDir });
+
+    assert.equal(debt.filesChecked, 1);
+    assert.deepEqual(debt.counts, {
+      ...createZeroCounts(),
+      colonAny: 1,
+      asAny: 1,
+    });
+    assert.deepEqual(debt.files.map((file) => file.path), [
+      'client/src/components/Production.tsx',
+    ]);
+  });
+});
+
+test('compareTypeDebtCounts reports only increases over baseline', () => {
+  const increases = compareTypeDebtCounts(
+    {
+      ...createZeroCounts(),
+      tsNocheck: 4,
+      colonAny: 1,
+    },
+    {
+      ...createZeroCounts(),
+      tsNocheck: 3,
+      colonAny: 2,
+    },
+  );
+
+  assert.deepEqual(increases, [
+    {
+      key: 'tsNocheck',
+      label: '@ts-nocheck',
+      current: 4,
+      baseline: 3,
+      delta: 1,
+    },
+  ]);
+});
+
+test('runTypeDebtRatchet fails when current counts exceed the checked-in baseline', () => {
+  withTempGitRepo((rootDir) => {
+    writeFile(rootDir, 'client/src/components/Production.tsx', 'const value: any = input;\n');
+    writeFile(rootDir, 'scripts/type-debt-baseline.json', JSON.stringify({
+      counts: createZeroCounts(),
+    }));
+    execFileSync('git', ['add', '.'], { cwd: rootDir, stdio: 'ignore' });
+
+    const stdout = [];
+    const stderr = [];
+    const status = runTypeDebtRatchet({
+      rootDir,
+      stdout: (line) => stdout.push(line),
+      stderr: (line) => stderr.push(line),
+    });
+
+    assert.equal(status, 1);
+    assert.match(stderr.join('\n'), /: any: 1 exceeds baseline 0 by 1/);
+    assert.match(stdout.join('\n'), /Current counts/);
+  });
+});
