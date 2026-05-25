@@ -3903,7 +3903,7 @@ class CreateSBTGroup extends Component<any, any> {
     };
 
     return (
-      <div id={styles.createGroupExpanded} style={rootSurfaceStyle}>
+      <div className={styles.createGroupExpanded} style={rootSurfaceStyle}>
         <div className={styles.headerContainer}>
           <h1 className={styles.createGroupTitle}>{headerTitle}</h1>
           <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="learnMoreTooltip" style={resolveCreateSbtTooltipIconStyle()} />
@@ -4014,7 +4014,7 @@ class CreateSBTGroup extends Component<any, any> {
 
               <div className={styles.tokenInfoMetaGrid}>
                 <div className={styles.tokenInfoMetaCard} data-testid={E2E_TESTIDS.SBT_CREATE_DOCS_LOCK_ROW}>
-                  <div id={styles.addDocUrlSection} className={styles.docUrlField}>
+                  <div className={`${styles.addDocUrlSection} ${styles.docUrlField}`}>
                     <input
                       type="text"
                       name="documentUrl"
@@ -4032,7 +4032,7 @@ class CreateSBTGroup extends Component<any, any> {
                       className={styles.addDocUrlActionButton}
                       data-testid={E2E_TESTIDS.SBT_CREATE_DOC_URL_ADD}
                     >
-                      <FontAwesomeIcon icon={faPlus} id={styles.addDocUrlButton} />
+                      <FontAwesomeIcon icon={faPlus} className={styles.addDocUrlButton} />
                     </button>
                     <div className={inlineFieldLockClassName}>
                       {renderFieldLock('docs', 'documentURLs', docsSelectedGateIds)}
