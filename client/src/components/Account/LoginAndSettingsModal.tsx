@@ -108,6 +108,10 @@ import {
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
+import {
+  formatSponsoredStatusMeta,
+  getSponsoredKeyAliases,
+} from './loginSettingsSponsoredStatusHelpers';
 
 const accountLog = createLogger('account');
 const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
@@ -172,10 +176,6 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
-type SponsoredStatusEntry = LoginAndSettingsRecord & {
-  status?: string;
-};
-
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
@@ -187,38 +187,6 @@ const uniqueList = <T = unknown>(values: T[] = []) => (
     )
   )
 );
-const getSponsoredKeyAliases = (resourceKey: string = '') => {
-  if (resourceKey === 'txGas') return ['faucet', 'txGas'];
-  return [resourceKey];
-};
-const formatSponsoredStatusMeta = (entry: SponsoredStatusEntry | null = null, hasActiveSponsor: boolean = false) => {
-  const status = entry?.status === 'unresolved'
-    ? 'error'
-    : (entry?.status || 'no-gate');
-  if (!hasActiveSponsor) {
-    return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
-  }
-  if (status === 'granted') {
-    return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
-  }
-  if (status === 'denied') {
-    return { label: 'Gate locked', tone: 'warn', detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.' };
-  }
-  if (status === 'needs-wallet') {
-    return { label: 'Connect wallet', tone: 'warn', detail: 'Connect a wallet to evaluate the sponsor gate for this session.' };
-  }
-  if (status === 'invalid-gate') {
-    return { label: 'Invalid gate', tone: 'warn', detail: 'This sponsor gate configuration is incomplete.' };
-  }
-  if (status === 'unknown' || status === 'error') {
-    return { label: 'Check unavailable', tone: 'muted', detail: 'We could not confirm gate access for the active-session sponsor.' };
-  }
-  if (status === 'no-gate' && hasActiveSponsor) {
-    return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
-  }
-  return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
-};
-
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
