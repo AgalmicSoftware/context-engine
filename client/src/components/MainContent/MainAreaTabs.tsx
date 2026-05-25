@@ -158,7 +158,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                       className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
                       onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
                     >
-                      <FontAwesomeIcon icon={faCompass} id={styles.navTabIcon} />
+                      <FontAwesomeIcon icon={faCompass} className={styles.navTabIcon} />
                       <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>
                     </NavLink>
                   </NavItem>
