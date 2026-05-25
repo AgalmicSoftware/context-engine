@@ -1,13 +1,95 @@
 import {
+  resolveMainSiteExplicitSessionSlugFromPath,
+  resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteRenderActiveSessionSlug,
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
 
 describe('routeSessionResolution', () => {
+  it('resolves explicit session path slugs before Redux session state', () => {
+    const resolveSessionSlugFromPathToken = jest.fn((token) => (
+      token === 'DEBATE' ? 'debate' : ''
+    ));
+
+    expect(resolveMainSiteSessionSlugFromProps({
+      path: '/session/DEBATE',
+      activeSessionSlug: 'active',
+      sessionState: {
+        selectedSessionScope: 'list',
+        selectedSessionSlugs: ['fallback'],
+      },
+      resolveSessionSlugFromPathToken,
+      derivePrimarySessionSlugFromList: () => 'fallback',
+    })).toBe('debate');
+
+    expect(resolveSessionSlugFromPathToken).toHaveBeenCalledWith('DEBATE');
+  });
+
+  it('preserves explicit new and general session path handling', () => {
+    expect(resolveMainSiteExplicitSessionSlugFromPath({
+      path: '/session/new',
+      resolveSessionSlugFromPathToken: () => '',
+    })).toEqual({
+      hasExplicitSessionSlug: true,
+      sessionSlug: '',
+    });
+
+    expect(resolveMainSiteExplicitSessionSlugFromPath({
+      path: '/session/general',
+      resolveSessionSlugFromPathToken: () => '',
+    })).toEqual({
+      hasExplicitSessionSlug: true,
+      sessionSlug: '',
+    });
+  });
+
+  it('derives primary and active slugs from selected list state without normalizing active props', () => {
+    const derivePrimarySessionSlugFromList = jest.fn(() => 'beta');
+    const sessionState = {
+      selectedSessionScope: 'LIST',
+      selectedSessionSlugs: ['alpha', 'beta'],
+    };
+
+    expect(resolveMainSiteGlobalPrimarySessionSlug({
+      sessionState,
+      derivePrimarySessionSlugFromList,
+    })).toBe('beta');
+
+    expect(resolveMainSiteSessionSlugFromProps({
+      path: '/questions',
+      activeSessionSlug: 'ActiveCase',
+      sessionState,
+      derivePrimarySessionSlugFromList,
+    })).toBe('ActiveCase');
+  });
+
+  it('does not derive a non-general list primary when primary selection explicitly includes general', () => {
+    const derivePrimarySessionSlugFromList = jest.fn(() => 'alpha');
+    const sessionState = {
+      primarySessionExplicit: true,
+      selectedSessionScope: 'list',
+      selectedSessionSlugs: ['general', 'alpha'],
+    };
+
+    expect(resolveMainSiteGlobalPrimarySessionSlug({
+      sessionState,
+      derivePrimarySessionSlugFromList,
+    })).toBe('');
+
+    expect(resolveMainSiteSessionSlugFromProps({
+      path: '/questions',
+      activeSessionSlug: '',
+      sessionState,
+      derivePrimarySessionSlugFromList,
+    })).toBe('');
+    expect(derivePrimarySessionSlugFromList).not.toHaveBeenCalled();
+  });
+
   it('canonicalizes explicit query session aliases and preserves survey-route slug-only behavior', () => {
     expect(resolveMainSiteRouteSessionSlugHint({
       search: '?session=DEBATE',
