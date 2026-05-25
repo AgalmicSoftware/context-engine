@@ -1,4 +1,4 @@
-/** @file storageRefs.js */
+/** @file storageRefs.ts */
 
 import { toStr } from '../shared/primitives.js';
 
@@ -6,7 +6,7 @@ export const STORAGE_BACKENDS = Object.freeze({
   ARWEAVE: 'arweave',
   LIT_ARWEAVE: 'lit-arweave',
   CLOUDFLARE: 'cloudflare',
-});
+} as const);
 
 export const STORAGE_RESOURCE_KEYS = Object.freeze({
   DOCS_CONTEXT: 'docsContext',
@@ -15,22 +15,50 @@ export const STORAGE_RESOURCE_KEYS = Object.freeze({
   RESPONSES: 'responses',
   GENERATED: 'generatedArtifacts',
   MEDIA: 'media',
-});
+} as const);
+
+export type StorageBackend = typeof STORAGE_BACKENDS[keyof typeof STORAGE_BACKENDS];
+
+type UnknownRecord = Record<string, unknown>;
+
+export interface StorageRef extends UnknownRecord {
+  backend: StorageBackend;
+  id: string;
+  uri?: string;
+  contentType?: string;
+  encrypted?: true;
+  gate?: string;
+  resource?: string;
+  createdAt?: string;
+}
+
+interface NormalizeStorageRefOptions extends UnknownRecord {
+  fallbackBackend?: unknown;
+  legacyArweaveTxId?: unknown;
+  encrypted?: unknown;
+  resource?: unknown;
+}
+
+interface LegacyStorageRefOptions extends NormalizeStorageRefOptions {
+  backend?: unknown;
+  contentType?: unknown;
+  gate?: unknown;
+}
 
 const ARWEAVE_TX_ID_RE = /^[a-z0-9_-]{43}$/i;
 const CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
 const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
-const trim = (value) => toStr(value).trim();
+const trim = (value: unknown): string => toStr(value).trim();
 
 /**
  * @param {unknown} value
  * @param {string} [fallback]
  * @returns {'arweave' | 'lit-arweave' | 'cloudflare'}
  */
-export const normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
+export const normalizeStorageBackend = (value: unknown, fallback: unknown = STORAGE_BACKENDS.ARWEAVE): StorageBackend => {
   const raw = trim(value).toLowerCase();
   if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === 'cf' || raw === 'r2') {
     return STORAGE_BACKENDS.CLOUDFLARE;
@@ -50,23 +78,23 @@ export const normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEA
   return normalizeStorageBackend(fallback, STORAGE_BACKENDS.ARWEAVE);
 };
 
-export const isArweaveStorageBackend = (value) => {
+export const isArweaveStorageBackend = (value: unknown): boolean => {
   const backend = normalizeStorageBackend(value);
   return backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE;
 };
 
-export const isCloudflareStorageBackend = (value) => (
+export const isCloudflareStorageBackend = (value: unknown): boolean => (
   normalizeStorageBackend(value) === STORAGE_BACKENDS.CLOUDFLARE
 );
 
-export const isArweaveTxId = (value) => ARWEAVE_TX_ID_RE.test(trim(value));
+export const isArweaveTxId = (value: unknown): boolean => ARWEAVE_TX_ID_RE.test(trim(value));
 
-export const isSafeCloudflareStorageRefId = (value) => {
+export const isSafeCloudflareStorageRefId = (value: unknown): boolean => {
   const id = trim(value);
   return !!id && CLOUDFLARE_REF_ID_RE.test(id) && !CLOUDFLARE_REF_FORBIDDEN_RE.test(id);
 };
 
-const normalizeCreatedAt = (value) => {
+const normalizeCreatedAt = (value: unknown): string => {
   const raw = trim(value);
   if (!raw) return '';
   const date = new Date(raw);
@@ -74,26 +102,26 @@ const normalizeCreatedAt = (value) => {
   return date.toISOString();
 };
 
-const normalizeCloudflareStorageUri = (value, id) => {
+const normalizeCloudflareStorageUri = (value: unknown, id: string): string => {
   const raw = trim(value);
   if (!raw) return id ? `/storage/read?id=${encodeURIComponent(id)}` : '';
   if (/^\/storage\/read(?:\?|$)/.test(raw)) return raw;
   return id ? `/storage/read?id=${encodeURIComponent(id)}` : '';
 };
 
-const normalizeArweaveStorageUri = (backend, value, id) => {
+const normalizeArweaveStorageUri = (backend: StorageBackend, value: unknown, id: string): string => {
   const raw = trim(value);
   if (raw && /^(ar|arweave|https?):\/\//i.test(raw)) return raw;
   if (!id) return '';
   return backend === STORAGE_BACKENDS.LIT_ARWEAVE ? `lit-arweave://${id}` : `ar://${id}`;
 };
 
-export const normalizeStorageRef = (input, {
+export const normalizeStorageRef = (input: unknown, {
   fallbackBackend = STORAGE_BACKENDS.ARWEAVE,
   legacyArweaveTxId = '',
   encrypted = undefined,
   resource = '',
-} = {}) => {
+}: NormalizeStorageRefOptions = {}): StorageRef | null => {
   const raw = isObj(input)
     ? input
     : (trim(input) ? { id: trim(input) } : {});
@@ -113,7 +141,7 @@ export const normalizeStorageRef = (input, {
 
   if (!id) return null;
 
-  const next = {
+  const next: StorageRef = {
     backend,
     id,
   };
@@ -143,7 +171,10 @@ export const normalizeStorageRef = (input, {
   return next;
 };
 
-export const deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
+export const deriveStorageRefFromLegacyArweaveTxId = (
+  arweaveTxId: unknown,
+  opts: LegacyStorageRefOptions = {}
+): StorageRef | null => {
   const txId = trim(arweaveTxId);
   if (!txId) return null;
   return normalizeStorageRef(
@@ -158,7 +189,10 @@ export const deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) =>
   );
 };
 
-export const resolvePayloadStorageRef = (record, opts = {}) => {
+export const resolvePayloadStorageRef = (
+  record: unknown,
+  opts: LegacyStorageRefOptions = {}
+): StorageRef | null => {
   const raw = isObj(record) ? record : {};
   const isEncrypted = opts.encrypted ?? raw.encrypted ?? raw.payloadEncrypted;
   const fallbackBackend = opts.fallbackBackend || (isEncrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE);
@@ -183,7 +217,10 @@ export const resolvePayloadStorageRef = (record, opts = {}) => {
   });
 };
 
-export const getLegacyArweaveTxId = (record, opts = {}) => {
+export const getLegacyArweaveTxId = (
+  record: unknown,
+  opts: NormalizeStorageRefOptions = {}
+): string => {
   if (!isObj(record)) return trim(record);
   const storageRef = record.storageRef
     ? normalizeStorageRef(record.storageRef, {
@@ -197,7 +234,10 @@ export const getLegacyArweaveTxId = (record, opts = {}) => {
   return trim(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
 };
 
-export const attachStorageRefCompatibilityFields = (record, opts = {}) => {
+export const attachStorageRefCompatibilityFields = (
+  record: unknown,
+  opts: LegacyStorageRefOptions = {}
+): UnknownRecord => {
   const source = isObj(record) ? { ...record } : {};
   const storageRef = resolvePayloadStorageRef(source, opts);
   if (!storageRef) return source;
@@ -213,9 +253,9 @@ export const storageRefFromLegacyArweaveTxId = deriveStorageRefFromLegacyArweave
 export const normalizeStorageRefForRecord = resolvePayloadStorageRef;
 export const withStorageRefCompatibility = attachStorageRefCompatibilityFields;
 
-export const assertNoCloudflarePrivateMaterial = (value) => {
+export const assertNoCloudflarePrivateMaterial = (value: unknown): true => {
   const text = typeof value === 'string' ? value : JSON.stringify(value || {});
-  if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text)) {
+  if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text as string)) {
     throw new Error('Cloudflare storage references must not expose private storage identifiers or credentials.');
   }
   return true;
