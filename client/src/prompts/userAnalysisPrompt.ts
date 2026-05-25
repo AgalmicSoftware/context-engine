@@ -32,6 +32,8 @@ signals of topical focus/interest. Keep commentary factual and measured.
 Additionally, include a brief "Historical Alignment" section:
 - Choose ONE widely known historical figure whose views broadly align with the user's themes.
 - Provide a concise justification (1–2 sentences) grounded in the provided data.
+- If the provided data is too sparse for a defensible comparison, use empty strings for figure and reasoning.
+- Do not base the comparison on demographics, identity guesses, or private affiliations.
 
 STRICTLY return a single VALID JSON object with this exact shape (no extra text):
 {
