@@ -36,6 +36,27 @@ export interface SessionMetaFieldsRefreshResult {
   errors: FieldDecryptError[];
 }
 
+type SessionMetaStateUpdater = (
+  prev: Record<string, unknown>
+) => Record<string, unknown> | null;
+
+export interface SessionMetaRefreshHost {
+  getActiveSessionSlug: () => string;
+  getSessionConfigBySlugOrDefault: (slug: string) => Record<string, unknown> | null | undefined;
+  getGlobalLitHooks: () => { getKey?: ((...args: unknown[]) => unknown) | null } | null | undefined;
+  getAccount: () => string;
+  getProviderLike: () => unknown;
+  decryptEnvelopeValue: (encrypted: unknown, opts: Record<string, unknown>) => Promise<unknown>;
+  setState: (updater: SessionMetaStateUpdater) => void;
+  warn?: (context: string, error: unknown) => void;
+}
+
+export interface SessionMetaRefreshController {
+  refreshSessionInfo: () => Promise<void>;
+  refreshSessionMetaFields: () => Promise<void>;
+  destroy: () => void;
+}
+
 const buildDecryptedAttemptKey = ({
   slug,
   account,
@@ -191,5 +212,92 @@ export const refreshSessionMetaFieldsForSlug = async (
     attempts: nextAttempts,
     patches,
     errors,
+  };
+};
+
+export const createSessionMetaRefreshController = (
+  host: SessionMetaRefreshHost,
+): SessionMetaRefreshController => {
+  let sessionMetaAttempts: Record<string, boolean> = {};
+  let lastSessionInfoAttempt = '';
+
+  const warn = (context: string, error: unknown): void => {
+    if (typeof host.warn === 'function') {
+      host.warn(context, error);
+    }
+  };
+
+  const refreshSessionInfo = async (): Promise<void> => {
+    const slug = host.getActiveSessionSlug();
+    const cfg = host.getSessionConfigBySlugOrDefault(slug) || {};
+    const litHooks = host.getGlobalLitHooks();
+    try {
+      const result = await refreshSessionInfoForSlug({
+        slug,
+        cfg,
+        account: host.getAccount() || '',
+        providerLike: host.getProviderLike(),
+        getKey: litHooks?.getKey,
+        lastAttemptKey: lastSessionInfoAttempt,
+        decryptEnvelopeValue: host.decryptEnvelopeValue,
+      });
+      lastSessionInfoAttempt = result.attemptKey || lastSessionInfoAttempt;
+      if (!result.shouldUpdate) return;
+      host.setState((prev) => ({
+        sessionInfoOverrides: {
+          ...((prev.sessionInfoOverrides || {}) as Record<string, unknown>),
+          [slug]: result.nextValue,
+        },
+      }));
+    } catch (error) {
+      warn('MainSite: fallback', error);
+    }
+  };
+
+  const refreshSessionMetaFields = async (): Promise<void> => {
+    const slug = host.getActiveSessionSlug();
+    const cfg = host.getSessionConfigBySlugOrDefault(slug) || {};
+    const litHooks = host.getGlobalLitHooks();
+    try {
+      const result = await refreshSessionMetaFieldsForSlug({
+        slug,
+        cfg,
+        account: host.getAccount() || '',
+        providerLike: host.getProviderLike(),
+        getKey: litHooks?.getKey,
+        attempts: sessionMetaAttempts,
+        decryptEnvelopeValue: host.decryptEnvelopeValue,
+      });
+
+      sessionMetaAttempts = result.attempts;
+      result.errors.forEach(({ error }) => {
+        warn('MainSite: fallback', error);
+      });
+
+      if (!Object.keys(result.patches || {}).length) return;
+      host.setState((prev) => {
+        const nextState: Record<string, unknown> = {};
+        Object.entries(result.patches).forEach(([stateKey, patch]) => {
+          nextState[stateKey] = {
+            ...((prev[stateKey] || {}) as Record<string, unknown>),
+            ...patch,
+          };
+        });
+        return nextState;
+      });
+    } catch (error) {
+      warn('MainSite: fallback', error);
+    }
+  };
+
+  const destroy = (): void => {
+    sessionMetaAttempts = {};
+    lastSessionInfoAttempt = '';
+  };
+
+  return {
+    refreshSessionInfo,
+    refreshSessionMetaFields,
+    destroy,
   };
 };

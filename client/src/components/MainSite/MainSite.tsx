@@ -62,8 +62,8 @@ import {
   resolveProfileScanAttemptedCoverageSlugs,
 } from '../../utilities/session/profileScanReportHelpers.js';
 import {
-  refreshSessionInfoForSlug,
-  refreshSessionMetaFieldsForSlug,
+  createSessionMetaRefreshController,
+  type SessionMetaRefreshController,
 } from '../../utilities/session/sessionMetaController.js';
 import { createSessionScanPolicy, type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import {
@@ -983,8 +983,16 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     getSessionTokenFromPath: (path: string) => this.getSessionTokenFromPath(path),
     warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
   });
-  _sessionMetaAttempts: Record<string, boolean> = {};
-  _lastSessionInfoAttempt = '';
+  _sessionMetaRefreshController: SessionMetaRefreshController = createSessionMetaRefreshController({
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getSessionConfigBySlugOrDefault: (slug: string) => getSessionConfigBySlugOrDefault(slug) as Record<string, unknown> | null | undefined,
+    getGlobalLitHooks: () => getGlobalLitHooks(),
+    getAccount: () => this.props.account || '',
+    getProviderLike: () => this.props.provider,
+    decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+    setState: (updater) => this.setState((prev) => updater(prev) as MainSiteStatePatch),
+    warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
+  });
   _lastGroupChainId: number | null = null;
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
@@ -1550,64 +1558,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     });
   };
 
-  refreshSessionInfo = async () => {
-    const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const litHooks = getGlobalLitHooks();
-    try {
-      const result = await refreshSessionInfoForSlug({
-        slug,
-        cfg,
-        account: this.props.account || '',
-        providerLike: this.props.provider,
-        getKey: litHooks?.getKey,
-        lastAttemptKey: this._lastSessionInfoAttempt,
-        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
-      });
-      this._lastSessionInfoAttempt = result.attemptKey || this._lastSessionInfoAttempt;
-      if (!result.shouldUpdate) return;
-      this.setState((prev) => ({
-        sessionInfoOverrides: {
-          ...(prev.sessionInfoOverrides || {}),
-          [slug]: result.nextValue,
-        },
-      }));
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-  };
+  refreshSessionInfo: SessionMetaRefreshController['refreshSessionInfo'] =
+    (...args) => this._sessionMetaRefreshController.refreshSessionInfo(...args);
 
-  refreshSessionMetaFields = async () => {
-    const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const litHooks = getGlobalLitHooks();
-    try {
-      const result = await refreshSessionMetaFieldsForSlug({
-        slug,
-        cfg,
-        account: this.props.account || '',
-        providerLike: this.props.provider,
-        getKey: litHooks?.getKey,
-        attempts: this._sessionMetaAttempts,
-        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
-      });
-
-      this._sessionMetaAttempts = result.attempts;
-      result.errors.forEach(({ error }) => {
-        mainSiteLog.warn('MainSite: fallback', error);
-      });
-
-      if (!Object.keys(result.patches || {}).length) return;
-      this.setState((prev) => {
-        const nextState: Partial<MainSiteState> = {};
-        Object.entries(result.patches).forEach(([stateKey, patch]) => {
-          nextState[stateKey] = {
-            ...(prev[stateKey] || {}),
-            ...patch,
-          };
-        });
-        return nextState;
-      });
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-  };
+  refreshSessionMetaFields: SessionMetaRefreshController['refreshSessionMetaFields'] =
+    (...args) => this._sessionMetaRefreshController.refreshSessionMetaFields(...args);
 
   refreshGroupCredentials = async () => {
     // Legacy metadata-backed Lit credentials are intentionally disabled so
@@ -4069,6 +4024,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
     try {
       this._responseHydrationController?.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._sessionMetaRefreshController?.destroy();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
