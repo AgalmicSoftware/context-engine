@@ -1,7 +1,7 @@
 /* ---------------------------------------------------- Main.jsx ---------------------------------------------------- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #main {
+  .main {
     display: flex; // flex-direction: column-reverse;
     flex-direction: column;
     width: 100%;
@@ -9,7 +9,7 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #main {
+  .main {
     display: flex; // flex-direction: column-reverse;
     flex-direction: column;
     width: 100%;
@@ -34,7 +34,7 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #main {
+  .main {
     display: flex; // flex-direction: column-reverse;
     flex-direction: column;
     width: 100%;
@@ -42,7 +42,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #main {
+  .main {
     display: flex;
     flex-direction: row;
     align-items: stretch;
@@ -53,7 +53,7 @@
 }
 
 @media (min-width: 1367px) {
-  #main {
+  .main {
     display: flex;
     flex-direction: row;
     align-items: stretch;
