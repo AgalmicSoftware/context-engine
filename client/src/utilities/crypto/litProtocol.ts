@@ -6,7 +6,6 @@
  *
  * Key exports: getGlobalLitHooks, buildSbtAccessControlConditions, resolveLitChain, litStorage, uploadEncryptedArweaveData
  */
-// @ts-nocheck
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
@@ -27,6 +26,153 @@ import {
   fetchWorkerWithAuth,
   normalizeWorkerUrl,
 } from '../worker/workerAuth.js';
+
+type UnknownRecord = Record<string, unknown>;
+type ChainInput = unknown;
+type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
+type LitProviderLike = unknown;
+type LitAccessControlCondition = UnknownRecord & {
+  operator?: 'and' | 'or' | string;
+  contractAddress?: string;
+  standardContractType?: string;
+  chain?: string;
+  method?: string;
+  parameters?: string[];
+  returnValueTest?: {
+    comparator?: string;
+    value?: string;
+  };
+};
+type LitHookOptions = UnknownRecord & {
+  accessControlConditions?: unknown;
+  chain?: unknown;
+  connectTimeout?: unknown;
+  litNetwork?: unknown;
+  resourceId?: unknown;
+  providerLike?: LitProviderLike;
+  resourceAbilityRequests?: unknown;
+  userMaxPrice?: unknown;
+  account?: unknown;
+  requesterAddress?: unknown;
+  ciphertext?: unknown;
+  dataToEncryptHash?: unknown;
+  encryptedSymmetricKey?: unknown;
+  toDecrypt?: unknown;
+  chipotle?: UnknownRecord | null;
+  chainId?: unknown;
+  rpcUrl?: unknown;
+};
+type LitHooksApi = UnknownRecord & {
+  saveKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
+  getKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
+  clearCache?: (() => void) | null;
+  accessControlConditions?: LitAccessControlCondition[] | null;
+  litChain?: unknown;
+  litNetwork?: unknown;
+  chain?: unknown;
+  providerLike?: LitProviderLike;
+  connectTimeout?: unknown;
+  resourceAbilityRequests?: unknown;
+  userMaxPrice?: unknown;
+  __e2eMock?: boolean;
+};
+type LitDevToolsApi = UnknownRecord & {
+  encryptForSbt: (options?: UnknownRecord) => Promise<string>;
+  decryptEnvelope: (envelopeJson: unknown) => Promise<unknown>;
+};
+type LitUploadPayload = UnknownRecord & {
+  v?: 1;
+  kind?: 'text' | 'file' | string;
+  name?: string;
+  format?: string;
+  mime?: string;
+  encoding?: 'utf-8' | 'base64' | string;
+  data?: string;
+};
+type ArweaveJwkLike = string | UnknownRecord;
+type LitUploadOptions = UnknownRecord & {
+  data?: unknown;
+  format?: unknown;
+  name?: unknown;
+  mime?: unknown;
+  arweaveJwk?: unknown;
+  tags?: unknown;
+  arweave?: UnknownRecord;
+  providerLike?: LitProviderLike;
+  account?: unknown;
+  chainId?: unknown;
+  contextLabel?: unknown;
+  lit?: LitHooksApi;
+};
+type LitDownloadOptions = UnknownRecord & {
+  url?: unknown;
+  txId?: unknown;
+  providerLike?: LitProviderLike;
+  account?: unknown;
+  chainId?: unknown;
+  lit?: LitHooksApi;
+  arweave?: UnknownRecord;
+};
+type SbtGateInfo = {
+  sbtAddresses: string[];
+  gateMode: 'any' | 'all';
+  litChain: string;
+  chainId: number | null;
+};
+type ChipotleGate = {
+  sbtAddresses: string[];
+  gateChainId: number | null;
+  gateMode: 'any' | 'all';
+  litChain: string;
+};
+type LitChipotlePolicy = UnknownRecord & {
+  chainId: number;
+  gateMode: 'any' | 'all' | string;
+  sbtAddresses: string[];
+  litActionCid: string;
+  litPkpId: string;
+};
+type LitGetKeyCacheEntry = {
+  expiresAt: number;
+  value?: unknown;
+  errMsg?: string;
+};
+type BufferCtorLike = {
+  prototype?: UnknownRecord;
+  alloc?: (size: number) => Uint8Array & UnknownRecord;
+};
+
+declare global {
+  interface Window {
+    __litHooks?: LitHooksApi | null;
+    litHooks?: LitHooksApi | null;
+    __litTools?: LitDevToolsApi | null;
+  }
+
+  // eslint-disable-next-line no-var
+  var CE_E2E_LIT_MOCK: boolean | undefined;
+}
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
+const toErrorMessage = (err: unknown, fallback = ''): string => {
+  if (isRecord(err) && typeof err.message === 'string') return err.message;
+  const message = String(err || '').trim();
+  return message || fallback;
+};
+const toBytes = (value: unknown): Uint8Array => {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (value && typeof value === 'object' && typeof (value as ArrayLike<number>).length === 'number') {
+    return new Uint8Array(value as ArrayLike<number>);
+  }
+  return new Uint8Array([]);
+};
 
 /**
  * @typedef {import('ethers').providers.Provider} EthersProvider
@@ -176,18 +322,21 @@ import {
 
 const log = createLogger('sbt');
 
+const buildChipotlePolicy = buildLitChipotlePolicy as (input?: UnknownRecord) => LitChipotlePolicy;
+const fingerprintChipotlePolicy = fingerprintLitChipotlePolicy as (policy?: UnknownRecord) => string;
+
 const DEFAULT_LIT_NETWORK = 'chipotle';
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
 
-const getGlobalScope = () => {
+const getGlobalScope = (): (typeof globalThis & { Buffer?: BufferCtorLike }) | null => {
   if (typeof globalThis !== 'undefined') return globalThis;
   if (typeof window !== 'undefined') return window;
   return null;
 };
 
-const bufferHasBigUIntWrite = (BufferCtor) => {
+const bufferHasBigUIntWrite = (BufferCtor: BufferCtorLike | null | undefined) => {
   try {
     if (!BufferCtor || typeof BufferCtor.alloc !== 'function') return false;
     const probe = BufferCtor.alloc(8);
@@ -200,10 +349,14 @@ const bufferHasBigUIntWrite = (BufferCtor) => {
   }
 };
 
-const installBufferBigUIntWriteShim = (BufferCtor) => {
+const installBufferBigUIntWriteShim = (BufferCtor: BufferCtorLike | null | undefined) => {
   if (!BufferCtor || !BufferCtor.prototype) return false;
 
-  const writeCompat = function writeBigUInt64BECompat(value, offset = 0) {
+  const writeCompat = function writeBigUInt64BECompat(
+    this: Uint8Array,
+    value: string | number | bigint,
+    offset = 0
+  ) {
     const bigIntCtor = (
       typeof globalThis !== 'undefined' &&
       typeof globalThis.BigInt === 'function'
@@ -230,11 +383,12 @@ const installBufferBigUIntWriteShim = (BufferCtor) => {
     return start + 8;
   };
 
-  if (typeof BufferCtor.prototype.writeBigUInt64BE !== 'function') {
-    BufferCtor.prototype.writeBigUInt64BE = writeCompat;
+  const prototype = BufferCtor.prototype;
+  if (typeof prototype.writeBigUInt64BE !== 'function') {
+    prototype.writeBigUInt64BE = writeCompat;
   }
-  if (typeof BufferCtor.prototype.writeBigUint64BE !== 'function') {
-    BufferCtor.prototype.writeBigUint64BE = BufferCtor.prototype.writeBigUInt64BE;
+  if (typeof prototype.writeBigUint64BE !== 'function') {
+    prototype.writeBigUint64BE = prototype.writeBigUInt64BE;
   }
   return bufferHasBigUIntWrite(BufferCtor);
 };
@@ -251,16 +405,16 @@ export const ensureLitBufferCompatibility = () => {
   const runtimeBuffer = scope.Buffer;
   if (bufferHasBigUIntWrite(runtimeBuffer)) return runtimeBuffer;
 
-  if (bufferHasBigUIntWrite(Buffer)) {
-    scope.Buffer = Buffer;
+  if (bufferHasBigUIntWrite(Buffer as unknown as BufferCtorLike)) {
+    scope.Buffer = Buffer as unknown as BufferCtorLike;
     return scope.Buffer;
   }
 
   if (installBufferBigUIntWriteShim(runtimeBuffer)) {
     return runtimeBuffer;
   }
-  if (installBufferBigUIntWriteShim(Buffer)) {
-    scope.Buffer = Buffer;
+  if (installBufferBigUIntWriteShim(Buffer as unknown as BufferCtorLike)) {
+    scope.Buffer = Buffer as unknown as BufferCtorLike;
     return scope.Buffer;
   }
   return null;
@@ -268,8 +422,9 @@ export const ensureLitBufferCompatibility = () => {
 
 ensureLitBufferCompatibility();
 
-const logLit = (level, message, meta) => {
-  const fn = log[level] || log.log;
+const logLit = (level: string, message: string, meta?: unknown) => {
+  const logger = log as unknown as Record<string, (...args: unknown[]) => void>;
+  const fn = logger[level] || logger.log;
   if (meta === undefined) {
     fn(message);
   } else {
@@ -277,7 +432,7 @@ const logLit = (level, message, meta) => {
   }
 };
 
-const normalizeConnectTimeout = (value) => {
+const normalizeConnectTimeout = (value: unknown) => {
   const num = Number(value || 0);
   if (!Number.isFinite(num) || num <= 0) return DEFAULT_LIT_CONNECT_TIMEOUT;
   return Math.floor(num);
@@ -294,7 +449,7 @@ const isE2eLitMockEnabled = () => {
   if (typeof window === 'undefined') return false;
 
   try {
-    if (globalThis.CE_E2E_LIT_MOCK === true) return true;
+    if ((globalThis as typeof globalThis & { CE_E2E_LIT_MOCK?: boolean }).CE_E2E_LIT_MOCK === true) return true;
   } catch (e) { void e; /* fallback: lit mock detection. */ }
   try {
     if (localStorage.getItem('ce-e2e-lit-mock') === '1') return true;
@@ -306,7 +461,7 @@ const isE2eLitMockEnabled = () => {
   return false;
 };
 
-const LIT_CHAIN_BY_ID = Object.freeze({
+const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
   1: 'ethereum',
   10: 'optimism',
   56: 'bsc',
@@ -320,22 +475,22 @@ const LIT_CHAIN_BY_ID = Object.freeze({
   11155420: 'optimismSepolia',
 });
 
-const LIT_WALLET_CHAIN_FALLBACKS = Object.freeze({
+const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({
   optimismSepolia: 'sepolia',
 });
 
-const CHAIN_ID_BY_LIT_CHAIN = Object.freeze(
-  Object.entries(LIT_CHAIN_BY_ID).reduce((acc, [id, chain]) => {
+const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
+  Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
     acc[chain] = Number(id);
     return acc;
   }, {})
 );
 
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS = Object.freeze({
+const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({
   optimismSepolia: 'Lit does not currently support OP Sepolia for SBT-gated encryption. Choose "only me" private encryption or move the gate to a supported chain such as Base Sepolia.',
 });
 
-const LIT_NETWORK_ALIASES = Object.freeze({
+const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   chipotle: 'chipotle',
   'chipotle-v3': 'chipotle',
   'naga-dev': 'chipotle',
@@ -354,30 +509,30 @@ const LIT_NETWORK_ALIASES = Object.freeze({
  * @param {string | null | undefined} litNetwork
  * @returns {string}
  */
-export const resolveLitNetwork = (litNetwork) => {
+export const resolveLitNetwork = (litNetwork: unknown) => {
   const raw = toStr(litNetwork || DEFAULT_LIT_NETWORK).trim();
   if (!raw) return DEFAULT_LIT_NETWORK;
   const normalized = raw.toLowerCase().replace(/_/g, '-');
   return LIT_NETWORK_ALIASES[normalized] || DEFAULT_LIT_NETWORK;
 };
 
-const resolveLitCipherPayload = (value) => {
+const resolveLitCipherPayload = (value: unknown): UnknownRecord | null => {
   if (!value) return null;
-  if (typeof value === 'object' && value.ciphertext && value.dataToEncryptHash) {
+  if (isRecord(value) && value.ciphertext && value.dataToEncryptHash) {
     return value;
   }
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value);
-      if (parsed && parsed.ciphertext && parsed.dataToEncryptHash) return parsed;
+      if (isRecord(parsed) && parsed.ciphertext && parsed.dataToEncryptHash) return parsed;
     } catch (e) { log.warn('litProtocol: fallback', e); }
   }
   return null;
 };
 
-const normalizeSbtAddressList = (values = []) => {
-  const out = [];
-  const seen = new Set();
+const normalizeSbtAddressList = (values: unknown = []) => {
+  const out: string[] = [];
+  const seen = new Set<string>();
   (Array.isArray(values) ? values : []).forEach((raw) => {
     const value = toStr(raw).trim();
     if (!value || !ethers.utils.isAddress(value)) return;
@@ -390,11 +545,11 @@ const normalizeSbtAddressList = (values = []) => {
   return out;
 };
 
-const extractSbtGateFromAccessControlConditions = (conditions) => {
+const extractSbtGateFromAccessControlConditions = (conditions: unknown): SbtGateInfo | null => {
   const entries = Array.isArray(conditions) ? conditions : [];
-  const sbtAddresses = [];
-  const seen = new Set();
-  let gateMode = 'any';
+  const sbtAddresses: string[] = [];
+  const seen = new Set<string>();
+  let gateMode: 'any' | 'all' = 'any';
   let litChain = '';
 
   entries.forEach((entry) => {
@@ -431,12 +586,12 @@ const extractSbtGateFromAccessControlConditions = (conditions) => {
   };
 };
 
-const encodeChipotleKeyMessage = (raw) => {
-  const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw || []);
+const encodeChipotleKeyMessage = (raw: unknown) => {
+  const bytes = toBytes(raw);
   return ethers.utils.hexlify(bytes);
 };
 
-const decodeChipotleKeyMessage = (value) => {
+const decodeChipotleKeyMessage = (value: unknown) => {
   const normalized = normalizeChipotleCekHex(value);
   const bytes = ethers.utils.arrayify(normalized);
   if (bytes.length !== 32) {
@@ -445,14 +600,14 @@ const decodeChipotleKeyMessage = (value) => {
   return bytes;
 };
 
-const parseChipotleActionResponse = (payload) => {
-  if (payload && typeof payload === 'object' && payload.response && typeof payload.response === 'object') {
-    if (payload.response.response && typeof payload.response.response === 'object') {
+const parseChipotleActionResponse = (payload: unknown): UnknownRecord => {
+  if (isRecord(payload) && isRecord(payload.response)) {
+    if (isRecord(payload.response.response)) {
       return payload.response.response;
     }
     return payload.response;
   }
-  return payload && typeof payload === 'object' ? payload : {};
+  return isRecord(payload) ? payload : {};
 };
 
 const buildChipotleDataHashSentinel = ({
@@ -461,6 +616,12 @@ const buildChipotleDataHashSentinel = ({
   gateMode = 'any',
   sbtAddresses = [],
   policyFingerprint = '',
+}: {
+  litActionCid?: unknown;
+  chainId?: unknown;
+  gateMode?: unknown;
+  sbtAddresses?: unknown;
+  policyFingerprint?: unknown;
 } = {}) => (
   [
     'chipotle-v3',
@@ -476,12 +637,16 @@ const buildChipotleGateFromOptions = ({
   accessControlConditions,
   chipotle = {},
   chainId,
-} = {}) => {
-  const explicitGate = chipotle && typeof chipotle === 'object' ? chipotle : {};
-  const explicitPolicy = explicitGate.policy && typeof explicitGate.policy === 'object'
+}: {
+  accessControlConditions?: unknown;
+  chipotle?: unknown;
+  chainId?: unknown;
+} = {}): ChipotleGate => {
+  const explicitGate = asRecord(chipotle);
+  const explicitPolicy = isRecord(explicitGate.policy)
     ? explicitGate.policy
     : {};
-  const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || {};
+  const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || ({} as Partial<SbtGateInfo>);
   const sbtAddresses = normalizeSbtAddressList(
     explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || []
   );
@@ -511,7 +676,7 @@ const buildChipotleGateFromOptions = ({
   };
 };
 
-const isChipotleRuntimeConfigured = (chipotle = {}) => (
+const isChipotleRuntimeConfigured = (chipotle: UnknownRecord = {}) => (
   !!toStr(chipotle?.workerUrl).trim() &&
   !!toStr(chipotle?.sessionSlug).trim() &&
   !!toStr(chipotle?.litCredentials?.litApiBase).trim() &&
@@ -519,15 +684,18 @@ const isChipotleRuntimeConfigured = (chipotle = {}) => (
   !!toStr(chipotle?.litCredentials?.litActionCid).trim()
 );
 
-const resolveLitErrorMessage = (err) => {
+const resolveLitErrorMessage = (err: unknown) => {
   if (!err) return 'Unknown Lit error';
-  const direct = toStr(err?.message || '').trim();
+  const errRecord = asRecord(err);
+  const direct = toStr(errRecord.message || '').trim();
   if (direct) return direct;
+  const nestedError = asRecord(errRecord.error);
+  const nestedCause = asRecord(errRecord.cause);
   const nested = toStr(
-    err?.error?.message ||
-    err?.cause?.message ||
-    err?.reason ||
-    err?.details ||
+    nestedError.message ||
+    nestedCause.message ||
+    errRecord.reason ||
+    errRecord.details ||
     ''
   ).trim();
   if (nested) return nested;
@@ -538,12 +706,15 @@ const resolveLitErrorMessage = (err) => {
   return String(err);
 };
 
-const normalizeAccessControlConditions = (conditions, chainFallback) => {
+const normalizeAccessControlConditions = (
+  conditions: unknown,
+  chainFallback: unknown
+): LitAccessControlCondition[] | null => {
   if (!Array.isArray(conditions)) return null;
   const chain = toStr(chainFallback || '').trim();
   return conditions
     .map((cond) => {
-      if (!cond || typeof cond !== 'object') return cond;
+      if (!isRecord(cond)) return cond as LitAccessControlCondition;
       if (cond.operator) return cond;
       if (cond.chain) return cond;
       if (!chain) return cond;
@@ -551,7 +722,7 @@ const normalizeAccessControlConditions = (conditions, chainFallback) => {
     });
 };
 
-const summarizeAccConditions = (conditions) => {
+const summarizeAccConditions = (conditions: unknown) => {
   if (!Array.isArray(conditions) || !conditions.length) {
     return {
       hasConditions: false,
@@ -581,19 +752,24 @@ const LIT_GETKEY_SUCCESS_CACHE_MAX = 600;
 const LIT_GETKEY_NEG_CACHE_MAX = 250;
 const LIT_GETKEY_PRUNE_EVERY_N = 25;
 
-const stableKeyStringify = (value) => {
-  const seen = new Set();
-  const walk = (v) => {
-    if (v == null) return v;
+type StableJsonPrimitive = null | string | number | boolean;
+type StableJsonValue = StableJsonPrimitive | StableJsonValue[] | StableJsonObject;
+type StableJsonObject = { [key: string]: StableJsonValue };
+
+const stableKeyStringify = (value: unknown) => {
+  const seen = new Set<object>();
+  const walk = (v: unknown): StableJsonValue => {
+    if (v == null) return null;
     if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
     if (typeof v === 'bigint') return `bigint:${v.toString()}`;
     if (Array.isArray(v)) return v.map(walk);
     if (typeof v === 'object') {
       if (seen.has(v)) return '[Circular]';
       seen.add(v);
-      const out = {};
-      Object.keys(v).sort().forEach((k) => {
-        out[k] = walk(v[k]);
+      const record = v as UnknownRecord;
+      const out: StableJsonObject = {};
+      Object.keys(record).sort().forEach((k) => {
+        out[k] = walk(record[k]);
       });
       return out;
     }
@@ -610,7 +786,7 @@ const stableKeyStringify = (value) => {
   }
 };
 
-const hashStable = (value) => {
+const hashStable = (value: unknown) => {
   const raw = typeof value === 'string' ? value : stableKeyStringify(value);
   try {
     return ethers.utils.id(raw);
@@ -619,8 +795,9 @@ const hashStable = (value) => {
   }
 };
 
-const isAccFailure = (err) => {
-  const msg = toStr(err?.message || err?.reason || '').toLowerCase();
+const isAccFailure = (err: unknown) => {
+  const errRecord = asRecord(err);
+  const msg = toStr(errRecord.message || errRecord.reason || '').toLowerCase();
   if (!msg) return false;
   return (
     msg.includes('access control') ||
@@ -631,8 +808,9 @@ const isAccFailure = (err) => {
   );
 };
 
-const isTransientLitError = (err) => {
-  const msg = toStr(err?.message || err?.reason || '').toLowerCase();
+const isTransientLitError = (err: unknown) => {
+  const errRecord = asRecord(err);
+  const msg = toStr(errRecord.message || errRecord.reason || '').toLowerCase();
   if (!msg) return false;
   return (
     msg.includes('timed out') ||
@@ -656,7 +834,7 @@ const buildLitGetKeyCacheKey = ({
   dataToEncryptHash,
   encryptedSymmetricKey,
   chipotlePolicyFingerprint,
-} = {}) => {
+}: LitHookOptions = {}) => {
   const requester = toStr(requesterAddress).trim().toLowerCase();
   const network = resolveLitNetwork(litNetwork);
   const resolvedChain = toStr(chain).trim();
@@ -671,14 +849,19 @@ const buildLitGetKeyCacheKey = ({
   return hashStable([requester, network, resolvedChain, condsHash, resourceHash, cipherHash].join('|'));
 };
 
-const touchLru = (map, key, value) => {
+const touchLru = (map: Map<string, LitGetKeyCacheEntry>, key: string, value: LitGetKeyCacheEntry) => {
   try {
     map.delete(key);
     map.set(key, value);
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const cacheLruSet = (map, key, entry, maxSize) => {
+const cacheLruSet = (
+  map: Map<string, LitGetKeyCacheEntry> | null,
+  key: string,
+  entry: LitGetKeyCacheEntry,
+  maxSize: number
+) => {
   if (!map) return;
   try {
     if (map.has(key)) map.delete(key);
@@ -694,10 +877,10 @@ const cacheLruSet = (map, key, entry, maxSize) => {
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const pruneExpiredCacheEntries = (map, now) => {
+const pruneExpiredCacheEntries = (map: Map<string, LitGetKeyCacheEntry>, now: number) => {
   try {
     if (!map || map.size === 0) return;
-    const dead = [];
+    const dead: string[] = [];
     for (const [k, v] of map.entries()) {
       if (!v || typeof v !== 'object') continue;
       if (Number(v.expiresAt || 0) <= now) dead.push(k);
@@ -706,10 +889,13 @@ const pruneExpiredCacheEntries = (map, now) => {
   } catch (e) { log.warn('litProtocol: fallback', e); }
 };
 
-const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
-  const successCache = new Map(); // key -> { expiresAt, value }
-  const negativeCache = new Map(); // key -> { expiresAt, errMsg }
-  const inflight = new Map(); // key -> Promise
+const wrapLitGetKeyWithCache = (
+  getKeyUncached: (opts?: LitHookOptions) => Promise<unknown> | unknown,
+  context: LitHookOptions = {}
+) => {
+  const successCache = new Map<string, LitGetKeyCacheEntry>(); // key -> { expiresAt, value }
+  const negativeCache = new Map<string, LitGetKeyCacheEntry>(); // key -> { expiresAt, errMsg }
+  const inflight = new Map<string, Promise<unknown>>(); // key -> Promise
 
   let opCount = 0;
 
@@ -720,7 +906,7 @@ const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
     opCount = 0;
   };
 
-  const getKey = async (opts = {}) => {
+  const getKey = async (opts: LitHookOptions = {}) => {
     perfDebugLitGetKey('attempt');
 
     const requester = toStr(
@@ -756,7 +942,11 @@ const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
       ciphertext: cipherPayload?.ciphertext || opts.ciphertext || '',
       dataToEncryptHash: cipherPayload?.dataToEncryptHash || opts.dataToEncryptHash || '',
       encryptedSymmetricKey: opts.encryptedSymmetricKey || opts.toDecrypt || '',
-      chipotlePolicyFingerprint: opts.chipotle?.policyFingerprint || opts.chipotle?.policy?.policyFingerprint || '',
+      chipotlePolicyFingerprint: (() => {
+        const chipotle = asRecord(opts.chipotle);
+        const policy = asRecord(chipotle.policy);
+        return chipotle.policyFingerprint || policy.policyFingerprint || '';
+      })(),
     });
 
     const now = Date.now();
@@ -847,7 +1037,15 @@ const resolveLitChainFallbackWarnings = new Set();
  * @param {{ chainId?: number | string | null, litChain?: number | string | null, chain?: number | string | null }} [options={}]
  * @returns {string}
  */
-export const resolveLitChain = ({ chainId, litChain, chain } = {}) => {
+export const resolveLitChain = ({
+  chainId,
+  litChain,
+  chain,
+}: {
+  chainId?: ChainInput;
+  litChain?: ChainInput;
+  chain?: ChainInput;
+} = {}) => {
   const rawLitChain = litChain || chain;
   if (rawLitChain) {
     const numericId = Number(rawLitChain);
@@ -877,17 +1075,33 @@ export const resolveLitChain = ({ chainId, litChain, chain } = {}) => {
   return DEFAULT_LIT_CHAIN;
 };
 
-export const resolveLitWalletAddressChain = ({ chainId, litChain, chain } = {}) => {
+export const resolveLitWalletAddressChain = ({
+  chainId,
+  litChain,
+  chain,
+}: {
+  chainId?: ChainInput;
+  litChain?: ChainInput;
+  chain?: ChainInput;
+} = {}) => {
   const resolvedChain = resolveLitChain({ chainId, litChain, chain });
   return LIT_WALLET_CHAIN_FALLBACKS[resolvedChain] || resolvedChain;
 };
 
-export const getUnsupportedLitContractAccessControlError = ({ chainId, litChain, chain } = {}) => {
+export const getUnsupportedLitContractAccessControlError = ({
+  chainId,
+  litChain,
+  chain,
+}: {
+  chainId?: ChainInput;
+  litChain?: ChainInput;
+  chain?: ChainInput;
+} = {}) => {
   const resolvedChain = resolveLitChain({ chainId, litChain, chain });
   return LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS[resolvedChain] || '';
 };
 
-const ensureArray = (val) => (Array.isArray(val) ? val : (val ? [val] : []));
+const ensureArray = (val: unknown): unknown[] => (Array.isArray(val) ? val : (val ? [val] : []));
 
 /**
  * Builds Lit access control conditions that require ownership of one or more SBT contracts.
@@ -911,7 +1125,15 @@ export const buildSbtAccessControlConditions = ({
   chainId,
   mode,
   requireAll,
-} = {}) => {
+}: {
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+  chain?: ChainInput;
+  litChain?: ChainInput;
+  chainId?: ChainInput;
+  mode?: unknown;
+  requireAll?: unknown;
+} = {}): LitAccessControlCondition[] | undefined => {
   const addresses = ensureArray(sbtAddresses || sbtAddress).filter(Boolean);
   const resolvedChain = resolveLitChain({ chainId, litChain, chain });
   const normalizedMode = mode == null ? '' : String(mode).trim().toLowerCase();
@@ -924,7 +1146,7 @@ export const buildSbtAccessControlConditions = ({
     normalizedMode === '1';
   const operator = isAll ? 'and' : 'or';
   const conditions = addresses
-    .filter((addr) => ethers.utils.isAddress(addr))
+    .filter((addr): addr is string => typeof addr === 'string' && ethers.utils.isAddress(addr))
     .map((addr) => ({
       contractAddress: addr,
       standardContractType: 'ERC721',
@@ -934,9 +1156,9 @@ export const buildSbtAccessControlConditions = ({
       returnValueTest: { comparator: '>', value: '0' },
     }));
 
-  if (!conditions.length) return null;
+  if (!conditions.length) return null as unknown as undefined;
   if (conditions.length === 1) return conditions;
-  const out = [];
+  const out: LitAccessControlCondition[] = [];
   conditions.forEach((cond, idx) => {
     if (idx > 0) out.push({ operator });
     out.push(cond);
@@ -960,7 +1182,12 @@ export const buildWalletAddressAccessControlConditions = ({
   chain,
   litChain,
   chainId,
-} = {}) => {
+}: {
+  walletAddress?: unknown;
+  chain?: ChainInput;
+  litChain?: ChainInput;
+  chainId?: ChainInput;
+} = {}): LitAccessControlCondition[] | null => {
   const address = toStr(walletAddress).trim().toLowerCase();
   if (!ethers.utils.isAddress(address)) return null;
   const resolvedChain = resolveLitWalletAddressChain({ chainId, litChain, chain });
@@ -994,7 +1221,13 @@ export const buildHatAccessControlConditions = ({
   chain,
   litChain,
   chainId,
-} = {}) => {
+}: {
+  hatsAddress?: unknown;
+  hatId?: unknown;
+  chain?: ChainInput;
+  litChain?: ChainInput;
+  chainId?: ChainInput;
+} = {}): LitAccessControlCondition[] | null => {
   const address = toStr(hatsAddress).trim();
   const id = toStr(hatId).trim();
   if (!address || !ethers.utils.isAddress(address) || !id) return null;
@@ -1011,7 +1244,7 @@ export const buildHatAccessControlConditions = ({
   ];
 };
 
-const normalizeUserMaxPrice = (value) => {
+const normalizeUserMaxPrice = (value: unknown) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();
   if (!raw) return undefined;
@@ -1029,11 +1262,11 @@ const normalizeUserMaxPrice = (value) => {
   }
 };
 
-const sanitizePublicLitHooks = (hooks = {}) => {
-  return hooks && typeof hooks === 'object' ? hooks : hooks;
+const sanitizePublicLitHooks = (hooks: unknown = {}): LitHooksApi => {
+  return hooks as LitHooksApi;
 };
 
-let e2eLitMockMasterKeyPromise = null;
+let e2eLitMockMasterKeyPromise: Promise<CryptoKey> | null = null;
 const getE2eLitMockMasterKey = async () => {
   if (e2eLitMockMasterKeyPromise) return e2eLitMockMasterKeyPromise;
   e2eLitMockMasterKeyPromise = (async () => {
@@ -1053,7 +1286,7 @@ const getE2eLitMockMasterKey = async () => {
   return e2eLitMockMasterKeyPromise;
 };
 
-const e2eLitMockEncodePayload = async (keyBytes) => {
+const e2eLitMockEncodePayload = async (keyBytes: BufferSource) => {
   if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
     throw new Error('Lit mock requires WebCrypto support.');
   }
@@ -1078,7 +1311,7 @@ const e2eLitMockEncodePayload = async (keyBytes) => {
   };
 };
 
-const e2eLitMockDecodePayload = async (ciphertextB64) => {
+const e2eLitMockDecodePayload = async (ciphertextB64: unknown) => {
   if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
     throw new Error('Lit mock requires WebCrypto support.');
   }
@@ -1095,10 +1328,10 @@ const e2eLitMockDecodePayload = async (ciphertextB64) => {
   return new Uint8Array(plainBuf);
 };
 
-const e2eLitMockParseConditions = (conditions) => {
+const e2eLitMockParseConditions = (conditions: unknown) => {
   const list = Array.isArray(conditions) ? conditions : [];
-  let operator = null;
-  const checks = [];
+  let operator: 'and' | 'or' | null = null;
+  const checks: Array<{ type: 'erc721-balance' | 'wallet-address'; address: string }> = [];
 
   for (const cond of list) {
     if (!cond || typeof cond !== 'object') continue;
@@ -1111,7 +1344,7 @@ const e2eLitMockParseConditions = (conditions) => {
     const addr = toStr(cond.contractAddress).trim();
     const comparator = toStr(cond.returnValueTest?.comparator).trim();
     const value = toStr(cond.returnValueTest?.value).trim().toLowerCase();
-    const parameters = Array.isArray(cond.parameters) ? cond.parameters.map((entry) => toStr(entry).trim()) : [];
+    const parameters = Array.isArray(cond.parameters) ? cond.parameters.map((entry: unknown) => toStr(entry).trim()) : [];
     if (method === 'balanceof' && ethers.utils.isAddress(addr)) {
       checks.push({ type: 'erc721-balance', address: addr.toLowerCase() });
       continue;
@@ -1127,7 +1360,15 @@ const e2eLitMockParseConditions = (conditions) => {
   };
 };
 
-const e2eLitMockCheckAccessControlConditions = async ({ requesterAddress, conditions, providerLike }) => {
+const e2eLitMockCheckAccessControlConditions = async ({
+  requesterAddress,
+  conditions,
+  providerLike,
+}: {
+  requesterAddress?: unknown;
+  conditions?: unknown;
+  providerLike?: LitProviderLike;
+}) => {
   if (!Array.isArray(conditions) || !conditions.length) return false;
   const req = toStr(requesterAddress).trim();
   if (!ethers.utils.isAddress(req)) return false;
@@ -1138,11 +1379,11 @@ const e2eLitMockCheckAccessControlConditions = async ({ requesterAddress, condit
     return false;
   }
 
-  const provider = cryptoUtils._getProvider(providerLike);
+  const provider = cryptoUtils._getProvider(providerLike as Parameters<typeof cryptoUtils._getProvider>[0]);
   const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
   const abi = ['function balanceOf(address owner) view returns (uint256)'];
 
-  const checks = [];
+  const checks: boolean[] = [];
   for (const check of parsed.checks) {
     if (check?.type === 'wallet-address') {
       checks.push(check.address === req.toLowerCase());
@@ -1170,14 +1411,14 @@ const createE2eLitMockHooks = ({
   resourceAbilityRequests,
   connectTimeout,
   litConnectTimeout,
-} = {}) => {
+}: LitHookOptions = {}): LitHooksApi => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedNetwork = resolveLitNetwork(litNetwork);
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
 
-  const saveKey = async (symmetricKey, opts = {}) => {
+  const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
     ensureLitBufferCompatibility();
     const conditions = Array.isArray(opts.accessControlConditions)
       ? opts.accessControlConditions
@@ -1185,12 +1426,12 @@ const createE2eLitMockHooks = ({
     if (!conditions || !conditions.length) {
       throw new Error('Lit mock saveKey requires access control conditions.');
     }
-    const keyBytes = symmetricKey instanceof Uint8Array ? symmetricKey : new Uint8Array(symmetricKey || []);
+    const keyBytes = toBytes(symmetricKey);
     if (!keyBytes.length) throw new Error('Lit mock saveKey requires key bytes.');
     return e2eLitMockEncodePayload(keyBytes);
   };
 
-  const getKeyUncached = async (opts = {}) => {
+  const getKeyUncached = async (opts: LitHookOptions = {}) => {
     ensureLitBufferCompatibility();
     const effectiveProviderLike = opts.providerLike || providerLike;
     const requester = toStr(opts.requesterAddress || opts.account || account || '').trim();
@@ -1254,15 +1495,14 @@ const createLitChipotleHooks = ({
   accessControlConditions,
   connectTimeout,
   chipotle,
-} = {}) => {
-  const normalizedWorkerUrl = normalizeWorkerUrl(chipotle?.workerUrl);
-  const sessionSlug = toStr(chipotle?.sessionSlug).trim();
-  const sessionConfig = chipotle?.sessionConfig && typeof chipotle.sessionConfig === 'object'
-    ? chipotle.sessionConfig
+}: LitHookOptions = {}): LitHooksApi | null => {
+  const chipotleConfig = asRecord(chipotle);
+  const normalizedWorkerUrl = normalizeWorkerUrl(chipotleConfig.workerUrl);
+  const sessionSlug = toStr(chipotleConfig.sessionSlug).trim();
+  const sessionConfig = chipotleConfig.sessionConfig && typeof chipotleConfig.sessionConfig === 'object'
+    ? chipotleConfig.sessionConfig
     : null;
-  const litCredentials = chipotle?.litCredentials && typeof chipotle.litCredentials === 'object'
-    ? chipotle.litCredentials
-    : {};
+  const litCredentials = asRecord(chipotleConfig.litCredentials);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
 
   if (!isChipotleRuntimeConfigured({
@@ -1279,7 +1519,15 @@ const createLitChipotleHooks = ({
     message,
     ciphertext,
     chipotleMetadata,
+  }: {
+    op?: 'encrypt' | 'decrypt' | string;
+    gate?: ChipotleGate;
+    message?: unknown;
+    ciphertext?: unknown;
+    chipotleMetadata?: unknown;
   } = {}) => {
+    if (!gate) throw new Error('Lit Chipotle gate is required.');
+    const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
     const response = await fetchWorkerWithAuth(
       normalizedWorkerUrl,
       {
@@ -1308,18 +1556,18 @@ const createLitChipotleHooks = ({
         workerUrl: normalizedWorkerUrl,
       },
     );
-    const payload = await response.json().catch(() => ({}));
+    const payload = asRecord(await response.json().catch(() => ({})));
     if (!response.ok) {
-      throw new Error(payload?.error || `Lit Chipotle request failed (${response.status}).`);
+      throw new Error(toStr(payload.error).trim() || `Lit Chipotle request failed (${response.status}).`);
     }
     const actionResponse = parseChipotleActionResponse(payload);
     if (actionResponse?.ok === false) {
-      throw new Error(actionResponse.reason || 'Lit Chipotle gate check failed.');
+      throw new Error(toStr(actionResponse.reason).trim() || 'Lit Chipotle gate check failed.');
     }
     return actionResponse;
   };
 
-  const saveKey = async (symmetricKey, opts = {}) => {
+  const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
     const gate = buildChipotleGateFromOptions({
       accessControlConditions: Array.isArray(opts.accessControlConditions)
         ? opts.accessControlConditions
@@ -1337,8 +1585,8 @@ const createLitChipotleHooks = ({
       throw new Error('Lit Chipotle encrypt did not return ciphertext.');
     }
     const responsePolicy = wrapped?.policy
-      ? buildLitChipotlePolicy(wrapped.policy)
-      : buildLitChipotlePolicy({
+      ? buildChipotlePolicy(asRecord(wrapped.policy))
+      : buildChipotlePolicy({
         chainId: gate.gateChainId,
         gateMode: gate.gateMode,
         sbtAddresses: gate.sbtAddresses,
@@ -1346,9 +1594,9 @@ const createLitChipotleHooks = ({
         litPkpId: litCredentials.litPkpId,
       });
     const policyFingerprint = toStr(
-      wrapped?.policyFingerprint || fingerprintLitChipotlePolicy(responsePolicy)
+      wrapped?.policyFingerprint || fingerprintChipotlePolicy(responsePolicy)
     ).trim();
-    if (policyFingerprint.toLowerCase() !== fingerprintLitChipotlePolicy(responsePolicy).toLowerCase()) {
+    if (policyFingerprint.toLowerCase() !== fingerprintChipotlePolicy(responsePolicy).toLowerCase()) {
       throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
     }
     return {
@@ -1373,7 +1621,7 @@ const createLitChipotleHooks = ({
     };
   };
 
-  const getKeyUncached = async (opts = {}) => {
+  const getKeyUncached = async (opts: LitHookOptions = {}) => {
     const ciphertext = toStr(
       opts.ciphertext ||
       opts.encryptedSymmetricKey ||
@@ -1467,7 +1715,7 @@ export const createLitHooks = ({
   connectTimeout,
   litConnectTimeout,
   chipotle,
-} = {}) => {
+}: LitHookOptions = {}): LitHooksApi | null => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
@@ -1514,10 +1762,10 @@ export const createLitHooks = ({
  * @param {LitHooksApi | Record<string, any> | null | undefined} hooks
  * @returns {LitHooksApi | null}
  */
-export const setGlobalLitHooks = (hooks) => {
+export const setGlobalLitHooks = (hooks: LitHooksApi | UnknownRecord | null | undefined): LitHooksApi | null => {
   if (typeof window === 'undefined') return null;
   if (hooks && typeof hooks === 'object') {
-    const publicHooks = sanitizePublicLitHooks(hooks);
+    const publicHooks = sanitizePublicLitHooks(hooks) as LitHooksApi;
     window.__litHooks = publicHooks;
     return publicHooks;
   }
@@ -1546,10 +1794,20 @@ export const getGlobalLitHooks = () => {
  * }} [options={}]
  * @returns {LitDevToolsApi | null}
  */
-export const attachLitDevTools = ({ providerLike, account, chainId, litChain } = {}) => {
+export const attachLitDevTools = ({
+  providerLike,
+  account,
+  chainId,
+  litChain,
+}: {
+  providerLike?: LitProviderLike;
+  account?: string;
+  chainId?: ChainInput;
+  litChain?: ChainInput;
+} = {}): LitDevToolsApi | null => {
   if (typeof window === 'undefined') return null;
   const tools = {
-    encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain } = {}) => {
+    encryptForSbt: async ({ value, sbtAddresses, contextLabel, chain }: UnknownRecord = {}) => {
       const hooks = getGlobalLitHooks();
       if (!hooks || typeof hooks.saveKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
@@ -1575,7 +1833,7 @@ export const attachLitDevTools = ({ providerLike, account, chainId, litChain } =
         },
       });
     },
-    decryptEnvelope: async (envelopeJson) => {
+    decryptEnvelope: async (envelopeJson: unknown) => {
       const hooks = getGlobalLitHooks();
       if (!hooks || typeof hooks.getKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
@@ -1603,7 +1861,7 @@ const ALT_LIT_AR_PREFIX = 'lit+ar://';
  * @param {unknown} txId
  * @returns {string}
  */
-export const buildLitArweaveUrl = (txId) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).trim()}`;
+export const buildLitArweaveUrl = (txId: unknown) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).trim()}`;
 
 /**
  * Extracts an Arweave transaction id from a Lit storage URL.
@@ -1611,7 +1869,7 @@ export const buildLitArweaveUrl = (txId) => `${LIT_ARWEAVE_PREFIX}${toStr(txId).
  * @param {unknown} url
  * @returns {string | null}
  */
-export const parseLitArweaveUrl = (url) => {
+export const parseLitArweaveUrl = (url: unknown) => {
   const raw = toStr(url).trim();
   if (!raw) return null;
   if (raw.startsWith(LIT_ARWEAVE_PREFIX)) {
@@ -1629,10 +1887,10 @@ export const parseLitArweaveUrl = (url) => {
  * @param {unknown} url
  * @returns {boolean}
  */
-export const isLitArweaveUrl = (url) => !!parseLitArweaveUrl(url);
+export const isLitArweaveUrl = (url: unknown) => !!parseLitArweaveUrl(url);
 
-const readBlobAsArrayBuffer = (blob) =>
-  new Promise((resolve, reject) => {
+const readBlobAsArrayBuffer = (blob: Blob) =>
+  new Promise<ArrayBuffer | string | null>((resolve, reject) => {
     try {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
@@ -1643,7 +1901,7 @@ const readBlobAsArrayBuffer = (blob) =>
     }
   });
 
-const MIME_BY_EXT = Object.freeze({
+const MIME_BY_EXT: Readonly<Record<string, string>> = Object.freeze({
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   png: 'image/png',
@@ -1661,7 +1919,7 @@ const MIME_BY_EXT = Object.freeze({
   wav: 'audio/wav',
 });
 
-const resolveExt = ({ name, format } = {}) => {
+const resolveExt = ({ name, format }: { name?: unknown; format?: unknown } = {}) => {
   const fmt = toStr(format).trim().toLowerCase();
   if (fmt) return fmt;
   const rawName = toStr(name).trim();
@@ -1672,7 +1930,17 @@ const resolveExt = ({ name, format } = {}) => {
   return '';
 };
 
-const resolveMimeFromParts = ({ mime, name, format, type } = {}) => {
+const resolveMimeFromParts = ({
+  mime,
+  name,
+  format,
+  type,
+}: {
+  mime?: unknown;
+  name?: unknown;
+  format?: unknown;
+  type?: unknown;
+} = {}) => {
   const raw = toStr(mime || type).trim();
   const ext = resolveExt({ name, format });
   if (raw && raw !== 'application/octet-stream') return raw;
@@ -1680,14 +1948,16 @@ const resolveMimeFromParts = ({ mime, name, format, type } = {}) => {
   return raw || 'application/octet-stream';
 };
 
-const resolveMimeFromPayload = (payload) =>
-  resolveMimeFromParts({
-    mime: payload?.mime,
-    name: payload?.name,
-    format: payload?.format,
+const resolveMimeFromPayload = (payload: unknown) => {
+  const payloadRecord = asRecord(payload) as LitUploadPayload;
+  return resolveMimeFromParts({
+    mime: payloadRecord.mime,
+    name: payloadRecord.name,
+    format: payloadRecord.format,
   });
+};
 
-const isTextLikeMime = (mime) => {
+const isTextLikeMime = (mime: string) => {
   if (!mime) return false;
   if (mime.startsWith('text/')) return true;
   return [
@@ -1700,15 +1970,15 @@ const isTextLikeMime = (mime) => {
   ].includes(mime);
 };
 
-const encodeEncryptedPayload = async (data, opts = {}) => {
+const encodeEncryptedPayload = async (data: unknown, opts: { name?: string; format?: string; mime?: string } = {}): Promise<LitUploadPayload> => {
   const name = toStr(opts.name || '');
   const format = toStr(opts.format || '');
   const mime = toStr(opts.mime || '');
 
   if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
     const buf = await readBlobAsArrayBuffer(data);
-    const b64 = Buffer.from(new Uint8Array(buf || [])).toString('base64');
-    const resolvedName = name || data.name || 'encrypted-file';
+    const b64 = Buffer.from(toBytes(buf)).toString('base64');
+    const resolvedName = name || (data instanceof File ? data.name : '') || 'encrypted-file';
     const resolvedFormat = resolveExt({ name: resolvedName, format });
     const resolvedMime = resolveMimeFromParts({
       mime,
@@ -1770,7 +2040,7 @@ export const uploadEncryptedArweaveData = async ({
   chainId,
   contextLabel,
   lit,
-} = {}) => {
+}: LitUploadOptions = {}) => {
   if (!lit || typeof lit.saveKey !== 'function') {
     throw new Error('Lit saveKey is required to encrypt Arweave data.');
   }
@@ -1778,7 +2048,11 @@ export const uploadEncryptedArweaveData = async ({
     throw new Error('Lit accessControlConditions are required to encrypt Arweave data.');
   }
 
-  const payload = await encodeEncryptedPayload(data, { format, name, mime });
+  const payload = await encodeEncryptedPayload(data, {
+    format: toStr(format),
+    name: toStr(name),
+    mime: toStr(mime),
+  });
   const envelope = await cryptoUtils.encryptEnvelopeValue(payload, {
     providerLike,
     account,
@@ -1827,15 +2101,15 @@ export const downloadEncryptedArweaveData = async ({
   chainId,
   lit,
   arweave,
-} = {}) => {
+}: LitDownloadOptions = {}): Promise<{ payload: LitUploadPayload; txId: string; url: string }> => {
   const resolvedTx = toStr(txId || '') || parseLitArweaveUrl(url);
   if (!resolvedTx) throw new Error('Missing Arweave transaction ID for Lit doc.');
 
-  const arweaveOpts = (arweave && typeof arweave === 'object') ? { ...arweave } : {};
+  const arweaveOpts: UnknownRecord = isRecord(arweave) ? { ...arweave } : {};
   const existingDebugContext = (
     arweaveOpts.debugContext && typeof arweaveOpts.debugContext === 'object'
   )
-    ? arweaveOpts.debugContext
+    ? asRecord(arweaveOpts.debugContext)
     : {};
   arweaveOpts.debugContext = {
     ...existingDebugContext,
@@ -1851,7 +2125,7 @@ export const downloadEncryptedArweaveData = async ({
     providerLike,
     ...(litOpts ? { litOpts } : {}),
   });
-  return { payload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
+  return { payload: asRecord(payload) as LitUploadPayload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
 };
 
 /**
@@ -1860,20 +2134,21 @@ export const downloadEncryptedArweaveData = async ({
  * @param {LitUploadPayload | null | undefined} payload
  * @returns {string}
  */
-export const decodeLitPayloadToText = (payload) => {
+export const decodeLitPayloadToText = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') return '';
-  const mime = resolveMimeFromPayload(payload);
+  const payloadRecord = payload as LitUploadPayload;
+  const mime = resolveMimeFromPayload(payloadRecord);
   const shouldDecode =
-    payload.kind === 'text' ||
-    payload.encoding === 'utf-8' ||
+    payloadRecord.kind === 'text' ||
+    payloadRecord.encoding === 'utf-8' ||
     isTextLikeMime(mime);
   if (!shouldDecode) return '';
-  if (payload.encoding === 'utf-8' || payload.kind === 'text') {
-    return toStr(payload.data || '');
+  if (payloadRecord.encoding === 'utf-8' || payloadRecord.kind === 'text') {
+    return toStr(payloadRecord.data || '');
   }
-  if (payload.encoding === 'base64' && typeof payload.data === 'string') {
+  if (payloadRecord.encoding === 'base64' && typeof payloadRecord.data === 'string') {
     try {
-      return Buffer.from(payload.data, 'base64').toString('utf8');
+      return Buffer.from(payloadRecord.data, 'base64').toString('utf8');
     } catch (_) {
       return '';
     }
@@ -1887,12 +2162,13 @@ export const decodeLitPayloadToText = (payload) => {
  * @param {LitUploadPayload | null | undefined} payload
  * @returns {Blob | null}
  */
-export const decodeLitPayloadToBlob = (payload) => {
+export const decodeLitPayloadToBlob = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') return null;
-  if (payload.encoding !== 'base64' || typeof payload.data !== 'string') return null;
+  const payloadRecord = payload as LitUploadPayload;
+  if (payloadRecord.encoding !== 'base64' || typeof payloadRecord.data !== 'string') return null;
   try {
-    const bytes = Uint8Array.from(Buffer.from(payload.data, 'base64'));
-    return new Blob([bytes], { type: resolveMimeFromPayload(payload) });
+    const bytes = Uint8Array.from(Buffer.from(payloadRecord.data, 'base64'));
+    return new Blob([bytes], { type: resolveMimeFromPayload(payloadRecord) });
   } catch (_) {
     return null;
   }
