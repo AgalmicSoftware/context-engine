@@ -84,10 +84,6 @@ import {
   resolveQuestionFilterSectionHeaderStyle,
 } from './questionFilterDisplayHelpers';
 import {
-  areQuestionListsEquivalentById,
-  buildAiCandidateSignature,
-  buildFilterPayloadSignature,
-  buildFilteredResponsesByQuestionSignature,
   buildQuestionFilterAiApplyBasePatch,
   buildQuestionFilterAiApplyFailurePatch,
   buildQuestionFilterAiApplyErrorPatch,
@@ -116,17 +112,23 @@ import {
   buildQuestionFilterSelectedTagsPatch,
   buildQuestionFilterTopQuestionsCountPatch,
   buildQuestionFilterUrlInputPatch,
-  buildQuestionIdListSignature,
   isQuestionFilterStateDefault,
   normalizeAiIdList,
   normalizeFilterSelectionList,
-  normalizeNonceKey,
   normalizePositiveInt,
   normalizeResponseStatusFilterState,
   normalizeSbtFilterLocalState,
+} from './questionFilterHelpers.js';
+import {
+  areQuestionListsEquivalentById,
+  buildAiCandidateSignature,
+  buildFilterPayloadSignature,
+  buildFilteredResponsesByQuestionSignature,
+  buildQuestionIdListSignature,
+  normalizeNonceKey,
   stableSerializeSmallObject,
   toLowerId,
-} from './questionFilterHelpers.js';
+} from './questionFilterSignatureHelpers.js';
 export {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
