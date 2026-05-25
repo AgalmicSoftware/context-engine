@@ -1,6 +1,9 @@
 const LOCAL_CHAIN_ID = 31337;
 
-type InjectedProviderLike = Record<string, any>;
+type InjectedProviderLike = {
+  chainId?: unknown;
+  networkVersion?: unknown;
+};
 type ReadProviderSelectionOptions = {
   targetChainId?: unknown;
   injectedProvider?: unknown;

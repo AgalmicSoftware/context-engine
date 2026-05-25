@@ -230,9 +230,9 @@ const toUint8Array = (value: unknown): Uint8Array => {
 
 /**
  * @typedef {object} CryptoFieldEntry
- * @property {any=} value
+ * @property {unknown=} value
  * @property {boolean=} encrypted
- * @property {string | Record<string, any>=} encryptedPortion
+ * @property {string | Record<string, unknown>=} encryptedPortion
  * @property {string=} hash
  * @property {string=} poseidon
  * @property {string=} zkSalt
@@ -242,7 +242,7 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @typedef {object} CryptoAnswerSlice
  * @property {Record<string, CryptoFieldEntry>=} answers
  * @property {Record<string, CryptoFieldEntry>=} additionalComments
- * @property {Record<string, any>=} importance
+ * @property {Record<string, unknown>=} importance
  */
 
 /**
@@ -254,8 +254,8 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {number | string | null=} chainId
  * @property {string=} surveyId
  * @property {string[]=} onlyTheseQids
- * @property {Array<Record<string, any>>=} questionPool
- * @property {Record<string, any>=} lit
+ * @property {Array<Record<string, unknown>>=} questionPool
+ * @property {Record<string, unknown>=} lit
  * @property {((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null=} hasher
  * @property {((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null=} poseidon
  * @property {string=} kind
@@ -272,8 +272,8 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @property {string=} account
  * @property {number | string | null=} chainId
  * @property {string=} surveyId
- * @property {Record<string, any>=} lit
- * @property {Record<string, any>=} litOpts
+ * @property {Record<string, unknown>=} lit
+ * @property {Record<string, unknown>=} litOpts
  * @property {boolean=} throwOnError
  */
 
@@ -292,7 +292,7 @@ const toUint8Array = (value: unknown): Uint8Array => {
  *   account?: string,
  *   chainId?: number | string | null,
  *   providerLike?: unknown,
- *   litOpts?: Record<string, any>
+ *   litOpts?: Record<string, unknown>
  * }) => string} buildDecryptEnvelopeCacheKey
  */
 
@@ -300,24 +300,24 @@ const toUint8Array = (value: unknown): Uint8Array => {
  * @typedef {object} CryptoUtilsApi
  * @property {(providerLike: unknown) => ('wagmi' | 'porto' | 'web3auth')} getProviderKind
  * @property {(providerLike: unknown) => { request: (request: { method: string, params?: unknown[] }) => Promise<unknown> }} _getProvider
- * @property {(surveyState: CryptoAnswerSlice & Record<string, any>, optsOrPubKey?: CryptoEncryptOptions | string, extraOpts?: CryptoEncryptOptions) => Promise<CryptoAnswerSlice>} encryptMultipleAnswers
- * @property {(slice: CryptoAnswerSlice & Record<string, any>, questionPool?: Array<Record<string, any>>, accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptMultipleAnswers
- * @property {(slice: CryptoAnswerSlice & Record<string, any>, qId: string, fieldToDecrypt: 'answer' | 'additional' | 'both', accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptSingleField
+ * @property {(surveyState: CryptoAnswerSlice & Record<string, unknown>, optsOrPubKey?: CryptoEncryptOptions | string, extraOpts?: CryptoEncryptOptions) => Promise<CryptoAnswerSlice>} encryptMultipleAnswers
+ * @property {(slice: CryptoAnswerSlice & Record<string, unknown>, questionPool?: Array<Record<string, unknown>>, accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptMultipleAnswers
+ * @property {(slice: CryptoAnswerSlice & Record<string, unknown>, qId: string, fieldToDecrypt: 'answer' | 'additional' | 'both', accountOrOpts?: string | CryptoDecryptOptions, providerKind?: string, opts?: CryptoDecryptOptions) => Promise<CryptoAnswerSlice>} decryptSingleField
  * @property {(input: { chainId?: number | string | null, account?: string, surveyId?: string, qId?: string }) => string} computeContext
- * @property {(qId: string, opts?: { questionPool?: Array<Record<string, any>> }) => { kind: 'freeform' | 'binary' | 'rating' | 'multichoice', options: string[] }} getQuestionKindMeta
- * @property {(field: Record<string, any>, ctx?: { qId?: string, kind?: string, chainId?: number | string | null, surveyId?: string, optionsForKind?: string[], hasher?: ((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null }) => Promise<void>} addTopLevelPoseidonIfRequired
+ * @property {(qId: string, opts?: { questionPool?: Array<Record<string, unknown>> }) => { kind: 'freeform' | 'binary' | 'rating' | 'multichoice', options: string[] }} getQuestionKindMeta
+ * @property {(field: Record<string, unknown>, ctx?: { qId?: string, kind?: string, chainId?: number | string | null, surveyId?: string, optionsForKind?: string[], hasher?: ((inputs: bigint[]) => string | bigint | Promise<string | bigint>) | null }) => Promise<void>} addTopLevelPoseidonIfRequired
  * @property {(identifier: unknown) => string} hashIdentifier
  * @property {(data: unknown, password: string) => Promise<string>} encryptWithPassword
- * @property {(encryptedData: string | { iv?: string, salt?: string, ciphertext?: string }, password: string) => Promise<any>} decryptWithPassword
+ * @property {(encryptedData: string | { iv?: string, salt?: string, ciphertext?: string }, password: string) => Promise<unknown>} decryptWithPassword
  * @property {(value: unknown, opts?: CryptoEncryptOptions) => Promise<string>} encryptEnvelopeValue
- * @property {(envelopeJson: string | Record<string, any>, opts?: CryptoDecryptOptions) => Promise<any>} decryptEnvelopeValue
+ * @property {(envelopeJson: string | Record<string, unknown>, opts?: CryptoDecryptOptions) => Promise<unknown>} decryptEnvelopeValue
  * @property {(input: { password?: string, sbtAddress?: string }) => string} computeGroupPasswordHash
  * @property {(input: { password?: string, sbtAddress?: string, groupPasswordHash?: string }) => string | null} resolveGroupPasswordWalletScopeAddress
  * @property {(sbtAddress: string, userAddress: string) => string} computeGroupMintMessageHash
  * @property {(input: { password?: string, sbtAddress?: string, userAddress?: string, walletScopeSbtAddress?: string }) => Promise<string>} signGroupMintAuthorization
  * @property {(input: { sbtAddress?: string, nonce?: string | number }) => string} buildInviteMessageHash
  * @property {(input: { password?: string, sbtAddress?: string, nonce?: string | number, walletScopeSbtAddress?: string }) => Promise<string>} signInvite
- * @property {(payload: Record<string, any>) => string} encodeInvite
+ * @property {(payload: Record<string, unknown>) => string} encodeInvite
  * @property {(inviteCode: string) => ({ nonce: string, signature: string } | null)} decodeInvite
  * @property {() => string} generateInviteNonce
  * @property {(raw: unknown) => string} normalizeGroupPasswordInput

@@ -626,19 +626,22 @@ class QuestionFilter extends React.Component<any, any> {
     propsIn: QuestionFilterSessionProps = this.props
   ): QuestionFilterGateTooltipProps => {
     const sessionConfig = this.getEffectiveSessionConfig(propsIn);
-    const gateConfig =
+    const gateConfig = (
       resolveEncryptionGate(sessionConfig) ||
       resolveSponsoredGateStateForResource(sessionConfig, 'questionResponses')?.gate ||
       resolveSponsoredGateStateForResource(sessionConfig, 'default')?.gate ||
-      null;
-    const sbtAddresses = getGateSbtAddresses(gateConfig || {});
+      null
+    ) as React.ComponentProps<typeof GateTooltip>['gateConfig'] | null;
+    const sponsoredGateConfig = gateConfig as Parameters<typeof getGateSbtAddresses>[0];
+    const gateRecord = toUnknownRecord(gateConfig);
+    const sbtAddresses = getGateSbtAddresses(sponsoredGateConfig || {});
 
     if (!gateConfig && sbtAddresses.length === 0) return null;
 
     return {
-      gateId: String(gateConfig?.gateId || gateConfig?.id || '').trim() || null,
+      gateId: String(gateRecord.gateId || gateRecord.id || '').trim() || null,
       gateConfig,
-      mode: normalizeGateMode(gateConfig),
+      mode: normalizeGateMode(sponsoredGateConfig),
       sbtAddresses,
     };
   };
