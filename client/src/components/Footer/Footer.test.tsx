@@ -83,7 +83,7 @@ describe('Footer', () => {
       { minWidth: 466, maxWidth: 768 },
     ].forEach(({ minWidth, maxWidth }) => {
       const breakpointRule = new RegExp(
-        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?#footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: flex;[\\s\\S]*?justify-content: center;[\\s\\S]*?align-items: center;[\\s\\S]*?flex-wrap: wrap;[\\s\\S]*?width: 100%;`,
+        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: flex;[\\s\\S]*?justify-content: center;[\\s\\S]*?align-items: center;[\\s\\S]*?flex-wrap: wrap;[\\s\\S]*?width: 100%;`,
       );
 
       expect(footerStylesheet).toMatch(breakpointRule);
