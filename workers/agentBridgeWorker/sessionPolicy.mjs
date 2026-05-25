@@ -70,6 +70,56 @@ export function normalizeRequiredSbtGroups(session = {}) {
     .filter(Boolean);
 }
 
+function plainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizePositiveInteger(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return fallback;
+  return Math.floor(number);
+}
+
+function normalizeResultsExposurePolicy(session = {}) {
+  const source = plainObject(session.resultsExposure)
+    ? session.resultsExposure
+    : (
+      plainObject(session.telegramResultsExposure)
+        ? session.telegramResultsExposure
+        : (plainObject(session.publicResultsExposure) ? session.publicResultsExposure : {})
+    );
+  const aggregateValue = source.aggregateResultsEnabled ??
+    source.aggregateResults ??
+    source.level3Enabled ??
+    session.aggregateResultsEnabled ??
+    session.telegramAggregateResultsEnabled;
+  const publishedQuestionsValue = source.publishedQuestionsEnabled ??
+    source.publishedQuestions ??
+    source.level2Enabled ??
+    session.publishedQuestionsEnabled ??
+    session.telegramPublishedQuestionsEnabled;
+  const anonymizedGroupsValue = source.anonymizedGroupsEnabled ??
+    source.anonymizedGroups ??
+    source.groupViewEnabled ??
+    source.groupsEnabled ??
+    source.level4Enabled ??
+    session.anonymizedGroupsEnabled ??
+    session.telegramAnonymizedGroupsEnabled;
+
+  return {
+    metricsEnabled: true,
+    publishedQuestionsEnabled: normalizeBool(publishedQuestionsValue),
+    aggregateResultsEnabled: aggregateValue === undefined || aggregateValue === null
+      ? true
+      : normalizeBool(aggregateValue),
+    anonymizedGroupsEnabled: normalizeBool(anonymizedGroupsValue),
+    minGroupSize: normalizePositiveInteger(
+      source.minGroupSize ?? session.resultsMinGroupSize ?? session.telegramResultsMinGroupSize,
+      2
+    ),
+  };
+}
+
 function buildJoinedSbtLookup(joinedSbtIds = []) {
   return new Set((Array.isArray(joinedSbtIds) ? joinedSbtIds : [])
     .map((value) => safeString(value).toLowerCase())
@@ -105,6 +155,7 @@ export function normalizeSessionPolicy(input = {}) {
     sponsoredFaucetAllowed: session.sponsoredFaucetAllowed === true,
     sbtJoinModes: Array.isArray(session.sbtJoinModes) ? session.sbtJoinModes.slice() : ['public'],
     requiredSbtGroups: normalizeRequiredSbtGroups(session),
+    resultsExposure: normalizeResultsExposurePolicy(session),
     questionAuthoringPermissionMode: safeString(
       session.questionAuthoringPermissionMode ||
       session.telegramQuestionAuthoringPermissionMode ||
