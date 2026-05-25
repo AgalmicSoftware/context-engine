@@ -4,7 +4,7 @@
 /* --- LoginAndSettingsModal.tsx --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #navConnectContainer {
+  .navConnectContainer {
     display: flex;
     flex-direction: row;
     align-content: center;
@@ -13,7 +13,7 @@
     padding: 0px;
   }
 
-  #loginIcons {
+  .loginIcons {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -29,7 +29,7 @@
     }
   }
 
-  #loginIcon {
+  .loginIcon {
     margin-right: 0.25em;
     margin-left: 0.25em;
     padding: 0px;
@@ -37,7 +37,7 @@
     vertical-align: top;
   }
 
-  #navConnectButton {
+  .navConnectButton {
     padding-bottom: 5px;
     padding-top: 5px;
     display: flex;
@@ -46,7 +46,7 @@
     transform: scale(0.9);
   }
 
-  #loginPromptText {
+  .loginPromptText {
     font-size: 1.75em;
   }
 
@@ -244,7 +244,7 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #navConnectContainer {
+  .navConnectContainer {
     display: flex;
     flex-direction: row;
     align-content: center;
@@ -253,7 +253,7 @@
     padding: 0px;
   }
 
-  #navConnectButton {
+  .navConnectButton {
     padding-bottom: 7.5px;
     padding-top: 7.5px;
     display: flex;
@@ -264,7 +264,7 @@
     min-height: 70px !important;
   }
 
-  #loginIcons {
+  .loginIcons {
     display: flex;
     justify-content: center;
     align-content: center;
@@ -280,14 +280,14 @@
     }
   }
 
-  #loginIcon {
+  .loginIcon {
     margin-right: 0.1em;
     padding: 0px;
     transform: scale(0.8);
     vertical-align: top;
   }
 
-  #loginPromptText {
+  .loginPromptText {
     font-size: 1.75em;
   }
 
@@ -483,7 +483,7 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #navConnectContainer {
+  .navConnectContainer {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -493,14 +493,14 @@
     padding: 0px;
   }
 
-  #navConnectButton {
+  .navConnectButton {
     display: flex;
     justify-content: center;
     padding: 5% 2% 5% 2%;
     min-height: 80px !important;
   }
 
-  #loginIcons {
+  .loginIcons {
     display: flex;
     justify-content: center;
     align-content: center;
@@ -516,14 +516,14 @@
     }
   }
 
-  #loginIcon {
+  .loginIcon {
     margin-right: 0.1em;
     margin-left: 0.1em;
     padding: 0px;
     vertical-align: top;
   }
 
-  #loginPromptText {
+  .loginPromptText {
     font-size: 2em;
   }
 
@@ -719,7 +719,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #navConnectContainer {
+  .navConnectContainer {
     display: flex;
     align-content: center;
     justify-content: flex-end;
@@ -728,14 +728,14 @@
     margin-right: 0;
   }
 
-  #navConnectButton {
+  .navConnectButton {
     display: flex;
     justify-content: center;
     padding: 4% 0% 4% 0%;
     min-height: 100px !important;
   }
 
-  #loginIcons {
+  .loginIcons {
     display: flex;
     justify-content: center;
     align-content: center;
@@ -749,14 +749,14 @@
     }
   }
 
-  #loginIcon {
+  .loginIcon {
     margin-right: 0.15em;
     margin-left: 0.15em;
     padding: 0px;
     vertical-align: top;
   }
 
-  #loginPromptText {
+  .loginPromptText {
     font-size: 2em;
     padding-bottom: 7.5px;
   }
@@ -962,7 +962,7 @@
 }
 
 @media (min-width: 1367px) {
-  #navConnectContainer {
+  .navConnectContainer {
     display: flex;
     align-content: center;
     justify-content: flex-end;
@@ -970,7 +970,7 @@
     height: 100%;
   }
 
-  #navConnectButton {
+  .navConnectButton {
     min-width: 250px !important;
     min-height: 100px;
     display: flex;
@@ -979,7 +979,7 @@
     padding: 4% 0% 4% 0%;
   }
 
-  #loginIcons {
+  .loginIcons {
     display: flex;
     justify-content: center;
     align-content: center;
@@ -994,14 +994,14 @@
     }
   }
 
-  #loginIcon {
+  .loginIcon {
     margin-right: 0.2em;
     margin-left: 0.2em;
     padding: 0px;
     vertical-align: top;
   }
 
-  #loginPromptText {
+  .loginPromptText {
     font-size: 2.5em;
     padding-bottom: 10px;
   }
@@ -1212,7 +1212,7 @@ h1 {
   font-weight: 700;
 }
 
-#navConnectButton {
+.navConnectButton {
   min-width: 200px;
   min-height: 100px;
   display: flex;
@@ -1229,12 +1229,12 @@ h1 {
   }
 }
 
-#navConnectButton:hover.btn.btn-blue {
+.navConnectButton:hover.btn.btn-blue {
   background-color: var(--ce-color-indigo);
   background: var(--ce-color-indigo);
 }
 
-#loginPromptText {
+.loginPromptText {
   font-weight: 600;
   color: var(--ce-color-white);
 }
