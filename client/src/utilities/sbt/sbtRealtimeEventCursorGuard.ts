@@ -2,6 +2,24 @@ import {
   compareSbtRealtimeEventCursor,
   normalizeSbtRealtimeEventCursor,
 } from './sbtRealtimeCursorHelpers.js';
+import type { SbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
+
+interface SbtRealtimeEventCursorGuardOptions {
+  eventBlockNumber?: unknown;
+  lastRealtimeEventCursor?: unknown;
+  logIndex?: unknown;
+  overallLastBlockProcessedByNetwork?: unknown;
+  transactionIndex?: unknown;
+}
+
+interface SbtRealtimeEventCursorGuardResult {
+  eventBlockNumber?: unknown;
+  eventCursor: SbtRealtimeEventCursor | null;
+  lastRealtimeCursor: SbtRealtimeEventCursor | null;
+  overallLastBlockProcessedByNetwork?: unknown;
+  reason: 'cursor' | 'block' | '';
+  shouldSkip: boolean;
+}
 
 export const getSbtRealtimeEventCursorGuard = ({
   eventBlockNumber = 0,
@@ -9,7 +27,7 @@ export const getSbtRealtimeEventCursorGuard = ({
   logIndex = undefined,
   overallLastBlockProcessedByNetwork = 0,
   transactionIndex = undefined,
-} = {}) => {
+}: SbtRealtimeEventCursorGuardOptions = {}): SbtRealtimeEventCursorGuardResult => {
   const eventCursor = normalizeSbtRealtimeEventCursor({
     blockNumber: eventBlockNumber,
     transactionIndex,
@@ -30,7 +48,7 @@ export const getSbtRealtimeEventCursorGuard = ({
     };
   }
 
-  if (eventBlockNumber < overallLastBlockProcessedByNetwork) {
+  if ((eventBlockNumber as number) < (overallLastBlockProcessedByNetwork as number)) {
     return {
       eventBlockNumber,
       eventCursor,
