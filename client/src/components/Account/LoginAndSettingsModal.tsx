@@ -108,6 +108,10 @@ import {
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
+import {
+  formatSponsoredStatusMeta,
+  getSponsoredKeyAliases,
+} from './loginSettingsSponsoredStatusHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -180,10 +184,6 @@ interface LoginAndSettingsModalState {
   preLoginConfigOpen: boolean;
   walletBalanceWei: ethers.BigNumber | null;
 }
-
-type SponsoredStatusEntry = LoginAndSettingsRecord & {
-  status?: string;
-};
 
 export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
