@@ -992,7 +992,7 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
     font-family: var(--ce-font-mono);
   }
 
-  #featuredSBTsContainer {
+  .featuredSBTsContainer {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -1112,7 +1112,7 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
       gap: 4px;
     }
 
-    #featuredSBTsContainer {
+    .featuredSBTsContainer {
       gap: 10px;
     }
   }
