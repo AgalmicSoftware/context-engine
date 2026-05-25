@@ -2730,10 +2730,12 @@ test('/docs remains a legacy alias for attachments', async () => {
 });
 
 test('/me returns managed demo account metadata without the root secret', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
   const result = await buildTelegramCommandResponse({
     update: privateMessage('/me'),
     env: baseEnv(),
-    now: '2026-05-08T12:00:00.000Z',
+    now,
   });
 
   assert.equal(result.ok, true);
@@ -2745,7 +2747,10 @@ test('/me returns managed demo account metadata without the root secret', async 
   const addressButton = flattenButtons(result.response.replyMarkup)
     .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
   assert.equal(addressButton, undefined);
-  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'View Questions'), true);
+  const buttons = flattenButtons(result.response.replyMarkup);
+  const copyAddress = buttons.find((button) => button.text === 'Copy Address');
+  assert.deepEqual(copyAddress?.copy_text, { text: accountAddress });
+  assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 

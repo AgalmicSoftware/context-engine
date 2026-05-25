@@ -147,6 +147,15 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
+function safeAnswerString(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function firstAnswerValue(...values) {
+  return values.find((value) => safeAnswerString(value) !== '');
+}
+
 function lower(value) {
   return safeString(value).toLowerCase();
 }
@@ -278,6 +287,12 @@ function urlButton(label = '', url = '') {
   const text = safeString(label);
   const href = safeString(url);
   return text && href ? { text, url: href } : null;
+}
+
+function copyTextButton(label = '', value = '') {
+  const text = safeString(label);
+  const copyText = safeString(value);
+  return text && copyText ? { text, copy_text: { text: copyText } } : null;
 }
 
 function telegramButtonLabel(value = '', fallback = 'Question') {
@@ -2447,7 +2462,7 @@ async function buildQuestionsResponse({
 }
 
 function normalizeResultAnswerLabel(value = '') {
-  const label = safeString(value);
+  const label = safeAnswerString(value);
   const normalized = lower(label);
   if (normalized === 'agree' || normalized === 'yes' || normalized === 'true') return 'Agree';
   if (normalized === 'disagree' || normalized === 'no' || normalized === 'false') return 'Disagree';
@@ -2498,8 +2513,20 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
       createdAt: safeString(record.createdAt),
       telegramUserId: safeString(record.telegramUserId),
       questionId: safeString(record.questionId),
-      label: normalizeResultAnswerLabel(record.answer?.label || record.answer?.value || record.answer?.text),
-      value: safeString(record.answer?.value || record.answer?.text || record.answer?.label),
+      label: normalizeResultAnswerLabel(firstAnswerValue(
+        record.answer?.label,
+        record.answer?.value,
+        record.answer?.text,
+        record.answerLabel,
+        record.answerValue,
+      )),
+      value: safeAnswerString(firstAnswerValue(
+        record.answer?.value,
+        record.answer?.text,
+        record.answer?.label,
+        record.answerValue,
+        record.answerLabel,
+      )),
       txHash: safeString(record.onChain?.txHash),
     }))
     .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
@@ -4079,6 +4106,10 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     createdAt,
   });
   const rows = [[questionButton]];
+  const copyAddress = ADDRESS_RE.test(account.accountAddress)
+    ? copyTextButton('Copy Address', account.accountAddress)
+    : null;
+  if (copyAddress) rows.push([copyAddress]);
   if (exportButton) rows.push([exportButton]);
   if (exportAccessButton) rows.push([exportAccessButton]);
   return reply({
@@ -5195,6 +5226,11 @@ export {
   ANSWER_DRAFT_KV_PREFIX,
   COMMANDS,
   deleteAnswerDraft,
+  analyzeParticipantResultGroup,
+  buildParticipantGraph,
+  consensusQuestionsForResults,
+  formatCounts,
+  loadSubmittedResultRecords,
   loadSessionPolicy,
   loadQuestionsForSession,
   parseTelegramCommandText,
@@ -5204,5 +5240,6 @@ export {
   readActionRecord,
   readAnswerDraft,
   shortQuestionId,
+  summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,
 };

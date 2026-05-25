@@ -31,15 +31,21 @@ import {
   telegramSubmitQueueEnabled,
 } from './telegramSubmitQueue.mjs';
 import {
+  analyzeParticipantResultGroup,
+  buildParticipantGraph,
+  consensusQuestionsForResults,
   loadQuestionsForSession,
   loadSessionPolicy,
   deleteAnswerDraft,
+  formatCounts,
+  loadSubmittedResultRecords,
   persistActionRecord,
   persistAnswerDraft,
   questionId as readQuestionId,
   readActionRecord,
   readAnswerDraft,
   shortQuestionId,
+  summarizeQuestionResults,
 } from './telegramCommands.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 
@@ -58,6 +64,15 @@ const AGREE_UNSURE_DISAGREE_LABELS = Object.freeze({
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function safeAnswerString(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function firstAnswerValue(...values) {
+  return values.find((value) => safeAnswerString(value) !== '');
 }
 
 function safeJsonParse(value, fallback = null) {
@@ -329,6 +344,14 @@ function miniAppLaunchAllowsAgentWrite(record = {}) {
     TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
     TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
   ].includes(record.action);
+}
+
+function miniAppLaunchAllowsSession(record = {}, sessionSlug = '') {
+  if (!isValidMiniAppLaunchRecord(record)) return false;
+  if (sessionPickerEnabled(record)) return Boolean(sanitizeSessionSlug(sessionSlug));
+  const launchSlug = sanitizeSessionSlug(record?.serverContextRef?.sessionSlug);
+  const requestedSlug = sanitizeSessionSlug(sessionSlug);
+  return Boolean(launchSlug && requestedSlug && launchSlug === requestedSlug);
 }
 
 function normalizeAgentSettingsInput(settings = {}) {
@@ -631,7 +654,14 @@ async function loadSubmittedMiniAppAnswers({
       displayIndex: question.displayIndex,
       sessionSlug: question.sessionSlug,
       prompt: question.prompt || question.title || '',
-      answerLabel: safeString(record.answer?.label || record.answer?.value || record.answer?.text),
+      answerLabel: safeAnswerString(firstAnswerValue(
+        record.answer?.label,
+        record.answer?.value,
+        record.answer?.text,
+        record.answerLabel,
+        record.answerValue,
+      )),
+      answer: miniAnswerFromSubmittedRecord(record, question),
       status: safeString(record.status),
       submittedAt: safeString(record.createdAt),
       requestId: safeString(record.requestId),
@@ -642,6 +672,29 @@ async function loadSubmittedMiniAppAnswers({
     submittedAnswerKeys: submittedAnswers.map((entry) => entry.questionKey),
     submittedAnswers,
   };
+}
+
+function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
+  const source = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
+    ? record.answer
+    : {};
+  const type = safeString(question.questionType || source.questionType || record.controlType);
+  const rawValue = firstAnswerValue(source.value, source.answer, source.text, record.answerValue, record.answerLabel);
+  const comments = safeAnswerString(firstAnswerValue(source.comments, source.additionalComments, record.comments));
+  if (type === 'multichoice') {
+    const values = Array.isArray(source.values)
+      ? source.values.map(safeAnswerString).filter(Boolean)
+      : [rawValue].map(safeAnswerString).filter(Boolean);
+    return { values, comments };
+  }
+  if (type === 'freeform') {
+    return { text: safeAnswerString(firstAnswerValue(source.text, source.value, source.answer, record.answerValue, record.answerLabel)), comments };
+  }
+  if (type === 'rating') {
+    const value = Number(firstAnswerValue(source.value, source.rating, source.answer, record.answerValue, record.answerLabel));
+    return { value: Number.isFinite(value) ? value : safeAnswerString(rawValue), comments };
+  }
+  return { value: lower(rawValue), comments };
 }
 
 function miniAnswerFromSavedDraft(draft = {}, question = {}) {
@@ -1784,6 +1837,195 @@ function normalizeAiSearchResults(parsed = {}, fallback = [], allowedKeys = null
   return out.length ? out : fallback;
 }
 
+function resultCountObject(counts = []) {
+  return Object.fromEntries(counts.map(([label, count]) => [label, count]));
+}
+
+function miniResultQuestionRow(row = {}) {
+  const total = Number(row.total || 0) || 0;
+  const differenceScore = Number(row.differenceScore || 0) || 0;
+  const consensusScore = total > 0 ? Number(((1 - differenceScore) * 100).toFixed(1)) : 0;
+  return {
+    questionId: safeString(row.questionId),
+    prompt: safeString(row.prompt),
+    total,
+    participants: Number(row.participants || 0) || 0,
+    counts: resultCountObject(Array.isArray(row.counts) ? row.counts : []),
+    countsText: formatCounts(Array.isArray(row.counts) ? row.counts : []),
+    differenceScore: Number(differenceScore.toFixed(3)),
+    differencePercent: Number((differenceScore * 100).toFixed(1)),
+    consensusPercent: consensusScore,
+    hasDifference: row.hasDifference === true,
+  };
+}
+
+function miniResultGroup(group = {}) {
+  return {
+    groupId: safeString(group.groupId),
+    label: safeString(group.label),
+    theme: safeString(group.theme),
+    size: Number(group.size || 0) || 0,
+    aliases: Array.isArray(group.aliases) ? group.aliases.map(safeString).filter(Boolean) : [],
+    averageScore: Number(group.averageScore || 0) || 0,
+    topStatements: (Array.isArray(group.topStatements) ? group.topStatements : []).slice(0, 3).map((statement) => ({
+      label: safeString(statement.label),
+      prompt: safeString(statement.prompt),
+      differenceScore: Number(statement.differenceScore || 0) || 0,
+      cluster: statement.cluster || {},
+      overall: statement.overall || {},
+    })),
+  };
+}
+
+async function resolveMiniAppResultsContext({
+  request,
+  env = {},
+  body = {},
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) {
+    return { ok: false, status: 401, error: auth.reason || 'telegram_init_data_invalid' };
+  }
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const policy = await loadSessionPolicy(env);
+  const linkedSessions = linkedPolicySessions(policy);
+  const linkedSessionLookup = new Set(linkedSessions.map((session) => session.sessionSlug));
+  const requestedSessionSlugs = normalizeSessionSlugList(
+    body.sessionSlug ||
+    body.sessions ||
+    url.searchParams.get('sessionSlug') ||
+    url.searchParams.get('sessions') ||
+    url.searchParams.get('sessionSlugs')
+  );
+  let sessionSlug = requestedSessionSlugs[0] || '';
+  let launchRecord = null;
+  if (auth.authMode === 'telegram') {
+    launchRecord = await resolveLaunchRecord(env, launch);
+    if (!launchRecord) {
+      return { ok: false, status: 404, error: 'mini_app_launch_invalid' };
+    }
+    if (!isValidMiniAppLaunchRecord(launchRecord)) {
+      return { ok: false, status: 403, error: 'mini_app_launch_mismatch' };
+    }
+    if (!sessionSlug) sessionSlug = launchSessionSlug(launchRecord, env);
+    if (!miniAppLaunchAllowsSession(launchRecord, sessionSlug)) {
+      return { ok: false, status: 403, error: 'mini_app_launch_mismatch' };
+    }
+  }
+  if (!sessionSlug) {
+    sessionSlug = linkedSessions.find((session) => session.default)?.sessionSlug ||
+      linkedSessions[0]?.sessionSlug ||
+      sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG);
+  }
+  if (!sessionSlug || (linkedSessionLookup.size > 0 && !linkedSessionLookup.has(sessionSlug))) {
+    return { ok: false, status: 403, error: 'session_not_selectable' };
+  }
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return { ok: false, status: 404, error: resolved.reason || 'session_not_available' };
+  }
+  return {
+    ok: true,
+    auth,
+    launch,
+    policy,
+    session: resolved.session,
+  };
+}
+
+async function buildMiniAppResultsSummary({
+  env = {},
+  session = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
+  const loadedQuestions = await loadQuestionsForSession(env, sessionSlug);
+  const questions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
+  const records = await loadSubmittedResultRecords(env, sessionSlug);
+  const consensusQuestions = consensusQuestionsForResults(questions);
+  const consensusQuestionIds = new Set(consensusQuestions.map(readQuestionId).filter(Boolean));
+  const consensusRecords = records.filter((record) => consensusQuestionIds.has(record.questionId));
+  const summaries = summarizeQuestionResults(consensusRecords, consensusQuestions)
+    .filter((summary) => Number(summary.total || 0) > 0);
+  const divisive = summaries.slice()
+    .sort((left, right) => (
+      right.differenceScore - left.differenceScore ||
+      right.total - left.total ||
+      left.prompt.localeCompare(right.prompt)
+    ))
+    .slice(0, 5)
+    .map(miniResultQuestionRow);
+  const consensus = summaries.slice()
+    .sort((left, right) => (
+      left.differenceScore - right.differenceScore ||
+      right.total - left.total ||
+      left.prompt.localeCompare(right.prompt)
+    ))
+    .slice(0, 5)
+    .map(miniResultQuestionRow);
+  const graph = buildParticipantGraph(records, questions);
+  return {
+    ok: true,
+    sessionSlug,
+    sessionName: safeString(session.sessionName || session.name || sessionSlug),
+    responseCount: records.length,
+    participantCount: Number(graph.participantCount || 0) || 0,
+    questionCount: questions.length,
+    binaryQuestionCount: consensusQuestions.length,
+    consensusQuestionCount: summaries.length,
+    source: loadedQuestions.source || 'telegram_worker_question_cache',
+    sourceReason: loadedQuestions.reason || '',
+    questions: {
+      consensus,
+      divisive,
+    },
+    groups: (Array.isArray(graph.groups) ? graph.groups : []).map(miniResultGroup),
+  };
+}
+
+async function handleResultsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppResultsContext({ request, env, body });
+  if (!context.ok) {
+    return json({ ok: false, error: context.error || 'results_unavailable' }, { status: context.status || 400 });
+  }
+  const summary = await buildMiniAppResultsSummary({ env, session: context.session });
+  if (request.method !== 'POST' || safeString(body.action || body.mode) !== 'analyze_group') {
+    return json(summary);
+  }
+  const groupId = safeString(body.groupId);
+  const liveGraph = buildParticipantGraph(
+    await loadSubmittedResultRecords(env, context.session.sessionSlug),
+    (await loadQuestionsForSession(env, context.session.sessionSlug)).questions || []
+  );
+  const group = (Array.isArray(liveGraph.groups) ? liveGraph.groups : []).find((item) => item.groupId === groupId);
+  if (!group) {
+    return json({ ok: false, error: 'group_not_found', summary }, { status: 404 });
+  }
+  const ai = await analyzeParticipantResultGroup({
+    env,
+    normalized: context.auth.user || {},
+    policy: context.policy,
+    session: context.session,
+    group,
+    groups: liveGraph.groups,
+    createdAt,
+  });
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    group: miniResultGroup(group),
+    aiOk: ai.ok === true,
+    reason: ai.reason || '',
+    analysis: ai.analysis,
+    summary,
+  });
+}
+
 async function handleSearchRequest({
   request,
   env = {},
@@ -1994,6 +2236,7 @@ function telegramMiniAppHtml() {
       --line: rgba(255, 255, 255, 0.16);
       --accent: #62ffbf;
       --accent-2: #2cc3ff;
+      --results-accent: #62ffbf;
       --filter-accent: #2cc3ff;
       --settings-accent: #ffd166;
       --accent-text: #11142f;
@@ -2069,6 +2312,14 @@ function telegramMiniAppHtml() {
       background: var(--filter-accent);
       border-color: var(--filter-accent);
     }
+    .resultsButton {
+      border-color: rgba(98, 255, 191, 0.45);
+      color: var(--results-accent);
+    }
+    .resultsButton.active {
+      background: var(--results-accent);
+      border-color: var(--results-accent);
+    }
     .settingsButton {
       border-color: rgba(255, 209, 102, 0.45);
       color: var(--settings-accent);
@@ -2090,6 +2341,13 @@ function telegramMiniAppHtml() {
       stroke-linecap: round;
       stroke-linejoin: round;
     }
+    .resultsButton svg {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .settingsPanel select {
@@ -2101,7 +2359,8 @@ function telegramMiniAppHtml() {
       padding: 8px 10px;
     }
     .settingsPanel,
-    .filterPanel {
+    .filterPanel,
+    .resultsPanel {
       display: none;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -2120,7 +2379,61 @@ function telegramMiniAppHtml() {
       border-color: rgba(44, 195, 255, 0.52);
       background: rgba(20, 70, 104, 0.36);
     }
-    .settingsPanel.open, .filterPanel.open { display: grid; }
+    .resultsPanel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
+      border-color: rgba(98, 255, 191, 0.52);
+      background: rgba(24, 92, 71, 0.28);
+    }
+    .settingsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
+    .resultsHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .resultsSessionOptions, .resultGroups {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .resultColumns {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .resultSection, .groupAnalysis {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .resultList {
+      display: grid;
+      gap: 8px;
+    }
+    .resultRow {
+      display: grid;
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow-wrap: anywhere;
+    }
+    .resultRow strong { color: var(--text); font-size: 13px; }
+    .resultRow span { color: var(--muted); font-size: 12px; }
+    .resultGroup {
+      display: grid;
+      gap: 6px;
+      min-width: min(100%, 180px);
+      flex: 1 1 180px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .resultGroup strong { color: var(--text); }
+    .resultGroup span { color: var(--muted); font-size: 12px; }
     .savedDrafts {
       grid-column: 1 / -1;
       display: grid;
@@ -2135,6 +2448,15 @@ function telegramMiniAppHtml() {
     }
     .savedDrafts strong { color: var(--text); font-size: 13px; }
     .savedDrafts div { overflow-wrap: anywhere; }
+    .savedDraftsSection {
+      display: grid;
+      gap: 5px;
+      padding-bottom: 4px;
+    }
+    .savedDraftsSection + .savedDraftsSection {
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
     .savedDraftsHeader {
       display: flex;
       align-items: center;
@@ -2214,6 +2536,18 @@ function telegramMiniAppHtml() {
     .sessionActions { display: flex; justify-content: flex-end; }
     .questionStack { display: grid; gap: 12px; min-height: 0; }
     .questionMeta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .answerBadge {
+      margin-top: 10px;
+      display: inline-flex;
+      max-width: 100%;
+      border: 1px solid rgba(98, 255, 191, 0.42);
+      border-radius: 8px;
+      padding: 5px 8px;
+      background: rgba(98, 255, 191, 0.1);
+      color: var(--accent);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     .secondary {
       min-height: 36px;
       border: 1px solid var(--line);
@@ -2221,6 +2555,11 @@ function telegramMiniAppHtml() {
       background: rgba(255, 255, 255, 0.06);
       color: var(--text);
       padding: 7px 10px;
+    }
+    .secondary.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 10px rgba(98, 255, 191, 0.18);
     }
     .card {
       border: 1px solid var(--line);
@@ -2353,11 +2692,37 @@ function telegramMiniAppHtml() {
       text-align: center;
       font-weight: 700;
     }
+    .submitButton {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .submitButton svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .submitButton.submittedCheck {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: var(--accent-text);
+    }
+    .submitButton.submittedCheck:disabled {
+      opacity: 1;
+      cursor: default;
+    }
     .primary:disabled, .secondary:disabled { opacity: 0.58; cursor: default; }
+    .submitButton.submittedCheck:disabled { opacity: 1; }
     .ok { color: var(--ok); }
     .error { color: var(--danger); white-space: pre-wrap; }
     @media (max-width: 760px) {
       .settingsPanel, .filterPanel { grid-template-columns: 1fr; }
+      .resultColumns { grid-template-columns: 1fr; }
       .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto; }
     }
   </style>
@@ -2368,6 +2733,11 @@ function telegramMiniAppHtml() {
       <div class="headerBar">
         <h1>Context Engine</h1>
         <div class="headerActions">
+          <button class="iconButton resultsButton" id="showResults" type="button" aria-label="Results" aria-expanded="false" title="Results">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-8"></path><path d="M22 19H2"></path>
+            </svg>
+          </button>
           <button class="iconButton filterButton" id="showFilter" type="button" aria-label="Filter" aria-expanded="false" title="Filter">
             <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
@@ -2397,6 +2767,29 @@ function telegramMiniAppHtml() {
       </section>
       <div class="meta" id="meta"></div>
       <div class="status" id="status">Loading...</div>
+      <section class="resultsPanel" id="resultsPanel" aria-label="Results">
+        <div class="resultsHeader">
+          <div class="sectionTitle">Results</div>
+          <button class="secondary" id="refreshResults" type="button">Refresh</button>
+        </div>
+        <div class="resultsSessionOptions" id="resultsSessionOptions"></div>
+        <div class="filterSummary" id="resultsSummary"></div>
+        <div class="resultColumns">
+          <section class="resultSection" aria-label="Most consensus questions">
+            <div class="sectionTitle">Most consensus</div>
+            <div class="resultList" id="consensusResults"></div>
+          </section>
+          <section class="resultSection" aria-label="Most divisive questions">
+            <div class="sectionTitle">Most divisive</div>
+            <div class="resultList" id="divisiveResults"></div>
+          </section>
+        </div>
+        <section class="resultSection" aria-label="Groups">
+          <div class="sectionTitle">Groups</div>
+          <div class="resultGroups" id="resultGroups"></div>
+        </section>
+        <section class="groupAnalysis" id="groupAnalysis" aria-label="Group analysis"></section>
+      </section>
       <section class="filterPanel" id="filterPanel" aria-label="Question filters">
         <div class="filterControls">
           <label class="toggle">
@@ -2473,10 +2866,15 @@ function telegramMiniAppHtml() {
       selectedSessionSlugs: new Set(),
       savedDraftKeys: new Set(),
       submittedAnswerKeys: new Set(),
+      submittedAnswersByQuestionKey: new Map(),
       showUnansweredFirst: readShowUnansweredFirst(),
       selectedQuestionTypes: new Set(),
       aiDraftQuery: '',
       aiSearchQuery: '',
+      resultsData: null,
+      resultsLoading: false,
+      resultsSessionSlug: '',
+      groupAnalysisById: {},
       sessionPickerCollapsed: false,
       sessionPickerInitialized: false,
       loadedOnce: false,
@@ -2491,6 +2889,15 @@ function telegramMiniAppHtml() {
       sessionOptions: document.getElementById('sessionOptions'),
       continueSessions: document.getElementById('continueSessions'),
       questionStack: document.getElementById('questionStack'),
+      showResults: document.getElementById('showResults'),
+      resultsPanel: document.getElementById('resultsPanel'),
+      refreshResults: document.getElementById('refreshResults'),
+      resultsSessionOptions: document.getElementById('resultsSessionOptions'),
+      resultsSummary: document.getElementById('resultsSummary'),
+      consensusResults: document.getElementById('consensusResults'),
+      divisiveResults: document.getElementById('divisiveResults'),
+      resultGroups: document.getElementById('resultGroups'),
+      groupAnalysis: document.getElementById('groupAnalysis'),
       showFilter: document.getElementById('showFilter'),
       filterPanel: document.getElementById('filterPanel'),
       filterUnansweredFirst: document.getElementById('filterUnansweredFirst'),
@@ -2509,6 +2916,7 @@ function telegramMiniAppHtml() {
     };
     const MIC_ICON = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z"></path><path d="M17 11a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V21a1 1 0 1 1-2 0v-3.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"></path></svg>';
     const STOP_ICON = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M7 7h10v10H7z"></path></svg>';
+    const CHECK_ICON = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg>';
     el.filterAiSearchMic.dataset.idleLabel = 'Dictate AI search';
     el.filterAiSearchMic.dataset.stopLabel = 'Stop recording AI search';
     el.filterAiSearchMic.innerHTML = MIC_ICON;
@@ -2518,11 +2926,77 @@ function telegramMiniAppHtml() {
       return out;
     };
     const selectedSessionQuery = () => Array.from(state.selectedSessionSlugs).filter(Boolean).join(',');
+    const selectedResultsSessions = () => {
+      const pickerSessions = Array.isArray(state.data?.sessionPicker?.sessions) ? state.data.sessionPicker.sessions : [];
+      const selected = Array.from(state.selectedSessionSlugs).filter(Boolean);
+      return selected.map((slug) => {
+        const session = pickerSessions.find((item) => item.sessionSlug === slug) || {};
+        return { sessionSlug: slug, sessionName: session.sessionName || slug };
+      });
+    };
+    const resetResultsForSelection = () => {
+      state.resultsData = null;
+      state.resultsSessionSlug = '';
+      state.groupAnalysisById = {};
+    };
     const activeQuestion = () => (state.data?.questions || []).find((question) => question.questionKey === state.activeKey) || null;
     const draftFor = (question) => {
       if (!question) return {};
       state.drafts[question.questionKey] = state.drafts[question.questionKey] || {};
       return state.drafts[question.questionKey];
+    };
+    const answerHasContent = (answer) => {
+      if (!answer || typeof answer !== 'object') return false;
+      if (Array.isArray(answer.values) && answer.values.length > 0) return true;
+      return ['value', 'text', 'comments'].some((key) => {
+        const value = answer[key];
+        return value !== undefined && value !== null && String(value).trim() !== '';
+      });
+    };
+    const submittedAnswerFor = (question) => state.submittedAnswersByQuestionKey.get(question?.questionKey) || null;
+    const answerLabelForQuestion = (question, answer = {}) => {
+      if (question?.questionType === 'agree_unsure_disagree') {
+        return ({ agree: 'Agree', unsure: 'Unsure', disagree: 'Disagree' })[String(answer.value || '')] || String(answer.value || '');
+      }
+      if (question?.questionType === 'rating') {
+        return answer.value === undefined || answer.value === null ? '' : String(answer.value);
+      }
+      if (question?.questionType === 'multichoice') {
+        return Array.isArray(answer.values) ? answer.values.join(', ') : '';
+      }
+      return String(answer.text || answer.value || '').trim();
+    };
+    const normalizeAnswerForCompare = (answer = {}) => JSON.stringify({
+      value: answer.value === undefined || answer.value === null ? '' : String(answer.value).trim(),
+      text: String(answer.text || '').trim(),
+      comments: String(answer.comments || '').trim(),
+      values: Array.isArray(answer.values) ? answer.values.map((value) => String(value).trim()).filter(Boolean).sort() : [],
+    });
+    const currentAnswerMatchesSubmitted = (question) => {
+      const submittedAnswer = submittedAnswerFor(question);
+      if (!submittedAnswer?.answer) return false;
+      return normalizeAnswerForCompare(answerPayload(question)) === normalizeAnswerForCompare(submittedAnswer.answer);
+    };
+    const applySubmitButtonState = (button, question, { busy = false } = {}) => {
+      if (!button) return;
+      const submittedCurrentAnswer = !busy && currentAnswerMatchesSubmitted(question);
+      button.classList.toggle('submittedCheck', submittedCurrentAnswer);
+      button.disabled = busy || !question?.canAnswer || submittedCurrentAnswer;
+      button.setAttribute('aria-busy', busy ? 'true' : 'false');
+      if (submittedCurrentAnswer) {
+        button.innerHTML = CHECK_ICON;
+        button.setAttribute('aria-label', 'Submitted');
+        button.title = 'Submitted';
+        return;
+      }
+      button.textContent = busy ? 'Submitting...' : 'Submit';
+      button.setAttribute('aria-label', busy ? 'Submitting answer' : 'Submit answer');
+      button.title = busy ? 'Submitting answer' : 'Submit answer';
+    };
+    const refreshQuestionSubmitButton = (question, sourceElement) => {
+      const card = sourceElement?.closest?.('.card');
+      const button = card?.querySelector?.('.submitButton');
+      applySubmitButtonState(button, question);
     };
     const questionAnswered = (question) => {
       if (state.submittedAnswerKeys.has(question?.questionKey)) return true;
@@ -2657,12 +3131,10 @@ function telegramMiniAppHtml() {
         load({ retry: true });
       }, QUESTION_RETRY_DELAY_MS);
     }
-    function setSubmitBusy(isBusy, triggerButton = null) {
+    function setSubmitBusy(isBusy, triggerButton = null, question = activeQuestion()) {
       state.submitting = isBusy;
       [triggerButton].filter(Boolean).forEach((button) => {
-        button.disabled = isBusy || !activeQuestion()?.canAnswer;
-        button.textContent = isBusy ? 'Submitting...' : 'Submit';
-        button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+        applySubmitButtonState(button, question, { busy: isBusy });
       });
       if (!isBusy) updateFooterControls();
     }
@@ -2701,8 +3173,10 @@ function telegramMiniAppHtml() {
         input.onchange = () => {
           if (input.checked) state.selectedSessionSlugs.add(session.sessionSlug);
           else state.selectedSessionSlugs.delete(session.sessionSlug);
+          resetResultsForSelection();
           el.continueSessions.disabled = state.selectedSessionSlugs.size === 0;
           renderSessionPicker();
+          renderResults();
         };
         const name = document.createElement('span');
         name.textContent = session.sessionName || session.sessionSlug;
@@ -2736,6 +3210,13 @@ function telegramMiniAppHtml() {
         prompt.className = 'prompt';
         prompt.textContent = question.prompt || question.title || '';
         head.append(meta, prompt);
+        const submittedAnswer = submittedAnswerFor(question);
+        if (submittedAnswer) {
+          const badge = document.createElement('div');
+          badge.className = 'answerBadge';
+          badge.textContent = 'Submitted answer: ' + (submittedAnswer.answerLabel || answerLabelForQuestion(question, submittedAnswer.answer || {}) || 'Saved');
+          head.appendChild(badge);
+        }
         const body = document.createElement('div');
         body.className = 'cardBody';
         renderAnswerControls(question, body);
@@ -2802,6 +3283,7 @@ function telegramMiniAppHtml() {
           activate(question);
           draft.value = Number(input.value);
           label.textContent = input.value;
+          refreshQuestionSubmitButton(question, input);
           updateFooterControls();
         };
         mount.append(label, input);
@@ -2833,6 +3315,7 @@ function telegramMiniAppHtml() {
           }
           activate(question);
           draft.text = input.value;
+          refreshQuestionSubmitButton(question, input);
           updateFooterControls();
         };
         const answerActions = document.createElement('div');
@@ -2866,6 +3349,7 @@ function telegramMiniAppHtml() {
         }
         activate(question);
         draft.comments = comments.value;
+        refreshQuestionSubmitButton(question, comments);
         updateFooterControls();
       };
       const commentActions = document.createElement('div');
@@ -2897,10 +3381,11 @@ function telegramMiniAppHtml() {
       };
       const submit = document.createElement('button');
       submit.type = 'button';
-      submit.className = 'primary';
-      submit.textContent = 'Submit';
+      submit.className = 'primary submitButton';
+      applySubmitButtonState(submit, question);
       submit.onclick = (event) => {
         event.stopPropagation();
+        if (currentAnswerMatchesSubmitted(question)) return;
         sendAnswer(true, question, submit);
       };
       actions.append(save, submit);
@@ -2937,6 +3422,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.text = textarea.value;
       activate(question);
+      refreshQuestionSubmitButton(question, textarea);
       updateFooterControls();
     }
     function showAnswerMicError(question, textarea, error) {
@@ -2973,6 +3459,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.comments = textarea.value;
       activate(question);
+      refreshQuestionSubmitButton(question, textarea);
       updateFooterControls();
     }
     function showCommentMicError(question, textarea, error) {
@@ -3456,9 +3943,118 @@ function telegramMiniAppHtml() {
       const data = state.data;
       el.meta.textContent = data ? questionCountText(data) : '';
       renderSessionPicker();
+      renderResults();
       renderFilters();
       renderAgentSettings();
       renderQuestionStack();
+    }
+    function appendEmptyResult(mount, message) {
+      const empty = document.createElement('div');
+      empty.className = 'resultRow';
+      const text = document.createElement('span');
+      text.textContent = message;
+      empty.appendChild(text);
+      mount.appendChild(empty);
+    }
+    function renderResultRows(mount, rows, emptyText, scoreKind) {
+      mount.innerHTML = '';
+      if (!rows.length) {
+        appendEmptyResult(mount, emptyText);
+        return;
+      }
+      rows.forEach((row, index) => {
+        const item = document.createElement('div');
+        item.className = 'resultRow';
+        const prompt = document.createElement('strong');
+        prompt.textContent = (index + 1) + '. ' + (row.prompt || 'Untitled question');
+        const counts = document.createElement('span');
+        counts.textContent = row.countsText || 'No counts yet';
+        const score = document.createElement('span');
+        score.textContent = scoreKind === 'consensus'
+          ? 'Consensus ' + row.consensusPercent + '% | responses ' + row.total
+          : 'Difference ' + row.differencePercent + '% | responses ' + row.total;
+        item.append(prompt, counts, score);
+        mount.appendChild(item);
+      });
+    }
+    function renderResultGroups(groups) {
+      el.resultGroups.innerHTML = '';
+      el.groupAnalysis.innerHTML = '';
+      if (!groups.length) {
+        appendEmptyResult(el.resultGroups, 'Not enough participant response data for groups yet.');
+        return;
+      }
+      groups.forEach((group) => {
+        const item = document.createElement('div');
+        item.className = 'resultGroup';
+        const title = document.createElement('strong');
+        title.textContent = group.label + ' (' + group.size + ')';
+        const theme = document.createElement('span');
+        theme.textContent = group.theme || 'Distinct answer pattern';
+        const aliases = document.createElement('span');
+        aliases.textContent = group.aliases?.length ? group.aliases.join(', ') : 'Participants hidden';
+        const analyze = document.createElement('button');
+        analyze.type = 'button';
+        analyze.className = 'secondary';
+        const analysisState = state.groupAnalysisById[group.groupId] || {};
+        analyze.textContent = analysisState.loading ? 'Analyzing...' : 'Analyze with AI';
+        analyze.disabled = analysisState.loading === true;
+        analyze.onclick = () => analyzeResultGroup(group.groupId);
+        item.append(title, theme, aliases, analyze);
+        el.resultGroups.appendChild(item);
+        if (analysisState.analysis || analysisState.error) {
+          const detail = document.createElement('div');
+          detail.className = 'resultRow';
+          const heading = document.createElement('strong');
+          heading.textContent = analysisState.analysis?.name || group.label;
+          const short = document.createElement('span');
+          short.textContent = analysisState.error || analysisState.analysis?.short || '';
+          const long = document.createElement('span');
+          long.textContent = analysisState.analysis?.long || '';
+          detail.append(heading, short, long);
+          el.groupAnalysis.appendChild(detail);
+        }
+      });
+    }
+    function renderResults() {
+      const sessions = selectedResultsSessions();
+      if (!state.resultsSessionSlug || !sessions.some((session) => session.sessionSlug === state.resultsSessionSlug)) {
+        state.resultsSessionSlug = sessions[0]?.sessionSlug || state.data?.session?.sessionSlug || '';
+      }
+      el.resultsSessionOptions.innerHTML = '';
+      sessions.forEach((session) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary' + (session.sessionSlug === state.resultsSessionSlug ? ' active' : '');
+        button.textContent = session.sessionName || session.sessionSlug;
+        button.onclick = () => {
+          state.resultsSessionSlug = session.sessionSlug;
+          state.resultsData = null;
+          state.groupAnalysisById = {};
+          loadResults({ force: true });
+        };
+        el.resultsSessionOptions.appendChild(button);
+      });
+      el.refreshResults.disabled = state.resultsLoading || !state.resultsSessionSlug;
+      if (state.resultsLoading) {
+        el.resultsSummary.textContent = 'Loading results...';
+      } else if (!state.resultsSessionSlug) {
+        el.resultsSummary.textContent = 'Select a session to view results.';
+      } else if (state.resultsData?.ok === false) {
+        el.resultsSummary.textContent = 'Could not load results: ' + (state.resultsData.error || 'results_unavailable');
+      } else if (state.resultsData) {
+        el.resultsSummary.textContent = state.resultsData.sessionName + ' | ' +
+          state.resultsData.responseCount + ' responses | ' +
+          state.resultsData.participantCount + ' participants | ' +
+          state.resultsData.binaryQuestionCount + ' binary questions';
+      } else {
+        el.resultsSummary.textContent = 'Open or refresh results for the selected session.';
+      }
+      const consensusRows = state.resultsData?.questions?.consensus || [];
+      const divisiveRows = state.resultsData?.questions?.divisive || [];
+      renderResultRows(el.consensusResults, consensusRows, 'No binary question responses yet.', 'consensus');
+      renderResultRows(el.divisiveResults, divisiveRows, 'No divisive binary question responses yet.', 'divisive');
+      renderResultGroups(state.resultsData?.groups || []);
     }
     function renderFilters() {
       el.filterUnansweredFirst.checked = state.showUnansweredFirst;
@@ -3517,26 +4113,34 @@ function telegramMiniAppHtml() {
         el.draftStyle.appendChild(opt);
       });
       el.telegramReminders.checked = values.telegramReminders === true;
+      const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
       el.savedDrafts.innerHTML = '';
-      const header = document.createElement('div');
-      header.className = 'savedDraftsHeader';
-      const title = document.createElement('strong');
-      title.textContent = 'Saved draft responses';
-      header.appendChild(title);
-      el.savedDrafts.appendChild(header);
+      const appendResponseSection = (titleText, rows, emptyText) => {
+        const section = document.createElement('div');
+        section.className = 'savedDraftsSection';
+        const header = document.createElement('div');
+        header.className = 'savedDraftsHeader';
+        const title = document.createElement('strong');
+        title.textContent = titleText;
+        header.appendChild(title);
+        section.appendChild(header);
+        if (!rows.length) {
+          const empty = document.createElement('div');
+          empty.textContent = emptyText;
+          section.appendChild(empty);
+        } else {
+          rows.forEach((answer) => {
+            const row = document.createElement('div');
+            row.textContent = 'Q' + answer.displayIndex + ': ' + answer.answerLabel;
+            section.appendChild(row);
+          });
+        }
+        el.savedDrafts.appendChild(section);
+      };
+      appendResponseSection('Submitted responses', submittedAnswers, 'No submitted responses yet.');
+      appendResponseSection('Saved draft responses', savedDrafts, 'No saved drafts yet.');
       el.clearDrafts.disabled = savedDrafts.length === 0;
-      if (!savedDrafts.length) {
-        const empty = document.createElement('div');
-        empty.textContent = 'No saved drafts yet.';
-        el.savedDrafts.appendChild(empty);
-      } else {
-        savedDrafts.forEach((draft) => {
-          const row = document.createElement('div');
-          row.textContent = 'Q' + draft.displayIndex + ': ' + draft.answerLabel;
-          el.savedDrafts.appendChild(row);
-        });
-      }
     }
     function answerPayload(question) {
       const draft = draftFor(question);
@@ -3550,10 +4154,11 @@ function telegramMiniAppHtml() {
       updateFooterControls();
       if (submit) {
         setStatus('');
-        setSubmitBusy(true, triggerButton);
+        setSubmitBusy(true, triggerButton, question);
       } else {
         setStatus('Saving draft...');
       }
+      const payload = answerPayload(question);
       let response;
       let body;
       try {
@@ -3563,17 +4168,17 @@ function telegramMiniAppHtml() {
           body: JSON.stringify({
             launch,
             questionKey: question.questionKey,
-            answer: answerPayload(question),
+            answer: payload,
             submit,
           }),
         });
         body = await response.json().catch(() => ({}));
       } catch (error) {
-        if (submit) setSubmitBusy(false, triggerButton);
+        if (submit) setSubmitBusy(false, triggerButton, question);
         setStatus('Could not save answer.', 'error');
         return;
       }
-      if (submit) setSubmitBusy(false, triggerButton);
+      if (submit) setSubmitBusy(false, triggerButton, question);
       if (!response.ok || !body.ok) {
         setStatus(body.message || body.error || 'Could not save answer.', 'error');
         return;
@@ -3582,6 +4187,21 @@ function telegramMiniAppHtml() {
         setStatus('Submitted.', 'ok');
         state.submittedAnswerKeys.add(question.questionKey);
         state.savedDraftKeys.delete(question.questionKey);
+        const submittedAnswer = {
+          questionKey: question.questionKey,
+          displayIndex: question.displayIndex,
+          sessionSlug: question.sessionSlug,
+          prompt: question.prompt || question.title || '',
+          answerLabel: answerLabelForQuestion(question, payload),
+          answer: { ...payload },
+        };
+        state.submittedAnswersByQuestionKey.set(question.questionKey, submittedAnswer);
+        if (state.data) {
+          const answers = Array.isArray(state.data.submittedAnswers) ? state.data.submittedAnswers : [];
+          state.data.submittedAnswers = answers
+            .filter((answer) => answer.questionKey !== question.questionKey)
+            .concat(submittedAnswer);
+        }
         if (Array.isArray(state.data?.savedDrafts)) {
           state.data.savedDrafts = state.data.savedDrafts.filter((draft) => draft.questionKey !== question.questionKey);
         }
@@ -3657,6 +4277,66 @@ function telegramMiniAppHtml() {
       render();
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
+    async function loadResults({ force = false } = {}) {
+      if (!state.resultsSessionSlug || (state.resultsLoading && !force)) return;
+      state.resultsLoading = true;
+      renderResults();
+      let response;
+      let body;
+      try {
+        const resultsUrl = new URL('/telegram/mini-app/api/results', location.origin);
+        resultsUrl.searchParams.set('launch', launch);
+        resultsUrl.searchParams.set('sessionSlug', state.resultsSessionSlug);
+        response = await fetch(resultsUrl.pathname + resultsUrl.search, { headers: headers() });
+        body = await response.json().catch(() => ({}));
+      } catch (error) {
+        state.resultsData = { ok: false, error: 'results_load_failed' };
+        state.resultsLoading = false;
+        renderResults();
+        return;
+      }
+      state.resultsData = response.ok && body.ok !== false
+        ? body
+        : { ok: false, error: body.error || 'results_load_failed' };
+      state.resultsLoading = false;
+      renderResults();
+    }
+    async function analyzeResultGroup(groupId) {
+      if (!state.resultsSessionSlug || !groupId) return;
+      state.groupAnalysisById[groupId] = { loading: true };
+      renderResults();
+      let response;
+      let body;
+      try {
+        response = await fetch('/telegram/mini-app/api/results', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({
+            launch,
+            action: 'analyze_group',
+            sessionSlug: state.resultsSessionSlug,
+            groupId,
+          }),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch (error) {
+        state.groupAnalysisById[groupId] = { loading: false, error: 'Could not analyze group.' };
+        renderResults();
+        return;
+      }
+      if (!response.ok || !body.ok) {
+        state.groupAnalysisById[groupId] = { loading: false, error: body.error || 'Could not analyze group.' };
+      } else {
+        state.groupAnalysisById[groupId] = {
+          loading: false,
+          analysis: body.analysis,
+          aiOk: body.aiOk === true,
+          reason: body.reason || '',
+        };
+        if (body.summary) state.resultsData = body.summary;
+      }
+      renderResults();
+    }
     async function load({ retry = false } = {}) {
       let response;
       let body;
@@ -3684,6 +4364,16 @@ function telegramMiniAppHtml() {
         (body.sessionPicker.selectedSessionSlugs || []).forEach((slug) => state.selectedSessionSlugs.add(slug));
       }
       state.submittedAnswerKeys = new Set((body.submittedAnswerKeys || []).filter(Boolean));
+      state.submittedAnswersByQuestionKey = new Map();
+      const serverSubmittedAnswers = Array.isArray(body.submittedAnswers) ? body.submittedAnswers : [];
+      serverSubmittedAnswers.forEach((entry) => {
+        const questionKey = String(entry?.questionKey || '').trim();
+        if (!questionKey) return;
+        state.submittedAnswersByQuestionKey.set(questionKey, entry);
+        if (entry.answer && !answerHasContent(state.drafts[questionKey])) {
+          state.drafts[questionKey] = { ...entry.answer };
+        }
+      });
       state.savedDraftKeys = new Set();
       const serverDrafts = body.draftAnswersByQuestionKey || {};
       Object.entries(serverDrafts).forEach(([questionKey, draft]) => {
@@ -3713,6 +4403,7 @@ function telegramMiniAppHtml() {
       if (!state.selectedSessionSlugs.size) return;
       state.activeKey = '';
       state.loadedOnce = false;
+      resetResultsForSelection();
       state.sessionPickerCollapsed = true;
       state.sessionPickerInitialized = true;
       load();
@@ -3730,6 +4421,12 @@ function telegramMiniAppHtml() {
     }
     el.showFilter.onclick = () => setPanelOpen(el.filterPanel, el.showFilter, !el.filterPanel.classList.contains('open'));
     el.showSettings.onclick = () => setPanelOpen(el.settingsPanel, el.showSettings, !el.settingsPanel.classList.contains('open'));
+    el.showResults.onclick = () => {
+      const open = !el.resultsPanel.classList.contains('open');
+      setPanelOpen(el.resultsPanel, el.showResults, open);
+      if (open && !state.resultsData && state.resultsSessionSlug) loadResults();
+    };
+    el.refreshResults.onclick = () => loadResults({ force: true });
     el.filterUnansweredFirst.onchange = () => {
       state.showUnansweredFirst = el.filterUnansweredFirst.checked;
       writeShowUnansweredFirst(state.showUnansweredFirst);
@@ -3796,6 +4493,9 @@ export async function handleTelegramMiniAppRequest({
   }
   if (url.pathname === '/telegram/mini-app/api/search' && request.method === 'POST') {
     return handleSearchRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/results' && ['GET', 'POST'].includes(request.method)) {
+    return handleResultsRequest({ request, env });
   }
   if (url.pathname === '/telegram/mini-app/api/settings' && request.method === 'POST') {
     return handleSettingsRequest({ request, env });
