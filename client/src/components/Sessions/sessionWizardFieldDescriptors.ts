@@ -46,7 +46,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'slug',
   'sessionName',
   'sessionInfo',
-  'sessionModeProfile',
+  'telegramOnly',
   'sessionHeader',
   'sessionEndsAt',
   'storageProfile',
@@ -84,8 +84,7 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   slug: 'This becomes the session URL. Leave it unlocked if you want to choose the URL yourself, or lock it to use the generated session ID as a more private link.',
   sessionName: 'The main name people will see for this session across the app.',
   sessionInfo: 'A short description people will see on the session page, cards, and headers.',
-  sessionModeProfile:
-    'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
+  telegramOnly: 'Marks this session as a Telegram-only session. The web client shows a Telegram-only notice instead of the normal session page, and the Telegram bridge only lists sessions with this flag.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
   sessionEndsAt:
@@ -121,7 +120,7 @@ const FIELD_LABELS: Record<string, string> = {
   slug: 'URL',
   sessionName: 'Session Name',
   sessionInfo: 'Session Description',
-  sessionModeProfile: 'Session Mode',
+  telegramOnly: 'Telegram-only session',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
   sessionEndsAt: 'Session end time',

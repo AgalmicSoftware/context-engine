@@ -76,6 +76,15 @@ const resolveAutoFeatureBySessionSlug = (metadata: Record<string, unknown> | nul
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
+const isTelegramOnlySessionConfig = (metadata: any) => (
+  metadata?.telegramOnly === true ||
+  metadata?.telegram_only === true ||
+  metadata?.sessionMode === 'telegram_only' ||
+  metadata?.telegramMode === 'telegram_only' ||
+  metadata?.telegram?.only === true ||
+  metadata?.telegram?.mode === 'telegram_only'
+);
+
 const isPerfCountersEnabled = () => {
   try {
     return (
@@ -2242,59 +2251,39 @@ class OnePageSession extends Component<any, any> {
     const fallbackSessionLabel = slug && String(slug).trim() ? String(slug).trim() : 'Session';
     const titleText = sessionName ? `${sessionName}` : fallbackSessionLabel;
     const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
-    const isTelegramSession = isOnePageTelegramBackendMode({
-      sessionConfig: resolvedSessionConfig,
-      telegramSessionMeta: this.state.telegramSessionMeta,
-      sessionSlug: displaySessionSlug,
-    });
-    const telegramLoginTarget = resolveAgentClientLoginIdentityTarget({
-      sessionConfig: resolvedSessionConfig,
-      sessionSlug: displaySessionSlug,
-    });
+    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
+    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
+    const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
+    const brandingSectionClassName = [
+      styles.brandingSection,
+      pileSubmitRailActive ? styles.brandingSectionWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
+    const titleContainerClassName = [
+      styles.titleContainer,
+      pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
+    ].filter(Boolean).join(' ');
+    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
 
-    if (isTelegramSession) {
+    if (telegramOnlySession) {
       return (
-        <OnePageSessionTelegramShell
-          account={this.props.account}
-          blockLimits={blockLimits}
-          contracts={contracts}
-          defaultTags={defaultTags}
-          disclaimersActive={this.state.disclaimersActive}
-          displaySessionSlug={displaySessionSlug}
-          filterState={this.state.filterState}
-          loginComplete={this.props.loginComplete}
-          network={routedNetwork}
-          networkChainId={routedNetworkChainId}
-          provider={this.props.provider}
-          questionResponsesNonce={this.props.questionResponsesNonce}
-          questionScanProgress={this.props.questionScanProgress}
-          resultsViewMode={this.state.resultsViewMode}
-          sessionHeader={sessionHeader}
-          sessionInfo={sessionInfo}
-          sessionName={sessionName}
-          telegramAgentQuestions={this.state.telegramAgentQuestions || []}
-          telegramAgentQuestionsStatus={this.state.telegramAgentQuestionsStatus}
-          telegramAgentResults={this.state.telegramAgentResults}
-          telegramAgentResultsStatus={this.state.telegramAgentResultsStatus}
-          telegramClientEnvelope={this.state.telegramClientEnvelope}
-          telegramPolisDataset={this.state.telegramPolisDataset}
-          telegramQuestionPileIndex={this.state.telegramQuestionPileIndex}
-          telegramQuestionSubmitError={this.state.telegramQuestionSubmitError}
-          telegramSessionMeta={this.state.telegramSessionMeta}
-          telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
-          telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
-          workerGroupSessionId={String(telegramLoginTarget.sessionId || '')}
-          workerGroupWorkerUrl={String(telegramLoginTarget.workerUrl || '')}
-          titleText={titleText}
-          onLogout={this.handleTelegramLogout}
-          onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
-          onQuestionPileIndexChange={(telegramQuestionPileIndex: number) =>
-            this.setState({ telegramQuestionPileIndex })
-          }
-          onRefresh={() => this.loadTelegramAgentData(true)}
-          onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
-          onSubmitAnswer={this.handleTelegramQuestionSubmit}
-        />
+        <div className={styles.onePageDemoContainer}>
+          <div className={styles.telegramOnlyShell}>
+            <div className={titleContainerClassName}>
+              <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+            </div>
+            <Alert
+              color="info"
+              className={styles.telegramOnlyNotice}
+              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
+              fade={false}
+            >
+              <strong>Telegram-only session</strong>
+              <span>
+                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
+              </span>
+            </Alert>
+          </div>
+        </div>
       );
     }
 
