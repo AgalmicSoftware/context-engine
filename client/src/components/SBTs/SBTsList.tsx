@@ -3302,7 +3302,7 @@ const SBTsList = ({
       return <div className={styles.sectionEmptyHint}>{`No featured ${t('sbtsLower')}.`}</div>;
     }
     return (
-      <div id={styles.featuredSBTsContainer}>
+      <div className={styles.featuredSBTsContainer}>
         {displayedFeatured.map(renderFeaturedSBTCard)}
       </div>
     );
