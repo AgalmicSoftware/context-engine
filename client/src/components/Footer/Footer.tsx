@@ -1,5 +1,4 @@
 import React from "react";
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
@@ -22,13 +21,6 @@ type FooterProps = {
 };
 
 class Footer extends React.Component<FooterProps> {
-  static propTypes = {
-    changeFocusedTab: PropTypes.func.isRequired,
-    toggleLoginModal: PropTypes.func.isRequired,
-    focusedTab: PropTypes.number,
-    loginModalToggled: PropTypes.bool,
-  };
-
   clickedSettingsLink = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     this.props.toggleLoginModal(true)
