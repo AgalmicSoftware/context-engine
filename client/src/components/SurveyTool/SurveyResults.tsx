@@ -4439,14 +4439,14 @@ return (
     >
       <div className={styles.headerLeft}>
         <div className={styles.responseCountContainer}>
-          <FontAwesomeIcon icon={faComments} id={styles.responseCountIcon} />
-          <span id={styles.responseCountNumber}>{viewableResponsesCount}</span>
+          <FontAwesomeIcon icon={faComments} className={styles.responseCountIcon} />
+          <span className={styles.responseCountNumber}>{viewableResponsesCount}</span>
         </div>
         <span className={styles.questionTitle}>
           {questionPrompt}
         </span>
       </div>
-      <div id={styles.questionSummaryHeaderIcons}>
+      <div className={styles.questionSummaryHeaderIcons}>
         <FontAwesomeIcon
           icon={faBookmark}
           className={styles.biggerIcon}
@@ -5419,10 +5419,10 @@ return (
             <>
 
          {/* The "Filter" button that toggles the QuestionFilter */}
-        <Button id={styles.questionFilterButton} onClick={this.toggleQuestionFilter}>
+        <Button className={styles.questionFilterButton} onClick={this.toggleQuestionFilter}>
           Filter
 
-          <FontAwesomeIcon icon={faFilter} id={styles.questionFilterIcon} />
+          <FontAwesomeIcon icon={faFilter} className={styles.questionFilterIcon} />
 
            {isFilterActive && (
             <span className={styles.clearFilterIcon} onClick={this.handleClearFiltersFromParent}>

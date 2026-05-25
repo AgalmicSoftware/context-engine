@@ -493,7 +493,7 @@ describe('SurveyResults module styles', () => {
 
     expect(scss).toMatch(/\.toggleLabel\s*{[\s\S]*?color:\s*#1f2733;/);
     expect(scss).toMatch(/\.exportAndFilterContainer\s*{[\s\S]*?background:\s*#f3f5f9;/);
-    expect(scss).toMatch(/#questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/);
+    expect(scss).toMatch(/\.questionFilterButton\s*{[\s\S]*?background-color:\s*#1f2733 !important;[\s\S]*?color:\s*#f8fafc !important;/);
     expect(scss).toMatch(/\.filterSummaryBox\s*{[\s\S]*?color:\s*#4b5563;/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?border:\s*1px solid rgba\(19,\s*34,\s*86,\s*0\.2\);/);
