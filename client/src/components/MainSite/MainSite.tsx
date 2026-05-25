@@ -740,6 +740,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     setState: this.setRecordStateFromController,
     isMounted: () => this._mounted,
     resolveActiveSlug: () => this.resolveActiveSlugForCacheUpdates(),
+    getSessionSlugFromState: () => this.getSessionSlugFromState(),
+    getCurrentPathname: () => this.getCurrentPathname(),
     checkAllCachesReady: () => this.checkAllCachesReady(),
     syncCacheHasLoadedFlagFromPersistent: (
       slug: string,
@@ -751,6 +753,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       survey: !!this._surveyCacheController?.isInitInFlight?.(slug),
       response: !!this._responseHydrationController?.isInitInFlight?.(slug),
     }),
+    shouldAutoRunFullSbtScan: (opts: { pathname: string }) => this.shouldAutoRunFullSbtScan(opts),
+    initializeSbtCache: (opts: { mode: 'auto' | 'partial' | 'full' }) => this.initializeSbtCache(opts),
+    startSbtEventListener: () => this.startSbtEventListener(),
   });
 
   _cachePersistenceController: SessionCachePersistenceController = createSessionCachePersistenceController({
@@ -4619,42 +4624,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this.checkAllCachesReady();
   };
 
-  checkAllCachesReady = () => {
-    const { isSBTCacheReady, isSurveyCacheReady, isQuestionCacheReady } = this.state;
-    const nextIsAllReady = !!(isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady);
-
-    const slug = this.getSessionSlugFromState();
-
-    this.setState((prev: MainSiteState) => {
-      if (prev.isAllCachesReady === nextIsAllReady) return null;
-      return { isAllCachesReady: nextIsAllReady };
-    });
-    void this.syncCacheHasLoadedFlagOnTransition(slug, { isAllReady: nextIsAllReady });
-
-    // Deferred full SBT scan trigger (demo-only)
-    const pathname = this.getCurrentPathname();
-    const onDemo = pathname.startsWith('/session/');
-    if (!onDemo) return;
-
-    const shouldKickOff =
-      isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady &&
-      this.readFlag('sbt:deferredFullScanNeeded', slug) &&
-      !this.readFlag('sbt:fullScanInProgress', slug);
-
-    if (shouldKickOff) {
-      (async () => {
-        try {
-          if (!this.shouldAutoRunFullSbtScan({ pathname })) return;
-          mainSiteLog.log('[SBT Deferred] Kicking off full scan after questions & surveys are ready...');
-          await this.initializeSbtCache({ mode: 'full' });
-          this.startSbtEventListener();
-          mainSiteLog.log('[SBT Deferred] Full scan complete; listener started.');
-        } catch (e) {
-          mainSiteLog.error('[SBT Deferred] Full scan failed:', e);
-        }
-      })();
-    }
-  };
+  checkAllCachesReady: SessionCacheReadinessController['checkAllCachesReady'] =
+    (...args) => this._cacheReadinessController.checkAllCachesReady(...args);
 
   ensureSessionRouteSbtDiscovery: SessionSbtCacheController['ensureSessionRouteSbtDiscovery'] =
     (...args) => this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
