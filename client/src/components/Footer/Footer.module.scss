@@ -1,7 +1,7 @@
 /* ---------------------------------------------------- Footer.tsx ---------------------------------------------------- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -21,7 +21,7 @@
         width: 100%;
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -30,7 +30,7 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -50,7 +50,7 @@
         width: 100%;
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -59,7 +59,7 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -79,7 +79,7 @@
         width: 100%;
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -88,7 +88,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #footer {
+  .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -101,7 +101,7 @@
     border-left-width: 0px;
     border-right-width: 0px;
     background: transparent;
-    #copyright {
+    .copyright {
       justify-self: flex-end;
       font-family: inherit;
     }
@@ -109,7 +109,7 @@
 }
 
 @media (min-width: 1367px) {
-  #footer {
+  .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -122,7 +122,7 @@
     border-left-width: 0px;
     border-right-width: 0px;
     background: transparent;
-    #copyright {
+    .copyright {
       justify-self: flex-end;
       font-family: inherit;
       color: #ffffff5e;
@@ -130,14 +130,14 @@
   }
 }
 
-#footer {
+.footer {
   margin-top: 3%;
-  #copyright {
+  .copyright {
     font-size: 1rem;
   }
 }
 
-#footerLink {
+.footerLink {
   font-size: 1rem;
   margin-left: 5px;
   margin-right: 5px;
