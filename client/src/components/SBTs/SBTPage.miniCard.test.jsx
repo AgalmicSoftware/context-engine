@@ -57,6 +57,10 @@ const flattenText = (node) => {
   return '';
 };
 
+const nodeHasClassName = (node, className) => String(node?.props?.className || '')
+  .split(/\s+/)
+  .includes(className);
+
 const renderMiniCardNode = (props = {}) => {
   const sbtAddress = '0x00000000000000000000000000000000000000f1';
   const subject = createSubject({
@@ -129,13 +133,13 @@ describe('SBTPage mini-card', () => {
     mockIsCryptoMode.mockReturnValue(false);
     const { cardNode } = renderMiniCardNode();
 
-    expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
+    expect(findElementInTree(cardNode, (element) => nodeHasClassName(element, styles.miniSbtAddress))).toBeNull();
   });
 
   it('shows the mini-card address in crypto mode', () => {
     mockIsCryptoMode.mockReturnValue(true);
     const { cardNode, sbtAddress } = renderMiniCardNode();
-    const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
+    const addressNode = findElementInTree(cardNode, (element) => nodeHasClassName(element, styles.miniSbtAddress));
 
     expect(addressNode).not.toBeNull();
     expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
