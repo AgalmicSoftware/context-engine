@@ -10,7 +10,7 @@
     "test utility directories/files"
   ],
   "counts": {
-    "tsNocheck": 7,
+    "tsNocheck": 5,
     "colonAny": 1032,
     "asAny": 73,
     "promiseAny": 33,
