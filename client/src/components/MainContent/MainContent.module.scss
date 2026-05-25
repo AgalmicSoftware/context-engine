@@ -152,25 +152,25 @@
 /* --- OnboardingWalkthrough --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #onboardingWalkthrough {
+  .onboardingWalkthrough {
     display: flex;
     flex-direction: column;
     padding-right: 0px;
     padding-left: 0px;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     justify-content: center;
     align-items: center;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     padding-top: 10px;
     padding-bottom: 10px;
     font-size: 2em;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -178,7 +178,7 @@
     min-height: 50px;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     font-size: 0.85em;
   }
 
@@ -194,14 +194,14 @@
     color: var(--ce-color-white);
   }
 
-  #takeSurveyIcon {
+  .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
     font-size: 45px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     width: 100%;
     padding-top: 5px;
     padding-bottom: 5px;
@@ -230,7 +230,7 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #onboardingWalkthrough {
+  .onboardingWalkthrough {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -239,18 +239,18 @@
     min-height: 525px;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     justify-content: center;
     align-items: center;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     padding-top: 10px;
     padding-bottom: 10px;
     font-size: 2em;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -258,7 +258,7 @@
     min-height: 50px;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     font-size: 0.85em;
   }
 
@@ -274,14 +274,14 @@
     color: var(--ce-color-white);
   }
 
-  #takeSurveyIcon {
+  .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
     font-size: 55px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     width: 100%;
     padding-top: 5px;
     padding-bottom: 5px;
@@ -310,25 +310,25 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #onboardingWalkthrough {
+  .onboardingWalkthrough {
     display: flex;
     flex-direction: column;
     padding-right: 0px;
     padding-left: 0px;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     justify-content: center;
     align-items: center;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     padding-top: 20px;
     padding-bottom: 20px;
     font-size: 2.5em;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -336,7 +336,7 @@
     min-height: 75px;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     font-size: 1.25em;
   }
 
@@ -352,14 +352,14 @@
     color: var(--ce-color-white);
   }
 
-  #takeSurveyIcon {
+  .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
     font-size: 55px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     width: 100%;
     height: 75px;
     padding-top: 5px;
@@ -389,7 +389,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #onboardingWalkthrough {
+  .onboardingWalkthrough {
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -398,11 +398,11 @@
     min-height: 600px;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     align-items: center;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     align-self: center;
     font-weight: 600;
     color: #ffffff2e;
@@ -413,7 +413,7 @@
     font-size: 3em;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
     flex-direction: row;
     justify-content: center;
@@ -421,7 +421,7 @@
     min-height: 75px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     height: 80px;
     padding-top: 5px;
     padding-bottom: 5px;
@@ -440,7 +440,7 @@
     align-items: center;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     font-size: 1.35em;
   }
 
@@ -456,14 +456,14 @@
     color: var(--ce-color-white);
   }
 
-  #takeSurveyIcon {
+  .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
     font-size: 55px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     width: 100%;
     padding-top: 5px;
     padding-bottom: 5px;
@@ -494,7 +494,7 @@
 }
 
 @media (min-width: 1367px) {
-  #onboardingWalkthrough {
+  .onboardingWalkthrough {
     display: flex;
     flex-direction: row;
     padding-right: 0px;
@@ -503,13 +503,13 @@
     align-items: center;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     width: 100%;
     align-items: flex-start;
     justify-content: flex-end;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     align-self: flex-start;
     font-weight: 600;
     color: #ffffff2e;
@@ -520,7 +520,7 @@
     font-size: 4.25em;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -530,11 +530,11 @@
     height: 500px;
   }
 
-  #sidebarOpen {
+  .sidebarOpen {
     height: 100%;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     font-size: 1.75em;
     border-style: solid;
     border-color: transparent;
@@ -554,14 +554,14 @@
     color: var(--ce-color-white);
   }
 
-  #takeSurveyIcon {
+  .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
     margin-right: 5px;
     font-size: 80px;
   }
 
-  #takeSurveyButton {
+  .takeSurveyButton {
     height: 100%;
     width: 100%;
     padding-top: 5px;
@@ -593,13 +593,13 @@
   filter: opacity(1) !important;
 }
 
-#onboardingWalkthrough {
+.onboardingWalkthrough {
   display: flex;
   align-content: center;
   height: 100%;
   background: #0a0a0c7d;
 
-  #onboardingTitleArea {
+  .onboardingTitleArea {
     display: flex;
     flex-direction: column;
     flex-wrap: wrap;
@@ -607,14 +607,14 @@
     align-self: center;
   }
 
-  #onboardingTitle {
+  .onboardingTitle {
     font-weight: 700;
     color: #ffffff8a;
     text-transform: uppercase;
     margin-bottom: 0px;
   }
 
-  #onboardingInfo {
+  .onboardingInfo {
     display: flex;
     flex-direction: column;
     background-size: auto;
@@ -622,15 +622,15 @@
     // justify-content: space-between;
   }
 
-  #onboardingControls {
+  .onboardingControls {
     display: flex;
   }
 
-  #sidebarOpen {
+  .sidebarOpen {
     width: 100%;
   }
 
-  #openSidebarButton {
+  .openSidebarButton {
     width: 100%;
     height: 100%;
     cursor: pointer;
@@ -643,7 +643,7 @@
   }
 }
 
-#takeSurveyButton {
+.takeSurveyButton {
   color: #000000a6;
   border: none;
   background: #07c0f929;
