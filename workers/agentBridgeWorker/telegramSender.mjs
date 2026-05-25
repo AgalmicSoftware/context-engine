@@ -1,4 +1,5 @@
 const TELEGRAM_API_BASE_URL = 'https://api.telegram.org';
+const DEFAULT_TELEGRAM_API_TIMEOUT_MS = 8000;
 
 function safeString(value) {
   return String(value || '').trim();
@@ -35,11 +36,41 @@ async function readTelegramResponseBody(response) {
   }
 }
 
+function normalizeTimeoutMs(value = DEFAULT_TELEGRAM_API_TIMEOUT_MS) {
+  const ms = Number(value);
+  if (Number.isFinite(ms) && ms >= 1) return Math.floor(ms);
+  return DEFAULT_TELEGRAM_API_TIMEOUT_MS;
+}
+
+async function fetchTelegramWithTimeout(fetchImpl, url, init = {}, timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS) {
+  const ms = normalizeTimeoutMs(timeoutMs);
+  const controller = typeof AbortController === 'function' ? new AbortController() : null;
+  let timeout = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeout = setTimeout(() => {
+      if (controller) controller.abort();
+      reject(new Error('telegram_api_timeout'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([
+      fetchImpl(url, {
+        ...init,
+        ...(controller ? { signal: controller.signal } : {}),
+      }),
+      timeoutPromise,
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function telegramBotApiRequest({
   botToken = '',
   method = '',
   payload = {},
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   let url;
   try {
@@ -54,13 +85,13 @@ export async function telegramBotApiRequest({
 
   let response;
   try {
-    response = await fetchImpl(url, {
+    response = await fetchTelegramWithTimeout(fetchImpl, url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json; charset=utf-8',
       },
       body: JSON.stringify(payload || {}),
-    });
+    }, timeoutMs);
   } catch (error) {
     return {
       ok: false,
@@ -92,6 +123,7 @@ export async function telegramBotApiFormDataRequest({
   method = '',
   formData = null,
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   let url;
   try {
@@ -106,10 +138,10 @@ export async function telegramBotApiFormDataRequest({
 
   let response;
   try {
-    response = await fetchImpl(url, {
+    response = await fetchTelegramWithTimeout(fetchImpl, url, {
       method: 'POST',
       body: formData,
-    });
+    }, timeoutMs);
   } catch (error) {
     return {
       ok: false,
@@ -144,6 +176,7 @@ export async function sendTelegramMessage({
   parseMode = '',
   disableWebPagePreview = true,
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   const payload = {
     chat_id: chatId,
@@ -157,6 +190,7 @@ export async function sendTelegramMessage({
     method: 'sendMessage',
     payload,
     fetchImpl,
+    timeoutMs,
   });
 }
 
@@ -168,6 +202,7 @@ export async function sendTelegramPhoto({
   replyMarkup = null,
   parseMode = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   const form = new FormData();
   form.append('chat_id', safeString(chatId));
@@ -186,6 +221,7 @@ export async function sendTelegramPhoto({
     method: 'sendPhoto',
     formData: form,
     fetchImpl,
+    timeoutMs,
   });
 }
 
@@ -197,6 +233,7 @@ export async function sendTelegramDocument({
   replyMarkup = null,
   parseMode = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   const form = new FormData();
   form.append('chat_id', safeString(chatId));
@@ -219,6 +256,7 @@ export async function sendTelegramDocument({
     method: 'sendDocument',
     formData: form,
     fetchImpl,
+    timeoutMs,
   });
 }
 
@@ -231,6 +269,7 @@ export async function editTelegramMessageText({
   parseMode = '',
   disableWebPagePreview = true,
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   const payload = {
     chat_id: chatId,
@@ -245,6 +284,7 @@ export async function editTelegramMessageText({
     method: 'editMessageText',
     payload,
     fetchImpl,
+    timeoutMs,
   });
 }
 
@@ -255,6 +295,7 @@ export async function answerTelegramCallbackQuery({
   showAlert = false,
   cacheTime = 0,
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
 } = {}) {
   const payload = {
     callback_query_id: safeString(callbackQueryId),
@@ -267,6 +308,7 @@ export async function answerTelegramCallbackQuery({
     method: 'answerCallbackQuery',
     payload,
     fetchImpl,
+    timeoutMs,
   });
 }
 

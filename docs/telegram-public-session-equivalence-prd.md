@@ -1,6 +1,7 @@
 # Telegram Public Session Equivalence PRD
 
 Related PRD: [Telegram Response Export Scope](./telegram-response-export-scope-prd.md)
+Related PRD: [Telegram Cloudflare 500-User Scale](./telegram-cloudflare-500-user-scale-prd.md)
 
 ## Problem
 
@@ -17,6 +18,10 @@ surface-specific paths.
   App.
 - Telegram enablement controls Telegram availability only. It must not change
   whether public content is visible in the CE client.
+- `telegram_only` sessions are an explicit temporary exception: they are
+  authored from `/session/new`, listed by the Telegram bridge, and intentionally
+  blocked from the normal CE client session UI until the Cloudflare-native
+  Telegram path has full client parity.
 - Storage backend is not user-visible when the payload access mode is public.
   Arweave and Cloudflare `public_read` sessions should present equivalent
   content.
@@ -58,7 +63,15 @@ surface-specific paths.
 - `lit_encrypted` means the payload envelope is encrypted and should display as
   `Encrypted` until the viewer can decrypt.
 - Telegram session lists show only sessions where `telegramBridgeEnabled` is
-  true. The CE client may show any session the client route normally supports.
+  true and `telegramOnly` is true while the temporary Cloudflare-native
+  Telegram mode is active. The CE client may show any standard session the
+  client route normally supports.
+- `telegramOnly = true` writes `sessionMode = "telegram_only"` metadata and
+  causes the normal `/session/<slug>` client route to show a
+  `Telegram-only session` notice instead of rendering questions/results.
+- Telegram-only question loading must prefer preloaded Cloudflare/session-policy
+  question lists over chain event scans. Chain-backed public session parity is
+  still covered by the normal equivalence matrix below.
 - Test-only spam filtering such as hiding `e2e` sessions is temporary and must
   be replaced by a durable session visibility flag.
 - Temporary Telegram results exception: joined Telegram-enabled sessions can
@@ -78,6 +91,7 @@ surface-specific paths.
 | Cloudflare `lit_encrypted` ineligible viewer | Shows `Encrypted` | Shows encrypted/required SBT message | Shows encrypted/required SBT message |
 | Payload missing/indexing | Shows `Unavailable` with retry/refresh affordance | Shows unavailable/retry state | Shows unavailable/retry state |
 | Temporary Telegram results | Hidden until fuller client parity | Joined Telegram-enabled sessions can view result cards | Joined Telegram-enabled sessions can view result cards when exposed |
+| `telegram_only` Cloudflare-native session | Shows `Telegram-only session` notice | Listed and answered in Telegram without chain question discovery | Listed and answered in Mini App without chain question discovery |
 
 ## Requirements
 
@@ -91,7 +105,7 @@ surface-specific paths.
 - The Telegram worker question index must preserve payload access mode and
   payload-unavailable state separately from encryption state.
 - Mini App state must accept no-session launches and show a session picker with
-  Telegram-enabled sessions.
+  Telegram-only sessions.
 - Counts must use the same definitions across surfaces: total discovered,
   answerable, locked, unavailable.
 - Regression tests must cover at least one public Arweave session, one
@@ -104,8 +118,9 @@ surface-specific paths.
   require the operator to choose between public and gated prompts every time?
 - Should public response summaries be controlled by the same
   `payloadAccessControl.mode`, or by a separate response visibility setting?
-- What is the final durable metadata flag for Telegram visibility, replacing
-  the temporary `e2e` name filter?
+- When client parity is complete, should `telegramOnly` be migrated into a more
+  general `channelVisibility`/`supportedSurfaces` field and allow the normal
+  client route to render Cloudflare-native sessions?
 - Should a Telegram-managed account be allowed to unlock `worker_sbt_gate`
   client views through a client-side Telegram sign-in handoff, or should those
   views remain Telegram-only until full CE account linking exists?

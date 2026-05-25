@@ -53,6 +53,20 @@ function telegramWebhookRequest(update = {}) {
   });
 }
 
+async function withTimeout(promise, ms = 100, message = 'operation timed out') {
+  let timeout = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function telegramMessageUpdate(text, {
   updateId = 1000,
   messageId = 10,
@@ -248,7 +262,7 @@ test('worker preview update exercises command builder without Telegram network c
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -266,6 +280,27 @@ test('worker preview update exercises command builder without Telegram network c
   assert.equal(JSON.stringify(body).includes('TELEGRAM_BOT_TOKEN'), false);
 });
 
+test('worker serves short-lived Telegram result photos from KV', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:result-photo:cecb_1234567890abcdef', JSON.stringify({
+    version: 1,
+    id: 'cecb_1234567890abcdef',
+    filename: 'results.png',
+    contentType: 'image/png',
+    bytesBase64: Buffer.from([137, 80, 78, 71]).toString('base64'),
+    createdAt: '2026-05-24T12:00:00.000Z',
+  }));
+
+  const response = await worker.fetch(new Request('https://bridge.example/telegram/result-photo/cecb_1234567890abcdef'), {
+    AGENT_ACTION_KV: kv,
+  });
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(bytes), [137, 80, 78, 71]);
+});
+
 test('worker Mini App state and draft endpoints use opaque question actions', async () => {
   const kv = new MemoryKv();
   const bytes32QuestionId = `0x${'12'.repeat(32)}`;
@@ -276,7 +311,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: bytes32QuestionId, questionType: 'rating', prompt: 'How strong is the signal?' },
@@ -451,7 +486,7 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sponsoredFaucetAllowed: true,
         sessionWorkerUrl: 'https://session.example',
@@ -541,7 +576,7 @@ test('worker Mini App submit returns actionable worker auth failure details', as
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sessionWorkerUrl: 'https://session.example',
         surveysAddress: '0x1111111111111111111111111111111111111111',
@@ -616,7 +651,7 @@ test('worker Mini App retries failed direct submit records instead of replaying 
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sessionWorkerUrl: 'https://session.example',
         surveysAddress: '0x1111111111111111111111111111111111111111',
@@ -704,7 +739,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-first', questionType: 'rating', prompt: 'How strong is the first signal?' },
@@ -861,7 +896,7 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-rating', questionType: 'rating', prompt: 'How strong is the signal?' },
@@ -1019,6 +1054,41 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
   assert.equal(JSON.stringify(body).includes('webhook-secret'), false);
 });
 
+test('worker Telegram webhook defers Telegram sends when waitUntil is available', async () => {
+  const telegramCalls = [];
+  const request = telegramWebhookRequest({
+    update_id: 103,
+    message: {
+      text: '/start',
+      chat: { id: 55, type: 'private' },
+      from: { id: 77, username: 'demo_user' },
+    },
+  });
+  const waited = [];
+
+  const response = await withTimeout(worker.fetch(request, {
+    TELEGRAM_BRIDGE_ENABLED: 'true',
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    TELEGRAM_FETCH: async (...args) => {
+      telegramCalls.push(args);
+      return new Promise(() => {});
+    },
+  }, {
+    waitUntil: (promise) => waited.push(promise),
+  }), 100, 'webhook waited on Telegram send');
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.telegram.ok, true);
+  assert.equal(body.telegram.queued, true);
+  assert.equal(waited.length, 1);
+  assert.equal(telegramCalls.length, 1);
+  assert.equal(String(telegramCalls[0][0]).includes('/sendMessage'), true);
+});
+
 test('worker Telegram webhook mocked live-bot smoke covers core commands with safe opaque payloads', async () => {
   const kv = new MemoryKv();
   const telegramCalls = [];
@@ -1050,14 +1120,14 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },

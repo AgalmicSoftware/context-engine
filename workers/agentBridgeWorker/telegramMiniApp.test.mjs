@@ -183,7 +183,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /<h1>Context Engine<\/h1>[\s\S]*<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">[\s\S]*<div class="meta" id="meta"><\/div>/);
   assert.match(html, /<section class="layout">\s*<section class="questionStack" id="questionStack" aria-label="Questions"><\/section>\s*<\/section>/);
   assert.match(html, /startCommentDictation/);
+  assert.match(html, /startAnswerDictation/);
   assert.match(html, /startSearchDictation/);
+  assert.match(html, /Dictate answer/);
   assert.match(html, /Dictate additional comments/);
   assert.match(html, /Dictate AI search/);
   assert.match(html, /const MIC_ICON = '<svg/);
@@ -192,6 +194,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /Transcribing microphone audio/);
   assert.match(html, /Transcribing search audio/);
   assert.match(html, /function setCommentMicFeedback/);
+  assert.match(html, /function setAnswerMicFeedback/);
   assert.match(html, /function setSearchMicFeedback/);
   assert.equal(html.includes("mic.textContent = 'Mic';"), false);
   assert.equal(html.includes("button.textContent = 'Stop';"), false);
@@ -237,10 +240,10 @@ test('Mini App session picker lists sessions and loads multi-selected questions'
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true },
-        { sessionSlug: 'e2e-spam', sessionName: 'E2E Spam', telegramBridgeEnabled: true },
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'e2e-spam', sessionName: 'E2E Spam', telegramBridgeEnabled: true, telegramOnly: true },
         { sessionSlug: 'hidden', sessionName: 'Hidden', telegramBridgeEnabled: false },
-        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
       ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -287,8 +290,8 @@ test('Mini App keeps multi-select sessions visible after a joined-session launch
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true },
-        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true },
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
       ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -345,8 +348,8 @@ test('Mini App falls back to session picker when launch session is not selectabl
       AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
         defaultSessionSlug: 'alpha',
         sessions: [
-          { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true },
-          { sessionSlug: 'e2e-old', sessionName: 'E2E Old', telegramBridgeEnabled: true },
+          { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+          { sessionSlug: 'e2e-old', sessionName: 'E2E Old', telegramBridgeEnabled: true, telegramOnly: true },
         ],
       }),
     },
@@ -399,6 +402,10 @@ test('Mini App state pre-populates previously saved answers and exposes them in 
     env: {
       AGENT_ACTION_KV: kv,
       AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
         sessionSlug: 'alpha',
@@ -438,6 +445,10 @@ test('Mini App clear drafts endpoint deletes saved draft answers for visible que
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
       sessionSlug: 'alpha',
@@ -501,6 +512,10 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
   const env = {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
       sessionSlug: 'alpha',
@@ -550,7 +565,7 @@ test('Mini App search falls back to semantic food-preference matching when AI is
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sponsoredAiAllowed: false,
       }],
     }),
@@ -589,7 +604,7 @@ test('Mini App search ranks questions through the session worker AI route when a
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sponsoredAiAllowed: true,
         sessionWorkerUrl: 'https://session.example',
       }],
@@ -678,7 +693,7 @@ test('Mini App transcribe endpoint forwards microphone audio through the session
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sponsoredAiAllowed: true,
         sessionWorkerUrl: 'https://session.example',
       }],
@@ -758,7 +773,7 @@ test('Mini App transcribe endpoint accepts session-scoped AI search dictation wi
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sponsoredAiAllowed: true,
         sessionWorkerUrl: 'https://session.example',
       }],

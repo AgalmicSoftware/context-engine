@@ -16,6 +16,12 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
+function normalizeBool(value = false) {
+  if (value === true) return true;
+  const normalized = safeString(value).toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(normalized);
+}
+
 function normalizeRisk(value = RISK_CEILINGS.READ) {
   const risk = safeString(value).toLowerCase();
   return Object.hasOwn(RISK_RANK, risk) ? risk : RISK_CEILINGS.READ;
@@ -82,10 +88,17 @@ export function normalizeSessionPolicy(input = {}) {
     ? input.sessions
     : (Array.isArray(input.linkedSessions) ? input.linkedSessions : []);
   const linkedSessions = sessions.map((session) => ({
+    sessionMode: safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase(),
     sessionSlug: safeString(session.sessionSlug || session.slug || session.name).toLowerCase(),
     sessionName: safeString(session.sessionName || session.name || session.slug),
     default: session.default === true,
     telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
+    telegramOnly: (
+      normalizeBool(session.telegramOnly) ||
+      normalizeBool(session.telegram_only) ||
+      normalizeBool(session.telegram?.only) ||
+      safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase() === 'telegram_only'
+    ),
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,
     sponsoredAiAllowed: session.sponsoredAiAllowed === true,
     sponsoredRpcAllowed: session.sponsoredRpcAllowed === true,
@@ -93,6 +106,14 @@ export function normalizeSessionPolicy(input = {}) {
     sbtJoinModes: Array.isArray(session.sbtJoinModes) ? session.sbtJoinModes.slice() : ['public'],
     requiredSbtGroups: normalizeRequiredSbtGroups(session),
     docLibraryEnabled: session.docLibraryEnabled === true,
+    questions: Array.isArray(session.questions)
+      ? session.questions.slice()
+      : (Array.isArray(session.telegramQuestions) ? session.telegramQuestions.slice() : []),
+    storageProfile: (
+      session.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
+        ? { ...session.storageProfile }
+        : null
+    ),
     defaultGroupChatId: safeString(session.defaultGroupChatId || input.defaultGroupChatId) || null,
     sessionWorkerUrl: safeString(
       session.sessionWorkerUrl ||

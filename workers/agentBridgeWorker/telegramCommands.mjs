@@ -48,6 +48,12 @@ import {
   removeResponseExportAllowedAddress,
 } from './telegramResponseExport.mjs';
 import {
+  buildQueuedSubmitRecord,
+  queueTelegramSubmitRecord,
+  SUBMITTED_RESULT_STATUSES,
+  telegramSubmitQueueEnabled,
+} from './telegramSubmitQueue.mjs';
+import {
   normalizeTelegramGroup,
   normalizeTelegramMockUpdate,
   normalizeTelegramPrincipal,
@@ -65,14 +71,18 @@ const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
 const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
+const RESULT_PHOTO_KV_PREFIX = 'telegram:result-photo:';
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
 const TELEGRAM_RESULTS_PAGE_SIZE = 3;
 const TELEGRAM_BUTTON_LABEL_MAX_BYTES = 64;
+const DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS = 2500;
+const DEFAULT_TELEGRAM_ONLY_STORAGE_TIMEOUT_MS = 5000;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const ANSWER_BUTTON_CONTROL_TYPES = new Set([
   'agree_unsure_disagree',
@@ -139,6 +149,24 @@ function safeString(value) {
 
 function lower(value) {
   return safeString(value).toLowerCase();
+}
+
+function bytesToBase64(bytes = new Uint8Array()) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value = '') {
+  const binary = atob(safeString(value));
+  const out = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    out[index] = binary.charCodeAt(index);
+  }
+  return out;
 }
 
 function nowIso(now = null) {
@@ -351,15 +379,104 @@ async function loadSessionPolicy(env = {}, {
 function loadDemoQuestions(env = {}) {
   const parsed = safeJsonParse(env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON, null);
   const questions = Array.isArray(parsed) ? parsed : [DEFAULT_QUESTION];
-  const normalized = questions
-    .filter((entry) => entry && typeof entry === 'object')
-    .map((entry, index) => ({
-      ...entry,
-      questionId: questionId(entry) || `question-demo-${index + 1}`,
-      prompt: questionText(entry),
-    }));
+  const normalized = normalizePreloadedQuestionRecords(questions, {
+    fallbackSessionSlug: sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG),
+    source: 'demo_fixture',
+  });
   assertNoSecretShape(normalized, 'Telegram demo questions must not serialize secrets.');
   return normalized.length ? normalized : [DEFAULT_QUESTION];
+}
+
+function questionPayloadRoot(payload = {}) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  for (const candidate of [
+    payload,
+    payload.question,
+    payload.questionData,
+    payload.metadata,
+    payload.data,
+  ]) {
+    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+      const hasQuestionShape = candidate.id ||
+        candidate.questionId ||
+        candidate.prompt ||
+        candidate.questionText ||
+        candidate.title ||
+        candidate.type ||
+        candidate.questionType;
+      if (hasQuestionShape) return candidate;
+    }
+  }
+  return payload;
+}
+
+function normalizePreloadedQuestionRecord(entry = {}, {
+  index = 0,
+  fallbackSessionSlug = '',
+  source = 'telegram_only_preloaded_questions',
+} = {}) {
+  const root = questionPayloadRoot(entry);
+  if (!root) return null;
+  const sessionSlug = sanitizeSessionSlug(root.sessionSlug || root.session || entry.sessionSlug || entry.session || fallbackSessionSlug);
+  const storageRef = root.storageRef && typeof root.storageRef === 'object' && !Array.isArray(root.storageRef)
+    ? root.storageRef
+    : (entry.storageRef && typeof entry.storageRef === 'object' && !Array.isArray(entry.storageRef) ? entry.storageRef : null);
+  const id = safeString(
+    root.questionId ||
+    root.id ||
+    entry.questionId ||
+    entry.id ||
+    storageRef?.id ||
+    `telegram-only-${sessionSlug || 'session'}-${index + 1}`
+  );
+  if (!id) return null;
+  const visibility = lower(root.visibility || root.accessMode || entry.visibility || 'public') || 'public';
+  const locked = root.locked === true || entry.locked === true || ['private', 'sbt_gated', 'lit_encrypted'].includes(visibility);
+  const prompt = locked
+    ? ''
+    : safeString(root.questionText || root.prompt || root.title || entry.questionText || entry.prompt || entry.title);
+  const payloadUnavailable = !locked && !prompt;
+  const normalized = {
+    ...entry,
+    ...root,
+    questionId: id,
+    questionType: safeString(root.questionType || root.type || entry.questionType || entry.type || 'freeform'),
+    type: safeString(root.questionType || root.type || entry.questionType || entry.type || 'freeform'),
+    prompt: payloadUnavailable ? '' : prompt,
+    questionText: payloadUnavailable ? '' : prompt,
+    title: payloadUnavailable
+      ? 'Question unavailable'
+      : (prompt || (locked ? 'Locked question' : 'Untitled question')),
+    options: Array.isArray(root.options)
+      ? root.options.slice()
+      : (Array.isArray(entry.options) ? entry.options.slice() : []),
+    visibility: payloadUnavailable ? 'payload_unavailable' : visibility,
+    locked,
+    source,
+    sessionSlug,
+    ...(storageRef ? { storageRef } : {}),
+  };
+  if (payloadUnavailable) {
+    normalized.payloadUnavailable = true;
+    normalized.payloadUnavailableReason = 'telegram_only_question_payload_missing_prompt';
+  }
+  return normalized;
+}
+
+function normalizePreloadedQuestionRecords(questions = [], {
+  fallbackSessionSlug = '',
+  source = 'telegram_only_preloaded_questions',
+} = {}) {
+  return (Array.isArray(questions) ? questions : [])
+    .filter((entry) => entry && typeof entry === 'object')
+    .map((entry, index) => normalizePreloadedQuestionRecord(entry, { index, fallbackSessionSlug, source }))
+    .filter(Boolean);
+}
+
+function telegramOnlyStorageTimeoutMs(env = {}) {
+  const value = Number(env.AGENT_BRIDGE_TELEGRAM_ONLY_STORAGE_TIMEOUT_MS);
+  if (Number.isFinite(value) && value >= 1) return Math.floor(value);
+  return DEFAULT_TELEGRAM_ONLY_STORAGE_TIMEOUT_MS;
 }
 
 function questionSessionSlug(question = {}) {
@@ -384,6 +501,14 @@ function questionIsLocked(question = {}) {
   return question?.locked === true || ['private', 'sbt_gated', 'lit_encrypted'].includes(visibility);
 }
 
+function questionIsAnswerable(question = {}) {
+  return !questionIsPayloadUnavailable(question) && !questionIsLocked(question);
+}
+
+function allQuestionsPayloadUnavailable(questions = []) {
+  return Array.isArray(questions) && questions.length > 0 && questions.every(questionIsPayloadUnavailable);
+}
+
 function questionPresentationRank(question = {}) {
   if (questionIsPayloadUnavailable(question)) return 2;
   if (questionIsLocked(question)) return 1;
@@ -404,6 +529,10 @@ function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
 
+function envFlagDisabled(value = '') {
+  return ['0', 'false', 'no', 'off'].includes(lower(value));
+}
+
 function questionSourceMode(env = {}) {
   const mode = lower(env.AGENT_BRIDGE_QUESTION_SOURCE || 'live');
   if (['fixture', 'demo', 'demo_fixture'].includes(mode)) return 'fixture';
@@ -416,6 +545,12 @@ function allowDemoQuestionFallback(env = {}) {
     || envFlagEnabled(env.AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK);
 }
 
+function liveQuestionFallbackTimeoutMs(env = {}) {
+  const value = Number(env.AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS);
+  if (Number.isFinite(value) && value >= 1) return Math.floor(value);
+  return DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS;
+}
+
 function allowAdHocQuestions(env = {}) {
   return envFlagEnabled(env.AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS)
     || questionSourceMode(env) === 'fixture';
@@ -423,6 +558,12 @@ function allowAdHocQuestions(env = {}) {
 
 function questionLoadIssueText(result = {}) {
   const reason = safeString(result.reason);
+  if (reason === 'telegram_only_cloudflare_questions_list_failed') {
+    return 'Telegram-only questions could not be listed from Cloudflare. Try again shortly.';
+  }
+  if (reason === 'telegram_only_cloudflare_questions_read_failed') {
+    return 'Telegram-only question payloads could not be read from Cloudflare. Try again shortly.';
+  }
   if (reason === 'question_scan_window_unscoped') {
     return 'Question source needs session block limits before it can be shown here.';
   }
@@ -444,6 +585,9 @@ function questionLoadIssueText(result = {}) {
   if (reason === 'live_questions_indexing') {
     return 'Questions are indexing. Run /questions again shortly.';
   }
+  if (reason === 'live_question_cache_timeout') {
+    return 'Questions are still loading from Cloudflare. Run /questions again shortly.';
+  }
   return 'Questions could not be loaded. Try again shortly.';
 }
 
@@ -458,6 +602,198 @@ function questionListPromptLine(question = {}) {
   return `${prefix}${safeString(question.title) || 'Failed to load question prompt.'}`;
 }
 
+async function buildTelegramOnlyStorageAuth({
+  env = {},
+  session = {},
+  fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug || env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG);
+  const workerUrl = resolveSessionWorkerUrl(env, session);
+  if (!workerUrl || !sessionSlug) return { ok: false, reason: 'session_worker_url_missing' };
+  const principal = {
+    telegramUserId: `telegram-only-question-reader:${sessionSlug}`,
+    username: 'telegram-only-question-reader',
+  };
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+  });
+  return authenticateSessionWorker({
+    env,
+    session: { ...session, sessionSlug },
+    account,
+    principal,
+    workerUrl,
+    fetchImpl,
+  });
+}
+
+async function fetchTelegramOnlyCloudflareJson({
+  auth = {},
+  path = '',
+  env = {},
+  fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
+} = {}) {
+  if (!auth?.ok || !auth.workerUrl || !auth.token || !path || typeof fetchImpl !== 'function') {
+    return { ok: false, reason: 'telegram_only_cloudflare_auth_unavailable' };
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () => controller.abort(new Error('Telegram-only Cloudflare storage timed out')),
+    telegramOnlyStorageTimeoutMs(env)
+  );
+  try {
+    const response = await fetchImpl(`${auth.workerUrl}${path}`, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json',
+        Origin: publicBridgeBaseUrl(env) || 'http://localhost:7391',
+        Authorization: `Bearer ${auth.token}`,
+      },
+    });
+    const body = await response.json().catch(() => null);
+    if (!response?.ok) {
+      return {
+        ok: false,
+        reason: 'telegram_only_cloudflare_request_failed',
+        status: response?.status || 0,
+        error: safeString(body?.error || body?.reason || ''),
+      };
+    }
+    return { ok: true, body };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_request_failed',
+      error: safeString(error?.message || error),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function loadTelegramOnlyCloudflareQuestions({
+  env = {},
+  session = {},
+  fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
+  const auth = await buildTelegramOnlyStorageAuth({ env, session, fetchImpl });
+  if (!auth?.ok) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_questions_list_failed',
+      authReason: safeString(auth?.reason),
+      questions: [],
+    };
+  }
+  const listed = await fetchTelegramOnlyCloudflareJson({
+    auth,
+    path: '/storage/list?resource=questions',
+    env,
+    fetchImpl,
+  });
+  if (!listed.ok) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_questions_list_failed',
+      error: listed.error,
+      status: listed.status || 0,
+      questions: [],
+    };
+  }
+  const items = Array.isArray(listed.body?.items) ? listed.body.items : [];
+  const questions = [];
+  const readErrors = [];
+  const readResults = await Promise.all(items.map(async (item, index) => {
+    const storageRef = item?.storageRef && typeof item.storageRef === 'object' && !Array.isArray(item.storageRef)
+      ? item.storageRef
+      : {};
+    const id = safeString(storageRef.id || item?.id);
+    if (!id) return null;
+    const read = await fetchTelegramOnlyCloudflareJson({
+      auth,
+      path: `/storage/read?id=${encodeURIComponent(id)}`,
+      env,
+      fetchImpl,
+    });
+    if (!read.ok) {
+      return { error: { id, reason: read.reason, status: read.status || 0, error: read.error || '' } };
+    }
+    const normalized = normalizePreloadedQuestionRecord(
+      {
+        ...(read.body && typeof read.body === 'object' && !Array.isArray(read.body) ? read.body : {}),
+        storageRef,
+      },
+      {
+        index,
+        fallbackSessionSlug: sessionSlug,
+        source: 'telegram_only_cloudflare_questions',
+      }
+    );
+    return normalized ? { question: normalized } : null;
+  }));
+  readResults.forEach((result) => {
+    if (result?.question) questions.push(result.question);
+    if (result?.error) readErrors.push(result.error);
+  });
+  return {
+    ok: readErrors.length === 0 || questions.length > 0,
+    reason: readErrors.length && questions.length === 0
+      ? 'telegram_only_cloudflare_questions_read_failed'
+      : (questions.length ? 'telegram_only_cloudflare_questions_loaded' : 'telegram_only_cloudflare_questions_empty'),
+    source: 'telegram_only_cloudflare_storage',
+    questions,
+    questionCount: questions.length,
+    discoveredCount: items.length,
+    payloadFailureCount: readErrors.length,
+    readErrors,
+  };
+}
+
+async function loadTelegramOnlyQuestionsForSession(env = {}, sessionSlug = '') {
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok || resolved.session?.telegramOnly !== true) return null;
+  const session = resolved.session;
+  const inlineQuestions = normalizePreloadedQuestionRecords(session.questions, {
+    fallbackSessionSlug: session.sessionSlug,
+    source: 'telegram_only_policy_questions',
+  });
+  if (inlineQuestions.length) {
+    return {
+      ok: true,
+      reason: 'telegram_only_policy_questions_loaded',
+      source: 'telegram_only_policy',
+      questions: orderQuestionsForPresentation(inlineQuestions),
+      questionCount: inlineQuestions.length,
+      discoveredCount: inlineQuestions.length,
+    };
+  }
+  const storageProfile = session.storageProfile && typeof session.storageProfile === 'object' && !Array.isArray(session.storageProfile)
+    ? session.storageProfile
+    : {};
+  const cloudflareSelected = lower(storageProfile.backend || session.questionStorageBackend || session.storageBackend) === 'cloudflare' ||
+    lower(session.questionSource || session.telegramQuestionSource) === 'cloudflare_storage';
+  if (!cloudflareSelected) {
+    return {
+      ok: true,
+      reason: 'telegram_only_questions_empty',
+      source: 'telegram_only_policy',
+      questions: [],
+      questionCount: 0,
+      discoveredCount: 0,
+    };
+  }
+  const cloudflare = await loadTelegramOnlyCloudflareQuestions({ env, session });
+  return {
+    ...cloudflare,
+    questions: orderQuestionsForPresentation(cloudflare.questions || []),
+  };
+}
+
 async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   waitUntil = null,
 } = {}) {
@@ -470,24 +806,60 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
       questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
     };
   }
-  const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
+  const telegramOnly = await loadTelegramOnlyQuestionsForSession(env, sessionSlug);
+  if (telegramOnly) return telegramOnly;
+  const livePromise = listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
     ok: false,
     reason: 'live_question_cache_failed',
     error: safeString(error?.message || error),
     questions: [],
   }));
-  if ((live.ok && Array.isArray(live.questions) && live.questions.length) || !allowDemoQuestionFallback(env)) {
+  const fallbackAllowed = allowDemoQuestionFallback(env);
+  let live = null;
+  if (fallbackAllowed) {
+    let timeout = null;
+    live = await Promise.race([
+      livePromise,
+      new Promise((resolve) => {
+        timeout = setTimeout(() => resolve({
+          ok: false,
+          reason: 'live_question_cache_timeout',
+          timedOut: true,
+          questions: [],
+        }), liveQuestionFallbackTimeoutMs(env));
+      }),
+    ]).finally(() => clearTimeout(timeout));
+    if (live?.timedOut && typeof waitUntil === 'function') {
+      waitUntil(livePromise.catch(() => null));
+    }
+  } else {
+    live = await livePromise;
+  }
+  const liveQuestions = Array.isArray(live.questions) ? live.questions : [];
+  const liveHasAnswerableQuestions = liveQuestions.some(questionIsAnswerable);
+  const liveOnlyUnavailablePayloads = allQuestionsPayloadUnavailable(liveQuestions);
+  if (live?.timedOut || liveOnlyUnavailablePayloads) {
     return {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: orderQuestionsForPresentation(live.questions),
+      questions: orderQuestionsForPresentation(liveQuestions),
+    };
+  }
+  if (
+    (live.ok && liveQuestions.length && (liveHasAnswerableQuestions || !fallbackAllowed || !liveOnlyUnavailablePayloads)) ||
+    !fallbackAllowed
+  ) {
+    return {
+      ...live,
+      source: live.source || 'telegram_worker_question_cache',
+      questions: orderQuestionsForPresentation(liveQuestions),
     };
   }
   return {
     ok: true,
     reason: 'fixture_questions_fallback',
     source: 'demo_fixture',
-    fallbackFrom: live.reason || 'live_question_cache_unavailable',
+    fallbackFrom: live.reason || (liveOnlyUnavailablePayloads ? 'live_questions_payload_unavailable' : 'live_question_cache_unavailable'),
     questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
   };
 }
@@ -515,6 +887,7 @@ function summarizeQuestionPrefetch(result = {}, sessionSlug = '') {
 
 function questionAvailabilityLine(prefetch = {}) {
   if (prefetch.scheduled !== true) return 'Questions: not loaded yet.';
+  if (prefetch.reason === 'question_prefetch_scheduled') return 'Questions: loading.';
   if (prefetch.ok === false) return 'Questions: unavailable right now.';
   const available = Number(prefetch.availableQuestionCount ?? prefetch.questionCount ?? 0) || 0;
   const loaded = Number(prefetch.questionCount ?? available) || 0;
@@ -548,6 +921,73 @@ async function prefetchQuestionsForJoinedSession({
       complete: false,
     };
   }
+}
+
+function scheduleBackgroundTask(waitUntil = null, task = null) {
+  const promise = Promise.resolve()
+    .then(() => task)
+    .catch(() => null);
+  if (typeof waitUntil === 'function') {
+    waitUntil(promise);
+  }
+  return promise;
+}
+
+function scheduledQuestionPrefetchSummary(sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  return {
+    scheduled: !!slug,
+    sessionSlug: slug,
+    ok: true,
+    reason: slug ? 'question_prefetch_scheduled' : 'session_slug_missing',
+    questionCount: 0,
+    availableQuestionCount: 0,
+    unavailableQuestionCount: 0,
+    lockedQuestionCount: 0,
+    discoveredQuestionCount: 0,
+    complete: false,
+  };
+}
+
+function scheduleQuestionPrefetchForJoinedSession({
+  env = {},
+  sessionSlug = '',
+  waitUntil = null,
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return scheduledQuestionPrefetchSummary(slug);
+  scheduleBackgroundTask(
+    waitUntil,
+    prefetchQuestionsForJoinedSession({ env, sessionSlug: slug, waitUntil: null })
+  );
+  return scheduledQuestionPrefetchSummary(slug);
+}
+
+function scheduleManagedAccountFaucetForJoin({
+  env = {},
+  session = {},
+  account = {},
+  principal = {},
+  createdAt = null,
+  waitUntil = null,
+} = {}) {
+  if (envFlagDisabled(env.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN)) {
+    return { ok: false, skipped: true, reason: 'auto_faucet_on_join_disabled' };
+  }
+  if (session.sponsoredFaucetAllowed !== true) {
+    return { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
+  }
+  scheduleBackgroundTask(
+    waitUntil,
+    requestManagedAccountFaucetOnJoin({
+      env,
+      session,
+      account,
+      principal,
+      createdAt,
+    })
+  );
+  return { ok: true, scheduled: true, reason: 'faucet_request_scheduled' };
 }
 
 function loadDemoDocuments(env = {}) {
@@ -886,6 +1326,55 @@ async function persistTelegramSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, slug);
   const session = resolved.ok ? resolved.session : { sessionSlug: slug };
+  if (telegramSubmitQueueEnabled(env)) {
+    const record = buildQueuedSubmitRecord({
+      session,
+      canonicalBody: {
+        session: slug,
+        questionId: qid,
+        answerRef: 'telegram_private_answer_ref',
+        idempotencyKey,
+      },
+      baseRecord: {
+        version: 1,
+        requestId,
+        idempotencyKey,
+        answerFingerprint,
+        lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+        telegramUserId,
+        username: safeString(normalized.user?.username),
+        languageCode: safeString(normalized.user?.languageCode),
+        chatId: safeString(normalized.chat?.chatId),
+        sessionSlug: slug,
+        questionId: qid,
+        questionIdShort: shortQuestionId(qid),
+        answer: {
+          label: safeString(draft.answerLabel),
+          value: safeString(draft.answerValue),
+          controlType: safeString(draft.controlType),
+        },
+        onChainAnswer: onChainAnswerFromDraft(draft),
+        answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+        createdAt,
+      },
+    });
+    const queued = await queueTelegramSubmitRecord({ env, kvKey, record }).catch((error) => ({
+      ok: false,
+      reason: 'telegram_submit_queue_failed',
+      error: safeString(error?.message || error),
+    }));
+    if (queued.ok === true) {
+      return {
+        ok: true,
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        queued: true,
+        replayed: false,
+      };
+    }
+  }
   const principal = normalizeTelegramPrincipal(normalized);
   const account = await deriveManagedDemoAccount({
     principal,
@@ -1401,7 +1890,7 @@ function sessionVisibleInTelegram(session = {}) {
   // Temporary smoke-test hygiene: hide old E2E registry spam until session metadata
   // has a durable production flag for Telegram visibility.
   if (/\be2e\b|e2e/i.test(name)) return false;
-  return session.telegramBridgeEnabled === true;
+  return session.telegramBridgeEnabled === true && session.telegramOnly === true;
 }
 
 function telegramVisibleSessions(policy = {}) {
@@ -1703,7 +2192,7 @@ async function buildJoinResponse({
       session: resolved.session,
       createdAt,
     });
-    const questionPrefetch = await prefetchQuestionsForJoinedSession({
+    const questionPrefetch = scheduleQuestionPrefetchForJoinedSession({
       env,
       sessionSlug: resolved.session.sessionSlug,
       waitUntil,
@@ -1724,17 +2213,14 @@ async function buildJoinResponse({
       }],
       createdAt,
     });
-    const faucet = await requestManagedAccountFaucetOnJoin({
+    const faucet = scheduleManagedAccountFaucetForJoin({
       env,
       session: resolved.session,
       account,
       principal: normalizeTelegramPrincipal(normalized),
       createdAt,
-    }).catch((error) => ({
-      ok: false,
-      reason: 'faucet_request_failed',
-      error: safeString(error?.message || error),
-    }));
+      waitUntil,
+    });
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -1793,7 +2279,7 @@ async function buildJoinResponse({
     reason: 'user_session_binding_failed',
     error: safeString(error?.message || error),
   }));
-  const questionPrefetch = await prefetchQuestionsForJoinedSession({
+  const questionPrefetch = scheduleQuestionPrefetchForJoinedSession({
     env,
     sessionSlug: resolved.session.sessionSlug,
     waitUntil,
@@ -2000,9 +2486,10 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
 async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: 500 });
+  const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   return records
     .filter((record) => (
-      record?.status === 'direct_submitted' &&
+      submittedStatuses.has(safeString(record?.status)) &&
       sanitizeSessionSlug(record.sessionSlug) === slug &&
       safeString(record.questionId)
     ))
@@ -2025,6 +2512,25 @@ function questionPromptById(questions = []) {
     if (id) map.set(id, questionText(question));
   }
   return map;
+}
+
+function consensusQuestionType(question = {}) {
+  return lower(question.questionType || question.type || question.controlType);
+}
+
+function questionSupportsConsensus(question = {}) {
+  return [
+    'agree_unsure_disagree',
+    'agree-disagree',
+    'binary',
+    'boolean',
+    'yes_no',
+    'yes-no',
+  ].includes(consensusQuestionType(question));
+}
+
+function consensusQuestionsForResults(questions = []) {
+  return (Array.isArray(questions) ? questions : []).filter(questionSupportsConsensus);
 }
 
 function summarizeQuestionResults(records = [], questions = []) {
@@ -2063,7 +2569,9 @@ function summarizeQuestionResults(records = [], questions = []) {
   ));
 }
 
-function demoDifferenceRows(questions = []) {
+function demoDifferenceRows(questions = [], {
+  includeFallbackPrompts = true,
+} = {}) {
   const fallbackPrompts = [
     'Arriving 10 minutes early is better than arriving exactly on time.',
     'A supply-chain risk review should block launch when evidence is incomplete.',
@@ -2074,7 +2582,7 @@ function demoDifferenceRows(questions = []) {
   ];
   const prompts = [
     ...(questions.length ? questions.map(questionText) : []),
-    ...fallbackPrompts,
+    ...(includeFallbackPrompts ? fallbackPrompts : []),
   ].filter(Boolean);
   return prompts.slice(0, 6).map((prompt, index) => ({
     prompt,
@@ -2583,6 +3091,8 @@ async function buildResultsOptionsResponse({
   const lines = [
     'Results',
     '',
+    sessionSlug ? `Selected session: ${sessionSlug}` : 'Selected session: none',
+    '',
     intro,
     '',
     'Consensus: highlights questions with the most disagreement across responses.',
@@ -2720,6 +3230,7 @@ async function buildResultsResponse({
     const lines = demo
       ? [
         'Participants graph (demo data)',
+        `Session: ${resolved.session.sessionSlug}`,
         'Demo mode until enough live submissions are available.',
         'Choose a group to analyze.',
         ...graph.lines,
@@ -2727,6 +3238,7 @@ async function buildResultsResponse({
       ]
       : [
         'Participants graph',
+        `Session: ${resolved.session.sessionSlug}`,
         `Responses: ${records.length}`,
         ...(graph.groups.length ? ['Choose a group to analyze.'] : []),
         ...graph.lines,
@@ -2760,10 +3272,13 @@ async function buildResultsResponse({
       extra: { sessionSlug: resolved.session.sessionSlug, resultMode: mode, responseCount: records.length, demo },
     });
   }
-  const summaries = summarizeQuestionResults(records, questions);
+  const consensusQuestions = consensusQuestionsForResults(questions);
+  const consensusQuestionIds = new Set(consensusQuestions.map(questionId).filter(Boolean));
+  const consensusRecords = records.filter((record) => consensusQuestionIds.has(record.questionId));
+  const summaries = summarizeQuestionResults(consensusRecords, consensusQuestions);
   const allLiveDifference = summaries.filter((summary) => summary.hasDifference && summary.total >= 2);
-  const demo = allLiveDifference.length === 0;
-  const allRows = demo ? demoDifferenceRows(questions) : allLiveDifference;
+  const demo = allLiveDifference.length === 0 && consensusQuestions.length > 0;
+  const allRows = demo ? demoDifferenceRows(consensusQuestions, { includeFallbackPrompts: false }) : allLiveDifference;
   const requestedOffset = nonNegativeInteger(args[1] || 0);
   const pageOffset = allRows.length
     ? Math.min(requestedOffset, Math.max(0, allRows.length - 1))
@@ -2771,6 +3286,7 @@ async function buildResultsResponse({
   const rows = allRows.slice(pageOffset, pageOffset + TELEGRAM_RESULTS_PAGE_SIZE);
   const lines = [
     demo ? 'Beeswarm (demo data)' : 'Beeswarm',
+    `Session: ${resolved.session.sessionSlug}`,
     ...(demo ? ['Demo mode until enough overlapping live responses are available.'] : [`Live responses: ${records.length}`]),
     `Most difference ${pageOffset + 1}-${pageOffset + rows.length} of ${allRows.length}`,
     ...rows.map((row, index) => `${pageOffset + index + 1}. ● ${row.prompt}\n   ${formatCounts(row.counts)}`),
@@ -4413,6 +4929,75 @@ function summarizeTelegramSendResult(result = {}) {
     };
 }
 
+function publicBridgeBaseUrl(env = {}) {
+  return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL).replace(/\/+$/, '');
+}
+
+function telegramApiTimeoutMs(env = {}) {
+  const value = Number(env.AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS || env.TELEGRAM_API_TIMEOUT_MS);
+  if (Number.isFinite(value) && value >= 1) return Math.floor(value);
+  return undefined;
+}
+
+async function materializeTelegramResultPhoto({
+  env = {},
+  photo = null,
+  createdAt = null,
+} = {}) {
+  const photoBytes = photo?.bytes instanceof Uint8Array ? photo.bytes : null;
+  const baseUrl = publicBridgeBaseUrl(env);
+  if (!photoBytes || !baseUrl || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return photo;
+  }
+  const { callbackData: id } = createRandomTelegramCallbackAction({
+    action: 'telegram_result_photo',
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: { kind: 'result_photo' },
+    createdAt,
+  });
+  const record = {
+    version: 1,
+    id,
+    filename: safeString(photo.filename) || 'results.png',
+    contentType: safeString(photo.contentType) || 'image/png',
+    bytesBase64: bytesToBase64(photoBytes),
+    createdAt: createdAt || nowIso(),
+  };
+  await env.AGENT_ACTION_KV.put(`${RESULT_PHOTO_KV_PREFIX}${id}`, JSON.stringify(record), {
+    expirationTtl: RESULT_PHOTO_TTL_SECONDS,
+  });
+  return {
+    url: `${baseUrl}/telegram/result-photo/${id}`,
+    filename: record.filename,
+    contentType: record.contentType,
+  };
+}
+
+export async function readTelegramResultPhoto({
+  env = {},
+  id = '',
+} = {}) {
+  const safeId = safeString(id);
+  if (!/^cecb_[a-z0-9]{10,64}$/.test(safeId)) {
+    return { ok: false, status: 404, reason: 'result_photo_not_found' };
+  }
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function') {
+    return { ok: false, status: 404, reason: 'result_photo_storage_unavailable' };
+  }
+  const record = safeJsonParse(await kv.get(`${RESULT_PHOTO_KV_PREFIX}${safeId}`).catch(() => null), null);
+  if (!record || typeof record !== 'object' || !safeString(record.bytesBase64)) {
+    return { ok: false, status: 404, reason: 'result_photo_not_found' };
+  }
+  return {
+    ok: true,
+    status: 200,
+    bytes: base64ToBytes(record.bytesBase64),
+    contentType: safeString(record.contentType) || 'image/png',
+    filename: safeString(record.filename) || 'results.png',
+  };
+}
+
 function callbackQueryIdFromCommandResponse(commandResponse = {}) {
   return safeString(
     commandResponse.callbackQueryId ||
@@ -4425,22 +5010,26 @@ export async function dispatchTelegramCommandResponse({
   commandResponse = {},
   env = {},
   fetchImpl = globalThis.fetch,
+  skipCallbackAnswer = false,
+  callbackAnswerResult = null,
 } = {}) {
   if (commandResponse.ignored === true) {
     return { ...commandResponse, telegram: { ok: true, skipped: true } };
   }
   const response = commandResponse.response;
   const botToken = env.TELEGRAM_BOT_TOKEN || '';
+  const timeoutMs = telegramApiTimeoutMs(env);
   const callbackQueryId = callbackQueryIdFromCommandResponse(commandResponse);
-  const callbackAnswer = callbackQueryId
+  const callbackAnswer = callbackAnswerResult || (callbackQueryId && !skipCallbackAnswer
     ? await answerTelegramCallbackQuery({
       botToken,
       callbackQueryId,
       text: commandResponse.callbackAnswerText || '',
       showAlert: commandResponse.callbackAnswerShowAlert === true,
       fetchImpl,
+      timeoutMs,
     })
-    : null;
+    : null);
   if (!response) {
     return {
       ...commandResponse,
@@ -4461,17 +5050,36 @@ export async function dispatchTelegramCommandResponse({
       replyMarkup: response.replyMarkup,
       parseMode: response.parseMode,
       fetchImpl,
+      timeoutMs,
     });
   } else if (response.method === 'sendPhoto' && response.photo) {
+    const photoForTelegram = await materializeTelegramResultPhoto({
+      env,
+      photo: response.photo,
+      createdAt: commandResponse.createdAt || null,
+    }).catch(() => response.photo);
     sendResult = await sendTelegramPhoto({
       botToken,
       chatId: response.chatId,
-      photo: response.photo,
+      photo: photoForTelegram,
       caption: response.text,
       replyMarkup: response.replyMarkup,
       parseMode: response.parseMode,
       fetchImpl,
+      timeoutMs,
     });
+    if (!sendResult?.ok) {
+      sendResult = await sendTelegramDocument({
+        botToken,
+        chatId: response.chatId,
+        document: photoForTelegram,
+        caption: response.text,
+        replyMarkup: response.replyMarkup,
+        parseMode: response.parseMode,
+        fetchImpl,
+        timeoutMs,
+      });
+    }
     if (!sendResult?.ok) {
       sendResult = await sendTelegramMessage({
         botToken,
@@ -4480,6 +5088,7 @@ export async function dispatchTelegramCommandResponse({
         replyMarkup: response.replyMarkup,
         parseMode: response.parseMode,
         fetchImpl,
+        timeoutMs,
       });
     }
   } else if (response.method === 'sendDocument' && response.document) {
@@ -4491,6 +5100,7 @@ export async function dispatchTelegramCommandResponse({
       replyMarkup: response.replyMarkup,
       parseMode: response.parseMode,
       fetchImpl,
+      timeoutMs,
     });
     if (!sendResult?.ok) {
       sendResult = await sendTelegramMessage({
@@ -4500,6 +5110,7 @@ export async function dispatchTelegramCommandResponse({
         replyMarkup: response.replyMarkup,
         parseMode: response.parseMode,
         fetchImpl,
+        timeoutMs,
       });
     }
   } else {
@@ -4510,6 +5121,7 @@ export async function dispatchTelegramCommandResponse({
       replyMarkup: response.replyMarkup,
       parseMode: response.parseMode,
       fetchImpl,
+      timeoutMs,
     });
   }
   return {
@@ -4527,15 +5139,53 @@ export async function handleTelegramWebhookUpdate({
   fetchImpl = globalThis.fetch,
   now = null,
   waitUntil = null,
+  deferDispatch = false,
 } = {}) {
+  const callbackQueryId = safeString(update?.callback_query?.id);
+  const earlyCallbackAnswer = callbackQueryId
+    ? await answerTelegramCallbackQuery({
+      botToken: env.TELEGRAM_BOT_TOKEN || '',
+      callbackQueryId,
+      fetchImpl,
+      timeoutMs: telegramApiTimeoutMs(env),
+    })
+    : null;
   const commandResponse = await buildTelegramCommandResponse({ update, env, now, waitUntil });
   if (!commandResponse.ok && !commandResponse.response) {
     return commandResponse;
+  }
+  const callbackAnswerSummary = earlyCallbackAnswer ? summarizeTelegramSendResult(earlyCallbackAnswer) : null;
+  if (deferDispatch === true && typeof waitUntil === 'function') {
+    waitUntil(dispatchTelegramCommandResponse({
+      commandResponse,
+      env,
+      fetchImpl,
+      skipCallbackAnswer: !!earlyCallbackAnswer,
+      callbackAnswerResult: earlyCallbackAnswer,
+    }).catch(() => ({
+      ...commandResponse,
+      telegram: {
+        ok: false,
+        status: 502,
+        error: 'telegram_dispatch_failed',
+        callbackAnswer: callbackAnswerSummary,
+      },
+    })));
+    return {
+      ...commandResponse,
+      telegram: {
+        ok: true,
+        queued: true,
+        callbackAnswer: callbackAnswerSummary,
+      },
+    };
   }
   return dispatchTelegramCommandResponse({
     commandResponse,
     env,
     fetchImpl,
+    skipCallbackAnswer: !!earlyCallbackAnswer,
+    callbackAnswerResult: earlyCallbackAnswer,
   });
 }
 

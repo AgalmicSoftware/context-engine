@@ -1,0 +1,138 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  buildQueuedSubmitRecord,
+  processTelegramSubmitQueueBatch,
+  queueTelegramSubmitRecord,
+  telegramSubmitQueueEnabled,
+} from './telegramSubmitQueue.mjs';
+
+class MemoryKv {
+  constructor() {
+    this.store = new Map();
+  }
+
+  async put(key, value) {
+    this.store.set(key, value);
+  }
+
+  async get(key) {
+    return this.store.get(key) || null;
+  }
+}
+
+class MemoryQueue {
+  constructor() {
+    this.messages = [];
+  }
+
+  async send(body, options = {}) {
+    this.messages.push({ body, options });
+  }
+}
+
+test('Telegram submit queue persists accepted responses before async processing', async () => {
+  const kv = new MemoryKv();
+  const queue = new MemoryQueue();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_RESPONSE_QUEUE: queue,
+    AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED: 'true',
+  };
+  const record = buildQueuedSubmitRecord({
+    session: {
+      sessionSlug: 'alpha',
+      managedAccountSubmitAllowed: true,
+    },
+    canonicalBody: {
+      session: 'alpha',
+      questionId: `0x${'12'.repeat(32)}`,
+      answerRef: 'telegram_private_answer_ref',
+      idempotencyKey: 'idem-1',
+    },
+    baseRecord: {
+      version: 1,
+      requestId: 'submit-one',
+      idempotencyKey: 'idem-1',
+      answerFingerprint: 'fp-1',
+      lane: 'telegram_mini_app',
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      questionId: `0x${'12'.repeat(32)}`,
+      questionIdShort: '0x1212...1212',
+      answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+      onChainAnswer: {
+        questionType: 'agree_unsure_disagree',
+        value: 'agree',
+        label: 'Agree',
+        comments: '',
+      },
+      createdAt: '2026-05-23T12:00:00.000Z',
+    },
+  });
+
+  assert.equal(telegramSubmitQueueEnabled(env), true);
+  const queued = await queueTelegramSubmitRecord({
+    env,
+    kvKey: 'telegram:submit-request:submit-one',
+    record,
+  });
+
+  assert.equal(queued.ok, true);
+  assert.equal(queue.messages.length, 1);
+  assert.equal(queue.messages[0].body.type, 'telegram_submit_direct_v1');
+  assert.equal(JSON.parse(await kv.get('telegram:submit-request:submit-one')).status, 'submit_queued');
+});
+
+test('Telegram submit queue consumer updates persisted records after processing', async () => {
+  const kv = new MemoryKv();
+  const record = buildQueuedSubmitRecord({
+    session: {
+      sessionSlug: 'alpha',
+      managedAccountSubmitAllowed: true,
+    },
+    canonicalBody: {
+      session: 'alpha',
+      questionId: `0x${'12'.repeat(32)}`,
+      answerRef: 'telegram_private_answer_ref',
+      idempotencyKey: 'idem-2',
+    },
+    baseRecord: {
+      version: 1,
+      requestId: 'submit-two',
+      idempotencyKey: 'idem-2',
+      answerFingerprint: 'fp-2',
+      lane: 'telegram_mini_app',
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      questionId: `0x${'12'.repeat(32)}`,
+      questionIdShort: '0x1212...1212',
+      answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+      onChainAnswer: {
+        questionType: 'agree_unsure_disagree',
+        value: 'agree',
+        label: 'Agree',
+        comments: '',
+      },
+      createdAt: '2026-05-23T12:00:00.000Z',
+    },
+  });
+  await kv.put('telegram:submit-request:submit-two', JSON.stringify(record));
+  let acked = false;
+
+  const result = await processTelegramSubmitQueueBatch({
+    messages: [{
+      body: { type: 'telegram_submit_direct_v1', record },
+      ack: () => { acked = true; },
+    }],
+  }, {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED: 'true',
+  });
+
+  const stored = JSON.parse(await kv.get('telegram:submit-request:submit-two'));
+  assert.equal(result.ok, false);
+  assert.equal(acked, true);
+  assert.equal(stored.status, 'direct_submit_failed');
+  assert.equal(stored.onChain.reason, 'session_worker_url_missing');
+});

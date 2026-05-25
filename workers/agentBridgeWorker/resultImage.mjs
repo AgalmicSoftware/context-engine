@@ -577,6 +577,9 @@ function concat(parts) {
 }
 
 function encodePng(rgba, width, height) {
+  const indexed = encodeIndexedPng(rgba, width, height);
+  if (indexed) return indexed;
+
   const stride = width * 4;
   const scanlines = new Uint8Array((stride + 1) * height);
   for (let y = 0; y < height; y += 1) {
@@ -592,6 +595,54 @@ function encodePng(rgba, width, height) {
   return concat([
     new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
     chunk('IHDR', ihdr),
+    chunk('IDAT', zlibStore(scanlines)),
+    chunk('IEND'),
+  ]);
+}
+
+function encodeIndexedPng(rgba, width, height) {
+  const pixelCount = width * height;
+  const palette = [];
+  const paletteIndex = new Map();
+  const indexed = new Uint8Array(pixelCount);
+
+  for (let pixel = 0; pixel < pixelCount; pixel += 1) {
+    const offset = pixel * 4;
+    if (rgba[offset + 3] !== 255) return null;
+    const key = (rgba[offset] << 16) | (rgba[offset + 1] << 8) | rgba[offset + 2];
+    let index = paletteIndex.get(key);
+    if (index === undefined) {
+      if (palette.length >= 256) return null;
+      index = palette.length;
+      palette.push([rgba[offset], rgba[offset + 1], rgba[offset + 2]]);
+      paletteIndex.set(key, index);
+    }
+    indexed[pixel] = index;
+  }
+
+  const scanlines = new Uint8Array((width + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const lineOffset = y * (width + 1);
+    scanlines[lineOffset] = 0;
+    scanlines.set(indexed.subarray(y * width, (y + 1) * width), lineOffset + 1);
+  }
+
+  const paletteBytes = new Uint8Array(palette.length * 3);
+  palette.forEach((color, index) => {
+    paletteBytes[index * 3] = color[0];
+    paletteBytes[index * 3 + 1] = color[1];
+    paletteBytes[index * 3 + 2] = color[2];
+  });
+
+  const ihdr = new Uint8Array(13);
+  ihdr.set(u32be(width), 0);
+  ihdr.set(u32be(height), 4);
+  ihdr[8] = 8;
+  ihdr[9] = 3;
+  return concat([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    chunk('IHDR', ihdr),
+    chunk('PLTE', paletteBytes),
     chunk('IDAT', zlibStore(scanlines)),
     chunk('IEND'),
   ]);

@@ -17,6 +17,10 @@
   Surveys default. Set
   `AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED=false` or `BROADCAST_ENABLED=false` to
   force canonical submit-request records instead of broadcasting.
+- For larger events, `AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED=true` plus an
+  `AGENT_RESPONSE_QUEUE` binding accepts submit records into KV with
+  `submit_queued` status and settles them through the Worker queue consumer.
+  See [Telegram Cloudflare 500-User Scale PRD](../../docs/telegram-cloudflare-500-user-scale-prd.md).
 
 ## Managed Demo Accounts
 
@@ -292,6 +296,7 @@ Required values:
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
 | Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
+| Optional Telegram API timeout | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000` |
 | Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
@@ -324,7 +329,12 @@ hidden `/create_agent` compatibility commands, `/settings`, `/join <session>`, `
 `/questions`, `/pose_question`, `/q`, `/results`, `/results consensus`, `/results group`,
 `/attachments` or alias `/docs`, and `/me`, answers callback queries to clear Telegram's
 inline-button loading state, and sends replies through an injected Telegram Bot
-API adapter. Unit tests use mocked `fetch` and fake bot tokens; real
+API adapter. In live Cloudflare requests, Telegram sends are scheduled with
+`ctx.waitUntil` after the command response is built so the webhook can return a
+fast 200 instead of waiting on Telegram media upload or message delivery. Bot
+API calls are bounded by `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` so media sends
+can fall back to document or text replies instead of hanging indefinitely. Unit
+tests use mocked `fetch` and fake bot tokens; real
 `TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
 
 Callback data and private deep-link start payloads are opaque `cecb_*` or
@@ -332,16 +342,17 @@ Callback data and private deep-link start payloads are opaque `cecb_*` or
 private keys, and Cloudflare credentials must never be placed in Telegram
 callback data.
 
-The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as an explicit
-demo/session-policy override when it is configured. Without that override, the
-live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
-plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
-`/sessions` and `/join`. Those commands force a fresh registry read so new
-sessions are not hidden behind the short-lived Worker cache; capped registry
-lists use the newest session window. `/sessions` displays only
-Telegram-enabled sessions (`telegramBridgeEnabled=true`), hides `e2e`-named
-smoke-test sessions as a temporary cleanup heuristic, and paginates tall
-inline-keyboard lists with `Load Next`. Group session selection through
+The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as the explicit
+Telegram session list when it is configured. Telegram-visible sessions must set
+both `telegramBridgeEnabled=true` and `telegramOnly=true`; standard registry
+sessions are not listed just because they exist on-chain. The policy can carry
+preloaded `questions` for Cloudflare-native Telegram-only sessions, or point at
+a Cloudflare-backed session worker through `sessionWorkerUrl` plus
+`storageProfile.backend="cloudflare"` so the bridge can load
+`/storage/list?resource=questions` and `/storage/read` directly instead of
+scanning chain question events. `/sessions` hides `e2e`-named smoke-test
+sessions as a temporary cleanup heuristic and paginates tall inline-keyboard
+lists with `Load Next`. Group session selection through
 `/sessions` or `/join <session>` persists the chat's selected session in
 `AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, `/results`, and
 `/attachments` use that session without repeating the slug. It also stores that
@@ -405,7 +416,9 @@ Optional `AGENT_BRIDGE_DEMO_QUESTIONS_JSON` and
 `AGENT_BRIDGE_DEMO_DOCS_JSON` fixtures are still available for local preview or
 copy work. Set `AGENT_BRIDGE_QUESTION_SOURCE=fixture` to force fixture
 questions, or `AGENT_BRIDGE_QUESTION_SOURCE=live_or_fixture` to fall back to
-fixtures when live question reads return nothing. Fixtures must remain
+fixtures only when live question reads return no records. Live read timeouts
+and payload-unavailable rows stay visible as live-source loading/unavailable
+states instead of being replaced by fixtures. Fixtures must remain
 non-identifying and secret-free. When optional fixture/cache vars are present in
 untracked `.dev.vars`, `deploy:apply -- --apply` uploads them as plain Worker
 vars.
@@ -415,6 +428,7 @@ Question cache controls:
 | Var | Purpose |
 | --- | --- |
 | `AGENT_BRIDGE_QUESTION_SOURCE` | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback |
+| `AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS` | In `live_or_fixture`, maximum live question wait before returning a loading state and continuing live indexing in the background; default `2500` |
 | `AGENT_BRIDGE_RPC_TIMEOUT_MS` | Per-RPC timeout before trying the next configured RPC URL; default `5000` |
 | `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS` | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows an unavailable/retryable row instead of inventing a prompt |
 | `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300` |
@@ -807,12 +821,14 @@ direct path uses only deterministic managed Telegram demo accounts on testnets;
 passkey, Porto, CE-CC local, linked external wallet, and production modes remain
 blocked from worker-side signing.
 
-Private `/join <session>` also requests faucet gas for the managed Telegram
+Private `/join <session>` also schedules faucet gas for the managed Telegram
 account when the session policy sets `sponsoredFaucetAllowed=true` and a session
-worker URL is configured. Faucet results are kept in response metadata and logs
-rather than shown in Telegram copy. If policy or worker configuration does not
-allow faucet, or the session worker lacks a usable faucet key/route, join still
-succeeds without funding.
+worker URL is configured. Join replies do not wait on question prefetch or
+faucet setup; those tasks run through `ctx.waitUntil` in live Cloudflare
+requests. Faucet results are kept in response metadata and logs rather than
+shown in Telegram copy. If policy or worker configuration does not allow faucet,
+or the session worker lacks a usable faucet key/route, join still succeeds
+without funding.
 
 Mini App direct-submit retries also request faucet gas and wait for a non-zero
 managed-account balance before broadcasting the answer transaction. The wait is

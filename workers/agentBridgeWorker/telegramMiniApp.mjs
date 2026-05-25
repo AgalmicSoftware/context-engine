@@ -25,6 +25,12 @@ import {
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
 import {
+  buildQueuedSubmitRecord,
+  queueTelegramSubmitRecord,
+  SUBMITTED_RESULT_STATUSES,
+  telegramSubmitQueueEnabled,
+} from './telegramSubmitQueue.mjs';
+import {
   loadQuestionsForSession,
   loadSessionPolicy,
   deleteAnswerDraft,
@@ -542,9 +548,10 @@ function linkedPolicySessions(policy = {}) {
       sessionName: safeString(session.sessionName || session.sessionSlug),
       default: session.default === true,
       telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
+      telegramOnly: session.telegramOnly === true,
     }))
     .filter((session) => {
-      if (!session.sessionSlug || !session.telegramBridgeEnabled) return false;
+      if (!session.sessionSlug || !session.telegramBridgeEnabled || !session.telegramOnly) return false;
       const label = `${session.sessionSlug} ${session.sessionName}`;
       // Temporary smoke-test hygiene: hide old E2E registry spam until session
       // metadata has a durable production flag for Telegram visibility.
@@ -608,7 +615,7 @@ async function loadSubmittedMiniAppAnswers({
     if (question.questionKey && question.questionId) questionByRef.set(ref, question);
   });
   if (!questionByRef.size) return { submittedAnswerKeys: [], submittedAnswers: [] };
-  const submittedStatuses = new Set(['direct_submitted', 'submit_request_created']);
+  const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: 1000 });
   const byQuestionKey = new Map();
   records.forEach((record) => {
@@ -1122,6 +1129,51 @@ async function persistSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   const session = resolved.ok ? resolved.session : { sessionSlug };
+  if (telegramSubmitQueueEnabled(env)) {
+    const record = buildQueuedSubmitRecord({
+      session,
+      canonicalBody: {
+        session: sessionSlug,
+        questionId: qid,
+        questionRef: 'telegram_server_question_ref',
+        answerRef: 'telegram_private_answer_ref',
+        idempotencyKey,
+      },
+      baseRecord: {
+        version: 1,
+        requestId,
+        idempotencyKey,
+        answerFingerprint,
+        lane: TELEGRAM_CHAT_LANES.MINI_APP,
+        telegramUserId,
+        username: safeString(auth.user?.username),
+        languageCode: safeString(auth.user?.languageCode),
+        sessionSlug,
+        questionId: qid,
+        questionIdShort: shortQuestionId(qid),
+        answer,
+        onChainAnswer: answer,
+        answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+        createdAt,
+      },
+    });
+    const queued = await queueTelegramSubmitRecord({ env, kvKey, record }).catch((error) => ({
+      ok: false,
+      reason: 'telegram_submit_queue_failed',
+      error: safeString(error?.message || error),
+    }));
+    if (queued.ok === true) {
+      return {
+        ok: true,
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        queued: true,
+        replayed: false,
+      };
+    }
+  }
   const principal = normalizeTelegramPrincipal(auth.user || {});
   const account = await deriveManagedDemoAccount({
     principal,
@@ -2768,15 +2820,38 @@ function telegramMiniAppHtml() {
         });
         mount.appendChild(wrap);
       } else {
+        const answerBox = document.createElement('div');
+        answerBox.className = 'commentBox freeformAnswerBox';
         const input = document.createElement('textarea');
         input.placeholder = 'Type your response';
         input.value = draft.text || '';
         input.oninput = () => {
+          if (input.dataset.micFeedbackActive === 'true') {
+            input.classList.remove('micFeedback');
+            delete input.dataset.micFeedbackActive;
+            input.placeholder = input.dataset.originalPlaceholder || 'Type your response';
+          }
           activate(question);
           draft.text = input.value;
           updateFooterControls();
         };
-        mount.appendChild(input);
+        const answerActions = document.createElement('div');
+        answerActions.className = 'commentActions';
+        const answerMic = document.createElement('button');
+        answerMic.type = 'button';
+        answerMic.className = 'secondary micButton';
+        answerMic.innerHTML = MIC_ICON;
+        answerMic.dataset.idleLabel = 'Dictate answer';
+        answerMic.dataset.stopLabel = 'Stop recording answer';
+        answerMic.setAttribute('aria-label', 'Dictate answer');
+        answerMic.setAttribute('aria-pressed', 'false');
+        answerMic.onclick = (event) => {
+          event.stopPropagation();
+          startAnswerDictation(question, input, answerMic);
+        };
+        answerActions.appendChild(answerMic);
+        answerBox.append(input, answerActions);
+        mount.appendChild(answerBox);
       }
       const commentBox = document.createElement('div');
       commentBox.className = 'commentBox';
@@ -2832,6 +2907,42 @@ function telegramMiniAppHtml() {
       mount.appendChild(actions);
     }
     let activeDictation = null;
+    function setAnswerMicFeedback(question, textarea, message) {
+      const draft = draftFor(question);
+      if (!textarea.dataset.originalPlaceholder) {
+        textarea.dataset.originalPlaceholder = textarea.placeholder || 'Type your response';
+      }
+      textarea.placeholder = message;
+      if (!String(draft.text || textarea.value || '').trim() || textarea.dataset.micFeedbackActive === 'true') {
+        textarea.dataset.micFeedbackActive = 'true';
+        textarea.classList.add('micFeedback');
+        textarea.value = message;
+      }
+    }
+    function clearAnswerMicFeedback(question, textarea) {
+      if (textarea.dataset.micFeedbackActive === 'true') {
+        textarea.value = draftFor(question).text || '';
+      }
+      textarea.classList.remove('micFeedback');
+      delete textarea.dataset.micFeedbackActive;
+      textarea.placeholder = textarea.dataset.originalPlaceholder || 'Type your response';
+    }
+    function appendAnswerTranscript(question, textarea, transcript) {
+      const text = String(transcript || '').trim();
+      if (!text) return;
+      const draft = draftFor(question);
+      const base = textarea.dataset.micFeedbackActive === 'true' ? (draft.text || '') : textarea.value;
+      clearAnswerMicFeedback(question, textarea);
+      const prefix = base && !base.endsWith(' ') ? ' ' : '';
+      textarea.value = base + prefix + text;
+      draft.text = textarea.value;
+      activate(question);
+      updateFooterControls();
+    }
+    function showAnswerMicError(question, textarea, error) {
+      const message = 'Could not transcribe: ' + String(error || 'transcription_failed');
+      setAnswerMicFeedback(question, textarea, message);
+    }
     function setCommentMicFeedback(question, textarea, message) {
       const draft = draftFor(question);
       if (!textarea.dataset.originalPlaceholder) {
@@ -2924,6 +3035,14 @@ function telegramMiniAppHtml() {
         blob,
       });
       appendCommentTranscript(question, textarea, text);
+    }
+    async function transcribeAnswerAudio(question, textarea, blob) {
+      const text = await transcribeAudio({
+        questionKey: question.questionKey,
+        sessionSlug: question.sessionSlug || selectedTranscribeSessionSlug(),
+        blob,
+      });
+      appendAnswerTranscript(question, textarea, text);
     }
     function setSearchMicFeedback(message) {
       if (!el.filterAiSearch.dataset.originalPlaceholder) {
@@ -3071,6 +3190,102 @@ function telegramMiniAppHtml() {
       } catch {
         resetMicButton(button);
         return false;
+      }
+    }
+    function startAnswerSpeechRecognitionFallback(question, textarea, button) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        showAnswerMicError(question, textarea, 'Microphone dictation is not available in this Telegram webview.');
+        return false;
+      }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      button.disabled = true;
+      setMicIcon(button, true);
+      button.setAttribute('aria-pressed', 'true');
+      setAnswerMicFeedback(question, textarea, 'Listening...');
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results || [])
+          .map((result) => result?.[0]?.transcript || '')
+          .join(' ')
+          .trim();
+        appendAnswerTranscript(question, textarea, transcript);
+      };
+      recognition.onerror = () => {
+        showAnswerMicError(question, textarea, 'Could not capture microphone input.');
+      };
+      recognition.onend = () => resetMicButton(button);
+      try {
+        recognition.start();
+        return true;
+      } catch {
+        resetMicButton(button);
+        return false;
+      }
+    }
+    async function startAnswerDictation(question, textarea, button) {
+      if (activeDictation) {
+        const current = activeDictation;
+        activeDictation = null;
+        current.recorder?.state === 'recording' && current.recorder.stop();
+        resetMicButton(current.button);
+        if (typeof current.setTranscribing === 'function') current.setTranscribing();
+        else setAnswerMicFeedback(current.question || question, current.textarea || textarea, 'Transcribing microphone audio...');
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+        startAnswerSpeechRecognitionFallback(question, textarea, button);
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const chunks = [];
+        const mimeType = supportedAudioMimeType();
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        activeDictation = {
+          recorder,
+          stream,
+          button,
+          question,
+          textarea,
+          questionKey: question.questionKey,
+          setTranscribing: () => setAnswerMicFeedback(question, textarea, 'Transcribing microphone audio...'),
+        };
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = () => {
+          showAnswerMicError(question, textarea, 'Could not capture microphone input.');
+          stream.getTracks().forEach((track) => track.stop());
+          activeDictation = null;
+          resetMicButton(button);
+        };
+        recorder.onstop = async () => {
+          activeDictation = null;
+          stream.getTracks().forEach((track) => track.stop());
+          const blob = new Blob(chunks, { type: recorder.mimeType || mimeType || 'audio/webm' });
+          resetMicButton(button);
+          if (!blob.size) {
+            showAnswerMicError(question, textarea, 'No microphone audio captured.');
+            return;
+          }
+          try {
+            setAnswerMicFeedback(question, textarea, 'Transcribing microphone audio...');
+            await transcribeAnswerAudio(question, textarea, blob);
+          } catch (error) {
+            showAnswerMicError(question, textarea, error.message || error);
+          }
+        };
+        button.disabled = false;
+        setMicIcon(button, true);
+        button.setAttribute('aria-pressed', 'true');
+        recorder.start();
+        setAnswerMicFeedback(question, textarea, 'Recording answer. Tap stop when finished.');
+      } catch (error) {
+        resetMicButton(button);
+        showAnswerMicError(question, textarea, error.message || error);
       }
     }
     async function startCommentDictation(question, textarea, button) {

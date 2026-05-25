@@ -243,6 +243,23 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
+  it('shows a Telegram-only notice instead of the web session UI', async () => {
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      }}
+    />);
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
+      /Telegram-only session/i
+    );
+    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
+    expect(mockSurveyPage).not.toHaveBeenCalled();
+  });
+
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
     render(<OnePageSession
       {...buildProps()}
