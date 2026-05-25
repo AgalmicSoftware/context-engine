@@ -1,10 +1,38 @@
+type SbtInstanceListenerPlanReason = (
+  'missing-network' |
+  'empty-cache' |
+  'disabled' |
+  'max-disabled' |
+  'too-many' |
+  'attach'
+);
+
+interface SbtInstanceListenerPlanOptions {
+  allowInstanceListeners?: unknown;
+  maxOverridePresent?: unknown;
+  maxOverrideValue?: unknown;
+  networkID?: unknown;
+  sbtList?: unknown;
+}
+
+interface SbtInstanceListenerPlan {
+  addresses: unknown[];
+  count: number;
+  hasMaxOverride: boolean;
+  maxInstanceListeners: number;
+  networkID: string;
+  reason: SbtInstanceListenerPlanReason;
+  shouldAttach: boolean;
+  shouldMarkCoverage: boolean;
+}
+
 export const getSbtInstanceListenerPlan = ({
   allowInstanceListeners = true,
   maxOverridePresent = false,
   maxOverrideValue = undefined,
   networkID = '',
   sbtList = {},
-} = {}) => {
+}: SbtInstanceListenerPlanOptions = {}): SbtInstanceListenerPlan => {
   const safeNetworkID = String(networkID || '');
   if (!safeNetworkID) {
     return {
@@ -19,8 +47,8 @@ export const getSbtInstanceListenerPlan = ({
     };
   }
 
-  const addresses = Object.values(sbtList || {})
-    .map((entry) => entry && entry.sbtAddress)
+  const addresses = Object.values((sbtList || {}) as Record<string, unknown>)
+    .map((entry) => entry && (entry as { sbtAddress?: unknown }).sbtAddress)
     .filter(Boolean);
 
   const hasMaxOverride = !!maxOverridePresent;
