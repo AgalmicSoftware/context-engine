@@ -52,11 +52,15 @@ import {
 } from '../../utilities/web3/sessionRegistry.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import {
-  getAllowedSessionSlugs,
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
+import {
+  createInitialProfileScanReport,
+  createProfileScanFanoutPlan,
+  resolveProfileScanAttemptedCoverageSlugs,
+} from '../../utilities/session/profileScanReportHelpers.js';
 import {
   refreshSessionInfoForSlug,
   refreshSessionMetaFieldsForSlug,
@@ -2255,34 +2259,18 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const run = (async () => {
       const allSessionsMode = this.getUserProfileAllSessionsScanMode();
       const scopeContext = this.getProfileScanScopeContext();
-      const isListScope = scopeContext.scope === 'list';
-      const allowListScopeSbtFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsSbtScan === true
-      );
-      const allowListScopeSurveyActivityFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsSurveyActivityScan === true
-      );
-      const allowListScopeQuestionActivityFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsQuestionActivityScan === true
-      );
-      const allowListScopeAnyFanout = (
-        allowListScopeSbtFanout ||
-        allowListScopeSurveyActivityFanout ||
-        allowListScopeQuestionActivityFanout
-      );
-      const useAllSessionsScan = isListScope
-        ? allowListScopeAnyFanout
-        : allSessionsMode.useAllSessionsScan;
-      const shouldHydrateRegistry = (
-        allSessionsMode.useAllSessionsScan ||
-        isListScope
-      );
+      const fanoutPlan = createProfileScanFanoutPlan({
+        scopeContext,
+        allSessionsMode,
+      });
+      const {
+        isListScope,
+        allowListScopeSbtFanout,
+        allowListScopeSurveyActivityFanout,
+        allowListScopeQuestionActivityFanout,
+        useAllSessionsScan,
+        shouldHydrateRegistry,
+      } = fanoutPlan;
       const registryStatus = shouldHydrateRegistry
         ? await this.ensureRegistryHydratedForProfileScan({
           forceAllChains: isListScope,
@@ -2293,21 +2281,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         useAllSessionsScan,
       });
       const allSlugs = profileScanPlan.slugs;
-      const listScopeCoverageSlugs = isListScope
-        ? Array.from(new Set(
-            getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug)
-              .map((slug) => normalizeSessionSlug(slug || ''))
-          ))
-        : [];
-      const attemptedCoverageSlugs = (
-        allowListScopeAnyFanout &&
-        listScopeCoverageSlugs.length > 0
-      )
-        ? listScopeCoverageSlugs
-        : [...allSlugs];
-      const attemptedCoverageSlugSet = new Set(
-        attemptedCoverageSlugs.map((slug) => normalizeSessionSlug(slug || ''))
-      );
+      const {
+        attemptedCoverageSlugs,
+        attemptedCoverageSlugSet,
+      } = resolveProfileScanAttemptedCoverageSlugs({
+        fanoutPlan,
+        scopeContext,
+        allSlugs,
+      });
       this.emitProfileScanColdDiag('plan', {
         targetAddress: targetLower,
         scope: scopeContext.scope,
@@ -2332,54 +2313,18 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       const activityLookbackBlocks = this.readProfileScanActivityLookbackBlocks({
         useAllSessions: !!allSessionsMode.useAllSessionsActivityScan,
       });
-      const report: MainSiteProfileScanReport = {
-        targetAddress: targetLower,
-        usedAllSessions: !!profileScanPlan.usedAllSessions,
-        useAllSessionsSbtScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsSbtScan),
-        useAllSessionsSurveyActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsSurveyActivityScan),
-        useAllSessionsQuestionActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsQuestionActivityScan),
-        useAllSessionsActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsActivityScan),
-        listScopeSbtFanout: allowListScopeSbtFanout,
-        listScopeSurveyActivityFanout: allowListScopeSurveyActivityFanout,
-        listScopeQuestionActivityFanout: allowListScopeQuestionActivityFanout,
-        attemptedSlugs: [...attemptedCoverageSlugs],
-        scannedSlugs: [],
-        skippedSlugs: [],
-        skippedSlugReasons: {},
-        failedSlugs: [],
-        failedActivitySlugs: [],
-        allActivityFailed: false,
-        allSbtFailed: false,
-        hadRpcErrors: profileScanPlan.coverageComplete === false,
-        anyNewData: false,
-        coverageComplete: profileScanPlan.coverageComplete !== false,
-        coverageReason: profileScanPlan.coverageReason || '',
-        registryEntryCount: Number(profileScanPlan.registryEntryCount || 0),
-        hadLoadErrors: !!profileScanPlan.hadLoadErrors,
-        rawAllSlugCount: Number(profileScanPlan.rawAllSlugCount || 0),
-        activeChainSlugCount: Number(profileScanPlan.activeChainSlugCount || 0),
-        scopedFallbackSlugCount: Number(profileScanPlan.scopedFallbackSlugCount || 0),
-        relevantSlugs: Array.isArray(profileScanPlan.relevantSlugs)
-          ? [...profileScanPlan.relevantSlugs]
-          : [],
-        prioritizedGeneralFirst: !!profileScanPlan.prioritizedGeneralFirst,
-        scanOrdering: String(profileScanPlan.scanOrdering || ''),
-        slugFetchTimeoutMs: Number(slugFetchTimeoutMs || 0),
-        sbtFetchTimeoutMs: Number(sbtFetchTimeoutMs || 0),
-        activityFetchTimeoutMs: Number(activityFetchTimeoutMs || 0),
-        activityLookbackBlocks: Number(activityLookbackBlocks || 0),
-        sbtBurstSize: Number(sbtBurstSize || 1),
-        totalSbtContractsFound: 0,
-        totalCreatedSurveysFound: 0,
-        totalCreatedQuestionsFound: 0,
-        totalSurveyResponsesFound: 0,
-        totalQuestionResponsesFound: 0,
-        sampleSbtAddresses: [],
-        sampleCreatedSurveyIds: [],
-        sampleCreatedQuestionIds: [],
-        sampleSurveyResponseIds: [],
-        sampleQuestionResponseIds: [],
-      };
+      const report = createInitialProfileScanReport({
+        targetLower,
+        profileScanPlan,
+        allSessionsMode,
+        fanoutPlan,
+        attemptedCoverageSlugs,
+        slugFetchTimeoutMs,
+        sbtFetchTimeoutMs,
+        activityFetchTimeoutMs,
+        activityLookbackBlocks,
+        sbtBurstSize,
+      }) as MainSiteProfileScanReport;
       this.emitProfileScanTelemetry('scan-start', {
         targetAddress: targetLower,
         usedAllSessions: report.usedAllSessions,
