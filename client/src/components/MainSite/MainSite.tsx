@@ -5428,7 +5428,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _renderHomeRoute = (ctx: RouteRenderCtx) => {
     const { defaultSlug, defaultSessionNetwork, cacheInitializationError } = ctx;
     return (
-      <div id={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
+      <div className={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
         <MainAreaTabs
           changeFocusedTab={this.props.changeFocusedTab}
           toggleLoginModal={this.props.toggleLoginModal}
