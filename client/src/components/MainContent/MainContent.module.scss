@@ -88,9 +88,7 @@
   }
 
   .mainAreaTabsAlt {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: 100%;
+    width: 75%;
     height: 100%;
     min-height: 100%;
     margin-top: 5px;
@@ -147,8 +145,7 @@
   margin-top: 0px;
 }
 
-.navTabIcon {
-}
+.navTabIcon { }
 
 #trelloEmbed {
   display: flex;

@@ -113,13 +113,51 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
     const activeClassName = (isActive: boolean) => (isActive ? 'active' : '');
     return (
       <div className={styles.mainAreaTabsAlt}>
-        <Card className={styles.mainTabsCard}>
-          <CardHeader className={styles.mainTabsCardHeader}>
-            <Nav className="nav-tabs-info" role="tablist" tabs>
-              <NavItem>
-                <NavLink
-                  className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
-                  onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
+                <Card className={styles.mainTabsCard}>
+              <CardHeader className={styles.mainTabsCardHeader}>
+                <Nav className="nav-tabs-info" role="tablist" tabs>
+                  <NavItem>
+                    <NavLink
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.LATEST)}
+                      onClick={() => this.changeTabs(MAIN_AREA_TABS.LATEST)}
+                    >
+                      <FontAwesomeIcon icon={faPlay} className={styles.navTabIcon} />
+                      <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]} </div>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem>
+                    <NavLink
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.COMMUNITY)}
+                      onClick={() => this.changeTabs(MAIN_AREA_TABS.COMMUNITY)}
+                    >
+                      <FontAwesomeIcon icon={faGlobe} className={styles.navTabIcon} />
+                      <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.COMMUNITY]} </div>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem>
+                    <NavLink
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.TOOLS)}
+                      onClick={() => this.changeTabs(MAIN_AREA_TABS.TOOLS)}
+                    >
+                      <FontAwesomeIcon icon={faTools} className={styles.navTabIcon} />
+                     <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.TOOLS]} </div>
+                    </NavLink>
+                  </NavItem>
+                  <NavItem>
+                    <NavLink
+                      className={activeClassName(this.props.focusedTab === MAIN_AREA_TABS.WELCOME)}
+                      onClick={() => this.changeTabs(MAIN_AREA_TABS.WELCOME)}
+                    >
+                      <FontAwesomeIcon icon={faCompass} className={styles.navTabIcon} />
+                      <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.WELCOME]} </div>
+                    </NavLink>
+                  </NavItem>
+                </Nav>
+              </CardHeader>
+              <CardBody className={styles.mainAreaCardBody}>
+                <TabContent
+                  className="tab-space"
+                  activeTab={"link" + this.state.currentTabIndex}
                 >
                   <FontAwesomeIcon icon={faPlay} className={styles.navTabIcon} />
                   <div id="mainContentTabTitle"> {MAIN_AREA_TAB_TITLES[MAIN_AREA_TABS.LATEST]} </div>
