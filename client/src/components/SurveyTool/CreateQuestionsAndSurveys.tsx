@@ -690,6 +690,7 @@ const mergeCreateSurveySessionConfigWithRegistry = ({
   };
 };
 const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
+const writeCreateSurveyCacheOptimistic = writeCacheOptimistic as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
@@ -1968,11 +1969,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (!primaryNetId) return false;
 
       const existing = readManagedCacheSnapshot('questionsCache', primarySlug);
-      const next = (existing && typeof existing === 'object') ? { ...existing } : {};
-      const netBucket = (next[primaryNetId] && typeof next[primaryNetId] === 'object')
-        ? { ...next[primaryNetId] }
+      const next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
+      const netBucket: ManagedCacheBucket = isObjectLikeRecord(next[primaryNetId])
+        ? { ...(next[primaryNetId] as UnknownRecord) }
         : {};
-      const questions = (netBucket.questions && typeof netBucket.questions === 'object')
+      const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions)
         ? { ...netBucket.questions }
         : {};
 
@@ -1995,7 +1996,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
-        await writeCacheOptimistic('questionsCache', primarySlug, next);
+        await writeCreateSurveyCacheOptimistic('questionsCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
@@ -2053,7 +2054,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       const existing = readManagedCacheSnapshot('surveysCache', primarySlug);
-      let next = (existing && typeof existing === 'object') ? { ...existing } : {};
+      let next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
       next = ensureManagedSurveysNet(next, primaryNetId);
       const netBucket = next[primaryNetId] as ManagedCacheBucket;
       const surveys = netBucket.surveys as ManagedResourceMap;
@@ -2068,7 +2069,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       try {
-        await writeCacheOptimistic('surveysCache', primarySlug, next);
+        await writeCreateSurveyCacheOptimistic('surveysCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
