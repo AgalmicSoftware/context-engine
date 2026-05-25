@@ -42,6 +42,7 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_SESSION_ROOT: 'ce-page-session-root',
   PAGE_SESSION_DOCS_ROOT: 'ce-page-session-docs-root',
   PAGE_SESSION_WIZARD_ROOT: 'ce-page-session-wizard-root',
+  SESSION_TELEGRAM_ONLY_NOTICE: 'ce-session-telegram-only-notice',
   SESSION_LOADING_SKELETON: 'ce-session-loading-skeleton',
   PAGE_ATLAS_ROOT: 'ce-page-atlas-root',
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
