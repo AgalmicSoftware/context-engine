@@ -81,6 +81,7 @@ import {
   parseAllowOriginsDraft,
 } from './adminPageDraftFormattingHelpers';
 import {
+  buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
