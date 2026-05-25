@@ -183,11 +183,6 @@ type CreateSurveyEncryptionGateSbt = {
   [key: string]: unknown;
 };
 
-type AiPromptModelConfig = {
-  provider?: unknown;
-  model?: unknown;
-};
-
 export {
   buildCreateSurveyDocUrlClearPatch,
   buildCreateSurveyDocUrlErrorPatch,
@@ -198,14 +193,11 @@ export {
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveySurveyLockGateIdsPatch,
 } from './createQuestionsAndSurveysLockStateHelpers';
+export {
+  buildCreateSurveyAiPromptModelLabelPatch,
+  formatAiPromptModelLabel,
+} from './createQuestionsAndSurveysAiDisplayHelpers';
 
-const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  custom: 'Custom',
-  local: 'Local',
-});
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
 const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   default: 'default',
@@ -552,25 +544,11 @@ export const getCreateSurveyValidationError = ({
   return '';
 };
 
-export const formatAiPromptModelLabel = (config: AiPromptModelConfig = {}) => {
-  const providerKey = String(config?.provider || '').trim().toLowerCase();
-  const model = String(config?.model || '').trim();
-  const provider =
-    AI_PROVIDER_LABELS[providerKey] ||
-    (providerKey ? `${providerKey.charAt(0).toUpperCase()}${providerKey.slice(1)}` : '');
-  if (provider && model) return `${provider} ${model}`;
-  return model || provider || 'Configured model';
-};
-
 export const buildCreateSurveyCopySuccessPatch = (
   stateKey: unknown,
   copied: unknown
 ) => ({
   [String(stateKey || '')]: !!copied,
-});
-
-export const buildCreateSurveyAiPromptModelLabelPatch = (aiPromptModelLabel: unknown) => ({
-  aiPromptModelLabel: String(aiPromptModelLabel || 'Configured model'),
 });
 
 export const buildCreateSurveyFocusTargetPatch = (focusTargetUiKey: unknown = null) => ({
