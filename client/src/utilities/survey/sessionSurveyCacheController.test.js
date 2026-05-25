@@ -244,32 +244,14 @@ describe('createSessionSurveyCacheController', () => {
       expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
 
       expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'alpha');
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'alpha'
+      );
 
       const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
       const event = { type: 'SurveyAdded', surveyId: '0xsurvey' };
-      handler(event);
-
-      expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
-    });
-
-    it('uses an injected event stream port for survey listeners', () => {
-      const surveyEventStreamsPort = {
-        removeSurveyEventsListener: jest.fn(),
-        listenForSurveyEvents: jest.fn(),
-      };
-      const host = createMockHost({ surveyEventStreamsPort });
-      const controller = createSessionSurveyCacheController(host);
-
-      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
-
-      expect(surveyEventStreamsPort.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
-      expect(surveyEventStreamsPort.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'alpha');
-      expect(contractScripts.removeSurveyEventsListener).not.toHaveBeenCalled();
-      expect(contractScripts.listenForSurveyEvents).not.toHaveBeenCalled();
-
-      const handler = surveyEventStreamsPort.listenForSurveyEvents.mock.calls[0][1];
-      const event = { type: 'SurveyAdded', surveyId: '0xinjected' };
       handler(event);
 
       expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
@@ -282,7 +264,11 @@ describe('createSessionSurveyCacheController', () => {
       expect(controller.startSurveyAndQuestionEventListener()).toBe(true);
 
       expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'active-slug');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith('none', expect.any(Function), 'active-slug');
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'active-slug'
+      );
     });
 
     it('does not attach a listener when scan policy skips the slug', () => {

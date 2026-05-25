@@ -135,7 +135,11 @@ interface SurveyContractScripts {
     latestBlock: number,
     slug: string,
   ) => Promise<unknown>;
-  listenForSurveyEvents?: (providerName: string, handler: (event: unknown) => unknown, slug: string) => unknown;
+  listenForSurveyEvents?: (
+    providerName: string,
+    handler: (event: unknown) => unknown,
+    slug: string
+  ) => unknown;
   removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
 }
 type SurveyEventStreamsPort = Pick<SbtEventStreamsPort, 'listenForSurveyEvents' | 'removeSurveyEventsListener'>;
@@ -154,7 +158,6 @@ export interface SessionSurveyCacheHost extends WorkerMetadataHydrationHost {
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
   onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
-  surveyEventStreamsPort?: SurveyEventStreamsPort;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -193,38 +196,37 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
     }
     if (typeof cb === 'function') cb();
   };
-  const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
-  const dgRead = (...args: [string, string]): CacheRecord | null =>
-    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null;
-  const getActiveSessionSlug = (): string =>
-    String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
-  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const cfg = readWorkerMetadataSessionConfig(host, slug);
-    if (!cfg || typeof cfg !== 'object') return slug;
-    // Regression guard: preserve resolved demo block limits across chain scans.
-    return {
-      ...cfg,
-      slug: normalizeSessionSlug(cfg.slug || slug),
-      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
-        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
-        : {}),
-    };
-  };
-  const getSessionChainId = (slug: string): string | number | null | undefined =>
-    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
-  const getSessionScanScope = (): string =>
-    String(typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : '');
-  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean =>
-    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false;
-  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean =>
+  const isMounted = (): boolean => (
+    typeof host.isMounted === 'function' ? host.isMounted() : false
+  );
+  const dgRead = (...args: [string, string]): CacheRecord | null => (
+    typeof host.dgRead === 'function' ? (host.dgRead(...args) as CacheRecord | null) : null
+  );
+  const dgWrite = (...args: [string, string, CacheRecord]): unknown => (
+    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null
+  );
+  const getActiveSessionSlug = (): string => String(
+    typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : ''
+  );
+  const getSessionChainId = (slug: string): string | number | null | undefined => (
+    typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null
+  );
+  const getSessionScanScope = (): string => String(
+    typeof host.getSessionScanScope === 'function' ? host.getSessionScanScope() || '' : ''
+  );
+  const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
+    typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
+  );
+  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean => (
     typeof host.shouldSkipSessionScanForSlug === 'function'
       ? host.shouldSkipSessionScanForSlug(slug, op, scopeCtx)
-      : false;
-  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown =>
+      : false
+  );
+  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown => (
     typeof host.onSurveyEventDetectedForGroup === 'function'
       ? host.onSurveyEventDetectedForGroup(slug, event)
-      : undefined;
+      : undefined
+  );
   const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') {
       host.checkAllCachesReady();
@@ -1163,22 +1165,24 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
 
   const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
-    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', {
-      slug,
-    });
-    surveyEventStreams.removeSurveyEventsListener('none', slug);
+    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
+    if (typeof surveyContractScripts.removeSurveyEventsListener === 'function') {
+      surveyContractScripts.removeSurveyEventsListener('none', slug);
+    }
     if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
-    surveyEventStreams.listenForSurveyEvents(
+    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
+    surveyContractScripts.listenForSurveyEvents(
       'none',
       (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
-      slug,
+      slug
     );
     mainSiteLog.log('Survey & Question event listener started');
     return true;
   };
 
-  const startSurveyAndQuestionEventListener = (): boolean =>
-    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug());
+  const startSurveyAndQuestionEventListener = (): boolean => (
+    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug())
+  );
 
   const refreshSurveyResponsesByIDForGroup = async (slugIn: string, surveyID: string): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
