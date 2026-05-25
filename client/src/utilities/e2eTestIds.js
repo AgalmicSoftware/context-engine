@@ -47,7 +47,6 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_ATLAS_ROOT: 'ce-page-atlas-root',
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
   PAGE_AGENT_ROOT: 'ce-page-agent-root',
-  PAGE_TELEGRAM_DEMO_SETUP_ROOT: 'ce-page-telegram-demo-setup-root',
   PAGE_DEBATE_ROOT: 'ce-page-debate-root',
   DEBATE_VIEW_MODE: 'ce-debate-view-mode',
   ATLAS_NODE: 'ce-atlas-node',
@@ -179,20 +178,6 @@ const E2E_TESTIDS = Object.freeze({
   AGENT_RUN: 'ce-agent-run',
   AGENT_STEP: 'ce-agent-step',
   AGENT_LOG: 'ce-agent-log',
-
-  // Telegram demo setup
-  TELEGRAM_DEMO_SESSION_SELECT: 'ce-telegram-demo-session-select',
-  TELEGRAM_DEMO_BOT_TOKEN: 'ce-telegram-demo-bot-token',
-  TELEGRAM_DEMO_BOT_USERNAME: 'ce-telegram-demo-bot-username',
-  TELEGRAM_DEMO_CLOUDFLARE_API_TOKEN: 'ce-telegram-demo-cloudflare-api-token',
-  TELEGRAM_DEMO_WORKER_NAME: 'ce-telegram-demo-worker-name',
-  TELEGRAM_DEMO_WORKERS_SUBDOMAIN: 'ce-telegram-demo-workers-subdomain',
-  TELEGRAM_DEMO_PUBLIC_URL: 'ce-telegram-demo-public-url',
-  TELEGRAM_DEMO_DEFAULT_RPC_URL: 'ce-telegram-demo-default-rpc-url',
-  TELEGRAM_DEMO_ADDITIONAL_RPC_URL: 'ce-telegram-demo-additional-rpc-url',
-  TELEGRAM_DEMO_BUILD_PLAN: 'ce-telegram-demo-build-plan',
-  TELEGRAM_DEMO_STATUS: 'ce-telegram-demo-status',
-  TELEGRAM_DEMO_GENERATED_SECRETS: 'ce-telegram-demo-generated-secrets',
 
   // SurveyTool (answering/responding)
   SURVEY_DECRYPT_PROMPT: 'ce-survey-decrypt-prompt',

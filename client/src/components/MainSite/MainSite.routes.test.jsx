@@ -25,7 +25,6 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
-const mockTelegramDemoSetupPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
@@ -234,20 +233,6 @@ jest.mock('../DebateMap/DebateMap', () => {
       return React.createElement('div', {
         'data-testid': 'mock-debate-map',
         'data-demo-mode': typeof props.demoMode === 'undefined' ? '' : String(props.demoMode),
-      });
-    },
-  };
-});
-
-jest.mock('../TelegramDemoSetup/TelegramDemoSetupPage', () => {
-  const React = require('react');
-  return {
-    __esModule: true,
-    default: (props) => {
-      mockTelegramDemoSetupPage(props);
-      return React.createElement('div', {
-        'data-testid': 'mock-telegram-demo-setup-page',
-        'data-active-session-slug': String(props.activeSessionSlug || ''),
       });
     },
   };
@@ -766,7 +751,7 @@ describe('MainSite route render smoke', () => {
     expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-network-id', '84532');
   });
 
-  it('renders the Telegram demo setup route without waiting for cache bootstrap', async () => {
+  it('does not expose the private Telegram demo setup route', async () => {
     const subject = createSubject({
       path: '/telegram-demo-setup',
       activeSessionSlug: 'edge',
@@ -780,9 +765,9 @@ describe('MainSite route render smoke', () => {
 
     render(subject.render());
 
-    expect(await screen.findByTestId('mock-telegram-demo-setup-page')).toHaveAttribute('data-active-session-slug', 'edge');
-    expect(mockTelegramDemoSetupPage.mock.calls[mockTelegramDemoSetupPage.mock.calls.length - 1][0]?.activeSessionSlug)
-      .toBe('edge');
+    expect(await screen.findByText('Page not found')).toBeInTheDocument();
+    expect(screen.getByText(/This URL is not part of the supported public surface/i)).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node?.textContent === 'Path: /telegram-demo-setup')).toBeInTheDocument();
   });
 
   it.each([
