@@ -153,6 +153,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.sessionPicker\.collapsed \.sessionPickerBody \{ display: none; \}/);
   assert.match(html, /<div class="sectionTitle">Sessions<\/div>/);
   assert.match(html, /id="continueSessions"/);
+  assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
+  assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
+  assert.match(html, /id="consensusResults"/);
+  assert.match(html, /id="divisiveResults"/);
+  assert.match(html, /id="resultGroups"/);
+  assert.match(html, /Analyze with AI/);
+  assert.match(html, /\/telegram\/mini-app\/api\/results/);
+  assert.match(html, /function renderResults\(\)/);
+  assert.match(html, /function analyzeResultGroup\(groupId\)/);
   assert.equal(html.includes('id="groupsPicker"'), false);
   assert.equal(html.includes('function renderGroupsPicker()'), false);
   assert.match(html, /id="filterUnansweredFirst"/);
@@ -167,6 +176,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="submit"'), false);
   assert.match(html, /\.cardActions \{[\s\S]*grid-template-columns: minmax\(96px, 3fr\) minmax\(0, 7fr\);/);
   assert.match(html, /id="savedDrafts"/);
+  assert.match(html, /Submitted responses/);
+  assert.match(html, /Submitted answer: /);
+  assert.match(html, /submittedAnswersByQuestionKey/);
+  assert.match(html, /answerHasContent/);
   assert.match(html, /const serverDrafts = body\.draftAnswersByQuestionKey \|\| \{\};/);
   assert.equal(html.includes('enableVerticalSwipes'), false);
   assert.equal(html.includes('disableVerticalSwipes'), false);
@@ -190,7 +203,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /Dictate AI search/);
   assert.match(html, /const MIC_ICON = '<svg/);
   assert.match(html, /const STOP_ICON = '<svg/);
+  assert.match(html, /const CHECK_ICON = '<svg/);
   assert.match(html, /\.commentActions \.micButton svg \{[\s\S]*width: 30px;[\s\S]*height: 30px;/);
+  assert.match(html, /\.submitButton\.submittedCheck/);
   assert.match(html, /Transcribing microphone audio/);
   assert.match(html, /Transcribing search audio/);
   assert.match(html, /function setCommentMicFeedback/);
@@ -206,7 +221,12 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /SpeechRecognition/);
   assert.match(html, /\/telegram\/mini-app\/api\/clear-drafts/);
   assert.equal(html.includes("setStatus(submit ? 'Submitting...' : 'Saving draft...');"), false);
-  assert.match(html, /button\.textContent = isBusy \? 'Submitting\.\.\.' : 'Submit';/);
+  assert.match(html, /function setSubmitBusy\(isBusy, triggerButton = null, question = activeQuestion\(\)\)/);
+  assert.match(html, /applySubmitButtonState\(button, question, \{ busy: isBusy \}\);/);
+  assert.match(html, /currentAnswerMatchesSubmitted/);
+  assert.match(html, /refreshQuestionSubmitButton\(question, input\);/);
+  assert.match(html, /refreshQuestionSubmitButton\(question, comments\);/);
+  assert.match(html, /if \(currentAnswerMatchesSubmitted\(question\)\) return;/);
   assert.match(html, /const QUESTION_RETRY_DELAY_MS = 4000;/);
   assert.match(html, /SHOW_UNANSWERED_STORAGE_KEY/);
   assert.match(html, /function renderSessionPicker\(\)/);
@@ -554,6 +574,140 @@ test('Mini App clear drafts leaves submitted answer history intact', async () =>
   assert.deepEqual(after.submittedAnswerKeys, [questionKey]);
   assert.equal(after.submittedAnswers[0].answerLabel, 'Agree');
   assert.equal(after.savedDrafts.length, 0);
+});
+
+test('Mini App state exposes submitted rating answers for hydration', async () => {
+  const kv = new MemoryKv();
+  const questionId = 'q-rating-history';
+  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}rating-history`, JSON.stringify({
+    version: 1,
+    requestId: 'rating-history',
+    status: 'direct_submitted',
+    lane: 'telegram_mini_app',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: { questionType: 'rating', value: 0, comments: 'Lowest score' },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'rating',
+        prompt: 'Rate the Mini App.',
+      }]),
+    },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+  assert.deepEqual(state.submittedAnswerKeys, [questionKey]);
+  assert.equal(state.submittedAnswers[0].answerLabel, '0');
+  assert.deepEqual(state.submittedAnswers[0].answer, {
+    value: 0,
+    comments: 'Lowest score',
+  });
+  assert.equal(state.savedDrafts.length, 0);
+  assert.deepEqual(state.draftAnswersByQuestionKey, {});
+});
+
+test('Mini App results endpoint summarizes consensus, divisive questions, groups, and group analysis', async () => {
+  const kv = new MemoryKv();
+  const submitRecords = [
+    ['r1', 'user-a', 'q-consensus', { value: 'agree', label: 'Agree' }],
+    ['r2', 'user-b', 'q-consensus', { value: 'agree', label: 'Agree' }],
+    ['r3', 'user-a', 'q-divisive', { value: 'agree', label: 'Agree' }],
+    ['r4', 'user-b', 'q-divisive', { value: 'disagree', label: 'Disagree' }],
+    ['r5', 'user-c', 'q-divisive', { value: 'unsure', label: 'Unsure' }],
+  ];
+  for (const [id, telegramUserId, questionId, answer] of submitRecords) {
+    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${id}`, JSON.stringify({
+      version: 1,
+      requestId: id,
+      status: 'direct_submitted',
+      lane: 'telegram_mini_app',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer,
+      createdAt: `2026-05-08T12:00:0${id.slice(1)}.000Z`,
+    }));
+  }
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-consensus',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the team keep the current plan?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-divisive',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should the team change the launch date?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-freeform',
+        questionType: 'freeform',
+        prompt: 'What context is missing?',
+      },
+    ]),
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha'),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.responseCount, 5);
+  assert.equal(body.binaryQuestionCount, 2);
+  assert.equal(body.questions.consensus[0].questionId, 'q-consensus');
+  assert.equal(body.questions.divisive[0].questionId, 'q-divisive');
+  assert.equal(body.questions.divisive[0].counts.Disagree, 1);
+  assert.equal(body.groups.length > 0, true);
+
+  const analysisResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        action: 'analyze_group',
+        sessionSlug: 'alpha',
+        groupId: body.groups[0].groupId,
+      }),
+    }),
+    env,
+  });
+  const analysisBody = await analysisResponse.json();
+
+  assert.equal(analysisResponse.status, 200);
+  assert.equal(analysisBody.ok, true);
+  assert.equal(analysisBody.group.groupId, body.groups[0].groupId);
+  assert.match(analysisBody.analysis.short, /group/i);
 });
 
 test('Mini App search falls back to semantic food-preference matching when AI is unavailable', async () => {
