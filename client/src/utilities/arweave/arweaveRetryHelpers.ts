@@ -12,17 +12,24 @@ import {
 
 export { isTerminalArweaveFailureState, normalizeArweaveFailureMeta };
 
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
 export const shouldStopPendingMetadataRetry = ({
   pendingEntry = null,
   error = null,
   maxAttempts = 0,
 }: {
-  pendingEntry?: any;
-  error?: any;
+  pendingEntry?: unknown;
+  error?: unknown;
   maxAttempts?: unknown;
 } = {}) => {
+  const pendingRecord = isRecord(pendingEntry) ? pendingEntry : {};
   const meta = normalizeArweaveFailureMeta(error);
-  const attempts = Math.max(0, Number(pendingEntry?.attempts || 0));
+  const attempts = Math.max(0, Number(pendingRecord.attempts || 0));
   const boundedMax = Math.max(0, Number(maxAttempts || 0));
   const reachedMaxAttempts = boundedMax > 0 && attempts >= boundedMax;
   const terminal = isTerminalArweaveFailureState(meta.state);
@@ -34,36 +41,40 @@ export const shouldStopPendingMetadataRetry = ({
   };
 };
 
-const pickNewerTextEntry = (a: any, b: any) => {
-  const aTs = Number(a?.savedAtMs || 0);
-  const bTs = Number(b?.savedAtMs || 0);
+const pickNewerTextEntry = (a: unknown, b: unknown) => {
+  const aRecord = isRecord(a) ? a : {};
+  const bRecord = isRecord(b) ? b : {};
+  const aTs = Number(aRecord.savedAtMs || 0);
+  const bTs = Number(bRecord.savedAtMs || 0);
   if (aTs > bTs) return a;
   if (bTs > aTs) return b;
-  const aLen = typeof a?.text === 'string' ? a.text.length : 0;
-  const bLen = typeof b?.text === 'string' ? b.text.length : 0;
+  const aLen = typeof aRecord.text === 'string' ? aRecord.text.length : 0;
+  const bLen = typeof bRecord.text === 'string' ? bRecord.text.length : 0;
   return aLen >= bLen ? a : b;
 };
 
-const pickNewerFailureEntry = (a: any, b: any) => {
-  const aTs = Number(a?.lastFailedAtMs || a?.firstFailedAtMs || 0);
-  const bTs = Number(b?.lastFailedAtMs || b?.firstFailedAtMs || 0);
+const pickNewerFailureEntry = (a: unknown, b: unknown) => {
+  const aRecord = isRecord(a) ? a : {};
+  const bRecord = isRecord(b) ? b : {};
+  const aTs = Number(aRecord.lastFailedAtMs || aRecord.firstFailedAtMs || 0);
+  const bTs = Number(bRecord.lastFailedAtMs || bRecord.firstFailedAtMs || 0);
   if (aTs > bTs) return a;
   if (bTs > aTs) return b;
-  const aAttempts = Number(a?.attempts || 0);
-  const bAttempts = Number(b?.attempts || 0);
+  const aAttempts = Number(aRecord.attempts || 0);
+  const bAttempts = Number(bRecord.attempts || 0);
   if (aAttempts > bAttempts) return a;
   if (bAttempts > aAttempts) return b;
-  const aTerminal = isTerminalArweaveFailureState(a?.state);
-  const bTerminal = isTerminalArweaveFailureState(b?.state);
+  const aTerminal = isTerminalArweaveFailureState(aRecord.state);
+  const bTerminal = isTerminalArweaveFailureState(bRecord.state);
   if (aTerminal && !bTerminal) return a;
   if (bTerminal && !aTerminal) return b;
   return a || b || null;
 };
 
-const mergeByKey = (localMap: any, freshMap: any, chooser: (a: any, b: any) => any) => {
-  const local: Record<string, any> = (localMap && typeof localMap === 'object') ? localMap : {};
-  const fresh: Record<string, any> = (freshMap && typeof freshMap === 'object') ? freshMap : {};
-  const out: Record<string, any> = {};
+const mergeByKey = (localMap: unknown, freshMap: unknown, chooser: (a: unknown, b: unknown) => unknown) => {
+  const local: UnknownRecord = isRecord(localMap) ? localMap : {};
+  const fresh: UnknownRecord = isRecord(freshMap) ? freshMap : {};
+  const out: UnknownRecord = {};
   const keys = new Set([...Object.keys(local), ...Object.keys(fresh)]);
   keys.forEach((key) => {
     const localEntry = local[key];
@@ -84,14 +95,14 @@ export const prunePendingMetadataEntries = ({
   hydratedEntries = null,
   normalizeKey = normalizePendingMetadataKey,
 }: {
-  pendingEntries?: any;
-  hydratedEntries?: any;
+  pendingEntries?: unknown;
+  hydratedEntries?: unknown;
   normalizeKey?: ((key: unknown) => string) | null;
 } = {}) => {
   const normalize = (typeof normalizeKey === 'function') ? normalizeKey : normalizePendingMetadataKey;
-  const pending: Record<string, any> = (pendingEntries && typeof pendingEntries === 'object') ? pendingEntries : {};
-  const hydrated: Record<string, any> = (hydratedEntries && typeof hydratedEntries === 'object') ? hydratedEntries : {};
-  const nextPending: Record<string, any> = {};
+  const pending: UnknownRecord = isRecord(pendingEntries) ? pendingEntries : {};
+  const hydrated: UnknownRecord = isRecord(hydratedEntries) ? hydratedEntries : {};
+  const nextPending: UnknownRecord = {};
   const removedKeys: string[] = [];
 
   Object.keys(pending).forEach((rawKey) => {
@@ -111,17 +122,20 @@ export const prunePendingMetadataEntries = ({
   };
 };
 
-export const ensureQuestionArweaveCacheBranches = (networkNode: any) => {
-  const node = (networkNode && typeof networkNode === 'object') ? networkNode : {};
+export const ensureQuestionArweaveCacheBranches = (networkNode: unknown) => {
+  const node = (isRecord(networkNode) ? networkNode : {}) as UnknownRecord & {
+    arweaveTxCache?: unknown;
+    arweaveTxFailureCache?: unknown;
+  };
   if (!node.arweaveTxCache || typeof node.arweaveTxCache !== 'object') node.arweaveTxCache = {};
   if (!node.arweaveTxFailureCache || typeof node.arweaveTxFailureCache !== 'object') node.arweaveTxFailureCache = {};
   return node;
 };
 
-export const mergeQuestionArweaveCacheBranches = (localNode: any, freshNode: any) => {
+export const mergeQuestionArweaveCacheBranches = (localNode: unknown, freshNode: unknown) => {
   const local = ensureQuestionArweaveCacheBranches(localNode);
   const fresh = ensureQuestionArweaveCacheBranches(
-    (freshNode && typeof freshNode === 'object') ? freshNode : {}
+    isRecord(freshNode) ? freshNode : {}
   );
   local.arweaveTxCache = mergeByKey(local.arweaveTxCache, fresh.arweaveTxCache, pickNewerTextEntry);
   local.arweaveTxFailureCache = mergeByKey(
