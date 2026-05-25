@@ -45,6 +45,12 @@ and results API only. Do not add client-side CE changes for
 `/session/<telegram-only-slug>` yet. The normal CE client should continue to
 show the `Telegram-only session` notice described in the parity PRD.
 
+The Mini App may also offer a local `Demo data` toggle. That toggle should
+populate aggregate/group result panels and rendered images with synthetic
+records only, so operators can inspect the Telegram chat image format before a
+session has enough live responses. Demo data must be marked as demo in API
+responses and must not be exported as live response data.
+
 ## Policy Shape
 
 Session policy may include:
@@ -129,6 +135,10 @@ and group summaries should be omitted unless admin-published.
   an admin explicitly publishes it.
 - Participant counts in a public layer should be thresholded or rounded when a
   session is small.
+- Lightweight Telegram-only group memberships may be used as additional
+  aggregate segmentation context after the user explicitly saves them in the
+  Mini App. They are Cloudflare-managed demo metadata, not on-chain SBT claims,
+  until the parity PRD defines a durable resource-gating model.
 
 ## Agent Village Compatibility
 

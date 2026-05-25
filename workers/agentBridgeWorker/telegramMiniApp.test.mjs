@@ -1123,3 +1123,197 @@ test('Mini App distinguishes encrypted questions from unavailable payloads', asy
   assert.equal(unavailable.payloadUnavailable, true);
   assert.match(unavailable.lockMessage, /not available yet/);
 });
+
+test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo toggle, and result image controls', () => {
+  const html = __test__telegramMiniApp.telegramMiniAppHtml();
+
+  assert.match(html, /id="showGroups"[^>]*aria-label="Groups"/);
+  assert.match(html, /id="groupsPanel"[^>]*aria-label="Groups"/);
+  assert.match(html, /id="groupCategories"/);
+  assert.match(html, /id="saveGroups"/);
+  assert.match(html, /function renderGroups\(\)/);
+  assert.match(html, /\/telegram\/mini-app\/api\/groups/);
+  assert.match(html, /id="renderConsensusImage"/);
+  assert.match(html, /id="renderGroupImage"/);
+  assert.match(html, /id="resultImagePreview"/);
+  assert.match(html, /\/telegram\/mini-app\/api\/results-image/);
+  assert.match(html, /id="demoDataResults"/);
+  assert.match(html, /Demo data/);
+  assert.match(html, /expandedQuestionKeys: new Set\(\)/);
+  assert.match(html, /highlightedQuestionKey/);
+  assert.match(html, /scrollHighlightedQuestionIntoView/);
+  assert.match(html, /\.card\.collapsed \.cardBody \{ display: none; \}/);
+  assert.match(html, /className = 'card' \+ \(expanded \? '' : ' collapsed'\)/);
+});
+
+test('Mini App state and group endpoints support lightweight Telegram-only groups', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        lightweightGroups: [{
+          categoryId: 'demo_track',
+          label: 'Demo track',
+          selectionMode: 'single',
+          options: [{ optionId: 'builder', label: 'Builder' }],
+        }],
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-group-state',
+      questionType: 'freeform',
+      prompt: 'Which group should review this?',
+    }]),
+  };
+
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+  });
+
+  assert.equal(state.ok, true);
+  assert.equal(state.groups.enabled, true);
+  assert.equal(state.groups.sessionSlug, 'alpha');
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'age_bucket'), true);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'demo_track'), true);
+
+  const saveResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/groups?sessionSlug=alpha', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        selections: {
+          age_bucket: ['25_34'],
+          ai_tribe: ['e_acc', 'pause_ai'],
+          missing_category: ['ignored'],
+        },
+      }),
+    }),
+    env,
+  });
+  const saved = await saveResponse.json();
+
+  assert.equal(saveResponse.status, 200);
+  assert.equal(saved.ok, true);
+  assert.deepEqual(saved.groups.selections.age_bucket, ['25_34']);
+  assert.deepEqual(saved.groups.selections.ai_tribe, ['e_acc']);
+  assert.equal(saved.groups.selections.missing_category, undefined);
+
+  const getResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/groups?sessionSlug=alpha'),
+    env,
+  });
+  const loaded = await getResponse.json();
+
+  assert.equal(getResponse.status, 200);
+  assert.deepEqual(loaded.groups.selections.age_bucket, ['25_34']);
+});
+
+test('Mini App group and image routes enforce Telegram-only and results exposure boundaries', async () => {
+  const nonTelegramOnlyEnv = {
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: false,
+      }],
+    }),
+  };
+  const groupsResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/groups?sessionSlug=alpha'),
+    env: nonTelegramOnlyEnv,
+  });
+  const groupsBody = await groupsResponse.json();
+
+  assert.equal(groupsResponse.status, 403);
+  assert.equal(groupsBody.error, 'telegram_only_session_required');
+
+  const aggregateDisabledEnv = {
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: {
+          aggregateResultsEnabled: false,
+        },
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-pizza',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Leftover pizza tastes better cold than reheated.',
+    }]),
+  };
+  const imageResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus'),
+    env: aggregateDisabledEnv,
+  });
+  const imageBody = await imageResponse.json();
+
+  assert.equal(imageResponse.status, 403);
+  assert.equal(imageBody.error, 'level_3_aggregate_results_admin_disabled');
+});
+
+test('Mini App results demo data and image endpoint render PNG previews', async () => {
+  const env = {
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-pizza',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Leftover pizza tastes better cold than reheated.',
+    }]),
+  };
+
+  const summaryResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&demo=1'),
+    env,
+  });
+  const summary = await summaryResponse.json();
+
+  assert.equal(summaryResponse.status, 200);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.demo, true);
+  assert.equal(summary.responseCount > 0, true);
+  assert.equal(summary.groupView.status, 'demo_preview');
+  assert.equal(summary.groups.length > 0, true);
+
+  const imageResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&demo=1'),
+    env,
+  });
+  const bytes = new Uint8Array(await imageResponse.arrayBuffer());
+
+  assert.equal(imageResponse.status, 200);
+  assert.equal(imageResponse.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+});

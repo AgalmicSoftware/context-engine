@@ -30,6 +30,11 @@ import {
   SUBMITTED_RESULT_STATUSES,
   telegramSubmitQueueEnabled,
 } from './telegramSubmitQueue.mjs';
+import { buildResultsImage } from './resultImage.mjs';
+import {
+  loadTelegramLightweightGroups,
+  saveTelegramLightweightGroupMembership,
+} from './telegramGroups.mjs';
 import {
   analyzeParticipantResultGroup,
   buildParticipantGraph,
@@ -653,6 +658,17 @@ function buildMiniAppSessionPicker(policy = {}, selectedSessionSlugs = []) {
   };
 }
 
+function emptyMiniAppGroupState(sessionSlug = '') {
+  return {
+    enabled: false,
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    categories: [],
+    selections: {},
+    proposals: [],
+    updatedAt: null,
+  };
+}
+
 async function listKvRecordsByPrefix(env = {}, prefix = '', {
   limit = 500,
 } = {}) {
@@ -945,6 +961,7 @@ async function buildMiniAppState({
       },
       sessionPicker,
       selectedSessionSlugs: [],
+      groups: emptyMiniAppGroupState(),
       questions: [],
       savedDrafts: [],
       submittedAnswers: [],
@@ -1034,6 +1051,14 @@ async function buildMiniAppState({
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
   });
   const agentSettings = defaultAgentSettingsState({ sessionSlug, createdAt });
+  const primaryResolved = resolveSessionInvocation(policy, sessionSlug);
+  const groups = primaryResolved.ok
+    ? await loadTelegramLightweightGroups({
+      env,
+      session: primaryResolved.session,
+      telegramUserId: auth.user?.telegramUserId,
+    })
+    : emptyMiniAppGroupState(sessionSlug);
   const selectedSessionTitles = effectiveSelectedSessionSlugs.map((slug) => (
     linkedSessions.find((session) => session.sessionSlug === slug)?.sessionName || slug
   ));
@@ -1055,6 +1080,7 @@ async function buildMiniAppState({
     },
     sessionPicker,
     selectedSessionSlugs: effectiveSelectedSessionSlugs,
+    groups,
     questions,
     savedDrafts: savedDraftState.savedDrafts,
     submittedAnswers: submittedAnswerState.submittedAnswers,
@@ -1933,6 +1959,64 @@ function miniResultGroup(group = {}) {
   };
 }
 
+function miniDemoQuestionsForResults(questions = []) {
+  const fallback = [
+    'Arriving 10 minutes early is better than arriving exactly on time.',
+    'Showering at night beats showering in the morning.',
+    'Leftover pizza tastes better cold than reheated.',
+    'Participants should explain uncertainty before choosing Agree or Disagree.',
+    'Results should be shared publicly once enough people respond.',
+  ];
+  const source = (Array.isArray(questions) ? questions : [])
+    .filter((question) => safeString(question.prompt || question.questionText || question.title))
+    .slice(0, 5);
+  const rows = source.length ? source : fallback.map((prompt, index) => ({
+    questionId: `demo-q-${index + 1}`,
+    questionType: 'agree_unsure_disagree',
+    prompt,
+  }));
+  return rows.map((question, index) => ({
+    ...question,
+    questionId: safeString(question.questionId || question.id || `demo-q-${index + 1}`),
+    questionType: 'agree_unsure_disagree',
+    prompt: safeString(question.prompt || question.questionText || question.title || fallback[index] || `Demo question ${index + 1}`),
+    questionText: safeString(question.prompt || question.questionText || question.title || fallback[index] || `Demo question ${index + 1}`),
+  }));
+}
+
+function miniDemoResultRecords(questions = []) {
+  const labelsByQuestion = [
+    ['Agree', 'Agree', 'Agree', 'Unsure', 'Disagree'],
+    ['Agree', 'Agree', 'Unsure', 'Disagree', 'Disagree'],
+    ['Agree', 'Unsure', 'Disagree', 'Disagree', 'Disagree'],
+    ['Agree', 'Agree', 'Agree', 'Disagree', 'Unsure'],
+    ['Agree', 'Unsure', 'Unsure', 'Disagree', 'Agree'],
+  ];
+  return miniDemoQuestionsForResults(questions).flatMap((question, questionIndex) => (
+    (labelsByQuestion[questionIndex] || labelsByQuestion[0]).map((label, participantIndex) => ({
+      key: `demo:${question.questionId}:${participantIndex + 1}`,
+      createdAt: `demo-${questionIndex + 1}-${participantIndex + 1}`,
+      telegramUserId: `demo-user-${participantIndex + 1}`,
+      questionId: question.questionId,
+      label,
+      value: lower(label),
+      questionType: 'agree_unsure_disagree',
+      text: '',
+      comments: participantIndex % 2 === 0 ? 'Demo rationale for the selected stance.' : '',
+    }))
+  ));
+}
+
+function resultRowsToBeeswarmRows(rows = []) {
+  return rows.slice(0, 3).map((row, index) => ({
+    label: `Q${index + 1}`,
+    prompt: safeString(row.prompt),
+    answers: Object.entries(row.counts || {}).flatMap(([label, count]) => (
+      new Array(Math.max(0, Number(count || 0))).fill(label)
+    )),
+  }));
+}
+
 async function resolveMiniAppResultsContext({
   request,
   env = {},
@@ -1993,13 +2077,20 @@ async function resolveMiniAppResultsContext({
 async function buildMiniAppResultsSummary({
   env = {},
   session = {},
+  demo = false,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
+  const demoData = demo === true;
   const exposure = miniResultsExposurePolicy(session);
   const viewLevels = miniResultsLevelState(exposure);
   const loadedQuestions = await loadQuestionsForSession(env, sessionSlug);
-  const questions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
-  const records = await loadSubmittedResultRecords(env, sessionSlug);
+  const loadedQuestionList = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
+  const liveRecords = await loadSubmittedResultRecords(env, sessionSlug);
+  const liveConsensusQuestions = consensusQuestionsForResults(loadedQuestionList);
+  const questions = demoData
+    ? miniDemoQuestionsForResults(liveConsensusQuestions.length ? liveConsensusQuestions : loadedQuestionList)
+    : loadedQuestionList;
+  const records = demoData ? miniDemoResultRecords(questions) : liveRecords;
   const consensusQuestions = consensusQuestionsForResults(questions);
   const consensusQuestionIds = new Set(consensusQuestions.map(readQuestionId).filter(Boolean));
   const consensusRecords = records.filter((record) => consensusQuestionIds.has(record.questionId));
@@ -2029,10 +2120,11 @@ async function buildMiniAppResultsSummary({
     : [];
   const graph = buildParticipantGraph(records, questions);
   const rawGroups = Array.isArray(graph.groups) ? graph.groups : [];
-  const exposedGroups = exposure.anonymizedGroupsEnabled
+  const groupViewEnabled = exposure.anonymizedGroupsEnabled || demoData;
+  const exposedGroups = groupViewEnabled
     ? rawGroups
       .filter((group) => Number(group.size || 0) >= exposure.minGroupSize)
-      .map(miniResultGroup)
+      .map((group) => miniResultGroup(demoData ? { ...group, demo: true } : group))
     : [];
   const counts = {
     questionsSubmitted: questions.length,
@@ -2046,13 +2138,14 @@ async function buildMiniAppResultsSummary({
     type: 'ce_public_results_snapshot',
     version: 1,
     audience: 'telegram_participant',
+    demo: demoData,
     session: {
       sessionSlug,
       sessionName: safeString(session.sessionName || session.name || sessionSlug),
       mode: session.telegramOnly === true ? 'telegram_only' : safeString(session.sessionMode || 'telegram_enabled'),
     },
     exposure: {
-      participantLevel: exposure.anonymizedGroupsEnabled ? 4 : (exposure.aggregateResultsEnabled ? 3 : 1),
+      participantLevel: groupViewEnabled ? 4 : (exposure.aggregateResultsEnabled ? 3 : 1),
       levels: viewLevels,
       redactions: [
         'telegram_user_ids',
@@ -2068,7 +2161,7 @@ async function buildMiniAppResultsSummary({
       divisive,
     },
     anonymizedGroups: {
-      enabled: exposure.anonymizedGroupsEnabled,
+      enabled: groupViewEnabled,
       groups: exposedGroups,
     },
   };
@@ -2077,6 +2170,7 @@ async function buildMiniAppResultsSummary({
     sessionSlug,
     sessionName: safeString(session.sessionName || session.name || sessionSlug),
     responseCount: counts.responsesGiven,
+    demo: demoData,
     participantCount: counts.uniqueParticipants,
     questionCount: counts.questionsSubmitted,
     binaryQuestionCount: counts.binaryQuestions,
@@ -2091,11 +2185,11 @@ async function buildMiniAppResultsSummary({
       divisive,
     },
     groupView: {
-      enabled: exposure.anonymizedGroupsEnabled,
-      status: exposure.anonymizedGroupsEnabled ? 'available' : 'admin_can_enable',
-      reason: exposure.anonymizedGroupsEnabled ? '' : 'level_4_anonymized_groups_admin_disabled',
+      enabled: groupViewEnabled,
+      status: demoData ? 'demo_preview' : (exposure.anonymizedGroupsEnabled ? 'available' : 'admin_can_enable'),
+      reason: groupViewEnabled ? '' : 'level_4_anonymized_groups_admin_disabled',
       minGroupSize: exposure.minGroupSize,
-      hiddenGroupCount: exposure.anonymizedGroupsEnabled
+      hiddenGroupCount: groupViewEnabled
         ? Math.max(0, rawGroups.length - exposedGroups.length)
         : null,
     },
@@ -2110,21 +2204,25 @@ async function handleResultsRequest({
   createdAt = new Date().toISOString(),
 } = {}) {
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const url = new URL(request.url);
+  const demo = body.demo === true || ['1', 'true', 'yes', 'on'].includes(lower(url.searchParams.get('demo')));
   const context = await resolveMiniAppResultsContext({ request, env, body });
   if (!context.ok) {
     return json({ ok: false, error: context.error || 'results_unavailable' }, { status: context.status || 400 });
   }
-  const summary = await buildMiniAppResultsSummary({ env, session: context.session });
+  const summary = await buildMiniAppResultsSummary({ env, session: context.session, demo });
   if (request.method !== 'POST' || safeString(body.action || body.mode) !== 'analyze_group') {
     return json(summary);
   }
   const groupId = safeString(body.groupId);
-  const liveGraph = buildParticipantGraph(
-    await loadSubmittedResultRecords(env, context.session.sessionSlug),
-    (await loadQuestionsForSession(env, context.session.sessionSlug)).questions || []
-  );
+  const loadedQuestions = (await loadQuestionsForSession(env, context.session.sessionSlug)).questions || [];
+  const graphQuestions = demo
+    ? miniDemoQuestionsForResults(consensusQuestionsForResults(loadedQuestions).length ? consensusQuestionsForResults(loadedQuestions) : loadedQuestions)
+    : loadedQuestions;
+  const graphRecords = demo ? miniDemoResultRecords(graphQuestions) : await loadSubmittedResultRecords(env, context.session.sessionSlug);
+  const liveGraph = buildParticipantGraph(graphRecords, graphQuestions);
   const exposure = miniResultsExposurePolicy(context.session);
-  if (exposure.anonymizedGroupsEnabled !== true) {
+  if (exposure.anonymizedGroupsEnabled !== true && !demo) {
     return json({
       ok: false,
       error: 'level_4_anonymized_groups_admin_disabled',
@@ -2155,6 +2253,108 @@ async function handleResultsRequest({
     analysis: ai.analysis,
     summary,
   });
+}
+
+async function handleResultsImageRequest({
+  request,
+  env = {},
+} = {}) {
+  const url = new URL(request.url);
+  const mode = lower(url.searchParams.get('mode')) === 'group' ? 'group' : 'consensus';
+  const demo = ['1', 'true', 'yes', 'on'].includes(lower(url.searchParams.get('demo')));
+  const context = await resolveMiniAppResultsContext({ request, env });
+  if (!context.ok) {
+    return json({ ok: false, error: context.error || 'results_unavailable' }, { status: context.status || 400 });
+  }
+  const loadedQuestions = await loadQuestionsForSession(env, context.session.sessionSlug);
+  const liveQuestions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
+  const liveRecords = await loadSubmittedResultRecords(env, context.session.sessionSlug);
+  const consensusQuestions = consensusQuestionsForResults(liveQuestions);
+  const imageQuestions = demo
+    ? miniDemoQuestionsForResults(consensusQuestions.length ? consensusQuestions : liveQuestions)
+    : liveQuestions;
+  const imageRecords = demo ? miniDemoResultRecords(imageQuestions) : liveRecords;
+  const exposure = miniResultsExposurePolicy(context.session);
+  if (mode === 'consensus' && exposure.aggregateResultsEnabled !== true && !demo) {
+    return json({ ok: false, error: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  }
+  if (mode === 'group' && exposure.anonymizedGroupsEnabled !== true && !demo) {
+    return json({ ok: false, error: 'level_4_anonymized_groups_admin_disabled' }, { status: 403 });
+  }
+  let image;
+  if (mode === 'group') {
+    const graph = buildParticipantGraph(imageRecords, imageQuestions);
+    image = buildResultsImage({
+      mode,
+      sessionTitle: context.session.sessionName || context.session.sessionSlug,
+      responseCount: imageRecords.length,
+      demo,
+      participants: graph.participants,
+      groups: graph.groups,
+    });
+  } else {
+    const binaryQuestions = consensusQuestionsForResults(imageQuestions);
+    const binaryIds = new Set(binaryQuestions.map(readQuestionId).filter(Boolean));
+    const rows = summarizeQuestionResults(
+      imageRecords.filter((record) => binaryIds.has(record.questionId)),
+      binaryQuestions
+    )
+      .filter((summary) => Number(summary.total || 0) > 0)
+      .sort((left, right) => (
+        right.differenceScore - left.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      ))
+      .slice(0, 3)
+      .map(miniResultQuestionRow);
+    image = buildResultsImage({
+      mode: 'consensus',
+      sessionTitle: context.session.sessionName || context.session.sessionSlug,
+      responseCount: imageRecords.length,
+      demo,
+      beeswarmRows: resultRowsToBeeswarmRows(rows),
+    });
+  }
+  return new Response(image.bytes, {
+    status: 200,
+    headers: {
+      'content-type': image.contentType,
+      'cache-control': 'no-store',
+      'content-disposition': `inline; filename="${image.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+    },
+  });
+}
+
+async function handleGroupsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppResultsContext({ request, env, body });
+  if (!context.ok) {
+    return json({ ok: false, error: context.error || 'groups_unavailable' }, { status: context.status || 400 });
+  }
+  if (context.session?.telegramOnly !== true) {
+    return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
+  }
+  if (request.method === 'POST') {
+    const saved = await saveTelegramLightweightGroupMembership({
+      env,
+      session: context.session,
+      telegramUserId: context.auth.user?.telegramUserId,
+      selections: body.selections || {},
+      createdAt,
+    });
+    if (!saved.ok) return json({ ok: false, error: saved.reason || 'groups_save_failed' }, { status: 503 });
+    return json({ ok: true, groups: saved.groups });
+  }
+  const groups = await loadTelegramLightweightGroups({
+    env,
+    session: context.session,
+    telegramUserId: context.auth.user?.telegramUserId,
+  });
+  return json({ ok: true, groups });
 }
 
 async function handleSearchRequest({
@@ -2368,6 +2568,7 @@ function telegramMiniAppHtml() {
       --accent: #62ffbf;
       --accent-2: #2cc3ff;
       --results-accent: #62ffbf;
+      --groups-accent: #b8a2ff;
       --filter-accent: #2cc3ff;
       --settings-accent: #ffd166;
       --accent-text: #11142f;
@@ -2451,6 +2652,14 @@ function telegramMiniAppHtml() {
       background: var(--results-accent);
       border-color: var(--results-accent);
     }
+    .groupsButton {
+      border-color: rgba(184, 162, 255, 0.45);
+      color: var(--groups-accent);
+    }
+    .groupsButton.active {
+      background: var(--groups-accent);
+      border-color: var(--groups-accent);
+    }
     .settingsButton {
       border-color: rgba(255, 209, 102, 0.45);
       color: var(--settings-accent);
@@ -2490,6 +2699,7 @@ function telegramMiniAppHtml() {
       padding: 8px 10px;
     }
     .settingsPanel,
+    .groupsPanel,
     .filterPanel,
     .resultsPanel {
       display: none;
@@ -2510,13 +2720,19 @@ function telegramMiniAppHtml() {
       border-color: rgba(44, 195, 255, 0.52);
       background: rgba(20, 70, 104, 0.36);
     }
+    .groupsPanel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
+      border-color: rgba(184, 162, 255, 0.52);
+      background: rgba(73, 55, 132, 0.34);
+    }
     .resultsPanel {
       grid-template-columns: minmax(0, 1fr);
       align-items: stretch;
       border-color: rgba(98, 255, 191, 0.52);
       background: rgba(24, 92, 71, 0.28);
     }
-    .settingsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
+    .settingsPanel.open, .groupsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
     .resultsHeader {
       display: flex;
       align-items: center;
@@ -2526,6 +2742,65 @@ function telegramMiniAppHtml() {
     .resultsSessionOptions, .resultGroups, .resultViewLevels {
       display: flex;
       flex-wrap: wrap;
+      gap: 8px;
+    }
+    .resultImageActions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .resultImagePreview {
+      display: none;
+      width: 100%;
+      max-height: 58vh;
+      object-fit: contain;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .resultImagePreview.open { display: block; }
+    .groupsSessionOptions, .groupCategories, .groupProposals {
+      display: grid;
+      gap: 10px;
+    }
+    .groupsSessionOptions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .groupCategory {
+      display: grid;
+      gap: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .groupCategoryHeader {
+      display: grid;
+      gap: 2px;
+    }
+    .groupCategoryHeader strong { color: var(--text); }
+    .groupCategoryHeader span, .groupProposal { color: var(--muted); font-size: 12px; }
+    .groupOptions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .groupOption {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .groupActions {
+      display: flex;
+      justify-content: flex-end;
       gap: 8px;
     }
     .resultLevel {
@@ -2725,9 +3000,35 @@ function telegramMiniAppHtml() {
       border-color: rgba(98, 255, 191, 0.75);
       box-shadow: inset 4px 0 0 var(--accent), 7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
     }
-    .cardHead { padding: 16px; border-bottom: 1px solid var(--line); }
+    .card[data-highlight="true"] {
+      border-color: rgba(255, 209, 102, 0.85);
+      box-shadow: inset 4px 0 0 var(--settings-accent), 7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
+    }
+    .card.collapsed { grid-template-rows: auto; }
+    .cardHead {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+    }
+    .card.collapsed .cardHead { border-bottom: 0; }
+    .cardHeadText { min-width: 0; }
+    .cardToggle {
+      min-width: 36px;
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+    }
     .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
     .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; }
+    .card.collapsed .cardBody { display: none; }
     .cardActions { display: grid; grid-template-columns: minmax(96px, 3fr) minmax(0, 7fr); gap: 8px; }
     .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -2873,7 +3174,7 @@ function telegramMiniAppHtml() {
     .ok { color: var(--ok); }
     .error { color: var(--danger); white-space: pre-wrap; }
     @media (max-width: 760px) {
-      .settingsPanel, .filterPanel { grid-template-columns: 1fr; }
+      .settingsPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
       .resultColumns { grid-template-columns: 1fr; }
       .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto; }
     }
@@ -2888,6 +3189,11 @@ function telegramMiniAppHtml() {
           <button class="iconButton resultsButton" id="showResults" type="button" aria-label="Results" aria-expanded="false" title="Results">
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M4 19V9"></path><path d="M10 19V5"></path><path d="M16 19v-8"></path><path d="M22 19H2"></path>
+            </svg>
+          </button>
+          <button class="iconButton groupsButton" id="showGroups" type="button" aria-label="Groups" aria-expanded="false" title="Groups">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M7.5 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path><path d="M16.5 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path><path d="M3 20a4.5 4.5 0 0 1 9 0"></path><path d="M12 20a4.5 4.5 0 0 1 9 0"></path>
             </svg>
           </button>
           <button class="iconButton filterButton" id="showFilter" type="button" aria-label="Filter" aria-expanded="false" title="Filter">
@@ -2927,6 +3233,11 @@ function telegramMiniAppHtml() {
         <div class="resultsSessionOptions" id="resultsSessionOptions"></div>
         <div class="resultViewLevels" id="resultViewLevels" aria-label="Results exposure levels"></div>
         <div class="filterSummary" id="resultsSummary"></div>
+        <div class="resultImageActions">
+          <button class="secondary" id="renderConsensusImage" type="button">Consensus image</button>
+          <button class="secondary" id="renderGroupImage" type="button">Groups image</button>
+        </div>
+        <img class="resultImagePreview" id="resultImagePreview" alt="Rendered results preview">
         <div class="resultColumns">
           <section class="resultSection" aria-label="Most consensus questions">
             <div class="sectionTitle">Most consensus</div>
@@ -2942,6 +3253,19 @@ function telegramMiniAppHtml() {
           <div class="resultGroups" id="resultGroups"></div>
         </section>
         <section class="groupAnalysis" id="groupAnalysis" aria-label="Group analysis"></section>
+      </section>
+      <section class="groupsPanel" id="groupsPanel" aria-label="Groups">
+        <div class="resultsHeader">
+          <div class="sectionTitle">Groups</div>
+          <button class="secondary" id="refreshGroups" type="button">Refresh</button>
+        </div>
+        <div class="groupsSessionOptions" id="groupsSessionOptions"></div>
+        <div class="filterSummary" id="groupsSummary"></div>
+        <div class="groupProposals" id="groupProposals"></div>
+        <div class="groupCategories" id="groupCategories"></div>
+        <div class="groupActions">
+          <button class="primary" id="saveGroups" type="button">Save groups</button>
+        </div>
       </section>
       <section class="filterPanel" id="filterPanel" aria-label="Question filters">
         <div class="filterControls">
@@ -2973,6 +3297,10 @@ function telegramMiniAppHtml() {
           <input id="telegramReminders" type="checkbox">
           <span>Reminders</span>
         </label>
+        <label class="toggle">
+          <input id="demoDataResults" type="checkbox">
+          <span>Demo data</span>
+        </label>
         <button class="primary" id="saveSettings" type="button">Save</button>
         <div class="savedDrafts" id="savedDrafts"></div>
         <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
@@ -3000,11 +3328,18 @@ function telegramMiniAppHtml() {
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
     const QUESTION_RETRY_DELAY_MS = 4000;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
+    const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results';
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
     };
     const writeShowUnansweredFirst = (value) => {
       try { window.localStorage.setItem(SHOW_UNANSWERED_STORAGE_KEY, value ? 'true' : 'false'); } catch {}
+    };
+    const readDemoResults = () => {
+      try { return window.localStorage.getItem(DEMO_RESULTS_STORAGE_KEY) === 'true'; } catch { return false; }
+    };
+    const writeDemoResults = (value) => {
+      try { window.localStorage.setItem(DEMO_RESULTS_STORAGE_KEY, value ? 'true' : 'false'); } catch {}
     };
     const state = {
       data: null,
@@ -3027,7 +3362,17 @@ function telegramMiniAppHtml() {
       resultsData: null,
       resultsLoading: false,
       resultsSessionSlug: '',
+      resultsDemoData: readDemoResults(),
+      resultImageUrl: '',
       groupAnalysisById: {},
+      groupsData: null,
+      groupsLoading: false,
+      groupsSaving: false,
+      groupsSessionSlug: '',
+      groupSelections: {},
+      expandedQuestionKeys: new Set(),
+      highlightedQuestionKey: '',
+      highlightScrollDone: false,
       sessionPickerCollapsed: false,
       sessionPickerInitialized: false,
       loadedOnce: false,
@@ -3045,6 +3390,9 @@ function telegramMiniAppHtml() {
       showResults: document.getElementById('showResults'),
       resultsPanel: document.getElementById('resultsPanel'),
       refreshResults: document.getElementById('refreshResults'),
+      renderConsensusImage: document.getElementById('renderConsensusImage'),
+      renderGroupImage: document.getElementById('renderGroupImage'),
+      resultImagePreview: document.getElementById('resultImagePreview'),
       resultsSessionOptions: document.getElementById('resultsSessionOptions'),
       resultViewLevels: document.getElementById('resultViewLevels'),
       resultsSummary: document.getElementById('resultsSummary'),
@@ -3052,6 +3400,14 @@ function telegramMiniAppHtml() {
       divisiveResults: document.getElementById('divisiveResults'),
       resultGroups: document.getElementById('resultGroups'),
       groupAnalysis: document.getElementById('groupAnalysis'),
+      showGroups: document.getElementById('showGroups'),
+      groupsPanel: document.getElementById('groupsPanel'),
+      refreshGroups: document.getElementById('refreshGroups'),
+      groupsSessionOptions: document.getElementById('groupsSessionOptions'),
+      groupsSummary: document.getElementById('groupsSummary'),
+      groupProposals: document.getElementById('groupProposals'),
+      groupCategories: document.getElementById('groupCategories'),
+      saveGroups: document.getElementById('saveGroups'),
       showFilter: document.getElementById('showFilter'),
       filterPanel: document.getElementById('filterPanel'),
       filterUnansweredFirst: document.getElementById('filterUnansweredFirst'),
@@ -3064,6 +3420,7 @@ function telegramMiniAppHtml() {
       settingsPanel: document.getElementById('settingsPanel'),
       draftStyle: document.getElementById('draftStyle'),
       telegramReminders: document.getElementById('telegramReminders'),
+      demoDataResults: document.getElementById('demoDataResults'),
       saveSettings: document.getElementById('saveSettings'),
       savedDrafts: document.getElementById('savedDrafts'),
       clearDrafts: document.getElementById('clearDrafts'),
@@ -3092,6 +3449,16 @@ function telegramMiniAppHtml() {
       state.resultsData = null;
       state.resultsSessionSlug = '';
       state.groupAnalysisById = {};
+      state.resultImageUrl = '';
+      if (el.resultImagePreview) {
+        el.resultImagePreview.removeAttribute('src');
+        el.resultImagePreview.classList.remove('open');
+      }
+    };
+    const resetGroupsForSelection = () => {
+      state.groupsData = null;
+      state.groupsSessionSlug = '';
+      state.groupSelections = {};
     };
     const activeQuestion = () => (state.data?.questions || []).find((question) => question.questionKey === state.activeKey) || null;
     const draftFor = (question) => {
@@ -3259,6 +3626,16 @@ function telegramMiniAppHtml() {
     const activate = (question) => {
       if (question?.questionKey) state.activeKey = question.questionKey;
     };
+    const expandQuestion = (question) => {
+      if (question?.questionKey) state.expandedQuestionKeys.add(question.questionKey);
+    };
+    const toggleQuestionExpanded = (question) => {
+      if (!question?.questionKey) return;
+      activate(question);
+      if (state.expandedQuestionKeys.has(question.questionKey)) state.expandedQuestionKeys.delete(question.questionKey);
+      else state.expandedQuestionKeys.add(question.questionKey);
+      renderQuestionStack();
+    };
     const setStatus = (message, kind = '') => {
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
@@ -3328,9 +3705,11 @@ function telegramMiniAppHtml() {
           if (input.checked) state.selectedSessionSlugs.add(session.sessionSlug);
           else state.selectedSessionSlugs.delete(session.sessionSlug);
           resetResultsForSelection();
+          resetGroupsForSelection();
           el.continueSessions.disabled = state.selectedSessionSlugs.size === 0;
           renderSessionPicker();
           renderResults();
+          renderGroups();
         };
         const name = document.createElement('span');
         name.textContent = session.sessionName || session.sessionSlug;
@@ -3338,6 +3717,16 @@ function telegramMiniAppHtml() {
         el.sessionOptions.appendChild(label);
       });
       el.continueSessions.disabled = state.selectedSessionSlugs.size === 0;
+    }
+    function scrollHighlightedQuestionIntoView() {
+      if (!state.highlightedQuestionKey || state.highlightScrollDone) return;
+      const target = Array.from(el.questionStack.querySelectorAll('.card'))
+        .find((card) => card.dataset.questionKey === state.highlightedQuestionKey);
+      if (!target) return;
+      state.highlightScrollDone = true;
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      });
     }
     function renderQuestionStack() {
       const questions = orderedQuestions();
@@ -3351,33 +3740,51 @@ function telegramMiniAppHtml() {
         return;
       }
       questions.forEach((question) => {
+        const expanded = state.expandedQuestionKeys.has(question.questionKey);
         const card = document.createElement('article');
-        card.className = 'card';
+        card.className = 'card' + (expanded ? '' : ' collapsed');
         card.dataset.active = question.questionKey === state.activeKey ? 'true' : 'false';
-        card.onclick = () => { activate(question); updateFooterControls(); };
+        card.dataset.questionKey = question.questionKey || '';
+        card.dataset.expanded = expanded ? 'true' : 'false';
+        card.dataset.highlight = question.questionKey && question.questionKey === state.highlightedQuestionKey ? 'true' : 'false';
         const head = document.createElement('div');
         head.className = 'cardHead';
+        head.onclick = () => toggleQuestionExpanded(question);
+        const headText = document.createElement('div');
+        headText.className = 'cardHeadText';
         const meta = document.createElement('div');
         meta.className = 'questionMeta';
         meta.textContent = 'Question ' + question.displayIndex;
         const prompt = document.createElement('p');
         prompt.className = 'prompt';
         prompt.textContent = question.prompt || question.title || '';
-        head.append(meta, prompt);
+        headText.append(meta, prompt);
         const submittedAnswer = submittedAnswerFor(question);
         if (submittedAnswer) {
           const badge = document.createElement('div');
           badge.className = 'answerBadge';
           badge.textContent = 'Submitted answer: ' + (submittedAnswer.answerLabel || answerLabelForQuestion(question, submittedAnswer.answer || {}) || 'Saved');
-          head.appendChild(badge);
+          headText.appendChild(badge);
         }
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'cardToggle';
+        toggle.setAttribute('aria-label', expanded ? 'Collapse question' : 'Expand question');
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        toggle.textContent = expanded ? '−' : '+';
+        toggle.onclick = (event) => {
+          event.stopPropagation();
+          toggleQuestionExpanded(question);
+        };
+        head.append(headText, toggle);
         const body = document.createElement('div');
         body.className = 'cardBody';
-        renderAnswerControls(question, body);
+        if (expanded) renderAnswerControls(question, body);
         card.append(head, body);
         el.questionStack.appendChild(card);
       });
       updateFooterControls();
+      scrollHighlightedQuestionIntoView();
     }
     function selectValue(question, value) {
       activate(question);
@@ -4098,6 +4505,7 @@ function telegramMiniAppHtml() {
       el.meta.textContent = data ? questionCountText(data) : '';
       renderSessionPicker();
       renderResults();
+      renderGroups();
       renderFilters();
       renderAgentSettings();
       renderQuestionStack();
@@ -4203,6 +4611,7 @@ function telegramMiniAppHtml() {
           state.resultsSessionSlug = session.sessionSlug;
           state.resultsData = null;
           state.groupAnalysisById = {};
+          state.resultImageUrl = '';
           loadResults({ force: true });
         };
         el.resultsSessionOptions.appendChild(button);
@@ -4224,10 +4633,109 @@ function telegramMiniAppHtml() {
       }
       const consensusRows = state.resultsData?.questions?.consensus || [];
       const divisiveRows = state.resultsData?.questions?.divisive || [];
+      el.renderConsensusImage.disabled = !state.resultsSessionSlug;
+      el.renderGroupImage.disabled = !state.resultsSessionSlug || (state.resultsData?.groupView?.enabled === false && !state.resultsDemoData);
+      if (state.resultImageUrl) {
+        el.resultImagePreview.src = state.resultImageUrl;
+        el.resultImagePreview.classList.add('open');
+      } else {
+        el.resultImagePreview.removeAttribute('src');
+        el.resultImagePreview.classList.remove('open');
+      }
       renderResultViewLevels();
       renderResultRows(el.consensusResults, consensusRows, 'No binary question responses yet.', 'consensus');
       renderResultRows(el.divisiveResults, divisiveRows, 'No divisive binary question responses yet.', 'divisive');
       renderResultGroups(state.resultsData?.groups || []);
+    }
+    function renderGroups() {
+      const sessions = selectedResultsSessions();
+      if (!state.groupsSessionSlug || !sessions.some((session) => session.sessionSlug === state.groupsSessionSlug)) {
+        state.groupsSessionSlug = sessions[0]?.sessionSlug || state.data?.session?.sessionSlug || '';
+      }
+      el.groupsSessionOptions.innerHTML = '';
+      sessions.forEach((session) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary' + (session.sessionSlug === state.groupsSessionSlug ? ' active' : '');
+        button.textContent = session.sessionName || session.sessionSlug;
+        button.onclick = () => {
+          state.groupsSessionSlug = session.sessionSlug;
+          state.groupsData = null;
+          state.groupSelections = {};
+          loadGroups({ force: true });
+        };
+        el.groupsSessionOptions.appendChild(button);
+      });
+      const groups = state.groupsData?.groups || state.data?.groups || null;
+      const categories = Array.isArray(groups?.categories) ? groups.categories : [];
+      const selections = Object.keys(state.groupSelections || {}).length
+        ? state.groupSelections
+        : (groups?.selections || {});
+      el.refreshGroups.disabled = state.groupsLoading || !state.groupsSessionSlug;
+      el.saveGroups.disabled = state.groupsSaving || state.groupsLoading || !state.groupsSessionSlug || !categories.length;
+      if (state.groupsLoading) {
+        el.groupsSummary.textContent = 'Loading groups...';
+      } else if (!state.groupsSessionSlug) {
+        el.groupsSummary.textContent = 'Select a session to manage groups.';
+      } else if (state.groupsData?.ok === false) {
+        el.groupsSummary.textContent = 'Could not load groups: ' + (state.groupsData.error || 'groups_unavailable');
+      } else {
+        const joined = Object.values(selections).reduce((sum, values) => sum + (Array.isArray(values) ? values.length : 0), 0);
+        el.groupsSummary.textContent = categories.length
+          ? categories.length + ' categories | ' + joined + ' selected'
+          : 'No groups are configured for this session.';
+      }
+      el.groupProposals.innerHTML = '';
+      const proposals = Array.isArray(groups?.proposals) ? groups.proposals : [];
+      proposals.forEach((proposal) => {
+        const item = document.createElement('div');
+        item.className = 'groupProposal';
+        item.textContent = proposal.message || 'An agent suggested a group choice for your review.';
+        el.groupProposals.appendChild(item);
+      });
+      el.groupCategories.innerHTML = '';
+      categories.forEach((category) => {
+        const section = document.createElement('section');
+        section.className = 'groupCategory';
+        const header = document.createElement('div');
+        header.className = 'groupCategoryHeader';
+        const title = document.createElement('strong');
+        title.textContent = category.label;
+        const description = document.createElement('span');
+        description.textContent = category.description || (category.selectionMode === 'multi' ? 'Choose any that apply.' : 'Choose one.');
+        header.append(title, description);
+        const options = document.createElement('div');
+        options.className = 'groupOptions';
+        const selected = new Set(Array.isArray(selections[category.categoryId]) ? selections[category.categoryId] : []);
+        (category.options || []).forEach((option) => {
+          const label = document.createElement('label');
+          label.className = 'groupOption';
+          const input = document.createElement('input');
+          input.type = category.selectionMode === 'multi' ? 'checkbox' : 'radio';
+          input.name = 'group-' + category.categoryId;
+          input.value = option.optionId;
+          input.checked = selected.has(option.optionId);
+          input.onchange = () => {
+            const next = new Set(Array.isArray(state.groupSelections[category.categoryId])
+              ? state.groupSelections[category.categoryId]
+              : Array.from(selected));
+            if (category.selectionMode === 'single') {
+              state.groupSelections[category.categoryId] = input.checked ? [option.optionId] : [];
+            } else {
+              if (input.checked) next.add(option.optionId);
+              else next.delete(option.optionId);
+              state.groupSelections[category.categoryId] = Array.from(next);
+            }
+            renderGroups();
+          };
+          const text = document.createElement('span');
+          text.textContent = option.label;
+          label.append(input, text);
+          options.appendChild(label);
+        });
+        section.append(header, options);
+        el.groupCategories.appendChild(section);
+      });
     }
     function renderFilters() {
       el.filterUnansweredFirst.checked = state.showUnansweredFirst;
@@ -4286,6 +4794,7 @@ function telegramMiniAppHtml() {
         el.draftStyle.appendChild(opt);
       });
       el.telegramReminders.checked = values.telegramReminders === true;
+      el.demoDataResults.checked = state.resultsDemoData === true;
       const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
       el.savedDrafts.innerHTML = '';
@@ -4453,6 +4962,7 @@ function telegramMiniAppHtml() {
     async function loadResults({ force = false } = {}) {
       if (!state.resultsSessionSlug || (state.resultsLoading && !force)) return;
       state.resultsLoading = true;
+      state.resultImageUrl = '';
       renderResults();
       let response;
       let body;
@@ -4460,6 +4970,7 @@ function telegramMiniAppHtml() {
         const resultsUrl = new URL('/telegram/mini-app/api/results', location.origin);
         resultsUrl.searchParams.set('launch', launch);
         resultsUrl.searchParams.set('sessionSlug', state.resultsSessionSlug);
+        if (state.resultsDemoData) resultsUrl.searchParams.set('demo', '1');
         response = await fetch(resultsUrl.pathname + resultsUrl.search, { headers: headers() });
         body = await response.json().catch(() => ({}));
       } catch (error) {
@@ -4473,6 +4984,77 @@ function telegramMiniAppHtml() {
         : { ok: false, error: body.error || 'results_load_failed' };
       state.resultsLoading = false;
       renderResults();
+    }
+    function renderResultImage(mode) {
+      if (!state.resultsSessionSlug) return;
+      const imageUrl = new URL('/telegram/mini-app/api/results-image', location.origin);
+      imageUrl.searchParams.set('launch', launch);
+      imageUrl.searchParams.set('sessionSlug', state.resultsSessionSlug);
+      imageUrl.searchParams.set('mode', mode);
+      if (state.resultsDemoData) imageUrl.searchParams.set('demo', '1');
+      imageUrl.searchParams.set('v', String(Date.now()));
+      state.resultImageUrl = imageUrl.pathname + imageUrl.search;
+      renderResults();
+    }
+    async function loadGroups({ force = false } = {}) {
+      if (!state.groupsSessionSlug || (state.groupsLoading && !force)) return;
+      state.groupsLoading = true;
+      renderGroups();
+      let response;
+      let body;
+      try {
+        const groupsUrl = new URL('/telegram/mini-app/api/groups', location.origin);
+        groupsUrl.searchParams.set('launch', launch);
+        groupsUrl.searchParams.set('sessionSlug', state.groupsSessionSlug);
+        response = await fetch(groupsUrl.pathname + groupsUrl.search, { headers: headers() });
+        body = await response.json().catch(() => ({}));
+      } catch {
+        state.groupsData = { ok: false, error: 'groups_load_failed' };
+        state.groupsLoading = false;
+        renderGroups();
+        return;
+      }
+      state.groupsData = response.ok && body.ok !== false
+        ? body
+        : { ok: false, error: body.error || 'groups_load_failed' };
+      state.groupSelections = { ...((state.groupsData.groups && state.groupsData.groups.selections) || {}) };
+      state.groupsLoading = false;
+      renderGroups();
+    }
+    async function saveGroups() {
+      if (!state.groupsSessionSlug) return;
+      state.groupsSaving = true;
+      renderGroups();
+      let response;
+      let body;
+      try {
+        response = await fetch('/telegram/mini-app/api/groups', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({
+            launch,
+            sessionSlug: state.groupsSessionSlug,
+            selections: state.groupSelections || {},
+          }),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch {
+        setStatus('Could not save groups.', 'error');
+        state.groupsSaving = false;
+        renderGroups();
+        return;
+      }
+      state.groupsSaving = false;
+      if (!response.ok || !body.ok) {
+        setStatus(body.error || 'Could not save groups.', 'error');
+        renderGroups();
+        return;
+      }
+      state.groupsData = body;
+      state.groupSelections = { ...((body.groups && body.groups.selections) || {}) };
+      setStatus('Groups saved.', 'ok');
+      renderGroups();
+      if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
     async function analyzeResultGroup(groupId) {
       if (!state.resultsSessionSlug || !groupId) return;
@@ -4489,6 +5071,7 @@ function telegramMiniAppHtml() {
             action: 'analyze_group',
             sessionSlug: state.resultsSessionSlug,
             groupId,
+            demo: state.resultsDemoData,
           }),
         });
         body = await response.json().catch(() => ({}));
@@ -4556,10 +5139,17 @@ function telegramMiniAppHtml() {
         }
       });
       const questions = Array.isArray(body.questions) ? body.questions : [];
+      const launchQuestion = questions.find((question) => question.activeFromLaunch === true && question.questionKey);
+      if (launchQuestion && !state.loadedOnce) {
+        state.highlightedQuestionKey = launchQuestion.questionKey;
+        state.highlightScrollDone = false;
+        expandQuestion(launchQuestion);
+        state.activeKey = launchQuestion.questionKey;
+      }
       if (!questions.some((question) => question.questionKey === state.activeKey)) {
         state.activeKey = firstPreferredQuestionKey() || body.activeQuestionKey || '';
       } else if (!state.loadedOnce && state.showUnansweredFirst) {
-        state.activeKey = firstPreferredQuestionKey() || body.activeQuestionKey || state.activeKey;
+        state.activeKey = state.highlightedQuestionKey || firstPreferredQuestionKey() || body.activeQuestionKey || state.activeKey;
       }
       if (shouldRetryQuestions(body)) {
         setStatus(body.sourceError || (retry ? 'Questions are still loading. Retrying...' : 'Questions are loading. Retrying...'), body.sourceOk ? '' : 'error');
@@ -4577,6 +5167,10 @@ function telegramMiniAppHtml() {
       state.activeKey = '';
       state.loadedOnce = false;
       resetResultsForSelection();
+      resetGroupsForSelection();
+      state.expandedQuestionKeys = new Set();
+      state.highlightedQuestionKey = '';
+      state.highlightScrollDone = false;
       state.sessionPickerCollapsed = true;
       state.sessionPickerInitialized = true;
       load();
@@ -4594,12 +5188,21 @@ function telegramMiniAppHtml() {
     }
     el.showFilter.onclick = () => setPanelOpen(el.filterPanel, el.showFilter, !el.filterPanel.classList.contains('open'));
     el.showSettings.onclick = () => setPanelOpen(el.settingsPanel, el.showSettings, !el.settingsPanel.classList.contains('open'));
+    el.showGroups.onclick = () => {
+      const open = !el.groupsPanel.classList.contains('open');
+      setPanelOpen(el.groupsPanel, el.showGroups, open);
+      if (open && !state.groupsData && state.groupsSessionSlug) loadGroups();
+    };
     el.showResults.onclick = () => {
       const open = !el.resultsPanel.classList.contains('open');
       setPanelOpen(el.resultsPanel, el.showResults, open);
       if (open && !state.resultsData && state.resultsSessionSlug) loadResults();
     };
     el.refreshResults.onclick = () => loadResults({ force: true });
+    el.renderConsensusImage.onclick = () => renderResultImage('consensus');
+    el.renderGroupImage.onclick = () => renderResultImage('group');
+    el.refreshGroups.onclick = () => loadGroups({ force: true });
+    el.saveGroups.onclick = () => saveGroups();
     el.filterUnansweredFirst.onchange = () => {
       state.showUnansweredFirst = el.filterUnansweredFirst.checked;
       writeShowUnansweredFirst(state.showUnansweredFirst);
@@ -4630,6 +5233,12 @@ function telegramMiniAppHtml() {
       render();
     };
     el.filterAiSearchMic.onclick = () => startSearchDictation(el.filterAiSearchMic);
+    el.demoDataResults.onchange = () => {
+      state.resultsDemoData = el.demoDataResults.checked;
+      writeDemoResults(state.resultsDemoData);
+      resetResultsForSelection();
+      if (el.resultsPanel.classList.contains('open')) loadResults({ force: true });
+    };
     el.saveSettings.onclick = () => sendSettings();
     el.clearDrafts.onclick = () => clearSavedDrafts();
     load();
@@ -4670,6 +5279,12 @@ export async function handleTelegramMiniAppRequest({
   if (url.pathname === '/telegram/mini-app/api/results' && ['GET', 'POST'].includes(request.method)) {
     return handleResultsRequest({ request, env });
   }
+  if (url.pathname === '/telegram/mini-app/api/results-image' && request.method === 'GET') {
+    return handleResultsImageRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/groups' && ['GET', 'POST'].includes(request.method)) {
+    return handleGroupsRequest({ request, env });
+  }
   if (url.pathname === '/telegram/mini-app/api/settings' && request.method === 'POST') {
     return handleSettingsRequest({ request, env });
   }
@@ -4681,6 +5296,8 @@ export const __test__telegramMiniApp = {
   SUBMIT_REQUEST_KV_PREFIX,
   buildMiniAppState,
   miniQuestionFromRecord,
+  miniDemoQuestionsForResults,
+  miniDemoResultRecords,
   normalizeAgentSettingsInput,
   normalizeMiniAnswer,
   telegramMiniAppHtml,

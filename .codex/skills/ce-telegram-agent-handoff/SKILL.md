@@ -124,3 +124,70 @@ Prefer the shared-group pattern when CE-owned response buttons matter:
 2. OpenClaw calls `POST /telegram/agent/api/questions/pose`.
 3. CE bot posts the question with CE response buttons.
 4. User taps the CE button, and CE handles the callback.
+
+## Lightweight Telegram Groups
+
+Telegram-only sessions may expose Cloudflare-managed group categories without
+on-chain SBTs. Groups are optional user self-selections and must not be treated
+as submitted until the user approves them.
+
+Read available group categories and current selections:
+
+```http
+GET /telegram/agent/api/groups?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
+```
+
+Propose or create a group category, while leaving membership to the user:
+
+```http
+POST /telegram/agent/api/groups/propose
+```
+
+```json
+{
+  "telegramUserId": "42",
+  "groupChatId": "-100123",
+  "sessionSlug": "telegram-demo-3",
+  "category": {
+    "categoryId": "ai_tribe",
+    "label": "AI tribe",
+    "selectionMode": "single",
+    "options": [
+      { "optionId": "e_acc", "label": "e/acc" },
+      { "optionId": "d_acc", "label": "d/acc" },
+      { "optionId": "pause_ai", "label": "Pause AI" }
+    ]
+  },
+  "optionIds": ["e_acc"],
+  "message": "Consider joining the e/acc group for this session."
+}
+```
+
+The response includes `requiresUserApproval: true`. Direct the user to the Mini
+App Groups panel to review and save memberships.
+
+## Child Sessions
+
+Agents can kick off worker-local child-session records for Telegram-only
+workflows:
+
+```http
+POST /telegram/agent/api/sessions/child
+```
+
+```json
+{
+  "telegramUserId": "42",
+  "groupChatId": "-100123",
+  "sessionSlug": "telegram-demo-3",
+  "childSessionSlug": "telegram-demo-3-breakout-a",
+  "sessionName": "Breakout A",
+  "questions": [
+    { "questionId": "q-next", "questionType": "freeform", "prompt": "What should this breakout decide?" }
+  ],
+  "groups": []
+}
+```
+
+These records are `worker_local_until_session_registry_parity`; do not assume
+they are visible in the normal CE client or contract stack.
