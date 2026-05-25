@@ -86,6 +86,13 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
+import {
+  ADMIN_SECRET_CARDS,
+  buildAdminSecretRemoveTestId,
+  getAdminSecretFieldInputType,
+  getAdminSecretFieldLabel,
+  getAdminSecretFieldRows,
+} from './adminPageSecretCardHelpers';
 import type { AdminTestResults } from './adminPageTestResultHelpers';
 import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
@@ -1985,13 +1992,6 @@ const AdminPage = ({
     }
   };
 
-  const SECRET_CARDS = [
-    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
-    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
-    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
-    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
-  ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
@@ -3123,7 +3123,7 @@ const AdminPage = ({
         {workerSecretsOpen && (
           <>
             <div className={styles.secretOptionsGrid}>
-              {SECRET_CARDS.map((card: any) => {
+              {ADMIN_SECRET_CARDS.map((card: any) => {
                 const isOpen = openSecretCards[card.key];
                 const hasValue = cardHasValue(card.fields);
                 return (
@@ -3146,27 +3146,16 @@ const AdminPage = ({
                       <div className={styles.secretOptionBody}>
                         {card.fields.map((fieldKey: any) => {
                           const secretFieldKey = String(fieldKey);
-                          const isTextarea = secretFieldKey === 'arweaveJwk';
-                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
-                          const secretFieldLabels: Record<string, string> = {
-                            openaiKey: 'OpenAI API key',
-                            anthropicKey: 'Anthropic API key',
-                            openrouterKey: 'OpenRouter API key',
-                            customRpcUrl: 'Custom RPC URL',
-                            customRpcKey: 'Custom RPC key',
-                            arweaveJwk: 'Arweave JWK (JSON)',
-                            faucetPrivateKey: 'Faucet private key',
-                            litAccountApiKey: 'Lit account API key',
-                            litUsageApiKey: 'Lit usage API key',
-                          };
-                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
+                          const inputType = getAdminSecretFieldInputType(secretFieldKey);
+                          const isTextarea = inputType === 'textarea';
+                          const label = getAdminSecretFieldLabel(secretFieldKey);
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>
                               <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
                                 <Input
-                                  type={isTextarea ? 'textarea' : isPassword ? 'password' : 'text'}
-                                  rows={isTextarea ? 3 : undefined}
+                                  type={inputType}
+                                  rows={getAdminSecretFieldRows(secretFieldKey)}
                                   value={secrets[secretFieldKey]}
                                   onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
                                   className={styles.secretInput}
@@ -3177,7 +3166,7 @@ const AdminPage = ({
                                   onClick={() => handleClearSecret(secretFieldKey)}
                                   title={`Clear ${label} on next save`}
                                   aria-label={`Clear ${label}`}
-                                  data-testid={`ce-admin-secret-remove-${secretFieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
+                                  data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
                                 >
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
