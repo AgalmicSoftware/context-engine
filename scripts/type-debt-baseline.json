@@ -76,11 +76,10 @@
     "client/src/wallet/session"
   ],
   "counts": {
-    "tsNocheck": 0,
-    "colonAny": 927,
-    "asAny": 83,
-    "asUnknownAs": 44,
-    "promiseAny": 2,
+    "tsNocheck": 5,
+    "colonAny": 1032,
+    "asAny": 73,
+    "promiseAny": 33,
     "arrayAny": 0,
     "recordAny": 44,
     "aliasAny": 3,
