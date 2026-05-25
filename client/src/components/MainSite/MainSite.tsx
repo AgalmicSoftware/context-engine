@@ -147,11 +147,14 @@ import {
 } from '../../utilities/session/mainSiteSessionConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  resolveMainSiteExplicitSessionSlugFromPath,
+  resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteRenderActiveSessionSlug,
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
 import {
@@ -1264,71 +1267,36 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
       )
       : this.normalizeRoutePath(props?.path || '');
-    const parts = String(path || '').split('/').filter(Boolean);
-    const sessionToken = parts[0] === 'session' && parts[1]
-      ? String(parts[1] || '').trim()
-      : '';
-    if (!sessionToken) {
-      return { hasExplicitSessionSlug: false, sessionSlug: '' };
-    }
-    if (sessionToken.toLowerCase() === 'new') {
-      return { hasExplicitSessionSlug: true, sessionSlug: '' };
-    }
-
-    const resolvedSessionSlug = this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve });
-    if (resolvedSessionSlug) {
-      return { hasExplicitSessionSlug: true, sessionSlug: resolvedSessionSlug };
-    }
-
-    if (normalizeSessionSlug(sessionToken) === '') {
-      return { hasExplicitSessionSlug: true, sessionSlug: '' };
-    }
-
-    return { hasExplicitSessionSlug: false, sessionSlug: '' };
+    return resolveMainSiteExplicitSessionSlugFromPath({
+      path,
+      resolveSessionSlugFromPathToken: (sessionToken: string) => (
+        this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve })
+      ),
+    });
   };
 
   getGlobalPrimarySessionSlugFromProps = (props: MainSiteProps = this.props): string => {
-    const primarySessionSlug = normalizeSessionSlug(props?.sessionState?.primarySessionSlug || '');
-    const primarySessionExplicit = props?.sessionState?.primarySessionExplicit === true;
-    const selectedSessionScope = String(props?.sessionState?.selectedSessionScope || '').trim().toLowerCase();
-    const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
-      ? props.sessionState.selectedSessionSlugs
-      : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
-    if (primarySessionSlug) return primarySessionSlug;
-    if (primarySessionExplicit) {
-      if (selectedSessionScope === 'list' && !listIncludesGeneral) {
-        return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-      }
-      return primarySessionSlug;
-    }
-    if (selectedSessionScope === 'list') {
-      return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-    }
-    return '';
+    return resolveMainSiteGlobalPrimarySessionSlug({
+      sessionState: props?.sessionState || {},
+      derivePrimarySessionSlugFromList,
+    });
   };
 
   getSessionSlugFromProps = (props: MainSiteProps = this.props): string => {
-    const routeSession = this.getExplicitSessionSlugFromProps(props, { allowAsyncResolve: true });
-    if (routeSession.hasExplicitSessionSlug) return routeSession.sessionSlug;
-    const activeSessionSlug = props.activeSessionSlug || '';
-    const primarySessionExplicit = props?.sessionState?.primarySessionExplicit === true;
-    const selectedSessionScope = String(props?.sessionState?.selectedSessionScope || '').trim().toLowerCase();
-    const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
-      ? props.sessionState.selectedSessionSlugs
-      : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
-    if (activeSessionSlug) return activeSessionSlug;
-    if (primarySessionExplicit) {
-      if (selectedSessionScope === 'list' && !listIncludesGeneral) {
-        return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-      }
-      return activeSessionSlug;
-    }
-    if (selectedSessionScope === 'list') {
-      return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-    }
-    return '';
+    const path = props === this.props
+      ? this.getEffectiveRoutePath(
+        props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
+      )
+      : this.normalizeRoutePath(props?.path || '');
+    return resolveMainSiteSessionSlugFromProps({
+      path,
+      activeSessionSlug: props.activeSessionSlug || '',
+      sessionState: props?.sessionState || {},
+      resolveSessionSlugFromPathToken: (sessionToken: string) => (
+        this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
+      ),
+      derivePrimarySessionSlugFromList,
+    });
   };
 
   getDisplaySessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
