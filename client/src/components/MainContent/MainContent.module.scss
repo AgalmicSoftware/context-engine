@@ -3,7 +3,7 @@
 /* --- MainAreaTabs --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #mainTabsCard {
+  .mainTabsCard {
     min-height: 100%;
     background: #00000000;
   }
@@ -13,17 +13,17 @@
     margin-top: 0px;
   }
 
-  #mainTabsCardHeader {
+  .mainTabsCardHeader {
     padding: 15px 5px 15px 5px;
   }
 
-  #mainAreaCardBody {
+  .mainAreaCardBody {
     padding: 0px;
   }
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #mainTabsCard {
+  .mainTabsCard {
     min-height: 100%;
     background: #00000000;
   }
@@ -33,17 +33,17 @@
     margin-top: 0px;
   }
 
-  #mainTabsCardHeader {
+  .mainTabsCardHeader {
     padding: 15px 10px 15px 10px;
   }
 
-  #mainAreaCardBody {
+  .mainAreaCardBody {
     padding: 0px;
   }
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #mainTabsCard {
+  .mainTabsCard {
     min-height: 100%;
     background: #00000000;
     border-radius: var(--ce-radius-7);
@@ -54,11 +54,11 @@
     margin-top: 17.5px;
   }
 
-  #mainTabsCardHeader {
+  .mainTabsCardHeader {
     padding: 15px 10px 15px 10px;
   }
 
-  #mainAreaCardBody {
+  .mainAreaCardBody {
     padding-left: 10px;
     padding-right: 10px;
     padding-top: 0px;
@@ -67,7 +67,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #mainTabsCard {
+  .mainTabsCard {
     min-height: 100%;
     background: var(--ce-color-bg);
     border-radius: var(--ce-radius-7);
@@ -85,7 +85,7 @@
     margin-right: 2%;
   }
 
-  #mainAreaTabsAlt {
+  .mainAreaTabsAlt {
     width: 75%;
     height: 100%;
     min-height: 100%;
@@ -93,17 +93,17 @@
     margin-right: 2%;
   }
 
-  #mainTabsCardHeader {
+  .mainTabsCardHeader {
     padding: 15px 10px 15px 10px;
   }
 
-  #mainAreaCardBody {
+  .mainAreaCardBody {
     padding: 0px 15px 15px 15px;
   }
 }
 
 @media (min-width: 1367px) {
-  #mainTabsCard {
+  .mainTabsCard {
     min-height: 100%;
     background: var(--ce-color-bg);
     border-radius: var(--ce-radius-7);
@@ -120,7 +120,7 @@
     margin-right: 2%;
   }
 
-  #mainAreaTabsAlt {
+  .mainAreaTabsAlt {
     flex: 0 0 75%;
     width: 75%;
     min-height: 100%;
@@ -128,22 +128,22 @@
     margin-right: 2%;
   }
 
-  #mainTabsCardHeader {
+  .mainTabsCardHeader {
     padding: 15px 10px 15px 10px;
   }
 
-  #mainAreaCardBody {
+  .mainAreaCardBody {
     min-height: 500px;
     padding: 0px 25px 25px 25px;
   }
 }
 
-#mainTabsCard {
+.mainTabsCard {
   min-height: 100%;
   margin-top: 0px;
 }
 
-#navTabIcon { }
+.navTabIcon { }
 
 #trelloEmbed {
   display: flex;
