@@ -83,6 +83,8 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
+import type { AdminTestResults } from './adminPageTestResultHelpers';
+import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
   buildAdminSecretPresenceTargetKey,
   normalizeAdminSecretPresence,
@@ -114,40 +116,12 @@ import {
 
 const log = createLogger('general');
 
-type AdminLinkedResult = {
-  label?: string;
-  text?: string;
-  href?: string;
-};
-
-type AdminTestResult = string | AdminLinkedResult;
-type AdminTestResults = Record<string, AdminTestResult>;
 type AdminSecrets = Record<string, string>;
 type AdminSecretKeySet = Set<string>;
 type AdminOpenSecretCards = Record<string, boolean>;
 type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
-};
-
-const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => (
-  !!entry && typeof entry === 'object'
-);
-
-const renderTestResult = (entry: AdminTestResult | null | undefined) => {
-  if (!entry) return 'Not run';
-  if (typeof entry === 'string') return entry;
-  if (!isAdminLinkedResult(entry)) return 'OK';
-  const label = toStr(entry.label || entry.text).trim();
-  const href = toStr(entry.href).trim();
-  if (href) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer">
-        {label || 'View'}
-      </a>
-    );
-  }
-  return label || 'OK';
 };
 
 export const __adminPageTestUtils = {
@@ -3140,7 +3114,7 @@ const AdminPageRuntime = ({
                 {gateSyncStatus}
               </div>
             )}
-            {gateSyncResult && <div className={styles.statusNote}>{renderTestResult(gateSyncResult)}</div>}
+            {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
           </>
         )}
       </section>
@@ -3526,7 +3500,7 @@ const AdminPageRuntime = ({
               id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
             >
             <span>Health</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.health)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
           </div>
           {!defaultGateIsEmpty && !walletReady && (
             <CETooltip
@@ -3543,39 +3517,136 @@ const AdminPageRuntime = ({
             onClick={() => {
               if (!testBusy && account) runWorkerAiTest();
             }}
-            litTestValue={litTestValue}
-            setLitTestValue={setLitTestValue}
-            litTestBusy={litTestBusy}
-            litTestEnvelope={litTestEnvelope}
-            litTestStatus={litTestStatus}
-            litTestDecrypted={litTestDecrypted}
-            runLitEncryptTest={runLitEncryptTest}
-            runLitDecryptTest={runLitDecryptTest}
-            canRunTests={canRunTests}
-            canRunHealthTest={canRunHealthTest}
-            defaultGateIsEmpty={defaultGateIsEmpty}
-            walletReady={walletReady}
-            account={account}
-            testBusy={testBusy}
-            testResults={testResults}
-            testStatus={testStatus}
-            runWorkerHealthTest={runWorkerHealthTest}
-            runWorkerAiTest={runWorkerAiTest}
-            runWorkerArweaveTest={runWorkerArweaveTest}
-            runWorkerFaucetTest={runWorkerFaucetTest}
-            transcribeText={transcribeText}
-            handleTranscribeTestTextChange={handleTranscribeTestTextChange}
-            selectedSlug={selectedSlug}
-            testSessionConfig={testSessionConfig}
-            testContext={testContext}
-            baseWorkerUrl={baseWorkerUrl}
-            deniedBusy={deniedBusy}
-            deniedStatus={deniedStatus}
-            deniedResults={deniedResults}
-            runDeniedAccessTest={runDeniedAccessTest}
-            visibleTestKeys={sessionCapabilities.adminTestKeys}
-            gateKind={sessionCapabilities.gateKind}
-          />
+            role={account ? 'button' : undefined}
+            tabIndex={account ? 0 : -1}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerAiTest(); }}
+            title="Click to test AI"
+          >
+            <span>AI</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!testBusy && account) runWorkerArweaveTest();
+            }}
+            role={account ? 'button' : undefined}
+            tabIndex={account ? 0 : -1}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerArweaveTest(); }}
+            title="Click to test Arweave upload"
+          >
+            <span>Arweave</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!testBusy && account) runWorkerFaucetTest();
+            }}
+            role={account ? 'button' : undefined}
+            tabIndex={account ? 0 : -1}
+            onKeyDown={(e: any) => { if (e.key === 'Enter' && !testBusy && account) runWorkerFaucetTest(); }}
+            title="Click to test faucet (0.0000001)"
+          >
+            <span>Faucet</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
+          </div>
+          <div className={styles.statusItem}>
+            <span>Transcribe</span>
+            <span>{renderAdminTestResult(testResults.transcribe)}</span>
+          </div>
+        </div>
+        <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
+          <div className={styles.panelTitle}>Negative tests (denied access)</div>
+          {renderInfoTooltip(
+            'admin-negative-tests-tip',
+            'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.'
+          )}
+        </div>
+        {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
+        <div className={styles.grid}>
+          <div
+            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!deniedBusy) runDeniedAccessTest('login');
+            }}
+            role={!deniedBusy ? 'button' : undefined}
+            tabIndex={!deniedBusy ? 0 : -1}
+            onKeyDown={(e: any) => {
+              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('login');
+            }}
+            title="Click to test login denied"
+            data-testid="ce-admin-denied-chip-login"
+          >
+            <span>Login</span>
+            <span>{renderAdminTestResult(deniedResults.login)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!deniedBusy) runDeniedAccessTest('ai');
+            }}
+            role={!deniedBusy ? 'button' : undefined}
+            tabIndex={!deniedBusy ? 0 : -1}
+            onKeyDown={(e: any) => {
+              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('ai');
+            }}
+            title="Click to test AI denied"
+            data-testid="ce-admin-denied-chip-ai"
+          >
+            <span>AI</span>
+            <span>{renderAdminTestResult(deniedResults.ai)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!deniedBusy) runDeniedAccessTest('arweave');
+            }}
+            role={!deniedBusy ? 'button' : undefined}
+            tabIndex={!deniedBusy ? 0 : -1}
+            onKeyDown={(e: any) => {
+              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('arweave');
+            }}
+            title="Click to test Arweave denied"
+            data-testid="ce-admin-denied-chip-arweave"
+          >
+            <span>Arweave</span>
+            <span>{renderAdminTestResult(deniedResults.arweave)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!deniedBusy) runDeniedAccessTest('transcribe');
+            }}
+            role={!deniedBusy ? 'button' : undefined}
+            tabIndex={!deniedBusy ? 0 : -1}
+            onKeyDown={(e: any) => {
+              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('transcribe');
+            }}
+            title="Click to test transcription denied"
+            data-testid="ce-admin-denied-chip-transcribe"
+          >
+            <span>Transcribe</span>
+            <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
+          </div>
+          <div
+            className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
+            onClick={() => {
+              if (!deniedBusy) runDeniedAccessTest('faucet');
+            }}
+            role={!deniedBusy ? 'button' : undefined}
+            tabIndex={!deniedBusy ? 0 : -1}
+            onKeyDown={(e: any) => {
+              if (e.key === 'Enter' && !deniedBusy) runDeniedAccessTest('faucet');
+            }}
+            title="Click to test faucet denied"
+            data-testid="ce-admin-denied-chip-faucet"
+          >
+            <span>Faucet</span>
+            <span>{renderAdminTestResult(deniedResults.faucet)}</span>
+          </div>
+        </div>
+          </>
         )}
       </div>
     </div>

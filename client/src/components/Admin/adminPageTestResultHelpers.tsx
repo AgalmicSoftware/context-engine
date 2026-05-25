@@ -9,7 +9,9 @@ export type AdminLinkedResult = {
 export type AdminTestResult = string | AdminLinkedResult;
 export type AdminTestResults = Record<string, AdminTestResult>;
 
-export const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => !!entry && typeof entry === 'object';
+export const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => (
+  !!entry && typeof entry === 'object'
+);
 
 export const renderAdminTestResult = (entry: AdminTestResult | null | undefined) => {
   if (!entry) return 'Not run';
