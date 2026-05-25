@@ -624,9 +624,9 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                             className={sbtPageStyles.sbtImage}
                           />
                         </div>
-                        <p id={sbtPageStyles.miniSbtName}>{sbtName}</p>
+                        <p className={sbtPageStyles.miniSbtName}>{sbtName}</p>
                         {showMiniSbtAddress ? (
-                          <p id={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
+                          <p className={sbtPageStyles.miniSbtAddress}>{shortenedAddress}</p>
                         ) : null}
                       </a>
                     );
