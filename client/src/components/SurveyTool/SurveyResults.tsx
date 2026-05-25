@@ -145,6 +145,10 @@ import {
   renderSurveyResultsFilterSummary,
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
+import {
+  isSurveyResultsStateSynced,
+  type SurveyResultsSyncStateLike,
+} from './surveyResultsSyncHelpers.js';
 
 export {
   countQuestionModeResponses,
@@ -369,16 +373,6 @@ type SurveyResultsScopedQuestionNetworkMemo = {
 };
 type SurveyResultsManagedCacheUpdate = {
   namespace?: unknown;
-};
-type SurveyResultsSyncState = SurveyResultsRecord & {
-  networkLatestBlock?: unknown;
-  questionLocalBlock?: unknown;
-  refreshTargetQuestionBlock?: unknown;
-  refreshTargetResponseBlock?: unknown;
-  refreshTargetSurveyBlock?: unknown;
-  responseLocalBlock?: unknown;
-  surveyLocalBlock?: unknown;
-  viewMode?: unknown;
 };
 type SurveyResultsFilterQuestionRecord = SurveyResultsRecord & {
   creator?: unknown;
@@ -1284,38 +1278,9 @@ class SurveyResults extends Component<any, any> {
     this._surveysCacheChangeNonce += 1;
   };
 
-  getIsSyncedForState = (stateSnapshot: SurveyResultsSyncState = this.state): boolean => {
-    const netBlock = Number(stateSnapshot?.networkLatestBlock || 0);
-    const isSourceSynced = (localBlockValue: unknown, refreshTargetBlockValue: unknown): boolean => {
-      const localBlock = Number(localBlockValue || 0);
-      const refreshTargetBlock = Number(refreshTargetBlockValue || 0);
-      if (localBlock === 0 || netBlock === 0) return false;
-      const clampedLocalBlock = Math.min(localBlock, netBlock);
-      const clampedTargetBlock =
-        refreshTargetBlock > 0 ? Math.min(refreshTargetBlock, netBlock) : 0;
-      return clampedTargetBlock > 0
-        ? clampedLocalBlock >= clampedTargetBlock
-        : clampedLocalBlock >= netBlock;
-    };
-
-    if (stateSnapshot?.viewMode === 'questions') {
-      return (
-        isSourceSynced(
-          stateSnapshot.questionLocalBlock,
-          stateSnapshot.refreshTargetQuestionBlock
-        ) &&
-        isSourceSynced(
-          stateSnapshot.responseLocalBlock,
-          stateSnapshot.refreshTargetResponseBlock
-        )
-      );
-    }
-
-    return isSourceSynced(
-      stateSnapshot?.surveyLocalBlock,
-      stateSnapshot?.refreshTargetSurveyBlock
-    );
-  };
+  getIsSyncedForState = (stateSnapshot: SurveyResultsSyncStateLike = this.state): boolean => (
+    isSurveyResultsStateSynced(stateSnapshot)
+  );
 
   /**
    * Resolve the effective session slug for cache + RPC calls.

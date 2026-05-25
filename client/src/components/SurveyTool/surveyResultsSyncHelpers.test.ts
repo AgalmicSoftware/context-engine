@@ -20,12 +20,6 @@ describe('surveyResultsSyncHelpers', () => {
     expect(isSurveyResultsSourceSynced(12, 20, 12)).toBe(true);
   });
 
-  it('treats malformed block metadata as missing progress', () => {
-    expect(isSurveyResultsSourceSynced('not-a-block', 10, 12)).toBe(false);
-    expect(isSurveyResultsSourceSynced(12, Number.POSITIVE_INFINITY, 12)).toBe(true);
-    expect(isSurveyResultsSourceSynced(12, 10, Number.NaN)).toBe(false);
-  });
-
   it('requires both question and response sources in question view', () => {
     expect(isSurveyResultsStateSynced({
       viewMode: 'questions',

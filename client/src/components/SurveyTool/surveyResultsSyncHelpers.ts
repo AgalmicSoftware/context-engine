@@ -1,5 +1,3 @@
-import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
-
 export type SurveyResultsSyncStateLike = {
   networkLatestBlock?: unknown;
   questionLocalBlock?: unknown;
@@ -16,9 +14,9 @@ export const isSurveyResultsSourceSynced = (
   refreshTargetBlockValue: unknown,
   networkLatestBlockValue: unknown
 ): boolean => {
-  const localBlock = normalizeSurveyResultsBlockNumber(localBlockValue);
-  const refreshTargetBlock = normalizeSurveyResultsBlockNumber(refreshTargetBlockValue);
-  const networkLatestBlock = normalizeSurveyResultsBlockNumber(networkLatestBlockValue);
+  const localBlock = Number(localBlockValue || 0);
+  const refreshTargetBlock = Number(refreshTargetBlockValue || 0);
+  const networkLatestBlock = Number(networkLatestBlockValue || 0);
   if (localBlock === 0 || networkLatestBlock === 0) return false;
   const clampedLocalBlock = Math.min(localBlock, networkLatestBlock);
   const clampedTargetBlock =
