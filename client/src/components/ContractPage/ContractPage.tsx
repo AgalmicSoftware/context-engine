@@ -528,11 +528,6 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   );
 };
 
-ContractPage.propTypes = {
-  activeSessionSlug: PropTypes.string,
-  reduxActiveSessionSlug: PropTypes.string,
-};
-
 const mapStateToProps = (state: { sessionState?: { activeSessionSlug?: string } }) => ({
   reduxActiveSessionSlug: state.sessionState?.activeSessionSlug || '',
 });

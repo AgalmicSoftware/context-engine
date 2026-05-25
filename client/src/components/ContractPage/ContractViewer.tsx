@@ -327,25 +327,4 @@ const ContractViewer = ({
   );
 };
 
-ContractViewer.propTypes = {
-  contracts: PropTypes.arrayOf(PropTypes.shape({
-    key: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    explainer: PropTypes.string,
-    sourceFile: PropTypes.string,
-    source: PropTypes.string,
-    extraAction: PropTypes.node,
-    addresses: PropTypes.arrayOf(PropTypes.shape({
-      address: PropTypes.string.isRequired,
-      id: PropTypes.number,
-      testnet: PropTypes.bool,
-      explorerUrl: PropTypes.string,
-    })),
-  })),
-  variant: PropTypes.oneOf(['full', 'compact']),
-  autoOpenContractKey: PropTypes.string,
-  renderSourceHeaderActions: PropTypes.func,
-  onClose: PropTypes.func,
-};
-
 export default ContractViewer;
