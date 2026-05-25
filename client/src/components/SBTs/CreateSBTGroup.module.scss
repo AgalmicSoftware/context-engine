@@ -34,7 +34,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
   }
 }
 
-#createGroupExpanded {
+.createGroupExpanded {
   justify-self: center !important;
   background: var(--ce-create-group-surface-bg, #{$card-bg});
   width: 100%;
@@ -1179,7 +1179,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
   }
 
   /* --- Doc URL Section --- */
-  #addDocUrlSection {
+  .addDocUrlSection {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -1221,7 +1221,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     justify-content: center;
   }
 
-  #addDocUrlButton {
+  .addDocUrlButton {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1631,7 +1631,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
 }
 
 @mixin tokenInfoNarrowLayout {
-  #createGroupExpanded {
+  .createGroupExpanded {
     .tokenInfoTopGrid,
     .tokenInfoMetaGrid {
       grid-template-columns: 1fr;
@@ -1658,7 +1658,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       flex-wrap: nowrap;
     }
 
-    #addDocUrlSection {
+    .addDocUrlSection {
       flex-direction: row;
       align-items: center;
       flex-wrap: wrap;
@@ -1723,7 +1723,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
 
 /* Mobile adjustments for combined row */
 @media (max-width: 900px) {
-  #createGroupExpanded {
+  .createGroupExpanded {
     padding: 20px;
 
     .headerContainer {
@@ -1739,7 +1739,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
 
   @include tokenInfoNarrowLayout;
 
-  #createGroupExpanded {
+  .createGroupExpanded {
 
     .fieldSectionHeader,
     .settingRow,
@@ -1822,7 +1822,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
 }
 
 @media (max-width: 600px) {
-  #createGroupExpanded {
+  .createGroupExpanded {
     padding: 14px;
 
     .createGroupTitle {
@@ -1911,7 +1911,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     max-width: none;
   }
 
-  #addDocUrlSection {
+  .addDocUrlSection {
     flex-wrap: wrap;
 
     > input {
