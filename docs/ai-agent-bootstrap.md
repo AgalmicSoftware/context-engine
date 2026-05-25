@@ -27,13 +27,6 @@ It does two things:
   - `client/src/components/Agent/AgentPage.tsx`
   - activation: `/agent?agent=1` or `localStorage["ce-agent-enabled"]="1"`
   - current methods: `getState()`, `describe()`, `perform(action)`, `run(actions[])`
-- Telegram agent bridge scaffold:
-  - `workers/agentBridgeWorker/agentApiCatalog.mjs`
-  - `workers/agentBridgeWorker/telegramCommands.mjs`
-  - `workers/agentBridgeWorker/telegramMiniApp.mjs`
-  - commands: `/actions`, `/create_agent`, `/settings`, `/join`, `/questions`, `/q`, `/attachments`, `/me`
-  - Mini App APIs: `GET /telegram/mini-app/api/state`, `POST /telegram/mini-app/api/draft`, `POST /telegram/mini-app/api/settings`
-  - canonical boundary: cataloged `/api/agent/*` request envelopes; no secrets or private inputs in callback data, deep links, logs, or group messages
 - Local Claude Code companion:
   - `contextEngine-cc/README.md`
   - `contextEngine-cc/lib/routeInventory.mjs`
@@ -43,9 +36,8 @@ It does two things:
 1. Bootstrap against `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, and `docs/run-modes.md` before making assumptions about runtime mode.
 2. Prefer the documented TestID API for deterministic browser interaction instead of ad hoc selectors.
 3. If you are driving the dev browser surface, inspect `window.__ceAgent.describe()` first so the supported actions and higher-level tools are explicit.
-4. If you are driving Telegram, inspect the agent bridge catalog first; add new Telegram/Mini App capabilities by registering catalog entries instead of hard-coding request shapes in command handlers.
-5. If you are integrating through `contextEngine-cc`, treat `contextEngine-cc/lib/routeInventory.mjs` as the canonical local HTTP route inventory until the MCP surface lands.
-6. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
+4. If you are integrating through `contextEngine-cc`, treat `contextEngine-cc/lib/routeInventory.mjs` as the canonical local HTTP route inventory until the MCP surface lands.
+5. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
 
 ## Practical Rule Of Thumb
 
@@ -55,7 +47,6 @@ The current safe path is:
 
 - bootstrap from the canonical docs
 - automate through stable TestIDs or `window.__ceAgent`
-- use the Telegram bridge catalog for bot/Mini App `/api/agent/*` envelopes
 - use `contextEngine-cc` for local companion flows
 - verify with explicit E2E mode choices
 
