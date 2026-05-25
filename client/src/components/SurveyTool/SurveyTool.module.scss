@@ -1443,7 +1443,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   opacity: 0.8;
 }
 
-#importanceText {
+.importanceText {
   font-size: 1.25em;
   font-weight: 600;
   text-transform: uppercase;
@@ -1453,7 +1453,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1.1;
 }
 
-#importanceText.convictionToggleText {
+.importanceText.convictionToggleText {
   opacity: 1;
 }
 
