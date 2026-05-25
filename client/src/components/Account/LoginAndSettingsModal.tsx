@@ -83,7 +83,6 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js';
@@ -94,31 +93,6 @@ import {
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
-import {
-  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
-  getSponsoredKeyAliases,
-  mergeWorkerResourcePresenceIntoSponsoredKeys,
-} from './loginSettingsSponsoredStatusHelpers';
-import {
-  getLoginSettingsOverviewContext,
-  type LoginSettingsOverviewContext,
-  type SponsoredSessionSources,
-} from './loginSettingsOverviewContext';
-import {
-  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
-  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
-  formatLoginSettingsAiProviderLabel,
-} from './loginSettingsAiDisplayHelpers';
-import LoginAgentTokenPanel from './LoginAgentTokenPanel';
-import {
-  createLoginAgentActions,
-  resolveValidatedWorkerCanonicalLoginConfig,
-} from './loginAndSettingsAgentTokenActions';
-import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
-import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
-
-const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiConfigContent'));
-const LoginSettingsResourceKeysContent = React.lazy(() => import('./LoginSettingsResourceKeysContent'));
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -209,29 +183,7 @@ type SponsoredSessionEntry = Record<string, unknown> & {
   inRpcScope?: boolean;
 };
 
-type AiSettingsLike = Record<string, unknown> & {
-  mode?: unknown;
-  models?: Record<string, unknown>;
-  modelProviders?: Record<string, unknown>;
-  providers?: Record<string, unknown>;
-  preset?: unknown;
-  taskReasoningEffort?: Record<string, unknown>;
-  transcription?: Record<string, unknown>;
-};
-
-type AiPresetOption = {
-  key: string;
-  label: string;
-  badgeLabel: string;
-  provider?: unknown;
-  models?: Readonly<Record<string, unknown>>;
-};
-
-type AiPresetConfig = {
-  provider?: unknown;
-  models?: Readonly<Record<string, unknown>>;
-};
-export const buildBookmarksRoutePath = (): string => buildPublicRoute('/bookmarks');
+export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
