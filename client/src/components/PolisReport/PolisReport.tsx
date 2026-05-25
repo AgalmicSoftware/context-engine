@@ -3380,7 +3380,7 @@ export default function PolisReport({
       </div>
 
       {showSettingsRow && (
-        <div className={styles.pdfIgnore} id={styles.settingsRow}>
+        <div className={`${styles.pdfIgnore} ${styles.settingsRow}`}>
           <div style={{ marginRight: '12px', position: 'relative' }}>
             <button
               onClick={handleDownloadPDF}
@@ -3566,7 +3566,7 @@ export default function PolisReport({
                 style={{ width: '100%', cursor: 'pointer' }}
                 onClick={() => setStatsOpen(!statsOpen)}
               >
-                <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
+                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                   <FontAwesomeIcon icon={faCaretUp} style={{ marginRight: '6px' }} />
                   Summary and Statistics
                 </h5>
@@ -3658,7 +3658,7 @@ export default function PolisReport({
                 style={{ width: '100%', cursor: 'pointer' }}
                 onClick={() => setBeeswarmOpen(!beeswarmOpen)}
               >
-                <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
+                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                   <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
                   Consensus and Difference
                 </h5>
@@ -3685,7 +3685,7 @@ export default function PolisReport({
                 style={{ width: '100%', cursor: 'pointer' }}
                 onClick={() => setParticipantsGraphOpen(!participantsGraphOpen)}
               >
-                <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
+                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                   <FontAwesomeIcon icon={participantsGraphOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
                   Participants Graph
                   {renderTooltipReference(PARTICIPANTS_GRAPH_TOOLTIP_TEXT, {
@@ -3883,7 +3883,7 @@ export default function PolisReport({
                 style={{ width: '100%', cursor: 'pointer' }}
                 onClick={() => setAllQuestionsOpen(!allQuestionsOpen)}
               >
-                <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
+                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                   <FontAwesomeIcon icon={allQuestionsOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
                   All Questions
                 </h5>
@@ -3910,7 +3910,7 @@ export default function PolisReport({
                 style={{ width: '100%', cursor: 'pointer' }}
                 onClick={() => setParticipantsListOpen(!participantsListOpen)}
               >
-                <h5 id={styles.sectionHeader} className={styles.sectionTitle}>
+                <h5 className={`${styles.sectionHeader} ${styles.sectionTitle}`}>
                   <FontAwesomeIcon icon={participantsListOpen ? faCaretUp : faCaretDown} style={{ marginRight: '6px' }} />
                   List of Participants
                 </h5>
