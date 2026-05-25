@@ -1,5 +1,3 @@
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';
 export {
   buildSbtListDisplayCardModel,
   buildSbtListExpandedAddressSetToggle,
@@ -126,13 +124,4 @@ export type {
   BuildSbtRenderBucketsOptions,
   SbtRenderBuckets,
 } from './sbtListRenderBucketHelpers';
-
-export const buildSbtListDetailHref = (
-  sbtAddress: unknown,
-  sessionSlug: unknown = ''
-): string => (
-  buildSbtDetailPath(
-    sbtAddress,
-    isSbtListSyntheticNoSessionSlug(sessionSlug) ? '' : String(sessionSlug || '')
-  )
-);
+export { buildSbtListDetailHref } from './sbtListRouteHelpers';
