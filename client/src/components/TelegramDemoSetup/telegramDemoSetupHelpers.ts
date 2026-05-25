@@ -415,7 +415,11 @@ export const validateTelegramDemoSetup = (plan: ReturnType<typeof buildTelegramD
       }
     })();
   const policySessions = Array.isArray(policy?.sessions) ? policy.sessions : [];
-  if (!policySessions.some((session) => session?.telegramOnly === true && session?.telegramBridgeEnabled === true)) {
+  if (!policySessions.some((session: unknown) => (
+    isObj(session) &&
+    session.telegramOnly === true &&
+    session.telegramBridgeEnabled === true
+  ))) {
     missing.push('telegramOnly session flag');
   }
   return {
