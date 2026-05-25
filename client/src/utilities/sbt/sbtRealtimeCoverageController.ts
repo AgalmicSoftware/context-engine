@@ -1,9 +1,23 @@
 import { normalizeSessionSlug } from '../web3/contractScripts.js';
 
+interface SbtRealtimeCoverageState {
+  sbtRealtimeCoverageBySlug?: Record<string, unknown>;
+}
+
+type SbtRealtimeCoverageStatePatch = {
+  sbtRealtimeCoverageBySlug: Record<string, unknown>;
+} | null;
+
+type SbtRealtimeCoverageUpdater = (prev: SbtRealtimeCoverageState | null | undefined) => SbtRealtimeCoverageStatePatch;
+
+interface SbtRealtimeCoverageControllerOptions {
+  setState?: ((updater: SbtRealtimeCoverageUpdater, cb?: unknown) => unknown) | null;
+}
+
 export const createSbtRealtimeCoverageController = ({
   setState = null,
-} = {}) => {
-  const applyState = (updater, cb) => {
+}: SbtRealtimeCoverageControllerOptions = {}) => {
+  const applyState = (updater: SbtRealtimeCoverageUpdater, cb?: unknown): void => {
     if (typeof setState === 'function') {
       setState(updater, cb);
       return;
@@ -11,7 +25,7 @@ export const createSbtRealtimeCoverageController = ({
     if (typeof cb === 'function') cb();
   };
 
-  const setSbtRealtimeCoverageForGroup = (slugIn, hasCoverage = true) => {
+  const setSbtRealtimeCoverageForGroup = (slugIn: unknown, hasCoverage: unknown = true): void => {
     const slug = normalizeSessionSlug(slugIn || '');
     applyState((prev) => {
       const currentMap = prev?.sbtRealtimeCoverageBySlug || {};
@@ -31,7 +45,7 @@ export const createSbtRealtimeCoverageController = ({
     });
   };
 
-  const clearSbtRealtimeCoverageForGroup = (slugIn) => {
+  const clearSbtRealtimeCoverageForGroup = (slugIn: unknown): void => {
     setSbtRealtimeCoverageForGroup(slugIn, false);
   };
 
