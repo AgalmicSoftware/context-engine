@@ -1830,12 +1830,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       const existing = readManagedCacheSnapshot('questionsCache', primarySlug);
       const next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
-      const existingNetBucket = next[primaryNetId];
-      const canReuseNetBucket =
-        !workerCacheIdentity || workerCanonicalCacheIdentityMatches(existingNetBucket, workerCacheIdentity);
-      const netBucket: ManagedCacheBucket =
-        canReuseNetBucket && isObjectLikeRecord(existingNetBucket) ? { ...(existingNetBucket as UnknownRecord) } : {};
-      const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions) ? { ...netBucket.questions } : {};
+      const netBucket: ManagedCacheBucket = isObjectLikeRecord(next[primaryNetId])
+        ? { ...(next[primaryNetId] as UnknownRecord) }
+        : {};
+      const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions)
+        ? { ...netBucket.questions }
+        : {};
 
       normalizedRows.forEach((row) => {
         questions[row.id] = { ...((questions[row.id] as UnknownRecord) || {}), ...row };
@@ -1861,10 +1861,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
-        if (workerCacheIdentity) {
-          const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
-          if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
-        }
         await writeCreateSurveyCacheOptimistic('questionsCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
@@ -1927,9 +1923,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       const existing = readManagedCacheSnapshot('surveysCache', primarySlug);
       let next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
-      if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(next[primaryNetId], workerCacheIdentity)) {
-        next[primaryNetId] = {};
-      }
       next = ensureManagedSurveysNet(next, primaryNetId);
       const netBucket = next[primaryNetId] as ManagedCacheBucket;
       const surveys = netBucket.surveys as ManagedResourceMap;
@@ -1947,10 +1940,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       try {
-        if (workerCacheIdentity) {
-          const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
-          if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
-        }
         await writeCreateSurveyCacheOptimistic('surveysCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
