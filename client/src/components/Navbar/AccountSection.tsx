@@ -1,6 +1,5 @@
 /** @file AccountSection.tsx */
 import React, { Component } from 'react';
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { toggleLoginModal } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
@@ -33,14 +32,6 @@ const LoginButton = LoginButtonRaw as React.ComponentType<any>;
 const LoginAndSettingsModal = LoginAndSettingsModalRaw as React.ComponentType<any>;
 
 class AccountSection extends Component<AccountSectionProps> {
-  static propTypes = {
-    toggleLoginModal: PropTypes.func.isRequired,
-    loginModalToggled: PropTypes.bool,
-    userImageURL: PropTypes.string,
-    account: PropTypes.string,
-    provider: PropTypes.string,
-  };
-
   state = {};
 
   componentDidMount() {}
