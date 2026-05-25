@@ -10,10 +10,12 @@ import store from '../../store.js';
 import { cryptoUtils } from './cryptography.js';
 import { toStr } from '../shared/primitives.js';
 
-type EncryptedEnvelope = string | Record<string, any>;
+type UnknownRecord = Record<string, unknown>;
+
+type EncryptedEnvelope = string | UnknownRecord;
 
 type LitHooks = {
-  getKey?: (options?: Record<string, any>) => Promise<Uint8Array | string>;
+  getKey?: (options?: UnknownRecord) => Promise<Uint8Array | string>;
 } | null;
 
 type EncryptionContext = {
@@ -31,7 +33,7 @@ type EncryptedValueStatus =
   | 'locked';
 
 type EncryptedValueResolution = {
-  value: any;
+  value: unknown;
   status: EncryptedValueStatus;
   encryptedAvailable: boolean;
 };
@@ -62,7 +64,7 @@ const pathKey = (path: string | string[]): string => (
   Array.isArray(path) ? path.join('.') : toStr(path)
 );
 
-const hasOverrideValue = (obj: Record<string, any> | null | undefined, key: string): boolean => (
+const hasOverrideValue = (obj: UnknownRecord | null | undefined, key: string): boolean => (
   !!obj &&
   typeof obj === 'object' &&
   Object.prototype.hasOwnProperty.call(obj, key) &&
