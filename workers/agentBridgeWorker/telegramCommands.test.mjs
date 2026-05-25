@@ -2457,6 +2457,63 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
   assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
 });
 
+test('/add_question requires a joined Telegram group and adds questions to the session list', async () => {
+  const env = baseEnv();
+  const denied = await buildTelegramCommandResponse({
+    update: groupMessage('/add_question What should we fund this week?'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(denied.ok, false);
+  assert.equal(denied.reason, 'telegram_group_session_binding_required');
+
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const added = await buildTelegramCommandResponse({
+    update: groupMessage('/add_question binary: Should we fund this week?'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: groupMessage('/questions'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(added.ok, true);
+  assert.equal(added.screen, 'add_question');
+  assert.match(added.response.text, /Question added to Alpha Session/);
+  assert.equal(flattenButtons(added.response.replyMarkup).some((button) => button.text === 'Pose Question'), true);
+  assert.match(questions.response.text, /Should we fund this week\?/);
+});
+
+test('/q natural language persists as a proposed question after a group joins', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const posed = await buildTelegramCommandResponse({
+    update: groupMessage('/q What should we review next?'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: groupMessage('/questions'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(posed.ok, true);
+  assert.match(posed.response.text, /What should we review next\?/);
+  assert.match(questions.response.text, /What should we review next\?/);
+});
+
 test('/q renders structured answer buttons and auto-submits from callbacks', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([

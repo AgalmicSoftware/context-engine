@@ -2,6 +2,7 @@ import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
 import { directSubmitFeatureEnabled } from './onChainResponses.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
+import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
 import { buildTelegramCommandResponse, handleTelegramWebhookUpdate, readTelegramResultPhoto } from './telegramCommands.mjs';
 import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
 import { processTelegramSubmitQueueBatch } from './telegramSubmitQueue.mjs';
@@ -115,6 +116,7 @@ function telegramPreviewHtml() {
         <button data-command="/join alpha">/join alpha</button>
         <button data-command="/sessions">/sessions</button>
         <button data-command="/questions">/questions</button>
+        <button data-command="/add_question What should we decide next?">/add_question</button>
         <button data-command="/pose_question">/pose_question</button>
         <button data-command="/q 1">/q 1</button>
         <button data-command="/attachments">/attachments</button>
@@ -262,6 +264,13 @@ export default {
     }
     if (url.pathname === '/telegram/mini-app' || url.pathname.startsWith('/telegram/mini-app/api/')) {
       return handleTelegramMiniAppRequest({
+        request,
+        env,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
+      });
+    }
+    if (url.pathname.startsWith('/telegram/agent/api/')) {
+      return handleTelegramAgentHandoffRequest({
         request,
         env,
         waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
