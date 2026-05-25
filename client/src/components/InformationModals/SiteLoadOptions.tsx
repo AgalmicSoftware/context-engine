@@ -1,6 +1,5 @@
 /** @file SiteLoadOptions.tsx */
 import React, { Component } from "react";
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { fetchSessionState } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
@@ -43,12 +42,6 @@ type SiteLoadOptionsState = {
 };
 
 class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsState> {
-  static propTypes = {
-    fetchSessionState: PropTypes.func.isRequired,
-    account: PropTypes.string,
-    provider: PropTypes.string,
-  };
-
   state: SiteLoadOptionsState = {
     explainerModalOpen: false,
     sidebarNotClosed: false,
