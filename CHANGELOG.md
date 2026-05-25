@@ -12,7 +12,6 @@ All notable changes to this project will be documented in this file.
 
 ### Completed TODOs
 
-- Switched the agentBridgeWorker Telegram bot surface to unprefixed commands such as `/join`, `/sessions`, `/questions`, `/attachments`, and `/me` while preserving hidden `/ce_*` compatibility aliases; `/sessions` and `/join` now force a fresh registry read and capped registry lists use the newest session window.
 - Kept uploaded sponsored Custom RPC URLs out of public registry fields while preserving the `sponsored_rpc` flag, and made sponsored RPC access fall back to the session's default on-chain gate when no resource-specific RPC gate is set.
 
 ## 2026-05-09
@@ -29,10 +28,8 @@ All notable changes to this project will be documented in this file.
 - Threaded `storageRef` compatibility into client question/survey/response reads and CE-CC agent question/response summaries where legacy Arweave tx ids are still the contract source of truth.
 - Added explicit dual-field helpers, made question/survey/response client and CE-CC records prefer `storageRef` before legacy `arweaveTxId`, extended worker storage tests for `questions`, `surveys`, and `responses`, and documented the future canonical `storageRef` naming migration.
 - Routed Cloudflare-configured session question, survey, and response writes through sessionCorsWorker `/storage/upload`, using opaque bytes32-compatible Cloudflare IDs in existing Surveys pointer fields without changing the contract ABI; readers now try Cloudflare `storageRef` resolution before Arweave fallback.
-- Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination, while keeping Telegram/agentBridgeWorker scoped to demo preferences, drafts, action IDs, event logs, and demo account state.
+- Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination.
 - Added `/new` Cloudflare payload access modes: default `worker_sbt_gate` worker-enforced SBT access control without Lit credential requirements, plus a `lit_encrypted` scaffold that requires pre-encrypted payloads and rejects plaintext Cloudflare uploads until the Lit envelope path is complete.
-- Added a safe agentBridgeWorker Telegram webhook setup path with local `.dev.vars`/`.env` examples, Wrangler secret guidance, and a secret-token-gated `/telegram/webhook` acknowledgement route.
-- Added live agentBridgeWorker Telegram command handling for `/start`, `/ce_join`, `/ce_sessions`, `/ce_questions`, `/ce_pose_question`/`/q`, `/ce_docs`, and `/ce_me`, plus a mocked Telegram sender adapter and a redacted Cloudflare deploy-plan helper for the first Workers.dev demo.
 - Fixed encrypted Document Library image thumbnails so scoped Lit hooks arriving after initial render trigger preview loading.
 
 ### Remaining TODOs
