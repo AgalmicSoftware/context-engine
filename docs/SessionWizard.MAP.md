@@ -3,19 +3,23 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **~5,115 lines**
+- Current length: **~5,278 lines**
 - Component type: **React function component**
-- Hook inventory: **50 `useEffect` calls**, **32 `useMemo` calls**, **15 `useCallback` calls**
-- Named export count before default export: **39**
+- Hook inventory: **46 `useEffect` calls**, **34 `useMemo` calls**, **15 `useCallback` calls**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
-- Status note: the section ranges below were captured from an earlier snapshot and need a fuller refresh; use the live file for exact line anchors.
-- Recent extraction note: bounded follow-up work extracted `CollapsibleFieldGroup.tsx`, `AiFieldSelect.tsx`, `sessionWizardNormalModeCards.ts`, `hooks/useSponsoredBundleLifecycle.ts`, and `hooks/useSessionWizardWorkerDeploy.ts`. The remaining high-risk seam is the publish path.
+- Status note: the section ranges below are approximate current anchors; use the live file for exact line references.
+- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, and narrow modal shells while keeping the top-level `SessionWizard` public surface and publish orchestration in place. The remaining high-risk seam is the publish path.
 
 ## Navigation Rules
 
 - Start in `SessionWizard.tsx` only if you need the top-level UI flow or the full publish pipeline.
 - Start in `CollapsibleFieldGroup.tsx` for collapsible advanced-section chrome.
 - Start in `AiFieldSelect.tsx` for AI/gate select field rendering and its option/placeholder behavior.
+- Start in `sessionWizardFieldDescriptors.ts` for ordered draft field descriptors, labels, tooltip text, and normal/advanced field visibility.
+- Start in `SessionMetadataEditor.tsx` for the metadata panel composition, JSON preview controls, and More Options surface.
+- Start in `SessionPublishSummary.tsx` for publish controls, publish progress, generated URLs, manual metadata/gas overrides, and published pending-SBT links.
+- Start in `SessionWizardModals.tsx` for top-level `/new` modal ownership; it delegates to `SessionWizardCreateSbtModal.tsx`, `SessionWizardContractViewerModal.tsx`, and `SessionHeaderPreviewModal.tsx`.
+- Start in `WorkerPanel.tsx` for worker setup composition; its subsections live in `WorkerSecretsSection.tsx`, `WorkerDeploySection.tsx`, and `WorkerConnectionSection.tsx`.
 - Start in `hooks/useSponsoredBundleLifecycle.ts` for sponsored-bundle loading, apply/restore, and baseline override behavior.
 - Start in `hooks/useSessionWizardWorkerDeploy.ts` for deploy-button orchestration, worker verification, and deploy helper lifecycle.
 - Start in `sessionWizardNormalModeCards.ts` for normal-mode card and publish-summary view-model builders.
@@ -31,6 +35,17 @@
 SessionWizard.tsx
   -> CollapsibleFieldGroup.tsx
   -> AiFieldSelect.tsx
+  -> sessionWizardFieldDescriptors.ts
+  -> SessionMetadataEditor.tsx
+  -> SessionPublishSummary.tsx
+  -> SessionWizardModals.tsx
+       -> SessionWizardCreateSbtModal.tsx
+       -> SessionWizardContractViewerModal.tsx
+       -> SessionHeaderPreviewModal.tsx
+  -> WorkerPanel.tsx
+       -> WorkerSecretsSection.tsx
+       -> WorkerDeploySection.tsx
+       -> WorkerConnectionSection.tsx
   -> sessionWizardNormalModeCards.ts
   -> hooks/useSponsoredBundleLifecycle.ts
   -> hooks/useSessionWizardWorkerDeploy.ts
@@ -46,15 +61,15 @@ SessionWizard.tsx
 
 | Section | Lines | Purpose | Key Exports / Helpers |
 |---|---:|---|---|
-| Imports, constants, pure helpers | 1-2327 | File-level helpers, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `resolveSessionWizardDeployBundlePayload`, `buildSessionWizardPublishPlan`, `resolveSessionWizardChipotleHookConfig` |
-| Component bootstrap and cached draft hydration | 2329-3006 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, `resolveSessionWizardSelectorSourceConfig`, `applyWorkerSecretsUpdate` |
-| Derived config and synchronization effects | 3010-4054 | Keeps chain defaults, gate/resource snapshots, header preview state, and source-session inheritance aligned with the active draft | registry-chain effects, gate sync effects, session-header preview effects |
-| Draft mutation and modal orchestration | 4070-4655 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
-| Field renderer and advanced metadata editor | 4656-5880 | Recursive field rendering, lock/gate UI, compact header image controls, normal-vs-advanced metadata surface | `renderCompactSessionHeaderField`, `renderSessionHeaderPreviewSurface`, `renderField` |
-| Publish prep: metadata, SBT drafts, registry writes | 5881-6373 | Builds metadata payloads, uploads Arweave metadata, finalizes deferred SBT uploads, and performs on-chain registration | `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts`, `handleRegisterGroup` |
-| Publish orchestration and deploy helpers | 6374-7200 | Coordinates publish flow, copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `handleCopyAdminUrl`, `resolveWorkerBaseUrl`, `resolveConnectedAdminAddress`, `handleDeployWorker` |
-| Worker/resource cards and derived publish UI | 7201-8076 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, tooltips, and publish progress state | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, `renderEmbeddedDeployHelperToggle` |
-| Main render tree and modals | 8087-9392 | Renders the full `/new` surface, progress UI, modal flows, contract viewer, and image preview modal | `return (...)`, `export default SessionWizard` |
+| Imports, re-exports, constants, pure helpers | 1-545 | File-level helper exports, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `buildSessionWizardPublishPlan`, `resolveSessionWizardChipotleHookConfig` |
+| Component bootstrap and cached draft hydration | 546-1250 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, sponsored-bundle lifecycle wiring |
+| Derived config and synchronization effects | 1251-2240 | Keeps chain defaults, gate/resource snapshots, header preview state, and source-session inheritance aligned with the active draft | registry-chain effects, gate sync effects, session-header preview effects |
+| Draft mutation and modal orchestration | 2241-2411 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
+| Field renderer and advanced metadata fields | 2412-3474 | Recursive field rendering, lock/gate UI, compact header image controls, normal-vs-advanced metadata fields | `renderCompactSessionHeaderField`, `renderSessionHeaderPreviewSurface`, `renderField` |
+| Publish prep: metadata, SBT drafts, registry writes | 3475-3782 | Builds metadata payloads, uploads Arweave metadata, finalizes deferred SBT uploads, and prepares on-chain registration | `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts` |
+| Publish orchestration and deploy helpers | 3783-4400 | Coordinates publish flow, copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `handleCopyAdminUrl`, `handleDeployWorker` |
+| Worker/resource cards and derived publish UI | 4401-4841 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, contract modal selection, and publish progress state | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, selected contract memoization |
+| Main render tree and composed panels | 4842-5278 | Renders the full `/new` surface by composing encryption, metadata, worker, publish, and modal modules | `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals`, `export default SessionWizard` |
 
 ## Key Workflows
 
