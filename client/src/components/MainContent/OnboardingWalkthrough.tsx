@@ -60,9 +60,9 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
     const title = getWelcomeSlide(this.state.arrowIndex)?.title || '';
 
     return title ? (
-      <div id={styles.onboardingInfo}>
-        <div id={styles.onboardingTitleArea}>
-          <h2 id={styles.onboardingTitle}>{title}</h2>
+      <div className={styles.onboardingInfo}>
+        <div className={styles.onboardingTitleArea}>
+          <h2 className={styles.onboardingTitle}>{title}</h2>
         </div>
       </div>
     ) : null;
@@ -71,14 +71,14 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
   getLeftButton = () => {
     if (this.state.arrowIndex > 0) {
       return (
-        <button id={styles.takeSurveyButton} onClick={this.clickLeftArrow} style={{ cursor: 'pointer' }}>
-          <FontAwesomeIcon id={styles.takeSurveyIcon} icon={faArrowLeft} />
+        <button className={styles.takeSurveyButton} onClick={this.clickLeftArrow} style={{ cursor: 'pointer' }}>
+          <FontAwesomeIcon className={styles.takeSurveyIcon} icon={faArrowLeft} />
         </button>
       );
     }
     else {
       return (
-        <button id={styles.openSidebarButton}>
+        <button className={styles.openSidebarButton}>
         </button>
       );
     }
@@ -87,13 +87,13 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
   getRightButton = () => {
     if (this.state.arrowIndex < this.state.numSlides - 1) {
       return (
-        <button id={styles.takeSurveyButton} onClick={this.clickRightArrow} style={{ cursor: 'pointer' }}>
-          <FontAwesomeIcon id={styles.takeSurveyIcon} icon={faArrowRight} />
+        <button className={styles.takeSurveyButton} onClick={this.clickRightArrow} style={{ cursor: 'pointer' }}>
+          <FontAwesomeIcon className={styles.takeSurveyIcon} icon={faArrowRight} />
         </button>
       );
     } else {
       return (
-        <button onClick={this.clickFinalButton} id={styles.openSidebarButton} className={styles.getStartedButton}>
+        <button onClick={this.clickFinalButton} className={`${styles.openSidebarButton} ${styles.getStartedButton}`}>
           See Tools
         </button>
       );
@@ -110,9 +110,9 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
 
     return (
       <div className="block-gradient-slow">
-        <Container id={styles.onboardingWalkthrough}>
+        <Container className={styles.onboardingWalkthrough}>
 
-        <div id={styles.onboardingInfo}>
+        <div className={styles.onboardingInfo}>
          { onboardingHeadline }
             <SiteLoadOptions
               arrowIndex={this.state.arrowIndex}
@@ -122,8 +122,8 @@ class OnboardingWalkthrough extends Component<OnboardingWalkthroughProps, Onboar
               clickLeftArrow={this.clickLeftArrow} />
         </div>
 
-           <div id={styles.onboardingControls}>
-            <div id={styles.sidebarOpen}>
+           <div className={styles.onboardingControls}>
+            <div className={styles.sidebarOpen}>
                {  leftButton  }
             </div>
 
