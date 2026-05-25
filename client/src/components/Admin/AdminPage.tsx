@@ -86,6 +86,8 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
+import type { AdminTestResults } from './adminPageTestResultHelpers';
+import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
   dedupeSbtSelections,
   normalizeGateMode,
@@ -108,40 +110,12 @@ import {
 
 const log = createLogger('general');
 
-type AdminLinkedResult = {
-  label?: string;
-  text?: string;
-  href?: string;
-};
-
-type AdminTestResult = string | AdminLinkedResult;
-type AdminTestResults = Record<string, AdminTestResult>;
 type AdminSecrets = Record<string, string>;
 type AdminSecretKeySet = Set<string>;
 type AdminOpenSecretCards = Record<string, boolean>;
 type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
-};
-
-const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => (
-  !!entry && typeof entry === 'object'
-);
-
-const renderTestResult = (entry: AdminTestResult | null | undefined) => {
-  if (!entry) return 'Not run';
-  if (typeof entry === 'string') return entry;
-  if (!isAdminLinkedResult(entry)) return 'OK';
-  const label = toStr(entry.label || entry.text).trim();
-  const href = toStr(entry.href).trim();
-  if (href) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer">
-        {label || 'View'}
-      </a>
-    );
-  }
-  return label || 'OK';
 };
 
 export const __adminPageTestUtils = {
@@ -3119,7 +3093,7 @@ const AdminPage = ({
                 {gateSyncStatus}
               </div>
             )}
-            {gateSyncResult && <div className={styles.statusNote}>{renderTestResult(gateSyncResult)}</div>}
+            {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
           </>
         )}
       </section>
@@ -3388,7 +3362,7 @@ const AdminPage = ({
               id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
             >
             <span>Health</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.health)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
           </div>
           {!defaultGateIsEmpty && !walletReady && (
             <CETooltip
@@ -3411,7 +3385,7 @@ const AdminPage = ({
             title="Click to test AI"
           >
             <span>AI</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.ai)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
@@ -3424,7 +3398,7 @@ const AdminPage = ({
             title="Click to test Arweave upload"
           >
             <span>Arweave</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.arweave)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
@@ -3437,11 +3411,11 @@ const AdminPage = ({
             title="Click to test faucet (0.0000001)"
           >
             <span>Faucet</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.faucet)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
           </div>
           <div className={styles.statusItem}>
             <span>Transcribe</span>
-            <span>{renderTestResult(testResults.transcribe)}</span>
+            <span>{renderAdminTestResult(testResults.transcribe)}</span>
           </div>
         </div>
         <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
@@ -3467,7 +3441,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-login"
           >
             <span>Login</span>
-            <span>{renderTestResult(deniedResults.login)}</span>
+            <span>{renderAdminTestResult(deniedResults.login)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3483,7 +3457,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-ai"
           >
             <span>AI</span>
-            <span>{renderTestResult(deniedResults.ai)}</span>
+            <span>{renderAdminTestResult(deniedResults.ai)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3499,7 +3473,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-arweave"
           >
             <span>Arweave</span>
-            <span>{renderTestResult(deniedResults.arweave)}</span>
+            <span>{renderAdminTestResult(deniedResults.arweave)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3515,7 +3489,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-transcribe"
           >
             <span>Transcribe</span>
-            <span>{renderTestResult(deniedResults.transcribe)}</span>
+            <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3531,7 +3505,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-faucet"
           >
             <span>Faucet</span>
-            <span>{renderTestResult(deniedResults.faucet)}</span>
+            <span>{renderAdminTestResult(deniedResults.faucet)}</span>
           </div>
         </div>
           </>
