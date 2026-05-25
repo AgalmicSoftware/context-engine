@@ -1684,7 +1684,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
       flex-wrap: nowrap;
     }
 
-    #addDocUrlSection {
+    .addDocUrlSection {
       flex-direction: row;
       align-items: center;
       flex-wrap: wrap;
@@ -1770,6 +1770,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
   @include tokenInfoNarrowLayout;
 
   .createGroupExpanded {
+
     .fieldSectionHeader,
     .settingRow,
     .distributionCheckboxRow,
@@ -1944,7 +1945,7 @@ $placeholder-color: rgba(255, 255, 255, 0.5);
     max-width: none;
   }
 
-  #addDocUrlSection {
+  .addDocUrlSection {
     flex-wrap: wrap;
 
     > input {
