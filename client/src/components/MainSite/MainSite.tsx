@@ -73,7 +73,6 @@ import {
 } from '../../utilities/session/sessionProfileScanController.js';
 import {
   createSessionSbtCacheController,
-  type SbtRealtimeEventLike,
   type SessionSbtCacheController,
   type SessionSbtCacheHost,
 } from '../../utilities/sbt/sessionSbtCacheController.js';
@@ -3832,12 +3831,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
           // Attach instance listener for this SBT only (optional, lightweight)
           if (this.shouldAttachSbtDetailInstanceListener()) {
-            contractScripts.listenForSBTInstanceEvents(
-              'none',
-              [sbtAddressFromPath],
-              (e: SbtRealtimeEventLike | null) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
-              detailSlug
-            );
+            this.startSbtDetailInstanceListenerForGroup(detailSlug, [sbtAddressFromPath]);
           }
 
           // Defer non-SBT caches until after the SBT has loaded
@@ -4458,12 +4452,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
           this.setReadinessStateIfChanged({ isSBTCacheReady: true });
 
           if (this.shouldAttachSbtDetailInstanceListener()) {
-            contractScripts.listenForSBTInstanceEvents(
-              'none',
-              [sbtAddressFromPath],
-              (e: SbtRealtimeEventLike | null) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
-              detailSlug
-            );
+            this.startSbtDetailInstanceListenerForGroup(detailSlug, [sbtAddressFromPath]);
           }
 
           await this.initializeSurveyCache();
@@ -4631,6 +4620,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
   startSbtEventListenerForGroup: SessionSbtCacheController['startSbtEventListenerForGroup'] =
     (...args) => this._sbtCacheController.startSbtEventListenerForGroup(...args);
+
+  startSbtDetailInstanceListenerForGroup: SessionSbtCacheController['startSbtDetailInstanceListenerForGroup'] =
+    (...args) => this._sbtCacheController.startSbtDetailInstanceListenerForGroup(...args);
 
   onNewSbtEventDetected: SessionSbtCacheController['onNewSbtEventDetected'] =
     (...args) => this._sbtCacheController.onNewSbtEventDetected(...args);
