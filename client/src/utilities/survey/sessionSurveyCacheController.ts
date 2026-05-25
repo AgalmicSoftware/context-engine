@@ -137,6 +137,12 @@ interface SurveyContractScripts {
     latestBlock: number,
     slug: string
   ) => Promise<unknown>;
+  listenForSurveyEvents?: (
+    providerName: string,
+    handler: (event: unknown) => unknown,
+    slug: string
+  ) => unknown;
+  removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
 }
 
 export interface SessionSurveyCacheHost {
@@ -149,7 +155,9 @@ export interface SessionSurveyCacheHost {
   getActiveSessionSlug?: () => string;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string;
+  shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
+  onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -166,6 +174,8 @@ export interface SessionSurveyCacheHost {
 export interface SessionSurveyCacheController {
   initializeSurveyCacheForGroup: (slug: string, opts?: SurveyInitOptions) => Promise<void>;
   refreshSurveyResponsesByIDForGroup: (slug: string, surveyID: string) => Promise<void>;
+  startSurveyAndQuestionEventListener: () => boolean;
+  startSurveyAndQuestionEventListenerForGroup: (slugIn?: string | null) => boolean;
   isInitInFlight: (slug: string) => boolean;
   destroy: () => void;
 }
@@ -248,6 +258,16 @@ export const createSessionSurveyCacheController = (
   );
   const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
     typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
+  );
+  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean => (
+    typeof host.shouldSkipSessionScanForSlug === 'function'
+      ? host.shouldSkipSessionScanForSlug(slug, op, scopeCtx)
+      : false
+  );
+  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown => (
+    typeof host.onSurveyEventDetectedForGroup === 'function'
+      ? host.onSurveyEventDetectedForGroup(slug, event)
+      : undefined
   );
   const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') {
@@ -899,6 +919,27 @@ export const createSessionSurveyCacheController = (
     }
   };
 
+  const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
+    if (typeof surveyContractScripts.removeSurveyEventsListener === 'function') {
+      surveyContractScripts.removeSurveyEventsListener('none', slug);
+    }
+    if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
+    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
+    surveyContractScripts.listenForSurveyEvents(
+      'none',
+      (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
+      slug
+    );
+    mainSiteLog.log('Survey & Question event listener started');
+    return true;
+  };
+
+  const startSurveyAndQuestionEventListener = (): boolean => (
+    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug())
+  );
+
   const refreshSurveyResponsesByIDForGroup = async (slugIn: string, surveyID: string): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
     mainSiteLog.log('refreshSurveyResponsesByIDForGroup() for surveyID:', surveyID, 'slug:', slug);
@@ -981,6 +1022,8 @@ export const createSessionSurveyCacheController = (
   return {
     initializeSurveyCacheForGroup,
     refreshSurveyResponsesByIDForGroup,
+    startSurveyAndQuestionEventListener,
+    startSurveyAndQuestionEventListenerForGroup,
     isInitInFlight,
     destroy,
   };

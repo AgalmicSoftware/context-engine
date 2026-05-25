@@ -824,6 +824,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) => (
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx))
     ),
+    onSurveyEventDetectedForGroup: (slug: string, event: unknown) => (
+      this.onNewSurveyEventDetectedForGroup(slug, event as MainSiteSurveyEventLike)
+    ),
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     logScopeSkipOnce: (op: string, slug: string, scopeCtx?: unknown) => (
       this.logScopeSkipOnce(op, slug, toMainSiteScanScopeContext(scopeCtx))
@@ -4703,16 +4706,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   fetchQuestionResponsesChunkedForGroup: SessionResponseHydrationController['fetchQuestionResponsesChunkedForGroup'] =
     (...args) => this._responseHydrationController.fetchQuestionResponsesChunkedForGroup(...args);
 
-  startSurveyAndQuestionEventListener = async () => this.startSurveyAndQuestionEventListenerForGroup(this.getActiveSessionSlug());
+  startSurveyAndQuestionEventListener: SessionSurveyCacheController['startSurveyAndQuestionEventListener'] =
+    (...args) => this._surveyCacheController.startSurveyAndQuestionEventListener(...args);
 
-  startSurveyAndQuestionEventListenerForGroup = async (slugIn: unknown) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    mainSiteLog.log("startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener", { slug });
-    contractScripts.removeSurveyEventsListener('none', slug); // Ensure clean state
-    if (this.shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return;
-    contractScripts.listenForSurveyEvents('none', (e: MainSiteSurveyEventLike) => this.onNewSurveyEventDetectedForGroup(slug, e), slug);
-    mainSiteLog.log("Survey & Question event listener started");
-  };
+  startSurveyAndQuestionEventListenerForGroup: SessionSurveyCacheController['startSurveyAndQuestionEventListenerForGroup'] =
+    (...args) => this._surveyCacheController.startSurveyAndQuestionEventListenerForGroup(...args);
 
 
   onNewSurveyEventDetected = async (event: MainSiteSurveyEventLike) => this.onNewSurveyEventDetectedForGroup(this.getActiveSessionSlug(), event);
