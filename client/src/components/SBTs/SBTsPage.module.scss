@@ -18,7 +18,7 @@
   margin-bottom: 20px;
 }
 
-#showResultsButton {
+.showResultsButton {
   background: transparent;
   font-weight: 600;
   padding: 15px;
@@ -31,7 +31,7 @@
   margin-bottom: 20px;
 }
 
-#buttonRow {
+.buttonRow {
   display: flex;
   flex-direction: row;
   justify-content: space-evenly;
@@ -86,7 +86,7 @@
   opacity: 0.5;
 }
 
-#loadingIcon {
+.loadingIcon {
   display: block;
   margin: 20px auto;
   font-size: 2em;
