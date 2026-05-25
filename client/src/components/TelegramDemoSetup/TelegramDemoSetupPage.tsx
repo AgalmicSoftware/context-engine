@@ -112,6 +112,7 @@ export default function TelegramDemoSetupPage({ activeSessionSlug = '', sessionO
     defaultRpcUrl,
     additionalRpcUrl: normalizedExtraRpc,
     generatedSecrets,
+    sessionConfig: selectedConfig,
   });
   const validation = validateTelegramDemoSetup(plan);
 

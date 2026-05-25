@@ -56,6 +56,24 @@
   overflow: visible;
 }
 
+.telegramOnlyShell {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px 16px;
+}
+
+.telegramOnlyNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(42, 109, 244, 0.24);
+  border-radius: var(--ce-radius-8);
+  background: #f6f9ff;
+  color: #172033;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;
