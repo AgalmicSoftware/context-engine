@@ -298,7 +298,7 @@ describe('OnePageSession view gating', () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    const titleHeading = document.getElementById(styles.brandingSectionTitle);
+    const titleHeading = document.querySelector(`.${styles.brandingSectionTitle}`);
     const titleContainer = titleHeading?.closest(`.${styles.titleContainer}`);
     const latestSurveyPageProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1]?.[0];
 

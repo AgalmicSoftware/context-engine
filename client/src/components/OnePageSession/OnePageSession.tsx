@@ -2216,7 +2216,7 @@ class OnePageSession extends Component<any, any> {
         <div className={styles.onePageDemoContainer}>
           <div className={styles.telegramOnlyShell}>
             <div className={titleContainerClassName}>
-              <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+              <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
             </div>
             <Alert
               color="info"
@@ -2407,7 +2407,7 @@ class OnePageSession extends Component<any, any> {
         {/* Branding/header */}
         <div className={brandingSectionClassName}>
           <div className={titleContainerClassName}>
-            <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+            <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
               <span className={styles.tooltiptext}>
