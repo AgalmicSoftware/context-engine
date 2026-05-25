@@ -311,7 +311,8 @@ describe('SurveyResults multichoice aggregator summary', () => {
 
     const countNode = findElement(
       tree,
-      (element) => element?.props?.id === styles.responseCountNumber
+      (element) => typeof element?.props?.className === 'string' &&
+        element.props.className.includes(styles.responseCountNumber)
     );
 
     expect(countNode?.props?.children).toBe(1);
