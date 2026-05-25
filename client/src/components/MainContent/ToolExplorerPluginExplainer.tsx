@@ -1,7 +1,6 @@
 /** @file ToolExplorerPluginExplainer.tsx */
 
 import React from 'react';
-import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
@@ -25,10 +24,6 @@ const ToolExplorerPluginExplainer = ({ explainText }: ToolExplorerPluginExplaine
       </CETooltip>
     </span>
   );
-};
-
-ToolExplorerPluginExplainer.propTypes = {
-  explainText: PropTypes.string,
 };
 
 export default ToolExplorerPluginExplainer;
