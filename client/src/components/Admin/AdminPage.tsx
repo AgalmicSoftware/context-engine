@@ -81,6 +81,7 @@ import {
   parseAllowOriginsDraft,
 } from './adminPageDraftFormattingHelpers';
 import {
+  buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -2528,21 +2529,10 @@ const AdminPage = ({
               </div>
               <div className={styles.metadataItem}>
                 <span>Chain / Registry</span>
-                <span>{(() => {
-                  const chainId = toStr(groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '').trim();
-                  const chainName = getChainName(chainId);
-                  const registryChainId = toStr(groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '').trim();
-                  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
-                  const chainNum = Number(chainId);
-                  const registryNum = Number(registryChainId);
-                  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
-                    ? chainNum === registryNum
-                    : registryChainId === chainId;
-                  if (!registryChainId || sameChain) return chainDisplay;
-                  const registryName = getChainName(registryChainId);
-                  const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
-                  return `${chainDisplay} / ${registryDisplay}`;
-                })()}</span>
+                <span>{buildAdminChainRegistryDisplay({
+                  chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
+                  registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
+                })}</span>
               </div>
               <div className={styles.metadataItem}>
                 <span>Admin</span>
