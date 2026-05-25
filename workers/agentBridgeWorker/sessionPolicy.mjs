@@ -105,6 +105,25 @@ export function normalizeSessionPolicy(input = {}) {
     sponsoredFaucetAllowed: session.sponsoredFaucetAllowed === true,
     sbtJoinModes: Array.isArray(session.sbtJoinModes) ? session.sbtJoinModes.slice() : ['public'],
     requiredSbtGroups: normalizeRequiredSbtGroups(session),
+    questionAuthoringPermissionMode: safeString(
+      session.questionAuthoringPermissionMode ||
+      session.telegramQuestionAuthoringPermissionMode ||
+      session.telegram?.questionAuthoringPermissionMode ||
+      input.questionAuthoringPermissionMode ||
+      input.telegramQuestionAuthoringPermissionMode
+    ).toLowerCase() || null,
+    authoringGroupChatIds: (Array.isArray(session.authoringGroupChatIds)
+      ? session.authoringGroupChatIds
+      : (Array.isArray(session.telegramAuthoringGroupChatIds)
+        ? session.telegramAuthoringGroupChatIds
+        : (Array.isArray(input.authoringGroupChatIds) ? input.authoringGroupChatIds : [])))
+      .map(safeString)
+      .filter(Boolean),
+    telegramAuthoringGroupChatIds: (Array.isArray(session.telegramAuthoringGroupChatIds)
+      ? session.telegramAuthoringGroupChatIds
+      : (Array.isArray(input.telegramAuthoringGroupChatIds) ? input.telegramAuthoringGroupChatIds : []))
+      .map(safeString)
+      .filter(Boolean),
     docLibraryEnabled: session.docLibraryEnabled === true,
     questions: Array.isArray(session.questions)
       ? session.questions.slice()

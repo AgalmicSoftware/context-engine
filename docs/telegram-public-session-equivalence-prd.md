@@ -84,6 +84,13 @@ surface-specific paths.
   Telegram result cards should not be surfaced in the CE client yet. Reverse
   this exception when the fuller client results implementation can enforce the
   same access and sufficiency rules.
+- Temporary Telegram authoring exception: question authoring and agent handoff
+  permissions default to Telegram-native group/session binding. A user or agent
+  may add/pose questions and save preference drafts only when the Telegram
+  account is acting from a joined group or from a private binding that was
+  created from that group. This is intentionally narrower than full CE/SBT
+  resource parity and must be replaced or standardized before public operator
+  rollout.
 
 ## Surface Equivalence Matrix
 
@@ -96,6 +103,7 @@ surface-specific paths.
 | Cloudflare `lit_encrypted` ineligible viewer | Shows `Encrypted` | Shows encrypted/required SBT message | Shows encrypted/required SBT message |
 | Payload missing/indexing | Shows `Unavailable` with retry/refresh affordance | Shows unavailable/retry state | Shows unavailable/retry state |
 | Temporary Telegram results | Hidden until fuller client parity | Joined Telegram-enabled sessions can view result cards | Joined Telegram-enabled sessions can view result cards when exposed |
+| Temporary Telegram question authoring and preference drafts | Hidden until permission parity is standardized | Telegram-native joined group/bound user can add/pose questions and authorize agent drafts | Draft review only; submission still requires user action |
 | `telegram_only` Cloudflare-native session | Shows `Telegram-only session` notice | Listed and answered in Telegram without chain question discovery | Listed and answered in Mini App without chain question discovery |
 
 ## Requirements
@@ -129,3 +137,7 @@ surface-specific paths.
 - Should a Telegram-managed account be allowed to unlock `worker_sbt_gate`
   client views through a client-side Telegram sign-in handoff, or should those
   views remain Telegram-only until full CE account linking exists?
+- Should question authoring and agent preference drafting be governed by SBT
+  membership, Telegram group admin/member status, an explicit session author
+  allowlist, or a unified `resourcePermissions` policy that the client and
+  Telegram surfaces both enforce?

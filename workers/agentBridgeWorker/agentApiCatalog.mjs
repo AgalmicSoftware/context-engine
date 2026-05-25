@@ -143,6 +143,43 @@ const CAPABILITIES = Object.freeze([
     miniAppRoutes: ['questions'],
   }),
   freezeEntry({
+    id: 'agent.telegram.preferences.draft',
+    category: 'responses',
+    label: 'Draft Telegram Preferences',
+    canonicalActionId: 'agent.telegram.preferences.draft',
+    method: 'POST',
+    path: '/telegram/agent/api/preferences',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['telegramUserId', 'sessionSlug', 'preferences.answersByQuestionId'],
+    optionalFields: ['groupChatId'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Writes drafts for user review only; it must not submit answers without explicit user approval.',
+    ],
+  }),
+  freezeEntry({
+    id: 'agent.telegram.questions.pose',
+    category: 'questions',
+    label: 'Pose Telegram Question',
+    canonicalActionId: 'agent.telegram.questions.pose',
+    method: 'POST',
+    path: '/telegram/agent/api/questions/pose',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['telegramUserId', 'sessionSlug', 'questionId or prompt'],
+    optionalFields: ['groupChatId', 'questionType', 'send'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    ],
+    groupSafe: false,
+    notes: [
+      'Uses Telegram-native group membership or session binding for permission until CE parity gates are standardized.',
+    ],
+  }),
+  freezeEntry({
     id: 'agent.responses.submit_request',
     category: 'responses',
     label: 'Submit Response',
