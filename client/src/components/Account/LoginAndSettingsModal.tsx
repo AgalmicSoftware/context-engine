@@ -98,11 +98,16 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
-import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
 import { createLogger } from 'utilities/logging.js';
+import {
+  buildBookmarksRoutePath,
+  buildSettingsSessionHref,
+  formatSettingsSessionSlug,
+  normalizeSettingsSessionSlug,
+} from './loginSettingsRouteHelpers';
 
 const accountLog = createLogger('account');
 const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
@@ -171,19 +176,7 @@ type SponsoredStatusEntry = LoginAndSettingsRecord & {
   status?: string;
 };
 
-const normalizeSettingsSessionSlug = (value: unknown) => {
-  const raw = toStr(value).trim().toLowerCase();
-  return raw === 'general' ? '' : raw;
-};
-const formatSettingsSessionSlug = (value: unknown) => {
-  const normalized = normalizeSettingsSessionSlug(value);
-  return normalized || 'general';
-};
-const buildSettingsSessionHref = (slugIn?: string) => {
-  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
-  const slug = normalizeSettingsSessionSlug(slugIn);
-  return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
-};
+export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
