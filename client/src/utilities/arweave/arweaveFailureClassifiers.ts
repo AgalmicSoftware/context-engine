@@ -11,6 +11,12 @@ const TERMINAL_ARWEAVE_FAILURE_STATES = new Set([
   'terminal_invalid',
 ]);
 
+type UnknownRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
 const normalizeState = (state: unknown): string => String(state || '').trim().toLowerCase();
 
 export const isTerminalArweaveFailureState = (state: unknown): boolean => (
@@ -20,8 +26,8 @@ export const isTerminalArweaveFailureState = (state: unknown): boolean => (
 // Regression guard: keep failure-entry normalization in the Arweave layer.
 // Importing the cache module here reintroduces the HMR/runtime cycle that leaves
 // `isTerminalArweaveFailureState` uninitialized during module evaluation.
-export const normalizeArweaveFailureEntry = (rawEntry: any) => {
-  if (!rawEntry || typeof rawEntry !== 'object') return null;
+export const normalizeArweaveFailureEntry = (rawEntry: unknown) => {
+  if (!isRecord(rawEntry)) return null;
   const attempts = Math.max(0, Number(rawEntry.attempts || 0));
   const firstFailedAtMs = Number(rawEntry.firstFailedAtMs || 0);
   const lastFailedAtMs = Number(rawEntry.lastFailedAtMs || 0);
@@ -38,9 +44,9 @@ export const normalizeArweaveFailureEntry = (rawEntry: any) => {
   };
 };
 
-export const normalizeArweaveFailureMeta = (raw: any) => {
-  const fromError: Record<string, any> = raw && typeof raw === 'object' ? raw : {};
-  const nested: Record<string, any> = (fromError.arweaveFailure && typeof fromError.arweaveFailure === 'object')
+export const normalizeArweaveFailureMeta = (raw: unknown) => {
+  const fromError: UnknownRecord = isRecord(raw) ? raw : {};
+  const nested: UnknownRecord = isRecord(fromError.arweaveFailure)
     ? fromError.arweaveFailure
     : {};
   const read = (key: string, fallback: unknown = null): unknown => (
@@ -94,10 +100,11 @@ export const buildArweaveFailureError = ({
   kind?: unknown;
   nextRetryAtMs?: unknown;
   message?: unknown;
-  failureEntry?: any;
+  failureEntry?: unknown;
   cause?: unknown;
 }) => {
-  const err = new Error(String(message || 'Arweave fetch failed')) as Error & Record<string, any>;
+  const failureRecord = isRecord(failureEntry) ? failureEntry : {};
+  const err = new Error(String(message || 'Arweave fetch failed')) as Error & UnknownRecord;
   err.name = 'ArweaveTxFailureError';
   err.txId = String(txId || '');
   err.status = Number.isFinite(Number(status)) ? Number(status) : null;
@@ -113,11 +120,11 @@ export const buildArweaveFailureError = ({
     kind: err.kind,
     state: err.state,
     nextRetryAtMs: err.nextRetryAtMs,
-    attempts: Number(failureEntry?.attempts || 0),
-    lastStatus: Number.isFinite(Number(failureEntry?.lastStatus))
-      ? Number(failureEntry.lastStatus)
+    attempts: Number(failureRecord.attempts || 0),
+    lastStatus: Number.isFinite(Number(failureRecord.lastStatus))
+      ? Number(failureRecord.lastStatus)
       : null,
-    message: String(message || failureEntry?.message || ''),
+    message: String(message || failureRecord.message || ''),
   };
   if (cause) err.cause = cause;
   return err;
@@ -129,8 +136,8 @@ export const classifyArweaveFailureState = ({
   error,
 }: {
   txId?: unknown;
-  prevEntry?: any;
-  error?: any;
+  prevEntry?: unknown;
+  error?: unknown;
 }) => {
   const now = Date.now();
   const prev = normalizeArweaveFailureEntry(prevEntry) || {
@@ -177,7 +184,8 @@ export const classifyArweaveFailureState = ({
       Number.isFinite(externalNextRetryAt) ? externalNextRetryAt : 0
     );
   }
-  const message = String(meta.message || error?.message || prev.message || 'Arweave fetch failed');
+  const errorRecord = isRecord(error) ? error : {};
+  const message = String(meta.message || errorRecord.message || prev.message || 'Arweave fetch failed');
   return {
     txId: String(txId || ''),
     attempts,
@@ -190,11 +198,12 @@ export const classifyArweaveFailureState = ({
   };
 };
 
-export const buildHashUnavailableMetadataError = (message: unknown, meta: any = {}) => {
-  const retryAtMs = Number(meta?.nextRetryAtMs || 0) > 0
-    ? Number(meta.nextRetryAtMs)
+export const buildHashUnavailableMetadataError = (message: unknown, meta: unknown = {}) => {
+  const metaRecord = isRecord(meta) ? meta : {};
+  const retryAtMs = Number(metaRecord.nextRetryAtMs || 0) > 0
+    ? Number(metaRecord.nextRetryAtMs)
     : (Date.now() + ARWEAVE_TX_FAILURE_TERMINAL_RECHECK_MS);
-  const err = new Error(String(message || 'Metadata hash is unavailable')) as Error & Record<string, any>;
+  const err = new Error(String(message || 'Metadata hash is unavailable')) as Error & UnknownRecord;
   err.name = 'MetadataUnavailableError';
   err.state = 'terminal_not_found';
   err.kind = 'not_found';
@@ -202,7 +211,7 @@ export const buildHashUnavailableMetadataError = (message: unknown, meta: any = 
   err.status = 404;
   err.nextRetryAtMs = retryAtMs;
   err.arweaveFailure = {
-    txId: String(meta?.txId || ''),
+    txId: String(metaRecord.txId || ''),
     state: 'terminal_not_found',
     kind: 'not_found',
     retryable: false,
