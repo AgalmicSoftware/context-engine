@@ -12,6 +12,21 @@ type LocationLike = {
   search?: unknown;
 } | undefined;
 
+type StructuredDataNode = Record<string, unknown>;
+
+type PublicPageStructuredData = {
+  '@context': 'https://schema.org';
+  '@graph': StructuredDataNode[];
+};
+
+export type PublicPageHeadState = {
+  title: string;
+  description: string;
+  image: string;
+  canonicalUrl: string;
+  ogUrl: string;
+};
+
 export const DEFAULT_PUBLIC_PAGE_TITLE =
   'Context Engine | Deliberation Toolkit';
 
@@ -30,7 +45,11 @@ const STRUCTURED_DATA_SELECTOR =
 
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
-const ensureHeadNode = (selector: string, tagName: string, attrs: Record<string, string> = {}) => {
+const ensureHeadNode = (
+  selector: string,
+  tagName: string,
+  attrs: Record<string, string> = {}
+): HTMLElement => {
   let node = document.head.querySelector(selector) as HTMLElement | null;
   if (node) return node;
   node = document.createElement(tagName) as HTMLElement;
@@ -41,13 +60,21 @@ const ensureHeadNode = (selector: string, tagName: string, attrs: Record<string,
   return node;
 };
 
-const setMetaContent = (selector: string, attrs: Record<string, string>, content: string) => {
+const setMetaContent = (
+  selector: string,
+  attrs: Record<string, string>,
+  content: string
+): HTMLElement => {
   const node = ensureHeadNode(selector, 'meta', attrs);
   node.setAttribute('content', content);
   return node;
 };
 
-const setStructuredDataContent = (selector: string, attrs: Record<string, string>, content: string) => {
+const setStructuredDataContent = (
+  selector: string,
+  attrs: Record<string, string>,
+  content: string
+): HTMLElement => {
   const node = ensureHeadNode(selector, 'script', attrs);
   node.textContent = content;
   return node;
@@ -103,7 +130,7 @@ const buildCanonicalSearch = (search: unknown, pathname = ''): string => {
 
   const params = new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`);
   const canonicalParams = new URLSearchParams();
-  const setCanonicalParam = (canonicalKey: string, aliases: string[] = []) => {
+  const setCanonicalParam = (canonicalKey: string, aliases: string[] = []): void => {
     for (const alias of aliases) {
       if (!params.has(alias)) continue;
       const normalizedValue = normalizeCanonicalParamValue(params.get(alias));
@@ -168,7 +195,7 @@ const buildPublicPageStructuredData = ({
   description?: string;
   canonicalUrl?: string;
   location?: LocationLike;
-} = {}) => ({
+} = {}): PublicPageStructuredData => ({
   '@context': 'https://schema.org',
   '@graph': [
     {
@@ -226,7 +253,7 @@ export const syncPublicPageHead = ({
   image?: unknown;
   canonicalUrl?: unknown;
   ogUrl?: unknown;
-} = {}) => {
+} = {}): PublicPageHeadState | null => {
   if (typeof document === 'undefined') return null;
 
   const resolvedTitle = toStr(title) || DEFAULT_PUBLIC_PAGE_TITLE;
