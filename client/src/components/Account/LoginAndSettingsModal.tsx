@@ -98,7 +98,6 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
@@ -109,16 +108,6 @@ import {
   formatSettingsSessionSlug,
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
-import {
-  buildLoginSettingsSponsorshipCards,
-  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
-  getSponsoredKeyAliases,
-} from './loginSettingsSponsoredStatusHelpers';
-import {
-  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
-  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
-  formatLoginSettingsAiProviderLabel,
-} from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -196,20 +185,7 @@ type SponsoredStatusEntry = LoginAndSettingsRecord & {
   status?: string;
 };
 
-const normalizeSettingsSessionSlug = (value: unknown) => {
-  const raw = toStr(value).trim().toLowerCase();
-  return raw === 'general' ? '' : raw;
-};
-const formatSettingsSessionSlug = (value: unknown) => {
-  const normalized = normalizeSettingsSessionSlug(value);
-  return normalized || 'general';
-};
-const buildSettingsSessionHref = (slugIn?: string) => {
-  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
-  const slug = normalizeSettingsSessionSlug(slugIn);
-  return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
-};
-export const buildBookmarksRoutePath = (): string => buildPublicRoute('/bookmarks');
+export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
