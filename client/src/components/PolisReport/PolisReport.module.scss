@@ -256,7 +256,7 @@
   color: var(--ce-color-border);
 }
 
-#sectionHeader {
+.sectionHeader {
   font-size: 1.4rem;
   margin-bottom: 10px;
   color: var(--ce-color-border);
@@ -290,7 +290,7 @@
 }
 
 /* Add a row for the top toggles */
-#settingsRow {
+.settingsRow {
   margin-bottom: 10px;
   display: flex;
   flex-direction: row;
@@ -697,7 +697,7 @@
   /*
    * 1. Top settings row: Make buttons and controls wrap instead of overflowing.
    */
-  #settingsRow {
+  .settingsRow {
     flex-wrap: wrap;
     justify-content: flex-start;
     gap: 10px;
@@ -771,7 +771,7 @@
   box-shadow: 0 18px 32px rgba(15, 23, 42, 0.1);
   color: #1f2a44;
 
-  #settingsRow {
+  .settingsRow {
     background: rgba(255, 255, 255, 0.95);
     border: none;
     border-radius: var(--ce-radius-6);
@@ -854,7 +854,7 @@
     margin-bottom: 10px;
   }
 
-  #sectionHeader {
+  .sectionHeader {
     font-weight: 700;
     color: #1f2a44;
   }
@@ -1022,7 +1022,7 @@
   color: #e5e7eb;
   color-scheme: dark;
 
-  #settingsRow {
+  .settingsRow {
     background: #0f172a;
     border: 1px solid #1f2937;
     border-radius: var(--ce-radius-6);
@@ -1103,7 +1103,7 @@
     margin-bottom: 10px;
   }
 
-  #sectionHeader {
+  .sectionHeader {
     font-weight: 700;
     color: #f3f4f6;
   }
