@@ -438,7 +438,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       return (
         <div>
           <div className={styles.container}>
-            <div id={styles.buttonRow}>
+            <div className={styles.buttonRow}>
               <button
                 onClick={() => (window.location.href = sbtsListPath())}
                 className={styles.backButton}
@@ -566,7 +566,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             {showCreateGroupBeforeFeatured && renderCreateGroupPanel()}
             {/* <h2 className={styles.featuredTitle}>Featured</h2> */}
             {showFeaturedColdStartSpinner ? (
-              <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
+              <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingIcon} />
             ) : (
               <div className={styles.featuredSection}>
                 {showFeaturedCornerSpinner && (
@@ -666,7 +666,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
 
             <div className={styles.container}>
               {!hideMiniActionRow && (
-                <div id={styles.buttonRow}>
+                <div className={styles.buttonRow}>
                   <button
                     onClick={() => (window.location.href = sbtsListPath())}
                     className={styles.backButton}
@@ -674,7 +674,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                     <FontAwesomeIcon icon={faExpand} /> View All
                   </button>
                   <button
-                    id={styles.showResultsButton}
+                    className={styles.showResultsButton}
                     onClick={this.toggleCreateGroup}
                     data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
                   >
