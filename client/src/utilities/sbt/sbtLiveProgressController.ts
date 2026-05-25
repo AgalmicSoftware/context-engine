@@ -5,11 +5,59 @@ import {
   shouldCommitThrottledProgress,
 } from '../../components/MainSite/progressHelpers.js';
 
+interface BuildSbtCountsInitialProgressOptions {
+  startBlock?: unknown;
+  toBlock?: unknown;
+  seedBlock?: unknown;
+}
+
+interface SbtCountsInitialProgress {
+  phase: 'activity';
+  fromBlock: number;
+  toBlock: number;
+  totalBlocks: number;
+  scannedBlocks: number;
+  remainingBlocks: number;
+  completionRatio: number;
+  scanFrom: number;
+  scanTo: number;
+  lastScannedBlock: number;
+}
+
+type MergeProgressEntry = typeof mergeSbtLiveProgressEntry;
+type ShouldCommitProgress = typeof shouldCommitThrottledProgress;
+type MergeProgressArgs = Parameters<MergeProgressEntry>[0];
+type SbtLiveProgressEntry = NonNullable<NonNullable<MergeProgressArgs>['nextPatch']>;
+
+interface SbtLiveProgressState {
+  sbtScanProgressBySlug?: Record<string, SbtLiveProgressEntry>;
+}
+
+type SbtLiveProgressStatePatch = {
+  sbtScanProgressBySlug: Record<string, SbtLiveProgressEntry>;
+} | null;
+
+type SbtLiveProgressStateUpdater = (
+  prev: SbtLiveProgressState | null | undefined
+) => SbtLiveProgressStatePatch;
+
+interface SbtLiveProgressControllerOptions {
+  mergeProgressEntry?: MergeProgressEntry;
+  setState?: ((updater: SbtLiveProgressStateUpdater, cb?: unknown) => unknown) | null;
+  shouldCommitProgress?: ShouldCommitProgress;
+  minIntervalMs?: number;
+}
+
+interface SbtLiveProgressMeta {
+  token: number;
+  lastCommitMs: number;
+}
+
 export const buildSbtCountsInitialProgress = ({
   startBlock,
   toBlock,
   seedBlock,
-} = {}) => {
+}: BuildSbtCountsInitialProgressOptions = {}): SbtCountsInitialProgress | null => {
   const scanStartBlock = Number(startBlock);
   const scanToBlock = Number(toBlock);
   const progressSeedBlock = Number(seedBlock);
@@ -52,10 +100,10 @@ export const createSbtLiveProgressController = ({
   setState = null,
   shouldCommitProgress = shouldCommitThrottledProgress,
   minIntervalMs = SBT_PROGRESS_MIN_INTERVAL_MS,
-} = {}) => {
-  const progressMetaBySlug = new Map();
+}: SbtLiveProgressControllerOptions = {}) => {
+  const progressMetaBySlug = new Map<string, SbtLiveProgressMeta>();
 
-  const applyState = (updater, cb) => {
+  const applyState = (updater: SbtLiveProgressStateUpdater, cb?: unknown): void => {
     if (typeof setState === 'function') {
       setState(updater, cb);
       return;
@@ -63,7 +111,7 @@ export const createSbtLiveProgressController = ({
     if (typeof cb === 'function') cb();
   };
 
-  const beginSbtLiveProgress = (slugIn, initialPatch = {}) => {
+  const beginSbtLiveProgress = (slugIn: unknown, initialPatch: unknown = {}): number => {
     const slug = normalizeSessionSlug(slugIn || '');
     const token = Number(progressMetaBySlug.get(slug)?.token || 0) + 1;
     const nowMs = Date.now();
@@ -78,7 +126,7 @@ export const createSbtLiveProgressController = ({
           prevEntry: null,
           nextPatch: {
             slug,
-            ...initialPatch,
+            ...(initialPatch as Record<string, unknown>),
             updatedAtMs: nowMs,
           },
           nowMs,
@@ -88,13 +136,18 @@ export const createSbtLiveProgressController = ({
     return token;
   };
 
-  const updateSbtLiveProgress = (slugIn, token, nextPatch = {}, options = {}) => {
+  const updateSbtLiveProgress = (
+    slugIn: unknown,
+    token: unknown,
+    nextPatch: unknown = {},
+    options: unknown = {}
+  ): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = progressMetaBySlug.get(slug);
     if (!meta || Number(meta.token || 0) !== Number(token || 0)) return false;
     const nowMs = Date.now();
     if (!shouldCommitProgress({
-      force: options?.force === true,
+      force: (options as { force?: unknown } | null | undefined)?.force === true,
       nowMs,
       lastCommitMs: Number(meta.lastCommitMs || 0),
       minIntervalMs,
@@ -109,7 +162,7 @@ export const createSbtLiveProgressController = ({
         prevEntry,
         nextPatch: {
           slug,
-          ...nextPatch,
+          ...(nextPatch as Record<string, unknown>),
           updatedAtMs: nowMs,
         },
         nowMs,
@@ -131,7 +184,7 @@ export const createSbtLiveProgressController = ({
     return true;
   };
 
-  const clearSbtLiveProgress = (slugIn, token = null) => {
+  const clearSbtLiveProgress = (slugIn: unknown, token: unknown = null): void => {
     const slug = normalizeSessionSlug(slugIn || '');
     const meta = progressMetaBySlug.get(slug);
     if (token != null && Number(meta?.token || 0) !== Number(token || 0)) return;
