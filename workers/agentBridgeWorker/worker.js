@@ -2,8 +2,9 @@ import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
 import { directSubmitFeatureEnabled } from './onChainResponses.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
-import { buildTelegramCommandResponse, handleTelegramWebhookUpdate } from './telegramCommands.mjs';
+import { buildTelegramCommandResponse, handleTelegramWebhookUpdate, readTelegramResultPhoto } from './telegramCommands.mjs';
 import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
+import { processTelegramSubmitQueueBatch } from './telegramSubmitQueue.mjs';
 
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -195,6 +196,10 @@ function telegramPreviewHtml() {
 }
 
 export default {
+  async queue(batch, env = {}) {
+    await processTelegramSubmitQueueBatch(batch, env);
+  },
+
   async fetch(request, env = {}, ctx = {}) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
@@ -240,6 +245,21 @@ export default {
         },
       }, { status: preview.ok === true ? 200 : 400 });
     }
+    if (url.pathname.startsWith('/telegram/result-photo/') && request.method === 'GET') {
+      const id = safeString(url.pathname.split('/').pop());
+      const photo = await readTelegramResultPhoto({ env, id });
+      if (!photo.ok) {
+        return json({ ok: false, error: photo.reason || 'result_photo_not_found' }, { status: photo.status || 404 });
+      }
+      return new Response(photo.bytes, {
+        status: 200,
+        headers: {
+          'content-type': photo.contentType,
+          'cache-control': 'public, max-age=600',
+          'content-disposition': `inline; filename="${photo.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+        },
+      });
+    }
     if (url.pathname === '/telegram/mini-app' || url.pathname.startsWith('/telegram/mini-app/api/')) {
       return handleTelegramMiniAppRequest({
         request,
@@ -263,11 +283,13 @@ export default {
       if (!update || typeof update !== 'object') {
         return json({ ok: false, error: 'invalid_telegram_update' }, { status: 400 });
       }
+      const waitUntil = typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null;
       const handled = await handleTelegramWebhookUpdate({
         update,
         env,
         fetchImpl: env.TELEGRAM_FETCH || globalThis.fetch,
-        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
+        waitUntil,
+        deferDispatch: !!waitUntil,
       });
       if (!handled.ok && !handled.response) {
         return json({ ok: false, error: handled.reason || 'invalid_telegram_update' }, { status: 400 });

@@ -23,6 +23,18 @@ kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]
 
+# Optional burst buffer for 500-user smoke/production events. When enabled,
+# submit requests are accepted into KV and queued for background settlement.
+# Create the queue separately for manual Wrangler debugging.
+# [[queues.producers]]
+# binding = "AGENT_RESPONSE_QUEUE"
+# queue = "ce-agent-bridge-response-submit"
+#
+# [[queues.consumers]]
+# queue = "ce-agent-bridge-response-submit"
+# max_batch_size = 25
+# max_batch_timeout = 5
+
 # Optional bridge-owned demo doc/artifact storage. The normal live Telegram
 # smoke deploy omits these bindings unless AGENT_BRIDGE_ENABLE_DOC_STORAGE=true
 # or deploy:apply receives --enable-doc-storage.
@@ -56,11 +68,13 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # and deny export.
 # AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = "0x0000000000000000000000000000000000000000"
 # AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
+# AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS = "2500"
 # AGENT_BRIDGE_RPC_TIMEOUT_MS = "5000"
 # AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS = "2500"
 # AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS = "300"
 # AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY = "4"
 # AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS = "1"
+# AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS = "8000"
 # Live question scans prefer metadata blockLimits, then SessionCreated for the slug.
 # AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK = "0"
 # AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK = ""
@@ -69,11 +83,15 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 AGENT_AI_PROVIDER = "ce_session_policy"
 BROADCAST_ENABLED = "true"
 AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED = "true"
+# Requires AGENT_RESPONSE_QUEUE binding. Leave false for simple smoke deploys.
+AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED = "false"
 AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 # Direct managed Telegram demo submits still require a live
 # CE_SESSION_WORKER_BASE_URL, Surveys address config from the linked session,
 # AGENT_BRIDGE_SURVEYS_ADDRESS, or the OP Sepolia default, plus
-# managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON. Set
+# managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON.
+# Telegram-visible sessions also require telegramOnly=true/sessionMode=telegram_only
+# so ordinary registry sessions are not listed accidentally. Set
 # either broadcast flag to "false" to force canonical submit-request records
 # instead of broadcasting.
 # Optional override for session worker auth. Defaults to AGENT_BRIDGE_PUBLIC_URL

@@ -16,6 +16,8 @@ function decodeStoredPng(image) {
   let offset = 8;
   let width = 0;
   let height = 0;
+  let colorType = 6;
+  let palette = null;
   const idat = [];
   while (offset < bytes.length) {
     const length = readU32(bytes, offset);
@@ -24,7 +26,9 @@ function decodeStoredPng(image) {
     if (type === 'IHDR') {
       width = readU32(data, 0);
       height = readU32(data, 4);
+      colorType = data[9];
     }
+    if (type === 'PLTE') palette = data;
     if (type === 'IDAT') idat.push(data);
     offset += 12 + length;
   }
@@ -48,11 +52,25 @@ function decodeStoredPng(image) {
     cursor += part.length;
   }
   const pixels = new Uint8Array(width * height * 4);
-  const stride = width * 4;
+  const bytesPerPixel = colorType === 3 ? 1 : 4;
+  const stride = width * bytesPerPixel;
   for (let y = 0; y < height; y += 1) {
     const src = y * (stride + 1);
     assert.equal(scanlines[src], 0);
-    pixels.set(scanlines.slice(src + 1, src + 1 + stride), y * stride);
+    if (colorType === 3) {
+      assert.ok(palette);
+      for (let x = 0; x < width; x += 1) {
+        const paletteIndex = scanlines[src + 1 + x];
+        const paletteOffset = paletteIndex * 3;
+        const pixelOffset = ((y * width) + x) * 4;
+        pixels[pixelOffset] = palette[paletteOffset];
+        pixels[pixelOffset + 1] = palette[paletteOffset + 1];
+        pixels[pixelOffset + 2] = palette[paletteOffset + 2];
+        pixels[pixelOffset + 3] = 255;
+      }
+    } else {
+      pixels.set(scanlines.slice(src + 1, src + 1 + stride), y * width * 4);
+    }
   }
   return { width, height, pixels };
 }
@@ -79,6 +97,7 @@ test('consensus result image uses white A1 layout with response distribution bar
   const decoded = decodeStoredPng(image);
 
   assert.deepEqual(pixelAt(decoded, 4, 4), [247, 249, 252, 255]);
+  assert.ok(image.bytes.length < 900_000);
   assert.deepEqual(pixelAt(decoded, 24, 24), [255, 255, 255, 255]);
   assert.deepEqual(pixelAt(decoded, 420, 244), [18, 181, 105, 255]);
   assert.deepEqual(pixelAt(decoded, 790, 244), [245, 181, 0, 255]);

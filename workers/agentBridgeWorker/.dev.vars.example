@@ -33,6 +33,7 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 # AGENT_BRIDGE_MINI_APP_URL=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev/telegram/mini-app
 # AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS=86400
 # AGENT_BRIDGE_QUESTION_SOURCE=fixture
+# AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS=2500
 # AGENT_BRIDGE_RPC_TIMEOUT_MS=5000
 # AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS=2500
 # AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS=300
@@ -44,9 +45,10 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 # AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK=
 # Emergency/debug only: allows recent-block fallback when no scoped bounds exist.
 # AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1
-# AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramBridgeEnabled":true}]}
+# AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramOnly":true,"sessionMode":"telegram_only","telegramBridgeEnabled":true,"questions":[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]}]}
 # AGENT_BRIDGE_DEMO_QUESTIONS_JSON=[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]
 # AGENT_BRIDGE_DEMO_DOCS_JSON=[{"docId":"doc-public","sessionSlug":"general","title":"Public notes","fileType":"md","visibility":"public","contentPreview":"Public summary only"}]
+# AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS=8000
 
 # Optional developer fallback only. Live apply derives the account from the
 # token when exactly one account is visible.

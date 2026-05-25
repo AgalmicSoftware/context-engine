@@ -91,6 +91,7 @@ describe('telegramDemoSetupHelpers', () => {
       cloudflareApiToken: 'cf-real-token',
       workersSubdomain: 'tenant-subdomain',
       generatedSecrets,
+      sessionConfig: { telegramOnly: true, sessionName: 'Alpha' },
     });
     const audit = buildTelegramDemoSetupAuditEvent({ plan });
     const serialized = JSON.stringify(audit);
@@ -135,6 +136,7 @@ describe('telegramDemoSetupHelpers', () => {
       workersSubdomain: 'tenant-subdomain',
       defaultRpcUrl: 'https://op-sepolia-testnet.api.pocket.network',
       additionalRpcUrl: 'https://infura.example.test/op-sepolia',
+      sessionConfig: { telegramOnly: true, sessionName: 'Alpha' },
       generatedSecrets: {
         TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
         DEMO_SIGNER_ROOT_SECRET: 'signer-secret',
@@ -143,6 +145,9 @@ describe('telegramDemoSetupHelpers', () => {
 
     expect(plan.vars.DEFAULT_RPC_URL).toBe('https://op-sepolia-testnet.api.pocket.network');
     expect(plan.vars.ADDITIONAL_RPC_URL).toBe('https://infura.example.test/op-sepolia');
+    const policy = JSON.parse(String(plan.vars.AGENT_BRIDGE_SESSION_POLICY_JSON || '{}'));
+    expect(policy.sessions[0].telegramOnly).toBe(true);
+    expect(policy.sessions[0].telegramBridgeEnabled).toBe(true);
     expect(normalizeAdditionalRpcUrl(
       'https://op-sepolia-testnet.api.pocket.network',
       'https://op-sepolia-testnet.api.pocket.network'

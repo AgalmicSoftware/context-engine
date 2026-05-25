@@ -245,6 +245,24 @@ export const resolveSessionDefaultRpcUrl = (sessionConfig: unknown): string => {
   return DEFAULT_AGENT_BRIDGE_RPC_URL;
 };
 
+export const resolveTelegramOnlySessionFlag = (sessionConfig: unknown): boolean => (
+  readNested(sessionConfig, ['telegramOnly']) === true ||
+  readNested(sessionConfig, ['telegram_only']) === true ||
+  toStr(readNested(sessionConfig, ['sessionMode'])).trim().toLowerCase() === 'telegram_only' ||
+  toStr(readNested(sessionConfig, ['telegramMode'])).trim().toLowerCase() === 'telegram_only' ||
+  readNested(sessionConfig, ['telegram', 'only']) === true ||
+  toStr(readNested(sessionConfig, ['telegram', 'mode'])).trim().toLowerCase() === 'telegram_only'
+);
+
+export const resolveSessionDisplayName = (sessionConfig: unknown, fallbackSlug = ''): string => (
+  toStr(
+    readNested(sessionConfig, ['sessionName']) ||
+    readNested(sessionConfig, ['name']) ||
+    fallbackSlug ||
+    'General'
+  ).trim()
+);
+
 export const normalizeAdditionalRpcUrl = (value: unknown, defaultRpcUrl = ''): string => {
   const normalized = normalizeHttpsBaseUrl(value);
   if (!normalized) return '';
@@ -287,6 +305,7 @@ export const buildTelegramDemoSetupPlan = ({
   defaultRpcUrl = DEFAULT_AGENT_BRIDGE_RPC_URL,
   additionalRpcUrl = '',
   generatedSecrets = {},
+  sessionConfig = {},
 }: {
   sessionSlug?: unknown;
   sessionWorkerBaseUrl?: unknown;
@@ -299,6 +318,7 @@ export const buildTelegramDemoSetupPlan = ({
   defaultRpcUrl?: unknown;
   additionalRpcUrl?: unknown;
   generatedSecrets?: UnknownRecord;
+  sessionConfig?: unknown;
 } = {}) => {
   const normalizedWorkerName = normalizeAgentBridgeWorkerName(workerName);
   const normalizedSubdomain = normalizeWorkersSubdomain(workersSubdomain);
@@ -318,9 +338,36 @@ export const buildTelegramDemoSetupPlan = ({
     BROADCAST_ENABLED: 'false',
     AGENT_AI_PROVIDER: 'ce_session_policy',
   };
+  const slug = toStr(sessionSlug).trim() || 'general';
+  const telegramOnly = resolveTelegramOnlySessionFlag(sessionConfig);
+  vars.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+    type: 'agent_bridge_session_policy',
+    defaultSessionSlug: slug,
+    riskCeiling: 'submit',
+    allowQuestionGeneration: false,
+    allowGenerateQuestion: false,
+    sessions: [{
+      sessionSlug: slug,
+      sessionName: resolveSessionDisplayName(sessionConfig, slug),
+      default: true,
+      telegramOnly,
+      sessionMode: telegramOnly ? 'telegram_only' : 'standard',
+      telegramBridgeEnabled: telegramOnly,
+      managedAccountSubmitAllowed: telegramOnly,
+      sponsoredAiAllowed: telegramOnly,
+      sponsoredRpcAllowed: telegramOnly,
+      sponsoredFaucetAllowed: telegramOnly,
+      docLibraryEnabled: false,
+      sessionWorkerUrl: normalizeHttpsBaseUrl(sessionWorkerBaseUrl),
+      chainId: String(Number(defaultChainId || 0) || DEFAULT_AGENT_BRIDGE_CHAIN_ID),
+      storageProfile: isObj(readNested(sessionConfig, ['storageProfile']))
+        ? readNested(sessionConfig, ['storageProfile'])
+        : null,
+    }],
+  });
   if (extraRpcUrl) vars.ADDITIONAL_RPC_URL = extraRpcUrl;
   return {
-    sessionSlug: toStr(sessionSlug).trim(),
+    sessionSlug: slug,
     workerName: normalizedWorkerName,
     accountId: '<derived-from-cloudflare-token>',
     accountLookup: {
@@ -357,6 +404,19 @@ export const validateTelegramDemoSetup = (plan: ReturnType<typeof buildTelegramD
   }
   if (toStr(plan.publicUrl).includes('<workers-subdomain>')) {
     missing.push('CLOUDFLARE_WORKERS_SUBDOMAIN');
+  }
+  const policy = isObj(plan.vars?.AGENT_BRIDGE_SESSION_POLICY_JSON)
+    ? plan.vars?.AGENT_BRIDGE_SESSION_POLICY_JSON
+    : (() => {
+      try {
+        return JSON.parse(toStr(plan.vars?.AGENT_BRIDGE_SESSION_POLICY_JSON));
+      } catch (_) {
+        return null;
+      }
+    })();
+  const policySessions = Array.isArray(policy?.sessions) ? policy.sessions : [];
+  if (!policySessions.some((session) => session?.telegramOnly === true && session?.telegramBridgeEnabled === true)) {
+    missing.push('telegramOnly session flag');
   }
   return {
     ok: missing.length === 0,

@@ -526,6 +526,19 @@ describe('SessionWizard rendered validation', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toBeInTheDocument();
   });
 
+  it('shows a Telegram-only session checkbox in session setup', async () => {
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+
+    const toggle = screen.getByRole('checkbox', { name: /telegram-only session/i });
+    expect(toggle).not.toBeChecked();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toBeChecked();
+  });
+
   it('shows contract tooltip and modal triggers in advanced metadata, then opens a compact reader for the selected contract', async () => {
     renderSessionWizard({ activeSessionSlug: 'session-alpha' });
 

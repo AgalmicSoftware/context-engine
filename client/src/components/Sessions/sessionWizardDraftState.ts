@@ -43,6 +43,14 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
+  draft.telegramOnly = draft.telegramOnly === true ||
+    draft.telegram_only === true ||
+    draft.sessionMode === 'telegram_only' ||
+    draft.telegramMode === 'telegram_only' ||
+    draft.telegram?.mode === 'telegram_only' ||
+    draft.telegram?.only === true;
+  delete draft.telegram_only;
+  delete draft.telegramMode;
   if (!draft.sessionInfoEncrypted) {
     delete draft.sessionInfoEncrypted;
   }
@@ -121,6 +129,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionName = '';
   draft.sessionInfo = '';
   draft.sessionHeader = '';
+  draft.telegramOnly = false;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';

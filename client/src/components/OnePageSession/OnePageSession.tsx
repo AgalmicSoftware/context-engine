@@ -90,6 +90,15 @@ const resolveAutoFeatureBySessionSlug = (metadata: any) => (
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
 
+const isTelegramOnlySessionConfig = (metadata: any) => (
+  metadata?.telegramOnly === true ||
+  metadata?.telegram_only === true ||
+  metadata?.sessionMode === 'telegram_only' ||
+  metadata?.telegramMode === 'telegram_only' ||
+  metadata?.telegram?.only === true ||
+  metadata?.telegram?.mode === 'telegram_only'
+);
+
 const isPerfCountersEnabled = () => {
   try {
     return typeof globalThis !== 'undefined' && (
@@ -2100,6 +2109,30 @@ class OnePageSession extends Component<any, any> {
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
+    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
+
+    if (telegramOnlySession) {
+      return (
+        <div className={styles.onePageDemoContainer}>
+          <div className={styles.telegramOnlyShell}>
+            <div className={titleContainerClassName}>
+              <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+            </div>
+            <Alert
+              color="info"
+              className={styles.telegramOnlyNotice}
+              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
+              fade={false}
+            >
+              <strong>Telegram-only session</strong>
+              <span>
+                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
+              </span>
+            </Alert>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className={styles.onePageDemoContainer}>

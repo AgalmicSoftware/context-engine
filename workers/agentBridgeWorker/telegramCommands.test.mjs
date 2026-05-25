@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
   dispatchTelegramCommandResponse,
+  handleTelegramWebhookUpdate,
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -124,6 +125,20 @@ function privateMessageFrom(text, {
       from: { id: Number(telegramUserId), username },
     },
   };
+}
+
+async function withTimeout(promise, ms = 100, message = 'operation timed out') {
+  let timeout = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function managedAccountAddressFor({
@@ -394,7 +409,7 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   }
 });
 
-test('/sessions uses live SessionRegistry slugs and hides E2E noise when no demo session policy is configured', async () => {
+test('/sessions does not expose registry-only sessions without telegram_only policy', async () => {
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/sessions'),
     env: {
@@ -409,19 +424,20 @@ test('/sessions uses live SessionRegistry slugs and hides E2E noise when no demo
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'group_session_card');
-  assert.match(result.response.text, /Sessions \(2\/2\)/);
-  assert.match(result.response.text, /- alpha \(alpha\)/);
-  assert.match(result.response.text, /- beta-room \(beta-room\)/);
+  assert.match(result.response.text, /Sessions \(0\/0\)/);
+  assert.equal(result.response.text.includes('- alpha (alpha)'), false);
+  assert.equal(result.response.text.includes('- beta-room (beta-room)'), false);
   assert.equal(result.response.text.includes('e2e-smoke-noise'), false);
   assert.equal(result.response.text.includes('general'), false);
 });
 
-test('/sessions bypasses stale registry cache so newly registered sessions show up', async () => {
+test('/sessions reads the current telegram_only policy list', async () => {
   const env = {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
-    DEFAULT_CHAIN_ID: '11155420',
-    DEFAULT_RPC_URL: 'https://fresh-sessions-rpc.example',
-    REGISTRY_FETCH: registryFetchForSlugs(['old-alpha']),
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'old-alpha',
+      sessions: [{ sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
     AGENT_ACTION_KV: new MemoryKv(),
   };
   const stale = await buildTelegramCommandResponse({
@@ -430,25 +446,37 @@ test('/sessions bypasses stale registry cache so newly registered sessions show 
     now: '2026-05-08T12:00:00.000Z',
   });
 
-  env.REGISTRY_FETCH = registryFetchForSlugs(['old-alpha', 'new-beta']);
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+    defaultSessionSlug: 'old-alpha',
+    sessions: [
+      { sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+      { sessionSlug: 'new-beta', sessionName: 'New Beta', telegramBridgeEnabled: true, telegramOnly: true },
+    ],
+  });
   const fresh = await buildTelegramCommandResponse({
     update: groupMessage('/sessions'),
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
 
-  assert.match(stale.response.text, /- old-alpha \(old-alpha\)/);
+  assert.match(stale.response.text, /- old-alpha \(Old Alpha\)/);
   assert.equal(stale.response.text.includes('new-beta'), false);
-  assert.match(fresh.response.text, /- old-alpha \(old-alpha\)/);
-  assert.match(fresh.response.text, /- new-beta \(new-beta\)/);
+  assert.match(fresh.response.text, /- old-alpha \(Old Alpha\)/);
+  assert.match(fresh.response.text, /- new-beta \(New Beta\)/);
 });
 
 test('/sessions paginates tall Telegram session lists', async () => {
   const env = {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
-    DEFAULT_CHAIN_ID: '11155420',
-    DEFAULT_RPC_URL: 'https://paged-sessions-rpc.example',
-    REGISTRY_FETCH: registryFetchForSlugs(['one', 'two', 'three', 'four', 'five', 'six']),
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'one',
+      sessions: ['one', 'two', 'three', 'four', 'five', 'six'].map((slug) => ({
+        sessionSlug: slug,
+        sessionName: slug,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      })),
+    }),
     AGENT_ACTION_KV: new MemoryKv(),
   };
   const first = await buildTelegramCommandResponse({
@@ -492,13 +520,13 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
         {
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: false,
         },
         {
@@ -814,6 +842,11 @@ test('/results consensus shows top difference questions from submitted records',
         questionType: 'agree_unsure_disagree',
         prompt: 'Should the group run another pilot?',
       },
+      {
+        questionId: 'q-freeform',
+        questionType: 'freeform',
+        prompt: 'What should the group write in the open note?',
+      },
     ]),
   });
   let counter = 0;
@@ -839,6 +872,8 @@ test('/results consensus shows top difference questions from submitted records',
   await putResponse('q-c', '2', 'Disagree');
   await putResponse('q-d', '1', 'Agree');
   await putResponse('q-d', '2', 'Disagree');
+  await putResponse('q-freeform', '1', 'Agree');
+  await putResponse('q-freeform', '2', 'Disagree');
 
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/results consensus'),
@@ -852,13 +887,14 @@ test('/results consensus shows top difference questions from submitted records',
   assert.equal(result.response.photo.contentType, 'image/png');
   assert.deepEqual(Array.from(result.response.photo.bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.match(result.response.text, /^Beeswarm/);
-  assert.match(result.response.text, /Live responses: 10/);
+  assert.match(result.response.text, /Live responses: 12/);
   assert.match(result.response.text, /Most difference 1-3 of 4/);
   assert.match(result.response.text, /1\. ● Should the group block launch\?/);
   assert.match(result.response.text, /Agree 2 \| Disagree 2/);
   assert.match(result.response.text, /2\. ● Should the group add a risk review\?/);
   assert.match(result.response.text, /3\. ● Should the group publish the summary\?/);
   assert.equal(result.response.text.includes('Should the group run another pilot?'), false);
+  assert.equal(result.response.text.includes('open note'), false);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Next 3']);
   assert.equal(result.response.text.includes('Demo mode'), false);
 
@@ -963,7 +999,7 @@ test('/results group analysis callback uses session worker AI for the selected p
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
         default: true,
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sponsoredAiAllowed: true,
         sessionWorkerUrl: 'https://session-worker.example',
@@ -1092,10 +1128,35 @@ test('/results without arguments explains available result views', async () => {
   assert.equal(result.screen, 'results_options');
   assert.equal(result.response.method, 'sendMessage');
   assert.match(result.response.text, /^Results/);
+  assert.match(result.response.text, /Selected session: alpha/);
   assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
   assert.match(result.response.text, /Group: shows participant answer patterns/);
   assert.match(result.response.text, /\/results \[ consensus \| group \]/);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group']);
+});
+
+test('/results consensus demo rows are limited to binary questions', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-binary', questionType: 'binary', prompt: 'Pets should be allowed in the office.' },
+      { questionId: 'q-freeform', questionType: 'freeform', prompt: 'What should the office policy say?' },
+      { questionId: 'q-rating', questionType: 'rating', prompt: 'How strongly do you agree?' },
+    ]),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/results consensus'),
+    env,
+    now: '2026-05-08T12:01:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'results_consensus');
+  assert.match(result.response.text, /^Beeswarm \(demo data\)/);
+  assert.match(result.response.text, /Most difference 1-1 of 1/);
+  assert.match(result.response.text, /Pets should be allowed in the office\./);
+  assert.equal(result.response.text.includes('office policy'), false);
+  assert.equal(result.response.text.includes('strongly'), false);
+  assert.equal(result.response.text.includes('Arriving 10 minutes early'), false);
 });
 
 test('/results uses the joined Telegram-enabled session without requiring SBT joins', async () => {
@@ -1107,13 +1168,13 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
         {
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: false,
           requiredSbtGroups: [{ groupId: 'beta-sbt', name: 'Beta SBT', joinMode: 'public' }],
         },
@@ -1121,7 +1182,7 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { sessionSlug: 'alpha', questionId: 'q-alpha', questionType: 'freeform', prompt: 'Alpha prompt?' },
-      { sessionSlug: 'beta', questionId: 'q-beta', questionType: 'freeform', prompt: 'Beta results prompt?' },
+      { sessionSlug: 'beta', questionId: 'q-beta', questionType: 'binary', prompt: 'Beta results prompt?' },
     ]),
   });
   const sessions = await buildTelegramCommandResponse({
@@ -1199,7 +1260,7 @@ test('/export_all sends a zip for the allowlisted Telegram managed wallet', asyn
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sessionWorkerUrl: 'https://session.example',
         storageProfile: { backend: 'cloudflare' },
@@ -1302,7 +1363,7 @@ test('/export_all falls back to Telegram submit records when storage payload lis
       sessions: [{
         sessionSlug: 'telegram-demo-2',
         sessionName: 'Telegram Demo 2',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sessionWorkerUrl: 'https://session.example',
       }],
@@ -1363,7 +1424,7 @@ test('/export_all denies non-allowlisted Telegram managed wallets', async () => 
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sessionWorkerUrl: 'https://session.example',
         storageProfile: { backend: 'cloudflare' },
       }],
@@ -1393,7 +1454,7 @@ test('/start and /me show export controls only to the configured export admin', 
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sessionWorkerUrl: 'https://session.example',
         storageProfile: { backend: 'cloudflare' },
       }],
@@ -1452,13 +1513,13 @@ test('/start export_all targets the latest submitted session before the registry
         {
           sessionSlug: 'test-session',
           sessionName: 'Registry First Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           sessionWorkerUrl: 'https://session.example',
         },
         {
           sessionSlug: 'telegram-demo-2',
           sessionName: 'Telegram Demo 2',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           sessionWorkerUrl: 'https://session.example',
           storageProfile: { backend: 'cloudflare' },
         },
@@ -1495,7 +1556,7 @@ test('configured export admin can grant and revoke another Telegram managed wall
       sessions: [{
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         sessionWorkerUrl: 'https://session.example',
         storageProfile: { backend: 'cloudflare' },
       }],
@@ -1607,6 +1668,26 @@ test('dispatchTelegramCommandResponse uploads rendered result photos and falls b
   assert.equal(calls[0].init.body.get('chat_id'), '-100123');
   assert.equal(calls[0].init.body.get('photo').type, 'image/png');
 
+  const urlEnv = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const urlCalls = [];
+  const urlDispatched = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env: urlEnv,
+    fetchImpl: async (url, init = {}) => {
+      urlCalls.push({ url, init });
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 79 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  const resultPhotoKeys = Array.from(urlEnv.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:result-photo:'));
+  assert.equal(urlDispatched.telegram.ok, true);
+  assert.equal(resultPhotoKeys.length, 1);
+  assert.match(urlCalls[0].init.body.get('photo'), /^https:\/\/bridge\.example\/telegram\/result-photo\/cecb_/);
+
   const fallbackCalls = [];
   const fallbackFetch = async (url, init = {}) => {
     fallbackCalls.push({ url, init });
@@ -1628,7 +1709,40 @@ test('dispatchTelegramCommandResponse uploads rendered result photos and falls b
   });
 
   assert.equal(fallback.telegram.ok, true);
-  assert.deepEqual(fallbackCalls.map((call) => String(call.url).split('/').pop()), ['sendPhoto', 'sendMessage']);
+  assert.deepEqual(fallbackCalls.map((call) => String(call.url).split('/').pop()), ['sendPhoto', 'sendDocument']);
+});
+
+test('dispatchTelegramCommandResponse falls back when Telegram media upload times out', async () => {
+  const calls = [];
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse: {
+      ok: true,
+      command: '/results',
+      screen: 'results_consensus',
+      response: {
+        method: 'sendPhoto',
+        chatId: '55',
+        text: 'Beeswarm\nSession: telegram-demo-3',
+        photo: {
+          url: 'https://bridge.example/telegram/result-photo/cecb_timeouttest',
+          contentType: 'image/png',
+          filename: 'results.png',
+        },
+      },
+    },
+    env: baseEnv({ AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS: '1' }),
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith('/sendPhoto')) return new Promise(() => {});
+      return new Response(JSON.stringify({ ok: true, result: { message_id: 79 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.deepEqual(calls.map((call) => call.url.split('/').pop()), ['sendPhoto', 'sendDocument']);
 });
 
 test('/questions does not invent demo questions when live question cache is empty', async () => {
@@ -1669,6 +1783,172 @@ test('/questions does not invent demo questions when live question cache is empt
   assert.equal(result.response.text.includes('What should Alpha decide next'), false);
 });
 
+test('/questions reads telegram_only preloaded policy questions without chain indexing', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/questions telegram-native'),
+    env: {
+      TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'telegram-native',
+        sessions: [{
+          sessionSlug: 'telegram-native',
+          sessionName: 'Telegram Native',
+          telegramOnly: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          questions: [{
+            questionId: 'q-native-1',
+            questionType: 'binary',
+            prompt: 'Should this session avoid chain question indexing?',
+          }],
+        }],
+      }),
+      REGISTRY_FETCH: async () => {
+        throw new Error('registry should not be called');
+      },
+    },
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionSourceReason, 'telegram_only_policy_questions_loaded');
+  assert.equal(result.response.text, 'Questions (1/1)\n\n1. Should this session avoid chain question indexing?');
+  assert.equal(flattenButtons(result.response.replyMarkup)[0].text, 'Pose 1');
+});
+
+test('/questions reads telegram_only Cloudflare question payloads concurrently', async () => {
+  let activeReads = 0;
+  let maxActiveReads = 0;
+  let releaseReads = null;
+  const readBarrier = new Promise((resolve) => {
+    releaseReads = resolve;
+  });
+  const fetchImpl = async (url, init = {}) => {
+    const target = new URL(String(url));
+    if (target.pathname.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/list')) {
+      return new Response(JSON.stringify({
+        items: [
+          { id: 'q-storage-1' },
+          { id: 'q-storage-2' },
+          { id: 'q-storage-3' },
+        ],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.pathname.endsWith('/storage/read')) {
+      activeReads += 1;
+      maxActiveReads = Math.max(maxActiveReads, activeReads);
+      if (activeReads === 3) releaseReads();
+      await readBarrier;
+      const id = target.searchParams.get('id');
+      activeReads -= 1;
+      return new Response(JSON.stringify({
+        questionId: id,
+        questionType: 'binary',
+        prompt: `Loaded ${id}`,
+        sessionSlug: 'telegram-cloudflare',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: 'unexpected_url' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await withTimeout(buildTelegramCommandResponse({
+    update: groupMessage('/questions telegram-cloudflare'),
+    env: baseEnv({
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'telegram-cloudflare',
+        sessions: [{
+          sessionSlug: 'telegram-cloudflare',
+          sessionName: 'Telegram Cloudflare',
+          telegramOnly: true,
+          telegramBridgeEnabled: true,
+          sessionWorkerUrl: 'https://session.example',
+          workerSessionSlug: 'telegram-cloudflare',
+          questionSource: 'cloudflare_storage',
+          storageProfile: { backend: 'cloudflare' },
+        }],
+      }),
+      QUESTION_FETCH: fetchImpl,
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  }), 500, 'telegram_only Cloudflare question reads were not concurrent');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionSourceReason, 'telegram_only_cloudflare_questions_loaded');
+  assert.equal(result.response.text, [
+    'Questions (3/3)',
+    '',
+    '1. Loaded q-storage-1',
+    '2. Loaded q-storage-2',
+    '3. Loaded q-storage-3',
+  ].join('\n'));
+  assert.equal(maxActiveReads, 3);
+});
+
+test('/questions live_or_fixture does not show fixture questions when live loading is slow', async () => {
+  __test__sessionQuestions.clearCaches();
+  const waited = [];
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/questions telegram-demo-3'),
+    env: baseEnv({
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live_or_fixture',
+      AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS: '1',
+      QUESTION_FETCH: async () => new Promise(() => {}),
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'telegram-demo-3',
+        riskCeiling: 'submit',
+        sessions: [{
+          sessionSlug: 'telegram-demo-3',
+          sessionName: 'Telegram Demo 3',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        }],
+      }),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        {
+          sessionSlug: 'telegram-demo-3',
+          questionId: 'q-demo-3',
+          questionType: 'freeform',
+          prompt: 'What should demo 3 test first?',
+        },
+      ]),
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+    waitUntil: (promise) => waited.push(promise),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionSource, 'telegram_worker_question_cache');
+  assert.equal(result.questionSourceReason, 'live_question_cache_timeout');
+  assert.equal(result.response.text, 'Questions (0/0)\n\nQuestions are still loading from Cloudflare. Run /questions again shortly.');
+  assert.equal(result.response.text.includes('What should demo 3 test first?'), false);
+  assert.equal(waited.length, 1);
+});
+
 test('/questions reports live source failures without caching them as empty lists', async () => {
   __test__sessionQuestions.clearCaches();
   const result = await buildTelegramCommandResponse({
@@ -1700,14 +1980,14 @@ test('group session binding makes later question and doc commands use the joined
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
@@ -1781,13 +2061,13 @@ test('private session join makes later question commands use the selected sessio
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
       ],
@@ -1833,7 +2113,7 @@ test('private session join makes later question commands use the selected sessio
   assert.match(posed.response.text, /^What should Demo decide next\?/);
 });
 
-test('private session join reports available question count after bounded prefetch', async () => {
+test('private session join schedules question prefetch without blocking the join reply', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -1843,13 +2123,13 @@ test('private session join reports available question count after bounded prefet
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
       ],
@@ -1878,20 +2158,20 @@ test('private session join reports available question count after bounded prefet
     scheduled: true,
     sessionSlug: 'demo',
     ok: true,
-    reason: 'fixture_questions_loaded',
-    questionCount: 1,
-    availableQuestionCount: 1,
+    reason: 'question_prefetch_scheduled',
+    questionCount: 0,
+    availableQuestionCount: 0,
     unavailableQuestionCount: 0,
     lockedQuestionCount: 0,
-    discoveredQuestionCount: 1,
-    complete: true,
+    discoveredQuestionCount: 0,
+    complete: false,
   });
-  assert.match(joined.response.text, /Questions: 1\./);
-  assert.equal(waited.length, 0);
+  assert.match(joined.response.text, /Questions: loading\./);
+  assert.equal(waited.length, 1);
   await Promise.all(waited);
 });
 
-test('group session join reports available question count after bounded prefetch', async () => {
+test('group session join schedules question prefetch without blocking the join reply', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'demo',
@@ -1900,7 +2180,7 @@ test('group session join reports available question count after bounded prefetch
         sessionSlug: 'demo',
         sessionName: 'Demo Session',
         default: true,
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
       }],
     }),
@@ -1928,20 +2208,20 @@ test('group session join reports available question count after bounded prefetch
     scheduled: true,
     sessionSlug: 'demo',
     ok: true,
-    reason: 'fixture_questions_loaded',
-    questionCount: 1,
-    availableQuestionCount: 1,
+    reason: 'question_prefetch_scheduled',
+    questionCount: 0,
+    availableQuestionCount: 0,
     unavailableQuestionCount: 0,
     lockedQuestionCount: 0,
-    discoveredQuestionCount: 1,
-    complete: true,
+    discoveredQuestionCount: 0,
+    complete: false,
   });
-  assert.match(joined.response.text, /Questions: 1\./);
-  assert.equal(waited.length, 0);
+  assert.match(joined.response.text, /Questions: loading\./);
+  assert.equal(waited.length, 1);
   await Promise.all(waited);
 });
 
-test('private session join requests faucet funding when session policy allows it', async () => {
+test('private session join schedules faucet funding when session policy allows it', async () => {
   const calls = [];
   const env = baseEnv({
     AGENT_BRIDGE_FETCH: mockSessionWorkerFetch(calls),
@@ -1952,7 +2232,7 @@ test('private session join requests faucet funding when session policy allows it
         sessionSlug: 'alpha',
         sessionName: 'Alpha Session',
         default: true,
-        telegramBridgeEnabled: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
         managedAccountSubmitAllowed: true,
         sponsoredFaucetAllowed: true,
         sessionWorkerUrl: 'https://session.example',
@@ -1960,15 +2240,20 @@ test('private session join requests faucet funding when session policy allows it
     }),
   });
 
+  const waited = [];
   const joined = await buildTelegramCommandResponse({
     update: privateMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
+    waitUntil: (promise) => waited.push(promise),
   });
 
   assert.equal(joined.ok, true);
   assert.equal(joined.response.text.includes('Faucet:'), false);
   assert.equal(joined.faucet.ok, true);
+  assert.equal(joined.faucet.scheduled, true);
+  assert.equal(waited.length, 2);
+  await Promise.all(waited);
   assert.equal(calls.length, 3);
   assert.equal(calls[2].url, 'https://session.example/');
   const faucetBody = JSON.parse(calls[2].init.body);
@@ -1976,6 +2261,58 @@ test('private session join requests faucet funding when session policy allows it
   assert.equal(faucetBody.sessionSlug, 'alpha');
   assert.match(faucetBody.to, /^0x[0-9a-fA-F]{40}$/);
   assert.equal(JSON.stringify(joined).includes('unit-root'), false);
+});
+
+test('/sessions join callback returns before slow session worker setup completes', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_FETCH: async () => new Promise(() => {}),
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'telegram-demo-3',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'telegram-demo-3',
+        sessionName: 'Telegram Demo 3',
+        default: true,
+        telegramBridgeEnabled: true, telegramOnly: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredFaucetAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  });
+  const sessions = await buildTelegramCommandResponse({
+    update: privateMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const joinButton = flattenButtons(sessions.response.replyMarkup)
+    .find((button) => button.text === 'Telegram Demo 3');
+  const waited = [];
+
+  const joined = await withTimeout(buildTelegramCommandResponse({
+    update: {
+      update_id: 7100,
+      callback_query: {
+        id: 'callback-join-demo3',
+        data: joinButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 88,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+    waitUntil: (promise) => waited.push(promise),
+  }), 100, 'join callback waited on slow session worker setup');
+
+  assert.equal(joined.ok, true);
+  assert.equal(joined.command, 'callback:join_session');
+  assert.match(joined.response.text, /Joined session: Telegram Demo 3/);
+  assert.match(joined.response.text, /Questions: loading\./);
+  assert.equal(joined.faucet.scheduled, true);
+  assert.equal(waited.length, 2);
 });
 
 test('/sessions callback switches the group session used by later question commands', async () => {
@@ -1988,13 +2325,13 @@ test('/sessions callback switches the group session used by later question comma
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           default: true,
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
-          telegramBridgeEnabled: true,
+          telegramBridgeEnabled: true, telegramOnly: true,
           managedAccountSubmitAllowed: true,
         },
       ],
