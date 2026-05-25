@@ -11,6 +11,29 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const expectedLintCommand = [
+  'eslint src/',
+  '"src/utilities/ui/**/*.{ts,tsx}"',
+  '"src/components/Shared/**/*.{ts,tsx}"',
+  '"src/components/About/**/*.{ts,tsx}"',
+  '"src/components/Footer/**/*.{ts,tsx}"',
+  '"src/components/InformationModals/**/*.{ts,tsx}"',
+  '"src/components/Onboarding/**/*.{ts,tsx}"',
+  '"src/components/MainContent/**/*.{ts,tsx}"',
+  '"src/components/Agent/**/*.{ts,tsx}"',
+  '"src/components/Bookmarks/**/*.{ts,tsx}"',
+  '"src/components/Sponsor/**/*.{ts,tsx}"',
+  '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
+  '"src/components/RightSidebar/**/*.{ts,tsx}"',
+  '"src/components/E2E/**/*.{ts,tsx}"',
+  '"src/components/Gates/**/*.{ts,tsx}"',
+  '"src/components/CommunityTab/**/*.{ts,tsx}"',
+  '"src/components/PolisReport/**/*.{ts,tsx}"',
+  '"src/components/DebateMap/**/*.{ts,tsx}"',
+  '"src/components/Navbar/**/*.{ts,tsx}"',
+  '"src/components/ContractPage/**/*.{ts,tsx}"',
+].join(' ');
+
 describe('client package modernization contract', () => {
   it('keeps canonical commands on the Vite and standalone Jest paths', () => {
     const pkg = readClientPackageJson();
@@ -33,6 +56,12 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
