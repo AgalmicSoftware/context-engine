@@ -2719,28 +2719,57 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
       sanitizeSessionSlug(record.sessionSlug) === slug &&
       safeString(record.questionId)
     ))
-    .map((record) => ({
-      key: safeString(record.key),
-      createdAt: safeString(record.createdAt),
-      telegramUserId: safeString(record.telegramUserId),
-      questionId: safeString(record.questionId),
-      label: normalizeResultAnswerLabel(firstAnswerValue(
-        record.answer?.label,
-        record.answer?.value,
-        record.answer?.text,
-        record.answerLabel,
-        record.answerValue,
-      )),
-      value: safeAnswerString(firstAnswerValue(
-        record.answer?.value,
-        record.answer?.text,
-        record.answer?.label,
-        record.answerValue,
-        record.answerLabel,
-      )),
-      txHash: safeString(record.onChain?.txHash),
-    }))
+    .map((record) => {
+      const answer = structuredResultAnswer(record);
+      return {
+        key: safeString(record.key),
+        createdAt: safeString(record.createdAt),
+        telegramUserId: safeString(record.telegramUserId),
+        questionId: safeString(record.questionId),
+        label: normalizeResultAnswerLabel(firstAnswerValue(
+          answer.label,
+          answer.value,
+          answer.text,
+          record.answerLabel,
+          record.answerValue,
+        )),
+        value: safeAnswerString(firstAnswerValue(
+          answer.value,
+          answer.text,
+          answer.label,
+          record.answerValue,
+          record.answerLabel,
+        )),
+        questionType: safeString(answer.questionType || record.questionType || record.controlType),
+        text: safeAnswerString(firstAnswerValue(
+          answer.text,
+          record.answerText,
+        )),
+        comments: safeAnswerString(firstAnswerValue(
+          answer.comments,
+          answer.additionalComments,
+          record.comments,
+          record.answerComments,
+        )),
+        txHash: safeString(record.onChain?.txHash),
+      };
+    })
     .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
+}
+
+function structuredResultAnswer(record = {}) {
+  const answer = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
+    ? { ...record.answer }
+    : {};
+  const parsed = safeJsonParse(answer.value || record.answerValue, null);
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    return {
+      ...answer,
+      ...parsed,
+      label: safeString(answer.label || parsed.label),
+    };
+  }
+  return answer;
 }
 
 function questionPromptById(questions = []) {
@@ -2891,6 +2920,7 @@ function buildGroupAnalysisPrompt(group = {}, groups = []) {
     clusterSize: group.size,
     totalClusters: groups.length,
     topStatements: group.topStatements,
+    qualitativeResponses: group.qualitativeResponses || [],
   };
   return `
 We have grouped participants into ${allGroupsData.clusterCount || 'N'} opinion clusters.
@@ -2902,13 +2932,16 @@ For this cluster, here are the most representative statements with per-cluster v
 Top statements (JSON):
 ${JSON.stringify(clusterData.topStatements || [], null, 2)}
 
+Additional comments and freeform responses from this cluster (JSON, optional):
+${JSON.stringify(clusterData.qualitativeResponses || [], null, 2)}
+
 All-clusters context (JSON, optional):
 ${JSON.stringify(allGroupsData, null, 2)}
 
 TASK:
 1) Give this cluster a brief, neutral NAME (2-4 words). No slurs or niche jargon.
 2) Write a SHORT one-sentence tagline about what unites the cluster.
-3) Write a LONG 2-4 sentence overview explaining what distinguishes them from others.
+3) Write a LONG 2-4 sentence overview explaining what distinguishes them from others. Use both vote patterns and any additional comments/freeform responses, without quoting private identifying details.
 
 STRICT OUTPUT (JSON only, no extra text):
 {
@@ -2922,11 +2955,17 @@ function localGroupAnalysis(group = {}) {
   const top = (group.topStatements || []).slice(0, 3).map((statement) => (
     `${statement.label}: ${statement.prompt} (${statement.cluster.agreeRate}% agree, ${statement.cluster.disagreeRate}% disagree)`
   ));
+  const qualitative = (group.qualitativeResponses || []).slice(0, 3).map((item) => (
+    `${item.questionLabel}: ${item.text}`
+  ));
   return {
     name: `${group.label} ${group.theme || ''}`.trim(),
     short: `This group trends toward ${group.theme || 'a distinct answer pattern'} across the strongest differentiating questions.`,
-    long: top.length
-      ? `Most distinguishing positions: ${top.join('; ')}.`
+    long: top.length || qualitative.length
+      ? [
+        top.length ? `Most distinguishing positions: ${top.join('; ')}.` : '',
+        qualitative.length ? `Qualitative context: ${qualitative.join('; ')}.` : '',
+      ].filter(Boolean).join(' ')
       : 'There is not enough question overlap to summarize distinctive positions yet.',
   };
 }
@@ -3142,6 +3181,49 @@ function countResultVotes(records = []) {
   };
 }
 
+function questionTypeById(questions = []) {
+  const map = new Map();
+  for (const question of questions) {
+    const id = questionId(question);
+    if (id) map.set(id, lower(question.questionType || question.type || question.controlType));
+  }
+  return map;
+}
+
+function qualitativeTextFromResultRecord(record = {}, questionTypeLookup = new Map()) {
+  const type = lower(record.questionType || questionTypeLookup.get(record.questionId));
+  const text = safeAnswerString(record.text);
+  const comments = safeAnswerString(record.comments);
+  const parts = [];
+  if (type === 'freeform' && text) parts.push(text);
+  if (comments) parts.push(comments);
+  return parts.join(' ').trim();
+}
+
+function qualitativeResponsesForGroup({
+  records = [],
+  aliases = new Map(),
+  questionIndex = new Map(),
+  promptMap = new Map(),
+  questionTypeLookup = new Map(),
+  limit = 8,
+} = {}) {
+  const responses = [];
+  for (const record of records) {
+    const text = qualitativeTextFromResultRecord(record, questionTypeLookup);
+    if (!text) continue;
+    responses.push({
+      participant: aliases.get(record.telegramUserId) || 'Participant',
+      questionId: record.questionId,
+      questionLabel: questionIndex.get(record.questionId) || 'Q?',
+      prompt: promptMap.get(record.questionId) || shortQuestionId(record.questionId),
+      text: text.slice(0, 500),
+    });
+    if (responses.length >= limit) break;
+  }
+  return responses;
+}
+
 function groupBucketForScore(score = 0) {
   if (score > 0.25) return { bucketId: 'support', theme: 'higher agreement' };
   if (score < -0.25) return { bucketId: 'concern', theme: 'higher disagreement' };
@@ -3155,6 +3237,7 @@ function buildParticipantResultGroups({
   questionIds = [],
   questionIndex = new Map(),
   promptMap = new Map(),
+  questionTypeLookup = new Map(),
 } = {}) {
   const buckets = new Map();
   for (const id of participantIds) {
@@ -3185,6 +3268,13 @@ function buildParticipantResultGroups({
     .map((bucket, index) => {
       const participantSet = new Set(bucket.participantIds);
       const clusterRecords = records.filter((record) => participantSet.has(record.telegramUserId));
+      const qualitativeResponses = qualitativeResponsesForGroup({
+        records: clusterRecords,
+        aliases,
+        questionIndex,
+        promptMap,
+        questionTypeLookup,
+      });
       const topStatements = questionIds.map((id, questionNumber) => {
         const clusterQuestionRecords = clusterRecords.filter((record) => record.questionId === id);
         const overallQuestionRecords = records.filter((record) => record.questionId === id);
@@ -3214,6 +3304,7 @@ function buildParticipantResultGroups({
         aliases: bucket.participantIds.map((id) => aliases.get(id)).filter(Boolean),
         averageScore: Number((bucket.scoreTotal / bucket.participantIds.length).toFixed(3)),
         topStatements,
+        qualitativeResponses,
       };
     });
 }
@@ -3252,12 +3343,17 @@ function buildDemoParticipantGraph(questions = []) {
 }
 
 function buildParticipantGraph(records = [], questions = []) {
-  const questionIds = Array.from(new Set(records.map((record) => record.questionId).filter(Boolean)));
+  const questionTypeLookup = questionTypeById(questions);
+  const graphRecords = (Array.isArray(records) ? records : []).map((record) => ({
+    ...record,
+    questionType: safeString(record.questionType || questionTypeLookup.get(record.questionId)),
+  }));
+  const questionIds = Array.from(new Set(graphRecords.map((record) => record.questionId).filter(Boolean)));
   const questionIndex = new Map(questionIds.map((id, index) => [id, `Q${index + 1}`]));
-  const participants = Array.from(new Set(records.map((record) => record.telegramUserId).filter(Boolean)));
+  const participants = Array.from(new Set(graphRecords.map((record) => record.telegramUserId).filter(Boolean)));
   const aliases = new Map(participants.map((id, index) => [id, participantAlias(id, index)]));
   const lines = participants.map((id) => {
-    const answered = records
+    const answered = graphRecords
       .filter((record) => record.telegramUserId === id)
       .map((record) => `${questionIndex.get(record.questionId) || 'Q?'}:${record.label}`);
     return `${aliases.get(id)} -> ${answered.join(', ') || 'No answers'}`;
@@ -3266,7 +3362,7 @@ function buildParticipantGraph(records = [], questions = []) {
   const legend = questionIds.slice(0, 5).map((id, index) => `${index + 1}. ${promptMap.get(id) || shortQuestionId(id)}`);
   const imageParticipants = participants.slice(0, 8).map((id) => ({
     participant: aliases.get(id),
-    answers: records
+    answers: graphRecords
       .filter((record) => record.telegramUserId === id)
       .map((record) => ({
         question: questionIndex.get(record.questionId) || 'Q?',
@@ -3274,12 +3370,13 @@ function buildParticipantGraph(records = [], questions = []) {
       })),
   }));
   const groups = buildParticipantResultGroups({
-    records,
+    records: graphRecords,
     participantIds: participants,
     aliases,
     questionIds,
     questionIndex,
     promptMap,
+    questionTypeLookup,
   });
   return {
     lines,

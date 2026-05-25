@@ -1008,6 +1008,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-1', questionType: 'agree_unsure_disagree', prompt: 'Should Alpha ship quickly?' },
       { questionId: 'q-2', questionType: 'agree_unsure_disagree', prompt: 'Should Alpha pause for review?' },
+      { questionId: 'q-3', questionType: 'freeform', prompt: 'What context should the group consider?' },
     ]),
   });
   env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
@@ -1029,6 +1030,9 @@ test('/results group analysis callback uses session worker AI for the selected p
       assert.equal(init.headers.Authorization, 'Bearer worker-token');
       const body = JSON.parse(init.body || '{}');
       assert.match(body.messages?.[1]?.content || '', /Top statements/);
+      assert.match(body.messages?.[1]?.content || '', /Additional comments and freeform responses/);
+      assert.match(body.messages?.[1]?.content || '', /Shipping is okay if rollback is ready/);
+      assert.match(body.messages?.[1]?.content || '', /Check the venue capacity before launch/);
       return new Response(JSON.stringify({
         completion: JSON.stringify({
           name: 'Launch Balancers',
@@ -1050,7 +1054,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     sessionSlug: 'alpha',
     telegramUserId: '42',
     questionId: 'q-1',
-    answer: { label: 'Agree', value: 'agree' },
+    answer: { label: 'Agree', value: 'agree', comments: 'Shipping is okay if rollback is ready.' },
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:00.000Z',
   }));
@@ -1062,6 +1066,15 @@ test('/results group analysis callback uses session worker AI for the selected p
     answer: { label: 'Agree', value: 'agree' },
     onChain: { ok: true },
     createdAt: '2026-05-08T12:00:01.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:freeform', JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    questionId: 'q-3',
+    answer: { questionType: 'freeform', text: 'Check the venue capacity before launch.' },
+    onChain: { ok: true },
+    createdAt: '2026-05-08T12:00:01.500Z',
   }));
   await env.AGENT_ACTION_KV.put('telegram:submit-request:three', JSON.stringify({
     status: 'direct_submitted',

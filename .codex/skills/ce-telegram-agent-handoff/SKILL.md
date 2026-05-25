@@ -1,11 +1,11 @@
 ---
 name: ce-telegram-agent-handoff
-description: Use when an agent needs to read active Context Engine Telegram questions, construct preference draft objects for Mini App review, or pose questions into a Telegram-enabled CE session.
+description: Use when an OpenClaw or similar agent needs to onboard a Telegram user into Context Engine, read active CE Telegram questions, draft preference objects for review, or pose questions through the CE Cloudflare worker.
 ---
 
 # CE Telegram Agent Handoff
 
-Use this skill when acting as an agent for a Telegram user who has joined a Telegram-enabled Context Engine session. The worker API is for drafting and posing only; do not submit answers unless a separate user-approved submit path is explicitly requested.
+Use this skill when acting as an OpenClaw-style agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is explicitly requested.
 
 ## Preconditions
 
@@ -16,6 +16,18 @@ Use this skill when acting as an agent for a Telegram user who has joined a Tele
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
 
+## One-Question Onboarding
+
+Goal: let the user become a CE participant by answering one CE question in a Telegram group that already has the CE bot enabled.
+
+1. Direct the user to the Telegram group/thread where the CE bot is present.
+2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session.
+3. Ask the user to answer any visible CE bot question by tapping a CE inline response button.
+4. After the tap, CE can bind `telegramUserId` to the group/session, derive or recover the CE-managed Telegram EVM account, and mark the user as an approved participant for worker calls.
+5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`.
+
+If the user is only in a one-on-one OpenClaw Telegram DM, send them a CE deep link or group link first. CE-owned inline response buttons cannot appear inside a normal private DM with another bot unless CE sends the message in a CE-accessible chat.
+
 ## Read Active Questions
 
 ```http
@@ -23,6 +35,8 @@ GET /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupCh
 ```
 
 Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped.
+
+If the user is interacting in an OpenClaw DM, use this endpoint to fetch CE questions, then ask the user in natural language. Save their answer through `POST /telegram/agent/api/preferences` for CE Mini App review. Do not claim the response is submitted.
 
 ## Preference Object
 
@@ -92,3 +106,21 @@ POST /telegram/agent/api/questions/pose
 ```
 
 Use `send: false` for dry runs. Otherwise the worker attempts to send the posed question into the bound Telegram group when the bot token is available.
+
+## OpenClaw DM Fallback
+
+In a one-on-one Telegram DM between the user and an OpenClaw bot:
+
+- The OpenClaw agent can ask CE questions in natural language.
+- The OpenClaw agent can collect the user's answer as plain text.
+- The OpenClaw agent should save answers as CE drafts with `POST /telegram/agent/api/preferences`.
+- CE-owned inline response buttons are not available inside that DM unless the CE bot is the sender or the chat is shared with CE.
+- If the OpenClaw Telegram integration has its own bot token, OpenClaw may render its own inline buttons and forward button callbacks to CE as preference drafts. Those buttons are OpenClaw-owned, not CE-owned.
+- If OpenClaw has no associated Telegram bot or client integration, it cannot render Telegram-native buttons; it can only produce text or links through whatever host channel is available.
+
+Prefer the shared-group pattern when CE-owned response buttons matter:
+
+1. User + OpenClaw bot + CE bot are present in one group or topic.
+2. OpenClaw calls `POST /telegram/agent/api/questions/pose`.
+3. CE bot posts the question with CE response buttons.
+4. User taps the CE button, and CE handles the callback.

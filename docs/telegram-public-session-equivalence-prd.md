@@ -50,6 +50,10 @@ surface-specific paths.
 
 ## Product Rules
 
+- Treat Telegram support as two separate dimensions:
+  session surface mode (where a session can be used) and storage/execution mode
+  (where questions/responses are stored and how writes are finalized). Do not
+  collapse these into one boolean.
 - `storageProfile.backend = "arweave"` remains the default backend for normal
   public sessions.
 - `storageProfile.backend = "cloudflare"` requires an explicit
@@ -91,6 +95,28 @@ surface-specific paths.
   created from that group. This is intentionally narrower than full CE/SBT
   resource parity and must be replaced or standardized before public operator
   rollout.
+- Telegram results group descriptions must consider both structured answer
+  patterns and qualitative evidence, including additional comments and freeform
+  responses, when available. Qualitative text should inform neutral summaries
+  but must not introduce identifying details.
+
+## Mode Taxonomy
+
+The current overlap is real. These are the working modes and the intended
+separation:
+
+| Surface mode | Storage/execution mode | Current priority | Expected behavior |
+| --- | --- | --- | --- |
+| `telegram_only` | Cloudflare-native questions and responses | Urgent Edge City demo path | Bot and Mini App list/answer sessions without chain question discovery; normal CE client shows `Telegram-only session` notice. |
+| `telegram_only` | Normal contracts plus Arweave payloads | Compatibility / fallback | Telegram can read public chain-backed questions, but this is not the preferred demo path because indexing and payload availability add latency. |
+| `telegram_only` | Contracts plus Cloudflare payload refs | Transitional hybrid | On-chain records may point at Cloudflare payloads, but Telegram still treats the session as channel-specific until client parity is complete. |
+| Normal CE session accessible by Telegram | Normal CE contracts/storage | Planned parity path | Client and Telegram both render public prompts. SBT/resource-gated access still needs standardized Telegram enforcement before this is broadly supported. |
+| Normal CE session not accessible by Telegram | Normal CE contracts/storage | Existing default | Client routes behave normally; Telegram session lists omit the session. |
+
+For the Edge City demo, optimize the first row: `telegram_only` with
+Cloudflare-native question loading, response drafts/submissions, export, and
+results. The PRD goal is to keep this explicit rather than letting the temporary
+Telegram-only path blur into normal public CE sessions.
 
 ## Surface Equivalence Matrix
 
