@@ -1,0 +1,20 @@
+{
+  "sourceRoot": "client/src",
+  "excluded": [
+    "*.test.ts",
+    "*.test.tsx",
+    "*.spec.ts",
+    "*.spec.tsx",
+    "setupTests.ts",
+    "__tests__/**",
+    "test utility directories/files"
+  ],
+  "counts": {
+    "tsNocheck": 5,
+    "colonAny": 982,
+    "asAny": 73,
+    "promiseAny": 30,
+    "arrayAny": 0,
+    "recordAny": 59
+  }
+}
