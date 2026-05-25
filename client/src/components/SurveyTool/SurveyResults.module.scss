@@ -946,7 +946,7 @@ grey background, white text, bigger icons, etc.
   cursor: pointer;
 }
 
-#questionSummaryHeaderIcons {
+.questionSummaryHeaderIcons {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1766,7 +1766,7 @@ grey background, white text, bigger icons, etc.
   white-space: nowrap;
 }
 
-#questionFilterButton {
+.questionFilterButton {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -1781,9 +1781,9 @@ grey background, white text, bigger icons, etc.
   font-weight: 600;
 }
 
-#questionFilterButton:hover,
-#questionFilterButton:focus,
-#questionFilterButton:active {
+.questionFilterButton:hover,
+.questionFilterButton:focus,
+.questionFilterButton:active {
   background-color: #111827 !important;
   background-image: none !important;
   border-color: #111827 !important;
@@ -1796,7 +1796,7 @@ grey background, white text, bigger icons, etc.
   margin-left: 10px;
 }
 
-#questionFilterIcon {
+.questionFilterIcon {
   margin-left: 10px;
 }
 
@@ -1950,13 +1950,13 @@ grey background, white text, bigger icons, etc.
   align-items: center;
 }
 
-#responseCountIcon {
+.responseCountIcon {
   font-weight: 600;
   font-size: 1em;
   opacity: 0.75;
 }
 
-#responseCountNumber {
+.responseCountNumber {
   font-weight: 600;
   font-size: 1em;
   opacity: 0.75;
