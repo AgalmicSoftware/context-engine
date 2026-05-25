@@ -37,7 +37,7 @@ const DecryptActionChip = ({
     <div className={styles.decryptChip}>
       <Button
         onClick={onClick}
-        id={styles.decryptQuestionButton}
+        className={styles.decryptQuestionButton}
         disabled={disabled}
         title={title}
       >

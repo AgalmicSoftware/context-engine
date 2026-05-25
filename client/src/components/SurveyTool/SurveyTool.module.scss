@@ -4577,7 +4577,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-color-white);
 }
 
-#decryptQuestionButton {
+.decryptQuestionButton {
   @extend %decryptCtaOutline;
   font-size: 1.2em;
   font-weight: 700;
