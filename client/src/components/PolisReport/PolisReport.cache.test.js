@@ -227,6 +227,7 @@ describe('PolisReport cache read options', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+      expect(screen.getByText('Summary and Statistics')).toHaveClass('sectionHeader', 'sectionTitle');
       expect(screen.getByText('OP Sepolia (11155420)')).toBeInTheDocument();
     });
   });
@@ -531,10 +532,11 @@ describe('PolisReport demo data defaults', () => {
   });
 
   it('shows the demo data toggle as enabled by default for the demo slug', () => {
-    render(<PolisReport {...baseReportProps} slug="demo" />);
+    const { container } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
     openSettingsRow();
 
+    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 
