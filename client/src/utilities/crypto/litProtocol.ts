@@ -188,7 +188,7 @@ const toBytes = (value: unknown): Uint8Array => {
  */
 
 /**
- * @typedef {string | Record<string, any>} ArweaveJwkLike
+ * @typedef {string | Record<string, unknown>} ArweaveJwkLike
  */
 
 /**
@@ -241,7 +241,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   chain?: string,
  *   connectTimeout?: number,
  *   litNetwork?: string,
- *   resourceId?: Record<string, any>,
+ *   resourceId?: Record<string, unknown>,
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
@@ -253,7 +253,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   chain?: string,
  *   connectTimeout?: number,
  *   litNetwork?: string,
- *   resourceId?: Record<string, any>,
+ *   resourceId?: Record<string, unknown>,
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
@@ -285,7 +285,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   contextLabel?: string,
  *   chain?: string | number
  * }) => Promise<string>} encryptForSbt
- * @property {(envelopeJson: string | Record<string, any>) => Promise<any>} decryptEnvelope
+ * @property {(envelopeJson: string | Record<string, unknown>) => Promise<unknown>} decryptEnvelope
  */
 
 /**
@@ -299,8 +299,8 @@ const toBytes = (value: unknown): Uint8Array => {
  *   name?: string,
  *   mime?: string,
  *   arweaveJwk?: ArweaveJwkLike,
- *   tags?: Array<Record<string, any>>,
- *   arweave?: Record<string, any>,
+ *   tags?: Array<Record<string, unknown>>,
+ *   arweave?: Record<string, unknown>,
  *   providerLike?: LitProviderLike,
  *   account?: string,
  *   chainId?: number | string | null,
@@ -314,7 +314,7 @@ const toBytes = (value: unknown): Uint8Array => {
  *   account?: string,
  *   chainId?: number | string | null,
  *   lit?: LitHooksApi,
- *   arweave?: Record<string, any>
+ *   arweave?: Record<string, unknown>
  * }) => Promise<LitDecryptResult>} downloadEncryptedArweaveData
  * @property {(payload: LitUploadPayload | null | undefined) => string} decodeLitPayloadToText
  * @property {(payload: LitUploadPayload | null | undefined) => Blob | null} decodeLitPayloadToBlob
@@ -1696,7 +1696,7 @@ const createLitChipotleHooks = ({
  *   resourceAbilityRequests?: unknown,
  *   connectTimeout?: number | string | null,
  *   litConnectTimeout?: number | string | null,
- *   chipotle?: Record<string, any>
+ *   chipotle?: Record<string, unknown>
  * }} [options={}]
  * @returns {LitHooksApi}
  */
@@ -1756,7 +1756,7 @@ export const createLitHooks = ({
 /**
  * Publishes a sanitized Lit hook set on `window.__litHooks`.
  *
- * @param {LitHooksApi | Record<string, any> | null | undefined} hooks
+ * @param {LitHooksApi | Record<string, unknown> | null | undefined} hooks
  * @returns {LitHooksApi | null}
  */
 export const setGlobalLitHooks = (hooks: LitHooksApi | UnknownRecord | null | undefined): LitHooksApi | null => {
@@ -2014,8 +2014,8 @@ const encodeEncryptedPayload = async (data: unknown, opts: { name?: string; form
  *   name?: string,
  *   mime?: string,
  *   arweaveJwk?: ArweaveJwkLike,
- *   tags?: Array<Record<string, any>>,
- *   arweave?: Record<string, any>,
+ *   tags?: Array<Record<string, unknown>>,
+ *   arweave?: Record<string, unknown>,
  *   providerLike?: LitProviderLike,
  *   account?: string,
  *   chainId?: number | string | null,
@@ -2086,7 +2086,7 @@ export const uploadEncryptedArweaveData = async ({
  *   account?: string,
  *   chainId?: number | string | null,
  *   lit?: LitHooksApi,
- *   arweave?: Record<string, any>
+ *   arweave?: Record<string, unknown>
  * }} [options={}]
  * @returns {Promise<LitDecryptResult>}
  */

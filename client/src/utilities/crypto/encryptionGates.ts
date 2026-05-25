@@ -7,7 +7,7 @@
  * Key exports: resolveEncryptionGate
  */
 
-type PlainObject = Record<string, any>;
+type PlainObject = Record<string, unknown>;
 
 type EncryptionGate = PlainObject;
 
@@ -21,7 +21,7 @@ type EncryptionConfig = {
     defaultGate?: string | null;
   } | null;
   encryptedFieldGates?: Record<string, string | string[] | null | undefined> | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 const isPlainObject = (value: unknown): value is PlainObject => (
