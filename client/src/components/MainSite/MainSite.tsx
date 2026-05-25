@@ -197,6 +197,14 @@ import {
   isRouteResponderAddress,
 } from './mainSiteUtils.js';
 import {
+  composeMainSiteAuthViewProps,
+  composeMainSiteLoginViewProps,
+  composeMainSiteQuestionCacheViewProps,
+  composeMainSiteSessionCacheViewProps,
+  composeMainSiteSurveyCacheViewProps,
+  composeMainSiteWalletViewProps,
+} from './mainSiteViewProps.js';
+import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
   readHashQueryParam,
@@ -5537,6 +5545,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // 7. Success: We have the data (or config) and the correct slug. Render the Page immediately.
     const effectiveNetwork = this.getSessionNetwork(effectiveSlug);
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(this.state);
     const surveyPathParts = fullPath.split('/');
     let responderParam = searchParams.get('responder') || null;
     const legacySurveyResponder = surveyPathParts.length > 3 ? surveyPathParts[3] : null;
@@ -5556,21 +5566,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             filterState={parsedFilterStateFromUrl}
             displayAnswerMode={isSurveyResultsRoute ? false : !!responderParam}
             viewAddress={isSurveyResultsRoute ? null : responderParam}
-            toggleLoginModal={this.props.toggleLoginModal}
-            account={this.props.account}
-            provider={this.props.provider}
-            loginComplete={this.props.loginComplete}
-            loginInProgress={this.props.loginInProgress}
+            {...authViewProps}
             network={effectiveNetwork}
             activeSessionSlug={effectiveSlug}
-            isSurveyCacheReady={this.state.isSurveyCacheReady}
-            isQuestionCacheReady={this.state.isQuestionCacheReady}
-            isResponsesCacheReady={this.state.isResponsesCacheReady}
-            isSBTCacheReady={this.state.isSBTCacheReady}
-            cacheHasLoaded={this.state.cacheHasLoaded}
-            sbtCacheRevision={this.state.sbtCacheRevision}
-            questionResponsesNonce={this.state.questionResponsesNonce}
-            questionScanProgress={this.state.questionScanProgress}
+            {...surveyCacheViewProps}
             refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
             refreshQuestionMetadata={this.refreshQuestionMetadata}
             refreshQuestionResponses={this.refreshQuestionResponses}
@@ -5695,6 +5694,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         ? ((addr: string, slug?: string) => this.refreshSbtData(addr, slug || effectivePageSlug!))
         : this.refreshSbtData
     );
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(this.state);
 
     return (
       <Suspense fallback={<LazyFallback label="Loading..." />}>
@@ -5704,25 +5705,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               surveyID={surveyID}
               displayAnswerMode={displayAnswerMode}
               viewAddress={viewResponseAddress}
-              toggleLoginModal={this.props.toggleLoginModal}
-              account={this.props.account}
-              provider={this.props.provider}
-              loginComplete={this.props.loginComplete}
-              loginInProgress={this.props.loginInProgress}
+              {...authViewProps}
               network={effectivePageNetwork}
               networkChainId={effectivePageChainId}
               activeSessionSlug={effectivePageSlug}
               sessionSlug={isQuestionsListRoute ? effectivePageSlug : undefined}
               sessionSlugPinned={questionRouteSession.sessionSlugPinned}
               sessionConfig={effectivePageSessionCfg}
-              isSurveyCacheReady={this.state.isSurveyCacheReady}
-              isQuestionCacheReady={this.state.isQuestionCacheReady}
-              isResponsesCacheReady={this.state.isResponsesCacheReady}
-              isSBTCacheReady={this.state.isSBTCacheReady}
-              cacheHasLoaded={this.state.cacheHasLoaded}
-              sbtCacheRevision={this.state.sbtCacheRevision}
-              questionResponsesNonce={this.state.questionResponsesNonce}
-              questionScanProgress={this.state.questionScanProgress}
+              {...surveyCacheViewProps}
               refreshSurveyResponsesByID={pageRefreshSurveyResponsesByID}
               refreshQuestionMetadata={pageRefreshQuestionMetadata}
               refreshQuestionResponses={pageRefreshQuestionResponses}
@@ -5802,6 +5792,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       this.getSessionNetwork('') ||
       null;
     const questionSessionCfg = this.getSessionCfg(effectiveQuestionSlug);
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const questionCacheViewProps = composeMainSiteQuestionCacheViewProps(this.state);
     return (
       <Suspense fallback={<LazyFallback label="Loading Question..." />}>
         <div data-testid={E2E_TESTIDS.PAGE_QUESTIONS_ROOT}>
@@ -5810,22 +5802,13 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             questionID={questionID}
             responderAddress={responderAddress}
             singleQuestionMode={true}
-            toggleLoginModal={this.props.toggleLoginModal}
-            account={this.props.account}
-            provider={this.props.provider}
-            loginComplete={this.props.loginComplete}
-            loginInProgress={this.props.loginInProgress}
+            {...authViewProps}
             network={effectiveQuestionNetwork}
             networkChainId={effectiveQuestionNetwork?.id || this.props.network?.id || null}
             activeSessionSlug={effectiveQuestionSlug}
             sessionSlug={effectiveQuestionSlug}
             sessionSlugPinned={questionSlugPinned}
-            isQuestionCacheReady={this.state.isQuestionCacheReady}
-            isResponsesCacheReady={this.state.isResponsesCacheReady}
-            isSBTCacheReady={this.state.isSBTCacheReady}
-            sbtCacheRevision={this.state.sbtCacheRevision}
-            questionResponsesNonce={this.state.questionResponsesNonce}
-            questionScanProgress={this.state.questionScanProgress}
+            {...questionCacheViewProps}
             refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)}
             refreshQuestionMetadata={() => this.refreshQuestionMetadataForGroup(effectiveQuestionSlug!)}
             refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
@@ -6015,6 +5998,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
+    const walletViewProps = composeMainSiteWalletViewProps(this.props);
+    const loginViewProps = composeMainSiteLoginViewProps(this.props);
+    const sessionCacheViewProps = composeMainSiteSessionCacheViewProps(this.state);
 
     return (
       <Suspense fallback={<LazyFallback label="Loading Session..." />}>
@@ -6034,19 +6020,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               blockLimits={sessionConfig.blockLimits || { start: null, end: null }}
               networkChainId={sessionConfig.networkChainId}
               questionsGenPrompt={sessionConfig.questionsGenPrompt}
-              account={this.props.account}
-              provider={this.props.provider}
+              {...walletViewProps}
               network={defaultSessionNetwork}
-              toggleLoginModal={this.props.toggleLoginModal}
-              loginComplete={this.props.loginComplete}
-              isSBTCacheReady={this.state.isSBTCacheReady}
-              isSurveyCacheReady={this.state.isSurveyCacheReady}
-              isQuestionCacheReady={this.state.isQuestionCacheReady}
-              isResponsesCacheReady={this.state.isResponsesCacheReady}
-              sbtCacheRevision={this.state.sbtCacheRevision}
-              cacheHasLoaded={this.state.cacheHasLoaded}
-              questionResponsesNonce={this.state.questionResponsesNonce}
-              questionScanProgress={this.state.questionScanProgress}
+              {...loginViewProps}
+              {...sessionCacheViewProps}
               refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
               refreshQuestionMetadata={this.refreshQuestionMetadata}
               refreshQuestionResponses={this.refreshQuestionResponses}
