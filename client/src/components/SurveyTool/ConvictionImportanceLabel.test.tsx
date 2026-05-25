@@ -19,6 +19,7 @@ describe('ConvictionImportanceLabel', () => {
 
     expect(screen.getByText('Conviction')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
+    expect(screen.getByText('Conviction').closest('h6')).toHaveClass('importanceText', 'convictionValueRow');
     expect(screen.queryByRole('button', { name: /importance/i })).not.toBeInTheDocument();
   });
 
@@ -38,6 +39,10 @@ describe('ConvictionImportanceLabel', () => {
     fireEvent.click(screen.getByRole('button', { name: /conviction 3/i }));
     fireEvent.click(screen.getByRole('button', { name: /importance 8/i }));
 
+    expect(screen.getByRole('heading', { name: /conviction 3 importance 8/i })).toHaveClass(
+      'importanceText',
+      'convictionToggleText'
+    );
     expect(onSelectMode).toHaveBeenNthCalledWith(1, 'conviction');
     expect(onSelectMode).toHaveBeenNthCalledWith(2, 'importance');
   });
