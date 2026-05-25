@@ -151,7 +151,9 @@ describe('SBTFilter render guards', () => {
     const tree = subject.render();
     const [filterButton] = findElementsInTree(
       tree,
-      (element) => typeof element?.props?.className === 'string' && element.props.className.includes('filterButton'),
+      (element) =>
+        typeof element?.props?.className === 'string' &&
+        element.props.className.includes('filterButton')
     );
     const [filterOptions] = findElementsInTree(
       tree,
