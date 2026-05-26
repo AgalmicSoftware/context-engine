@@ -113,6 +113,11 @@ import {
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
+import {
+  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
+  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
+  formatLoginSettingsAiProviderLabel,
+} from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
