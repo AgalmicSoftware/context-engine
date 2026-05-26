@@ -149,6 +149,12 @@ import {
   isSurveyResultsStateSynced,
   type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
+import {
+  SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
+  SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
+  getSurveyResultsExportTypeLabel as getExportTypeLabel,
+  type SurveyResultsExportOption,
+} from './surveyResultsExportDisplayHelpers.js';
 
 export {
   countQuestionModeResponses,
