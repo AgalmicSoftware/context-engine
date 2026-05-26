@@ -34,6 +34,7 @@ import {
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
@@ -189,6 +190,68 @@ describe('surveyQuestionsTypes', () => {
     expect(progressState.metaLeftText).toBe('0 blocks left');
     expect(progressState.metaRightText).toBe('0 / 0');
     expect(progressState.fillStyle).toEqual({ width: '0%' });
+  });
+
+  it('builds SurveyQuestions JSON panel display state for full survey flows', () => {
+    const styleMap = {
+      singleQuestionJsonPanel: 'single-panel',
+      singleQuestionJsonRow: 'single-row',
+      singleQuestionJsonToggle: 'single-toggle',
+      singleQuestionJsonToggleQuestion: 'question-toggle',
+      singleQuestionJsonToggleResponse: 'response-toggle',
+      surveyJsonRow: 'json-row',
+    };
+
+    expect(buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView: false,
+      isStandalone: false,
+      singleQuestionMode: false,
+      showQuestionsJson: true,
+      showResponseJson: true,
+      showSurveyJson: true,
+      styleMap,
+    })).toEqual({
+      showQuestionJsonControls: false,
+      showSurveyJsonPanel: true,
+      showQuestionsJsonPanel: false,
+      showResponseJsonPanel: true,
+      surveyJsonRowClassName: 'json-row',
+      surveyJsonToggleClassName: undefined,
+      questionJsonToggleClassName: undefined,
+      responseJsonToggleClassName: undefined,
+      surveyJsonPanelClassName: undefined,
+    });
+  });
+
+  it('builds SurveyQuestions JSON panel display state for single-question flows', () => {
+    const styleMap = {
+      singleQuestionJsonPanel: 'single-panel',
+      singleQuestionJsonRow: 'single-row',
+      singleQuestionJsonToggle: 'single-toggle',
+      singleQuestionJsonToggleQuestion: 'question-toggle',
+      singleQuestionJsonToggleResponse: 'response-toggle',
+      surveyJsonRow: 'json-row',
+    };
+
+    expect(buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView: true,
+      isStandalone: true,
+      singleQuestionMode: false,
+      showQuestionsJson: true,
+      showResponseJson: true,
+      showSurveyJson: true,
+      styleMap,
+    })).toEqual({
+      showQuestionJsonControls: true,
+      showSurveyJsonPanel: false,
+      showQuestionsJsonPanel: true,
+      showResponseJsonPanel: true,
+      surveyJsonRowClassName: 'json-row single-row',
+      surveyJsonToggleClassName: 'single-toggle',
+      questionJsonToggleClassName: 'single-toggle question-toggle',
+      responseJsonToggleClassName: 'single-toggle response-toggle',
+      surveyJsonPanelClassName: 'single-panel',
+    });
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {
