@@ -51,26 +51,6 @@ export const buildDocUploadTagMap = (tags: unknown) => Object.fromEntries(
   normalizeDocUploadTagsForTagMap(tags).map((tag) => [tag.name, tag.value])
 );
 
-export const resolveDocUploadResultId = (result: unknown): string => (
-  toStr(
-    readRecord(result, 'arweaveTxId') ||
-    readRecord(result, 'txId') ||
-    readRecord(result, 'id')
-  ).trim()
-);
-
-export const resolveDocUploadResultStorage = (result: unknown): string => {
-  const storageRef = readRecord(result, 'storageRef');
-  return (
-    toStr(
-      readRecord(storageRef, 'backend') ||
-      readRecord(result, 'storage') ||
-      STORAGE_BACKENDS.ARWEAVE
-    ).trim() ||
-    STORAGE_BACKENDS.ARWEAVE
-  );
-};
-
 export const buildSessionDocLibraryViewerUrl = ({
   sessionToken,
   txId,

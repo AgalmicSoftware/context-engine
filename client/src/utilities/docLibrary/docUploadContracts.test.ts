@@ -4,8 +4,6 @@ import {
   createDocLibraryLinkRecord,
   isSelfRecipientDocEncryption,
   normalizeDocUploadTagsForTagMap,
-  resolveDocUploadResultId,
-  resolveDocUploadResultStorage,
   resolveDocUploadsGate,
 } from './docUploadContracts.js';
 
@@ -116,31 +114,6 @@ describe('docUploadContracts', () => {
       Kind: 'file',
     });
     expect(JSON.stringify(tags)).toBe(before);
-  });
-
-  it('resolves upload result IDs and storage backend fallbacks without mutating records', () => {
-    const result = {
-      arweaveTxId: '',
-      txId: ' tx-1 ',
-      id: 'fallback-id',
-      storageRef: {
-        backend: ' cloudflare ',
-        uri: 'https://docs.example.test/doc-1',
-      },
-      storage: 'arweave',
-    };
-    const before = JSON.stringify(result);
-
-    expect(resolveDocUploadResultId(result)).toBe('tx-1');
-    expect(resolveDocUploadResultStorage(result)).toBe('cloudflare');
-    expect(resolveDocUploadResultId({ arweaveTxId: ' ar-1 ', txId: 'tx-1' })).toBe('ar-1');
-    expect(resolveDocUploadResultId({ id: ' fallback ' })).toBe('fallback');
-    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: 'lit-arweave' }))
-      .toBe('lit-arweave');
-    expect(resolveDocUploadResultStorage({ storageRef: { backend: '' }, storage: '' }))
-      .toBe('arweave');
-    expect(resolveDocUploadResultStorage(null)).toBe('arweave');
-    expect(JSON.stringify(result)).toBe(before);
   });
 
   it('detects self-recipient encryption modes from legacy aliases', () => {
