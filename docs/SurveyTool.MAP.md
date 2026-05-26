@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,395 lines**
+  - `SurveyQuestions.tsx`: **9,394 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
   - `surveyQuestionsJsonDerivation.ts`: **119 lines**
