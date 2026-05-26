@@ -48,6 +48,7 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -9007,56 +9008,25 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       isLoadingResponse: this.state.isLoadingResponse,
     });
 
-    const userResponseNotice =
-      this.state.userHasResponse &&
-      isOwnResponse &&
-      !isSingleQuestionView &&
-      this.state.displayAnswerMode ? (
-        <div className={styles.userResponseNotice} data-testid={E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE}>
-          <p className={styles.userResponseNoticeTitle}>
-            Existing survey response detected
-          </p>
-          <div className={styles.userResponseNoticeActions}>
-            <Button
-              onClick={this.handleStartFresh}
-              id={styles.startFreshButton}
-              data-testid={E2E_TESTIDS.SURVEY_START_FRESH}
-              disabled={this.state.isSubmitting || this.state.isDecrypting}
-            >
-              Start Fresh
-            </Button>
-            <Button
-              onClick={this.handleDecryptEdit}
-              id={styles.decryptEditButton}
-              data-testid={E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL}
-              disabled={this.state.isDecrypting || this.state.isSubmitting || !this.state.userResponseEncrypted}
-            >
-              {this.state.isDecrypting ? 'Decrypting...' : 'Decrypt / Edit All'}
-            </Button>
-            {submittedStateActive && this.state.responseUrl && (
-              <a
-                href={this.state.responseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.userResponseNoticeLink}
-                title="View submitted response"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            )}
-            {this.state.isEditing && (
-              <Button
-                onClick={this.handleExitEditing}
-                id={styles.exitEditingButton}
-                data-testid={E2E_TESTIDS.SURVEY_EXIT_EDITING}
-                disabled={this.state.isSubmitting}
-              >
-                Exit Editing
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : null;
+    const userResponseNotice = (
+      <SurveyQuestionsUserResponseNotice
+        show={
+          this.state.userHasResponse &&
+          isOwnResponse &&
+          !isSingleQuestionView &&
+          this.state.displayAnswerMode
+        }
+        isDecrypting={this.state.isDecrypting}
+        isEditing={this.state.isEditing}
+        isSubmitting={this.state.isSubmitting}
+        onDecryptEdit={this.handleDecryptEdit}
+        onExitEditing={this.handleExitEditing}
+        onStartFresh={this.handleStartFresh}
+        responseUrl={this.state.responseUrl}
+        submittedStateActive={submittedStateActive}
+        userResponseEncrypted={this.state.userResponseEncrypted}
+      />
+    );
 
     const submitFooterClassName = [
       styles.footer,
