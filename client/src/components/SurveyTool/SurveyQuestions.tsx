@@ -45,6 +45,7 @@ import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import {
@@ -10743,24 +10744,7 @@ export class SurveyQuestions extends Component {
         // fall-through to render below
       } else {
         return (
-          <div className={styles.loadingContainer}>
-            <FontAwesomeIcon icon={faSpinner} spin />
-            <div className={styles.fullLoadingHeadline}>Loading questions...</div>
-            {fullLoadingProgress.hasFullLoadingProgress && (
-              <div className={styles.fullLoadingProgressWrap}>
-                <div className={styles.fullLoadingProgressMeta}>
-                  <span>{fullLoadingProgress.metaLeftText}</span>
-                  <span>{fullLoadingProgress.metaRightText}</span>
-                </div>
-                <div className={styles.fullLoadingProgressBar}>
-                  <div
-                    className={styles.fullLoadingProgressFill}
-                    style={fullLoadingProgress.fillStyle}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
         );
       }
     }
