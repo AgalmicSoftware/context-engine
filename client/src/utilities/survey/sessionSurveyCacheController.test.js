@@ -16,6 +16,8 @@ jest.mock('../web3/contractScripts.js', () => ({
     fetchUserSubmittedSurveyIDs: jest.fn(),
     getSurveyDataById: jest.fn(),
     fetchAllSurveyResponses: jest.fn(),
+    listenForSurveyEvents: jest.fn(),
+    removeSurveyEventsListener: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
@@ -106,7 +108,9 @@ const createMockHost = (overrides = {}) => {
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : '11155420'
     )),
     getSessionScanScope: jest.fn(() => sessionScanScope || 'session'),
+    shouldSkipSessionScanForSlug: jest.fn(() => false),
     scanScopeNoop: jest.fn(() => false),
+    onSurveyEventDetectedForGroup: jest.fn(),
     checkAllCachesReady: jest.fn(),
     mergeLegacyNumericNetworkKey: jest.fn(() => false),
     writeSurveyMetadataToCache: jest.fn(() => true),
@@ -168,6 +172,54 @@ describe('createSessionSurveyCacheController', () => {
       const controller = createSessionSurveyCacheController(createMockHost());
 
       expect(controller.isInitInFlight('alpha')).toBe(false);
+    });
+  });
+
+  describe('startSurveyAndQuestionEventListenerForGroup', () => {
+    it('removes any existing listener and attaches a scoped survey listener', () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+
+      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
+
+      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'alpha'
+      );
+
+      const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
+      const event = { type: 'SurveyAdded', surveyId: '0xsurvey' };
+      handler(event);
+
+      expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
+    });
+
+    it('uses the active session slug for the unscoped listener entrypoint', () => {
+      const host = createMockHost({ activeSlug: 'active-slug' });
+      const controller = createSessionSurveyCacheController(host);
+
+      expect(controller.startSurveyAndQuestionEventListener()).toBe(true);
+
+      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'active-slug');
+      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+        'none',
+        expect.any(Function),
+        'active-slug'
+      );
+    });
+
+    it('does not attach a listener when scan policy skips the slug', () => {
+      const host = createMockHost({
+        shouldSkipSessionScanForSlug: jest.fn(() => true),
+      });
+      const controller = createSessionSurveyCacheController(host);
+
+      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(false);
+
+      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
+      expect(contractScripts.listenForSurveyEvents).not.toHaveBeenCalled();
     });
   });
 

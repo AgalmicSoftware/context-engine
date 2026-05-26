@@ -52,14 +52,18 @@ import {
 } from '../../utilities/web3/sessionRegistry.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import {
-  getAllowedSessionSlugs,
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
-  refreshSessionInfoForSlug,
-  refreshSessionMetaFieldsForSlug,
+  createInitialProfileScanReport,
+  createProfileScanFanoutPlan,
+  resolveProfileScanAttemptedCoverageSlugs,
+} from '../../utilities/session/profileScanReportHelpers.js';
+import {
+  createSessionMetaRefreshController,
+  type SessionMetaRefreshController,
 } from '../../utilities/session/sessionMetaController.js';
 import { createSessionScanPolicy, type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import {
@@ -69,7 +73,6 @@ import {
 } from '../../utilities/session/sessionProfileScanController.js';
 import {
   createSessionSbtCacheController,
-  type SbtRealtimeEventLike,
   type SessionSbtCacheController,
   type SessionSbtCacheHost,
 } from '../../utilities/sbt/sessionSbtCacheController.js';
@@ -147,11 +150,14 @@ import {
 } from '../../utilities/session/mainSiteSessionConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  resolveMainSiteExplicitSessionSlugFromPath,
+  resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteRenderActiveSessionSlug,
   resolveMainSiteRouteSessionIdHint,
   resolveMainSiteRouteSessionSlugHint,
   resolveMainSiteSessionRouteContext,
+  resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
 import {
@@ -190,6 +196,14 @@ import {
   buildMainSiteLitHooksStatePatch,
   isRouteResponderAddress,
 } from './mainSiteUtils.js';
+import {
+  composeMainSiteAuthViewProps,
+  composeMainSiteLoginViewProps,
+  composeMainSiteQuestionCacheViewProps,
+  composeMainSiteSessionCacheViewProps,
+  composeMainSiteSurveyCacheViewProps,
+  composeMainSiteWalletViewProps,
+} from './mainSiteViewProps.js';
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
@@ -737,6 +751,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     setState: this.setRecordStateFromController,
     isMounted: () => this._mounted,
     resolveActiveSlug: () => this.resolveActiveSlugForCacheUpdates(),
+    getSessionSlugFromState: () => this.getSessionSlugFromState(),
+    getCurrentPathname: () => this.getCurrentPathname(),
     checkAllCachesReady: () => this.checkAllCachesReady(),
     syncCacheHasLoadedFlagFromPersistent: (
       slug: string,
@@ -748,6 +764,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       survey: !!this._surveyCacheController?.isInitInFlight?.(slug),
       response: !!this._responseHydrationController?.isInitInFlight?.(slug),
     }),
+    shouldAutoRunFullSbtScan: (opts: { pathname: string }) => this.shouldAutoRunFullSbtScan(opts),
+    initializeSbtCache: (opts: { mode: 'auto' | 'partial' | 'full' }) => this.initializeSbtCache(opts),
+    startSbtEventListener: () => this.startSbtEventListener(),
   });
 
   _cachePersistenceController: SessionCachePersistenceController = createSessionCachePersistenceController({
@@ -859,6 +878,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) => (
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx))
     ),
+    onSurveyEventDetectedForGroup: (slug: string, event: unknown) => (
+      this.onNewSurveyEventDetectedForGroup(slug, event as MainSiteSurveyEventLike)
+    ),
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     logScopeSkipOnce: (op: string, slug: string, scopeCtx?: unknown) => (
       this.logScopeSkipOnce(op, slug, toMainSiteScanScopeContext(scopeCtx))
@@ -969,8 +991,16 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     getSessionTokenFromPath: (path: string) => this.getSessionTokenFromPath(path),
     warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
   });
-  _sessionMetaAttempts: Record<string, boolean> = {};
-  _lastSessionInfoAttempt = '';
+  _sessionMetaRefreshController: SessionMetaRefreshController = createSessionMetaRefreshController({
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getSessionConfigBySlugOrDefault: (slug: string) => getSessionConfigBySlugOrDefault(slug) as Record<string, unknown> | null | undefined,
+    getGlobalLitHooks: () => getGlobalLitHooks(),
+    getAccount: () => this.props.account || '',
+    getProviderLike: () => this.props.provider,
+    decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
+    setState: (updater) => this.setState((prev) => updater(prev) as MainSiteStatePatch),
+    warn: (context: string, error: unknown) => mainSiteLog.warn(context, error),
+  });
   _lastGroupChainId: number | null = null;
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
@@ -1264,71 +1294,36 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
       )
       : this.normalizeRoutePath(props?.path || '');
-    const parts = String(path || '').split('/').filter(Boolean);
-    const sessionToken = parts[0] === 'session' && parts[1]
-      ? String(parts[1] || '').trim()
-      : '';
-    if (!sessionToken) {
-      return { hasExplicitSessionSlug: false, sessionSlug: '' };
-    }
-    if (sessionToken.toLowerCase() === 'new') {
-      return { hasExplicitSessionSlug: true, sessionSlug: '' };
-    }
-
-    const resolvedSessionSlug = this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve });
-    if (resolvedSessionSlug) {
-      return { hasExplicitSessionSlug: true, sessionSlug: resolvedSessionSlug };
-    }
-
-    if (normalizeSessionSlug(sessionToken) === '') {
-      return { hasExplicitSessionSlug: true, sessionSlug: '' };
-    }
-
-    return { hasExplicitSessionSlug: false, sessionSlug: '' };
+    return resolveMainSiteExplicitSessionSlugFromPath({
+      path,
+      resolveSessionSlugFromPathToken: (sessionToken: string) => (
+        this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve })
+      ),
+    });
   };
 
   getGlobalPrimarySessionSlugFromProps = (props: MainSiteProps = this.props): string => {
-    const primarySessionSlug = normalizeSessionSlug(props?.sessionState?.primarySessionSlug || '');
-    const primarySessionExplicit = props?.sessionState?.primarySessionExplicit === true;
-    const selectedSessionScope = String(props?.sessionState?.selectedSessionScope || '').trim().toLowerCase();
-    const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
-      ? props.sessionState.selectedSessionSlugs
-      : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
-    if (primarySessionSlug) return primarySessionSlug;
-    if (primarySessionExplicit) {
-      if (selectedSessionScope === 'list' && !listIncludesGeneral) {
-        return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-      }
-      return primarySessionSlug;
-    }
-    if (selectedSessionScope === 'list') {
-      return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-    }
-    return '';
+    return resolveMainSiteGlobalPrimarySessionSlug({
+      sessionState: props?.sessionState || {},
+      derivePrimarySessionSlugFromList,
+    });
   };
 
   getSessionSlugFromProps = (props: MainSiteProps = this.props): string => {
-    const routeSession = this.getExplicitSessionSlugFromProps(props, { allowAsyncResolve: true });
-    if (routeSession.hasExplicitSessionSlug) return routeSession.sessionSlug;
-    const activeSessionSlug = props.activeSessionSlug || '';
-    const primarySessionExplicit = props?.sessionState?.primarySessionExplicit === true;
-    const selectedSessionScope = String(props?.sessionState?.selectedSessionScope || '').trim().toLowerCase();
-    const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
-      ? props.sessionState.selectedSessionSlugs
-      : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
-    if (activeSessionSlug) return activeSessionSlug;
-    if (primarySessionExplicit) {
-      if (selectedSessionScope === 'list' && !listIncludesGeneral) {
-        return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-      }
-      return activeSessionSlug;
-    }
-    if (selectedSessionScope === 'list') {
-      return derivePrimarySessionSlugFromList(selectedSessionSlugs);
-    }
-    return '';
+    const path = props === this.props
+      ? this.getEffectiveRoutePath(
+        props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
+      )
+      : this.normalizeRoutePath(props?.path || '');
+    return resolveMainSiteSessionSlugFromProps({
+      path,
+      activeSessionSlug: props.activeSessionSlug || '',
+      sessionState: props?.sessionState || {},
+      resolveSessionSlugFromPathToken: (sessionToken: string) => (
+        this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
+      ),
+      derivePrimarySessionSlugFromList,
+    });
   };
 
   getDisplaySessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
@@ -1571,64 +1566,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     });
   };
 
-  refreshSessionInfo = async () => {
-    const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const litHooks = getGlobalLitHooks();
-    try {
-      const result = await refreshSessionInfoForSlug({
-        slug,
-        cfg,
-        account: this.props.account || '',
-        providerLike: this.props.provider,
-        getKey: litHooks?.getKey,
-        lastAttemptKey: this._lastSessionInfoAttempt,
-        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
-      });
-      this._lastSessionInfoAttempt = result.attemptKey || this._lastSessionInfoAttempt;
-      if (!result.shouldUpdate) return;
-      this.setState((prev) => ({
-        sessionInfoOverrides: {
-          ...(prev.sessionInfoOverrides || {}),
-          [slug]: result.nextValue,
-        },
-      }));
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-  };
+  refreshSessionInfo: SessionMetaRefreshController['refreshSessionInfo'] =
+    (...args) => this._sessionMetaRefreshController.refreshSessionInfo(...args);
 
-  refreshSessionMetaFields = async () => {
-    const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const litHooks = getGlobalLitHooks();
-    try {
-      const result = await refreshSessionMetaFieldsForSlug({
-        slug,
-        cfg,
-        account: this.props.account || '',
-        providerLike: this.props.provider,
-        getKey: litHooks?.getKey,
-        attempts: this._sessionMetaAttempts,
-        decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue,
-      });
-
-      this._sessionMetaAttempts = result.attempts;
-      result.errors.forEach(({ error }) => {
-        mainSiteLog.warn('MainSite: fallback', error);
-      });
-
-      if (!Object.keys(result.patches || {}).length) return;
-      this.setState((prev) => {
-        const nextState: Partial<MainSiteState> = {};
-        Object.entries(result.patches).forEach(([stateKey, patch]) => {
-          nextState[stateKey] = {
-            ...(prev[stateKey] || {}),
-            ...patch,
-          };
-        });
-        return nextState;
-      });
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-  };
+  refreshSessionMetaFields: SessionMetaRefreshController['refreshSessionMetaFields'] =
+    (...args) => this._sessionMetaRefreshController.refreshSessionMetaFields(...args);
 
   refreshGroupCredentials = async () => {
     // Legacy metadata-backed Lit credentials are intentionally disabled so
@@ -2282,34 +2224,18 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const run = (async () => {
       const allSessionsMode = this.getUserProfileAllSessionsScanMode();
       const scopeContext = this.getProfileScanScopeContext();
-      const isListScope = scopeContext.scope === 'list';
-      const allowListScopeSbtFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsSbtScan === true
-      );
-      const allowListScopeSurveyActivityFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsSurveyActivityScan === true
-      );
-      const allowListScopeQuestionActivityFanout = (
-        isListScope &&
-        !allSessionsMode.legacyAllSessions &&
-        allSessionsMode.useAllSessionsQuestionActivityScan === true
-      );
-      const allowListScopeAnyFanout = (
-        allowListScopeSbtFanout ||
-        allowListScopeSurveyActivityFanout ||
-        allowListScopeQuestionActivityFanout
-      );
-      const useAllSessionsScan = isListScope
-        ? allowListScopeAnyFanout
-        : allSessionsMode.useAllSessionsScan;
-      const shouldHydrateRegistry = (
-        allSessionsMode.useAllSessionsScan ||
-        isListScope
-      );
+      const fanoutPlan = createProfileScanFanoutPlan({
+        scopeContext,
+        allSessionsMode,
+      });
+      const {
+        isListScope,
+        allowListScopeSbtFanout,
+        allowListScopeSurveyActivityFanout,
+        allowListScopeQuestionActivityFanout,
+        useAllSessionsScan,
+        shouldHydrateRegistry,
+      } = fanoutPlan;
       const registryStatus = shouldHydrateRegistry
         ? await this.ensureRegistryHydratedForProfileScan({
           forceAllChains: isListScope,
@@ -2320,21 +2246,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         useAllSessionsScan,
       });
       const allSlugs = profileScanPlan.slugs;
-      const listScopeCoverageSlugs = isListScope
-        ? Array.from(new Set(
-            getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug)
-              .map((slug) => normalizeSessionSlug(slug || ''))
-          ))
-        : [];
-      const attemptedCoverageSlugs = (
-        allowListScopeAnyFanout &&
-        listScopeCoverageSlugs.length > 0
-      )
-        ? listScopeCoverageSlugs
-        : [...allSlugs];
-      const attemptedCoverageSlugSet = new Set(
-        attemptedCoverageSlugs.map((slug) => normalizeSessionSlug(slug || ''))
-      );
+      const {
+        attemptedCoverageSlugs,
+        attemptedCoverageSlugSet,
+      } = resolveProfileScanAttemptedCoverageSlugs({
+        fanoutPlan,
+        scopeContext,
+        allSlugs,
+      });
       this.emitProfileScanColdDiag('plan', {
         targetAddress: targetLower,
         scope: scopeContext.scope,
@@ -2359,54 +2278,18 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       const activityLookbackBlocks = this.readProfileScanActivityLookbackBlocks({
         useAllSessions: !!allSessionsMode.useAllSessionsActivityScan,
       });
-      const report: MainSiteProfileScanReport = {
-        targetAddress: targetLower,
-        usedAllSessions: !!profileScanPlan.usedAllSessions,
-        useAllSessionsSbtScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsSbtScan),
-        useAllSessionsSurveyActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsSurveyActivityScan),
-        useAllSessionsQuestionActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsQuestionActivityScan),
-        useAllSessionsActivityScan: !!(profileScanPlan.usedAllSessions && allSessionsMode.useAllSessionsActivityScan),
-        listScopeSbtFanout: allowListScopeSbtFanout,
-        listScopeSurveyActivityFanout: allowListScopeSurveyActivityFanout,
-        listScopeQuestionActivityFanout: allowListScopeQuestionActivityFanout,
-        attemptedSlugs: [...attemptedCoverageSlugs],
-        scannedSlugs: [],
-        skippedSlugs: [],
-        skippedSlugReasons: {},
-        failedSlugs: [],
-        failedActivitySlugs: [],
-        allActivityFailed: false,
-        allSbtFailed: false,
-        hadRpcErrors: profileScanPlan.coverageComplete === false,
-        anyNewData: false,
-        coverageComplete: profileScanPlan.coverageComplete !== false,
-        coverageReason: profileScanPlan.coverageReason || '',
-        registryEntryCount: Number(profileScanPlan.registryEntryCount || 0),
-        hadLoadErrors: !!profileScanPlan.hadLoadErrors,
-        rawAllSlugCount: Number(profileScanPlan.rawAllSlugCount || 0),
-        activeChainSlugCount: Number(profileScanPlan.activeChainSlugCount || 0),
-        scopedFallbackSlugCount: Number(profileScanPlan.scopedFallbackSlugCount || 0),
-        relevantSlugs: Array.isArray(profileScanPlan.relevantSlugs)
-          ? [...profileScanPlan.relevantSlugs]
-          : [],
-        prioritizedGeneralFirst: !!profileScanPlan.prioritizedGeneralFirst,
-        scanOrdering: String(profileScanPlan.scanOrdering || ''),
-        slugFetchTimeoutMs: Number(slugFetchTimeoutMs || 0),
-        sbtFetchTimeoutMs: Number(sbtFetchTimeoutMs || 0),
-        activityFetchTimeoutMs: Number(activityFetchTimeoutMs || 0),
-        activityLookbackBlocks: Number(activityLookbackBlocks || 0),
-        sbtBurstSize: Number(sbtBurstSize || 1),
-        totalSbtContractsFound: 0,
-        totalCreatedSurveysFound: 0,
-        totalCreatedQuestionsFound: 0,
-        totalSurveyResponsesFound: 0,
-        totalQuestionResponsesFound: 0,
-        sampleSbtAddresses: [],
-        sampleCreatedSurveyIds: [],
-        sampleCreatedQuestionIds: [],
-        sampleSurveyResponseIds: [],
-        sampleQuestionResponseIds: [],
-      };
+      const report = createInitialProfileScanReport({
+        targetLower,
+        profileScanPlan,
+        allSessionsMode,
+        fanoutPlan,
+        attemptedCoverageSlugs,
+        slugFetchTimeoutMs,
+        sbtFetchTimeoutMs,
+        activityFetchTimeoutMs,
+        activityLookbackBlocks,
+        sbtBurstSize,
+      }) as MainSiteProfileScanReport;
       this.emitProfileScanTelemetry('scan-start', {
         targetAddress: targetLower,
         usedAllSessions: report.usedAllSessions,
@@ -3914,12 +3797,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
           // Attach instance listener for this SBT only (optional, lightweight)
           if (this.shouldAttachSbtDetailInstanceListener()) {
-            contractScripts.listenForSBTInstanceEvents(
-              'none',
-              [sbtAddressFromPath],
-              (e: SbtRealtimeEventLike | null) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
-              detailSlug
-            );
+            this.startSbtDetailInstanceListenerForGroup(detailSlug, [sbtAddressFromPath]);
           }
 
           // Defer non-SBT caches until after the SBT has loaded
@@ -4154,6 +4032,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
     try {
       this._responseHydrationController?.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._sessionMetaRefreshController?.destroy();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
@@ -4540,12 +4421,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
           this.setReadinessStateIfChanged({ isSBTCacheReady: true });
 
           if (this.shouldAttachSbtDetailInstanceListener()) {
-            contractScripts.listenForSBTInstanceEvents(
-              'none',
-              [sbtAddressFromPath],
-              (e: SbtRealtimeEventLike | null) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
-              detailSlug
-            );
+            this.startSbtDetailInstanceListenerForGroup(detailSlug, [sbtAddressFromPath]);
           }
 
           await this.initializeSurveyCache();
@@ -4651,42 +4527,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this.checkAllCachesReady();
   };
 
-  checkAllCachesReady = () => {
-    const { isSBTCacheReady, isSurveyCacheReady, isQuestionCacheReady } = this.state;
-    const nextIsAllReady = !!(isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady);
-
-    const slug = this.getSessionSlugFromState();
-
-    this.setState((prev: MainSiteState) => {
-      if (prev.isAllCachesReady === nextIsAllReady) return null;
-      return { isAllCachesReady: nextIsAllReady };
-    });
-    void this.syncCacheHasLoadedFlagOnTransition(slug, { isAllReady: nextIsAllReady });
-
-    // Deferred full SBT scan trigger (demo-only)
-    const pathname = this.getCurrentPathname();
-    const onDemo = pathname.startsWith('/session/');
-    if (!onDemo) return;
-
-    const shouldKickOff =
-      isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady &&
-      this.readFlag('sbt:deferredFullScanNeeded', slug) &&
-      !this.readFlag('sbt:fullScanInProgress', slug);
-
-    if (shouldKickOff) {
-      (async () => {
-        try {
-          if (!this.shouldAutoRunFullSbtScan({ pathname })) return;
-          mainSiteLog.log('[SBT Deferred] Kicking off full scan after questions & surveys are ready...');
-          await this.initializeSbtCache({ mode: 'full' });
-          this.startSbtEventListener();
-          mainSiteLog.log('[SBT Deferred] Full scan complete; listener started.');
-        } catch (e) {
-          mainSiteLog.error('[SBT Deferred] Full scan failed:', e);
-        }
-      })();
-    }
-  };
+  checkAllCachesReady: SessionCacheReadinessController['checkAllCachesReady'] =
+    (...args) => this._cacheReadinessController.checkAllCachesReady(...args);
 
   ensureSessionRouteSbtDiscovery: SessionSbtCacheController['ensureSessionRouteSbtDiscovery'] =
     (...args) => this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
@@ -4747,6 +4589,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
   startSbtEventListenerForGroup: SessionSbtCacheController['startSbtEventListenerForGroup'] =
     (...args) => this._sbtCacheController.startSbtEventListenerForGroup(...args);
+
+  startSbtDetailInstanceListenerForGroup: SessionSbtCacheController['startSbtDetailInstanceListenerForGroup'] =
+    (...args) => this._sbtCacheController.startSbtDetailInstanceListenerForGroup(...args);
 
   onNewSbtEventDetected: SessionSbtCacheController['onNewSbtEventDetected'] =
     (...args) => this._sbtCacheController.onNewSbtEventDetected(...args);
@@ -4827,16 +4672,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   fetchQuestionResponsesChunkedForGroup: SessionResponseHydrationController['fetchQuestionResponsesChunkedForGroup'] =
     (...args) => this._responseHydrationController.fetchQuestionResponsesChunkedForGroup(...args);
 
-  startSurveyAndQuestionEventListener = async () => this.startSurveyAndQuestionEventListenerForGroup(this.getActiveSessionSlug());
+  startSurveyAndQuestionEventListener: SessionSurveyCacheController['startSurveyAndQuestionEventListener'] =
+    (...args) => this._surveyCacheController.startSurveyAndQuestionEventListener(...args);
 
-  startSurveyAndQuestionEventListenerForGroup = async (slugIn: unknown) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    mainSiteLog.log("startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener", { slug });
-    contractScripts.removeSurveyEventsListener('none', slug); // Ensure clean state
-    if (this.shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return;
-    contractScripts.listenForSurveyEvents('none', (e: MainSiteSurveyEventLike) => this.onNewSurveyEventDetectedForGroup(slug, e), slug);
-    mainSiteLog.log("Survey & Question event listener started");
-  };
+  startSurveyAndQuestionEventListenerForGroup: SessionSurveyCacheController['startSurveyAndQuestionEventListenerForGroup'] =
+    (...args) => this._surveyCacheController.startSurveyAndQuestionEventListenerForGroup(...args);
 
 
   onNewSurveyEventDetected = async (event: MainSiteSurveyEventLike) => this.onNewSurveyEventDetectedForGroup(this.getActiveSessionSlug(), event);
@@ -5705,6 +5545,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
     // 7. Success: We have the data (or config) and the correct slug. Render the Page immediately.
     const effectiveNetwork = this.getSessionNetwork(effectiveSlug);
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(this.state);
     const surveyPathParts = fullPath.split('/');
     let responderParam = searchParams.get('responder') || null;
     const legacySurveyResponder = surveyPathParts.length > 3 ? surveyPathParts[3] : null;
@@ -5724,21 +5566,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             filterState={parsedFilterStateFromUrl}
             displayAnswerMode={isSurveyResultsRoute ? false : !!responderParam}
             viewAddress={isSurveyResultsRoute ? null : responderParam}
-            toggleLoginModal={this.props.toggleLoginModal}
-            account={this.props.account}
-            provider={this.props.provider}
-            loginComplete={this.props.loginComplete}
-            loginInProgress={this.props.loginInProgress}
+            {...authViewProps}
             network={effectiveNetwork}
             activeSessionSlug={effectiveSlug}
-            isSurveyCacheReady={this.state.isSurveyCacheReady}
-            isQuestionCacheReady={this.state.isQuestionCacheReady}
-            isResponsesCacheReady={this.state.isResponsesCacheReady}
-            isSBTCacheReady={this.state.isSBTCacheReady}
-            cacheHasLoaded={this.state.cacheHasLoaded}
-            sbtCacheRevision={this.state.sbtCacheRevision}
-            questionResponsesNonce={this.state.questionResponsesNonce}
-            questionScanProgress={this.state.questionScanProgress}
+            {...surveyCacheViewProps}
             refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
             refreshQuestionMetadata={this.refreshQuestionMetadata}
             refreshQuestionResponses={this.refreshQuestionResponses}
@@ -5863,6 +5694,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         ? ((addr: string, slug?: string) => this.refreshSbtData(addr, slug || effectivePageSlug!))
         : this.refreshSbtData
     );
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const surveyCacheViewProps = composeMainSiteSurveyCacheViewProps(this.state);
 
     return (
       <Suspense fallback={<LazyFallback label="Loading..." />}>
@@ -5872,25 +5705,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               surveyID={surveyID}
               displayAnswerMode={displayAnswerMode}
               viewAddress={viewResponseAddress}
-              toggleLoginModal={this.props.toggleLoginModal}
-              account={this.props.account}
-              provider={this.props.provider}
-              loginComplete={this.props.loginComplete}
-              loginInProgress={this.props.loginInProgress}
+              {...authViewProps}
               network={effectivePageNetwork}
               networkChainId={effectivePageChainId}
               activeSessionSlug={effectivePageSlug}
               sessionSlug={isQuestionsListRoute ? effectivePageSlug : undefined}
               sessionSlugPinned={questionRouteSession.sessionSlugPinned}
               sessionConfig={effectivePageSessionCfg}
-              isSurveyCacheReady={this.state.isSurveyCacheReady}
-              isQuestionCacheReady={this.state.isQuestionCacheReady}
-              isResponsesCacheReady={this.state.isResponsesCacheReady}
-              isSBTCacheReady={this.state.isSBTCacheReady}
-              cacheHasLoaded={this.state.cacheHasLoaded}
-              sbtCacheRevision={this.state.sbtCacheRevision}
-              questionResponsesNonce={this.state.questionResponsesNonce}
-              questionScanProgress={this.state.questionScanProgress}
+              {...surveyCacheViewProps}
               refreshSurveyResponsesByID={pageRefreshSurveyResponsesByID}
               refreshQuestionMetadata={pageRefreshQuestionMetadata}
               refreshQuestionResponses={pageRefreshQuestionResponses}
@@ -5970,6 +5792,8 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       this.getSessionNetwork('') ||
       null;
     const questionSessionCfg = this.getSessionCfg(effectiveQuestionSlug);
+    const authViewProps = composeMainSiteAuthViewProps(this.props);
+    const questionCacheViewProps = composeMainSiteQuestionCacheViewProps(this.state);
     return (
       <Suspense fallback={<LazyFallback label="Loading Question..." />}>
         <div data-testid={E2E_TESTIDS.PAGE_QUESTIONS_ROOT}>
@@ -5978,22 +5802,13 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             questionID={questionID}
             responderAddress={responderAddress}
             singleQuestionMode={true}
-            toggleLoginModal={this.props.toggleLoginModal}
-            account={this.props.account}
-            provider={this.props.provider}
-            loginComplete={this.props.loginComplete}
-            loginInProgress={this.props.loginInProgress}
+            {...authViewProps}
             network={effectiveQuestionNetwork}
             networkChainId={effectiveQuestionNetwork?.id || this.props.network?.id || null}
             activeSessionSlug={effectiveQuestionSlug}
             sessionSlug={effectiveQuestionSlug}
             sessionSlugPinned={questionSlugPinned}
-            isQuestionCacheReady={this.state.isQuestionCacheReady}
-            isResponsesCacheReady={this.state.isResponsesCacheReady}
-            isSBTCacheReady={this.state.isSBTCacheReady}
-            sbtCacheRevision={this.state.sbtCacheRevision}
-            questionResponsesNonce={this.state.questionResponsesNonce}
-            questionScanProgress={this.state.questionScanProgress}
+            {...questionCacheViewProps}
             refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)}
             refreshQuestionMetadata={() => this.refreshQuestionMetadataForGroup(effectiveQuestionSlug!)}
             refreshQuestionResponses={(questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) =>
@@ -6183,6 +5998,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
+    const walletViewProps = composeMainSiteWalletViewProps(this.props);
+    const loginViewProps = composeMainSiteLoginViewProps(this.props);
+    const sessionCacheViewProps = composeMainSiteSessionCacheViewProps(this.state);
 
     return (
       <Suspense fallback={<LazyFallback label="Loading Session..." />}>
@@ -6202,19 +6020,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               blockLimits={sessionConfig.blockLimits || { start: null, end: null }}
               networkChainId={sessionConfig.networkChainId}
               questionsGenPrompt={sessionConfig.questionsGenPrompt}
-              account={this.props.account}
-              provider={this.props.provider}
+              {...walletViewProps}
               network={defaultSessionNetwork}
-              toggleLoginModal={this.props.toggleLoginModal}
-              loginComplete={this.props.loginComplete}
-              isSBTCacheReady={this.state.isSBTCacheReady}
-              isSurveyCacheReady={this.state.isSurveyCacheReady}
-              isQuestionCacheReady={this.state.isQuestionCacheReady}
-              isResponsesCacheReady={this.state.isResponsesCacheReady}
-              sbtCacheRevision={this.state.sbtCacheRevision}
-              cacheHasLoaded={this.state.cacheHasLoaded}
-              questionResponsesNonce={this.state.questionResponsesNonce}
-              questionScanProgress={this.state.questionScanProgress}
+              {...loginViewProps}
+              {...sessionCacheViewProps}
               refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
               refreshQuestionMetadata={this.refreshQuestionMetadata}
               refreshQuestionResponses={this.refreshQuestionResponses}

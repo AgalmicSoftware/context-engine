@@ -27,6 +27,12 @@ export type WorkerSessionConfigPayload = AdminRecord & {
   adminAddress: string;
 };
 
+export type WorkerUrlResolutionDisplay = {
+  debug: string;
+  status: string;
+  url: string;
+};
+
 const asRecord = (value: unknown): AdminRecord => (
   value && typeof value === 'object'
     ? value as AdminRecord
@@ -56,6 +62,29 @@ export const pickFirstNonEmptyRpcUrlMap = (...candidates: unknown[]): RpcUrlMap 
   const sanitized = sanitizeRpcUrlMap(candidate);
   return Object.keys(sanitized).length > 0 ? sanitized : found;
 }, {});
+
+export const buildWorkerUrlResolutionDisplay = ({
+  resolved,
+  normalizeWorkerUrl,
+}: {
+  resolved?: unknown;
+  normalizeWorkerUrl: (value: unknown) => string;
+}): WorkerUrlResolutionDisplay => {
+  const resolvedRecord = asRecord(resolved);
+  const resolvedUrl = normalizeWorkerUrl(resolvedRecord.url || '');
+  const url = resolvedUrl || '';
+  const rawStatus = resolvedRecord.status;
+  const status = rawStatus || 'ok';
+  return {
+    url,
+    debug: `source=${resolvedRecord.source || 'unknown'} status=${toStr(status)} url=${resolvedUrl || '(none)'}`,
+    status: url
+      ? `Resolved (${toStr(status)})`
+      : rawStatus
+        ? `Missing (${toStr(rawStatus)})`
+        : 'Missing worker URL',
+  };
+};
 
 const mergeRpcUrlMaps = (...candidates: unknown[]): RpcUrlMap => candidates.reduce<RpcUrlMap>((merged, candidate) => {
   const sanitized = sanitizeRpcUrlMap(candidate);

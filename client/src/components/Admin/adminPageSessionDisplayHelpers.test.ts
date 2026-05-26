@@ -1,9 +1,11 @@
 import {
+  buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
+import { getChainName } from './adminPageHelpers';
 
 describe('adminPageSessionDisplayHelpers', () => {
   it('builds session URLs using normalized slugs and general-session fallback', () => {
@@ -29,6 +31,20 @@ describe('adminPageSessionDisplayHelpers', () => {
   it('formats short addresses consistently', () => {
     expect(shortAddress('0x1234567890abcdef')).toBe('0x1234…cdef');
     expect(shortAddress('')).toBe('');
+  });
+
+  it('formats chain and registry labels without changing same-chain or split-chain display', () => {
+    const baseSepoliaName = getChainName(84532);
+    const opSepoliaName = getChainName(11155420);
+
+    expect(buildAdminChainRegistryDisplay({ chainId: 84532 })).toBe(`${baseSepoliaName} (84532)`);
+    expect(buildAdminChainRegistryDisplay({ chainId: 84532, registryChainId: '84532' })).toBe(
+      `${baseSepoliaName} (84532)`
+    );
+    expect(buildAdminChainRegistryDisplay({ chainId: 11155420, registryChainId: 84532 })).toBe(
+      `${opSepoliaName} (11155420) / ${baseSepoliaName} (84532)`
+    );
+    expect(buildAdminChainRegistryDisplay()).toBe('\u2014');
   });
 
   it('collects encrypted metadata entries from legacy and provider locations', () => {

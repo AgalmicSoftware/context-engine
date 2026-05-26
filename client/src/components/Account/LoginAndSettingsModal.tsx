@@ -98,11 +98,26 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
-import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
 import { createLogger } from 'utilities/logging.js';
+import {
+  buildBookmarksRoutePath,
+  buildSettingsSessionHref,
+  formatSettingsSessionSlug,
+  normalizeSettingsSessionSlug,
+} from './loginSettingsRouteHelpers';
+import {
+  buildLoginSettingsSponsorshipCards,
+  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
+  getSponsoredKeyAliases,
+} from './loginSettingsSponsoredStatusHelpers';
+import {
+  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
+  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
+  formatLoginSettingsAiProviderLabel,
+} from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -176,24 +191,7 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
-type SponsoredStatusEntry = LoginAndSettingsRecord & {
-  status?: string;
-};
-
-const normalizeSettingsSessionSlug = (value: unknown) => {
-  const raw = toStr(value).trim().toLowerCase();
-  return raw === 'general' ? '' : raw;
-};
-const formatSettingsSessionSlug = (value: unknown) => {
-  const normalized = normalizeSettingsSessionSlug(value);
-  return normalized || 'general';
-};
-const buildSettingsSessionHref = (slugIn?: string) => {
-  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
-  const slug = normalizeSettingsSessionSlug(slugIn);
-  return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
-};
-export const buildBookmarksRoutePath = (): string => buildPublicRoute('/bookmarks');
+export { buildBookmarksRoutePath };
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
@@ -204,38 +202,6 @@ const uniqueList = <T = unknown>(values: T[] = []) => (
     )
   )
 );
-const getSponsoredKeyAliases = (resourceKey: string = '') => {
-  if (resourceKey === 'txGas') return ['faucet', 'txGas'];
-  return [resourceKey];
-};
-const formatSponsoredStatusMeta = (entry: SponsoredStatusEntry | null = null, hasActiveSponsor: boolean = false) => {
-  const status = entry?.status === 'unresolved'
-    ? 'error'
-    : (entry?.status || 'no-gate');
-  if (!hasActiveSponsor) {
-    return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
-  }
-  if (status === 'granted') {
-    return { label: 'Gate unlocked', tone: 'ok', detail: 'Sponsored key is available for the active session.' };
-  }
-  if (status === 'denied') {
-    return { label: 'Gate locked', tone: 'warn', detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.' };
-  }
-  if (status === 'needs-wallet') {
-    return { label: 'Connect wallet', tone: 'warn', detail: 'Connect a wallet to evaluate the sponsor gate for this session.' };
-  }
-  if (status === 'invalid-gate') {
-    return { label: 'Invalid gate', tone: 'warn', detail: 'This sponsor gate configuration is incomplete.' };
-  }
-  if (status === 'unknown' || status === 'error') {
-    return { label: 'Check unavailable', tone: 'muted', detail: 'We could not confirm gate access for the active-session sponsor.' };
-  }
-  if (status === 'no-gate' && hasActiveSponsor) {
-    return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
-  }
-  return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
-};
-
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
   'gpt-5': { label: 'GPT-5 (default)', badgeLabel: 'GPT-5' },
   'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
@@ -257,23 +223,6 @@ const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
     badgeLabel: 'Custom',
   }),
 ]);
-
-const AI_REASONING_LEVELS = Object.freeze(['low', 'medium', 'high']);
-
-const AI_TASK_REASONING_ROWS = Object.freeze([
-  { key: 'generate', label: 'Question Generation', hint: 'Default: low for speed.' },
-  { key: 'rewrite', label: 'AI Rewrite', hint: 'Uses the global setting unless overridden.' },
-  { key: 'summarize', label: 'Analysis / Summarize', hint: 'Uses the global setting unless overridden.' },
-  { key: 'rank', label: 'Filter Ranking', hint: 'Uses the global setting unless overridden.' },
-]);
-
-const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  custom: 'Custom RPC',
-  local: 'Local',
-});
 
 const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
   mode: settings?.mode,
@@ -1917,27 +1866,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
-    const buildSponsorshipCard = (key: any, title: any) => {
-      const sessions = sponsorSessions.byResource[key] || [];
-      const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
-      const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
-      return {
-        key,
-        title,
-        status: formatSponsoredStatusMeta(sponsoredAccess[key] || null, !!activeSponsorSession),
-        access: sponsoredAccess[key] || null,
-        activeSession,
-        activeSponsorSession,
-        otherSponsorSessions,
-        sessions,
-      };
-    };
-    const sponsorshipCards = [
-      buildSponsorshipCard('ai', 'AI'),
-      buildSponsorshipCard('arweave', 'Arweave'),
-      buildSponsorshipCard('rpc', 'RPC'),
-      buildSponsorshipCard('txGas', 'Tx gas'),
-    ];
+    const sponsorshipCards = buildLoginSettingsSponsorshipCards({
+      activeSession,
+      sponsoredAccess,
+      sponsorSessions,
+    });
 
     return {
       activeSession,
@@ -1995,23 +1928,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     resourceLabel = '',
     sponsoredKeys = {},
     sponsorSessions = {},
-  }: any = {}) => {
-    const label = resourceLabel || resourceKey || 'resource';
-    const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
-      .some((alias: any) => !!sponsoredKeys?.[alias]);
-    const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
-      .filter((entry: any) => !entry?.isActive);
-    if (activeHasSponsor) {
-      if (!otherSessions.length) {
-        return `${label} sponsor is configured for the active session.`;
-      }
-      return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}.`;
-    }
-    if (otherSessions.length) {
-      return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}. Switch sessions to use one.`;
-    }
-    return `No active-session ${label} sponsor configured.`;
-  };
+  }: any = {}) => formatLoginSettingsResourceSponsorHint({
+    resourceKey,
+    resourceLabel,
+    sponsoredKeys,
+    sponsorSessions,
+  });
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
@@ -2089,7 +2011,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const useLocalArweave = !!resourceKeys?.arweave?.useLocal;
     const aiProvider = String(aiDisplay.mode || 'openai').toLowerCase();
     const localProvider = String(aiLocal.mode || 'openai').toLowerCase();
-    const aiProviderLabel = AI_PROVIDER_LABELS[aiProvider] || aiProvider;
+    const aiProviderLabel = formatLoginSettingsAiProviderLabel(aiProvider);
     const aiPresetKey = aiDisplay?.preset || (
       (
         aiDisplay?.models?.fast ||

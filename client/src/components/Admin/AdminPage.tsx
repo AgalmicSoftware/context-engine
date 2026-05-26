@@ -81,20 +81,51 @@ import {
   parseAllowOriginsDraft,
 } from './adminPageDraftFormattingHelpers';
 import {
+  buildAdminChainRegistryDisplay,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
 import {
+  ADMIN_SECRET_CARDS,
+  buildAdminSecretRemoveTestId,
+  getAdminSecretFieldInputType,
+  getAdminSecretFieldLabel,
+  getAdminSecretFieldRows,
+} from './adminPageSecretCardHelpers';
+import type { AdminTestResults } from './adminPageTestResultHelpers';
+import { renderAdminTestResult } from './adminPageTestResultHelpers';
+import {
   dedupeSbtSelections,
   normalizeGateMode,
   resolveDefaultGateFromConfig,
 } from './adminPageSbtGateSelectionHelpers';
 import {
+  buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
+import {
+  buildAdminArweaveBalanceResource,
+  buildAdminArweaveEmptyResource,
+  buildAdminArweaveErrorResource,
+  buildAdminArweaveInvalidResource,
+  buildAdminArweaveLoadingResource,
+  buildAdminFaucetBalanceResource,
+  buildAdminFaucetEmptyResource,
+  buildAdminFaucetErrorResource,
+  buildAdminFaucetInvalidResource,
+  buildAdminFaucetLoadingResource,
+  buildAdminFaucetRpcUnavailableResource,
+  buildAdminLitErrorResource,
+  buildAdminLitLoadingResource,
+  buildAdminLitNotConfiguredResource,
+  buildAdminLitStatusNotLoadedResource,
+  buildAdminLitStatusResource,
+  buildAdminLitUnavailableResource,
+  getAdminLitResourceLabel,
+} from './adminPageResourceDisplayHelpers';
 import {
   ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
@@ -108,40 +139,12 @@ import {
 
 const log = createLogger('general');
 
-type AdminLinkedResult = {
-  label?: string;
-  text?: string;
-  href?: string;
-};
-
-type AdminTestResult = string | AdminLinkedResult;
-type AdminTestResults = Record<string, AdminTestResult>;
 type AdminSecrets = Record<string, string>;
 type AdminSecretKeySet = Set<string>;
 type AdminOpenSecretCards = Record<string, boolean>;
 type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
-};
-
-const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => (
-  !!entry && typeof entry === 'object'
-);
-
-const renderTestResult = (entry: AdminTestResult | null | undefined) => {
-  if (!entry) return 'Not run';
-  if (typeof entry === 'string') return entry;
-  if (!isAdminLinkedResult(entry)) return 'OK';
-  const label = toStr(entry.label || entry.text).trim();
-  const href = toStr(entry.href).trim();
-  if (href) {
-    return (
-      <a href={href} target="_blank" rel="noreferrer">
-        {label || 'View'}
-      </a>
-    );
-  }
-  return label || 'OK';
 };
 
 export const __adminPageTestUtils = {
@@ -246,25 +249,9 @@ const AdminPage = ({
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
   const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
-  const [arweaveResource, setArweaveResource] = useState<any>({
-    address: '',
-    display: 'No JWK entered',
-    meta: 'Enter a JWK above to read the public wallet balance.',
-    loading: false,
-  });
-  const [faucetResource, setFaucetResource] = useState<any>({
-    address: '',
-    display: 'No faucet key entered',
-    meta: 'Enter a faucet private key above to read the wallet balance.',
-    loading: false,
-  });
-  const [litResource, setLitResource] = useState<any>({
-    address: '',
-    display: 'Lit Chipotle not configured',
-    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-    loading: false,
-    manualRefreshAvailable: false,
-  });
+  const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
+  const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
+  const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
   const arweaveResourceRequestRef = useRef(0);
   const faucetResourceRequestRef = useRef(0);
   const litResourceRequestRef = useRef(0);
@@ -619,13 +606,7 @@ const AdminPage = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setLitResource({
-      address: '',
-      display: 'Lit Chipotle not configured',
-      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-      loading: false,
-      manualRefreshAvailable: false,
-    });
+    setLitResource(buildAdminLitNotConfiguredResource());
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -836,21 +817,19 @@ const AdminPage = ({
       }
 
       if (cancelled) return;
-      const resolvedUrl = normalizeWorkerUrl(resolved?.url || '');
-      const url = resolvedUrl || '';
-      setWorkerUrl(url);
-      setWorkerDebug(`source=${resolved?.source || 'unknown'} status=${resolved?.status || 'ok'} url=${resolvedUrl || '(none)'}`);
-      if (url) {
-        setWorkerStatus(`Resolved (${resolved?.status || 'ok'})`);
-      } else {
-        setWorkerStatus(resolved?.status ? `Missing (${resolved.status})` : 'Missing worker URL');
-      }
+      const workerUrlDisplay = buildWorkerUrlResolutionDisplay({
+        resolved,
+        normalizeWorkerUrl,
+      });
+      setWorkerUrl(workerUrlDisplay.url);
+      setWorkerDebug(workerUrlDisplay.debug);
+      setWorkerStatus(workerUrlDisplay.status);
       if (typeof window !== 'undefined') {
         // Debug help when worker URL resolution is unexpected.
         log.log('[AdminPage] Worker URL resolved', {
           slug: selectedSlug,
           resolved,
-          finalUrl: url,
+          finalUrl: workerUrlDisplay.url,
         });
       }
     };
@@ -865,12 +844,7 @@ const AdminPage = ({
     arweaveResourceRequestRef.current = requestId;
     const jwk = toStr(secrets.arweaveJwk).trim();
     if (!jwk) {
-      setArweaveResource({
-        address: '',
-        display: 'No JWK entered',
-        meta: 'Enter a JWK above to read the public wallet balance.',
-        loading: false,
-      });
+      setArweaveResource(buildAdminArweaveEmptyResource());
       return;
     }
 
@@ -879,45 +853,29 @@ const AdminPage = ({
       parsedJwk = JSON.parse(jwk);
     } catch (_) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource({
-        address: '',
-        display: 'Invalid JWK',
-        meta: 'The wallet JSON could not be parsed.',
-        loading: false,
-      });
+      setArweaveResource(buildAdminArweaveInvalidResource());
       return;
     }
 
-    setArweaveResource({
-      address: '',
-      display: 'Loading...',
-      meta: 'Resolving wallet address and balance…',
-      loading: true,
-    });
+    setArweaveResource(buildAdminArweaveLoadingResource());
 
     let address = '';
     try {
       const arweaveBalance = await arweaveScripts.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource({
+      setArweaveResource(buildAdminArweaveBalanceResource({
         address,
-        display: `${arweaveScripts.formatWinstonToAr(arweaveBalance.winston, 6)} AR`,
-        meta: shortAddress(address),
-        loading: false,
-      });
+        winston: arweaveBalance.winston,
+        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
+        shortAddress,
+      }));
     } catch (err) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      const message = address ? 'Unable to load balance' : 'Invalid JWK';
-      const meta = address
-        ? shortAddress(address)
-        : 'The wallet JSON is missing required Arweave key fields.';
-      setArweaveResource({
+      setArweaveResource(buildAdminArweaveErrorResource({
         address,
-        display: message,
-        meta,
-        loading: false,
-      });
+        shortAddress,
+      }));
     }
   }, [secrets.arweaveJwk]);
 
@@ -926,12 +884,7 @@ const AdminPage = ({
     faucetResourceRequestRef.current = requestId;
     const faucetPrivateKey = toStr(secrets.faucetPrivateKey).trim();
     if (!faucetPrivateKey) {
-      setFaucetResource({
-        address: '',
-        display: 'No faucet key entered',
-        meta: 'Enter a faucet private key above to read the wallet balance.',
-        loading: false,
-      });
+      setFaucetResource(buildAdminFaucetEmptyResource());
       return;
     }
 
@@ -940,33 +893,25 @@ const AdminPage = ({
       address = new ethers.Wallet(faucetPrivateKey).address;
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
-        address: '',
-        display: 'Invalid key',
-        meta: 'The private key could not be parsed.',
-        loading: false,
-      });
+      setFaucetResource(buildAdminFaucetInvalidResource());
       return;
     }
 
     const sessionChainLabel = relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
     if (!sessionReadRpc.rpcUrl || !sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetRpcUnavailableResource({
         address,
-        display: 'RPC unavailable',
-        meta: shortAddress(address),
-        loading: false,
-      });
+        shortAddress,
+      }));
       return;
     }
 
-    setFaucetResource({
+    setFaucetResource(buildAdminFaucetLoadingResource({
       address,
-      display: 'Loading...',
-      meta: sessionChainLabel ? `Reading ${sessionChainLabel}` : shortAddress(address),
-      loading: true,
-    });
+      sessionChainLabel,
+      shortAddress,
+    }));
 
     try {
       const readProvider = new ethers.providers.JsonRpcProvider(sessionReadRpc.rpcUrl, {
@@ -975,23 +920,19 @@ const AdminPage = ({
       });
       const balanceWei = await readProvider.getBalance(address);
       if (requestId !== faucetResourceRequestRef.current) return;
-      const meta = sessionChainLabel
-        ? `${shortAddress(address)} • ${sessionChainLabel}`
-        : shortAddress(address);
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetBalanceResource({
         address,
-        display: `${Number(ethers.utils.formatEther(balanceWei)).toFixed(4)} ETH`,
-        meta,
-        loading: false,
-      });
+        balanceWei,
+        sessionChainLabel,
+        formatEther: ethers.utils.formatEther,
+        shortAddress,
+      }));
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetErrorResource({
         address,
-        display: 'Unable to load balance',
-        meta: shortAddress(address),
-        loading: false,
-      });
+        shortAddress,
+      }));
     }
   }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId, sessionReadRpc.rpcUrl]);
 
@@ -1143,60 +1084,34 @@ const AdminPage = ({
     const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
     if (!useChipotlePath && !baseUrl) {
-      setLitResource({
-        address: '',
-        display: 'Lit Chipotle not configured',
-        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
+      setLitResource(buildAdminLitNotConfiguredResource());
       return;
     }
 
     if (!baseUrl || !selectedConfig) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
-        meta: useChipotlePath
-          ? 'Resolve the worker URL to read Lit Chipotle status.'
-          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
+      setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
       return;
     }
 
     if (!includeSignedStatus) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Status not loaded',
-        meta: [
-          accountApiKey ? 'Unsaved account key' : '',
-          usageApiKey ? 'Unsaved usage key' : '',
-          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId ? 'PKP configured' : '',
-          configuredLitActionCid ? 'Action configured' : '',
-          'Click refresh to query the worker for Lit Chipotle status.',
-        ].filter(Boolean).join(' • '),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitStatusNotLoadedResource({
+        hasAccountApiKey: !!accountApiKey,
+        hasUsageApiKey: !!usageApiKey,
+        configuredLitApiBase,
+        configuredLitGroupId,
+        configuredLitPkpId,
+        configuredLitActionCid,
+        formatPreviewValue,
+      }));
       return;
     }
 
-    setLitResource({
-      address: '',
-      display: 'Loading...',
-      meta: configuredLitGroupId
-        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
-        : 'Checking Lit Chipotle worker status',
-      loading: true,
-      manualRefreshAvailable: true,
-    });
+    setLitResource(buildAdminLitLoadingResource({
+      configuredLitGroupId,
+      formatPreviewValue,
+    }));
 
     try {
       const slug = normalizeSlug(selectedSlug);
@@ -1213,59 +1128,27 @@ const AdminPage = ({
       });
       if (requestId !== litResourceRequestRef.current) return;
 
-      const ready = data?.ready === true;
       const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
       const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
         ? data.groupSummary
         : {};
-      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
-      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
-      const hasHardConfigMiss = (
-        groupSummary.hasConfiguredPkp === false ||
-        groupSummary.hasConfiguredAction === false
-      );
       const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-      setLitResource({
-        address: '',
-        display: ready
-          ? 'Ready'
-          : hasHardConfigMiss
-            ? 'Needs config'
-            : warnings.length
-              ? 'Needs review'
-              : 'Configured',
-        meta: [
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          balanceDisplay ? `balance ${balanceDisplay}` : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId
-            ? (groupSummary.hasConfiguredPkp === true
-              ? 'PKP ready'
-              : groupSummary.hasConfiguredPkp === false
-                ? 'PKP missing'
-                : 'PKP unchecked')
-            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
-          configuredLitActionCid
-            ? (groupSummary.hasConfiguredAction === true
-              ? 'Action ready'
-              : groupSummary.hasConfiguredAction === false
-                ? 'Action missing'
-                : 'Action unchecked')
-            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
-          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitStatusResource({
+        ready: data?.ready === true,
+        warnings,
+        groupSummary,
+        balanceDisplay,
+        configuredLitApiBase,
+        configuredLitGroupId,
+        configuredLitPkpId,
+        configuredLitActionCid,
+        formatPreviewValue,
+      }));
     } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Unable to load status',
-        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitErrorResource(
+        getErrorMessage(error, 'Failed to load Lit Chipotle status.')
+      ));
     }
   }, [
     secrets.litAccountApiKey,
@@ -1291,13 +1174,15 @@ const AdminPage = ({
       ? selectedConfig.litCredentials
       : {};
     return (
-      toStr(secrets.litAccountApiKey).trim() ||
-      toStr(secrets.litUsageApiKey).trim() ||
-      toStr(litCredentials?.litApiBase).trim() ||
-      toStr(litCredentials?.litGroupId).trim() ||
-      toStr(litCredentials?.litPkpId).trim() ||
-      toStr(litCredentials?.litActionCid).trim()
-    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
+      getAdminLitResourceLabel({
+        hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
+        hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
+        configuredLitApiBase: litCredentials?.litApiBase,
+        configuredLitGroupId: litCredentials?.litGroupId,
+        configuredLitPkpId: litCredentials?.litPkpId,
+        configuredLitActionCid: litCredentials?.litActionCid,
+      })
+    );
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
@@ -2011,13 +1896,6 @@ const AdminPage = ({
     }
   };
 
-  const SECRET_CARDS = [
-    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
-    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
-    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
-    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
-  ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
@@ -2554,21 +2432,10 @@ const AdminPage = ({
               </div>
               <div className={styles.metadataItem}>
                 <span>Chain / Registry</span>
-                <span>{(() => {
-                  const chainId = toStr(groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '').trim();
-                  const chainName = getChainName(chainId);
-                  const registryChainId = toStr(groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '').trim();
-                  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
-                  const chainNum = Number(chainId);
-                  const registryNum = Number(registryChainId);
-                  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
-                    ? chainNum === registryNum
-                    : registryChainId === chainId;
-                  if (!registryChainId || sameChain) return chainDisplay;
-                  const registryName = getChainName(registryChainId);
-                  const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
-                  return `${chainDisplay} / ${registryDisplay}`;
-                })()}</span>
+                <span>{buildAdminChainRegistryDisplay({
+                  chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
+                  registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
+                })}</span>
               </div>
               <div className={styles.metadataItem}>
                 <span>Admin</span>
@@ -3119,7 +2986,7 @@ const AdminPage = ({
                 {gateSyncStatus}
               </div>
             )}
-            {gateSyncResult && <div className={styles.statusNote}>{renderTestResult(gateSyncResult)}</div>}
+            {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
           </>
         )}
       </section>
@@ -3149,7 +3016,7 @@ const AdminPage = ({
         {workerSecretsOpen && (
           <>
             <div className={styles.secretOptionsGrid}>
-              {SECRET_CARDS.map((card: any) => {
+              {ADMIN_SECRET_CARDS.map((card: any) => {
                 const isOpen = openSecretCards[card.key];
                 const hasValue = cardHasValue(card.fields);
                 return (
@@ -3172,27 +3039,16 @@ const AdminPage = ({
                       <div className={styles.secretOptionBody}>
                         {card.fields.map((fieldKey: any) => {
                           const secretFieldKey = String(fieldKey);
-                          const isTextarea = secretFieldKey === 'arweaveJwk';
-                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
-                          const secretFieldLabels: Record<string, string> = {
-                            openaiKey: 'OpenAI API key',
-                            anthropicKey: 'Anthropic API key',
-                            openrouterKey: 'OpenRouter API key',
-                            customRpcUrl: 'Custom RPC URL',
-                            customRpcKey: 'Custom RPC key',
-                            arweaveJwk: 'Arweave JWK (JSON)',
-                            faucetPrivateKey: 'Faucet private key',
-                            litAccountApiKey: 'Lit account API key',
-                            litUsageApiKey: 'Lit usage API key',
-                          };
-                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
+                          const inputType = getAdminSecretFieldInputType(secretFieldKey);
+                          const isTextarea = inputType === 'textarea';
+                          const label = getAdminSecretFieldLabel(secretFieldKey);
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>
                               <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
                                 <Input
-                                  type={isTextarea ? 'textarea' : isPassword ? 'password' : 'text'}
-                                  rows={isTextarea ? 3 : undefined}
+                                  type={inputType}
+                                  rows={getAdminSecretFieldRows(secretFieldKey)}
                                   value={secrets[secretFieldKey]}
                                   onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
                                   className={styles.secretInput}
@@ -3203,7 +3059,7 @@ const AdminPage = ({
                                   onClick={() => handleClearSecret(secretFieldKey)}
                                   title={`Clear ${label} on next save`}
                                   aria-label={`Clear ${label}`}
-                                  data-testid={`ce-admin-secret-remove-${secretFieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
+                                  data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
                                 >
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
@@ -3388,7 +3244,7 @@ const AdminPage = ({
               id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
             >
             <span>Health</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.health)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.health)}</span>
           </div>
           {!defaultGateIsEmpty && !walletReady && (
             <CETooltip
@@ -3411,7 +3267,7 @@ const AdminPage = ({
             title="Click to test AI"
           >
             <span>AI</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.ai)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.ai)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
@@ -3424,7 +3280,7 @@ const AdminPage = ({
             title="Click to test Arweave upload"
           >
             <span>Arweave</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.arweave)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.arweave)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${account ? styles.statusItemClickable : ''}`}
@@ -3437,11 +3293,11 @@ const AdminPage = ({
             title="Click to test faucet (0.0000001)"
           >
             <span>Faucet</span>
-            <span>{testBusy ? 'Testing\u2026' : renderTestResult(testResults.faucet)}</span>
+            <span>{testBusy ? 'Testing\u2026' : renderAdminTestResult(testResults.faucet)}</span>
           </div>
           <div className={styles.statusItem}>
             <span>Transcribe</span>
-            <span>{renderTestResult(testResults.transcribe)}</span>
+            <span>{renderAdminTestResult(testResults.transcribe)}</span>
           </div>
         </div>
         <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
@@ -3467,7 +3323,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-login"
           >
             <span>Login</span>
-            <span>{renderTestResult(deniedResults.login)}</span>
+            <span>{renderAdminTestResult(deniedResults.login)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3483,7 +3339,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-ai"
           >
             <span>AI</span>
-            <span>{renderTestResult(deniedResults.ai)}</span>
+            <span>{renderAdminTestResult(deniedResults.ai)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3499,7 +3355,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-arweave"
           >
             <span>Arweave</span>
-            <span>{renderTestResult(deniedResults.arweave)}</span>
+            <span>{renderAdminTestResult(deniedResults.arweave)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3515,7 +3371,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-transcribe"
           >
             <span>Transcribe</span>
-            <span>{renderTestResult(deniedResults.transcribe)}</span>
+            <span>{renderAdminTestResult(deniedResults.transcribe)}</span>
           </div>
           <div
             className={`${styles.statusItem} ${!deniedBusy ? styles.statusItemClickable : ''}`}
@@ -3531,7 +3387,7 @@ const AdminPage = ({
             data-testid="ce-admin-denied-chip-faucet"
           >
             <span>Faucet</span>
-            <span>{renderTestResult(deniedResults.faucet)}</span>
+            <span>{renderAdminTestResult(deniedResults.faucet)}</span>
           </div>
         </div>
           </>

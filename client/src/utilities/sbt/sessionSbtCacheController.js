@@ -1712,6 +1712,22 @@ export const createSessionSbtCacheController = (host = {}) => {
     }
   };
 
+  const startSbtDetailInstanceListenerForGroup = (slugIn, addressesIn = []) => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const addresses = (Array.isArray(addressesIn) ? addressesIn : [addressesIn])
+      .map((address) => String(address || '').trim())
+      .filter(Boolean);
+    if (!slug || addresses.length === 0) return false;
+
+    contractScripts.listenForSBTInstanceEvents(
+      'none',
+      addresses,
+      (e) => onNewSbtEventDetectedForGroup(slug, e),
+      slug
+    );
+    return true;
+  };
+
 
 
   const onNewSbtEventDetected = async (event) => onNewSbtEventDetectedForGroup(getActiveSessionSlug(), event);
@@ -2031,6 +2047,7 @@ export const createSessionSbtCacheController = (host = {}) => {
     refreshSbtDataForGroup,
     startSbtEventListener,
     startSbtEventListenerForGroup,
+    startSbtDetailInstanceListenerForGroup,
     onNewSbtEventDetected,
     onNewSbtEventDetectedForGroup,
     onSbtCreatedDetected,
