@@ -3,6 +3,9 @@ import {
   buildHashReadInflightKey,
   buildHashReadMemoKey,
   createContractScriptsCache,
+  getTimedMemoValue,
+  markHashRevertLoggedOnce,
+  setTimedMemoValue,
 } from './contractScriptsCache.js';
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
@@ -80,6 +83,42 @@ describe('contractScriptsCache helpers', () => {
       .toBe('84532|edge|0xabc|strict:1');
     expect(buildHashReadInflightKey({ baseKey: '84532|edge', id: '0xabc', throwOnError: false }))
       .toBe('84532|edge|0xabc|strict:0');
+  });
+
+  it('dedupes hash revert log keys and prunes oldest entries', () => {
+    const logged = new Set();
+
+    expect(markHashRevertLoggedOnce(logged, '')).toBe(false);
+    expect(markHashRevertLoggedOnce(logged, 'q1', 2)).toBe(true);
+    expect(markHashRevertLoggedOnce(logged, 'q1', 2)).toBe(false);
+    expect(markHashRevertLoggedOnce(logged, 'q2', 2)).toBe(true);
+    expect(markHashRevertLoggedOnce(logged, 'q3', 2)).toBe(true);
+
+    expect(Array.from(logged)).toEqual(['q2', 'q3']);
+  });
+
+  it('stores timed memo entries with TTL expiry and LRU refresh', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const memo = new Map();
+
+    try {
+      setTimedMemoValue(memo, 'a', 'first', 2);
+      setTimedMemoValue(memo, 'b', 'second', 2);
+      expect(Array.from(memo.keys())).toEqual(['a', 'b']);
+
+      nowSpy.mockReturnValue(1020);
+      expect(getTimedMemoValue(memo, 'a', 100)).toBe('first');
+      expect(Array.from(memo.keys())).toEqual(['b', 'a']);
+
+      setTimedMemoValue(memo, 'c', 'third', 2);
+      expect(Array.from(memo.keys())).toEqual(['a', 'c']);
+
+      nowSpy.mockReturnValue(1200);
+      expect(getTimedMemoValue(memo, 'a', 100)).toBeNull();
+      expect(Array.from(memo.keys())).toEqual(['c']);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('coalesces inflight Arweave tx work by chain and tx id', async () => {
