@@ -94,7 +94,8 @@ import {
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
 import {
-  formatSponsoredStatusMeta,
+  buildLoginSettingsSponsorshipCards,
+  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
 
@@ -1976,13 +1977,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     resourceLabel = '',
     sponsoredKeys = {},
     sponsorSessions = {},
-  }: any = {}) =>
-    formatLoginSettingsResourceSponsorHint({
-      resourceKey,
-      resourceLabel,
-      sponsoredKeys,
-      sponsorSessions,
-    });
+  }: any = {}) => formatLoginSettingsResourceSponsorHint({
+    resourceKey,
+    resourceLabel,
+    sponsoredKeys,
+    sponsorSessions,
+  });
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
