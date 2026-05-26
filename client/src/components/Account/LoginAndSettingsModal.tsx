@@ -110,6 +110,7 @@ import {
 } from './loginSettingsRouteHelpers';
 import {
   buildLoginSettingsSponsorshipCards,
+  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
 
@@ -1938,23 +1939,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     resourceLabel = '',
     sponsoredKeys = {},
     sponsorSessions = {},
-  }: any = {}) => {
-    const label = resourceLabel || resourceKey || 'resource';
-    const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
-      .some((alias: any) => !!sponsoredKeys?.[alias]);
-    const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
-      .filter((entry: any) => !entry?.isActive);
-    if (activeHasSponsor) {
-      if (!otherSessions.length) {
-        return `${label} sponsor is configured for the active session.`;
-      }
-      return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}.`;
-    }
-    if (otherSessions.length) {
-      return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}. Switch sessions to use one.`;
-    }
-    return `No active-session ${label} sponsor configured.`;
-  };
+  }: any = {}) => formatLoginSettingsResourceSponsorHint({
+    resourceKey,
+    resourceLabel,
+    sponsoredKeys,
+    sponsorSessions,
+  });
 
   renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());

@@ -10,6 +10,13 @@ type SponsorshipCardArgs = {
   title: string;
 };
 
+type ResourceSponsorHintArgs = {
+  resourceKey?: string;
+  resourceLabel?: string;
+  sponsoredKeys?: Record<string, any>;
+  sponsorSessions?: Record<string, any>;
+};
+
 const SETTINGS_SPONSORSHIP_RESOURCES = Object.freeze([
   { key: 'ai', title: 'AI' },
   { key: 'arweave', title: 'Arweave' },
@@ -91,3 +98,26 @@ export const buildLoginSettingsSponsorshipCards = ({
   sponsorSessions,
   title,
 }));
+
+export const formatResourceSponsorHint = ({
+  resourceKey = '',
+  resourceLabel = '',
+  sponsoredKeys = {},
+  sponsorSessions = {},
+}: ResourceSponsorHintArgs = {}) => {
+  const label = resourceLabel || resourceKey || 'resource';
+  const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
+    .some((alias: any) => !!sponsoredKeys?.[alias]);
+  const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
+    .filter((entry: any) => !entry?.isActive);
+  if (activeHasSponsor) {
+    if (!otherSessions.length) {
+      return `${label} sponsor is configured for the active session.`;
+    }
+    return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}.`;
+  }
+  if (otherSessions.length) {
+    return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}. Switch sessions to use one.`;
+  }
+  return `No active-session ${label} sponsor configured.`;
+};
