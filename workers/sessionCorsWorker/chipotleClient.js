@@ -7,7 +7,7 @@ import {
   normalizeChipotleCekHex,
   normalizeChipotleSbtAddresses,
   normalizeLitChipotleMetadataVersion,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.ts';
+} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';

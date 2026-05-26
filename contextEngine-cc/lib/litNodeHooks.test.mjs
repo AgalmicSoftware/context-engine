@@ -9,7 +9,7 @@ import {
 import {
   buildLitChipotlePolicy,
   fingerprintLitChipotlePolicy,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.ts';
+} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const GATE_ADDRESS = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
 const GATE_ADDRESS_B = '0x1111111111111111111111111111111111111111';
