@@ -24,12 +24,19 @@ import {
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayInflightLookupKey,
+  buildSbtDisplayLabelMemoKey,
+  buildSbtDisplayRetryStateKey,
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
+  isSbtDisplayMetadataRecord,
   isSbtMetadataFieldLocked,
   normalizeSbtDisplayChainId as normalizeChainId,
   resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
   resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
+  resolveSbtDisplayRetryAllowed,
+  resolveSbtMetadataLookupDecision,
+  shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
@@ -432,7 +439,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
       });
 
       const metadata = await contractScripts.getSbtMetadata('none', checksum, cfg);
-      if (!shouldPersistSbtDisplayMetadata(metadata)) {
+      if (!isSbtDisplayMetadataRecord(metadata)) {
         markNameLookupFailure(retryKey);
         return null;
       }
