@@ -3,17 +3,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyTool.module.scss';
-import type {
-  SurveyQuestionsLayoutDisplayState,
-  SurveyQuestionsRouteViewDisplayState,
-} from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsResponseViewProps = {
   isLoadingResponse?: boolean;
-  layoutDisplayState?: Pick<
-    SurveyQuestionsLayoutDisplayState,
-    'responseViewClassName'
-  >;
+  isOwnResponse?: unknown;
   noResponse?: boolean;
   parsedViewAddressAnswers?: any;
   questionPool?: any[];
@@ -30,18 +23,18 @@ type SurveyQuestionsResponseViewProps = {
   ) => React.ReactNode;
   responderAddress?: string;
   responseLookupWarning?: React.ReactNode;
-  routeViewDisplayState?: Pick<
-    SurveyQuestionsRouteViewDisplayState,
-    'isOwnResponse' | 'shortenedViewAddress' | 'viewedAddressLower' | 'viewedAddressRaw'
-  >;
+  responseViewClassName?: string;
+  shortenedViewAddress?: React.ReactNode;
   singleQuestionMode?: unknown;
   userAnswers?: any;
   viewAddress?: string;
+  viewedAddressLower?: string;
+  viewedAddressRaw?: string;
 };
 
 const SurveyQuestionsResponseView = ({
   isLoadingResponse = false,
-  layoutDisplayState,
+  isOwnResponse,
   noResponse = false,
   parsedViewAddressAnswers = null,
   questionPool = [],
@@ -50,10 +43,13 @@ const SurveyQuestionsResponseView = ({
   renderSurveyAnswers,
   responderAddress,
   responseLookupWarning = '',
-  routeViewDisplayState,
+  responseViewClassName,
+  shortenedViewAddress = '',
   singleQuestionMode = false,
   userAnswers = null,
   viewAddress,
+  viewedAddressLower = '',
+  viewedAddressRaw = '',
 }: SurveyQuestionsResponseViewProps): React.ReactElement => {
   if (isLoadingResponse) {
     return (
@@ -77,10 +73,6 @@ const SurveyQuestionsResponseView = ({
     );
   }
 
-  const isOwnResponse = routeViewDisplayState?.isOwnResponse;
-  const shortenedViewAddress = routeViewDisplayState?.shortenedViewAddress || '';
-  const viewedAddressLower = routeViewDisplayState?.viewedAddressLower || '';
-  const viewedAddressRaw = routeViewDisplayState?.viewedAddressRaw || '';
   const firstQuestion = Array.isArray(questionPool) ? questionPool[0] : undefined;
   const hasAnswerData =
     (singleQuestionMode && questionPoolReady && firstQuestion && (isOwnResponse || parsedViewAddressAnswers)) ||
@@ -88,7 +80,7 @@ const SurveyQuestionsResponseView = ({
     (!singleQuestionMode && parsedViewAddressAnswers);
 
   return (
-    <div className={layoutDisplayState?.responseViewClassName}>
+    <div className={responseViewClassName}>
       {viewedAddressRaw && (
         <h2 className={styles.viewAddressHeading}>
           <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
