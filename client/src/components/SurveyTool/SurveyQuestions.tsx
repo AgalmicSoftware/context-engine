@@ -510,6 +510,7 @@ import {
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
@@ -9175,17 +9176,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ? hasPendingEdits
       : genericShowInlineSubmit;
     const showTopInlineSubmit = showInlineSubmit && !isSingleQuestionView;
-    const showBottomInlineSubmit = showInlineSubmit;
-    const useTagModal = !this.props.singleQuestionMode && !this.props.isStandalone;
-    const activeTagModalTag = useTagModal
-      ? String(this.state.activeTagModalTag || '').trim()
-      : '';
-    const surveyPageClassName = [
-      isSingleQuestionView ? styles.singleQuestionPage : '',
-      isSingleQuestionView && viewingAnswers ? styles.singleQuestionReadPage : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const topSectionClassName = isSingleQuestionView ? styles.singleQuestionTopBar : undefined;
-    const responseViewClassName = isSingleQuestionView ? styles.singleQuestionResponseView : undefined;
+    const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: this.state.activeTagModalTag,
+      isSingleQuestionView,
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      styleMap: styles,
+      viewingAnswers,
+    });
+    const { activeTagModalTag, responseViewClassName, surveyPageClassName, topSectionClassName, useTagModal } = layoutDisplayState;
     const hasRenderedEditableQuestions =
       canEditQuestions &&
       questionPoolReady &&
@@ -9271,7 +9270,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               {/* Locked/decrypt banner is hidden only in embedded full mode */}
               {!hideEmbeddedDebugUi && canEditQuestions && questionPoolReady && currentSurveyResponseState && lockedQuestionsBanner}
               {renderedEditableQuestions}
-              {showBottomInlineSubmit && submitResponseButton}
+              {showInlineSubmit && submitResponseButton}
               {canEditQuestions && !this.props.singleQuestionMode && (
                   <JsonIconButton
                     label="Back to top"
