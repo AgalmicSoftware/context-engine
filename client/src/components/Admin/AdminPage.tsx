@@ -106,6 +106,19 @@ import {
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
 import {
+  buildAdminArweaveBalanceResource,
+  buildAdminArweaveEmptyResource,
+  buildAdminArweaveErrorResource,
+  buildAdminArweaveInvalidResource,
+  buildAdminArweaveLoadingResource,
+  buildAdminFaucetBalanceResource,
+  buildAdminFaucetEmptyResource,
+  buildAdminFaucetErrorResource,
+  buildAdminFaucetInvalidResource,
+  buildAdminFaucetLoadingResource,
+  buildAdminFaucetRpcUnavailableResource,
+} from './adminPageResourceDisplayHelpers';
+import {
   ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
   applyAdminMetadataDraft,
@@ -228,18 +241,8 @@ const AdminPage = ({
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
   const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
-  const [arweaveResource, setArweaveResource] = useState<any>({
-    address: '',
-    display: 'No JWK entered',
-    meta: 'Enter a JWK above to read the public wallet balance.',
-    loading: false,
-  });
-  const [faucetResource, setFaucetResource] = useState<any>({
-    address: '',
-    display: 'No faucet key entered',
-    meta: 'Enter a faucet private key above to read the wallet balance.',
-    loading: false,
-  });
+  const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
+  const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
   const [litResource, setLitResource] = useState<any>({
     address: '',
     display: 'Lit Chipotle not configured',
@@ -847,12 +850,7 @@ const AdminPage = ({
     arweaveResourceRequestRef.current = requestId;
     const jwk = toStr(secrets.arweaveJwk).trim();
     if (!jwk) {
-      setArweaveResource({
-        address: '',
-        display: 'No JWK entered',
-        meta: 'Enter a JWK above to read the public wallet balance.',
-        loading: false,
-      });
+      setArweaveResource(buildAdminArweaveEmptyResource());
       return;
     }
 
@@ -861,45 +859,29 @@ const AdminPage = ({
       parsedJwk = JSON.parse(jwk);
     } catch (_) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource({
-        address: '',
-        display: 'Invalid JWK',
-        meta: 'The wallet JSON could not be parsed.',
-        loading: false,
-      });
+      setArweaveResource(buildAdminArweaveInvalidResource());
       return;
     }
 
-    setArweaveResource({
-      address: '',
-      display: 'Loading...',
-      meta: 'Resolving wallet address and balance…',
-      loading: true,
-    });
+    setArweaveResource(buildAdminArweaveLoadingResource());
 
     let address = '';
     try {
       const arweaveBalance = await arweaveScripts.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource({
+      setArweaveResource(buildAdminArweaveBalanceResource({
         address,
-        display: `${arweaveScripts.formatWinstonToAr(arweaveBalance.winston, 6)} AR`,
-        meta: shortAddress(address),
-        loading: false,
-      });
+        winston: arweaveBalance.winston,
+        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
+        shortAddress,
+      }));
     } catch (err) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      const message = address ? 'Unable to load balance' : 'Invalid JWK';
-      const meta = address
-        ? shortAddress(address)
-        : 'The wallet JSON is missing required Arweave key fields.';
-      setArweaveResource({
+      setArweaveResource(buildAdminArweaveErrorResource({
         address,
-        display: message,
-        meta,
-        loading: false,
-      });
+        shortAddress,
+      }));
     }
   }, [secrets.arweaveJwk]);
 
@@ -908,12 +890,7 @@ const AdminPage = ({
     faucetResourceRequestRef.current = requestId;
     const faucetPrivateKey = toStr(secrets.faucetPrivateKey).trim();
     if (!faucetPrivateKey) {
-      setFaucetResource({
-        address: '',
-        display: 'No faucet key entered',
-        meta: 'Enter a faucet private key above to read the wallet balance.',
-        loading: false,
-      });
+      setFaucetResource(buildAdminFaucetEmptyResource());
       return;
     }
 
@@ -922,33 +899,25 @@ const AdminPage = ({
       address = new ethers.Wallet(faucetPrivateKey).address;
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
-        address: '',
-        display: 'Invalid key',
-        meta: 'The private key could not be parsed.',
-        loading: false,
-      });
+      setFaucetResource(buildAdminFaucetInvalidResource());
       return;
     }
 
     const sessionChainLabel = relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
     if (!sessionReadRpc.rpcUrl || !sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetRpcUnavailableResource({
         address,
-        display: 'RPC unavailable',
-        meta: shortAddress(address),
-        loading: false,
-      });
+        shortAddress,
+      }));
       return;
     }
 
-    setFaucetResource({
+    setFaucetResource(buildAdminFaucetLoadingResource({
       address,
-      display: 'Loading...',
-      meta: sessionChainLabel ? `Reading ${sessionChainLabel}` : shortAddress(address),
-      loading: true,
-    });
+      sessionChainLabel,
+      shortAddress,
+    }));
 
     try {
       const readProvider = new ethers.providers.JsonRpcProvider(sessionReadRpc.rpcUrl, {
@@ -957,23 +926,19 @@ const AdminPage = ({
       });
       const balanceWei = await readProvider.getBalance(address);
       if (requestId !== faucetResourceRequestRef.current) return;
-      const meta = sessionChainLabel
-        ? `${shortAddress(address)} • ${sessionChainLabel}`
-        : shortAddress(address);
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetBalanceResource({
         address,
-        display: `${Number(ethers.utils.formatEther(balanceWei)).toFixed(4)} ETH`,
-        meta,
-        loading: false,
-      });
+        balanceWei,
+        sessionChainLabel,
+        formatEther: ethers.utils.formatEther,
+        shortAddress,
+      }));
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource({
+      setFaucetResource(buildAdminFaucetErrorResource({
         address,
-        display: 'Unable to load balance',
-        meta: shortAddress(address),
-        loading: false,
-      });
+        shortAddress,
+      }));
     }
   }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId, sessionReadRpc.rpcUrl]);
 
