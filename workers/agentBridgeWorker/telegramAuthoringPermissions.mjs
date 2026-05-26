@@ -63,8 +63,25 @@ export function evaluateTelegramQuestionAuthoringPermission({
     session.telegramAuthoringGroupChatIds
   );
   const defaultGroupChatId = safeString(session.defaultGroupChatId || env.AGENT_BRIDGE_DEFAULT_GROUP_CHAT_ID);
+  const privateSessionMatches = isPrivate && privateBinding?.sessionSlug && (
+    !sessionSlug || lower(privateBinding.sessionSlug) === sessionSlug
+  );
+  const telegramOnlyPrivateParticipant = isPrivate &&
+    session.telegramOnly === true &&
+    privateSessionMatches &&
+    !configuredGroups.size &&
+    !defaultGroupChatId;
 
   if (!effectiveGroupChatId) {
+    if (telegramOnlyPrivateParticipant) {
+      return {
+        ok: true,
+        mode,
+        groupChatId: '',
+        privateBound: true,
+        reason: 'telegram_only_private_participant_allowed',
+      };
+    }
     return {
       ok: false,
       mode,

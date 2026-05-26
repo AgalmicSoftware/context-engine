@@ -45,11 +45,25 @@ and results API only. Do not add client-side CE changes for
 `/session/<telegram-only-slug>` yet. The normal CE client should continue to
 show the `Telegram-only session` notice described in the parity PRD.
 
-The Mini App may also offer a local `Demo data` toggle. That toggle should
-populate aggregate/group result panels and rendered images with synthetic
-records only, so operators can inspect the Telegram chat image format before a
-session has enough live responses. Demo data must be marked as demo in API
-responses and must not be exported as live response data.
+The Mini App may also offer a local `Demo data` toggle in the Results view and
+settings. That toggle should populate aggregate/group result panels and rendered
+images with synthetic records only, so operators can inspect the Telegram chat
+image format before a session has enough live responses. Demo data must be
+marked as demo in API responses and must not be exported as live response data.
+It must not reuse the live session's real question prompts or response records;
+real results are always the questions and submitted responses actually stored
+for the selected session.
+
+The Mini App results surface should stay compact in Telegram WebViews: exposure
+level labels are policy metadata, not visible pills. The results panel itself
+should be collapsible and start open when a participant opens it. Aggregate
+sections should be collapsible, start collapsed, and use response-distribution
+bars instead of duplicating numeric consensus/difference labels. Each aggregate
+section should page through additional rows with a `More` control until no more
+questions are available. Live result filters should also be collapsible and
+auto-apply on change so filtered aggregate views do not require a separate
+submit step. Rendered PNG/JPEG result images are reserved for Telegram bot
+messages; the Mini App should render inline bars and charts instead.
 
 ## Policy Shape
 
@@ -74,9 +88,12 @@ Defaults:
 - `minGroupSize`: `2`
 
 Admins can enable level 4 by setting `resultsExposure.anonymizedGroupsEnabled`
-to `true` for the session. If level 4 is disabled, the Mini App should show
-that anonymized groups require admin enablement and should reject group AI
-analysis requests.
+to `true` for the session. The Telegram bot also supports a temporary
+Cloudflare KV override from the private `Admin Actions` view for configured
+export admins. That view can toggle published questions, aggregate results,
+and anonymized groups for the selected session without exposing raw exports to
+participants. If level 4 is disabled, the Mini App should show that anonymized
+groups require admin enablement and should reject group AI analysis requests.
 
 ## Snapshot Shape
 
@@ -112,6 +129,14 @@ that can be reused by Agent Village:
     "consensus": [],
     "divisive": []
   },
+  "filters": {
+    "enabled": true,
+    "applied": false,
+    "matchedParticipants": null,
+    "suppressed": false,
+    "selections": {},
+    "details": {}
+  },
   "anonymizedGroups": {
     "enabled": false,
     "groups": []
@@ -137,8 +162,21 @@ and group summaries should be omitted unless admin-published.
   session is small.
 - Lightweight Telegram-only group memberships may be used as additional
   aggregate segmentation context after the user explicitly saves them in the
-  Mini App. They are Cloudflare-managed demo metadata, not on-chain SBT claims,
-  until the parity PRD defines a durable resource-gating model.
+  Mini App or updates them through the private bot. They are Cloudflare-managed
+  demo metadata, not on-chain SBT claims, until the parity PRD defines a durable
+  resource-gating model. Optional country details should be used only for
+  aggregate segmentation and must not be exposed as raw participant metadata in
+  levels 1-4.
+- Mini App live result filters may segment level 3 aggregate results by saved
+  lightweight group selections and country details. Filters apply only to real
+  live results, not demo data, and must suppress filtered slices below
+  `minGroupSize`.
+- Mini App group results should render an inline participant-group chart in the
+  Groups section, with a lightweight cluster-count control for exploring the
+  group split. Group analysis buttons should sit directly below that chart and
+  scroll the participant to the analysis output after a group is selected. Group
+  analysis remains governed by level 4 exposure rules and the same minimum
+  group size threshold.
 
 ## Agent Village Compatibility
 

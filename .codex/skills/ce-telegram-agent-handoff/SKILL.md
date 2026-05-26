@@ -24,7 +24,7 @@ Goal: let the user become a CE participant by answering one CE question in a Tel
 2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session.
 3. Ask the user to answer any visible CE bot question by tapping a CE inline response button.
 4. After the tap, CE can bind `telegramUserId` to the group/session, derive or recover the CE-managed Telegram EVM account, and mark the user as an approved participant for worker calls.
-5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`.
+5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
 
 If the user is only in a one-on-one OpenClaw Telegram DM, send them a CE deep link or group link first. CE-owned inline response buttons cannot appear inside a normal private DM with another bot unless CE sends the message in a CE-accessible chat.
 
@@ -164,7 +164,9 @@ POST /telegram/agent/api/groups/propose
 ```
 
 The response includes `requiresUserApproval: true`. Direct the user to the Mini
-App Groups panel to review and save memberships.
+App Groups panel or the private bot `/groups` command to review memberships.
+Mini App country relationship choices can include country details for `live in`
+and `citizen of`; do not infer or submit those details without user approval.
 
 ## Child Sessions
 

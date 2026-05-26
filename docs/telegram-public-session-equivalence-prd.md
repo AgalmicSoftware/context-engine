@@ -91,11 +91,12 @@ surface-specific paths.
   same access and sufficiency rules.
 - Temporary Telegram authoring exception: question authoring and agent handoff
   permissions default to Telegram-native group/session binding. A user or agent
-  may add/pose questions and save preference drafts only when the Telegram
-  account is acting from a joined group or from a private binding that was
-  created from that group. This is intentionally narrower than full CE/SBT
-  resource parity and must be replaced or standardized before public operator
-  rollout.
+  may add/pose questions and save preference drafts when the Telegram account is
+  acting from a joined group, from a private binding created by a joined group,
+  or, for `telegram_only` sessions, from a private Telegram participant binding
+  created by joining that session. This is intentionally narrower than full
+  CE/SBT resource parity and must be replaced or standardized before public
+  operator rollout.
 - Telegram results group descriptions must consider both structured answer
   patterns and qualitative evidence, including additional comments and freeform
   responses, when available. Qualitative text should inform neutral summaries
@@ -106,16 +107,44 @@ surface-specific paths.
   group views require explicit admin enablement. The normal CE client must not
   consume this Telegram-only result surface until a public/anonymized client
   route is designed and reviewed.
+- Telegram-only sessions may later expose an admin-enabled public-facing
+  Telegram session viewer. This must be an explicit per-session setting, such
+  as `publicTelegramViewerEnabled`, controlled by an authorized session admin.
+  When disabled, public viewer endpoints should return a non-public state even
+  if the session is answerable inside Telegram.
+- Public-facing Telegram viewer data must use the redacted snapshot/exposure
+  contract from the Telegram Results Exposure Levels PRD. The worker should
+  allow browser CORS only for approved CE-owned origins, such as the production
+  CE domain and approved staging domains. CORS must not be the only protection:
+  the endpoint must also enforce the session's public-viewer setting, exposure
+  level, sufficiency thresholds, and redaction policy so non-browser or
+  unauthorized callers cannot fetch private Telegram-only records.
+- Mini App result filters for Telegram-only sessions may segment real level 3
+  aggregate results by Cloudflare-managed lightweight group selections and
+  optional country details. These filters intentionally do not apply to local
+  demo data, and they must not expose raw membership metadata or participant
+  identities.
 - Telegram-only sessions may use lightweight Cloudflare-managed groups for the
   demo path. These are intentionally not on-chain SBTs. Categories such as age
   bucket, country relationship, AI tribe, and contribution role can be shown in
-  the Mini App, and users must explicitly save memberships. Agents may propose
-  new group categories or prompt a user to join a group, but the worker records
-  those prompts as `requiresUserApproval` rather than auto-joining anyone.
+  the Mini App and private bot. Users must explicitly save Mini App
+  memberships, while private bot group option taps save immediately. Country
+  relationship selections may include user-entered country details. Agents may
+  propose new group categories or prompt a user to join a group, but the worker
+  records those prompts as `requiresUserApproval` rather than auto-joining
+  anyone.
 - Agents may create worker-local child-session records for Telegram-only
   workflows. These records are `worker_local_until_session_registry_parity` and
   should not be treated as normal CE registry sessions until the parity model is
   standardized.
+- Telegram-only Mini App admin controls are visible only when the Telegram
+  managed wallet is already authorized for response export/session result
+  administration. Non-admin participants should not see the admin menu entry.
+- Telegram-only Mini App documents are a temporary Cloudflare-managed surface
+  for session context. The Mini App may list existing non-secret session
+  document summaries and accept lightweight uploads for Telegram-only sessions,
+  but normal CE client document parity and durable file storage remain separate
+  follow-up work.
 
 ## Mode Taxonomy
 
@@ -125,7 +154,7 @@ separation:
 | Surface mode | Storage/execution mode | Current priority | Expected behavior |
 | --- | --- | --- | --- |
 | `telegram_only` | Cloudflare-native questions and responses | Urgent Edge City demo path | Bot and Mini App list/answer sessions without chain question discovery; normal CE client shows `Telegram-only session` notice. |
-| `telegram_only` + lightweight groups | Cloudflare-native questions, responses, and group memberships | Urgent Edge City demo path | Mini App manages optional group categories/memberships without on-chain SBTs; agents may propose groups for user approval. |
+| `telegram_only` + lightweight groups | Cloudflare-native questions, responses, and group memberships | Urgent Edge City demo path | Mini App and private bot manage optional group categories/memberships without on-chain SBTs; agents may propose groups for user approval. |
 | `telegram_only` | Normal contracts plus Arweave payloads | Compatibility / fallback | Telegram can read public chain-backed questions, but this is not the preferred demo path because indexing and payload availability add latency. |
 | `telegram_only` | Contracts plus Cloudflare payload refs | Transitional hybrid | On-chain records may point at Cloudflare payloads, but Telegram still treats the session as channel-specific until client parity is complete. |
 | Normal CE session accessible by Telegram | Normal CE contracts/storage | Planned parity path | Client and Telegram both render public prompts. SBT/resource-gated access still needs standardized Telegram enforcement before this is broadly supported. |
@@ -148,8 +177,12 @@ Telegram-only path blur into normal public CE sessions.
 | Payload missing/indexing | Shows `Unavailable` with retry/refresh affordance | Shows unavailable/retry state | Shows unavailable/retry state |
 | Temporary Telegram results | Hidden until fuller client parity | Joined Telegram-enabled sessions can view result cards | Joined Telegram-enabled sessions can view result cards when exposed |
 | Telegram-only result exposure levels | No client-side implementation yet | Level 3 aggregate results by default; level 4 group views only when admin-enabled | Same participant exposure contract as bot/Mini App results API |
-| Temporary Telegram question authoring and preference drafts | Hidden until permission parity is standardized | Telegram-native joined group/bound user can add/pose questions and authorize agent drafts | Draft review only; submission still requires user action |
-| Temporary Telegram lightweight groups | Hidden until parity is standardized | Cloudflare-only group memberships for Telegram-only sessions | User-approved Mini App groups, not on-chain SBT claims |
+| Admin-enabled public Telegram viewer | Optional redacted viewer only when admin enables it and CE origin is allowed | No change to private bot participation | No change to participant Mini App access |
+| Telegram admin actions | Hidden until fuller client parity | Configured export admins see a private `Admin Actions` menu for exports and result exposure toggles | Result toggles are reflected through the same session exposure policy |
+| Telegram-only documents | Hidden until fuller client parity | Not yet exposed in bot commands | Mini App can list session document summaries and accept lightweight Telegram-only uploads |
+| Temporary Telegram question authoring and preference drafts | Hidden until permission parity is standardized | Telegram-native joined group/bound user can add/pose questions and authorize agent drafts | Mini App can add Telegram-only questions; draft submission still requires user action |
+| Temporary Telegram lightweight groups | Hidden until parity is standardized | Private bot can manage Cloudflare-only group memberships for Telegram-only sessions | User-approved Mini App groups, including optional country details, not on-chain SBT claims |
+| Telegram-only aggregate result filters | Hidden until parity is standardized | Not yet exposed in bot commands | Mini App can filter real aggregate results by saved lightweight group selections above threshold |
 | `telegram_only` Cloudflare-native session | Shows `Telegram-only session` notice | Listed and answered in Telegram without chain question discovery | Listed and answered in Mini App without chain question discovery |
 
 ## Requirements
@@ -165,6 +198,13 @@ Telegram-only path blur into normal public CE sessions.
   payload-unavailable state separately from encryption state.
 - Mini App state must accept no-session launches and show a session picker with
   Telegram-only sessions.
+- Public-facing Telegram-only viewer endpoints must require an admin-enabled
+  public viewer flag before returning any viewer payload, and must return only
+  redacted snapshot data compatible with the exposure-level PRD.
+- Public-facing Telegram-only viewer endpoints must use an explicit CORS
+  allowlist for CE-owned origins. Requests from unapproved origins should not
+  receive permissive CORS headers, and direct API calls must still be rejected
+  unless the session's public viewer policy allows the requested exposure.
 - Counts must use the same definitions across surfaces: total discovered,
   answerable, locked, unavailable.
 - Regression tests must cover at least one public Arweave session, one

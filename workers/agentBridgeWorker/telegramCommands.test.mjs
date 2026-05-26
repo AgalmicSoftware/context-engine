@@ -5,6 +5,7 @@ import {
   buildTelegramCommandResponse,
   dispatchTelegramCommandResponse,
   handleTelegramWebhookUpdate,
+  loadSessionPolicy,
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -401,7 +402,7 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   const callbackButtons = buttons.filter((button) => button.callback_data);
   assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
   assert.equal(startButton.url.includes('alpha'), false);
-  assert.equal(callbackButtons.length, 3);
+  assert.equal(callbackButtons.length, 4);
   for (const button of callbackButtons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
     assert.equal(button.callback_data.includes('alpha'), false);
@@ -1456,7 +1457,7 @@ test('/export_all denies non-allowlisted Telegram managed wallets', async () => 
   assert.match(result.response.text, /response_export_address_not_allowed/);
 });
 
-test('/start and /me show export controls only to the configured export admin', async () => {
+test('/start and /me show admin actions only to the configured export admin', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
   const allowedEnv = baseEnv({
@@ -1493,14 +1494,81 @@ test('/start and /me show export controls only to the configured export admin', 
     env: deniedEnv,
     now,
   });
+  const adminButton = flattenButtons(allowedStart.response.replyMarkup).find((button) => button.text === 'Admin Actions');
+  const adminView = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7101,
+      callback_query: {
+        id: 'callback-admin-actions',
+        data: adminButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env: allowedEnv,
+    now,
+  });
+  const resultsSettingsButton = flattenButtons(adminView.response.replyMarkup)
+    .find((button) => button.text === 'Results Settings');
+  const settingsView = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7102,
+      callback_query: {
+        id: 'callback-results-settings',
+        data: resultsSettingsButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env: allowedEnv,
+    now,
+  });
+  const enableGroupsButton = flattenButtons(settingsView.response.replyMarkup)
+    .find((button) => button.text === 'Enable Anonymized Groups');
+  const toggled = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7103,
+      callback_query: {
+        id: 'callback-toggle-results',
+        data: enableGroupsButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env: allowedEnv,
+    now,
+  });
+  const policyAfterToggle = await loadSessionPolicy(allowedEnv);
+  const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
-  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'export_all', 'export_access']);
-  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), true);
-  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), true);
+  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Admin Actions']);
+  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'), true);
+  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), false);
+  assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), false);
   assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App']);
+  assert.equal(adminView.screen, 'admin_actions');
+  assert.deepEqual(flattenButtons(adminView.response.replyMarkup).map((button) => button.text), [
+    'Export Responses',
+    'Export Access',
+    'Results Settings',
+  ]);
+  assert.equal(settingsView.screen, 'results_settings');
+  assert.match(settingsView.response.text, /Anonymized groups: off/);
+  assert.equal(toggled.screen, 'results_settings');
+  assert.match(toggled.response.text, /Anonymized groups: on/);
+  assert.equal(alphaAfterToggle.resultsExposure.anonymizedGroupsEnabled, true);
 });
 
-test('/start export_all targets the latest submitted session before the registry default', async () => {
+test('/start admin actions target the latest submitted session before the registry default', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const kv = new MemoryKv();
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
@@ -1545,7 +1613,24 @@ test('/start export_all targets the latest submitted session before the registry
     env,
     now,
   });
-  const exportButton = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'export_all');
+  const adminButton = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Admin Actions');
+  const adminView = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7104,
+      callback_query: {
+        id: 'callback-admin-latest-session',
+        data: adminButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 72,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const exportButton = flattenButtons(adminView.response.replyMarkup).find((button) => button.text === 'Export Responses');
   const actionRecord = JSON.parse(await kv.get(`telegram:action:${exportButton.callback_data}`));
 
   assert.equal(actionRecord.serverContextRef.sessionSlug, 'telegram-demo-2');
@@ -1642,7 +1727,7 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'export_all']);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App']);
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
   assert.equal(guestGrantAttempt.screen, 'response_export_access_denied');
@@ -2502,6 +2587,128 @@ test('/add_question requires a joined Telegram group and adds questions to the s
   assert.match(added.response.text, /Question added to Alpha Session/);
   assert.equal(flattenButtons(added.response.replyMarkup).some((button) => button.text === 'Pose Question'), true);
   assert.match(questions.response.text, /Should we fund this week\?/);
+});
+
+test('/add_question exposes type chooser, supports multichoice syntax, and allows private Telegram-only participants', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+  });
+  const chooser = await buildTelegramCommandResponse({
+    update: privateMessage('/add_question'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const chooserButtons = flattenButtons(chooser.response.replyMarkup);
+
+  assert.equal(chooser.ok, true);
+  assert.match(chooser.response.text, /Type: Freeform/);
+  assert.equal(chooserButtons.some((button) => button.text === 'Agree'), true);
+  assert.equal(chooserButtons.some((button) => button.text === 'Rating'), true);
+  assert.equal(chooserButtons.some((button) => button.text === 'Multi-choice'), true);
+  assert.equal(chooserButtons.some((button) => button.text === '✓ Freeform'), true);
+
+  const multiButton = chooserButtons.find((button) => button.text === 'Multi-choice');
+  const typed = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7003,
+      callback_query: {
+        id: 'callback-add-multi',
+        data: multiButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 70,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  assert.match(typed.response.text, /Type: Multi-choice/);
+  assert.match(typed.response.text, /Pizza \| Salad \| Tacos/);
+
+  await buildTelegramCommandResponse({
+    update: privateMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const added = await buildTelegramCommandResponse({
+    update: privateMessage('/add_question multichoice: What should lunch be? options: Pizza, Salad, Tacos'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: privateMessage('/questions alpha'),
+    env,
+    now: '2026-05-08T12:00:04.000Z',
+  });
+
+  assert.equal(added.ok, true);
+  assert.match(added.response.text, /Question added to Alpha Session/);
+  assert.match(questions.response.text, /What should lunch be\?/);
+});
+
+test('/groups manages lightweight Telegram-only group selections from the private bot', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+  });
+  await buildTelegramCommandResponse({
+    update: privateMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const groups = await buildTelegramCommandResponse({
+    update: privateMessage('/groups'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const buttons = flattenButtons(groups.response.replyMarkup);
+  const investor = buttons.find((button) => button.text === 'Investor');
+
+  assert.equal(groups.ok, true);
+  assert.equal(groups.screen, 'telegram_groups');
+  assert.match(groups.response.text, /Groups for Alpha Session/);
+  assert.ok(investor);
+
+  const selected = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7004,
+      callback_query: {
+        id: 'callback-group-investor',
+        data: investor.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(selected.ok, true);
+  assert.equal(selected.screen, 'telegram_groups');
+  assert.match(selected.response.text, /Role: Investor/);
+  assert.equal(flattenButtons(selected.response.replyMarkup).some((button) => button.text === '✓ Investor'), true);
 });
 
 test('/q natural language persists as a proposed question after a group joins', async () => {

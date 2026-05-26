@@ -35,7 +35,7 @@ function sanitizeSessionSlug(value = '') {
 
 function normalizeQuestionType(value = '') {
   const type = lower(value).replace(/_/g, '-');
-  if (type === 'agree-disagree' || type === 'agree_unsure_disagree') return 'binary';
+  if (type === 'agree-disagree' || type === 'agree-unsure-disagree') return 'binary';
   return SUPPORTED_QUESTION_TYPES.has(type) ? type : 'freeform';
 }
 
