@@ -7,7 +7,8 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,326 lines**
+  - `SurveyQuestions.tsx`: **9,397 lines**
+  - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
   - `surveyQuestionsJsonDerivation.ts`: **119 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
@@ -19,6 +20,7 @@ SurveyTool.tsx  [top-level wrapper]
   -> SurveySelector.tsx  [survey/questions selector + filter + results]
      -> QuestionsDashboard.tsx  [question list in "questions" mode]
      -> SurveyQuestions.tsx  [shared full response runtime]
+        -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
 ```
 
@@ -30,6 +32,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, and submission pipeline |
+| `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
 
 ## Boundary Map
