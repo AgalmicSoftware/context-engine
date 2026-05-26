@@ -33,6 +33,7 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
+  buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
@@ -134,6 +135,60 @@ describe('surveyQuestionsTypes', () => {
     })).toEqual({ width: '92%' });
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, true)).toBe('icon single-submit-icon');
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, false)).toBe('icon');
+  });
+
+  it('builds SurveyQuestions full loading progress state for scan progress', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: 'session-a',
+      questionScanProgress: {
+        slug: 'session-a',
+        totalBlocks: 100,
+        scannedBlocks: 25,
+      },
+    });
+
+    expect(progressState.hasFullLoadingProgress).toBe(true);
+    expect(progressState.isHydrating).toBe(false);
+    expect(progressState.metaLeftText).toBe('75 blocks left');
+    expect(progressState.metaRightText).toBe('25 / 100');
+    expect(progressState.fillStyle).toEqual({ width: '25%' });
+  });
+
+  it('builds SurveyQuestions hydrate progress labels and clamps completed counts', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: '',
+      questionScanProgress: {
+        slug: 'GENERAL',
+        phase: 'hydrate',
+        discoveredQuestions: 8,
+        hydratedQuestions: 12,
+      },
+    });
+
+    expect(progressState.hasFullLoadingProgress).toBe(true);
+    expect(progressState.isHydrating).toBe(true);
+    expect(progressState.hydrateDiscovered).toBe(8);
+    expect(progressState.hydrateDone).toBe(12);
+    expect(progressState.metaLeftText).toBe('0 items left');
+    expect(progressState.metaRightText).toBe('8 / 8');
+    expect(progressState.fillStyle).toEqual({ width: '100%' });
+  });
+
+  it('ignores SurveyQuestions full loading progress for unrelated slugs', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: 'session-a',
+      questionScanProgress: {
+        slug: 'session-b',
+        totalBlocks: 100,
+        scannedBlocks: 25,
+      },
+    });
+
+    expect(progressState.questionScanProgress).toBeNull();
+    expect(progressState.hasFullLoadingProgress).toBe(false);
+    expect(progressState.metaLeftText).toBe('0 blocks left');
+    expect(progressState.metaRightText).toBe('0 / 0');
+    expect(progressState.fillStyle).toEqual({ width: '0%' });
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {

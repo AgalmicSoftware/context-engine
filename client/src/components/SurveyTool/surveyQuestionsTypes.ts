@@ -1,5 +1,10 @@
 import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes.js';
+import {
+  buildQuestionScanProgressDisplay,
+  doesQuestionProgressMatchSlug,
+  normalizeQuestionProgressSlug,
+} from './surveyToolViewState.js';
 
 export type SurveyQuestionsProps = UnknownRecord & {
   displayAnswerMode?: boolean;
@@ -19,6 +24,30 @@ export type SurveyQuestionPoolLoadState = {
   pendingIds: string[];
   pendingCount: number;
   isIncomplete: boolean;
+};
+
+type SurveyQuestionsQuestionScanProgress = {
+  slug?: unknown;
+  phase?: unknown;
+  discoveredQuestions?: unknown;
+  hydratedQuestions?: unknown;
+  totalBlocks?: unknown;
+  requestedTotalBlocks?: unknown;
+  wasCapped?: boolean;
+  scannedBlocks?: unknown;
+  remainingBlocks?: unknown;
+} | null;
+
+export type SurveyQuestionsFullLoadingProgressState = {
+  questionScanProgress: SurveyQuestionsQuestionScanProgress;
+  scanProgressDisplay: ReturnType<typeof buildQuestionScanProgressDisplay>;
+  hydrateDiscovered: number;
+  hydrateDone: number;
+  isHydrating: boolean;
+  hasFullLoadingProgress: boolean;
+  metaLeftText: string;
+  metaRightText: string;
+  fillStyle: { width: string };
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {
@@ -592,6 +621,47 @@ export const buildSurveyQuestionsFullLoadingProgressFillStyle = ({
       : 0)
     : scanPercent}%`,
 });
+
+export const buildSurveyQuestionsFullLoadingProgressState = ({
+  questionScanProgress = null,
+  progressSlug = '',
+}: {
+  questionScanProgress?: SurveyQuestionsQuestionScanProgress;
+  progressSlug?: unknown;
+} = {}): SurveyQuestionsFullLoadingProgressState => {
+  const normalizedProgressSlug = normalizeQuestionProgressSlug(String(progressSlug || ''));
+  const matchedProgress = questionScanProgress &&
+    doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), normalizedProgressSlug)
+    ? questionScanProgress
+    : null;
+  const scanProgressDisplay = buildQuestionScanProgressDisplay(matchedProgress);
+  const hydrateDiscovered = Math.max(0, Number(matchedProgress?.discoveredQuestions || 0));
+  const hydrateDone = Math.max(0, Number(matchedProgress?.hydratedQuestions || 0));
+  const isHydrating = matchedProgress?.phase === 'hydrate';
+  const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
+  const hydrateDoneClamped = Math.min(hydrateDone, hydrateDiscovered);
+
+  return {
+    questionScanProgress: matchedProgress,
+    scanProgressDisplay,
+    hydrateDiscovered,
+    hydrateDone,
+    isHydrating,
+    hasFullLoadingProgress,
+    metaLeftText: isHydrating
+      ? `${Math.max(0, hydrateDiscovered - hydrateDoneClamped)} items left`
+      : scanProgressDisplay.metaLeftText,
+    metaRightText: isHydrating
+      ? `${hydrateDoneClamped} / ${hydrateDiscovered}`
+      : scanProgressDisplay.metaRightText,
+    fillStyle: buildSurveyQuestionsFullLoadingProgressFillStyle({
+      hydrateDiscovered,
+      hydrateDone,
+      isHydrating,
+      scanPercent: scanProgressDisplay.percentComplete,
+    }),
+  };
+};
 
 export const buildSurveyQuestionsSubmitAuxIconClassName = (
   styleMap: Record<string, string>,
