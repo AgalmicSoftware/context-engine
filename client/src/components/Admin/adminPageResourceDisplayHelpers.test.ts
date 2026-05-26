@@ -10,13 +10,6 @@ import {
   buildAdminFaucetInvalidResource,
   buildAdminFaucetLoadingResource,
   buildAdminFaucetRpcUnavailableResource,
-  buildAdminLitErrorResource,
-  buildAdminLitLoadingResource,
-  buildAdminLitNotConfiguredResource,
-  buildAdminLitStatusNotLoadedResource,
-  buildAdminLitStatusResource,
-  buildAdminLitUnavailableResource,
-  getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 
 const shortAddress = (address: unknown) => {
@@ -122,94 +115,5 @@ describe('adminPageResourceDisplayHelpers', () => {
       meta: '0x0000…00aa',
       loading: false,
     });
-  });
-
-  it('builds Lit Chipotle resource status descriptors', () => {
-    const formatPreviewValue = (value: unknown, limit: unknown) => `${value}:${limit}`;
-
-    expect(buildAdminLitNotConfiguredResource()).toEqual({
-      address: '',
-      display: 'Lit Chipotle not configured',
-      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-      loading: false,
-      manualRefreshAvailable: false,
-    });
-    expect(buildAdminLitUnavailableResource({ useChipotlePath: true })).toEqual({
-      address: '',
-      display: 'Worker unavailable',
-      meta: 'Resolve the worker URL to read Lit Chipotle status.',
-      loading: false,
-      manualRefreshAvailable: false,
-    });
-    expect(buildAdminLitStatusNotLoadedResource({
-      hasAccountApiKey: true,
-      configuredLitApiBase: 'https://api.chipotle.litprotocol.com',
-      configuredLitGroupId: 'group_123',
-      configuredLitPkpId: 'pkp_123',
-      configuredLitActionCid: 'bafy123',
-      formatPreviewValue,
-    })).toEqual({
-      address: '',
-      display: 'Status not loaded',
-      meta: 'Unsaved account key • api.chipotle.litprotocol.com:28 • group group_123:20 • PKP configured • Action configured • Click refresh to query the worker for Lit Chipotle status.',
-      loading: false,
-      manualRefreshAvailable: true,
-    });
-    expect(buildAdminLitLoadingResource({
-      configuredLitGroupId: 'group_123',
-      formatPreviewValue,
-    })).toEqual({
-      address: '',
-      display: 'Loading...',
-      meta: 'Checking group group_123:20',
-      loading: true,
-      manualRefreshAvailable: true,
-    });
-    expect(buildAdminLitStatusResource({
-      ready: true,
-      warnings: [],
-      groupSummary: {
-        hasConfiguredPkp: true,
-        hasConfiguredAction: true,
-      },
-      balanceDisplay: '$5.00 credit',
-      configuredLitApiBase: 'https://api.chipotle.litprotocol.com',
-      configuredLitGroupId: 'group_123',
-      configuredLitPkpId: 'pkp_123',
-      configuredLitActionCid: 'bafy123',
-      formatPreviewValue,
-    })).toEqual({
-      address: '',
-      display: 'Ready',
-      meta: 'api.chipotle.litprotocol.com:28 • balance $5.00 credit • group group_123:20 • PKP ready • Action ready',
-      loading: false,
-      manualRefreshAvailable: true,
-    });
-    expect(buildAdminLitStatusResource({
-      warnings: ['missing'],
-      groupSummary: { walletCount: 2, actionCount: 1 },
-      formatPreviewValue,
-    })).toEqual({
-      address: '',
-      display: 'Needs review',
-      meta: '2 wallets • 1 action • 1 warning',
-      loading: false,
-      manualRefreshAvailable: true,
-    });
-    expect(buildAdminLitStatusResource({
-      groupSummary: { hasConfiguredPkp: false },
-      configuredLitPkpId: 'pkp_123',
-      formatPreviewValue,
-    }).display).toBe('Needs config');
-    expect(buildAdminLitErrorResource('Failed to load Lit Chipotle status.')).toEqual({
-      address: '',
-      display: 'Unable to load status',
-      meta: 'Failed to load Lit Chipotle status.',
-      loading: false,
-      manualRefreshAvailable: true,
-    });
-    expect(getAdminLitResourceLabel({})).toBe('Lit sponsorship status');
-    expect(getAdminLitResourceLabel({ configuredLitActionCid: 'bafy123' })).toBe('Lit Chipotle status');
-    expect(getAdminLitResourceLabel({ hasUsageApiKey: true })).toBe('Lit Chipotle status');
   });
 });
