@@ -98,6 +98,11 @@ import {
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
+import {
+  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
+  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
+  formatLoginSettingsAiProviderLabel,
+} from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -215,18 +220,23 @@ const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
   }),
 ]);
 
-const deriveAiPresetKey = (settings: AiSettingsLike = {}) =>
-  deriveAiPreset({
-    mode: settings?.mode,
-    models: settings?.models,
-    modelProviders: settings?.modelProviders,
-  });
+const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
+  mode: settings?.mode,
+  models: settings?.models,
+  modelProviders: settings?.modelProviders,
+});
 
-const getAiPresetMeta = (presetKey: unknown = ''): AiPresetOption =>
-  AI_PRESET_OPTIONS.find((entry) => entry.key === presetKey) || AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1];
+const getAiPresetMeta = (presetKey: any = ''): any => (
+  AI_PRESET_OPTIONS.find((entry: any) => entry.key === presetKey) ||
+  AI_PRESET_OPTIONS[AI_PRESET_OPTIONS.length - 1]
+);
 
-const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
-  const hasModelShape = !!(settings?.models?.fast || settings?.models?.thinking || settings?.mode);
+const formatAiPresetBadgeLabel = (settings: any = {}) => {
+  const hasModelShape = !!(
+    settings?.models?.fast ||
+    settings?.models?.thinking ||
+    settings?.mode
+  );
   if (!hasModelShape) {
     return getAiPresetMeta('gpt-5').badgeLabel;
   }
@@ -2059,9 +2069,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const aiProvider = String(aiDisplay.mode || 'openai').toLowerCase();
     const localProvider = String(aiLocal.mode || 'openai').toLowerCase();
     const aiProviderLabel = formatLoginSettingsAiProviderLabel(aiProvider);
-    const aiPresetKey =
-      aiDisplay?.preset ||
-      (aiDisplay?.models?.fast || aiDisplay?.models?.thinking || aiDisplay?.mode
+    const aiPresetKey = aiDisplay?.preset || (
+      (
+        aiDisplay?.models?.fast ||
+        aiDisplay?.models?.thinking ||
+        aiDisplay?.mode
+      )
         ? deriveAiPresetKey(aiDisplay)
         : 'gpt-5');
     const aiPresetLabel = formatAiPresetBadgeLabel(aiDisplay);
