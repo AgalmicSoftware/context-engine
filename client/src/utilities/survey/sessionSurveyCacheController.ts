@@ -4,20 +4,16 @@ import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../
 import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
-  mergeSurveyResponseCacheSnapshot,
+  normalizeArweaveFailureMeta,
+  shouldStopPendingMetadataRetry,
+} from '../arweave/arweaveRetryHelpers.js';
+import { prepareSurveyMetadataCacheEntry } from '../../components/MainSite/metadataCacheEntryBuilders.js';
+import { resolveScopedMetadataSessionSlug } from '../../components/MainSite/metadataSessionBinding.js';
+import {
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,
+  type SurveyResponseItem,
 } from './sessionSurveyResponseHelpers.js';
-import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
-import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
-import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
-import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
-import {
-  hydrateSessionWorkerSurveyCache,
-  isWorkerMetadataHydrationInFlight,
-  resolveWorkerMetadataHydrationTarget,
-} from './sessionWorkerMetadataCacheRuntime';
-import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -183,9 +179,9 @@ export interface SessionSurveyCacheController {
 const mainSiteLog = createLogger('mainSite');
 const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
 
-class SurveyCachePersistenceError extends Error {}
-
-export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost): SessionSurveyCacheController => {
+export const createSessionSurveyCacheController = (
+  host: SessionSurveyCacheHost = {}
+): SessionSurveyCacheController => {
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
