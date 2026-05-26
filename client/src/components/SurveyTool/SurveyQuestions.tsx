@@ -508,6 +508,7 @@ import {
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
@@ -8968,28 +8969,22 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       (viewingAnswers && this.state.questionPool && Array.isArray(this.state.questionPool));
     const jsonPreview = canBuildJsonPreview ? (this.state.jsonPreview || {}) : null;
 
-    const notClickable = false;
-    const viewedAddressRaw = String(this.props.viewAddress || this.props.responderAddress || '').trim();
-    const viewedAddressLower = viewedAddressRaw.toLowerCase();
-    const shortenedViewAddress =
-      viewedAddressRaw
-        ? getShortenedAddress(
-            viewedAddressRaw,
-            notClickable
-          )
-        : '';
-    const isOwnResponse =
-      (this.props.viewAddress &&
-        this.props.account &&
-        this.props.viewAddress.toLowerCase() === this.props.account.toLowerCase()) ||
-      (this.props.responderAddress &&
-        this.props.account &&
-        this.props.responderAddress.toLowerCase() === this.props.account.toLowerCase()) ||
-      (!this.props.viewAddress && !this.props.responderAddress && this.props.account && this.state.userHasResponse);
-
-    const isSingleQuestionView =
-      this.props.singleQuestionMode ||
-      (this.props.isStandalone && Array.isArray(this.state.questionPool) && this.state.questionPool.length === 1);
+    const {
+      viewedAddressRaw,
+      viewedAddressLower,
+      shortenedViewAddress,
+      isOwnResponse,
+      isSingleQuestionView,
+    } = buildSurveyQuestionsRouteViewDisplayState({
+      account: this.props.account,
+      isStandalone: this.props.isStandalone,
+      questionPool: this.state.questionPool,
+      responderAddress: this.props.responderAddress,
+      shortenAddress: getShortenedAddress,
+      singleQuestionMode: this.props.singleQuestionMode,
+      userHasResponse: this.state.userHasResponse,
+      viewAddress: this.props.viewAddress,
+    });
 
     // Submit button label block (centralized)
     const _pendingStats = this.getPendingStatsSnapshot();
