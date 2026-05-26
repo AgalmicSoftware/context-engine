@@ -149,6 +149,12 @@ import {
   isSurveyResultsStateSynced,
   type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
+import {
+  SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
+  SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
+  getSurveyResultsExportTypeLabel as getExportTypeLabel,
+  type SurveyResultsExportOption,
+} from './surveyResultsExportDisplayHelpers.js';
 
 export {
   countQuestionModeResponses,
@@ -505,10 +511,6 @@ type SurveyResultsEncryptedFieldRecord = SurveyResultsRecord & {
   value?: unknown;
   valueEnvelope?: unknown;
 };
-type SurveyResultsExportOption = {
-  label: string;
-  value: string;
-};
 type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
@@ -525,35 +527,6 @@ const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
-const EXPORT_TYPES = Object.freeze({
-  CSV_QUESTIONS: 'csv-questions',
-  CSV_QUESTIONS_AND_RESPONSES: 'csv-questions-and-responses',
-  JSON_QUESTIONS: 'json-questions',
-  JSON_QUESTIONS_AND_RESPONSES: 'json-questions-and-responses',
-});
-const EXPORT_TYPE_LABELS: Record<string, string> = Object.freeze({
-  [EXPORT_TYPES.CSV_QUESTIONS]: 'CSV: Questions',
-  [EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES]: 'CSV: Questions + Responses',
-  [EXPORT_TYPES.JSON_QUESTIONS]: 'JSON: Questions',
-  [EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES]: 'JSON: Questions + Responses',
-});
-const EXPORT_OPTIONS: readonly SurveyResultsExportOption[] = Object.freeze([
-  { value: EXPORT_TYPES.CSV_QUESTIONS, label: EXPORT_TYPE_LABELS[EXPORT_TYPES.CSV_QUESTIONS] },
-  {
-    value: EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
-    label: EXPORT_TYPE_LABELS[EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES],
-  },
-  { value: EXPORT_TYPES.JSON_QUESTIONS, label: EXPORT_TYPE_LABELS[EXPORT_TYPES.JSON_QUESTIONS] },
-  {
-    value: EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES,
-    label: EXPORT_TYPE_LABELS[EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES],
-  },
-]);
-
-const getExportTypeLabel = (value: unknown = ''): string => (
-  EXPORT_TYPE_LABELS[String(value || '').trim()] || String(value || '').trim()
-);
-
 export const SURVEY_RESULTS_CLICKABLE_ICON_STYLE: React.CSSProperties = {
   cursor: 'pointer',
 };
