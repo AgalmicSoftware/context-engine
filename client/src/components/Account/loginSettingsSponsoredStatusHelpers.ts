@@ -1,20 +1,31 @@
-type SponsoredStatusEntry = Record<string, any> & {
+type SponsoredStatusEntry = Record<string, unknown> & {
   status?: string;
 };
 
+type SponsorSessionDisplayEntry = Record<string, unknown> & {
+  isActive?: boolean;
+  label?: string;
+};
+
+type SponsoredAccessRecord = Record<string, SponsoredStatusEntry | null | undefined>;
+type SponsoredKeysRecord = Record<string, unknown>;
+type SponsorSessionsRecord = Record<string, unknown> & {
+  byResource?: Record<string, readonly SponsorSessionDisplayEntry[]>;
+};
+
 type SponsorshipCardArgs = {
-  activeSession?: any;
+  activeSession?: unknown;
   key: string;
-  sponsoredAccess?: Record<string, any>;
-  sponsorSessions?: Record<string, any>;
+  sponsoredAccess?: SponsoredAccessRecord;
+  sponsorSessions?: SponsorSessionsRecord;
   title: string;
 };
 
 type ResourceSponsorHintArgs = {
   resourceKey?: string;
   resourceLabel?: string;
-  sponsoredKeys?: Record<string, any>;
-  sponsorSessions?: Record<string, any>;
+  sponsoredKeys?: SponsoredKeysRecord;
+  sponsorSessions?: SponsorSessionsRecord;
 };
 
 const SETTINGS_SPONSORSHIP_RESOURCES = Object.freeze([
@@ -68,8 +79,8 @@ export const buildLoginSettingsSponsorshipCard = ({
   title,
 }: SponsorshipCardArgs) => {
   const sessions = sponsorSessions.byResource?.[key] || [];
-  const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
-  const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
+  const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
+  const otherSponsorSessions = sessions.filter((entry) => !entry?.isActive);
   const access = sponsoredAccess[key] || null;
   return {
     key,
@@ -88,9 +99,9 @@ export const buildLoginSettingsSponsorshipCards = ({
   sponsoredAccess = {},
   sponsorSessions = {},
 }: {
-  activeSession?: any;
-  sponsoredAccess?: Record<string, any>;
-  sponsorSessions?: Record<string, any>;
+  activeSession?: unknown;
+  sponsoredAccess?: SponsoredAccessRecord;
+  sponsorSessions?: SponsorSessionsRecord;
 } = {}) => SETTINGS_SPONSORSHIP_RESOURCES.map(({ key, title }) => buildLoginSettingsSponsorshipCard({
   activeSession,
   key,
@@ -107,17 +118,17 @@ export const formatResourceSponsorHint = ({
 }: ResourceSponsorHintArgs = {}) => {
   const label = resourceLabel || resourceKey || 'resource';
   const activeHasSponsor = getSponsoredKeyAliases(resourceKey)
-    .some((alias: any) => !!sponsoredKeys?.[alias]);
+    .some((alias) => !!sponsoredKeys?.[alias]);
   const otherSessions = (sponsorSessions?.byResource?.[resourceKey] || [])
-    .filter((entry: any) => !entry?.isActive);
+    .filter((entry) => !entry?.isActive);
   if (activeHasSponsor) {
     if (!otherSessions.length) {
       return `${label} sponsor is configured for the active session.`;
     }
-    return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}.`;
+    return `${label} sponsor is configured for the active session. Other sessions also sponsor ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}.`;
   }
   if (otherSessions.length) {
-    return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry: any) => entry.label).join(', ')}. Switch sessions to use one.`;
+    return `No active-session ${label} sponsor. Other sessions with ${label}: ${otherSessions.map((entry) => entry.label).join(', ')}. Switch sessions to use one.`;
   }
   return `No active-session ${label} sponsor configured.`;
 };
