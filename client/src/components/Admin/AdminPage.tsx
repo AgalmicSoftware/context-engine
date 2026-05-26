@@ -104,6 +104,19 @@ import {
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
 import {
+  buildAdminArweaveBalanceResource,
+  buildAdminArweaveEmptyResource,
+  buildAdminArweaveErrorResource,
+  buildAdminArweaveInvalidResource,
+  buildAdminArweaveLoadingResource,
+  buildAdminFaucetBalanceResource,
+  buildAdminFaucetEmptyResource,
+  buildAdminFaucetErrorResource,
+  buildAdminFaucetInvalidResource,
+  buildAdminFaucetLoadingResource,
+  buildAdminFaucetRpcUnavailableResource,
+} from './adminPageResourceDisplayHelpers';
+import {
   ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
   applyAdminMetadataDraft,
@@ -229,18 +242,8 @@ const AdminPageRuntime = ({
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
   const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
-  const [arweaveResource, setArweaveResource] = useState<any>({
-    address: '',
-    display: 'No JWK entered',
-    meta: 'Enter a JWK above to read the public wallet balance.',
-    loading: false,
-  });
-  const [faucetResource, setFaucetResource] = useState<any>({
-    address: '',
-    display: 'No faucet key entered',
-    meta: 'Enter a faucet private key above to read the wallet balance.',
-    loading: false,
-  });
+  const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
+  const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
   const [litResource, setLitResource] = useState<any>({
     address: '',
     display: 'Lit Chipotle not configured',
@@ -924,22 +927,18 @@ const AdminPageRuntime = ({
       const arweaveBalance = await adminArweavePort.readArweaveWalletBalance(parsedJwk);
       address = arweaveBalance.address;
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(
-        buildAdminArweaveBalanceResource({
-          address,
-          winston: arweaveBalance.winston,
-          formatWinstonToAr: adminArweavePort.formatWinstonToAr,
-          shortAddress,
-        }),
-      );
+      setArweaveResource(buildAdminArweaveBalanceResource({
+        address,
+        winston: arweaveBalance.winston,
+        formatWinstonToAr: arweaveScripts.formatWinstonToAr,
+        shortAddress,
+      }));
     } catch (err) {
       if (requestId !== arweaveResourceRequestRef.current) return;
-      setArweaveResource(
-        buildAdminArweaveErrorResource({
-          address,
-          shortAddress,
-        }),
-      );
+      setArweaveResource(buildAdminArweaveErrorResource({
+        address,
+        shortAddress,
+      }));
     }
   }, [secrets.arweaveJwk]);
 
@@ -965,43 +964,35 @@ const AdminPageRuntime = ({
       relevantSessionChainLabel || (sessionReadRpc.chainId ? String(sessionReadRpc.chainId) : '');
     if (!sessionReadRpc.chainId) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(
-        buildAdminFaucetRpcUnavailableResource({
-          address,
-          shortAddress,
-        }),
-      );
+      setFaucetResource(buildAdminFaucetRpcUnavailableResource({
+        address,
+        shortAddress,
+      }));
       return;
     }
 
-    setFaucetResource(
-      buildAdminFaucetLoadingResource({
-        address,
-        sessionChainLabel,
-        shortAddress,
-      }),
-    );
+    setFaucetResource(buildAdminFaucetLoadingResource({
+      address,
+      sessionChainLabel,
+      shortAddress,
+    }));
 
     try {
       const balanceWei = await rpcProvidersChainReadsPort.getNativeBalanceWeiForChain(sessionReadRpc.chainId, address);
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(
-        buildAdminFaucetBalanceResource({
-          address,
-          balanceWei,
-          sessionChainLabel,
-          formatEther: ethers.utils.formatEther,
-          shortAddress,
-        }),
-      );
+      setFaucetResource(buildAdminFaucetBalanceResource({
+        address,
+        balanceWei,
+        sessionChainLabel,
+        formatEther: ethers.utils.formatEther,
+        shortAddress,
+      }));
     } catch (_) {
       if (requestId !== faucetResourceRequestRef.current) return;
-      setFaucetResource(
-        buildAdminFaucetErrorResource({
-          address,
-          shortAddress,
-        }),
-      );
+      setFaucetResource(buildAdminFaucetErrorResource({
+        address,
+        shortAddress,
+      }));
     }
   }, [relevantSessionChainLabel, secrets.faucetPrivateKey, sessionReadRpc.chainId]);
 
