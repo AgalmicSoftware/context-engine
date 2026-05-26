@@ -54,6 +54,7 @@ const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
       { optionId: 'builder', label: 'Builder' },
       { optionId: 'researcher', label: 'Researcher' },
       { optionId: 'founder_operator', label: 'Founder / operator' },
+      { optionId: 'investor', label: 'Investor' },
       { optionId: 'artist_designer', label: 'Artist / designer' },
       { optionId: 'community_host', label: 'Community host' },
       { optionId: 'other', label: 'Other' },
@@ -273,6 +274,26 @@ export function normalizeTelegramGroupSelections(selections = {}, categories = [
   return normalized;
 }
 
+export function normalizeTelegramGroupDetails(details = {}, categories = [], selections = {}) {
+  const categoryIds = new Set((Array.isArray(categories) ? categories : []).map((category) => category.categoryId));
+  const source = details && typeof details === 'object' && !Array.isArray(details) ? details : {};
+  const countrySource = source.country_relationship && typeof source.country_relationship === 'object' && !Array.isArray(source.country_relationship)
+    ? source.country_relationship
+    : {};
+  const countrySelections = new Set(Array.isArray(selections.country_relationship) ? selections.country_relationship : []);
+  if (!categoryIds.has('country_relationship') || !countrySelections.size) return {};
+  const country = {};
+  if (countrySelections.has('live_in')) {
+    const value = safeString(countrySource.live_in_country || countrySource.liveInCountry || countrySource.liveIn || '').slice(0, 80);
+    if (value) country.live_in_country = value;
+  }
+  if (countrySelections.has('citizen_of')) {
+    const value = safeString(countrySource.citizen_of_country || countrySource.citizenOfCountry || countrySource.citizenOf || '').slice(0, 80);
+    if (value) country.citizen_of_country = value;
+  }
+  return Object.keys(country).length ? { country_relationship: country } : {};
+}
+
 async function listKvRecordsByPrefix(env = {}, prefix = '', {
   limit = 100,
 } = {}) {
@@ -341,15 +362,56 @@ export async function loadTelegramLightweightGroups({
   );
   const membership = await readMembership(env, { sessionSlug, telegramUserId });
   const selections = normalizeTelegramGroupSelections(membership?.selections || {}, categories);
+  const details = normalizeTelegramGroupDetails(membership?.details || {}, categories, selections);
   const proposals = await loadGroupProposals(env, { sessionSlug, telegramUserId });
   return {
     enabled: Boolean(sessionSlug),
     sessionSlug,
     categories,
     selections,
+    details,
     proposals,
     updatedAt: safeString(membership?.updatedAt) || null,
   };
+}
+
+export async function listTelegramLightweightGroupMemberships({
+  env = {},
+  session = {},
+  limit = 1000,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
+  if (!sessionSlug) return [];
+  const policyGroups = normalizeTelegramGroupCategories(
+    session.lightweightGroups || session.telegramGroups || session.telegramOnlyGroups || []
+  );
+  const custom = await readCustomGroupConfig(env, sessionSlug);
+  const categories = mergeCategoryLists(
+    DEFAULT_TELEGRAM_GROUP_CATEGORIES.map((category) => ({ ...category, source: 'default' })),
+    policyGroups,
+    custom.categories
+  );
+  const records = await listKvRecordsByPrefix(
+    env,
+    `${TELEGRAM_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX}${sessionSlug}:`,
+    { limit }
+  );
+  return records
+    .map((record) => {
+      const selections = normalizeTelegramGroupSelections(record.selections || {}, categories);
+      const details = normalizeTelegramGroupDetails(record.details || {}, categories, selections);
+      const telegramUserId = safeString(record.telegramUserId || String(record.key || '').split(':').pop());
+      if (!telegramUserId) return null;
+      return {
+        version: 1,
+        sessionSlug,
+        telegramUserId,
+        selections,
+        details,
+        updatedAt: safeString(record.updatedAt) || null,
+      };
+    })
+    .filter(Boolean);
 }
 
 export async function saveTelegramLightweightGroupMembership({
@@ -357,11 +419,13 @@ export async function saveTelegramLightweightGroupMembership({
   session = {},
   telegramUserId = '',
   selections = {},
+  details = {},
   createdAt = null,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
   const groups = await loadTelegramLightweightGroups({ env, session, telegramUserId });
   const normalizedSelections = normalizeTelegramGroupSelections(selections, groups.categories);
+  const normalizedDetails = normalizeTelegramGroupDetails(details, groups.categories, normalizedSelections);
   const key = membershipKey({ sessionSlug, telegramUserId });
   const kv = env?.AGENT_ACTION_KV;
   if (!key || !kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
@@ -370,6 +434,7 @@ export async function saveTelegramLightweightGroupMembership({
     sessionSlug,
     telegramUserId: safeString(telegramUserId),
     selections: normalizedSelections,
+    details: normalizedDetails,
     updatedAt: createdAt || new Date().toISOString(),
   };
   assertNoSecretShape(record, 'Telegram lightweight group memberships must not serialize secrets.');
@@ -379,6 +444,7 @@ export async function saveTelegramLightweightGroupMembership({
     groups: {
       ...groups,
       selections: normalizedSelections,
+      details: normalizedDetails,
       updatedAt: record.updatedAt,
     },
   };

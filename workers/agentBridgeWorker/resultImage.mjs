@@ -493,7 +493,8 @@ function drawParticipantGraph(pixels, width, participants = [], groups = []) {
     drawText(pixels, width, group.label || `GROUP ${index + 1}`, x + 42, y + 18, 2, color);
     const aliases = Array.isArray(group.aliases) ? group.aliases.slice(0, 4).join(' ') : '';
     drawText(pixels, width, aliases || 'PARTICIPANTS', x + 24, y + 54, 2, BLACK);
-    wrapText(group.theme || 'CONNECTED BY SIMILAR VOTES', 30).slice(0, 1).forEach((line) => {
+    const sizeText = group.size ? `${group.size} PARTICIPANTS` : 'ANSWER PATTERN CLUSTER';
+    wrapText(sizeText, 30).slice(0, 1).forEach((line) => {
       drawText(pixels, width, line, x + 24, y + 78, 2, SLATE);
     });
   });
@@ -650,6 +651,7 @@ function encodeIndexedPng(rgba, width, height) {
 
 export function buildResultsImage({
   mode = 'consensus',
+  title = '',
   sessionTitle = '',
   responseCount = 0,
   demo = false,
@@ -663,7 +665,7 @@ export function buildResultsImage({
   fillRoundRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, 14, WHITE);
   strokeRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, CARD_BORDER);
   drawResultsHeader(pixels, WIDTH, {
-    title: mode === 'group' ? 'PARTICIPANTS' : 'CONSENSUS',
+    title: title || (mode === 'group' ? 'PARTICIPANTS' : 'CONSENSUS'),
     sessionTitle,
     responseCount,
     demo,

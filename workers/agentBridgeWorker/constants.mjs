@@ -54,6 +54,9 @@ export const RISK_RANK = Object.freeze({
 export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   VIEW_QUESTIONS: 'view_questions',
   VIEW_RESULTS: 'view_results',
+  VIEW_ADMIN_ACTIONS: 'view_admin_actions',
+  VIEW_RESULTS_SETTINGS: 'view_results_settings',
+  TOGGLE_RESULTS_EXPOSURE: 'toggle_results_exposure',
   EXPORT_ALL_RESPONSES: 'export_all_responses',
   MANAGE_RESPONSE_EXPORT_ACCESS: 'manage_response_export_access',
   LIST_SESSIONS: 'list_sessions',
@@ -76,6 +79,8 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   SUBMIT_RESPONSE: 'submit_response',
   DIRECT_SUBMIT_RESPONSE: 'direct_submit_response',
   ADD_QUESTION: 'add_question',
+  VIEW_GROUPS: 'view_groups',
+  SET_GROUP_SELECTION: 'set_group_selection',
   GENERATE_QUESTION: 'generate_question',
   SAVE_GENERATED_QUESTION: 'save_generated_question',
   LIST_DOCS: 'list_docs',

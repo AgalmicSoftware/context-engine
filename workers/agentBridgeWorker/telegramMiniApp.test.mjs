@@ -6,7 +6,12 @@ import {
   handleTelegramMiniAppRequest,
   validateTelegramMiniAppInitData,
 } from './telegramMiniApp.mjs';
-import { persistAnswerDraft, SUBMIT_REQUEST_KV_PREFIX } from './telegramCommands.mjs';
+import {
+  persistAnswerDraft,
+  persistTelegramUserSessionBinding,
+  SUBMIT_REQUEST_KV_PREFIX,
+} from './telegramCommands.mjs';
+import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 
 class MemoryKv {
   constructor() {
@@ -47,6 +52,19 @@ function signInitData(fields = {}, botToken = '') {
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
   const hash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
   return new URLSearchParams({ ...fields, hash }).toString();
+}
+
+async function seedPreviewPrivateSession(env, sessionSlug = 'alpha') {
+  await persistTelegramUserSessionBinding({
+    env,
+    normalized: {
+      user: { telegramUserId: 'preview-user', username: 'preview' },
+      chat: { chatId: 'preview-user', type: 'private', isPrivate: true },
+    },
+    session: { sessionSlug, sessionName: sessionSlug },
+    source: 'test_private_chat',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
 }
 
 test('validateTelegramMiniAppInitData accepts current Telegram HMAC init data', async () => {
@@ -130,6 +148,22 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /overflow-y: auto;/);
   assert.match(html, /touch-action: auto;/);
   assert.equal(html.includes('<h1>CE Agent</h1>'), false);
+  assert.match(html, /id="showToolMenu"[^>]*aria-label="Open tools menu"/);
+  assert.match(html, /id="toolMenu"[^>]*aria-label="Mini App tools"/);
+  assert.match(html, /id="showSessions"[^>]*aria-label="Sessions"/);
+  assert.match(html, /id="showDocuments"[^>]*aria-label="Documents"/);
+  assert.match(html, /id="showAdmin"[^>]*aria-label="Admin actions"[^>]*hidden/);
+  assert.match(html, /<span>Sessions<\/span>/);
+  assert.match(html, /<span>Documents<\/span>/);
+  assert.match(html, /<span>Results<\/span>/);
+  assert.match(html, /<span>Groups<\/span>/);
+  assert.match(html, /<span>Add question<\/span>/);
+  assert.match(html, /<span>Filter<\/span>/);
+  assert.match(html, /<span>Settings<\/span>/);
+  assert.match(html, /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/);
+  assert.match(html, /function setToolMenuOpen\(open\)/);
+  assert.match(html, /state\.sessionsPanelOpen/);
+  assert.match(html, /scrollPanelIntoView/);
   assert.match(html, /id="showFilter"[^>]*aria-label="Filter"/);
   assert.match(html, /id="showSettings"[^>]*aria-label="Settings"/);
   assert.match(html, /id="filterPanel"[^>]*aria-label="Question filters"/);
@@ -139,6 +173,13 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="applyAiSearch"'), false);
   assert.match(html, /id="clearAiSearch"[^>]*hidden/);
   assert.match(html, /id="filterSummary"/);
+  assert.match(html, /\.metaClearFilter/);
+  assert.match(html, /function activeQuestionFilterCount\(\)/);
+  assert.match(html, /function clearQuestionFilters\(\)/);
+  assert.match(html, /function renderMeta\(data\)/);
+  assert.match(html, /clear\.textContent = 'X';/);
+  assert.match(html, /clear\.setAttribute\('aria-label', 'Clear question filters'\);/);
+  assert.match(html, /count \+ label \+ \(activeFilters > 0 \? ' \(Filter: ' \+ activeFilters \+ '\)' : ''\)/);
   assert.match(html, /AI search/);
   assert.match(html, /Question type/);
   assert.match(html, /--filter-accent: #2cc3ff;/);
@@ -153,16 +194,56 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.sessionPicker\.collapsed \.sessionPickerBody \{ display: none; \}/);
   assert.match(html, /<div class="sectionTitle">Sessions<\/div>/);
   assert.match(html, /id="continueSessions"/);
+  assert.match(html, /id="continueSessions"[^>]*>Save<\/button>/);
+  assert.match(html, /id="documentsPanel"[^>]*aria-label="Documents"/);
+  assert.match(html, /id="toggleDocumentsPanelBody"[^>]*aria-expanded="true"/);
+  assert.match(html, /id="documentsPanelBody"/);
+  assert.match(html, /id="refreshDocuments"[^>]*aria-label="Refresh documents"/);
+  assert.match(html, /id="documentFile"/);
+  assert.match(html, /\/telegram\/mini-app\/api\/documents/);
+  assert.match(html, /documentsMessage/);
+  assert.match(html, /documentsSectionOpen/);
+  assert.match(html, /documentsPanel\.documentsCollapsed \.documentsPanelBody/);
+  assert.match(html, /el\.toggleDocumentsPanelBody\.onclick/);
+  assert.match(html, /state\.documentsMessage = 'Uploading ' \+ \(file\.name \|\| 'document'\) \+ '\.\.\.';/);
+  assert.match(html, /state\.documentsMessage = 'Uploaded ' \+ \(body\.document\?\./);
+  assert.match(html, /function documentUploadErrorMessage\(body, status\)/);
+  assert.match(html, /document_file_too_large/);
+  assert.match(html, /id="adminPanel"[^>]*aria-label="Admin actions"/);
   assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
-  assert.match(html, /id="resultViewLevels"[^>]*aria-label="Results exposure levels"/);
+  assert.match(html, /id="refreshResults"[^>]*aria-label="Refresh results"/);
+  assert.equal(html.includes('id="resultViewLevels"'), false);
+  assert.match(html, /id="resultFilters"[^>]*aria-label="Result filters"/);
+  assert.match(html, /id="toggleResultFilters"/);
+  assert.match(html, /id="resultFilterOptions"/);
+  assert.equal(html.includes('id="applyResultFilters"'), false);
+  assert.match(html, /autoApplyResultFilters/);
+  assert.match(html, /id="toggleResultsPanelBody"/);
+  assert.match(html, /id="moreConsensusResults"/);
+  assert.match(html, /id="moreDivisiveResults"/);
+  assert.match(html, /id="resultClusterControls"/);
+  assert.match(html, /id="resultGroupChart"/);
+  assert.match(html, /id="refreshGroups"[^>]*aria-label="Refresh groups"/);
+  assert.match(html, /\.panelIconButton/);
+  assert.equal(html.includes('>Refresh</button>'), false);
+  assert.equal(html.includes('Result images'), false);
+  assert.equal(html.includes('id="renderConsensusImage"'), false);
+  assert.equal(html.includes('id="renderGroupImage"'), false);
+  assert.equal(html.includes('id="resultImagePreview"'), false);
+  assert.match(html, /id="toggleConsensusSection"/);
+  assert.match(html, /id="toggleDivisiveSection"/);
+  assert.match(html, /id="toggleResultGroupsSection"/);
+  assert.match(html, /id="toggleGroupAnalysisSection"/);
   assert.match(html, /id="consensusResults"/);
   assert.match(html, /id="divisiveResults"/);
   assert.match(html, /id="resultGroups"/);
-  assert.match(html, /Analyze with AI/);
+  assert.match(html, /Analyze ' \+ group\.label/);
+  assert.match(html, /\.distributionBar/);
   assert.match(html, /\/telegram\/mini-app\/api\/results/);
   assert.match(html, /function renderResults\(\)/);
   assert.match(html, /function analyzeResultGroup\(groupId\)/);
+  assert.match(html, /function renderResultGroupChart\(groups\)/);
   assert.equal(html.includes('id="groupsPicker"'), false);
   assert.equal(html.includes('function renderGroupsPicker()'), false);
   assert.match(html, /id="filterUnansweredFirst"/);
@@ -194,7 +275,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="page"'), false);
   assert.equal(html.includes('state.page'), false);
   assert.equal(html.includes('.slice(state.page'), false);
-  assert.match(html, /<h1>Context Engine<\/h1>[\s\S]*<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">[\s\S]*<div class="meta" id="meta"><\/div>/);
+  assert.match(html, /<h1>Context Engine<\/h1>[\s\S]*<section class="toolMenu" id="toolMenu" aria-label="Mini App tools">[\s\S]*<section class="sessionPicker" id="sessionPicker" aria-label="Sessions">[\s\S]*<div class="meta" id="meta"><\/div>/);
   assert.match(html, /<section class="layout">\s*<section class="questionStack" id="questionStack" aria-label="Questions"><\/section>\s*<\/section>/);
   assert.match(html, /startCommentDictation/);
   assert.match(html, /startAnswerDictation/);
@@ -209,6 +290,13 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.submitButton\.submittedCheck/);
   assert.match(html, /Transcribing microphone audio/);
   assert.match(html, /Transcribing search audio/);
+  assert.match(html, /function startMicProgressTimer\(baseMessage, setFeedback\)/);
+  assert.match(html, /setFeedback\(baseMessage \+ ' ' \+ elapsedSeconds \+ 's elapsed'\);/);
+  assert.match(html, /activeMicProgressTimer = window\.setInterval\(update, 1000\);/);
+  assert.match(html, /function stopMicProgressTimer\(\)/);
+  assert.match(html, /startAnswerTranscriptionProgress\(question, textarea\)/);
+  assert.match(html, /startCommentTranscriptionProgress\(question, textarea\)/);
+  assert.match(html, /startSearchTranscriptionProgress\(\)/);
   assert.match(html, /function setCommentMicFeedback/);
   assert.match(html, /function setAnswerMicFeedback/);
   assert.match(html, /function setSearchMicFeedback/);
@@ -238,10 +326,22 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /const answerableCount = questions\.filter\(\(question\) => question\?\.canAnswer\)\.length;/);
   assert.match(html, /const unavailableCount = questions\.filter\(\(question\) => question\?\.payloadUnavailable === true\)\.length;/);
   assert.match(html, /function questionCountText\(data\)/);
-  assert.equal(html.includes("return available + ' questions';"), true);
+  assert.match(html, /const count = activeFilters > 0 \? filteredQuestionEntries\(\)\.length : available;/);
   assert.match(html, /answerableCount === 0 && \(/);
   assert.match(html, /unavailableCount > 0/);
   assert.match(html, /window\.setTimeout\(\(\) => \{[\s\S]*load\(\{ retry: true \}\);[\s\S]*\}, QUESTION_RETRY_DELAY_MS\);/);
+});
+
+test('Mini App inline scripts remain parseable by browsers', () => {
+  const html = __test__telegramMiniApp.telegramMiniAppHtml();
+  const scripts = Array.from(html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi))
+    .map((match) => match[1]);
+
+  assert.equal(scripts.length > 0, true);
+  for (const script of scripts) {
+    assert.doesNotThrow(() => new Function(script));
+  }
+  assert.equal(html.includes('.split(/[\\n,;|]+/)'), true);
 });
 
 test('Mini App session picker lists sessions and loads multi-selected questions', async () => {
@@ -347,6 +447,113 @@ test('Mini App keeps multi-select sessions visible after a joined-session launch
   assert.equal(multi.sessionPicker.initiallyCollapsed, true);
   assert.deepEqual(multi.selectedSessionSlugs, ['alpha', 'beta']);
   assert.equal(multi.questionCount, 2);
+});
+
+test('Mini App exposes admin state only for configured export admin managed wallet', async () => {
+  const createdAt = '2026-05-25T12:00:00.000Z';
+  const rootSecret = 'test-root-secret-for-mini-admin';
+  const adminAccount = await deriveTelegramResponseExportAccount({
+    env: { DEMO_SIGNER_ROOT_SECRET: rootSecret },
+    normalized: { user: { telegramUserId: 'preview-user' } },
+    createdAt,
+  });
+  const baseEnv = {
+    DEMO_SIGNER_ROOT_SECRET: rootSecret,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAccount.accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([]),
+  };
+
+  const adminState = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: baseEnv,
+    createdAt,
+  });
+  const guestState = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: {
+      ...baseEnv,
+      AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: '0x1111111111111111111111111111111111111111',
+    },
+    createdAt,
+  });
+
+  assert.equal(adminState.admin.available, true);
+  assert.equal(adminState.admin.sessionSlug, 'alpha');
+  assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_all'), true);
+  assert.equal(guestState.admin.available, false);
+  assert.equal(guestState.admin.reason, 'response_export_admin_required');
+});
+
+test('Mini App documents endpoint lists fixture docs and stores lightweight uploads', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      title: 'Existing brief',
+      name: 'brief.md',
+      fileType: 'md',
+      visibility: 'public',
+      storageProfile: 'cloudflare',
+      contentPreview: 'Existing public summary',
+    }]),
+  };
+  const beforeResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/documents?sessionSlug=alpha'),
+    env,
+  });
+  const before = await beforeResponse.json();
+  assert.equal(beforeResponse.status, 200);
+  assert.equal(before.documents.documents.length, 1);
+  assert.equal(before.documents.documents[0].title, 'Existing brief');
+
+  const form = new FormData();
+  form.append('title', 'Uploaded note');
+  form.append('visibility', 'public');
+  form.append('file', new Blob(['# Uploaded note\nThis is a preview.'], { type: 'text/markdown' }), 'note.md');
+  const uploadResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/documents?sessionSlug=alpha', {
+      method: 'POST',
+      body: form,
+    }),
+    env,
+  });
+  const upload = await uploadResponse.json();
+
+  assert.equal(uploadResponse.status, 200);
+  assert.equal(upload.ok, true);
+  assert.equal(upload.document.title, 'Uploaded note');
+  assert.equal(upload.document.fileType, 'md');
+  assert.match(upload.document.contentPreview, /Uploaded note/);
+  assert.equal(upload.documents.documents.length, 2);
+
+  const oversizedForm = new FormData();
+  oversizedForm.append('visibility', 'session');
+  oversizedForm.append('file', new Blob([new Uint8Array((1024 * 1024) + 1)], { type: 'text/plain' }), 'too-large.txt');
+  const oversizedResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/documents?sessionSlug=alpha', {
+      method: 'POST',
+      body: oversizedForm,
+    }),
+    env,
+  });
+  const oversized = await oversizedResponse.json();
+
+  assert.equal(oversizedResponse.status, 413);
+  assert.equal(oversized.ok, false);
+  assert.equal(oversized.error, 'document_file_too_large');
+  assert.equal(oversized.maxBytes, 1024 * 1024);
 });
 
 test('Mini App falls back to session picker when launch session is not selectable', async () => {
@@ -682,7 +889,7 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   };
 
   const response = await handleTelegramMiniAppRequest({
-    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha'),
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&clusters=2'),
     env,
   });
   const body = await response.json();
@@ -698,6 +905,8 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(body.publicSnapshot.type, 'ce_public_results_snapshot');
   assert.equal(body.publicSnapshot.audience, 'telegram_participant');
   assert.equal(body.publicSnapshot.counts.responsesGiven, 5);
+  assert.equal(body.groupView.clusterCount, 2);
+  assert.equal(body.publicSnapshot.exposure.clusterCount, 2);
   assert.equal(body.publicSnapshot.aggregateResults.consensus[0].questionId, 'q-consensus');
   assert.equal(body.questions.consensus[0].questionId, 'q-consensus');
   assert.equal(body.questions.divisive[0].questionId, 'q-divisive');
@@ -712,6 +921,7 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
         action: 'analyze_group',
         sessionSlug: 'alpha',
         groupId: body.groups[0].groupId,
+        clusterCount: 2,
       }),
     }),
     env,
@@ -1124,26 +1334,46 @@ test('Mini App distinguishes encrypted questions from unavailable payloads', asy
   assert.match(unavailable.lockMessage, /not available yet/);
 });
 
-test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo toggle, and result image controls', () => {
+test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo toggle, and inline result controls', () => {
   const html = __test__telegramMiniApp.telegramMiniAppHtml();
 
   assert.match(html, /id="showGroups"[^>]*aria-label="Groups"/);
+  assert.match(html, /id="showAddQuestion"[^>]*aria-label="Add question"/);
   assert.match(html, /id="groupsPanel"[^>]*aria-label="Groups"/);
   assert.match(html, /id="groupCategories"/);
   assert.match(html, /id="saveGroups"/);
+  assert.match(html, /id="saveGroupsTop"/);
   assert.match(html, /function renderGroups\(\)/);
   assert.match(html, /\/telegram\/mini-app\/api\/groups/);
-  assert.match(html, /id="renderConsensusImage"/);
-  assert.match(html, /id="renderGroupImage"/);
-  assert.match(html, /id="resultImagePreview"/);
-  assert.match(html, /\/telegram\/mini-app\/api\/results-image/);
+  assert.match(html, /id="addQuestionPanel"/);
+  assert.match(html, /id="addQuestionTypes"/);
+  assert.match(html, /\/telegram\/mini-app\/api\/questions\/add/);
+  assert.match(html, /id="resultGroupChart"/);
+  assert.match(html, /id="resultClusterControls"/);
+  assert.match(html, /id="moreConsensusResults"/);
+  assert.match(html, /id="moreDivisiveResults"/);
+  assert.match(html, /resultsUrl\.searchParams\.set\('clusters', String\(state\.resultClusterCount\)\)/);
+  assert.equal(html.includes('/telegram/mini-app/api/results-image'), false);
+  assert.equal(html.includes('id="renderConsensusImage"'), false);
+  assert.equal(html.includes('id="renderGroupImage"'), false);
+  assert.equal(html.includes('fetch(imageUrl.pathname + imageUrl.search'), false);
   assert.match(html, /id="demoDataResults"/);
+  assert.match(html, /id="demoDataResultsInline"/);
   assert.match(html, /Demo data/);
   assert.match(html, /expandedQuestionKeys: new Set\(\)/);
   assert.match(html, /highlightedQuestionKey/);
   assert.match(html, /scrollHighlightedQuestionIntoView/);
-  assert.match(html, /\.card\.collapsed \.cardBody \{ display: none; \}/);
+  assert.match(html, /\.card\.collapsed \.expandedOnly \{ display: none; \}/);
   assert.match(html, /className = 'card' \+ \(expanded \? '' : ' collapsed'\)/);
+  assert.match(html, /renderAnswerControls\(question, body, \{ showComments: expanded \}\);/);
+  assert.match(html, /function renderAnswerControls\(question, mount, \{ showComments = true \} = \{\}\)/);
+  assert.match(html, /commentBox\.className = 'commentBox expandedOnly';/);
+  assert.equal(html.includes("meta.textContent = 'Question ' + question.displayIndex;"), false);
+  assert.match(html, /CARET_DOWN_ICON/);
+  assert.match(html, /groupCountryDetails/);
+  assert.match(html, /Groups saved/);
+  assert.doesNotMatch(html, /setStatus\('Groups saved\./);
+  assert.doesNotMatch(html, /toggle\.textContent = expanded \? '−' : '\+'/);
 });
 
 test('Mini App state and group endpoints support lightweight Telegram-only groups', async () => {
@@ -1185,6 +1415,10 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   assert.equal(state.groups.sessionSlug, 'alpha');
   assert.equal(state.groups.categories.some((category) => category.categoryId === 'age_bucket'), true);
   assert.equal(state.groups.categories.some((category) => category.categoryId === 'demo_track'), true);
+  assert.equal(state.groups.categories.some((category) => (
+    category.categoryId === 'contribution_role' &&
+    category.options.some((option) => option.optionId === 'investor')
+  )), true);
 
   const saveResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/groups?sessionSlug=alpha', {
@@ -1195,7 +1429,14 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
         selections: {
           age_bucket: ['25_34'],
           ai_tribe: ['e_acc', 'pause_ai'],
+          country_relationship: ['live_in', 'citizen_of'],
           missing_category: ['ignored'],
+        },
+        details: {
+          country_relationship: {
+            live_in_country: 'United States',
+            citizen_of_country: 'Canada',
+          },
         },
       }),
     }),
@@ -1207,6 +1448,11 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   assert.equal(saved.ok, true);
   assert.deepEqual(saved.groups.selections.age_bucket, ['25_34']);
   assert.deepEqual(saved.groups.selections.ai_tribe, ['e_acc']);
+  assert.deepEqual(saved.groups.selections.country_relationship, ['live_in', 'citizen_of']);
+  assert.deepEqual(saved.groups.details.country_relationship, {
+    live_in_country: 'United States',
+    citizen_of_country: 'Canada',
+  });
   assert.equal(saved.groups.selections.missing_category, undefined);
 
   const getResponse = await handleTelegramMiniAppRequest({
@@ -1217,6 +1463,130 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
 
   assert.equal(getResponse.status, 200);
   assert.deepEqual(loaded.groups.selections.age_bucket, ['25_34']);
+  assert.deepEqual(loaded.groups.details.country_relationship, {
+    live_in_country: 'United States',
+    citizen_of_country: 'Canada',
+  });
+});
+
+test('Mini App add question endpoint persists Telegram-only proposed questions', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([]),
+  };
+  await seedPreviewPrivateSession(env, 'alpha');
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/questions/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        questionType: 'multichoice',
+        prompt: 'What should lunch be?',
+        options: ['Pizza', 'Salad', 'Tacos'],
+      }),
+    }),
+    env,
+  });
+  const body = await response.json();
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.question.questionType, 'multichoice');
+  assert.deepEqual(body.question.options, ['Pizza', 'Salad', 'Tacos']);
+  assert.equal(state.questions.some((question) => question.prompt === 'What should lunch be?'), true);
+});
+
+test('Mini App add question endpoint enforces Telegram-native authoring binding', async () => {
+  const env = {
+    AGENT_ACTION_KV: new MemoryKv(),
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+  };
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/questions/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        questionType: 'freeform',
+        prompt: 'Who can add questions?',
+      }),
+    }),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'telegram_group_binding_required');
+});
+
+test('Mini App add question endpoint keeps agree questions binary', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([]),
+  };
+  await seedPreviewPrivateSession(env, 'alpha');
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/questions/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should this render as buttons?',
+      }),
+    }),
+    env,
+  });
+  const body = await response.json();
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+  });
+  const added = state.questions.find((question) => question.prompt === 'Should this render as buttons?');
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.question.questionType, 'binary');
+  assert.equal(added.questionType, 'agree_unsure_disagree');
 });
 
 test('Mini App group and image routes enforce Telegram-only and results exposure boundaries', async () => {
@@ -1303,9 +1673,30 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.equal(summaryResponse.status, 200);
   assert.equal(summary.ok, true);
   assert.equal(summary.demo, true);
+  assert.equal(summary.questionCount >= 10, true);
   assert.equal(summary.responseCount > 0, true);
   assert.equal(summary.groupView.status, 'demo_preview');
   assert.equal(summary.groups.length > 0, true);
+  assert.equal(JSON.stringify(summary).includes('Leftover pizza tastes better cold than reheated.'), false);
+
+  const analysisResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        demo: true,
+        action: 'analyze_group',
+        groupId: summary.groups[0].groupId,
+      }),
+    }),
+    env,
+  });
+  const analysis = await analysisResponse.json();
+
+  assert.equal(analysisResponse.status, 200);
+  assert.equal(analysis.ok, true);
+  assert.match(analysis.analysis.name, /Builders|Stewards|Seekers|cluster/i);
 
   const imageResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&demo=1'),
@@ -1316,4 +1707,92 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.equal(imageResponse.status, 200);
   assert.equal(imageResponse.headers.get('content-type'), 'image/png');
   assert.deepEqual(Array.from(bytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+
+  const consensusImageResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=consensus&sort=most_consensus&demo=1'),
+    env,
+  });
+  const consensusBytes = new Uint8Array(await consensusImageResponse.arrayBuffer());
+
+  assert.equal(consensusImageResponse.status, 200);
+  assert.equal(consensusImageResponse.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(consensusBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test('Mini App live results can filter by saved lightweight group details', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        resultsExposure: { minGroupSize: 1, anonymizedGroupsEnabled: true },
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-filter',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should filtered results include this?',
+    }]),
+  };
+  await kv.put('telegram:submit-request:one', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-a',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-25T00:00:00.000Z',
+  }));
+  await kv.put('telegram:submit-request:two', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-b',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'disagree', label: 'Disagree' },
+    createdAt: '2026-05-25T00:01:00.000Z',
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-a', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-a',
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-b', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-b',
+    selections: { age_bucket: ['35_44'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'Canada' } },
+  }));
+
+  const filters = encodeURIComponent(JSON.stringify({
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
+  }));
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&filters=${filters}`),
+    env,
+  });
+  const summary = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(summary.ok, true);
+  assert.equal(summary.demo, false);
+  assert.equal(summary.responseCount, 1);
+  assert.equal(summary.participantCount, 1);
+  assert.equal(summary.filters.applied, true);
+  assert.equal(summary.filters.matchedParticipants, 1);
+  assert.equal(summary.publicSnapshot.filters.applied, true);
+  assert.equal(summary.publicSnapshot.filters.matchedParticipants, 1);
+  assert.deepEqual(summary.publicSnapshot.filters.details, {
+    country_relationship: { live_in_country: 'United States' },
+  });
+  assert.equal(summary.questions.consensus[0].counts.Agree, 1);
+  assert.equal(summary.questions.consensus[0].counts.Disagree, undefined);
 });

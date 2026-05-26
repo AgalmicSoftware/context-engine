@@ -26,6 +26,8 @@ const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'start', description: 'Open the Context Engine bot' },
   { command: 'sessions', description: 'List available sessions' },
   { command: 'questions', description: 'View session questions' },
+  { command: 'groups', description: 'Manage lightweight groups' },
+  { command: 'add_question', description: 'Add a session question' },
   { command: 'q', description: 'Pose a question by number' },
   { command: 'results', description: 'View consensus or group results' },
   { command: 'attachments', description: 'View session files' },
@@ -651,6 +653,64 @@ export async function setAgentBridgeTelegramBotCommands({
   };
 }
 
+function telegramProfilePhotoContentType(pathValue = '') {
+  const ext = extname(safeString(pathValue)).toLowerCase();
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.png') return 'image/png';
+  return 'application/octet-stream';
+}
+
+export async function setAgentBridgeTelegramBotProfilePhoto({
+  botToken = '',
+  photoPath = '',
+  fetchImpl = globalThis.fetch,
+  readFileImpl = readFileSync,
+  existsImpl = existsSync,
+} = {}) {
+  const resolvedPath = safeString(photoPath) ? resolve(photoPath) : '';
+  if (!resolvedPath) return { ok: true, skipped: true, reason: 'telegram_profile_photo_not_configured' };
+  if (!existsImpl(resolvedPath)) {
+    return {
+      ok: false,
+      step: 'telegram_set_profile_photo',
+      status: 400,
+      error: `Telegram profile photo was not found: ${resolvedPath}`,
+    };
+  }
+  const bytes = readFileImpl(resolvedPath);
+  const form = new FormData();
+  form.append('photo', JSON.stringify({ type: 'static', photo: 'attach://photo_file' }));
+  form.append('photo_file', new Blob([bytes], { type: telegramProfilePhotoContentType(resolvedPath) }), resolvedPath.split(sep).pop() || 'profile.jpg');
+  let response;
+  try {
+    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyProfilePhoto`, {
+      method: 'POST',
+      body: form,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      step: 'telegram_set_profile_photo',
+      status: 502,
+      error: `Telegram setMyProfilePhoto request failed: ${safeString(error?.message || error) || 'unknown error'}`,
+    };
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      step: 'telegram_set_profile_photo',
+      status: response.status || 502,
+      error: safeString(body?.description) || `Telegram setMyProfilePhoto failed (${response.status || 502})`,
+    };
+  }
+  return {
+    ok: true,
+    path: resolvedPath,
+    description: safeString(body?.description),
+  };
+}
+
 export async function verifyAgentBridgeHealth({
   publicUrl = '',
   fetchImpl = globalThis.fetch,
@@ -830,11 +890,20 @@ export async function executeAgentBridgeDeployApply({
         fetchImpl,
       });
       if (!commands.ok) return commands;
+      const profilePhoto = await setAgentBridgeTelegramBotProfilePhoto({
+        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
+        photoPath: resolvedEnv.TELEGRAM_BOT_PROFILE_PHOTO_PATH || resolvedEnv.AGENT_BRIDGE_TELEGRAM_BOT_PROFILE_PHOTO_PATH,
+        fetchImpl,
+        readFileImpl,
+        existsImpl,
+      });
+      if (!profilePhoto.ok) return profilePhoto;
       return {
         ok: true,
         description: webhook.description,
         webhook,
         commands,
+        profilePhoto,
       };
     })();
   if (!telegram.ok) return telegram;

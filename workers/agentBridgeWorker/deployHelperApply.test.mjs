@@ -185,6 +185,8 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
       const body = JSON.parse(options.body || '{}');
       assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
       assert.equal(body.commands.some((command) => command.command === 'results'), true);
+      assert.equal(body.commands.some((command) => command.command === 'groups'), true);
+      assert.equal(body.commands.some((command) => command.command === 'add_question'), true);
       assert.equal(body.commands.some((command) => command.command === 'actions'), false);
       assert.equal(body.commands.some((command) => command.command === 'settings'), false);
       assert.equal(body.commands.some((command) => command.command === 'join'), false);
@@ -227,6 +229,8 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')), true);
   assert.equal(result.telegram.commands.count > 0, true);
   assert.equal(result.telegram.commands.commands.includes('sessions'), true);
+  assert.equal(result.telegram.commands.commands.includes('groups'), true);
+  assert.equal(result.telegram.commands.commands.includes('add_question'), true);
   assert.equal(result.telegram.commands.commands.includes('actions'), false);
   assert.equal(result.telegram.commands.commands.includes('settings'), false);
   assert.equal(result.telegram.commands.commands.includes('join'), false);
