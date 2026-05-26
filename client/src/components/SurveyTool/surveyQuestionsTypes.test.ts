@@ -269,6 +269,8 @@ describe('surveyQuestionsTypes', () => {
       shortenedViewAddress: '0xABC:false',
       isOwnResponse: false,
       isSingleQuestionView: undefined,
+      showViewAnswersButton: true,
+      viewAnswersButtonText: ' View 0xABC:false answers',
     });
     expect(shortenAddress).toHaveBeenCalledWith('0xABC', false);
   });
@@ -330,6 +332,54 @@ describe('surveyQuestionsTypes', () => {
       isStandalone: true,
       questionPool: null,
     }).isSingleQuestionView).toBe(false);
+  });
+
+  it('builds SurveyQuestions view-answer toggle labels', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      viewingAnswers: true,
+    })).toMatchObject({
+      viewAnswersButtonText: ' Fill out survey',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      singleQuestionMode: true,
+      viewingAnswers: true,
+    })).toMatchObject({
+      viewAnswersButtonText: ' Fill out question',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      shortenAddress: () => '0xabc...1234',
+      viewAddress: '0xabcdef1234',
+    })).toMatchObject({
+      viewAnswersButtonText: ' View 0xabc...1234 answers',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      shortenAddress: () => '0xabc...1234',
+      singleQuestionMode: true,
+      viewAddress: '0xabcdef1234',
+    })).toMatchObject({
+      viewAnswersButtonText: ' View 0xabc...1234 answer',
+    });
+  });
+
+  it('builds SurveyQuestions view-answer toggle visibility', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState().showViewAnswersButton).toBeUndefined();
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isEditing: true,
+      account: '0xabc',
+      viewAddress: '0xabc',
+    }).showViewAnswersButton).toBe(false);
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      isEditing: false,
+      viewAddress: '0xabc',
+    }).showViewAnswersButton).toBe(true);
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isEditing: true,
+      responderAddress: '0xdef',
+    }).showViewAnswersButton).toBe(true);
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {
