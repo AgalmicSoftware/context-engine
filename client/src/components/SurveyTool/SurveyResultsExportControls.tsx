@@ -20,6 +20,7 @@ type SurveyResultsExportControlsProps = {
   exportOptions: readonly SurveyResultsExportOption[];
   exportTypeLabel?: string;
   onDownload: () => void;
+  onExportHtmlReport?: () => void;
   onExportTypeChange: (value: string) => void;
   onToggleExportArea: () => void;
   styleMap: Record<string, string>;
@@ -30,6 +31,7 @@ const SurveyResultsExportControls = ({
   exportOptions,
   exportTypeLabel = '',
   onDownload,
+  onExportHtmlReport,
   onExportTypeChange,
   onToggleExportArea,
   styleMap,
@@ -76,6 +78,16 @@ const SurveyResultsExportControls = ({
           <Button onClick={onDownload} className={styleMap.downloadButton}>
             Download
           </Button>
+          {onExportHtmlReport && (
+            <Button
+              type="button"
+              onClick={onExportHtmlReport}
+              className={styleMap.downloadButton}
+              data-testid="ce-surveyresults-export-html-report"
+            >
+              Export HTML Report
+            </Button>
+          )}
         </div>
       </div>
     )}

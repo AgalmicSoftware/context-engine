@@ -3,7 +3,7 @@ export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
 export const SESSION_RESULTS_HTML_PRIVACY_REDACTED = 'redacted';
 export const SESSION_RESULTS_EXPORT_FORMAT_VIEWER = 'viewer';
 export const SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML = 'single-html';
-export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'pdf-report';
+export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'single-page-pdf';
 
 const DEFAULT_UNAVAILABLE_REASON = 'No hydrated data was available for this section when the export was created.';
 const DEFAULT_REDACTIONS = [
@@ -13,8 +13,6 @@ const DEFAULT_REDACTIONS = [
   'gated_values',
   'telegram_identifiers',
 ] as const;
-const ETH_ADDRESS_TEXT_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
-const REDACTED_ADDRESS_PLACEHOLDER = '[redacted-address]';
 
 const SENSITIVE_KEY_PATTERNS = [
   /^address$/i,
@@ -88,7 +86,6 @@ export type SessionResultsExporterMetadata = {
 
 export type SessionResultsReportSection = {
   available: boolean;
-  dimensions: unknown[];
   groups: unknown[];
   questions: SessionResultsReportQuestion[];
   reason?: string;
@@ -167,7 +164,6 @@ export type SessionResultsHtmlReportRenderOptions = {
 };
 
 type JsPdfConstructor = new (...args: unknown[]) => {
-  addPage: () => void;
   addImage: (...args: unknown[]) => void;
   internal: {
     pageSize: {
@@ -247,9 +243,6 @@ export const redactSnapshotValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map((item) => redactSnapshotValue(item));
   }
-  if (typeof value === 'string') {
-    return value.replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER);
-  }
   if (!value || typeof value !== 'object') return value;
 
   const out: Record<string, unknown> = {};
@@ -279,14 +272,12 @@ const normalizeReportSection = (
     ? input.questions.map(normalizeReportQuestion).filter((question) => question.id || question.prompt)
     : [];
   const summary = toPlainRecord(redactSnapshotValue(input?.summary));
-  const dimensions = Array.isArray(input?.dimensions) ? input.dimensions.map(redactSnapshotValue) : [];
   const groups = Array.isArray(input?.groups) ? input.groups.map(redactSnapshotValue) : [];
   const representativeQuestions = Array.isArray(input?.representativeQuestions)
     ? input.representativeQuestions.map(redactSnapshotValue)
     : [];
   const hasContent =
     questions.length > 0 ||
-    dimensions.length > 0 ||
     groups.length > 0 ||
     representativeQuestions.length > 0 ||
     Object.keys(summary).length > 0;
@@ -294,7 +285,6 @@ const normalizeReportSection = (
 
   return {
     available,
-    dimensions,
     groups,
     questions,
     representativeQuestions,
@@ -454,29 +444,6 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
       </table>`;
 };
 
-const renderReportDimensions = (dimensions: unknown[]): string => {
-  if (dimensions.length === 0) return '';
-  return `
-      <h3>Comparison Dimensions</h3>
-      <p class="ce-report-muted">Generated Breakdown views should use these dataset-specific segment controls instead of demo-only demographic labels.</p>
-      ${dimensions.map((dimension) => {
-        const record = toPlainRecord(dimension);
-        const values = Array.isArray(record.values) ? record.values : [];
-        return `
-        <details data-ce-searchable>
-          <summary>${escapeHtml(record.label || record.id || 'Comparison dimension')}</summary>
-          ${values.length > 0 ? `
-          <ul>
-            ${values.map((value) => {
-              const valueRecord = toPlainRecord(value);
-              const count = toFiniteCount(valueRecord.count);
-              return `<li>${escapeHtml(valueRecord.label || valueRecord.id || 'Segment')}${count ? ` <span class="ce-report-muted">(${escapeHtml(count)})</span>` : ''}</li>`;
-            }).join('')}
-          </ul>` : '<p class="ce-report-muted">No segment values were captured for this dimension.</p>'}
-        </details>`;
-      }).join('')}`;
-};
-
 const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
   const { report } = snapshot.sections;
   if (!report.available) return renderUnavailable('report', report.reason);
@@ -490,7 +457,6 @@ const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
         <div><dt>Participants</dt><dd>${escapeHtml(snapshot.counts.participants)}</dd></div>
         <div><dt>Latest Block</dt><dd>${escapeHtml(snapshot.session.latestKnownBlock ?? 'Unknown')}</dd></div>
       </dl>
-      ${renderReportDimensions(report.dimensions)}
       ${renderQuestionRows(report.questions)}
     </section>`;
 };
@@ -879,26 +845,12 @@ export const downloadSessionResultsPdfReport = async ({
     const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    if (!canvas.width || !canvas.height) {
-      throw new Error('PDF export capture did not produce a usable canvas.');
-    }
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.82);
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = heightLeft - imgHeight;
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-    }
-
+    const fitScale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+    const imgWidth = canvas.width * fitScale;
+    const imgHeight = canvas.height * fitScale;
+    const x = (pageWidth - imgWidth) / 2;
+    const y = (pageHeight - imgHeight) / 2;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.86), 'JPEG', x, y, imgWidth, imgHeight, undefined, 'FAST');
     pdf.save(filename);
   } finally {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
