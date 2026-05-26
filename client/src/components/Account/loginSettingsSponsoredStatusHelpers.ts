@@ -2,6 +2,21 @@ type SponsoredStatusEntry = Record<string, any> & {
   status?: string;
 };
 
+type SponsorshipCardArgs = {
+  activeSession?: any;
+  key: string;
+  sponsoredAccess?: Record<string, any>;
+  sponsorSessions?: Record<string, any>;
+  title: string;
+};
+
+const SETTINGS_SPONSORSHIP_RESOURCES = Object.freeze([
+  { key: 'ai', title: 'AI' },
+  { key: 'arweave', title: 'Arweave' },
+  { key: 'rpc', title: 'RPC' },
+  { key: 'txGas', title: 'Tx gas' },
+]);
+
 export const getSponsoredKeyAliases = (resourceKey: string = ''): string[] => {
   if (resourceKey === 'txGas') return ['faucet', 'txGas'];
   return [resourceKey];
@@ -37,3 +52,42 @@ export const formatSponsoredStatusMeta = (
   }
   return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
 };
+
+export const buildLoginSettingsSponsorshipCard = ({
+  activeSession = null,
+  key,
+  sponsoredAccess = {},
+  sponsorSessions = {},
+  title,
+}: SponsorshipCardArgs) => {
+  const sessions = sponsorSessions.byResource?.[key] || [];
+  const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
+  const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
+  const access = sponsoredAccess[key] || null;
+  return {
+    key,
+    title,
+    status: formatSponsoredStatusMeta(access, !!activeSponsorSession),
+    access,
+    activeSession,
+    activeSponsorSession,
+    otherSponsorSessions,
+    sessions,
+  };
+};
+
+export const buildLoginSettingsSponsorshipCards = ({
+  activeSession = null,
+  sponsoredAccess = {},
+  sponsorSessions = {},
+}: {
+  activeSession?: any;
+  sponsoredAccess?: Record<string, any>;
+  sponsorSessions?: Record<string, any>;
+} = {}) => SETTINGS_SPONSORSHIP_RESOURCES.map(({ key, title }) => buildLoginSettingsSponsorshipCard({
+  activeSession,
+  key,
+  sponsoredAccess,
+  sponsorSessions,
+  title,
+}));
