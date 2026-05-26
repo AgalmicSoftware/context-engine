@@ -9,6 +9,21 @@ export type SbtDisplayMetadataRecord = Record<string, unknown> & {
   encryptedFields?: unknown;
 };
 
+export type SbtCacheEntryLike = Record<string, unknown> & {
+  sbtAddress?: unknown;
+  sbtInfo?: unknown;
+  chainID?: unknown;
+  chainId?: unknown;
+};
+
+export type SbtCacheNameHit = {
+  name: string;
+  info: unknown;
+  netKey: string;
+  chainId: number | null;
+  entry: unknown;
+};
+
 export const SBT_MASKED_FIELD_VALUE = '[encrypted]';
 
 export const LEGACY_SBT_ENCRYPTED_FIELD_KEYS = Object.freeze({
@@ -24,6 +39,17 @@ export type SbtEncryptedFieldKey = keyof typeof LEGACY_SBT_ENCRYPTED_FIELD_KEYS;
 export const isSbtDisplayMetadataRecord = (value: unknown): value is SbtDisplayMetadataRecord => (
   !!value && typeof value === 'object'
 );
+
+const readSbtRecordValue = (value: unknown, key: string): unknown => (
+  isSbtDisplayMetadataRecord(value) ? value[key] : undefined
+);
+
+export const getSbtDisplayAddressLower = (value: unknown): string => toStr(value).trim().toLowerCase();
+
+export const normalizeSbtDisplayChainId = (value: unknown): number => {
+  const chainId = Number(value);
+  return Number.isFinite(chainId) && chainId > 0 ? chainId : 0;
+};
 
 export const getLegacySbtEncryptedFieldKeys = (fieldKey: unknown): readonly string[] => {
   const key = toStr(fieldKey) as SbtEncryptedFieldKey;
@@ -75,4 +101,63 @@ export const getSbtMetadataDisplayNameValue = (info: unknown): string => {
   }
   if (nameLocked) return SBT_MASKED_FIELD_VALUE;
   return '';
+};
+
+export const resolveSbtCacheEntryFromBucket = (
+  bucket: unknown,
+  addressLower: unknown
+): unknown | null => {
+  if (!isSbtDisplayMetadataRecord(bucket)) return null;
+  const sbtList = isSbtDisplayMetadataRecord(bucket.sbtList) ? bucket.sbtList : null;
+  if (!sbtList) return null;
+
+  const addressKey = toStr(addressLower);
+  if (sbtList[addressKey]) return sbtList[addressKey];
+
+  for (const entry of Object.values(sbtList)) {
+    const lower = getSbtDisplayAddressLower(readSbtRecordValue(entry, 'sbtAddress'));
+    if (lower && lower === addressKey) return entry;
+  }
+
+  return null;
+};
+
+export const resolveSbtCacheEntryChainId = (entry: unknown, netKey: unknown = ''): number => (
+  normalizeSbtDisplayChainId(
+    readSbtRecordValue(readSbtRecordValue(entry, 'sbtInfo'), 'chainID') ||
+    readSbtRecordValue(readSbtRecordValue(entry, 'sbtInfo'), 'chainId') ||
+    readSbtRecordValue(entry, 'chainID') ||
+    readSbtRecordValue(entry, 'chainId') ||
+    netKey
+  )
+);
+
+export const resolveSbtDisplayNameFromCacheValue = (
+  cacheValue: unknown,
+  addressLower: unknown,
+  { expectedChainId = 0 }: { expectedChainId?: unknown } = {}
+): SbtCacheNameHit | null => {
+  if (!isSbtDisplayMetadataRecord(cacheValue)) return null;
+  const expected = normalizeSbtDisplayChainId(expectedChainId);
+  const addressKey = toStr(addressLower);
+
+  for (const netKey of Object.keys(cacheValue)) {
+    const bucket = cacheValue[netKey];
+    const entry = resolveSbtCacheEntryFromBucket(bucket, addressKey);
+    if (!entry) continue;
+    const chainId = resolveSbtCacheEntryChainId(entry, netKey);
+    if (expected > 0 && chainId !== expected) continue;
+    const info = readSbtRecordValue(entry, 'sbtInfo') || null;
+    const name = getSbtMetadataDisplayNameValue(info);
+    if (!name) continue;
+    return {
+      name,
+      info,
+      netKey,
+      chainId: chainId || null,
+      entry,
+    };
+  }
+
+  return null;
 };

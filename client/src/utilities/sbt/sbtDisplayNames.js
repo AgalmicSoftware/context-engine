@@ -27,6 +27,9 @@ import {
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
   isSbtMetadataFieldLocked,
+  normalizeSbtDisplayChainId as normalizeChainId,
+  resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
+  resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
 } from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
@@ -53,13 +56,6 @@ const normalizeAddress = (value) => {
   } catch (_) {
     return '';
   }
-};
-
-const getAddressLower = (value) => toStr(value).trim().toLowerCase();
-
-const normalizeChainId = (value) => {
-  const chainId = Number(value);
-  return Number.isFinite(chainId) && chainId > 0 ? chainId : 0;
 };
 
 const isUnresolvedSessionConfig = (config) => (
@@ -169,53 +165,6 @@ const ensureNetBucket = (cacheObj, netKey) => {
     cacheObj[key].sbtList = {};
   }
   return cacheObj[key];
-};
-
-const resolveEntryFromNetBucket = (bucket, addressLower) => {
-  if (!bucket || typeof bucket !== 'object') return null;
-  const sbtList = (bucket.sbtList && typeof bucket.sbtList === 'object') ? bucket.sbtList : null;
-  if (!sbtList) return null;
-
-  if (sbtList[addressLower]) return sbtList[addressLower];
-
-  for (const entry of Object.values(sbtList)) {
-    const lower = getAddressLower(entry?.sbtAddress);
-    if (lower && lower === addressLower) return entry;
-  }
-
-  return null;
-};
-
-const resolveEntryChainId = (entry, netKey = '') => normalizeChainId(
-  entry?.sbtInfo?.chainID ||
-  entry?.sbtInfo?.chainId ||
-  entry?.chainID ||
-  entry?.chainId ||
-  netKey
-);
-
-const resolveNameFromSbtCacheValue = (cacheValue, addressLower, { expectedChainId = 0 } = {}) => {
-  if (!cacheValue || typeof cacheValue !== 'object') return null;
-
-  for (const netKey of Object.keys(cacheValue)) {
-    const bucket = cacheValue[netKey];
-    const entry = resolveEntryFromNetBucket(bucket, addressLower);
-    if (!entry) continue;
-    const chainId = resolveEntryChainId(entry, netKey);
-    if (expectedChainId > 0 && chainId !== expectedChainId) continue;
-    const info = entry?.sbtInfo || null;
-    const name = getSbtDisplayNameValue(info);
-    if (!name) continue;
-    return {
-      name,
-      info,
-      netKey,
-      chainId: chainId || null,
-      entry,
-    };
-  }
-
-  return null;
 };
 
 const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = null, chainId = null } = {}) => {
