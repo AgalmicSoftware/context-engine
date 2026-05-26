@@ -28,8 +28,23 @@ export { describeCeAgentContract } from './ceAgentContract.js';
 
 const log = createLogger('ceAgent');
 
+type CeAgentRecord = Record<string, any>;
+type CeAgentAction = CeAgentRecord & {
+  type?: string;
+};
+type CeAgentActionResult = {
+  ok: boolean;
+  type?: string;
+  at?: string;
+  error?: string;
+  result?: CeAgentRecord;
+};
+type CeAgentRunResult = {
+  ok: boolean;
+  results: CeAgentActionResult[];
+};
 
-const readLocalStorageFlag = (key) => {
+const readLocalStorageFlag = (key: unknown): boolean => {
   try {
     if (typeof window === 'undefined' || !window.localStorage) return false;
     return window.localStorage.getItem(String(key || '')) === '1';
@@ -38,7 +53,7 @@ const readLocalStorageFlag = (key) => {
   }
 };
 
-const readQueryFlag = (key) => {
+const readQueryFlag = (key: unknown): boolean => {
   try {
     if (typeof window === 'undefined' || !window.location) return false;
     const qp = new URLSearchParams(String(window.location.search || ''));
@@ -53,17 +68,17 @@ const isAgentEnabled = () => {
   return readLocalStorageFlag('ce-agent-enabled') || readQueryFlag('agent');
 };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-const cssEscapeAttr = (value) => toStr(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+const cssEscapeAttr = (value: unknown): string => toStr(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
-const elByTestId = (testId) => {
+const elByTestId = (testId: unknown): Element | null => {
   const id = toStr(testId).trim();
   if (!id) return null;
   return document.querySelector(`[data-testid="${cssEscapeAttr(id)}"]`);
 };
 
-const isVisible = (el) => {
+const isVisible = (el: Element | null): boolean => {
   if (!el) return false;
   const style = window.getComputedStyle(el);
   if (!style) return false;
@@ -73,7 +88,10 @@ const isVisible = (el) => {
   return rect.width > 0 && rect.height > 0;
 };
 
-const waitFor = async (fn, { timeoutMs = 30000, tickMs = 100 } = {}) => {
+const waitFor = async (
+  fn: () => unknown | Promise<unknown>,
+  { timeoutMs = 30000, tickMs = 100 }: { timeoutMs?: number; tickMs?: number } = {}
+): Promise<boolean> => {
   const startedAt = Date.now();
   const maxMs = Math.max(100, Number(timeoutMs) || 0);
   const tick = Math.max(25, Number(tickMs) || 0);
@@ -88,14 +106,17 @@ const waitFor = async (fn, { timeoutMs = 30000, tickMs = 100 } = {}) => {
   }
 };
 
-const waitForTestId = async (testId, { timeoutMs = 20000 } = {}) => {
+const waitForTestId = async (
+  testId: unknown,
+  { timeoutMs = 20000 }: { timeoutMs?: number } = {}
+): Promise<Element | null> => {
   const id = toStr(testId).trim();
   if (!id) return null;
   const ok = await waitFor(() => !!elByTestId(id), { timeoutMs, tickMs: 50 });
   return ok ? elByTestId(id) : null;
 };
 
-const setNativeValue = (el, value) => {
+const setNativeValue = (el: HTMLInputElement | HTMLTextAreaElement | null, value: unknown): void => {
   const v = toStr(value);
   if (!el) return;
   const tag = String(el.tagName || '').toLowerCase();
@@ -109,7 +130,7 @@ const setNativeValue = (el, value) => {
   else el.value = v;
 };
 
-const scrollIntoViewIfNeeded = (el) => {
+const scrollIntoViewIfNeeded = (el: Element | null): void => {
   if (!el) return;
   try {
     el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
@@ -159,16 +180,23 @@ const getState = () => {
   };
 };
 
-export const resolvePolisReportSessionSlug = ({ params = {}, state = {} } = {}) => (
+export const resolvePolisReportSessionSlug = ({
+  params = {},
+  state = {},
+}: {
+  params?: CeAgentRecord;
+  state?: CeAgentRecord;
+} = {}): string => (
   toStr(params?.sessionSlug || params?.slug || state?.activeSessionSlug).trim()
 );
 
-const perform = async (action) => {
+const perform = async (action: unknown): Promise<CeAgentActionResult> => {
   const a = action && typeof action === 'object' ? action : null;
-  const type = toStr(a?.type).trim();
+  const actionRecord = a as CeAgentAction | null;
+  const type = toStr(actionRecord?.type).trim();
   const startedAt = new Date().toISOString();
 
-  const err = (message) => ({
+  const err = (message: unknown): CeAgentActionResult => ({
     ok: false,
     type,
     at: startedAt,
@@ -178,7 +206,7 @@ const perform = async (action) => {
   if (!type) return err('Missing action.type');
 
   if (type === 'navigate') {
-    const to = toStr(a?.to).trim();
+    const to = toStr(actionRecord?.to).trim();
     if (!to) return err('navigate.to is required');
     if (typeof window === 'undefined' || !window.history) return err('No window.history available');
     window.history.pushState({}, '', to);
@@ -192,8 +220,8 @@ const perform = async (action) => {
   }
 
   if (type === 'fill') {
-    const testId = toStr(a?.testId).trim();
-    const value = toStr(a?.value);
+    const testId = toStr(actionRecord?.testId).trim();
+    const value = toStr(actionRecord?.value);
     if (!testId) return err('fill.testId is required');
     const el = await waitForTestId(testId, { timeoutMs: 20000 });
     if (!el) return err(`fill: element not found for testId=${testId}`);
@@ -202,31 +230,32 @@ const perform = async (action) => {
       return err(`fill: element is not input/textarea (tag=${tag}) testId=${testId}`);
     }
     scrollIntoViewIfNeeded(el);
-    try { el.focus(); } catch (e) { log.warn('ceAgent: fallback', e); }
-    setNativeValue(el, value);
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    const inputEl = el as HTMLInputElement | HTMLTextAreaElement;
+    try { inputEl.focus(); } catch (e) { log.warn('ceAgent: fallback', e); }
+    setNativeValue(inputEl, value);
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
     // Best-effort wait for React to reconcile.
-    await waitFor(() => toStr(el.value) === value, { timeoutMs: 2000, tickMs: 50 });
+    await waitFor(() => toStr(inputEl.value) === value, { timeoutMs: 2000, tickMs: 50 });
     return { ok: true, type, at: startedAt, result: { testId, value } };
   }
 
   if (type === 'click') {
-    const testId = toStr(a?.testId).trim();
+    const testId = toStr(actionRecord?.testId).trim();
     if (!testId) return err('click.testId is required');
     const el = await waitForTestId(testId, { timeoutMs: 20000 });
     if (!el) return err(`click: element not found for testId=${testId}`);
     scrollIntoViewIfNeeded(el);
     // Click even if not strictly "visible"; some toggles are clipped but still clickable.
-    try { el.click(); } catch (e) { return err(`click failed: ${e?.message || e}`); }
+    try { (el as HTMLElement).click(); } catch (e) { return err(`click failed: ${(e as Error)?.message || e}`); }
     return { ok: true, type, at: startedAt, result: { testId } };
   }
 
   if (type === 'assertVisible') {
-    const testId = toStr(a?.testId).trim();
+    const testId = toStr(actionRecord?.testId).trim();
     if (!testId) return err('assertVisible.testId is required');
     const timeoutMs = (() => {
-      const raw = a?.timeoutMs ?? a?.timeout;
+      const raw = actionRecord?.timeoutMs ?? actionRecord?.timeout;
       const parsed = Number(raw);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 30000;
     })();
@@ -236,8 +265,10 @@ const perform = async (action) => {
   }
 
   if (type === 'invokeAi') {
-    const tool = toStr(a?.tool).trim();
-    const params = a?.params && typeof a.params === 'object' ? a.params : {};
+    const tool = toStr(actionRecord?.tool).trim();
+    const params = actionRecord?.params && typeof actionRecord.params === 'object'
+      ? actionRecord.params as CeAgentRecord
+      : {};
 
     if (tool === 'CompareAddresses') {
       const addressA = toStr(params.addressA || params.a).trim();
@@ -287,7 +318,7 @@ const perform = async (action) => {
       // Ensure Demo Data is enabled so summaries are deterministic.
       const demoToggle = await waitForTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE, { timeoutMs: 20000 });
       if (!demoToggle) return err('PolisReport: missing demo data toggle');
-      if (!demoToggle.checked) {
+      if (!(demoToggle as HTMLInputElement).checked) {
         const demoRes = await perform({ type: 'click', testId: E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE });
         if (!demoRes.ok) return demoRes;
       }
@@ -315,7 +346,7 @@ const perform = async (action) => {
   return err(`Unsupported action.type: ${type}`);
 };
 
-const run = async (actions) => {
+const run = async (actions: unknown): Promise<CeAgentRunResult> => {
   const arr = Array.isArray(actions) ? actions : null;
   if (!arr) return { ok: false, results: [{ ok: false, type: 'run', at: new Date().toISOString(), error: 'run(actions) expects an array' }] };
 
