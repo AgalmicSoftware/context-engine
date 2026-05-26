@@ -37,6 +37,7 @@ import {
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
@@ -310,6 +311,53 @@ describe('surveyQuestionsTypes', () => {
       viewingAnswers: true,
     }).jsonForDisplay).toEqual({
       message: 'No response found for question from address: N/A',
+    });
+  });
+
+  it('builds SurveyQuestions layout display state for full survey flows', () => {
+    const styleMap = {
+      singleQuestionPage: 'single-page',
+      singleQuestionReadPage: 'single-read',
+      singleQuestionResponseView: 'single-response',
+      singleQuestionTopBar: 'single-top',
+    };
+
+    expect(buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: ' governance ',
+      isStandalone: false,
+      singleQuestionMode: false,
+      styleMap,
+      viewingAnswers: true,
+    })).toEqual({
+      activeTagModalTag: 'governance',
+      responseViewClassName: undefined,
+      surveyPageClassName: undefined,
+      topSectionClassName: undefined,
+      useTagModal: true,
+    });
+  });
+
+  it('builds SurveyQuestions layout display state for single-question flows', () => {
+    const styleMap = {
+      singleQuestionPage: 'single-page',
+      singleQuestionReadPage: 'single-read',
+      singleQuestionResponseView: 'single-response',
+      singleQuestionTopBar: 'single-top',
+    };
+
+    expect(buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: ' governance ',
+      isSingleQuestionView: true,
+      isStandalone: true,
+      singleQuestionMode: true,
+      styleMap,
+      viewingAnswers: true,
+    })).toEqual({
+      activeTagModalTag: '',
+      responseViewClassName: 'single-response',
+      surveyPageClassName: 'single-page single-read',
+      topSectionClassName: 'single-top',
+      useTagModal: false,
     });
   });
 
