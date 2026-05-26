@@ -137,7 +137,7 @@ export const usesWorkerSbtGateCloudflareStorage = (sessionConfig: unknown = null
   normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
 );
 
-export const usesPublicReadCloudflareStorage = (sessionConfig = null, opts = {}) => (
+export const usesPublicReadCloudflareStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
   usesCloudflareSessionStorage(sessionConfig, opts) &&
   normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
 );
