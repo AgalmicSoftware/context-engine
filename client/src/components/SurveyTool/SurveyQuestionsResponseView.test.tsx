@@ -18,7 +18,7 @@ describe('SurveyQuestionsResponseView', () => {
         isLoadingResponse
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-      />,
+      />
     );
 
     expect(screen.getByText(/Loading\.\.\./)).toBeInTheDocument();
@@ -33,7 +33,7 @@ describe('SurveyQuestionsResponseView', () => {
         responseLookupWarning="Lookup warning"
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-      />,
+      />
     );
 
     expect(screen.getByText('Lookup warning')).toBeInTheDocument();
@@ -45,12 +45,12 @@ describe('SurveyQuestionsResponseView', () => {
         viewAddress="0xabc"
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-      />,
+      />
     );
 
-    expect(
-      screen.getAllByText((_, element) => element?.textContent === 'No response for this question from address: 0xabc'),
-    ).not.toHaveLength(0);
+    expect(screen.getAllByText((_, element) =>
+      element?.textContent === 'No response for this question from address: 0xabc'
+    )).not.toHaveLength(0);
     expect(renderQuestionAnswer).not.toHaveBeenCalled();
     expect(renderSurveyAnswers).not.toHaveBeenCalled();
   });
@@ -59,29 +59,29 @@ describe('SurveyQuestionsResponseView', () => {
     const question = { id: 'q1', prompt: 'Question?' };
     const parsedViewAddressAnswers = { q1: 'viewed answer' };
 
-    const { container } = render(
+    render(
       <SurveyQuestionsResponseView
-        layoutDisplayState={{ responseViewClassName: 'response-view' }}
         parsedViewAddressAnswers={parsedViewAddressAnswers}
         questionPool={[question]}
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-        routeViewDisplayState={{
-          isOwnResponse: undefined,
-          shortenedViewAddress: '0xabc...1234',
-          viewedAddressLower: '0xabc1234',
-          viewedAddressRaw: '0xABC1234',
-        }}
+        shortenedViewAddress="0xabc...1234"
         singleQuestionMode
-      />,
+        viewedAddressLower="0xabc1234"
+        viewedAddressRaw="0xABC1234"
+      />
     );
 
-    expect(container.firstElementChild).toHaveClass('response-view');
     expect(screen.getByRole('link', { name: '0xabc...1234' })).toHaveAttribute('href', '/u/0xabc1234');
     expect(screen.getByText('Response:')).toBeInTheDocument();
     expect(screen.getByTestId('single-answer')).toBeInTheDocument();
-    expect(renderQuestionAnswer).toHaveBeenCalledWith(question, parsedViewAddressAnswers, 0, undefined);
+    expect(renderQuestionAnswer).toHaveBeenCalledWith(
+      question,
+      parsedViewAddressAnswers,
+      0,
+      undefined
+    );
     expect(renderSurveyAnswers).not.toHaveBeenCalled();
   });
 
@@ -90,18 +90,13 @@ describe('SurveyQuestionsResponseView', () => {
 
     render(
       <SurveyQuestionsResponseView
+        isOwnResponse
         questionPool={[{ id: 'q1' }]}
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-        routeViewDisplayState={{
-          isOwnResponse: true,
-          shortenedViewAddress: '',
-          viewedAddressLower: '',
-          viewedAddressRaw: '',
-        }}
         userAnswers={{ responses }}
-      />,
+      />
     );
 
     expect(screen.getByTestId('survey-answers')).toBeInTheDocument();
@@ -117,7 +112,7 @@ describe('SurveyQuestionsResponseView', () => {
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
         singleQuestionMode
-      />,
+      />
     );
 
     expect(screen.getByText(/Loading answer data\.\.\./)).toBeInTheDocument();
