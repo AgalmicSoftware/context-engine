@@ -39,6 +39,7 @@ import {
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
+  buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
@@ -252,6 +253,83 @@ describe('surveyQuestionsTypes', () => {
       responseJsonToggleClassName: 'single-toggle response-toggle',
       surveyJsonPanelClassName: 'single-panel',
     });
+  });
+
+  it('builds SurveyQuestions route view display state for viewed addresses', () => {
+    const shortenAddress = jest.fn((address, notClickable) => `${address}:${notClickable}`);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xdef',
+      shortenAddress,
+      viewAddress: ' 0xABC ',
+    })).toEqual({
+      viewedAddressRaw: '0xABC',
+      viewedAddressLower: '0xabc',
+      shortenedViewAddress: '0xABC:false',
+      isOwnResponse: false,
+      isSingleQuestionView: undefined,
+    });
+    expect(shortenAddress).toHaveBeenCalledWith('0xABC', false);
+  });
+
+  it('preserves SurveyQuestions route view fallback and own-response checks', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xABC',
+    })).toMatchObject({
+      viewedAddressRaw: '0xABC',
+      viewedAddressLower: '0xabc',
+      shortenedViewAddress: '0xABC',
+      isOwnResponse: true,
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xABC',
+      viewAddress: '0xdef',
+    })).toMatchObject({
+      viewedAddressRaw: '0xdef',
+      isOwnResponse: true,
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      userHasResponse: true,
+    }).isOwnResponse).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      viewAddress: '0xABC',
+    }).isOwnResponse).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      viewAddress: ' 0xABC ',
+    }).isOwnResponse).toBe(false);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState().shortenedViewAddress).toBe('');
+  });
+
+  it('builds SurveyQuestions single-question route flags without moving state', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      singleQuestionMode: true,
+    }).isSingleQuestionView).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: [{ id: 'q1' }],
+    }).isSingleQuestionView).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+    }).isSingleQuestionView).toBe(false);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: null,
+    }).isSingleQuestionView).toBe(false);
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {

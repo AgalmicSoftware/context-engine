@@ -62,6 +62,14 @@ export type SurveyQuestionsJsonPanelDisplayState = {
   surveyJsonPanelClassName: string | undefined;
 };
 
+export type SurveyQuestionsRouteViewDisplayState = {
+  viewedAddressRaw: string;
+  viewedAddressLower: string;
+  shortenedViewAddress: string;
+  isOwnResponse: unknown;
+  isSingleQuestionView: unknown;
+};
+
 export type SurveyAutoDecryptDisabledStatePatch = {
   autoDecryptEnabled: boolean;
   decryptingByKey: Record<string, unknown>;
@@ -728,6 +736,51 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
     questionJsonToggleClassName,
     responseJsonToggleClassName,
     surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
+};
+
+export const buildSurveyQuestionsRouteViewDisplayState = ({
+  account,
+  isStandalone,
+  questionPool,
+  responderAddress,
+  shortenAddress,
+  singleQuestionMode,
+  userHasResponse,
+  viewAddress,
+}: {
+  account?: string;
+  isStandalone?: unknown;
+  questionPool?: unknown;
+  responderAddress?: string;
+  shortenAddress?: (address: string, notClickable: boolean) => string;
+  singleQuestionMode?: unknown;
+  userHasResponse?: unknown;
+  viewAddress?: string;
+} = {}): SurveyQuestionsRouteViewDisplayState => {
+  const viewedAddressRaw = String(viewAddress || responderAddress || '').trim();
+  const viewedAddressLower = viewedAddressRaw.toLowerCase();
+  const shortenedViewAddress = viewedAddressRaw
+    ? (shortenAddress || ((address: string) => address))(viewedAddressRaw, false)
+    : '';
+  const isOwnResponse =
+    (viewAddress &&
+      account &&
+      viewAddress.toLowerCase() === account.toLowerCase()) ||
+    (responderAddress &&
+      account &&
+      responderAddress.toLowerCase() === account.toLowerCase()) ||
+    (!viewAddress && !responderAddress && account && userHasResponse);
+  const isSingleQuestionView =
+    singleQuestionMode ||
+    (isStandalone && Array.isArray(questionPool) && questionPool.length === 1);
+
+  return {
+    viewedAddressRaw,
+    viewedAddressLower,
+    shortenedViewAddress,
+    isOwnResponse,
+    isSingleQuestionView,
   };
 };
 
