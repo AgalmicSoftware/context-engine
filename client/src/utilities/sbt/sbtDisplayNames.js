@@ -24,12 +24,19 @@ import {
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayInflightLookupKey,
+  buildSbtDisplayLabelMemoKey,
+  buildSbtDisplayRetryStateKey,
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
+  isSbtDisplayMetadataRecord,
   isSbtMetadataFieldLocked,
   normalizeSbtDisplayChainId as normalizeChainId,
   resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
   resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
+  resolveSbtDisplayRetryAllowed,
+  resolveSbtMetadataLookupDecision,
+  shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
@@ -106,9 +113,7 @@ const getNameLookupDelayMs = (attempts) => {
   return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
 };
 
-const getDisplayLabelMemoKey = ({ addressLower = '', preferredSlug = '', chainId = null } = {}) => (
-  `${toStr(addressLower).trim().toLowerCase()}|${sanitizeSlug(preferredSlug)}|${normalizeChainId(chainId)}`
-);
+const getDisplayLabelMemoKey = buildSbtDisplayLabelMemoKey;
 
 const readDisplayLabelMemoEntry = (memoKey) => {
   const key = toStr(memoKey).trim();
@@ -127,7 +132,7 @@ const readDisplayLabelMemoEntry = (memoKey) => {
 
 const writeDisplayLabelMemoEntry = (memoKey, value) => {
   const key = toStr(memoKey).trim();
-  if (!key || !value || typeof value !== 'object' || !value.name) return;
+  if (!shouldWriteSbtDisplayLabelMemoEntry({ memoKey: key, value })) return;
   displayLabelMemoByKey.delete(key);
   displayLabelMemoByKey.set(key, { value, ts: Date.now() });
   while (displayLabelMemoByKey.size > DISPLAY_LABEL_MEMO_MAX) {
@@ -203,9 +208,7 @@ const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = nu
   return out;
 };
 
-const getRetryStateKey = ({ addressLower = '', slug = '', chainId = null } = {}) => (
-  `${addressLower}|${sanitizeSlug(slug)}|${Number(chainId || 0) || 0}`
-);
+const getRetryStateKey = buildSbtDisplayRetryStateKey;
 
 const pruneRetryStateCache = (now = Date.now()) => {
   const staleBefore = now - RETRY_STATE_TTL_MS;
@@ -227,8 +230,7 @@ const pruneRetryStateCache = (now = Date.now()) => {
 
 const canRetryNameLookup = (retryKey, now = Date.now()) => {
   pruneRetryStateCache(now);
-  const retryAt = Number(retryStateByKey.get(retryKey)?.nextRetryAt || 0);
-  return !Number.isFinite(retryAt) || retryAt <= now;
+  return resolveSbtDisplayRetryAllowed(retryStateByKey.get(retryKey), now);
 };
 
 const markNameLookupFailure = (retryKey, now = Date.now()) => {
@@ -463,7 +465,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
 
   if (!canRetryNameLookup(retryKey)) return null;
 
-  const inFlightKey = `${retryKey}|lookup`;
+  const inFlightKey = buildSbtDisplayInflightLookupKey(retryKey);
   if (inflightByKey.has(inFlightKey)) {
     return inflightByKey.get(inFlightKey);
   }
@@ -477,7 +479,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
       });
 
       const metadata = await contractScripts.getSbtMetadata('none', checksum, cfg);
-      if (!metadata || typeof metadata !== 'object') {
+      if (!isSbtDisplayMetadataRecord(metadata)) {
         markNameLookupFailure(retryKey);
         return null;
       }
@@ -491,13 +493,14 @@ export const hydrateSbtDisplayNameTargeted = async ({
         });
       }
 
-      const name = getSbtDisplayNameValue(metadata);
-      if (!name) {
+      const metadataDecision = resolveSbtMetadataLookupDecision(metadata);
+      if (!metadataDecision.shouldUseResult) {
         markNameLookupFailure(retryKey);
         return null;
       }
 
       clearNameLookupFailure(retryKey);
+      const name = metadataDecision.name;
 
       const resolved = {
         address: checksum,

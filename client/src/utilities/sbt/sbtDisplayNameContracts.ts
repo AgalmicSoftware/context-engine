@@ -24,6 +24,15 @@ export type SbtCacheNameHit = {
   entry: unknown;
 };
 
+export type SbtMetadataLookupDecision = {
+  status: 'missing' | 'unnamed' | 'named';
+  hasMetadataRecord: boolean;
+  name: string;
+  shouldMarkFailure: boolean;
+  shouldClearFailure: boolean;
+  shouldUseResult: boolean;
+};
+
 export const SBT_MASKED_FIELD_VALUE = '[encrypted]';
 
 export const LEGACY_SBT_ENCRYPTED_FIELD_KEYS = Object.freeze({
@@ -46,9 +55,60 @@ const readSbtRecordValue = (value: unknown, key: string): unknown => (
 
 export const getSbtDisplayAddressLower = (value: unknown): string => toStr(value).trim().toLowerCase();
 
+export const normalizeSbtDisplaySlug = (value: unknown): string => toStr(value).trim().toLowerCase();
+
 export const normalizeSbtDisplayChainId = (value: unknown): number => {
   const chainId = Number(value);
   return Number.isFinite(chainId) && chainId > 0 ? chainId : 0;
+};
+
+export const buildSbtDisplayLabelMemoKey = ({
+  addressLower = '',
+  preferredSlug = '',
+  chainId = null,
+}: {
+  addressLower?: unknown;
+  preferredSlug?: unknown;
+  chainId?: unknown;
+} = {}): string => (
+  `${toStr(addressLower).trim().toLowerCase()}|${normalizeSbtDisplaySlug(preferredSlug)}|${normalizeSbtDisplayChainId(chainId)}`
+);
+
+export const buildSbtDisplayRetryStateKey = ({
+  addressLower = '',
+  slug = '',
+  chainId = null,
+}: {
+  addressLower?: unknown;
+  slug?: unknown;
+  chainId?: unknown;
+} = {}): string => (
+  `${addressLower === undefined ? '' : String(addressLower)}|${normalizeSbtDisplaySlug(slug)}|${Number(chainId || 0) || 0}`
+);
+
+export const buildSbtDisplayInflightLookupKey = (retryKey: unknown): string => (
+  `${retryKey === undefined ? '' : String(retryKey)}|lookup`
+);
+
+export const resolveSbtDisplayRetryAllowed = (retryStateEntry: unknown, now: unknown): boolean => {
+  const retryAt = Number(readSbtRecordValue(retryStateEntry, 'nextRetryAt') || 0);
+  return !Number.isFinite(retryAt) || retryAt <= Number(now);
+};
+
+export const shouldWriteSbtDisplayLabelMemoEntry = ({
+  memoKey,
+  value,
+}: {
+  memoKey?: unknown;
+  value?: unknown;
+} = {}): boolean => {
+  const key = toStr(memoKey).trim();
+  return !!(
+    key &&
+    value &&
+    typeof value === 'object' &&
+    readSbtRecordValue(value, 'name')
+  );
 };
 
 export const getLegacySbtEncryptedFieldKeys = (fieldKey: unknown): readonly string[] => {
@@ -101,6 +161,40 @@ export const getSbtMetadataDisplayNameValue = (info: unknown): string => {
   }
   if (nameLocked) return SBT_MASKED_FIELD_VALUE;
   return '';
+};
+
+export const resolveSbtMetadataLookupDecision = (metadata: unknown): SbtMetadataLookupDecision => {
+  if (!isSbtDisplayMetadataRecord(metadata)) {
+    return {
+      status: 'missing',
+      hasMetadataRecord: false,
+      name: '',
+      shouldMarkFailure: true,
+      shouldClearFailure: false,
+      shouldUseResult: false,
+    };
+  }
+
+  const name = getSbtMetadataDisplayNameValue(metadata);
+  if (!name) {
+    return {
+      status: 'unnamed',
+      hasMetadataRecord: true,
+      name: '',
+      shouldMarkFailure: true,
+      shouldClearFailure: false,
+      shouldUseResult: false,
+    };
+  }
+
+  return {
+    status: 'named',
+    hasMetadataRecord: true,
+    name,
+    shouldMarkFailure: false,
+    shouldClearFailure: true,
+    shouldUseResult: true,
+  };
 };
 
 export const resolveSbtCacheEntryFromBucket = (
