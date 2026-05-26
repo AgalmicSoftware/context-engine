@@ -2,6 +2,7 @@ import {
   buildLoginSettingsSponsorshipCard,
   buildLoginSettingsSponsorshipCards,
   formatSponsoredStatusMeta,
+  formatResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
 
@@ -108,5 +109,38 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(cards[0].status.label).toBe('Gate unlocked');
     expect(cards[3].status.label).toBe('Not sponsored');
     expect(cards[3].otherSponsorSessions.map((entry: any) => entry.label)).toEqual(['Funding']);
+  });
+
+  it('formats resource sponsor hints without changing active and other-session fallbacks', () => {
+    const sponsorSessions = {
+      byResource: {
+        rpc: [
+          { slug: 'active', label: 'Active', isActive: true },
+          { slug: 'backup', label: 'Backup', isActive: false },
+        ],
+        arweave: [
+          { slug: 'archive', label: 'Archive', isActive: false },
+        ],
+      },
+    };
+
+    expect(formatResourceSponsorHint({
+      resourceKey: 'rpc',
+      resourceLabel: 'RPC',
+      sponsoredKeys: { rpc: 'key' },
+      sponsorSessions,
+    })).toBe('RPC sponsor is configured for the active session. Other sessions also sponsor RPC: Backup.');
+    expect(formatResourceSponsorHint({
+      resourceKey: 'arweave',
+      resourceLabel: 'Arweave',
+      sponsoredKeys: {},
+      sponsorSessions,
+    })).toBe('No active-session Arweave sponsor. Other sessions with Arweave: Archive. Switch sessions to use one.');
+    expect(formatResourceSponsorHint({
+      resourceKey: 'ai',
+      resourceLabel: 'AI',
+      sponsoredKeys: {},
+      sponsorSessions,
+    })).toBe('No active-session AI sponsor configured.');
   });
 });
