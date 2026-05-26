@@ -1,4 +1,4 @@
-/** @file storageClient.js */
+/** @file storageClient.ts */
 
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
@@ -15,15 +15,49 @@ import {
   resolveSessionStorageBackend,
 } from './sessionStorageConfig.js';
 
-const normalizeWorkerBaseUrl = (rawUrl) => toStr(rawUrl).trim().replace(/\/+$/, '');
-const normalizeTags = (tags) => (
+type UnknownRecord = Record<string, unknown>;
+
+interface StorageWorkerOptions {
+  sessionSlug?: unknown;
+  sessionConfig?: unknown;
+  context?: unknown;
+  workerUrl?: unknown;
+}
+
+interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
+  tags?: unknown;
+  contentType?: unknown;
+  resource?: unknown;
+  encrypted?: unknown;
+  payloadEncrypted?: unknown;
+  arweaveJwk?: unknown;
+}
+
+interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
+  storageRef?: unknown;
+}
+
+interface ListSessionStorageRefsOptions extends StorageWorkerOptions {
+  resource?: unknown;
+}
+
+const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
+const normalizeTags = (tags: unknown): Array<{ name: string; value: string }> => (
   (Array.isArray(tags) ? tags : [])
     .filter((tag) => tag && typeof tag === 'object')
-    .map((tag) => ({ name: toStr(tag.name).trim(), value: toStr(tag.value).trim() }))
+    .map((tag) => ({
+      name: toStr((tag as UnknownRecord).name).trim(),
+      value: toStr((tag as UnknownRecord).value).trim(),
+    }))
     .filter((tag) => tag.name && tag.value !== '')
 );
 
-const resolveStorageWorkerUrl = async ({ sessionSlug, sessionConfig, context, workerUrl } = {}) => {
+const resolveStorageWorkerUrl = async ({
+  sessionSlug,
+  sessionConfig,
+  context,
+  workerUrl,
+}: StorageWorkerOptions = {}): Promise<string> => {
   const explicit = normalizeWorkerBaseUrl(workerUrl);
   if (explicit) return explicit;
   const resolved = await getCorsProxyUrlOrThrow({
@@ -35,9 +69,15 @@ const resolveStorageWorkerUrl = async ({ sessionSlug, sessionConfig, context, wo
   return normalizeWorkerBaseUrl(resolved);
 };
 
-const parseStorageUploadResponse = async (response) => {
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error || body?.message || `Storage upload failed (${response.status}).`);
+const parseStorageUploadResponse = async (response: Response): Promise<UnknownRecord> => {
+  const body = await response.json().catch(() => ({})) as UnknownRecord;
+  if (!response.ok) {
+    throw new Error(
+      (body?.error as string) ||
+      (body?.message as string) ||
+      `Storage upload failed (${response.status}).`
+    );
+  }
   const storageRef = normalizeStorageRef(body?.storageRef || body, {
     legacyArweaveTxId: body?.arweaveTxId || body?.txId || body?.id,
   });
@@ -45,7 +85,7 @@ const parseStorageUploadResponse = async (response) => {
   return { ...body, storageRef, id: storageRef.id };
 };
 
-export const uploadDataToSessionStorage = async (data, format, {
+export const uploadDataToSessionStorage = async (data: unknown, format: unknown, {
   sessionSlug = '',
   sessionConfig = null,
   context = null,
@@ -56,7 +96,7 @@ export const uploadDataToSessionStorage = async (data, format, {
   encrypted = false,
   payloadEncrypted = false,
   arweaveJwk = '',
-} = {}) => {
+}: UploadDataToSessionStorageOptions = {}): Promise<UnknownRecord> => {
   const payloadIsEncrypted = encrypted || payloadEncrypted;
   const backend = resolveSessionStorageBackend(sessionConfig, { resource, encrypted: payloadIsEncrypted });
   const normalizedTags = normalizeTags(tags);
@@ -103,12 +143,12 @@ export const uploadDataToSessionStorage = async (data, format, {
       : 'application/json'
   );
 
-  let requestInit;
+  let requestInit: RequestInit;
   if (typeof File !== 'undefined' && (data instanceof File || data instanceof Blob)) {
     const form = new FormData();
-    form.append('file', data, data.name || 'payload.bin');
+    form.append('file', data, (data as File).name || 'payload.bin');
     form.append('backend', STORAGE_BACKENDS.CLOUDFLARE);
-    form.append('resource', resource);
+    form.append('resource', resource as string);
     form.append('contentType', bodyContentType);
     form.append('payloadEncrypted', payloadIsEncrypted ? 'true' : 'false');
     if (normalizedTags.length) form.append('tags', JSON.stringify(normalizedTags));
@@ -142,7 +182,13 @@ export const uploadDataToSessionStorage = async (data, format, {
   };
 };
 
-export const readSessionStorageBlob = async ({ storageRef, sessionSlug = '', sessionConfig = null, context = null, workerUrl = '' } = {}) => {
+export const readSessionStorageBlob = async ({
+  storageRef,
+  sessionSlug = '',
+  sessionConfig = null,
+  context = null,
+  workerUrl = '',
+}: ReadSessionStorageBlobOptions = {}): Promise<Response> => {
   const ref = normalizeStorageRef(storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
@@ -162,9 +208,15 @@ export const readSessionStorageBlob = async ({ storageRef, sessionSlug = '', ses
   return response;
 };
 
-export const listSessionStorageRefs = async ({ sessionSlug = '', sessionConfig = null, context = null, workerUrl = '', resource = 'docsContext' } = {}) => {
+export const listSessionStorageRefs = async ({
+  sessionSlug = '',
+  sessionConfig = null,
+  context = null,
+  workerUrl = '',
+  resource = 'docsContext',
+}: ListSessionStorageRefsOptions = {}): Promise<unknown[]> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
-  const endpoint = `${baseUrl}/storage/list?resource=${encodeURIComponent(resource)}`;
+  const endpoint = `${baseUrl}/storage/list?resource=${encodeURIComponent(resource as string)}`;
   const response = await fetchWorkerWithAuth(endpoint, { method: 'GET' }, {
     sessionSlug,
     sessionConfig,
@@ -173,7 +225,7 @@ export const listSessionStorageRefs = async ({ sessionSlug = '', sessionConfig =
     allowDemoFallback: defaultStrictAllowDemoFallback(),
     preferAnonymous: true,
   });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body?.error || `Storage list failed (${response.status}).`);
+  const body = await response.json().catch(() => ({})) as UnknownRecord;
+  if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);
   return Array.isArray(body?.items) ? body.items : [];
 };
