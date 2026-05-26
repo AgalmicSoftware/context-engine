@@ -217,7 +217,6 @@ import {
   buildQuestionDashboardLoadContextSignature,
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
-  buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
   loadDraftAnswersByQuestionIdSafely,
   buildDraftHydrationPatchForQuestion,
@@ -305,10 +304,9 @@ import {
   canUseRecentQuestionPayloadForAccount,
   clampSliderValue,
   computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
+  mergePersistedDraftPayloads,
   ensureQuestionsNet,
   ensureSurveysNet,
-  formatQuestionScanBlockCount,
   getActiveSessionSlugFromProps,
   getBlockedQuestionIdsSet,
   getConvictionFromResponse,
@@ -333,7 +331,6 @@ import {
   mergeQuestionResponses,
   mergeSurveyResponsePayloads,
   normalizeQuestionIdKey,
-  normalizeQuestionProgressSlug,
   normalizeSessionSlugValue,
   normalizeSurveyToolFilterState,
   readQuestionsCache,
@@ -529,8 +526,8 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonTreeItemStyle,
-  buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
@@ -10699,24 +10696,13 @@ export class SurveyQuestions extends Component {
       visibleQuestionPool.length === 0 &&
       !!this.props.isQuestionCacheReady;
     const hasHiddenMaskedQuestions = hiddenMaskedQuestionIds.length > 0;
-    const progressSlug = normalizeQuestionProgressSlug(
-      (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(this.props) ||
-      ''
-    );
-    const questionScanProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
-        : null;
-    const scanProgressDisplay = buildQuestionScanProgressDisplay(questionScanProgress);
-    const scanTotalBlocks = scanProgressDisplay.totalBlocks;
-    const scanRemainingBlocks = scanProgressDisplay.remainingBlocks;
-    const scanPercent = scanProgressDisplay.percentComplete;
-    const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
-    const hydrateDone = Math.max(0, Number(questionScanProgress?.hydratedQuestions || 0));
-    const isHydrating = questionScanProgress?.phase === 'hydrate';
-    const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
+    const fullLoadingProgress = buildSurveyQuestionsFullLoadingProgressState({
+      questionScanProgress: this.props.questionScanProgress,
+      progressSlug:
+        (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : '') ||
+        resolveEffectiveSlug(this.props) ||
+        '',
+    });
 
     if (
       !currentSurveyResponseState ||
@@ -10730,28 +10716,16 @@ export class SurveyQuestions extends Component {
           <div className={styles.loadingContainer}>
             <FontAwesomeIcon icon={faSpinner} spin />
             <div className={styles.fullLoadingHeadline}>Loading questions...</div>
-            {hasFullLoadingProgress && (
+            {fullLoadingProgress.hasFullLoadingProgress && (
               <div className={styles.fullLoadingProgressWrap}>
                 <div className={styles.fullLoadingProgressMeta}>
-                  <span>
-                    {isHydrating
-                      ? `${Math.max(0, hydrateDiscovered - Math.min(hydrateDone, hydrateDiscovered))} items left`
-                      : scanProgressDisplay.metaLeftText}
-                  </span>
-                  <span>
-                    {isHydrating
-                      ? `${Math.min(hydrateDone, hydrateDiscovered)} / ${hydrateDiscovered}`
-                      : scanProgressDisplay.metaRightText}
-                  </span>
+                  <span>{fullLoadingProgress.metaLeftText}</span>
+                  <span>{fullLoadingProgress.metaRightText}</span>
                 </div>
                 <div className={styles.fullLoadingProgressBar}>
                   <div
                     className={styles.fullLoadingProgressFill}
-                    style={{
-                      width: `${isHydrating
-                        ? (hydrateDiscovered > 0 ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100) : 0)
-                        : scanPercent}%`,
-                    }}
+                    style={fullLoadingProgress.fillStyle}
                   />
                 </div>
               </div>

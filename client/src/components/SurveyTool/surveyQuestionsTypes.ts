@@ -7,7 +7,6 @@ import {
   doesQuestionProgressMatchSlug,
   normalizeQuestionProgressSlug,
 } from './surveyToolViewState.js';
-import { filterPendingQuestionMetadataPlaceholders } from './surveyQuestionMetadataPlaceholders.js';
 
 export type SurveyQuestionsLegacyRecord = Record<string, any>;
 export type SurveyQuestionsLegacyValue = SurveyQuestionsLegacyRecord[string];
@@ -82,116 +81,6 @@ export type SurveyQuestionsFullLoadingProgressState = {
   metaLeftText: string;
   metaRightText: string;
   fillStyle: { width: string };
-};
-
-export type SurveyQuestionsJsonPanelDisplayState = {
-  showFullSurveyJsonControls: boolean;
-  showQuestionJsonControls: boolean;
-  showQuestionsJson: boolean;
-  showSurveyJsonPanel: boolean;
-  showQuestionsJsonPanel: boolean;
-  showResponseJson: boolean;
-  showResponseJsonPanel: boolean;
-  showSurveyJson: boolean;
-  surveyJsonRowClassName: string | undefined;
-  surveyJsonToggleClassName: string | undefined;
-  questionJsonToggleClassName: string | undefined;
-  responseJsonToggleClassName: string | undefined;
-  surveyJsonPanelClassName: string | undefined;
-};
-
-export type SurveyQuestionsJsonForDisplayState = {
-  jsonForDisplay: unknown;
-};
-
-export type SurveyQuestionsJsonPreviewDisplayState = {
-  canUseJsonPreview: boolean;
-  jsonPreview: unknown;
-};
-
-export type SurveyQuestionsLayoutDisplayState = {
-  activeTagModalTag: string;
-  responseViewClassName: string | undefined;
-  surveyPageClassName: string | undefined;
-  topSectionClassName: string | undefined;
-  useTagModal: boolean;
-};
-
-export type SurveyQuestionsRouteViewDisplayState = {
-  viewedAddressRaw: string;
-  viewedAddressLower: string;
-  shortenedViewAddress: string;
-  isOwnResponse: unknown;
-  isSingleQuestionView: unknown;
-  showViewAnswersButton: unknown;
-  viewAnswersButtonText: string;
-};
-
-export type SurveyQuestionsSubmitFooterDisplayState = {
-  submittedStateActive: boolean;
-  submittedIndicatorActive: boolean;
-  singleQuestionSubmittedIndicatorActive: boolean;
-  showSubmitAux: boolean;
-  uploadStatusText: string;
-  submitDisabled: boolean;
-  canEditQuestions: boolean;
-  hasPendingEdits: boolean;
-  genericShowInlineSubmit: boolean;
-  showInlineSubmit: boolean;
-  showTopInlineSubmit: boolean;
-};
-
-export type SurveyQuestionsSubmitReadinessDescriptor = {
-  currentStep: number;
-  encryptedPendingEditCount: number;
-  hasEncryptedAnswers: boolean;
-  hasMaskedCurrentQuestionPayload: boolean;
-  isSubmitting: boolean;
-  pendingEditCount: number;
-  shouldCheckMaskedCurrentQuestionPayload: boolean;
-  singleQuestionMode: boolean;
-  uploadPhase: 'encrypting' | 'uploading';
-};
-
-export type SurveyQuestionsRenderReadinessDescriptor = {
-  surveyIndex: number;
-  currentSurveyResponseState: ResponseSlice | null;
-  fullQuestionPool: unknown[];
-  visibleQuestionPool: unknown[];
-  hiddenMaskedQuestionIds: string[];
-  questionPoolReady: boolean;
-  gatedEmptyStateReady: boolean;
-  hasHiddenMaskedQuestions: boolean;
-  canFallThroughDisplayAnswerMode: boolean;
-  shouldShowLoadingState: boolean;
-};
-
-export type SurveyQuestionsMaskedQuestionVisibilityState = {
-  fullQuestionPool: unknown[];
-  visibleQuestionPool: unknown[];
-  hiddenMaskedQuestionIds: string[];
-};
-
-export type SurveyQuestionsAuthoringPanelDisplayState = {
-  showBackToTopControl: boolean;
-  showJsonControl: boolean;
-  showLockedQuestionsBanner: boolean;
-};
-
-export type SurveyQuestionsAuthoringRouteReadinessDescriptor = {
-  canEditQuestions: boolean;
-  gatedEmptyStateReady: boolean;
-  hasCurrentSurveyResponseState: boolean;
-  hasVisibleQuestions: boolean;
-  questionPoolReady: boolean;
-  shouldRenderEditableQuestions: boolean;
-  visibleQuestionCount: number;
-};
-
-export type SurveyQuestionsPrimarySubmitPlan = {
-  action: 'inert' | 'navigate' | 'submit';
-  reason: string;
-  path: string;
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {
@@ -1753,16 +1642,15 @@ export const buildSurveyQuestionsFullLoadingProgressState = ({
   progressSlug?: unknown;
 } = {}): SurveyQuestionsFullLoadingProgressState => {
   const normalizedProgressSlug = normalizeQuestionProgressSlug(String(progressSlug || ''));
-  const matchedProgress =
-    questionScanProgress &&
+  const matchedProgress = questionScanProgress &&
     doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), normalizedProgressSlug)
-      ? questionScanProgress
-      : null;
+    ? questionScanProgress
+    : null;
   const scanProgressDisplay = buildQuestionScanProgressDisplay(matchedProgress);
   const hydrateDiscovered = Math.max(0, Number(matchedProgress?.discoveredQuestions || 0));
   const hydrateDone = Math.max(0, Number(matchedProgress?.hydratedQuestions || 0));
   const isHydrating = matchedProgress?.phase === 'hydrate';
-  const hasFullLoadingProgress = scanProgressDisplay.requestedTotalBlocks > 0 || isHydrating;
+  const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
   const hydrateDoneClamped = Math.min(hydrateDone, hydrateDiscovered);
 
   return {
@@ -1775,7 +1663,9 @@ export const buildSurveyQuestionsFullLoadingProgressState = ({
     metaLeftText: isHydrating
       ? `${Math.max(0, hydrateDiscovered - hydrateDoneClamped)} items left`
       : scanProgressDisplay.metaLeftText,
-    metaRightText: isHydrating ? `${hydrateDoneClamped} / ${hydrateDiscovered}` : scanProgressDisplay.metaRightText,
+    metaRightText: isHydrating
+      ? `${hydrateDoneClamped} / ${hydrateDiscovered}`
+      : scanProgressDisplay.metaRightText,
     fillStyle: buildSurveyQuestionsFullLoadingProgressFillStyle({
       hydrateDiscovered,
       hydrateDone,
