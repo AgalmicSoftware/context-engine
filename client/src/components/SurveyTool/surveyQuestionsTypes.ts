@@ -66,6 +66,14 @@ export type SurveyQuestionsJsonForDisplayState = {
   jsonForDisplay: unknown;
 };
 
+export type SurveyQuestionsLayoutDisplayState = {
+  activeTagModalTag: string;
+  responseViewClassName: string | undefined;
+  surveyPageClassName: string | undefined;
+  topSectionClassName: string | undefined;
+  useTagModal: boolean;
+};
+
 export type SurveyQuestionsRouteViewDisplayState = {
   viewedAddressRaw: string;
   viewedAddressLower: string;
@@ -784,6 +792,36 @@ export const buildSurveyQuestionsJsonForDisplayState = ({
     jsonForDisplay: isOwnResponse
       ? (userAnswers || jsonPreview)
       : (parsedViewAddressAnswers || { info: 'Loading viewed response...' }),
+  };
+};
+
+export const buildSurveyQuestionsLayoutDisplayState = ({
+  activeTagModalTag = '',
+  isSingleQuestionView = false,
+  isStandalone = false,
+  singleQuestionMode = false,
+  styleMap = {},
+  viewingAnswers = false,
+}: {
+  activeTagModalTag?: unknown;
+  isSingleQuestionView?: unknown;
+  isStandalone?: unknown;
+  singleQuestionMode?: unknown;
+  styleMap?: Record<string, string>;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsLayoutDisplayState => {
+  const useTagModal = !singleQuestionMode && !isStandalone;
+  const surveyPageClassName = [
+    isSingleQuestionView ? styleMap.singleQuestionPage : '',
+    isSingleQuestionView && viewingAnswers ? styleMap.singleQuestionReadPage : '',
+  ].filter(Boolean).join(' ') || undefined;
+
+  return {
+    activeTagModalTag: useTagModal ? String(activeTagModalTag || '').trim() : '',
+    responseViewClassName: isSingleQuestionView ? styleMap.singleQuestionResponseView : undefined,
+    surveyPageClassName,
+    topSectionClassName: isSingleQuestionView ? styleMap.singleQuestionTopBar : undefined,
+    useTagModal,
   };
 };
 
