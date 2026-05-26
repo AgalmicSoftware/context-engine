@@ -27,6 +27,9 @@ import {
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
   isSbtMetadataFieldLocked,
+  normalizeSbtDisplayChainId as normalizeChainId,
+  resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
+  resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
 } from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
