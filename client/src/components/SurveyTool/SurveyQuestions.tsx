@@ -48,6 +48,7 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
@@ -10999,51 +11000,25 @@ export class SurveyQuestions extends Component {
         </div>
 
         {viewingAnswers ? (
-          this.state.isLoadingResponse ? (
-            <div className={styles.loadingContainer}>
-              <FontAwesomeIcon icon={faSpinner} spin /> Loading...
-            </div>
-          ) : this.state.noResponse ? (
-            <div>
-              {this.state.responseLookupWarning || (
-                <>
-                  No response for this{' '}
-                  {this.props.singleQuestionMode ? 'question' : 'survey'} from address:{' '}
-                  {this.props.viewAddress || this.props.responderAddress}
-                </>
-              )}
-            </div>
-          ) : (
-              <div className={responseViewClassName}>
-                  {viewedAddressRaw && (
-                      <h2 className={styles.viewAddressHeading}>
-                        <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
-                          {shortenedViewAddress}
-                        </a>
-                        <span className={styles.viewAddressHeadingSuffix}>Response:</span>
-                      </h2>
-                  )}
-                  {(this.props.singleQuestionMode && questionPoolReady && this.state.questionPool[0] && (isOwnResponse || this.state.parsedViewAddressAnswers)) || (!this.props.singleQuestionMode && questionPoolReady) || (!this.props.singleQuestionMode && this.state.parsedViewAddressAnswers) ? (
-                      this.props.singleQuestionMode ? (
-                        this.renderQuestionAnswer(
-                            this.state.questionPool[0],
-                            isOwnResponse ? (this.state.userAnswers || {}) : (this.state.parsedViewAddressAnswers || {}),
-                            0,
-                            isOwnResponse
-                        )
-                      ) : (
-                          this.renderSurveyAnswers(
-                              isOwnResponse
-                              ? (this.state.userAnswers?.responses || [])
-                              : (this.state.parsedViewAddressAnswers?.responses || []),
-                              isOwnResponse
-                          )
-                      )
-                  ) : (
-                      !this.state.noResponse && <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading answer data...</div>
-                  )}
-              </div>
-          )
+          <SurveyQuestionsResponseView
+            isLoadingResponse={this.state.isLoadingResponse}
+            isOwnResponse={isOwnResponse}
+            noResponse={this.state.noResponse}
+            parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
+            questionPool={this.state.questionPool}
+            questionPoolReady={questionPoolReady}
+            renderQuestionAnswer={this.renderQuestionAnswer}
+            renderSurveyAnswers={this.renderSurveyAnswers}
+            responderAddress={this.props.responderAddress}
+            responseLookupWarning={this.state.responseLookupWarning}
+            responseViewClassName={responseViewClassName}
+            shortenedViewAddress={shortenedViewAddress}
+            singleQuestionMode={this.props.singleQuestionMode}
+            userAnswers={this.state.userAnswers}
+            viewAddress={this.props.viewAddress}
+            viewedAddressLower={viewedAddressLower}
+            viewedAddressRaw={viewedAddressRaw}
+          />
         ) : (
             <>
               {showTopInlineSubmit && submitResponseButton}
