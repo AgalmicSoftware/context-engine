@@ -34,6 +34,7 @@ import {
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLockAudienceGateClassName,
@@ -252,6 +253,63 @@ describe('surveyQuestionsTypes', () => {
       questionJsonToggleClassName: 'single-toggle question-toggle',
       responseJsonToggleClassName: 'single-toggle response-toggle',
       surveyJsonPanelClassName: 'single-panel',
+    });
+  });
+
+  it('builds SurveyQuestions JSON display payloads for preview and viewed responses', () => {
+    const jsonPreview = { preview: true };
+    const userAnswers = { responses: [{ q: 'own' }] };
+    const parsedViewAddressAnswers = { responses: [{ q: 'other' }] };
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      jsonPreview,
+      viewingAnswers: false,
+    }).jsonForDisplay).toBe(jsonPreview);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: true,
+      jsonPreview,
+      userAnswers,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(userAnswers);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: false,
+      parsedViewAddressAnswers,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(parsedViewAddressAnswers);
+  });
+
+  it('builds SurveyQuestions JSON display fallbacks for missing responses', () => {
+    const jsonPreview = { preview: true };
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: true,
+      jsonPreview,
+      userAnswers: null,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(jsonPreview);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: false,
+      parsedViewAddressAnswers: null,
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({ info: 'Loading viewed response...' });
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      noResponse: true,
+      viewAddress: '0xabc',
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({
+      message: 'No response found for survey from address: 0xabc',
+    });
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      noResponse: true,
+      singleQuestionMode: true,
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({
+      message: 'No response found for question from address: N/A',
     });
   });
 

@@ -62,6 +62,10 @@ export type SurveyQuestionsJsonPanelDisplayState = {
   surveyJsonPanelClassName: string | undefined;
 };
 
+export type SurveyQuestionsJsonForDisplayState = {
+  jsonForDisplay: unknown;
+};
+
 export type SurveyQuestionsRouteViewDisplayState = {
   viewedAddressRaw: string;
   viewedAddressLower: string;
@@ -738,6 +742,48 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
     questionJsonToggleClassName,
     responseJsonToggleClassName,
     surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
+};
+
+export const buildSurveyQuestionsJsonForDisplayState = ({
+  isOwnResponse,
+  jsonPreview = null,
+  noResponse,
+  parsedViewAddressAnswers = null,
+  responderAddress,
+  singleQuestionMode,
+  userAnswers = null,
+  viewAddress,
+  viewingAnswers,
+}: {
+  isOwnResponse?: unknown;
+  jsonPreview?: unknown;
+  noResponse?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  responderAddress?: unknown;
+  singleQuestionMode?: unknown;
+  userAnswers?: unknown;
+  viewAddress?: unknown;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsJsonForDisplayState => {
+  if (!viewingAnswers) {
+    return { jsonForDisplay: jsonPreview };
+  }
+
+  if (noResponse) {
+    return {
+      jsonForDisplay: {
+        message: `No response found for ${singleQuestionMode ? 'question' : 'survey'} from address: ${
+          viewAddress || responderAddress || 'N/A'
+        }`,
+      },
+    };
+  }
+
+  return {
+    jsonForDisplay: isOwnResponse
+      ? (userAnswers || jsonPreview)
+      : (parsedViewAddressAnswers || { info: 'Loading viewed response...' }),
   };
 };
 

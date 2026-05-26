@@ -530,6 +530,7 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsRouteViewDisplayState,
@@ -10924,20 +10925,17 @@ export class SurveyQuestions extends Component {
       </Button>
     ) : null;
 
-    let jsonForDisplay;
-    if (viewingAnswers) {
-      if (this.state.noResponse) {
-        jsonForDisplay = {
-          message: `No response found for ${this.props.singleQuestionMode ? 'question' : 'survey'} from address: ${
-            this.props.viewAddress || this.props.responderAddress || 'N/A'
-          }`
-        };
-      } else {
-        jsonForDisplay = isOwnResponse ? (this.state.userAnswers || jsonPreview) : (this.state.parsedViewAddressAnswers || { info: "Loading viewed response..."});
-      }
-    } else {
-      jsonForDisplay = jsonPreview;
-    }
+    const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse,
+      jsonPreview,
+      noResponse: this.state.noResponse,
+      parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+      responderAddress: this.props.responderAddress,
+      singleQuestionMode: this.props.singleQuestionMode,
+      userAnswers: this.state.userAnswers,
+      viewAddress: this.props.viewAddress,
+      viewingAnswers,
+    });
 
     const hideEmbeddedDebugUi = !!this.props.hideEmbeddedDebugUi;
     const jsonPanelDisplayState = buildSurveyQuestionsJsonPanelDisplayState({
