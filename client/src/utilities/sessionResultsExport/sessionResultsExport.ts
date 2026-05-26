@@ -3,7 +3,7 @@ export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
 export const SESSION_RESULTS_HTML_PRIVACY_REDACTED = 'redacted';
 export const SESSION_RESULTS_EXPORT_FORMAT_VIEWER = 'viewer';
 export const SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML = 'single-html';
-export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'pdf-report';
+export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'single-page-pdf';
 
 const DEFAULT_UNAVAILABLE_REASON = 'No hydrated data was available for this section when the export was created.';
 const DEFAULT_REDACTIONS = [
@@ -13,8 +13,6 @@ const DEFAULT_REDACTIONS = [
   'gated_values',
   'telegram_identifiers',
 ] as const;
-const ETH_ADDRESS_TEXT_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
-const REDACTED_ADDRESS_PLACEHOLDER = '[redacted-address]';
 
 const SENSITIVE_KEY_PATTERNS = [
   /^address$/i,
@@ -88,7 +86,6 @@ export type SessionResultsExporterMetadata = {
 
 export type SessionResultsReportSection = {
   available: boolean;
-  dimensions: unknown[];
   groups: unknown[];
   questions: SessionResultsReportQuestion[];
   reason?: string;
@@ -167,7 +164,6 @@ export type SessionResultsHtmlReportRenderOptions = {
 };
 
 type JsPdfConstructor = new (...args: unknown[]) => {
-  addPage: () => void;
   addImage: (...args: unknown[]) => void;
   internal: {
     pageSize: {
@@ -186,7 +182,9 @@ export type SessionResultsPdfDownloadOptions = {
   jsPdfLoader?: () => Promise<unknown>;
 };
 
-const toSafeString = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
+const toSafeString = (value: unknown): string => (
+  value === null || value === undefined ? '' : String(value)
+);
 
 const toFiniteCount = (value: unknown): number => {
   const numeric = Number(value);
@@ -198,8 +196,11 @@ const toFiniteNullableNumber = (value: unknown): number | null => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-const toStringArray = (value: unknown): string[] =>
-  Array.isArray(value) ? value.map((item) => toSafeString(item).trim()).filter(Boolean) : [];
+const toStringArray = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value.map((item) => toSafeString(item).trim()).filter(Boolean)
+    : []
+);
 
 const shortenAddress = (value: unknown): string => {
   const address = toSafeString(value).trim();
@@ -208,8 +209,11 @@ const shortenAddress = (value: unknown): string => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 };
 
-const toPlainRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+const toPlainRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
 
 const normalizeIsoTimestamp = (value: unknown): string => {
   if (typeof value === 'string' && value.trim()) {
@@ -220,7 +224,7 @@ const normalizeIsoTimestamp = (value: unknown): string => {
 };
 
 const normalizeExporterMetadata = (
-  value?: Partial<SessionResultsExporterMetadata>,
+  value?: Partial<SessionResultsExporterMetadata>
 ): SessionResultsExporterMetadata | undefined => {
   const address = toSafeString(value?.address).trim();
   if (!address) return undefined;
@@ -231,14 +235,13 @@ const normalizeExporterMetadata = (
   };
 };
 
-const shouldDropRedactedKey = (key: string): boolean => SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
+const shouldDropRedactedKey = (key: string): boolean => (
+  SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key))
+);
 
 export const redactSnapshotValue = (value: unknown): unknown => {
   if (Array.isArray(value)) {
     return value.map((item) => redactSnapshotValue(item));
-  }
-  if (typeof value === 'string') {
-    return value.replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER);
   }
   if (!value || typeof value !== 'object') return value;
 
@@ -262,19 +265,19 @@ const normalizeReportQuestion = (value: unknown): SessionResultsReportQuestion =
   };
 };
 
-const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): SessionResultsReportSection => {
+const normalizeReportSection = (
+  input?: Partial<SessionResultsReportSection>
+): SessionResultsReportSection => {
   const questions = Array.isArray(input?.questions)
     ? input.questions.map(normalizeReportQuestion).filter((question) => question.id || question.prompt)
     : [];
   const summary = toPlainRecord(redactSnapshotValue(input?.summary));
-  const dimensions = Array.isArray(input?.dimensions) ? input.dimensions.map(redactSnapshotValue) : [];
   const groups = Array.isArray(input?.groups) ? input.groups.map(redactSnapshotValue) : [];
   const representativeQuestions = Array.isArray(input?.representativeQuestions)
     ? input.representativeQuestions.map(redactSnapshotValue)
     : [];
   const hasContent =
     questions.length > 0 ||
-    dimensions.length > 0 ||
     groups.length > 0 ||
     representativeQuestions.length > 0 ||
     Object.keys(summary).length > 0;
@@ -282,7 +285,6 @@ const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): S
 
   return {
     available,
-    dimensions,
     groups,
     questions,
     representativeQuestions,
@@ -292,7 +294,7 @@ const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): S
 };
 
 const normalizeArgumentMapSection = (
-  input?: Partial<SessionResultsArgumentMapSection>,
+  input?: Partial<SessionResultsArgumentMapSection>
 ): SessionResultsArgumentMapSection => {
   const debates = Array.isArray(input?.debates) ? input.debates.map(redactSnapshotValue) : [];
   const available = input?.available === true || (input?.available !== false && debates.length > 0);
@@ -304,14 +306,17 @@ const normalizeArgumentMapSection = (
 };
 
 const normalizeRiskMatrixSection = (
-  input?: Partial<SessionResultsRiskMatrixSection>,
+  input?: Partial<SessionResultsRiskMatrixSection>
 ): SessionResultsRiskMatrixSection => {
   const categories = Array.isArray(input?.categories) ? input.categories.map(redactSnapshotValue) : [];
   const comments = Array.isArray(input?.comments) ? input.comments.map(redactSnapshotValue) : [];
   const scenarioLinks = Array.isArray(input?.scenarioLinks) ? input.scenarioLinks.map(redactSnapshotValue) : [];
   const heatmap = toPlainRecord(redactSnapshotValue(input?.heatmap));
   const hasContent =
-    categories.length > 0 || comments.length > 0 || scenarioLinks.length > 0 || Object.keys(heatmap).length > 0;
+    categories.length > 0 ||
+    comments.length > 0 ||
+    scenarioLinks.length > 0 ||
+    Object.keys(heatmap).length > 0;
   const available = input?.available === true || (input?.available !== false && hasContent);
   return {
     available,
@@ -323,7 +328,9 @@ const normalizeRiskMatrixSection = (
   };
 };
 
-const normalizeAtlasSection = (input?: Partial<SessionResultsAtlasSection>): SessionResultsAtlasSection => {
+const normalizeAtlasSection = (
+  input?: Partial<SessionResultsAtlasSection>
+): SessionResultsAtlasSection => {
   const nodes = Array.isArray(input?.nodes) ? input.nodes.map(redactSnapshotValue) : [];
   const edges = Array.isArray(input?.edges) ? input.edges.map(redactSnapshotValue) : [];
   const available = input?.available === true || (input?.available !== false && (nodes.length > 0 || edges.length > 0));
@@ -336,7 +343,7 @@ const normalizeAtlasSection = (input?: Partial<SessionResultsAtlasSection>): Ses
 };
 
 export const buildRedactedSessionResultsSnapshot = (
-  input: BuildSessionResultsSnapshotInput = {},
+  input: BuildSessionResultsSnapshotInput = {}
 ): SessionResultsHtmlSnapshot => {
   const counts = input.counts || {};
   const session = input.session || {};
@@ -380,21 +387,23 @@ export const buildRedactedSessionResultsSnapshot = (
   };
 };
 
-export const escapeHtml = (value: unknown): string =>
+export const escapeHtml = (value: unknown): string => (
   toSafeString(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/'/g, '&#39;')
+);
 
-export const serializeJsonForHtmlScript = (value: unknown): string =>
+export const serializeJsonForHtmlScript = (value: unknown): string => (
   (JSON.stringify(value, null, 2) || 'null')
     .replace(/</g, '\\u003C')
     .replace(/>/g, '\\u003E')
     .replace(/&/g, '\\u0026')
     .replace(/\u2028/g, '\\u2028')
-    .replace(/\u2029/g, '\\u2029');
+    .replace(/\u2029/g, '\\u2029')
+);
 
 const renderUnavailable = (label: string, reason?: string): string => `
     <section id="${escapeHtml(label)}" class="ce-report-section ce-report-section--unavailable">
@@ -418,9 +427,7 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
           </tr>
         </thead>
         <tbody>
-          ${questions
-            .map(
-              (question) => `
+          ${questions.map((question) => `
             <tr data-ce-searchable>
               <td>
                 <a href="#question-${escapeHtml(question.id || question.prompt)}" id="question-${escapeHtml(question.id || question.prompt)}">
@@ -432,42 +439,9 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
               <td>${escapeHtml(question.responseCount)}</td>
               <td>${escapeHtml(question.tags.join(', '))}</td>
               <td>${escapeHtml(question.options.join(', '))}</td>
-            </tr>`,
-            )
-            .join('')}
+            </tr>`).join('')}
         </tbody>
       </table>`;
-};
-
-const renderReportDimensions = (dimensions: unknown[]): string => {
-  if (dimensions.length === 0) return '';
-  return `
-      <h3>Comparison Dimensions</h3>
-      <p class="ce-report-muted">Generated Breakdown views should use these dataset-specific segment controls instead of demo-only demographic labels.</p>
-      ${dimensions
-        .map((dimension) => {
-          const record = toPlainRecord(dimension);
-          const values = Array.isArray(record.values) ? record.values : [];
-          return `
-        <details data-ce-searchable>
-          <summary>${escapeHtml(record.label || record.id || 'Comparison dimension')}</summary>
-          ${
-            values.length > 0
-              ? `
-          <ul>
-            ${values
-              .map((value) => {
-                const valueRecord = toPlainRecord(value);
-                const count = toFiniteCount(valueRecord.count);
-                return `<li>${escapeHtml(valueRecord.label || valueRecord.id || 'Segment')}${count ? ` <span class="ce-report-muted">(${escapeHtml(count)})</span>` : ''}</li>`;
-              })
-              .join('')}
-          </ul>`
-              : '<p class="ce-report-muted">No segment values were captured for this dimension.</p>'
-          }
-        </details>`;
-        })
-        .join('')}`;
 };
 
 const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
@@ -483,22 +457,17 @@ const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
         <div><dt>Participants</dt><dd>${escapeHtml(snapshot.counts.participants)}</dd></div>
         <div><dt>Latest Block</dt><dd>${escapeHtml(snapshot.session.latestKnownBlock ?? 'Unknown')}</dd></div>
       </dl>
-      ${renderReportDimensions(report.dimensions)}
       ${renderQuestionRows(report.questions)}
     </section>`;
 };
 
 const renderJsonRows = (items: unknown[], emptyText: string): string => {
   if (items.length === 0) return `<p>${escapeHtml(emptyText)}</p>`;
-  return items
-    .map(
-      (item, index) => `
+  return items.map((item, index) => `
     <details data-ce-searchable>
       <summary>Item ${escapeHtml(index + 1)}</summary>
       <pre>${escapeHtml(JSON.stringify(item, null, 2))}</pre>
-    </details>`,
-    )
-    .join('');
+    </details>`).join('');
 };
 
 const renderArgumentMapSection = (snapshot: SessionResultsHtmlSnapshot): string => {
@@ -536,11 +505,13 @@ const renderAtlasSection = (snapshot: SessionResultsHtmlSnapshot): string => {
     </section>`;
 };
 
-const isSelected = (sections: SessionResultsSectionSelection, key: keyof SessionResultsSectionSelection): boolean =>
-  sections[key] !== false;
+const isSelected = (
+  sections: SessionResultsSectionSelection,
+  key: keyof SessionResultsSectionSelection
+): boolean => sections[key] !== false;
 
 const resolveRenderSections = (
-  sections: SessionResultsSectionSelection = {},
+  sections: SessionResultsSectionSelection = {}
 ): Required<SessionResultsSectionSelection> => ({
   argumentMap: isSelected(sections, 'argumentMap'),
   atlas: isSelected(sections, 'atlas'),
@@ -549,41 +520,33 @@ const resolveRenderSections = (
   snapshotJson: isSelected(sections, 'snapshotJson'),
 });
 
-const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): string =>
-  [
-    sections.report ? '<a href="#report">Report</a>' : '',
-    sections.argumentMap ? '<a href="#argument-map">Argument Map</a>' : '',
-    sections.riskMatrix ? '<a href="#risk-matrix">Risk Matrix</a>' : '',
-    sections.atlas ? '<a href="#atlas">Atlas Nodes</a>' : '',
-    sections.snapshotJson ? '<a href="#snapshot-json">Snapshot JSON</a>' : '',
-  ]
-    .filter(Boolean)
-    .join('\n      ');
+const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): string => ([
+  sections.report ? '<a href="#report">Report</a>' : '',
+  sections.argumentMap ? '<a href="#argument-map">Argument Map</a>' : '',
+  sections.riskMatrix ? '<a href="#risk-matrix">Risk Matrix</a>' : '',
+  sections.atlas ? '<a href="#atlas">Atlas Nodes</a>' : '',
+  sections.snapshotJson ? '<a href="#snapshot-json">Snapshot JSON</a>' : '',
+].filter(Boolean).join('\n      '));
 
 const renderSelectedReportSections = (
   snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection>,
-): string =>
-  [
-    sections.report ? renderReportSection(snapshot) : '',
-    sections.argumentMap ? renderArgumentMapSection(snapshot) : '',
-    sections.riskMatrix ? renderRiskMatrixSection(snapshot) : '',
-    sections.atlas ? renderAtlasSection(snapshot) : '',
-    sections.snapshotJson
-      ? `
+  sections: Required<SessionResultsSectionSelection>
+): string => ([
+  sections.report ? renderReportSection(snapshot) : '',
+  sections.argumentMap ? renderArgumentMapSection(snapshot) : '',
+  sections.riskMatrix ? renderRiskMatrixSection(snapshot) : '',
+  sections.atlas ? renderAtlasSection(snapshot) : '',
+  sections.snapshotJson ? `
     <section id="snapshot-json" class="ce-report-section">
       <h2>Embedded Snapshot JSON</h2>
       <p class="ce-report-muted">This JSON is embedded as inert application data for reproducibility.</p>
       <pre>${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre>
-    </section>`
-      : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
+    </section>` : '',
+].filter(Boolean).join('\n'));
 
 export const renderSessionResultsHtmlReport = (
   inputSnapshot: SessionResultsHtmlSnapshot,
-  options: SessionResultsHtmlReportRenderOptions = {},
+  options: SessionResultsHtmlReportRenderOptions = {}
 ): string => {
   const snapshot = buildRedactedSessionResultsSnapshot(inputSnapshot);
   const sessionTitle = snapshot.session.name || snapshot.session.slug || 'Session';
@@ -666,17 +629,13 @@ export const renderSessionResultsHtmlReport = (
     <nav aria-label="Report sections">
       ${renderNavLinks(sections)}
     </nav>
-    ${
-      isViewer
-        ? `<div class="ce-report-toolbar">
+    ${isViewer ? `<div class="ce-report-toolbar">
       <label>
         <span class="ce-report-muted">Search captured rows</span><br>
         <input type="search" data-ce-report-search placeholder="Search questions, argument items, and atlas data">
       </label>
       <button type="button" data-ce-download-snapshot>Download Snapshot JSON</button>
-    </div>`
-        : ''
-    }
+    </div>` : ''}
   </header>
   <main>
     ${renderSelectedReportSections(snapshot, sections)}
@@ -739,28 +698,25 @@ export const sanitizeFilenameSegment = (value: unknown, fallback = 'session'): s
   return cleaned || fallback;
 };
 
-export const formatTimestampForFilename = (value: unknown): string =>
-  normalizeIsoTimestamp(value).replace(/[:.]/g, '_');
+export const formatTimestampForFilename = (value: unknown): string => (
+  normalizeIsoTimestamp(value).replace(/[:.]/g, '_')
+);
 
-export const buildSessionResultsHtmlReportFilename = (
-  args: {
-    exportedAt?: unknown;
-    name?: unknown;
-    slug?: unknown;
-  } = {},
-): string => {
+export const buildSessionResultsHtmlReportFilename = (args: {
+  exportedAt?: unknown;
+  name?: unknown;
+  slug?: unknown;
+} = {}): string => {
   const sessionPart = sanitizeFilenameSegment(args.slug || args.name || 'session', 'session');
   const timestampPart = formatTimestampForFilename(args.exportedAt);
   return `contextEngine_sessionReport_${sessionPart}_${timestampPart}.html`;
 };
 
-export const buildSessionResultsPdfReportFilename = (
-  args: {
-    exportedAt?: unknown;
-    name?: unknown;
-    slug?: unknown;
-  } = {},
-): string => {
+export const buildSessionResultsPdfReportFilename = (args: {
+  exportedAt?: unknown;
+  name?: unknown;
+  slug?: unknown;
+} = {}): string => {
   const sessionPart = sanitizeFilenameSegment(args.slug || args.name || 'session', 'session');
   const timestampPart = formatTimestampForFilename(args.exportedAt);
   return `contextEngine_sessionReport_${sessionPart}_${timestampPart}.pdf`;
@@ -799,7 +755,7 @@ export const downloadBrowserFile = ({
 export const downloadSessionResultsHtmlReport = (
   html: string,
   filename: string,
-  deps: Omit<BrowserFileDownloadOptions, 'content' | 'filename' | 'mimeType'> = {},
+  deps: Omit<BrowserFileDownloadOptions, 'content' | 'filename' | 'mimeType'> = {}
 ): void => {
   downloadBrowserFile({
     ...deps,
@@ -809,7 +765,7 @@ export const downloadSessionResultsHtmlReport = (
   });
 };
 
-const loadWithRetry = async <T>(loader: () => Promise<T>, retries = 2): Promise<T> => {
+const loadWithRetry = async <T,>(loader: () => Promise<T>, retries = 2): Promise<T> => {
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
       return await loader();
@@ -821,7 +777,7 @@ const loadWithRetry = async <T>(loader: () => Promise<T>, retries = 2): Promise<
   return loader();
 };
 
-const resolveDefaultExport = <T>(moduleValue: unknown): T => {
+const resolveDefaultExport = <T,>(moduleValue: unknown): T => {
   const record = toPlainRecord(moduleValue);
   return (record.default || moduleValue) as T;
 };
@@ -871,10 +827,9 @@ export const downloadSessionResultsPdfReport = async ({
       loadWithRetry(html2canvasLoader),
       loadWithRetry(jsPdfLoader),
     ]);
-    const html2canvas =
-      resolveDefaultExport<(element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>>(
-        html2canvasModule,
-      );
+    const html2canvas = resolveDefaultExport<(element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>>(
+      html2canvasModule
+    );
     const JsPdf = resolveJsPdfConstructor(jsPdfModule);
     const captureTarget = iframeDoc.body;
     const canvas = await html2canvas(captureTarget, {
@@ -890,26 +845,12 @@ export const downloadSessionResultsPdfReport = async ({
     const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    if (!canvas.width || !canvas.height) {
-      throw new Error('PDF export capture did not produce a usable canvas.');
-    }
-
-    const imgData = canvas.toDataURL('image/jpeg', 0.82);
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * pageWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      pdf.addPage();
-      position = heightLeft - imgHeight;
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pageHeight;
-    }
-
+    const fitScale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
+    const imgWidth = canvas.width * fitScale;
+    const imgHeight = canvas.height * fitScale;
+    const x = (pageWidth - imgWidth) / 2;
+    const y = (pageHeight - imgHeight) / 2;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.86), 'JPEG', x, y, imgWidth, imgHeight, undefined, 'FAST');
     pdf.save(filename);
   } finally {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
