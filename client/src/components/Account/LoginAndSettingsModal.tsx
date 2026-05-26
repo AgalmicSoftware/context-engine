@@ -109,7 +109,7 @@ import {
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
 import {
-  formatSponsoredStatusMeta,
+  buildLoginSettingsSponsorshipCards,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
 
@@ -1876,27 +1876,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
     const sponsoredAccess = this.state.sponsoredAccess || {};
     const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
-    const buildSponsorshipCard = (key: any, title: any) => {
-      const sessions = sponsorSessions.byResource[key] || [];
-      const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
-      const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
-      return {
-        key,
-        title,
-        status: formatSponsoredStatusMeta(sponsoredAccess[key] || null, !!activeSponsorSession),
-        access: sponsoredAccess[key] || null,
-        activeSession,
-        activeSponsorSession,
-        otherSponsorSessions,
-        sessions,
-      };
-    };
-    const sponsorshipCards = [
-      buildSponsorshipCard('ai', 'AI'),
-      buildSponsorshipCard('arweave', 'Arweave'),
-      buildSponsorshipCard('rpc', 'RPC'),
-      buildSponsorshipCard('txGas', 'Tx gas'),
-    ];
+    const sponsorshipCards = buildLoginSettingsSponsorshipCards({
+      activeSession,
+      sponsoredAccess,
+      sponsorSessions,
+    });
 
     return {
       activeSession,
