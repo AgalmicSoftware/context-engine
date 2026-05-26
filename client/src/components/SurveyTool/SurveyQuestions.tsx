@@ -529,6 +529,7 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
@@ -10974,14 +10975,18 @@ export class SurveyQuestions extends Component {
     }
 
     const hideEmbeddedDebugUi = !!this.props.hideEmbeddedDebugUi;
-    const showQuestionJsonControls = !!(this.props.singleQuestionMode || this.props.isStandalone);
-    const showSurveyJsonPanel =
-      this.state.showSurveyJson && !this.props.isStandalone && !this.props.singleQuestionMode;
-    const showQuestionsJsonPanel = this.state.showQuestionsJson && showQuestionJsonControls;
-    const showResponseJsonPanel = this.state.showResponseJson;
-    const surveyJson = showSurveyJsonPanel ? this.getSurveyJson() : null;
-    const questionsJson = showQuestionsJsonPanel ? this.getQuestionsJson() : null;
-    const responseJson = showResponseJsonPanel ? this.getResponseJson() : null;
+    const jsonPanelDisplayState = buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView,
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      showQuestionsJson: this.state.showQuestionsJson,
+      showResponseJson: this.state.showResponseJson,
+      showSurveyJson: this.state.showSurveyJson,
+      styleMap: styles,
+    });
+    const surveyJson = jsonPanelDisplayState.showSurveyJsonPanel ? this.getSurveyJson() : null;
+    const questionsJson = jsonPanelDisplayState.showQuestionsJsonPanel ? this.getQuestionsJson() : null;
+    const responseJson = jsonPanelDisplayState.showResponseJsonPanel ? this.getResponseJson() : null;
     const canEditQuestions = !this.state.userHasResponse || this.state.startFresh || this.state.isEditing;
     const hasPendingEdits = !!this.state.isDirty || Number(_pendingStats.total || 0) > 0;
     const genericShowInlineSubmit = shouldRenderInlineSubmitButton({
@@ -11006,20 +11011,6 @@ export class SurveyQuestions extends Component {
     ].filter(Boolean).join(' ') || undefined;
     const topSectionClassName = isSingleQuestionView ? styles.singleQuestionTopBar : undefined;
     const responseViewClassName = isSingleQuestionView ? styles.singleQuestionResponseView : undefined;
-    const surveyJsonRowClassName = [
-      styles.surveyJsonRow,
-      isSingleQuestionView ? styles.singleQuestionJsonRow : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const surveyJsonToggleClassName = isSingleQuestionView ? styles.singleQuestionJsonToggle : undefined;
-    const questionJsonToggleClassName = [
-      surveyJsonToggleClassName,
-      isSingleQuestionView ? styles.singleQuestionJsonToggleQuestion : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const responseJsonToggleClassName = [
-      surveyJsonToggleClassName,
-      isSingleQuestionView ? styles.singleQuestionJsonToggleResponse : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const surveyJsonPanelClassName = isSingleQuestionView ? styles.singleQuestionJsonPanel : undefined;
     const hasRenderedEditableQuestions =
       canEditQuestions &&
       questionPoolReady &&
@@ -11142,20 +11133,20 @@ export class SurveyQuestions extends Component {
         {/* Bottom JSON controls, gated by hideEmbeddedDebugUi for OnePageSession embedded full mode */}
         {!hideEmbeddedDebugUi && (
         <div ref={this.bottomRef}>
-            <JsonButtonRow className={surveyJsonRowClassName}>
-                {showQuestionJsonControls && (
+            <JsonButtonRow className={jsonPanelDisplayState.surveyJsonRowClassName}>
+                {jsonPanelDisplayState.showQuestionJsonControls && (
                     <>
                         <JsonToggleButton
                             label="question .json"
                             active={this.state.showQuestionsJson}
                             onClick={this.toggleShowQuestionsJson}
-                            className={questionJsonToggleClassName}
+                            className={jsonPanelDisplayState.questionJsonToggleClassName}
                         />
                         <JsonToggleButton
                             label="response .json"
                             active={this.state.showResponseJson}
                             onClick={this.toggleShowResponseJson}
-                            className={responseJsonToggleClassName}
+                            className={jsonPanelDisplayState.responseJsonToggleClassName}
                         />
                     </>
                 )}
@@ -11165,44 +11156,44 @@ export class SurveyQuestions extends Component {
                             label={this.state.showSurveyJson ? 'Hide Survey .json' : 'View Survey .json'}
                             active={this.state.showSurveyJson}
                             onClick={this.toggleShowSurveyJson}
-                            className={surveyJsonToggleClassName}
+                            className={jsonPanelDisplayState.surveyJsonToggleClassName}
                         />
                         <JsonToggleButton
                             label={this.state.showResponseJson ? 'Hide Response .json' : 'View Response .json'}
                             active={this.state.showResponseJson}
                             onClick={this.toggleShowResponseJson}
-                            className={surveyJsonToggleClassName}
+                            className={jsonPanelDisplayState.surveyJsonToggleClassName}
                         />
                     </>
                 )}
             </JsonButtonRow>
 
-            {showSurveyJsonPanel && (
+            {jsonPanelDisplayState.showSurveyJsonPanel && (
                 <JsonPanel
                     onCopy={() => this.copyJsonToClipboard(surveyJson, 'survey')}
                     copied={this.state.copiedSurveyJson}
                     copyTitle="Copy Survey Definition JSON"
-                    className={surveyJsonPanelClassName}
+                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
                 >
                     {this.jsonTreeDisplay(surveyJson)}
                 </JsonPanel>
             )}
-            {showQuestionsJsonPanel && (
+            {jsonPanelDisplayState.showQuestionsJsonPanel && (
                 <JsonPanel
                     onCopy={() => this.copyJsonToClipboard(questionsJson, 'questions')}
                     copied={this.state.copiedQuestionsJson}
                     copyTitle="Copy Question Definition JSON"
-                    className={surveyJsonPanelClassName}
+                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
                 >
                     {this.jsonTreeDisplay(questionsJson)}
                 </JsonPanel>
             )}
-            {showResponseJsonPanel && (
+            {jsonPanelDisplayState.showResponseJsonPanel && (
                 <JsonPanel
                     onCopy={() => this.copyJsonToClipboard(responseJson, 'response')}
                     copied={this.state.copiedResponseJson}
                     copyTitle="Copy Response JSON"
-                    className={surveyJsonPanelClassName}
+                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
                 >
                     {this.jsonTreeDisplay(responseJson)}
                 </JsonPanel>

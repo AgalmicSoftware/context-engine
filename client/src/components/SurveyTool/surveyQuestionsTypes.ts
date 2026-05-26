@@ -50,6 +50,18 @@ export type SurveyQuestionsFullLoadingProgressState = {
   fillStyle: { width: string };
 };
 
+export type SurveyQuestionsJsonPanelDisplayState = {
+  showQuestionJsonControls: boolean;
+  showSurveyJsonPanel: boolean;
+  showQuestionsJsonPanel: boolean;
+  showResponseJsonPanel: boolean;
+  surveyJsonRowClassName: string | undefined;
+  surveyJsonToggleClassName: string | undefined;
+  questionJsonToggleClassName: string | undefined;
+  responseJsonToggleClassName: string | undefined;
+  surveyJsonPanelClassName: string | undefined;
+};
+
 export type SurveyAutoDecryptDisabledStatePatch = {
   autoDecryptEnabled: boolean;
   decryptingByKey: Record<string, unknown>;
@@ -669,6 +681,54 @@ export const buildSurveyQuestionsSubmitAuxIconClassName = (
 ) => {
   const className = `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
   return className || undefined;
+};
+
+export const buildSurveyQuestionsJsonPanelDisplayState = ({
+  isSingleQuestionView = false,
+  isStandalone = false,
+  singleQuestionMode = false,
+  showQuestionsJson = false,
+  showResponseJson = false,
+  showSurveyJson = false,
+  styleMap = {},
+}: {
+  isSingleQuestionView?: unknown;
+  isStandalone?: unknown;
+  singleQuestionMode?: unknown;
+  showQuestionsJson?: unknown;
+  showResponseJson?: unknown;
+  showSurveyJson?: unknown;
+  styleMap?: Record<string, string>;
+} = {}): SurveyQuestionsJsonPanelDisplayState => {
+  const showQuestionJsonControls = !!(singleQuestionMode || isStandalone);
+  const showSurveyJsonPanel = !!showSurveyJson && !isStandalone && !singleQuestionMode;
+  const showQuestionsJsonPanel = !!showQuestionsJson && showQuestionJsonControls;
+  const showResponseJsonPanel = !!showResponseJson;
+  const surveyJsonToggleClassName = isSingleQuestionView ? styleMap.singleQuestionJsonToggle : undefined;
+  const surveyJsonRowClassName = [
+    styleMap.surveyJsonRow,
+    isSingleQuestionView ? styleMap.singleQuestionJsonRow : '',
+  ].filter(Boolean).join(' ') || undefined;
+  const questionJsonToggleClassName = [
+    surveyJsonToggleClassName,
+    isSingleQuestionView ? styleMap.singleQuestionJsonToggleQuestion : '',
+  ].filter(Boolean).join(' ') || undefined;
+  const responseJsonToggleClassName = [
+    surveyJsonToggleClassName,
+    isSingleQuestionView ? styleMap.singleQuestionJsonToggleResponse : '',
+  ].filter(Boolean).join(' ') || undefined;
+
+  return {
+    showQuestionJsonControls,
+    showSurveyJsonPanel,
+    showQuestionsJsonPanel,
+    showResponseJsonPanel,
+    surveyJsonRowClassName,
+    surveyJsonToggleClassName,
+    questionJsonToggleClassName,
+    responseJsonToggleClassName,
+    surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
 };
 
 export const buildCopiedQuestionsJsonState = (copiedQuestionsJson: unknown) => ({
