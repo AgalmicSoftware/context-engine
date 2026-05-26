@@ -9,7 +9,12 @@ describe('SurveyQuestionsUserResponseNotice', () => {
 
   it('does not render when hidden', () => {
     render(
-      <SurveyQuestionsUserResponseNotice show={false} onStartFresh={noop} onDecryptEdit={noop} onExitEditing={noop} />,
+      <SurveyQuestionsUserResponseNotice
+        show={false}
+        onStartFresh={noop}
+        onDecryptEdit={noop}
+        onExitEditing={noop}
+      />
     );
 
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeNull();
@@ -30,7 +35,7 @@ describe('SurveyQuestionsUserResponseNotice', () => {
         onStartFresh={onStartFresh}
         onDecryptEdit={onDecryptEdit}
         onExitEditing={onExitEditing}
-      />,
+      />
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBeInTheDocument();
@@ -41,7 +46,10 @@ describe('SurveyQuestionsUserResponseNotice', () => {
     expect(onStartFresh).toHaveBeenCalledTimes(1);
     expect(onDecryptEdit).toHaveBeenCalledTimes(1);
     expect(onExitEditing).toHaveBeenCalledTimes(1);
-    expect(screen.getByTitle('View submitted response')).toHaveAttribute('href', 'https://example.com/response');
+    expect(screen.getByTitle('View submitted response')).toHaveAttribute(
+      'href',
+      'https://example.com/response'
+    );
   });
 
   it('preserves decrypting and disabled button states', () => {
@@ -54,7 +62,7 @@ describe('SurveyQuestionsUserResponseNotice', () => {
         onStartFresh={noop}
         onDecryptEdit={noop}
         onExitEditing={noop}
-      />,
+      />
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_START_FRESH)).toBeDisabled();
