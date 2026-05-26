@@ -48,6 +48,7 @@ describe('SurveyResultsExportControls', () => {
 
   it('renders expanded options, collapse action, and download wiring', () => {
     const onDownload = jest.fn();
+    const onExportHtmlReport = jest.fn();
     const onExportTypeChange = jest.fn();
     const onToggleExportArea = jest.fn();
     render(
@@ -56,6 +57,7 @@ describe('SurveyResultsExportControls', () => {
         exportOptions={exportOptions}
         exportTypeLabel="CSV: Questions"
         onDownload={onDownload}
+        onExportHtmlReport={onExportHtmlReport}
         onExportTypeChange={onExportTypeChange}
         onToggleExportArea={onToggleExportArea}
         styleMap={styleMap}
@@ -71,6 +73,9 @@ describe('SurveyResultsExportControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Download' }));
     expect(onDownload).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-export-html-report'));
+    expect(onExportHtmlReport).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText('Collapse export area'));
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);
