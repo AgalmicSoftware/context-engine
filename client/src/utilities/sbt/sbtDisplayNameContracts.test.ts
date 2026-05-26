@@ -1,5 +1,6 @@
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayCacheEntry,
   buildSbtDisplayInflightLookupKey,
   buildSbtDisplayLabelMemoKey,
   buildSbtDisplayRetryStateKey,
@@ -14,7 +15,9 @@ import {
   resolveSbtMetadataLookupDecision,
   resolveSbtCacheEntryChainId,
   resolveSbtCacheEntryFromBucket,
+  resolveSbtDisplayCacheWriteNetKey,
   resolveSbtDisplayNameFromCacheValue,
+  shouldPersistSbtDisplayMetadata,
   shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
@@ -209,6 +212,14 @@ describe('sbtDisplayNameContracts', () => {
     })).toBe(false);
   });
 
+  it('preserves display metadata persistence eligibility', () => {
+    expect(shouldPersistSbtDisplayMetadata({ name: '' })).toBe(true);
+    expect(shouldPersistSbtDisplayMetadata({ name: '', encryptedName: true })).toBe(true);
+    expect(shouldPersistSbtDisplayMetadata([])).toBe(true);
+    expect(shouldPersistSbtDisplayMetadata(null)).toBe(false);
+    expect(shouldPersistSbtDisplayMetadata('metadata')).toBe(false);
+  });
+
   it('selects cache entries by exact bucket key or embedded SBT address without mutation', () => {
     const addressA = '0x1111111111111111111111111111111111111111';
     const addressB = '0x2222222222222222222222222222222222222222';
@@ -277,5 +288,109 @@ describe('sbtDisplayNameContracts', () => {
       expectedChainId: 11155420,
     })).toBeNull();
     expect(resolveSbtDisplayNameFromCacheValue(null, address.toLowerCase())).toBeNull();
+  });
+
+  it('selects cache write network keys without mutating cache input', () => {
+    const address = '0x4444444444444444444444444444444444444444';
+    const cacheObj = {
+      10: {
+        sbtList: {
+          [address.toLowerCase()]: {
+            sbtAddress: address,
+            sbtInfo: { name: 'Optimism Name', chainID: 10 },
+          },
+        },
+      },
+      84532: {
+        sbtList: {
+          alias: {
+            sbtAddress: address,
+            sbtInfo: { name: 'Base Name', chainID: 84532 },
+          },
+        },
+      },
+    };
+    const before = JSON.stringify(cacheObj);
+
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj,
+      addressLower: address.toLowerCase(),
+      chainId: 84532,
+      info: { chainID: 10 },
+    })).toBe('84532');
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj,
+      addressLower: address.toLowerCase(),
+      chainId: null,
+      info: { chainID: 10 },
+    })).toBe('10');
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj,
+      addressLower: '0x5555555555555555555555555555555555555555',
+      chainId: 11155420,
+      info: { chainID: 84532 },
+    })).toBe('11155420');
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj,
+      addressLower: '0x5555555555555555555555555555555555555555',
+      chainId: null,
+      info: { chainID: 84532 },
+    })).toBe('84532');
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj: { 84532: { sbtList: {} } },
+      addressLower: address.toLowerCase(),
+    })).toBe('84532');
+    expect(resolveSbtDisplayCacheWriteNetKey({
+      cacheObj: { 84532: {}, 10: {} },
+      addressLower: address.toLowerCase(),
+    })).toBe('');
+    expect(JSON.stringify(cacheObj)).toBe(before);
+  });
+
+  it('builds cache entries by preserving existing fields and merging metadata', () => {
+    const existingEntry = {
+      sbtAddress: '0xold',
+      ownerCount: 2,
+      sbtInfo: {
+        name: 'Old Name',
+        description: 'Old description',
+        encryptedName: true,
+      },
+    };
+    const metadata = {
+      name: '',
+      title: 'New Title',
+      chainID: 84532,
+    };
+    const before = JSON.stringify({ existingEntry, metadata });
+
+    expect(buildSbtDisplayCacheEntry({
+      existingEntry,
+      checksum: '0xnew',
+      metadata,
+      slug: 'edge',
+    })).toEqual({
+      sbtAddress: '0xnew',
+      ownerCount: 2,
+      sbtInfo: {
+        name: '',
+        description: 'Old description',
+        encryptedName: true,
+        title: 'New Title',
+        chainID: 84532,
+      },
+      slug: 'edge',
+    });
+    expect(buildSbtDisplayCacheEntry({
+      existingEntry: null,
+      checksum: '0xnew',
+      metadata: { encryptedName: true },
+      slug: 'edge',
+    })).toEqual({
+      sbtAddress: '0xnew',
+      sbtInfo: { encryptedName: true },
+      slug: 'edge',
+    });
+    expect(JSON.stringify({ existingEntry, metadata })).toBe(before);
   });
 });

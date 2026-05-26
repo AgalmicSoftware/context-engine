@@ -24,18 +24,20 @@ import {
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayCacheEntry,
   buildSbtDisplayInflightLookupKey,
   buildSbtDisplayLabelMemoKey,
   buildSbtDisplayRetryStateKey,
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
-  isSbtDisplayMetadataRecord,
   isSbtMetadataFieldLocked,
   normalizeSbtDisplayChainId as normalizeChainId,
   resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
+  resolveSbtDisplayCacheWriteNetKey,
   resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
   resolveSbtDisplayRetryAllowed,
   resolveSbtMetadataLookupDecision,
+  shouldPersistSbtDisplayMetadata,
   shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
@@ -439,7 +441,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
       });
 
       const metadata = await contractScripts.getSbtMetadata('none', checksum, cfg);
-      if (!isSbtDisplayMetadataRecord(metadata)) {
+      if (!shouldPersistSbtDisplayMetadata(metadata)) {
         markNameLookupFailure(retryKey);
         return null;
       }
