@@ -1,4 +1,6 @@
 import {
+  buildLoginSettingsSponsorshipCard,
+  buildLoginSettingsSponsorshipCards,
   formatSponsoredStatusMeta,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
@@ -46,5 +48,65 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
       tone: 'ok',
       detail: 'A sponsor key is configured and does not require an SBT gate.',
     });
+  });
+
+  it('builds sponsored resource card display models without reordering sessions', () => {
+    const activeSession = { slug: 'active', label: 'Active session' };
+    const activeSponsorSession = { slug: 'active', label: 'Active session', isActive: true };
+    const otherSponsorSession = { slug: 'other', label: 'Other session', isActive: false };
+    const sponsorSessions = {
+      byResource: {
+        rpc: [otherSponsorSession, activeSponsorSession],
+      },
+    };
+    const sponsoredAccess = {
+      rpc: { status: 'granted' },
+    };
+
+    expect(buildLoginSettingsSponsorshipCard({
+      activeSession,
+      key: 'rpc',
+      sponsoredAccess,
+      sponsorSessions,
+      title: 'RPC',
+    })).toEqual({
+      key: 'rpc',
+      title: 'RPC',
+      status: {
+        label: 'Gate unlocked',
+        tone: 'ok',
+        detail: 'Sponsored key is available for the active session.',
+      },
+      access: sponsoredAccess.rpc,
+      activeSession,
+      activeSponsorSession,
+      otherSponsorSessions: [otherSponsorSession],
+      sessions: sponsorSessions.byResource.rpc,
+    });
+  });
+
+  it('builds settings sponsorship cards in the existing resource order', () => {
+    const cards = buildLoginSettingsSponsorshipCards({
+      activeSession: { slug: '', label: 'General' },
+      sponsorSessions: {
+        byResource: {
+          ai: [{ slug: '', label: 'General', isActive: true }],
+          txGas: [{ slug: 'funding', label: 'Funding', isActive: false }],
+        },
+      },
+      sponsoredAccess: {
+        ai: { status: 'granted' },
+      },
+    });
+
+    expect(cards.map((card) => [card.key, card.title])).toEqual([
+      ['ai', 'AI'],
+      ['arweave', 'Arweave'],
+      ['rpc', 'RPC'],
+      ['txGas', 'Tx gas'],
+    ]);
+    expect(cards[0].status.label).toBe('Gate unlocked');
+    expect(cards[3].status.label).toBe('Not sponsored');
+    expect(cards[3].otherSponsorSessions.map((entry: any) => entry.label)).toEqual(['Funding']);
   });
 });
