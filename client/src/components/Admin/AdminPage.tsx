@@ -102,6 +102,7 @@ import {
   resolveDefaultGateFromConfig,
 } from './adminPageSbtGateSelectionHelpers';
 import {
+  buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
@@ -816,21 +817,19 @@ const AdminPage = ({
       }
 
       if (cancelled) return;
-      const resolvedUrl = normalizeWorkerUrl(resolved?.url || '');
-      const url = resolvedUrl || '';
-      setWorkerUrl(url);
-      setWorkerDebug(`source=${resolved?.source || 'unknown'} status=${resolved?.status || 'ok'} url=${resolvedUrl || '(none)'}`);
-      if (url) {
-        setWorkerStatus(`Resolved (${resolved?.status || 'ok'})`);
-      } else {
-        setWorkerStatus(resolved?.status ? `Missing (${resolved.status})` : 'Missing worker URL');
-      }
+      const workerUrlDisplay = buildWorkerUrlResolutionDisplay({
+        resolved,
+        normalizeWorkerUrl,
+      });
+      setWorkerUrl(workerUrlDisplay.url);
+      setWorkerDebug(workerUrlDisplay.debug);
+      setWorkerStatus(workerUrlDisplay.status);
       if (typeof window !== 'undefined') {
         // Debug help when worker URL resolution is unexpected.
         log.log('[AdminPage] Worker URL resolved', {
           slug: selectedSlug,
           resolved,
-          finalUrl: url,
+          finalUrl: workerUrlDisplay.url,
         });
       }
     };
