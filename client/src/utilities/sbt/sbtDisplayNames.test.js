@@ -1,9 +1,13 @@
 import {
   __test__getSbtDisplayNameLookupStats,
   __test__resetSbtDisplayNameLookups,
+  getSbtDisplayName,
   getSbtDescriptionText,
+  hasSbtDisplayName,
   hydrateSbtDisplayNameTargeted,
+  isSbtFieldLocked,
   resolveSbtDisplayNameFromCaches,
+  resolveSbtDisplayLabel,
 } from './sbtDisplayNames.js';
 import contractScripts, {
   getDemoSessionConfigBySlug,
@@ -151,6 +155,48 @@ describe('sbtDisplayNames helpers', () => {
     const hit = resolveSbtDisplayNameFromCaches({ address: addrA, preferredSlug: 'edge' });
     expect(hit?.name).toBe('[encrypted]');
     expect(getSbtDescriptionText({ description: '', descriptionLocked: true })).toBe('[encrypted]');
+  });
+
+  it('honors legacy encrypted-field aliases without mutating metadata', () => {
+    const info = {
+      name: '',
+      title: 'Visible title',
+      symbol: 'VISIBLE',
+      contractName: 'VisibleContract',
+      description: '',
+      encryptedName: true,
+      encryptedDescription: true,
+      encryptedTags: true,
+      encryptedImage: true,
+    };
+    const before = JSON.stringify(info);
+
+    expect(isSbtFieldLocked(info, 'name')).toBe(true);
+    expect(isSbtFieldLocked(info, 'description')).toBe(true);
+    expect(isSbtFieldLocked(info, 'tags')).toBe(true);
+    expect(isSbtFieldLocked(info, 'image')).toBe(true);
+    expect(getSbtDisplayName(info)).toBe('[encrypted]');
+    expect(getSbtDescriptionText(info)).toBe('[encrypted]');
+    expect(JSON.stringify(info)).toBe(before);
+  });
+
+  it('preserves display-name fallback order and address fallback handling', () => {
+    expect(getSbtDisplayName({ name: '', title: 'Title Name', symbol: 'SYM', contractName: 'Contract' }))
+      .toBe('Title Name');
+    expect(getSbtDisplayName({ name: '', title: '', symbol: 'SYM', contractName: 'Contract' }))
+      .toBe('SYM');
+    expect(getSbtDisplayName({ name: '', title: '', symbol: '', contractName: 'Contract' }))
+      .toBe('Contract');
+    expect(hasSbtDisplayName({ name: '', title: '', symbol: '', contractName: '' })).toBe(false);
+    expect(resolveSbtDisplayLabel({
+      address: addrA,
+      sbtInfo: {},
+      fallback: 'address',
+    })).toBe(addrA);
+    expect(resolveSbtDisplayLabel({
+      address: 'not-an-address',
+      sbtInfo: { name: 'Ignored' },
+    })).toBe('');
   });
 
   it('invalidates memoized display labels after sbt cache writes', async () => {
