@@ -24,18 +24,20 @@ import {
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayCacheEntry,
   buildSbtDisplayInflightLookupKey,
   buildSbtDisplayLabelMemoKey,
   buildSbtDisplayRetryStateKey,
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
-  isSbtDisplayMetadataRecord,
   isSbtMetadataFieldLocked,
   normalizeSbtDisplayChainId as normalizeChainId,
   resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
+  resolveSbtDisplayCacheWriteNetKey,
   resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
   resolveSbtDisplayRetryAllowed,
   resolveSbtMetadataLookupDecision,
+  shouldPersistSbtDisplayMetadata,
   shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
@@ -250,42 +252,6 @@ const clearNameLookupFailure = (retryKey) => {
   retryStateByKey.delete(retryKey);
 };
 
-const resolveNetKeyForWrite = ({ cacheObj, addressLower = '', chainId = null, info = null } = {}) => {
-  const cache = (cacheObj && typeof cacheObj === 'object') ? cacheObj : {};
-  const infoChainId = normalizeChainId(info?.chainID || info?.chainId || 0);
-  const preferredChainId = normalizeChainId(chainId);
-  const preferredNetKey = preferredChainId > 0 ? String(preferredChainId) : '';
-  const infoNetKey = infoChainId > 0 ? String(infoChainId) : '';
-  const entryNetKeys = [];
-
-  for (const netKey of Object.keys(cache)) {
-    const entry = resolveEntryFromNetBucket(cache[netKey], addressLower);
-    if (!entry) continue;
-    entryNetKeys.push(netKey);
-  }
-
-  if (preferredNetKey && entryNetKeys.includes(preferredNetKey)) {
-    return preferredNetKey;
-  }
-  if (infoNetKey && entryNetKeys.includes(infoNetKey)) {
-    return infoNetKey;
-  }
-  if (preferredNetKey) {
-    return preferredNetKey;
-  }
-  if (infoNetKey) {
-    return infoNetKey;
-  }
-  if (entryNetKeys.length > 0) {
-    return entryNetKeys[0];
-  }
-
-  const existingKeys = Object.keys(cache).filter((key) => key && key !== 'undefined');
-  if (existingKeys.length === 1) return existingKeys[0];
-
-  return '';
-};
-
 const persistSbtMetadataToCache = async ({
   address = '',
   preferredSlug = '',
@@ -293,12 +259,12 @@ const persistSbtMetadataToCache = async ({
   chainId = null,
 } = {}) => {
   const checksum = normalizeAddress(address);
-  if (!checksum || !metadata || typeof metadata !== 'object') return false;
+  if (!checksum || !shouldPersistSbtDisplayMetadata(metadata)) return false;
 
   const slug = sanitizeSlug(preferredSlug || metadata?.slug || '');
   const addressLower = checksum.toLowerCase();
   const cacheObj = (await readCache('sbtCache', slug)) || {};
-  const netKey = resolveNetKeyForWrite({
+  const netKey = resolveSbtDisplayCacheWriteNetKey({
     cacheObj,
     addressLower,
     chainId,
@@ -311,16 +277,12 @@ const persistSbtMetadataToCache = async ({
   if (!bucket) return false;
 
   const existingEntry = resolveEntryFromNetBucket(bucket, addressLower) || {};
-  const existingInfo = (existingEntry?.sbtInfo && typeof existingEntry.sbtInfo === 'object')
-    ? existingEntry.sbtInfo
-    : {};
-
-  bucket.sbtList[addressLower] = {
-    ...existingEntry,
-    sbtAddress: checksum,
-    sbtInfo: { ...existingInfo, ...metadata },
+  bucket.sbtList[addressLower] = buildSbtDisplayCacheEntry({
+    existingEntry,
+    checksum,
+    metadata,
     slug,
-  };
+  });
 
   return !!(await writeCache('sbtCache', slug, cacheObj));
 };
@@ -479,7 +441,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
       });
 
       const metadata = await contractScripts.getSbtMetadata('none', checksum, cfg);
-      if (!isSbtDisplayMetadataRecord(metadata)) {
+      if (!shouldPersistSbtDisplayMetadata(metadata)) {
         markNameLookupFailure(retryKey);
         return null;
       }

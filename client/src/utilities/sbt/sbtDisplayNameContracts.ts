@@ -111,6 +111,10 @@ export const shouldWriteSbtDisplayLabelMemoEntry = ({
   );
 };
 
+export const shouldPersistSbtDisplayMetadata = (metadata: unknown): boolean => (
+  isSbtDisplayMetadataRecord(metadata)
+);
+
 export const getLegacySbtEncryptedFieldKeys = (fieldKey: unknown): readonly string[] => {
   const key = toStr(fieldKey) as SbtEncryptedFieldKey;
   if (!key) return [];
@@ -254,4 +258,79 @@ export const resolveSbtDisplayNameFromCacheValue = (
   }
 
   return null;
+};
+
+export const resolveSbtDisplayCacheWriteNetKey = ({
+  cacheObj,
+  addressLower = '',
+  chainId = null,
+  info = null,
+}: {
+  cacheObj?: unknown;
+  addressLower?: unknown;
+  chainId?: unknown;
+  info?: unknown;
+} = {}): string => {
+  const cache = isSbtDisplayMetadataRecord(cacheObj) ? cacheObj : {};
+  const infoChainId = normalizeSbtDisplayChainId(
+    readSbtRecordValue(info, 'chainID') ||
+    readSbtRecordValue(info, 'chainId') ||
+    0
+  );
+  const preferredChainId = normalizeSbtDisplayChainId(chainId);
+  const preferredNetKey = preferredChainId > 0 ? String(preferredChainId) : '';
+  const infoNetKey = infoChainId > 0 ? String(infoChainId) : '';
+  const entryNetKeys: string[] = [];
+
+  for (const netKey of Object.keys(cache)) {
+    const entry = resolveSbtCacheEntryFromBucket(cache[netKey], addressLower);
+    if (!entry) continue;
+    entryNetKeys.push(netKey);
+  }
+
+  if (preferredNetKey && entryNetKeys.includes(preferredNetKey)) {
+    return preferredNetKey;
+  }
+  if (infoNetKey && entryNetKeys.includes(infoNetKey)) {
+    return infoNetKey;
+  }
+  if (preferredNetKey) {
+    return preferredNetKey;
+  }
+  if (infoNetKey) {
+    return infoNetKey;
+  }
+  if (entryNetKeys.length > 0) {
+    return entryNetKeys[0];
+  }
+
+  const existingKeys = Object.keys(cache).filter((key) => key && key !== 'undefined');
+  if (existingKeys.length === 1) return existingKeys[0];
+
+  return '';
+};
+
+export const buildSbtDisplayCacheEntry = ({
+  existingEntry = null,
+  checksum = '',
+  metadata = null,
+  slug = '',
+}: {
+  existingEntry?: unknown;
+  checksum?: unknown;
+  metadata?: unknown;
+  slug?: unknown;
+} = {}): Record<string, unknown> => {
+  const existing = isSbtDisplayMetadataRecord(existingEntry) ? existingEntry : {};
+  const existingInfoValue = readSbtRecordValue(existing, 'sbtInfo');
+  const existingInfo = isSbtDisplayMetadataRecord(existingInfoValue)
+    ? existingInfoValue
+    : {};
+  const metadataRecord = isSbtDisplayMetadataRecord(metadata) ? metadata : {};
+  return {
+    ...existing,
+    sbtAddress: checksum,
+    sbtInfo: { ...existingInfo, ...metadataRecord },
+    slug,
+  };
 };
