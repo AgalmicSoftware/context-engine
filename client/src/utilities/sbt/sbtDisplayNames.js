@@ -22,6 +22,12 @@ import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
+import {
+  SBT_MASKED_FIELD_VALUE,
+  getSbtMetadataDescriptionText,
+  getSbtMetadataDisplayNameValue,
+  isSbtMetadataFieldLocked,
+} from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
 const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
@@ -30,7 +36,6 @@ const DISPLAY_LABEL_MEMO_TTL_MS = 5 * 60 * 1000;
 const DISPLAY_LABEL_MEMO_MAX = 3000;
 const RETRY_STATE_TTL_MS = 24 * 60 * 60 * 1000;
 const RETRY_STATE_MAX = 4000;
-const MASKED_SBT_FIELD_VALUE = '[encrypted]';
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
 const inflightByKey = new Map();
@@ -145,55 +150,13 @@ const ensureSbtDisplayNameCacheSubscription = () => {
   });
 };
 
-const LEGACY_ENCRYPTED_FIELD_KEYS = Object.freeze({
-  name: ['nameEncrypted', 'encryptedName'],
-  description: ['descriptionEncrypted', 'encryptedDescription'],
-  tags: ['tagsEncrypted', 'encryptedTags'],
-  documentURLs: ['documentURLsEncrypted', 'docUrlsEncrypted'],
-  image: ['imageEncrypted', 'encryptedImage'],
-});
+export const isSbtFieldLocked = isSbtMetadataFieldLocked;
 
-export const isSbtFieldLocked = (info, fieldKey) => {
-  if (!info || typeof info !== 'object' || !fieldKey) return false;
-  if (info?.[`${fieldKey}Locked`] === true) return true;
-  const encryptedFields = (info?.encryptedFields && typeof info.encryptedFields === 'object')
-    ? info.encryptedFields
-    : null;
-  if (encryptedFields && Object.prototype.hasOwnProperty.call(encryptedFields, fieldKey) && encryptedFields[fieldKey]) {
-    return true;
-  }
-  const legacyKeys = LEGACY_ENCRYPTED_FIELD_KEYS[fieldKey] || [];
-  return legacyKeys.some((key) => !!info?.[key]);
-};
+export const getSbtMaskedFieldValue = () => SBT_MASKED_FIELD_VALUE;
 
-export const getSbtMaskedFieldValue = () => MASKED_SBT_FIELD_VALUE;
+export const getSbtDescriptionText = getSbtMetadataDescriptionText;
 
-export const getSbtDescriptionText = (info) => {
-  const description = toStr(info?.description).trim();
-  if (description) return description;
-  return isSbtFieldLocked(info, 'description') ? MASKED_SBT_FIELD_VALUE : '';
-};
-
-const getSbtDisplayNameValue = (info) => {
-  if (!info || typeof info !== 'object') return '';
-  const nameLocked = isSbtFieldLocked(info, 'name');
-  const candidates = nameLocked
-    ? [info.name]
-    : [
-        info.name,
-        info.title,
-      ];
-  if (!nameLocked) {
-    candidates.push(info.symbol);
-    candidates.push(info.contractName);
-  }
-  for (const candidate of candidates) {
-    const name = toStr(candidate).trim();
-    if (name) return name;
-  }
-  if (nameLocked) return MASKED_SBT_FIELD_VALUE;
-  return '';
-};
+const getSbtDisplayNameValue = getSbtMetadataDisplayNameValue;
 
 const ensureNetBucket = (cacheObj, netKey) => {
   const key = toStr(netKey).trim();
