@@ -109,7 +109,8 @@ import {
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
 import {
-  formatSponsoredStatusMeta,
+  buildLoginSettingsSponsorshipCards,
+  formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
 
