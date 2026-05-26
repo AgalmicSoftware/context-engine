@@ -1,5 +1,8 @@
 import {
   SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayInflightLookupKey,
+  buildSbtDisplayLabelMemoKey,
+  buildSbtDisplayRetryStateKey,
   getLegacySbtEncryptedFieldKeys,
   getSbtDisplayAddressLower,
   getSbtMetadataDescriptionText,
@@ -7,9 +10,12 @@ import {
   isSbtDisplayMetadataRecord,
   isSbtMetadataFieldLocked,
   normalizeSbtDisplayChainId,
+  resolveSbtDisplayRetryAllowed,
+  resolveSbtMetadataLookupDecision,
   resolveSbtCacheEntryChainId,
   resolveSbtCacheEntryFromBucket,
   resolveSbtDisplayNameFromCacheValue,
+  shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
 describe('sbtDisplayNameContracts', () => {
@@ -106,6 +112,101 @@ describe('sbtDisplayNameContracts', () => {
     expect(normalizeSbtDisplayChainId('0')).toBe(0);
     expect(normalizeSbtDisplayChainId('not-a-chain')).toBe(0);
     expect(normalizeSbtDisplayChainId(-1)).toBe(0);
+  });
+
+  it('preserves memo and retry key formats', () => {
+    expect(buildSbtDisplayLabelMemoKey({
+      addressLower: '  0xABC  ',
+      preferredSlug: ' Edge Session ',
+      chainId: '84532',
+    })).toBe('0xabc|edge session|84532');
+    expect(buildSbtDisplayLabelMemoKey({
+      addressLower: null,
+      preferredSlug: null,
+      chainId: 'not-a-chain',
+    })).toBe('||0');
+    expect(buildSbtDisplayRetryStateKey({
+      addressLower: ' 0xABC ',
+      slug: ' Edge Session ',
+      chainId: '84532',
+    })).toBe(' 0xABC |edge session|84532');
+    expect(buildSbtDisplayRetryStateKey({
+      addressLower: null,
+      slug: null,
+      chainId: 'not-a-chain',
+    })).toBe('null||0');
+    expect(buildSbtDisplayInflightLookupKey('0xabc|edge|84532')).toBe('0xabc|edge|84532|lookup');
+  });
+
+  it('resolves retry allowance from retry state entries without mutating them', () => {
+    const entry = { nextRetryAt: 2000 };
+    const before = JSON.stringify(entry);
+
+    expect(resolveSbtDisplayRetryAllowed(null, 1000)).toBe(true);
+    expect(resolveSbtDisplayRetryAllowed(entry, 1000)).toBe(false);
+    expect(resolveSbtDisplayRetryAllowed(entry, 2000)).toBe(true);
+    expect(resolveSbtDisplayRetryAllowed({ nextRetryAt: 'later' }, 1000)).toBe(true);
+    expect(JSON.stringify(entry)).toBe(before);
+  });
+
+  it('resolves metadata lookup retry decisions for missing, unnamed, and named metadata', () => {
+    const unnamed = { name: '', title: '', symbol: '' };
+    const locked = { name: '', encryptedName: true };
+    const named = { name: 'Visible Name' };
+    const before = JSON.stringify({ unnamed, locked, named });
+
+    expect(resolveSbtMetadataLookupDecision(null)).toEqual({
+      status: 'missing',
+      hasMetadataRecord: false,
+      name: '',
+      shouldMarkFailure: true,
+      shouldClearFailure: false,
+      shouldUseResult: false,
+    });
+    expect(resolveSbtMetadataLookupDecision(unnamed)).toEqual({
+      status: 'unnamed',
+      hasMetadataRecord: true,
+      name: '',
+      shouldMarkFailure: true,
+      shouldClearFailure: false,
+      shouldUseResult: false,
+    });
+    expect(resolveSbtMetadataLookupDecision(locked)).toEqual({
+      status: 'named',
+      hasMetadataRecord: true,
+      name: SBT_MASKED_FIELD_VALUE,
+      shouldMarkFailure: false,
+      shouldClearFailure: true,
+      shouldUseResult: true,
+    });
+    expect(resolveSbtMetadataLookupDecision(named)).toEqual({
+      status: 'named',
+      hasMetadataRecord: true,
+      name: 'Visible Name',
+      shouldMarkFailure: false,
+      shouldClearFailure: true,
+      shouldUseResult: true,
+    });
+    expect(JSON.stringify({ unnamed, locked, named })).toBe(before);
+  });
+
+  it('preserves display memo write eligibility', () => {
+    expect(shouldWriteSbtDisplayLabelMemoEntry({
+      memoKey: ' 0xabc|edge|84532 ',
+      value: { name: 'Visible Name' },
+    })).toBe(true);
+    expect(shouldWriteSbtDisplayLabelMemoEntry({
+      memoKey: '',
+      value: { name: 'Visible Name' },
+    })).toBe(false);
+    expect(shouldWriteSbtDisplayLabelMemoEntry({
+      memoKey: '0xabc|edge|84532',
+      value: { name: '' },
+    })).toBe(false);
+    expect(shouldWriteSbtDisplayLabelMemoEntry({
+      memoKey: '0xabc|edge|84532',
+      value: null,
+    })).toBe(false);
   });
 
   it('selects cache entries by exact bucket key or embedded SBT address without mutation', () => {
