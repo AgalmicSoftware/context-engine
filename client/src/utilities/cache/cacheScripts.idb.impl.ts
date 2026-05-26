@@ -6,26 +6,34 @@
  */
 
 const DEFAULT_DB_VERSION = 1;
-const dbPromises = new Map();
+type CacheIdbStore = {
+  dbName: string;
+  storeName: string;
+};
 
-const getStoreIdentity = (store = {}) => (
+type CacheIdbEntry = [IDBValidKey, unknown];
+
+const dbPromises = new Map<string, Promise<IDBDatabase>>();
+
+const getStoreIdentity = (store: Partial<CacheIdbStore> = {}): string => (
   `${String(store.dbName || 'keyval-store')}::${String(store.storeName || 'keyval')}`
 );
 
-const getStoreShape = (store = {}) => ({
+const getStoreShape = (store: Partial<CacheIdbStore> = {}): CacheIdbStore => ({
   dbName: String(store.dbName || 'keyval-store'),
   storeName: String(store.storeName || 'keyval'),
 });
 
-const getOrOpenDatabase = (store) => {
+const getOrOpenDatabase = (store: Partial<CacheIdbStore>): Promise<IDBDatabase> => {
   const normalizedStore = getStoreShape(store);
   const identity = getStoreIdentity(normalizedStore);
 
-  if (dbPromises.has(identity)) {
-    return dbPromises.get(identity);
+  const existingDbPromise = dbPromises.get(identity);
+  if (existingDbPromise) {
+    return existingDbPromise;
   }
 
-  const dbPromise = new Promise((resolve, reject) => {
+  const dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     if (typeof indexedDB === 'undefined') {
       reject(new Error('IndexedDB not available'));
       return;
@@ -61,12 +69,16 @@ const getOrOpenDatabase = (store) => {
   return dbPromise;
 };
 
-const runTransaction = async (store, mode, executeRequest) => {
+const runTransaction = async <T>(
+  store: Partial<CacheIdbStore> | undefined,
+  mode: IDBTransactionMode,
+  executeRequest: (objectStore: IDBObjectStore) => IDBRequest<T>
+): Promise<T | undefined> => {
   const normalizedStore = getStoreShape(store);
   const db = await getOrOpenDatabase(normalizedStore);
 
   return new Promise((resolve, reject) => {
-    let request;
+    let request: IDBRequest<T> | null = null;
     try {
       const tx = db.transaction(normalizedStore.storeName, mode);
       const objectStore = tx.objectStore(normalizedStore.storeName);
@@ -81,21 +93,21 @@ const runTransaction = async (store, mode, executeRequest) => {
   });
 };
 
-export const createStore = (dbName, storeName) => getStoreShape({ dbName, storeName });
+export const createStore = (dbName?: unknown, storeName?: unknown): CacheIdbStore => getStoreShape({ dbName: String(dbName || ''), storeName: String(storeName || '') });
 
-export const get = async (key, store) => (
+export const get = async (key: IDBValidKey, store?: Partial<CacheIdbStore>): Promise<unknown> => (
   runTransaction(store, 'readonly', (objectStore) => objectStore.get(key))
 );
 
-export const set = async (key, value, store) => {
+export const set = async (key: IDBValidKey, value: unknown, store?: Partial<CacheIdbStore>): Promise<void> => {
   await runTransaction(store, 'readwrite', (objectStore) => objectStore.put(value, key));
 };
 
-export const del = async (key, store) => {
+export const del = async (key: IDBValidKey, store?: Partial<CacheIdbStore>): Promise<void> => {
   await runTransaction(store, 'readwrite', (objectStore) => objectStore.delete(key));
 };
 
-export const entries = async (store) => {
+export const entries = async (store?: Partial<CacheIdbStore>): Promise<CacheIdbEntry[]> => {
   const normalizedStore = getStoreShape(store);
   const db = await getOrOpenDatabase(normalizedStore);
 
@@ -103,7 +115,7 @@ export const entries = async (store) => {
     try {
       const tx = db.transaction(normalizedStore.storeName, 'readonly');
       const objectStore = tx.objectStore(normalizedStore.storeName);
-      const collected = [];
+      const collected: CacheIdbEntry[] = [];
       const cursorRequest = objectStore.openCursor();
 
       cursorRequest.onsuccess = () => {
