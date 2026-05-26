@@ -10763,8 +10763,11 @@ export class SurveyQuestions extends Component {
       shortenedViewAddress,
       isOwnResponse,
       isSingleQuestionView,
+      showViewAnswersButton,
+      viewAnswersButtonText,
     } = buildSurveyQuestionsRouteViewDisplayState({
       account: this.props.account,
+      isEditing: this.state.isEditing,
       isStandalone: this.props.isStandalone,
       questionPool: this.state.questionPool,
       responderAddress: this.props.responderAddress,
@@ -10772,6 +10775,7 @@ export class SurveyQuestions extends Component {
       singleQuestionMode: this.props.singleQuestionMode,
       userHasResponse: this.state.userHasResponse,
       viewAddress: this.props.viewAddress,
+      viewingAnswers,
     });
 
     // Submit button label block (centralized)
@@ -10935,15 +10939,11 @@ export class SurveyQuestions extends Component {
     const responseLink = this.state.responseUrl;
 
     const viewAnswersButton =
-      (this.props.viewAddress || this.props.responderAddress) && (!isOwnResponse || !this.state.isEditing) ? (
+      showViewAnswersButton ? (
         <Button onClick={this.toggleDisplayAnswerMode} id={styles.answerSurveyButton}>
           <FontAwesomeIcon icon={faArrowLeft} id={styles.encryptIcon} />
           <div id={styles.surveyButtonText}>
-            {viewingAnswers
-              ? ` Fill out ${this.props.singleQuestionMode ? 'question' : 'survey'}`
-              : ` View ${shortenedViewAddress} ${
-                  this.props.singleQuestionMode ? 'answer' : 'answers'
-                }`}
+            {viewAnswersButtonText}
           </div>
         </Button>
       ) : null;

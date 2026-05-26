@@ -68,6 +68,8 @@ export type SurveyQuestionsRouteViewDisplayState = {
   shortenedViewAddress: string;
   isOwnResponse: unknown;
   isSingleQuestionView: unknown;
+  showViewAnswersButton: unknown;
+  viewAnswersButtonText: string;
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {
@@ -741,6 +743,7 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
 
 export const buildSurveyQuestionsRouteViewDisplayState = ({
   account,
+  isEditing,
   isStandalone,
   questionPool,
   responderAddress,
@@ -748,8 +751,10 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
   singleQuestionMode,
   userHasResponse,
   viewAddress,
+  viewingAnswers,
 }: {
   account?: string;
+  isEditing?: unknown;
   isStandalone?: unknown;
   questionPool?: unknown;
   responderAddress?: string;
@@ -757,6 +762,7 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
   singleQuestionMode?: unknown;
   userHasResponse?: unknown;
   viewAddress?: string;
+  viewingAnswers?: unknown;
 } = {}): SurveyQuestionsRouteViewDisplayState => {
   const viewedAddressRaw = String(viewAddress || responderAddress || '').trim();
   const viewedAddressLower = viewedAddressRaw.toLowerCase();
@@ -774,6 +780,11 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
   const isSingleQuestionView =
     singleQuestionMode ||
     (isStandalone && Array.isArray(questionPool) && questionPool.length === 1);
+  const showViewAnswersButton =
+    (viewAddress || responderAddress) && (!isOwnResponse || !isEditing);
+  const viewAnswersButtonText = viewingAnswers
+    ? ` Fill out ${singleQuestionMode ? 'question' : 'survey'}`
+    : ` View ${shortenedViewAddress} ${singleQuestionMode ? 'answer' : 'answers'}`;
 
   return {
     viewedAddressRaw,
@@ -781,6 +792,8 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
     shortenedViewAddress,
     isOwnResponse,
     isSingleQuestionView,
+    showViewAnswersButton,
+    viewAnswersButtonText,
   };
 };
 
