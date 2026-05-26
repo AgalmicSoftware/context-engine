@@ -18,7 +18,7 @@ import {
   buildLitChipotlePolicy,
   buildLitChipotleWrappedPlaintext,
   fingerprintLitChipotlePolicy,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
+} from '../../client/src/utilities/crypto/litChipotlePolicy.ts';
 import {
   DEFAULT_CHIPOTLE_ACTION_CODE,
 } from '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';

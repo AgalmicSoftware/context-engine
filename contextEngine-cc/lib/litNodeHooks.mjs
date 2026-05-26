@@ -5,7 +5,7 @@ import { DEFAULT_CHIPOTLE_ACTION_CODE } from './litChipotleActionCatalog.mjs';
 import {
   buildLitChipotlePolicy,
   fingerprintLitChipotlePolicy,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
+} from '../../client/src/utilities/crypto/litChipotlePolicy.ts';
 
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_CONNECT_TIMEOUT_MS = 45_000;
