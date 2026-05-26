@@ -12,6 +12,8 @@ import {
   createDocLibraryLinkRecord,
   isSelfRecipientDocEncryption,
   normalizeDocUploadTagsForTagMap as normalizeTagsForTagMap,
+  resolveDocUploadResultId,
+  resolveDocUploadResultStorage,
 } from './docUploadContracts.js';
 
 export {
@@ -282,8 +284,8 @@ export const uploadDocLibraryFile = async ({
     contentType,
     resource: 'docsContext',
   });
-  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
-  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
+  const txId = resolveDocUploadResultId(result);
+  const storage = resolveDocUploadResultStorage(result);
 
   return {
     txId,
@@ -359,8 +361,8 @@ export const uploadDocLibraryUrlRecord = async ({
     contentType: 'application/json',
     resource: 'docsContext',
   });
-  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
-  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
+  const txId = resolveDocUploadResultId(result);
+  const storage = resolveDocUploadResultStorage(result);
 
   return {
     txId,
