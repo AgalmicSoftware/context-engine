@@ -102,6 +102,16 @@ import {
   renderSurveyResultsFilterSummary,
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
+import {
+  isSurveyResultsStateSynced,
+  type SurveyResultsSyncStateLike,
+} from './surveyResultsSyncHelpers.js';
+import {
+  SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
+  SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
+  getSurveyResultsExportTypeLabel as getExportTypeLabel,
+  type SurveyResultsExportOption,
+} from './surveyResultsExportDisplayHelpers.js';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -270,72 +280,37 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   surveyId?: string;
   viewMode?: string;
 };
-export type SurveyResultsState = SurveyResultsRecord & {
-  activeQuestionToggles: Record<string, boolean>;
-  activeToggles: Record<string, boolean>;
-  aggregateQuestionResponses: Record<string, unknown[]>;
-  aggregatorQuestionResponses: Record<string, unknown[]>;
-  alertMessage: string;
-  bookmarkedQuestionIDs: string[];
-  bookmarkedSurveyIDs: string[];
-  cachedQuestionsCount: number;
-  cachedSurveyResponsesCount: number;
-  csvData: string;
-  decryptedResponseOverrides: Record<string, SurveyResultsDecryptedResponseOverride>;
-  demoResultsAtlasNodeId: string | null;
-  demoResultsViewMode: string;
-  exportAreaOpen: boolean;
-  exportType: string;
-  filterBookmarkedFeedback: boolean;
-  filteredQuestionsCount: number | null;
-  filteredResponsesCount: number;
-  filterLoading: boolean;
-  filterState: SurveyResultsFilterState;
-  htmlReportAnalysisArtifact: SessionResultsGeneratedAnalysisArtifact | null;
-  htmlReportAnalysisError: string;
-  htmlReportAnalysisGenerating: boolean;
-  htmlReportAnalysisInputSignature: string;
-  htmlReportAnalysisProgress: string;
-  htmlReportDemoMode: boolean;
-  htmlReportExportedAt: string;
-  htmlReportExportFormat: SessionResultsExportFormat;
-  htmlReportModalOpen: boolean;
-  htmlReportSelectedSections: Required<SessionResultsSectionSelection>;
-  isFilterActive: boolean;
-  loading: boolean;
-  lockedResponseDetailsOpen: boolean;
-  lockedResponsesDecrypting: boolean;
-  networkLatestBlock: number;
-  questionIdSortAsc: boolean;
-  questionIdSortBy: string;
-  questionLocalBlock: number;
-  questionPartialLoading: boolean;
-  questionPartialProgress: number;
-  questionPartialTotal: number;
-  questionResponses: SurveyResultsQuestionResponsesByQuestion | SurveyResultsRecord;
-  questionResultsHydrated: boolean;
-  refreshTargetQuestionBlock: number;
-  refreshTargetResponseBlock: number;
-  refreshTargetSurveyBlock: number;
-  responseLocalBlock: number;
-  responsePartialLoading: boolean;
-  responsePartialProgress: number;
-  responsePartialTotal: number;
-  responses: SurveyResultsResponseListEntry[];
-  sbtFilteredAggregatorQuestionResponses: Record<string, unknown>;
-  sbtFilteredQuestionResponses: SurveyResultsRecord;
-  sbtFilteredResponses: SurveyResultsResponseListEntry[];
-  showQuestionFilter: boolean;
-  surveyDocumentURLs: string[];
-  surveyId: string;
-  surveyLocalBlock: number;
-  surveyResultsHydrated: boolean;
-  surveyTitle: string;
-  surveyViewMode: string;
-  syncDetailsOpen: boolean;
-  totalQuestionsCount: number;
-  totalResponsesCount: number;
-  viewMode: string;
+type SurveyResultsGateRecord = SurveyResultsRecord & {
+  address?: unknown;
+  gateId?: unknown;
+  id?: unknown;
+  label?: unknown;
+  name?: unknown;
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+  sbts?: unknown;
+  title?: unknown;
+};
+type SurveyResultsGateEntry = {
+  address: string;
+  label: string;
+};
+type SurveyResultsEncryptedFieldRecord = SurveyResultsRecord & {
+  encrypted?: unknown;
+  encryptedData?: unknown;
+  encryptedEnvelope?: unknown;
+  encryptedPortion?: unknown;
+  encryptionAudience?: unknown;
+  envelope?: unknown;
+  isEncrypted?: unknown;
+  locked?: unknown;
+  payload?: unknown;
+  value?: unknown;
+  valueEnvelope?: unknown;
+};
+type SurveyResultsDemoViewOption = {
+  key: string;
+  label: string;
 };
 type SurveyResultsSbtDisplayLabelResolver = (args: {
   address: string;
@@ -343,45 +318,12 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
   fallback?: string;
   preferredSlug?: unknown;
 }) => string;
-const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord =>
-  value && typeof value === 'object' ? (value as SurveyResultsRecord) : {};
-const normalizeNextSurveyResultsFilterState = (
-  nextFilterState: unknown,
-  fallbackFilterState: unknown = {},
-): SurveyResultsFilterState =>
-  nextFilterState && typeof nextFilterState === 'object'
-    ? (nextFilterState as SurveyResultsFilterState)
-    : preserveSurveyResultsFilterStateValue(fallbackFilterState);
-const buildSurveyResultsSbtFilterState = ({
-  filterState,
-  sbtFilter,
-}: {
-  filterState: unknown;
-  sbtFilter: unknown;
-}): SurveyResultsFilterState => ({
-  ...toSurveyResultsRecord(filterState),
-  sbtFilter,
-});
-const asSurveyResultsStatePatch = (patch: unknown): SurveyResultsState => patch as SurveyResultsState;
-const asSurveyResultsStateUpdater = (
-  updater: (prevState: SurveyResultsState) => unknown,
-): ((prevState: Readonly<SurveyResultsState>) => SurveyResultsState) =>
-  updater as (prevState: Readonly<SurveyResultsState>) => SurveyResultsState;
-const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) =>
-  (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args);
-
-const HTML_REPORT_ANALYSIS_SECTION_LABELS: Record<SessionResultsAnalysisSectionKey, string> = {
-  argumentMap: 'Argument Map',
-  atlas: 'Atlas Nodes',
-  breakdown: 'Breakdown',
-  riskMatrix: 'Risk Matrix',
-};
-const HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS: Record<SessionResultsAnalysisSectionKey, number> = {
-  argumentMap: 6000,
-  atlas: 7000,
-  breakdown: 5000,
-  riskMatrix: 6500,
-};
+const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
+  value && typeof value === 'object' ? value as SurveyResultsRecord : {}
+);
+const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
+  (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
+);
 export const SURVEY_RESULTS_CLICKABLE_ICON_STYLE: React.CSSProperties = {
   cursor: 'pointer',
 };
