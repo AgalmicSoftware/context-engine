@@ -113,6 +113,11 @@ import {
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
 } from './loginSettingsSponsoredStatusHelpers';
+import {
+  LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
+  LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
+  formatLoginSettingsAiProviderLabel,
+} from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
 type AccountUserPageProps = {
@@ -218,23 +223,6 @@ const AI_PRESET_OPTIONS: readonly any[] = Object.freeze([
     badgeLabel: 'Custom',
   }),
 ]);
-
-const AI_REASONING_LEVELS = Object.freeze(['low', 'medium', 'high']);
-
-const AI_TASK_REASONING_ROWS = Object.freeze([
-  { key: 'generate', label: 'Question Generation', hint: 'Default: low for speed.' },
-  { key: 'rewrite', label: 'AI Rewrite', hint: 'Uses the global setting unless overridden.' },
-  { key: 'summarize', label: 'Analysis / Summarize', hint: 'Uses the global setting unless overridden.' },
-  { key: 'rank', label: 'Filter Ranking', hint: 'Uses the global setting unless overridden.' },
-]);
-
-const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  openrouter: 'OpenRouter',
-  custom: 'Custom RPC',
-  local: 'Local',
-});
 
 const deriveAiPresetKey = (settings: any = {}) => deriveAiPreset({
   mode: settings?.mode,
