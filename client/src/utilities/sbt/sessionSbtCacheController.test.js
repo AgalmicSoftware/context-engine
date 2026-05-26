@@ -859,6 +859,34 @@ describe('createSessionSbtCacheController', () => {
       expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
       expect(host.dgRead).not.toHaveBeenCalled();
     });
+
+    it('attaches a detail-page instance listener through the controller', () => {
+      const host = createMockHost();
+      const controller = createSessionSbtCacheController(host);
+
+      expect(
+        controller.startSbtDetailInstanceListenerForGroup('alpha', ['0xSbt'])
+      ).toBe(true);
+
+      expect(contractScripts.listenForSBTInstanceEvents).toHaveBeenCalledWith(
+        'none',
+        ['0xSbt'],
+        expect.any(Function),
+        'alpha'
+      );
+      expect(contractScripts.removeSBTEventListener).not.toHaveBeenCalled();
+      expect(contractScripts.removeSBTInstanceEventsListener).not.toHaveBeenCalled();
+    });
+
+    it('does not attach a detail-page instance listener without a slug and address', () => {
+      const host = createMockHost();
+      const controller = createSessionSbtCacheController(host);
+
+      expect(controller.startSbtDetailInstanceListenerForGroup('', ['0xSbt'])).toBe(false);
+      expect(controller.startSbtDetailInstanceListenerForGroup('alpha', [])).toBe(false);
+
+      expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
+    });
   });
 
   describe('refreshSbtDataForGroup', () => {

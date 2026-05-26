@@ -1,6 +1,5 @@
 import { ethers } from 'ethers';
 import {
-  getSessionSlugByName,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import {
@@ -28,6 +27,27 @@ import {
   buildSbtLookupKey,
   normalizeChainValue,
 } from './sbtSelectorSessionRuntimeHelpers';
+import {
+  getSelectableSbtKey,
+  normalizeSelectableSbtAddress,
+} from './sbtSelectorSelectionKeyHelpers';
+import {
+  buildScopedSbtIgnoreKey,
+  hasOwn,
+  pickNormalizedSessionSlug,
+  pickOptionalNormalizedSessionSlug,
+  resolveAuthoritativeSbtSessionBindingSlug,
+  resolveConcreteSbtSessionBindingSlug,
+  resolveDeclaredSbtSessionSlug,
+} from './sbtSelectorSessionBindingHelpers';
+import {
+  decorateScopedSbtEntry,
+  mergeScopedSbtEntry,
+  resolveSbtEntryChainId,
+} from './sbtSelectorScopedEntryMergeHelpers';
+import type {
+  SbtSelectorScopedEntry,
+} from './sbtSelectorScopedEntryMergeHelpers';
 export {
   isSbtSelectorForcedDebugEnabled,
   readBoolishDebugFlag,
@@ -113,6 +133,43 @@ export type {
   SbtSelectorSessionConfigSigLike,
 } from './sbtSelectorSessionRuntimeHelpers';
 export {
+  getSelectableSbtKey,
+  getSelectOptionValue,
+  normalizeSelectableSbtAddress,
+} from './sbtSelectorSelectionKeyHelpers';
+export {
+  buildEffectiveFeaturedAddressSet,
+  buildSbtOptionsByAddress,
+  buildSbtOptionsBySelectionKey,
+  buildSbtSelectorMergedSelectableOptions,
+  buildSbtSelectorSelectOptions,
+  buildSelectedSbtAddressSet,
+  buildSelectedSbtKeySet,
+  hasSelectedOrPendingSbtSelectorAddress,
+  hasSelectedOrPendingSbtSelectorKey,
+  resolveSbtSelectorDisplayOptions,
+} from './sbtSelectorOptionCollectionHelpers';
+export {
+  buildScopedSbtIgnoreKey,
+  hasAuthoritativeSessionSlug,
+  hasOwn,
+  pickNormalizedSessionSlug,
+  pickOptionalNormalizedSessionSlug,
+  resolveAuthoritativeSbtSessionBindingSlug,
+  resolveConcreteSbtSessionBindingSlug,
+  resolveDeclaredSbtSessionSlug,
+  resolveSbtDetailLinkSessionSlug,
+} from './sbtSelectorSessionBindingHelpers';
+export {
+  decorateScopedSbtEntry,
+  mergeScopedSbtEntry,
+  resolveSbtEntryChainId,
+  shouldPreferIncomingScopedSbtEntry,
+} from './sbtSelectorScopedEntryMergeHelpers';
+export type {
+  SbtSelectorScopedEntry,
+} from './sbtSelectorScopedEntryMergeHelpers';
+export {
   buildSbtSelectorCustomAddressClearPatch,
   buildSbtSelectorCustomAddressInputPatch,
   buildSbtSelectorDiscoveringPatch,
@@ -153,41 +210,6 @@ export type {
   SbtNameLookupState,
 } from './sbtSelectorNameLookupHelpers';
 
-type ScopedSbtIgnoreKeyArgs = {
-  address?: unknown;
-  slug?: unknown;
-};
-type SbtSelectorScopedEntryLike = Record<string, unknown> & {
-  address?: unknown;
-  chainId?: unknown;
-  sbtInfo?: (Record<string, unknown> & {
-    chainID?: unknown;
-    chainId?: unknown;
-  }) | null;
-  slug?: unknown;
-};
-export type SbtSelectorScopedEntry = SbtSelectorScopedEntryLike & {
-  __sourceSessionSlug?: unknown;
-  sbtAddress?: unknown;
-  sessionBindingSlug?: unknown;
-  sbtInfo?: (Record<string, unknown> & {
-    chainID?: unknown;
-    chainId?: unknown;
-    image?: unknown;
-  }) | null;
-};
-type SbtSessionSlugRecord = Record<string, unknown> & {
-  sessionName?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
-  slug?: unknown;
-  sbtInfo?: Record<string, unknown> & {
-    sessionName?: unknown;
-    sessionSlug?: unknown;
-    sessionSlugExplicit?: unknown;
-    slug?: unknown;
-  };
-};
 type SbtSelectorHiddenTitleArgs = {
   label?: unknown;
   sbtInfo?: unknown;
@@ -209,48 +231,12 @@ type SbtSelectorCustomSbtSelection = {
   sessionName: unknown;
   sessionSlug: string;
 };
-type SbtSelectorSelectedOrPendingAddressArgs = {
-  address?: unknown;
-  pendingAddresses?: Set<string> | null;
-  selectedAddresses?: Set<string> | null;
-};
-type SbtSelectorSelectedOrPendingKeyArgs = {
-  pendingKeys?: Set<string> | null;
-  selectedKeys?: Set<string> | null;
-  value?: unknown;
-};
-type SbtDetailLinkSessionSlugArgs = {
-  fallbackSlug?: unknown;
-  sbt?: unknown;
-};
 type BuildSbtSelectorSelectedDisplayEntriesArgs = {
   currentSessionSlug?: unknown;
   resolveSbtLabel?: (sbtInfo: unknown, address: string, sessionSlug: string) => unknown;
   sbtOptionsByAddress?: Map<string, Record<string, unknown>>;
   sbtOptionsBySelectionKey?: Map<string, Record<string, unknown>>;
   selectedSbts?: unknown;
-};
-type BuildSbtSelectorMergedSelectableOptionsArgs = {
-  additionalOptions?: unknown;
-  sbtOptions?: unknown;
-};
-type ResolveSbtSelectorDisplayOptionsArgs = {
-  defaultFeaturedSBTs?: unknown;
-  limitToFeatured?: unknown;
-  mergedSbtOptions?: unknown;
-  scopeFeaturedAddresses?: unknown;
-};
-type ResolveSbtSelectorDisplayOptionsResult<T extends Record<string, unknown>> = {
-  displayOptions: T[];
-  effectiveFeatured: unknown[];
-  hasFeaturedSBTs: boolean;
-};
-type SbtSelectorSelectOption = {
-  chainId?: unknown;
-  image?: unknown;
-  label: string;
-  selectionKey: string;
-  value: string;
 };
 type SbtSelectorHiddenTitleInfo = Record<string, unknown> & {
   name?: unknown;
@@ -298,17 +284,6 @@ type SbtSelectorComparableOption = Record<string, unknown> & {
   selectionKey?: unknown;
   sessionName?: unknown;
   sessionSlug?: unknown;
-};
-type SbtSelectorSelectableKeySource = Record<string, unknown> & {
-  address?: unknown;
-  chainId?: unknown;
-  sbtAddress?: unknown;
-  sbtInfo?: (Record<string, unknown> & {
-    chainID?: unknown;
-    chainId?: unknown;
-  }) | null;
-  selectionKey?: unknown;
-  value?: unknown;
 };
 type BuildSbtSelectorOptionFromEntryArgs = {
   address: string;
@@ -478,35 +453,6 @@ const asComparableSbtOption = (value: unknown): SbtSelectorComparableOption => (
   value != null && (typeof value === 'object' || typeof value === 'function')
     ? value as unknown as SbtSelectorComparableOption
     : {}
-);
-
-export const normalizeSelectableSbtAddress = (value: unknown): string => {
-  const rawAddress = String(value || '').trim();
-  if (!rawAddress || !ethers.utils.isAddress(rawAddress)) return '';
-  return ethers.utils.getAddress(rawAddress).toLowerCase();
-};
-
-export const getSelectableSbtKey = (value: unknown): string => {
-  if (isRecord(value)) {
-    const record = value as SbtSelectorSelectableKeySource;
-    const explicit = String(record.selectionKey || '').trim();
-    if (explicit) return explicit;
-    const rawAddress = record.address || record.sbtAddress || record.value;
-    const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
-    const chainId = record.chainId || sbtInfo.chainId || sbtInfo.chainID || null;
-    return buildSbtLookupKey({ address: rawAddress, chainId }) || normalizeSelectableSbtAddress(rawAddress);
-  }
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  const chainScopedMatch = raw.match(/^(\d+):(0x[a-fA-F0-9]{40})$/);
-  if (chainScopedMatch && ethers.utils.isAddress(chainScopedMatch[2])) {
-    return `${Number(chainScopedMatch[1])}:${ethers.utils.getAddress(chainScopedMatch[2]).toLowerCase()}`;
-  }
-  return normalizeSelectableSbtAddress(raw);
-};
-
-export const getSelectOptionValue = (option: unknown): string => (
-  getSelectableSbtKey(option) || String(isRecord(option) ? option.value || '' : '')
 );
 
 export const normalizeAdditionalSbtOptions = (optionsInput: unknown): NormalizedAdditionalSbtOption[] => (
@@ -750,129 +696,6 @@ export const buildScopeFeaturedSbtSelectorEntries = ({
   return out;
 };
 
-export const buildSbtOptionsByAddress = <T extends Record<string, unknown> = Record<string, unknown>>(
-  sbtOptionsInput: unknown
-): Map<string, T> => {
-  const byAddress = new Map<string, T>();
-  (Array.isArray(sbtOptionsInput) ? sbtOptionsInput : []).forEach((entry: unknown) => {
-    const record = isRecord(entry) ? entry as T : null;
-    if (!record) return;
-    const key = String(record.address || '').toLowerCase();
-    if (!key || byAddress.has(key)) return;
-    byAddress.set(key, record);
-  });
-  return byAddress;
-};
-
-export const buildSbtOptionsBySelectionKey = <T extends Record<string, unknown> = Record<string, unknown>>(
-  sbtOptionsInput: unknown
-): Map<string, T> => {
-  const bySelectionKey = new Map<string, T>();
-  (Array.isArray(sbtOptionsInput) ? sbtOptionsInput : []).forEach((entry: unknown) => {
-    const record = isRecord(entry) ? entry as T : null;
-    if (!record) return;
-    const key = getSelectableSbtKey(record);
-    if (!key || bySelectionKey.has(key)) return;
-    bySelectionKey.set(key, record);
-  });
-  return bySelectionKey;
-};
-
-export const buildSbtSelectorMergedSelectableOptions = <T extends Record<string, unknown> = Record<string, unknown>>({
-  additionalOptions = [],
-  sbtOptions = [],
-}: BuildSbtSelectorMergedSelectableOptionsArgs = {}): T[] => {
-  const baseOptions = Array.isArray(sbtOptions) ? sbtOptions as T[] : [];
-  const extraOptions = Array.isArray(additionalOptions) ? additionalOptions as T[] : [];
-  return [
-    ...baseOptions,
-    ...extraOptions.filter((entry: T) => (
-      !baseOptions.some((existing: T) => (
-        String(existing?.address || '').toLowerCase() === String(entry?.address || '').toLowerCase()
-      ))
-    )),
-  ];
-};
-
-export const resolveSbtSelectorDisplayOptions = <T extends Record<string, unknown> = Record<string, unknown>>({
-  defaultFeaturedSBTs = [],
-  limitToFeatured = false,
-  mergedSbtOptions = [],
-  scopeFeaturedAddresses = [],
-}: ResolveSbtSelectorDisplayOptionsArgs = {}): ResolveSbtSelectorDisplayOptionsResult<T> => {
-  const options = Array.isArray(mergedSbtOptions) ? mergedSbtOptions as T[] : [];
-  const effectiveFeatured = (
-    Array.isArray(scopeFeaturedAddresses) && scopeFeaturedAddresses.length > 0
-      ? scopeFeaturedAddresses
-      : (Array.isArray(defaultFeaturedSBTs) ? defaultFeaturedSBTs : [])
-  );
-  const hasFeaturedSBTs = effectiveFeatured.length > 0;
-  if (!hasFeaturedSBTs || limitToFeatured !== true) {
-    return { displayOptions: options, effectiveFeatured, hasFeaturedSBTs };
-  }
-
-  const featuredLower = new Set<string>(
-    effectiveFeatured.map((addr: unknown) => String(addr || '').toLowerCase())
-  );
-  return {
-    displayOptions: options.filter((opt: T) => (
-      featuredLower.has(String(opt?.address || '').toLowerCase())
-    )),
-    effectiveFeatured,
-    hasFeaturedSBTs,
-  };
-};
-
-export const buildSbtSelectorSelectOptions = (displayOptions: unknown): SbtSelectorSelectOption[] => (
-  (Array.isArray(displayOptions) ? displayOptions : []).map((sbt: unknown) => {
-    const record = isRecord(sbt) ? sbt : {};
-    return {
-      value: String(record.address || ''),
-      selectionKey: getSelectableSbtKey(record),
-      label: String(record.name || ''),
-      image: record.image,
-      chainId: record.chainId,
-    };
-  })
-);
-
-export const buildSelectedSbtKeySet = (selectedSbts: unknown): Set<string> => (
-  new Set(
-    (Array.isArray(selectedSbts) ? selectedSbts : [])
-      .map((sbt: unknown) => getSelectableSbtKey(sbt))
-      .filter(Boolean)
-  )
-);
-
-export const buildSelectedSbtAddressSet = (selectedSbts: unknown): Set<string> => (
-  new Set(
-    (Array.isArray(selectedSbts) ? selectedSbts : [])
-      .map((sbt: unknown) => {
-        const record = isRecord(sbt) ? sbt : {};
-        return normalizeSelectableSbtAddress(record.address);
-      })
-      .filter(Boolean)
-  )
-);
-
-export const buildEffectiveFeaturedAddressSet = ({
-  scopeFeaturedAddresses,
-  defaultFeaturedSBTs,
-}: {
-  defaultFeaturedSBTs?: unknown;
-  scopeFeaturedAddresses?: unknown;
-} = {}): Set<string> => (
-  new Set(
-    (
-      Array.isArray(scopeFeaturedAddresses) && scopeFeaturedAddresses.length > 0
-        ? scopeFeaturedAddresses
-        : (Array.isArray(defaultFeaturedSBTs) ? defaultFeaturedSBTs : [])
-    )
-      .map((address: unknown) => normalizeSelectableSbtAddress(address))
-      .filter(Boolean)
-  )
-);
-
 export const buildSbtSelectorSelectedDisplayEntries = ({
   currentSessionSlug = '',
   resolveSbtLabel = () => '',
@@ -910,98 +733,6 @@ export const buildSbtSelectorSelectedDisplayEntries = ({
     };
   })
 );
-
-export const hasSelectedOrPendingSbtSelectorAddress = ({
-  address = '',
-  pendingAddresses = null,
-  selectedAddresses = null,
-}: SbtSelectorSelectedOrPendingAddressArgs = {}): boolean => {
-  const normalizedAddress = normalizeSelectableSbtAddress(address);
-  if (!normalizedAddress) return false;
-  return !!(
-    selectedAddresses?.has(normalizedAddress) ||
-    pendingAddresses?.has(normalizedAddress)
-  );
-};
-
-export const hasSelectedOrPendingSbtSelectorKey = ({
-  pendingKeys = null,
-  selectedKeys = null,
-  value = null,
-}: SbtSelectorSelectedOrPendingKeyArgs = {}): boolean => {
-  const normalizedKey = getSelectableSbtKey(value);
-  if (!normalizedKey) return false;
-  return !!(
-    selectedKeys?.has(normalizedKey) ||
-    pendingKeys?.has(normalizedKey)
-  );
-};
-
-export const pickNormalizedSessionSlug = (...values: unknown[]): string => {
-  for (const value of values) {
-    if (value === undefined || value === null) continue;
-    const normalized = normalizeSessionSlug(value);
-    if (normalized != null) return normalized;
-  }
-  return '';
-};
-
-export const pickOptionalNormalizedSessionSlug = (...values: unknown[]): string | null => {
-  for (const value of values) {
-    if (value === undefined || value === null) continue;
-    const normalized = normalizeSessionSlug(value);
-    if (normalized != null) return normalized;
-  }
-  return null;
-};
-
-export const hasOwn = (value: unknown, key: PropertyKey): boolean => (
-  isRecord(value) &&
-  Object.prototype.hasOwnProperty.call(value, key)
-);
-
-export const buildScopedSbtIgnoreKey = ({ slug, address }: ScopedSbtIgnoreKeyArgs = {}): string => {
-  const lowerAddress = String(address || '').trim().toLowerCase();
-  if (!lowerAddress) return '';
-  return `${pickNormalizedSessionSlug(slug)}|${lowerAddress}`;
-};
-
-export const hasAuthoritativeSessionSlug = (value: unknown): boolean => {
-  const record = isRecord(value) ? value : {};
-  if (!hasOwn(value, 'sessionSlug')) return false;
-  const hasExplicitFlag = hasOwn(value, 'sessionSlugExplicit');
-  return record.sessionSlugExplicit === true || !hasExplicitFlag;
-};
-
-export const resolveAuthoritativeSbtSessionBindingSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
-  const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
-
-  if (hasAuthoritativeSessionSlug(sbtInfo)) {
-    return normalizeSessionSlug(sbtInfo.sessionSlug || '');
-  }
-  if (hasAuthoritativeSessionSlug(record)) {
-    return normalizeSessionSlug(record.sessionSlug || '');
-  }
-
-  const legacySlugRaw = sbtInfo.slug;
-  if (legacySlugRaw != null && String(legacySlugRaw).trim() !== '') {
-    return normalizeSessionSlug(legacySlugRaw);
-  }
-  return null;
-};
-
-export const resolveDeclaredSbtSessionSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
-  const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
-  if (hasOwn(sbtInfo, 'sessionSlug')) {
-    return normalizeSessionSlug(sbtInfo.sessionSlug || '');
-  }
-  if (hasOwn(record, 'sessionSlug')) {
-    return normalizeSessionSlug(record.sessionSlug || '');
-  }
-  return null;
-};
 
 export const shouldIncludeSbtSelectorEntryForListScope = ({
   declaredSessionSlug = null,
@@ -1127,164 +858,6 @@ export const buildSbtSelectorOptionFromEntry = ({
       sbtInfo: info,
     }),
   };
-};
-
-export const resolveConcreteSbtSessionBindingSlug = (sbt: unknown): string | null => {
-  const record = isRecord(sbt) ? sbt as SbtSessionSlugRecord : {};
-  const authoritativeSlug = resolveAuthoritativeSbtSessionBindingSlug(sbt);
-  if (authoritativeSlug != null) return authoritativeSlug;
-
-  const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
-
-  const hasInferredSessionSlug = (
-    (hasOwn(sbtInfo, 'sessionSlug') && sbtInfo.sessionSlugExplicit === false) ||
-    (hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === false)
-  );
-  if (hasInferredSessionSlug) return null;
-
-  const legacySessionName = String(
-    sbtInfo.sessionName ??
-    record.sessionName ??
-    ''
-  ).trim();
-  if (!legacySessionName) return null;
-
-  const mappedSlug = getSessionSlugByName(legacySessionName);
-  if (mappedSlug == null) return null;
-  return normalizeSessionSlug(mappedSlug);
-};
-
-export const resolveSbtDetailLinkSessionSlug = ({
-  sbt,
-  fallbackSlug = '',
-}: SbtDetailLinkSessionSlugArgs = {}): string => {
-  const record = isRecord(sbt) ? sbt : {};
-  const sbtInfo = isRecord(record.sbtInfo) ? record.sbtInfo : {};
-  const explicitBindingSlug = pickOptionalNormalizedSessionSlug(
-    hasOwn(record, 'sessionBindingSlug') ? record.sessionBindingSlug : undefined,
-    hasAuthoritativeSessionSlug(sbtInfo)
-      ? normalizeSessionSlug(sbtInfo.sessionSlug || '')
-      : undefined,
-    (hasOwn(record, 'sessionSlug') && record.sessionSlugExplicit === true)
-      ? normalizeSessionSlug(record.sessionSlug || '')
-      : undefined
-  );
-  if (explicitBindingSlug != null) return explicitBindingSlug;
-
-  const metadataSessionName = String(
-    sbtInfo.sessionName ??
-    record.sessionName ??
-    ''
-  ).trim();
-  if (metadataSessionName) {
-    const byName = getSessionSlugByName(metadataSessionName);
-    if (byName != null) return normalizeSessionSlug(byName);
-  }
-
-  const existingSelectedSlug = pickOptionalNormalizedSessionSlug(record.sessionSlug);
-  if (existingSelectedSlug != null) return existingSelectedSlug;
-
-  return pickNormalizedSessionSlug(fallbackSlug);
-};
-
-export const resolveSbtEntryChainId = (entry: unknown, fallbackChainId: unknown = null): number | null => {
-  const record = isRecord(entry) ? entry as SbtSelectorScopedEntryLike : {};
-  return normalizeChainValue(
-    record.chainId ||
-    record.sbtInfo?.chainId ||
-    record.sbtInfo?.chainID ||
-    fallbackChainId
-  );
-};
-
-export const decorateScopedSbtEntry = (
-  entry: unknown,
-  fallbackSlug: unknown = ''
-): SbtSelectorScopedEntry => {
-  const next = isRecord(entry) ? { ...entry } as SbtSelectorScopedEntry : {};
-  const sourceSlug = pickNormalizedSessionSlug(
-    hasOwn(next, '__sourceSessionSlug') ? next.__sourceSessionSlug : undefined,
-    next.slug,
-    fallbackSlug
-  );
-  const sessionBindingSlug = pickOptionalNormalizedSessionSlug(
-    hasOwn(next, 'sessionBindingSlug') ? next.sessionBindingSlug : undefined,
-    resolveConcreteSbtSessionBindingSlug({
-      ...next,
-      slug: sourceSlug,
-      __sourceSessionSlug: sourceSlug,
-    })
-  );
-  return {
-    ...next,
-    chainId: resolveSbtEntryChainId(next),
-    slug: pickNormalizedSessionSlug(next.slug, fallbackSlug),
-    __sourceSessionSlug: sourceSlug,
-    ...(sessionBindingSlug != null ? { sessionBindingSlug } : {}),
-  };
-};
-
-export const shouldPreferIncomingScopedSbtEntry = (
-  existingEntry: unknown,
-  incomingEntry: unknown
-): boolean => {
-  const existing = isRecord(existingEntry)
-    ? existingEntry as SbtSelectorScopedEntry
-    : null;
-  const incoming = isRecord(incomingEntry)
-    ? incomingEntry as SbtSelectorScopedEntry
-    : null;
-  if (!incoming) return false;
-
-  const existingNamed = hasSbtDisplayName(existing?.sbtInfo || null);
-  const incomingNamed = hasSbtDisplayName(incoming.sbtInfo || null);
-  if (!existingNamed && incomingNamed) return true;
-  return !existing?.sbtInfo?.image && !!incoming.sbtInfo?.image;
-};
-
-export const mergeScopedSbtEntry = (
-  existingEntry: unknown,
-  incomingEntry: unknown,
-  fallbackSlug: unknown = ''
-): SbtSelectorScopedEntry | null => {
-  const existing = isRecord(existingEntry)
-    ? decorateScopedSbtEntry(existingEntry, fallbackSlug)
-    : null;
-  const incoming = isRecord(incomingEntry)
-    ? decorateScopedSbtEntry(incomingEntry, fallbackSlug)
-    : null;
-  const mergedBindingSlug = pickOptionalNormalizedSessionSlug(
-    existing && hasOwn(existing, 'sessionBindingSlug') ? existing.sessionBindingSlug : undefined,
-    incoming && hasOwn(incoming, 'sessionBindingSlug') ? incoming.sessionBindingSlug : undefined
-  );
-  const finalizeEntry = (entry: SbtSelectorScopedEntry | null): SbtSelectorScopedEntry | null => {
-    if (!entry) return null;
-    return {
-      ...entry,
-      chainId: resolveSbtEntryChainId(entry),
-      slug: pickNormalizedSessionSlug(entry.slug, fallbackSlug),
-      __sourceSessionSlug: pickNormalizedSessionSlug(
-        hasOwn(entry, '__sourceSessionSlug') ? entry.__sourceSessionSlug : undefined,
-        entry.slug,
-        fallbackSlug
-      ),
-      ...(mergedBindingSlug != null ? { sessionBindingSlug: mergedBindingSlug } : {}),
-    };
-  };
-  if (!existing) {
-    return incoming ? finalizeEntry(incoming) : null;
-  }
-  if (!incoming) return finalizeEntry(existing);
-
-  if (shouldPreferIncomingScopedSbtEntry(existing, incoming)) {
-    return finalizeEntry({
-      ...existing,
-      ...incoming,
-      slug: pickNormalizedSessionSlug(existing.slug, incoming.slug, fallbackSlug),
-    });
-  }
-
-  return finalizeEntry(existing);
 };
 
 export const applySbtSelectorDiscoveredAddressesToList = ({

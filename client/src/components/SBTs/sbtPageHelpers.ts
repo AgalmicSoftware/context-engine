@@ -1,18 +1,58 @@
 import {
-  getSessionSlugByName,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import { ethers } from 'ethers';
-import {
-  sanitizeSbtPageMintedTokensOverride,
-} from './sbtPageAutoMintHelpers';
 import {
   buildSbtPageHolderListSignature,
   buildSbtPageNextFilteredHolderRows,
   computeSbtPageNetCounts,
   computeSbtPageNetHoldersList,
 } from './sbtPageHolderHelpers';
-
+import {
+  buildSessionRoutePath,
+  resolveSbtAddress,
+} from './sbtPageAddressSessionHelpers';
+export {
+  buildSessionRoutePath,
+  getCurrentSbtAddressInfo,
+  resolveSbtAddress,
+  resolveSbtAddressString,
+  resolveSbtPageAddressLinkState,
+} from './sbtPageAddressSessionHelpers';
+export {
+  resolveSbtPageAdminCreatorAddresses,
+  resolveSbtPageBurnAuthLabel,
+  resolveSbtPageMaxTokensDisplay,
+  resolveSbtPageRelevantInfoDisplayState,
+  resolveSbtPageRelevantInfoLists,
+  toSbtPageDocumentUrlList,
+  toStringList,
+} from './sbtPageMetadataDisplayHelpers';
+export {
+  getExplicitSbtPageSessionSlug,
+  hasExplicitSbtPageSessionSlugProp,
+  resolveSbtPageEffectiveSessionSlug,
+  resolveSbtPageSessionDisplayConfig,
+  resolveSbtPageSessionDisplayLabel,
+  resolveSbtPageSessionSlugFromInfo,
+} from './sbtPageSessionDisplayHelpers';
+export type {
+  SbtPageSessionDisplayConfig,
+} from './sbtPageSessionDisplayHelpers';
+export {
+  applySbtPageHistorySummaryFallback,
+  normalizeSbtPageHistorySummary,
+} from './sbtPageHistorySummaryHelpers';
+export type {
+  SbtPageHistorySummary,
+  SbtPageHistorySummaryInput,
+} from './sbtPageHistorySummaryHelpers';
+export {
+  coerceSbtPageEpochSeconds,
+  coerceSbtPageStringArrayValue,
+  getErrorMessage,
+  resolveSbtPageCopyableErrorText,
+} from './sbtPageValueCoercionHelpers';
 export {
   buildSbtPageAutoMintCleanPath,
   collectAutoMintPairsFromSearchParams,
@@ -347,47 +387,6 @@ type SbtPageChainMetadataReadNeeds = {
   needMax: boolean;
   shouldRead: boolean;
 };
-export type SbtPageSessionDisplayConfig = Record<string, unknown> & {
-  blockLimits?: Record<string, unknown>;
-  sessionName?: unknown;
-};
-type SbtAddressPropsLike = {
-  SBTAddress?: unknown;
-  loginComplete?: unknown;
-};
-type SbtAddressInfo = {
-  lower: string;
-  original: unknown;
-};
-type ResolveSbtPageAddressLinkStateArgs = {
-  address?: unknown;
-  isAddress?: ((value: string) => boolean) | null;
-  zeroAddress?: unknown;
-};
-type SbtPageAddressLinkState = {
-  isRenderable: boolean;
-  isZeroAddress: boolean;
-  normalized: string;
-};
-type ResolveSbtPageEffectiveSessionSlugArgs = {
-  props?: SessionSlugPropsLike | null;
-  resolvedSessionSlug?: unknown;
-  sbtInfo?: unknown;
-};
-type SbtPageSessionConfigReader = (slug: string) => unknown;
-type SbtPageDemoSessionConfigReader = (
-  slug: string,
-  options?: { allowDemoFallback?: boolean }
-) => unknown;
-type ResolveSbtPageSessionDisplayConfigArgs = {
-  getDemoSessionConfigBySlug?: SbtPageDemoSessionConfigReader | null;
-  getSessionConfigBySlugOrDefault?: SbtPageSessionConfigReader | null;
-  sessionSlugRaw?: unknown;
-};
-type ResolveSbtPageSessionDisplayLabelArgs = {
-  sessionConfig?: unknown;
-  sessionSlugRaw?: unknown;
-};
 type SbtPageMetadataInfoLike = Record<string, unknown> & {
   chainID?: unknown;
   chainId?: unknown;
@@ -450,24 +449,6 @@ type SbtPageMetadataHydrationMode = {
   parentOwnsInitialRefresh: boolean;
   usingCentralHydration: boolean;
 };
-type ResolveSbtPageRelevantInfoListsArgs = {
-  sbtInfo?: unknown;
-};
-type SbtPageRelevantInfoLists = {
-  documentIDHashes: string[];
-  documentURLs: string[];
-  tags: string[];
-};
-type ResolveSbtPageRelevantInfoDisplayStateArgs = {
-  documentIDHashes?: unknown;
-  documentURLs?: unknown;
-  tags?: unknown;
-};
-type SbtPageRelevantInfoDisplayState = {
-  shouldRenderDocumentIdHashes: boolean;
-  shouldRenderDocumentUrls: boolean;
-  shouldRenderTags: boolean;
-};
 type SbtPageLoadInfoRequestNetwork = {
   id?: unknown;
 };
@@ -498,10 +479,6 @@ type BuildSbtPageOpenMintAutoJoinUrlArgs = {
   propSBTAddress?: unknown;
   sbtInfo?: unknown;
   sessionSlug?: unknown;
-};
-type SessionSlugPropsLike = {
-  sessionSlug?: unknown;
-  slug?: unknown;
 };
 type SbtPageSessionSbtAddressesConfig = Record<string, unknown> & {
   defaultFeaturedSBTs?: unknown;
@@ -540,32 +517,6 @@ type BuildSbtPageAdminFallbackPatchArgs = {
   ownerAddress?: unknown;
   zeroAddress?: unknown;
 };
-export type SbtPageHistorySummary = {
-  activeSupply: string;
-  currentHolderCount: string;
-  historicalHolderCount: string;
-  totalBurned: string;
-  totalMinted: string;
-};
-export type SbtPageHistorySummaryInput = Record<string, unknown> & {
-  activeSupply?: unknown;
-  currentHolderCount?: unknown;
-  historicalHolderCount?: unknown;
-  totalBurned?: unknown;
-  totalMinted?: unknown;
-};
-type ApplySbtPageHistorySummaryFallbackArgs = {
-  mintedTokensOverride?: string | null;
-  mintedTokensSource?: string | null;
-  ownerLookupUpperBound?: string | null;
-  sourceLabel?: unknown;
-  summaryValue?: unknown;
-};
-type SbtPageHistorySummaryFallbackState = {
-  mintedTokensOverride: string | null;
-  mintedTokensSource: string | null;
-  ownerLookupUpperBound: string | null;
-};
 type SbtPageMetadataCompletenessInfo = Record<string, unknown> & {
   admin?: unknown;
   admin_?: unknown;
@@ -585,60 +536,6 @@ type SbtPageMetadataCompletenessInfo = Record<string, unknown> & {
 export const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object'
 );
-
-export const toStringList = (value: unknown): string[] => (
-  Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : []
-);
-
-export const toSbtPageDocumentUrlList = (...values: unknown[]): string[] => {
-  const out: string[] = [];
-  const visit = (value: unknown): void => {
-    if (value == null) return;
-    if (Array.isArray(value)) {
-      value.forEach(visit);
-      return;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (trimmed) out.push(trimmed);
-      return;
-    }
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      out.push(String(value));
-      return;
-    }
-    if (!isRecord(value)) return;
-    const nested = [
-      value.url,
-      value.href,
-      value.link,
-      value.documentURL,
-      value.documentUrl,
-      value.docURL,
-      value.docUrl,
-      value.value,
-    ].find((entry) => typeof entry === 'string' && entry.trim().length > 0);
-    if (typeof nested === 'string') out.push(nested.trim());
-  };
-  values.forEach(visit);
-  return out;
-};
-
-export const coerceSbtPageStringArrayValue = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value.map((entry: unknown) => String(entry));
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    if (trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) return parsed.map((entry: unknown) => String(entry));
-      } catch (_) {}
-    }
-    return [trimmed];
-  }
-  return [];
-};
 
 export const buildSbtPageEncryptedEnvelopeFingerprint = ({
   descriptionEnvelope = null,
@@ -721,77 +618,6 @@ export const findNestedInteractiveElement = (target: EventTarget | null): unknow
     : null;
 };
 
-export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
-  const message = (
-    error !== null &&
-    (typeof error === 'object' || typeof error === 'function') &&
-    'message' in error
-  )
-    ? error.message
-    : undefined;
-  return error instanceof Error && error.message ? error.message : String(message || error || fallback);
-};
-
-export const resolveSbtPageCopyableErrorText = (error: unknown): string => (
-  (typeof error === 'string' && error)
-    ? error
-    : getErrorMessage(error, '')
-);
-
-export const coerceSbtPageEpochSeconds = (value: unknown): number => {
-  const n = Number(value || 0);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return n > 1e12 ? Math.floor(n / 1000) : n;
-};
-
-export const normalizeSbtPageHistorySummary = (value: unknown): SbtPageHistorySummary | null => {
-  if (!isRecord(value)) return null;
-  const summary = value as SbtPageHistorySummaryInput;
-  const normalizeField = (fieldValue: unknown): string | null => {
-    const raw = String(fieldValue ?? '').trim();
-    if (!/^\d+$/.test(raw)) return null;
-    return raw.replace(/^0+(?=\d)/, '') || '0';
-  };
-  const totalMinted = normalizeField(summary.totalMinted);
-  const totalBurned = normalizeField(summary.totalBurned);
-  const activeSupply = normalizeField(summary.activeSupply);
-  const currentHolderCount = normalizeField(summary.currentHolderCount);
-  const historicalHolderCount = normalizeField(summary.historicalHolderCount);
-  if (
-    totalMinted == null ||
-    totalBurned == null ||
-    activeSupply == null ||
-    currentHolderCount == null ||
-    historicalHolderCount == null
-  ) {
-    return null;
-  }
-  return {
-    totalMinted,
-    totalBurned,
-    activeSupply,
-    currentHolderCount,
-    historicalHolderCount,
-  };
-};
-
-export const applySbtPageHistorySummaryFallback = ({
-  mintedTokensOverride = null,
-  mintedTokensSource = null,
-  ownerLookupUpperBound = null,
-  sourceLabel = '',
-  summaryValue = null,
-}: ApplySbtPageHistorySummaryFallbackArgs = {}): SbtPageHistorySummaryFallbackState => {
-  const summaryRecord = isRecord(summaryValue) ? summaryValue as SbtPageHistorySummaryInput : {};
-  const holderCount = sanitizeSbtPageMintedTokensOverride(summaryRecord.currentHolderCount);
-  const totalMinted = sanitizeSbtPageMintedTokensOverride(summaryRecord.totalMinted);
-  return {
-    mintedTokensOverride: holderCount != null ? holderCount : mintedTokensOverride,
-    mintedTokensSource: holderCount != null ? String(sourceLabel || '') : mintedTokensSource,
-    ownerLookupUpperBound: totalMinted != null ? totalMinted : ownerLookupUpperBound,
-  };
-};
-
 export const needsSbtPageTokenUriFields = (infoInput: unknown): boolean => {
   if (!isRecord(infoInput)) return true;
   const info = infoInput as SbtPageMetadataCompletenessInfo;
@@ -818,41 +644,6 @@ export const needsSbtPageTokenUriFields = (infoInput: unknown): boolean => {
 export const needsSbtPageDirectMetadataHydration = (infoInput: unknown): boolean => {
   if (!isRecord(infoInput)) return true;
   return Object.keys(infoInput).length === 0;
-};
-
-export const buildSessionRoutePath = (slugRaw: unknown = '', basePath: unknown = ''): string => {
-  const slug = normalizeSessionSlug(slugRaw || '');
-  const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
-  return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
-};
-
-export const resolveSbtAddress = (input: unknown): unknown | null => {
-  if (Array.isArray(input)) {
-    const found = input.find((entry) => isRecord(entry) && entry.sbtAddress !== undefined);
-    return found ? found.sbtAddress : null;
-  }
-  if (isRecord(input) && input.sbtAddress !== undefined) return input.sbtAddress;
-  return input || null;
-};
-
-export const resolveSbtAddressString = (input: unknown): string => {
-  const resolved = resolveSbtAddress(input);
-  return resolved ? String(resolved) : '';
-};
-
-export const resolveSbtPageAddressLinkState = ({
-  address = '',
-  isAddress = ethers.utils.isAddress,
-  zeroAddress = ethers.constants.AddressZero,
-}: ResolveSbtPageAddressLinkStateArgs = {}): SbtPageAddressLinkState => {
-  const normalized = String(address || '').trim();
-  const isZeroAddress =
-    normalized.toLowerCase() === String(zeroAddress || '').toLowerCase();
-  return {
-    isRenderable: !!normalized && !isZeroAddress && typeof isAddress === 'function' && isAddress(normalized),
-    isZeroAddress,
-    normalized,
-  };
 };
 
 export const buildSbtPageAdminFallbackPatch = ({
@@ -1024,87 +815,6 @@ export const buildSbtPageOpenMintAutoJoinUrl = ({
 
   const demoPath = buildSessionRoutePath(sessionSlug, basePath);
   return `${normalizedOrigin}${demoPath}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`;
-};
-
-export const getCurrentSbtAddressInfo = (propsIn: SbtAddressPropsLike = {}): SbtAddressInfo => {
-  const original = resolveSbtAddress(propsIn.SBTAddress) || '';
-  return {
-    original,
-    lower: String(original || '').toLowerCase(),
-  };
-};
-
-export const resolveSbtPageSessionSlugFromInfo = (info: unknown): string | null => {
-  const record = isRecord(info) ? info : {};
-  if (Object.prototype.hasOwnProperty.call(record, 'sessionSlug')) {
-    const hasExplicitFlag = Object.prototype.hasOwnProperty.call(record, 'sessionSlugExplicit');
-    const isExplicitSessionSlug = record.sessionSlugExplicit === true;
-    if (isExplicitSessionSlug || !hasExplicitFlag) {
-      return normalizeSessionSlug(record.sessionSlug || '');
-    }
-  }
-  const name = String(record.sessionName || '').trim();
-  if (!name) return null;
-  return getSessionSlugByName(name);
-};
-
-export const hasExplicitSbtPageSessionSlugProp = (props: SessionSlugPropsLike = {}): boolean => (
-  !!props && (
-    Object.prototype.hasOwnProperty.call(props, 'sessionSlug') ||
-    Object.prototype.hasOwnProperty.call(props, 'slug')
-  )
-);
-
-export const getExplicitSbtPageSessionSlug = (props: SessionSlugPropsLike = {}): string | null => {
-  if (!hasExplicitSbtPageSessionSlugProp(props)) return null;
-  const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug')
-    ? props.sessionSlug
-    : props.slug;
-  return normalizeSessionSlug(raw || '');
-};
-
-export const resolveSbtPageEffectiveSessionSlug = ({
-  props = {},
-  resolvedSessionSlug = null,
-  sbtInfo = null,
-}: ResolveSbtPageEffectiveSessionSlugArgs = {}): string => {
-  const propsIn = props || {};
-  const explicitSlug = getExplicitSbtPageSessionSlug(propsIn);
-  if (explicitSlug != null) return explicitSlug;
-  if (resolvedSessionSlug != null) return String(resolvedSessionSlug || '');
-  const fromInfo = resolveSbtPageSessionSlugFromInfo(sbtInfo);
-  if (fromInfo != null) return fromInfo;
-  return String(propsIn.sessionSlug || propsIn.slug || '');
-};
-
-export const resolveSbtPageSessionDisplayConfig = ({
-  getDemoSessionConfigBySlug: readDemoSessionConfig = null,
-  getSessionConfigBySlugOrDefault: readSessionConfig = null,
-  sessionSlugRaw = '',
-}: ResolveSbtPageSessionDisplayConfigArgs = {}): SbtPageSessionDisplayConfig | null => {
-  const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
-  try {
-    const config = (
-      (readSessionConfig ? readSessionConfig(sessionSlug || '') : null)
-      || (readDemoSessionConfig ? readDemoSessionConfig(sessionSlug || '', { allowDemoFallback: true }) : null)
-      || null
-    );
-    return isRecord(config) ? config as SbtPageSessionDisplayConfig : null;
-  } catch (_) {
-    return null;
-  }
-};
-
-export const resolveSbtPageSessionDisplayLabel = ({
-  sessionConfig = null,
-  sessionSlugRaw = '',
-}: ResolveSbtPageSessionDisplayLabelArgs = {}): string => {
-  const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
-  const sessionName = String(
-    isRecord(sessionConfig) ? sessionConfig.sessionName || '' : ''
-  ).trim();
-  if (!sessionSlug) return sessionName || 'General';
-  return sessionName || sessionSlug;
 };
 
 export const deriveSbtPageCacheNetKey = ({
@@ -1410,68 +1120,3 @@ export const buildSbtPageLocalBurnSuccessPatch = ({
       : prev.filteredMintedUsersSignature,
   };
 };
-
-const SBT_PAGE_BURN_AUTH_LABELS = ['Admin Only', 'Owner Only', 'Both', 'Neither'];
-const SBT_PAGE_BURN_AUTH_INDEX_BY_NAME: Record<string, number> = {
-  AdminOnly: 0,
-  OwnerOnly: 1,
-  Both: 2,
-  Neither: 3,
-};
-
-export const resolveSbtPageBurnAuthLabel = (burnAuth: unknown): string => {
-  const burnIdx = typeof burnAuth === 'string'
-    ? (SBT_PAGE_BURN_AUTH_INDEX_BY_NAME[burnAuth] ?? undefined)
-    : (burnAuth != null ? Number(burnAuth) : undefined);
-  const normalizedBurnIdx = Number.isInteger(burnIdx) ? Number(burnIdx) : -1;
-  return (normalizedBurnIdx >= 0 && normalizedBurnIdx < SBT_PAGE_BURN_AUTH_LABELS.length)
-    ? SBT_PAGE_BURN_AUTH_LABELS[normalizedBurnIdx]
-    : '?';
-};
-
-export const resolveSbtPageMaxTokensDisplay = (maxTokens: unknown): string => (
-  maxTokens === '0'
-    ? '∞'
-    : (maxTokens != null ? String(maxTokens) : '-')
-);
-
-export const resolveSbtPageAdminCreatorAddresses = (sbtInfoInput: unknown): {
-  adminAddress: unknown;
-  creatorAddress: unknown;
-} => {
-  const sbtInfo = isRecord(sbtInfoInput) ? sbtInfoInput : {};
-  const adminAddress = sbtInfo.admin || sbtInfo.admin_ || sbtInfo.deployer || '';
-  const creatorAddress = sbtInfo.creator || adminAddress || sbtInfo.deployer || sbtInfo.admin_ || '';
-  return { adminAddress, creatorAddress };
-};
-
-export const resolveSbtPageRelevantInfoLists = ({
-  sbtInfo = null,
-}: ResolveSbtPageRelevantInfoListsArgs = {}): SbtPageRelevantInfoLists => {
-  const info = isRecord(sbtInfo) ? sbtInfo : {};
-  return {
-    documentIDHashes: toStringList(info.documentIDHashes),
-    documentURLs: toSbtPageDocumentUrlList(
-      info.documentURLs,
-      info.documentUrls,
-      info.documentURL,
-      info.documentUrl,
-      info.docURLs,
-      info.docUrls,
-      info.docURL,
-      info.docUrl,
-      info.documents,
-    ),
-    tags: toStringList(info.tags),
-  };
-};
-
-export const resolveSbtPageRelevantInfoDisplayState = ({
-  documentIDHashes = [],
-  documentURLs = [],
-  tags = [],
-}: ResolveSbtPageRelevantInfoDisplayStateArgs = {}): SbtPageRelevantInfoDisplayState => ({
-  shouldRenderDocumentIdHashes: Array.isArray(documentIDHashes) && documentIDHashes.length > 0,
-  shouldRenderDocumentUrls: Array.isArray(documentURLs) && documentURLs.length > 0,
-  shouldRenderTags: Array.isArray(tags) && tags.length > 0,
-});

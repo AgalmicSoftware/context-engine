@@ -1,12 +1,9 @@
 import React from 'react';
-import { Modal, ModalBody, ModalHeader } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
-import styles from './SessionWizard.module.scss';
-import CreateSBTGroup from '../SBTs/CreateSBTGroup';
-import ContractViewer, { type ContractViewerContract } from '../ContractPage/ContractViewer';
-import { WIZARD_CONTRACT_MODAL_TESTID } from '../ContractPage/contractMetadata.js';
+import type { ContractViewerContract } from '../ContractPage/ContractViewer';
+import SessionHeaderPreviewModal from './SessionHeaderPreviewModal';
+import SessionWizardContractViewerModal from './SessionWizardContractViewerModal';
+import SessionWizardCreateSbtModal from './SessionWizardCreateSbtModal';
 
 type GateLike = {
   id?: string;
@@ -29,7 +26,7 @@ type WizardDraftLike = Record<string, unknown> & {
   defaultSbtTags?: string;
 };
 
-type SessionWizardModalsProps = {
+export type SessionWizardModalsProps = {
   account?: string;
   provider?: unknown;
   createSbtModalState: CreateSbtModalState;
@@ -81,104 +78,37 @@ const SessionWizardModals = ({
   t,
 }: SessionWizardModalsProps) => (
   <>
-    <Modal
-      isOpen={createSbtModalState.open}
-      toggle={closeCreateSbtModal}
-      className={styles.createSbtModal}
-      size="xl"
-      scrollable
-    >
-      <ModalHeader toggle={closeCreateSbtModal} className={styles.createSbtModalHeader}>
-        {`Add ${t('sbt')} to Session`}
-      </ModalHeader>
-      <ModalBody className={styles.createSbtModalBody}>
-        <CreateSBTGroup
-          account={account}
-          provider={provider}
-          network={createSbtModalNetwork}
-          loginComplete={!!account}
-          toggleLoginModal={toggleLoginModal}
-          sessionSlug={createSbtModalSessionSlug}
-          sessionConfigOverride={{
-            ...(draft && typeof draft === 'object' ? draft : {}),
-            slug: createSbtModalSessionSlug,
-            networkChainId: createSbtModalChainId,
-            contracts: (draft && typeof draft.contracts === 'object') ? draft.contracts : {},
-          }}
-          arweaveJwkOverride={createSbtModalArweaveJwkOverride}
-          encryptionGates={encryptionGates.map((gate) => ({
-            id: gate.id,
-            gateId: gate.id,
-            label: gate.label,
-            name: gate.label,
-            color: gate.color,
-            mode: gate.mode,
-            requireAll: gate.mode === 'all',
-            sbtAddresses: normalizeSbtSelection(gate.sbts || []).map((entry) => entry.address),
-            chainId: createSbtModalChainId,
-          }))}
-          defaultGateId={defaultGateId || encryptionGates[0]?.id || ''}
-          defaultSbtTags={draft?.defaultSbtTags || ''}
-          deferredDeploy={true}
-          attemptImmediateDeferredUpload={false}
-          hideNetworkSelector={true}
-          signAdminAction={signBootstrapAdminAction}
-          onSaveDraft={handleSavePendingSbtDraft}
-        />
-      </ModalBody>
-    </Modal>
+    <SessionWizardCreateSbtModal
+      account={account}
+      provider={provider}
+      createSbtModalState={createSbtModalState}
+      closeCreateSbtModal={closeCreateSbtModal}
+      createSbtModalNetwork={createSbtModalNetwork}
+      toggleLoginModal={toggleLoginModal}
+      createSbtModalSessionSlug={createSbtModalSessionSlug}
+      draft={draft}
+      createSbtModalChainId={createSbtModalChainId}
+      createSbtModalArweaveJwkOverride={createSbtModalArweaveJwkOverride}
+      encryptionGates={encryptionGates}
+      normalizeSbtSelection={normalizeSbtSelection}
+      defaultGateId={defaultGateId}
+      signBootstrapAdminAction={signBootstrapAdminAction}
+      handleSavePendingSbtDraft={handleSavePendingSbtDraft}
+      t={t}
+    />
 
-    <Modal
-      isOpen={contractViewerModalState.open && !!selectedWizardContract}
-      toggle={closeContractViewerModal}
-      className={styles.contractViewerModal}
-      contentClassName={styles.contractViewerModalContent}
-      centered
-    >
-      <ModalBody
-        className={styles.contractViewerModalBody}
-        data-testid={WIZARD_CONTRACT_MODAL_TESTID}
-      >
-        {selectedWizardContract ? (
-          <ContractViewer
-            variant="compact"
-            contracts={[selectedWizardContract]}
-            onClose={closeContractViewerModal}
-            renderSourceHeaderActions={(contract) => (
-              <a
-                href={selectedWizardContractHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.contractViewerFullPageLink}
-                aria-label={`Open full Contracts page for ${contract.name}`}
-                title={`Open full Contracts page for ${contract.name}`}
-                data-testid="ce-wizard-contract-modal-full-link"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-                <span>Full page</span>
-              </a>
-            )}
-          />
-        ) : null}
-      </ModalBody>
-    </Modal>
+    <SessionWizardContractViewerModal
+      contractViewerModalState={contractViewerModalState}
+      selectedWizardContract={selectedWizardContract}
+      closeContractViewerModal={closeContractViewerModal}
+      selectedWizardContractHref={selectedWizardContractHref}
+    />
 
-    <Modal
+    <SessionHeaderPreviewModal
       isOpen={sessionHeaderPreviewModalOpen}
-      toggle={onCloseSessionHeaderPreviewModal}
-      centered
-      size="xl"
-      contentClassName={styles.sessionHeaderPreviewModalContent}
-    >
-      <ModalBody
-        className={styles.sessionHeaderPreviewModalBody}
-        onClick={onCloseSessionHeaderPreviewModal}
-      >
-        {sessionHeaderPreviewSrc ? (
-          <img src={sessionHeaderPreviewSrc} alt="Expanded session header preview" />
-        ) : null}
-      </ModalBody>
-    </Modal>
+      onClose={onCloseSessionHeaderPreviewModal}
+      previewSrc={sessionHeaderPreviewSrc}
+    />
   </>
 );
 

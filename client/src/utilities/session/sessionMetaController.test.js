@@ -1,4 +1,5 @@
 import {
+  createSessionMetaRefreshController,
   refreshSessionInfoForSlug,
   refreshSessionMetaFieldsForSlug,
 } from './sessionMetaController.js';
@@ -135,5 +136,107 @@ describe('sessionMetaController', () => {
     expect(result.errors[0].fieldKey).toBe('sessionName');
     expect(result.errors[0].error).toBeInstanceOf(Error);
     expect(result.errors[0].error.message).toBe('not authorized');
+  });
+
+  it('refresh controller applies session info once per slug/account/envelope and resets on destroy', async () => {
+    const getKey = jest.fn();
+    const decryptEnvelopeValue = jest.fn().mockResolvedValue('Private session info');
+    let state = {
+      sessionInfoOverrides: {
+        other: 'Existing info',
+      },
+    };
+    const host = {
+      getActiveSessionSlug: jest.fn(() => 'edge'),
+      getSessionConfigBySlugOrDefault: jest.fn(() => ({
+        ...GROUP_CFG,
+        sessionInfoEncrypted: 'session-info-env',
+      })),
+      getGlobalLitHooks: jest.fn(() => ({ getKey })),
+      getAccount: jest.fn(() => ACCOUNT),
+      getProviderLike: jest.fn(() => 'wagmi'),
+      decryptEnvelopeValue,
+      setState: jest.fn((updater) => {
+        const patch = updater(state);
+        state = {
+          ...state,
+          ...patch,
+        };
+      }),
+      warn: jest.fn(),
+    };
+
+    const controller = createSessionMetaRefreshController(host);
+
+    await controller.refreshSessionInfo();
+    await controller.refreshSessionInfo();
+
+    expect(decryptEnvelopeValue).toHaveBeenCalledTimes(1);
+    expect(host.setState).toHaveBeenCalledTimes(1);
+    expect(state.sessionInfoOverrides).toEqual({
+      other: 'Existing info',
+      edge: 'Private session info',
+    });
+    expect(host.warn).not.toHaveBeenCalled();
+
+    controller.destroy();
+    await controller.refreshSessionInfo();
+
+    expect(decryptEnvelopeValue).toHaveBeenCalledTimes(2);
+  });
+
+  it('refresh controller merges metadata patches and preserves field attempt state', async () => {
+    const getKey = jest.fn();
+    const decryptEnvelopeValue = jest.fn().mockImplementation(async (encrypted) => {
+      if (encrypted === 'name-env') {
+        throw new Error('not authorized');
+      }
+      if (encrypted === 'header-env') return 'ar://private-header';
+      throw new Error(`Unexpected envelope: ${encrypted}`);
+    });
+    let state = {
+      sessionHeaderOverrides: {
+        other: 'ar://existing-header',
+      },
+    };
+    const host = {
+      getActiveSessionSlug: jest.fn(() => 'edge'),
+      getSessionConfigBySlugOrDefault: jest.fn(() => ({
+        ...GROUP_CFG,
+        encryptedFields: {
+          sessionName: 'name-env',
+          sessionHeader: 'header-env',
+        },
+      })),
+      getGlobalLitHooks: jest.fn(() => ({ getKey })),
+      getAccount: jest.fn(() => ACCOUNT),
+      getProviderLike: jest.fn(() => 'wagmi'),
+      decryptEnvelopeValue,
+      setState: jest.fn((updater) => {
+        const patch = updater(state);
+        state = {
+          ...state,
+          ...patch,
+        };
+      }),
+      warn: jest.fn(),
+    };
+
+    const controller = createSessionMetaRefreshController(host);
+
+    await controller.refreshSessionMetaFields();
+    await controller.refreshSessionMetaFields();
+
+    expect(decryptEnvelopeValue).toHaveBeenCalledTimes(2);
+    expect(host.setState).toHaveBeenCalledTimes(1);
+    expect(state).toEqual({
+      sessionHeaderOverrides: {
+        other: 'ar://existing-header',
+        edge: 'ar://private-header',
+      },
+    });
+    expect(host.warn).toHaveBeenCalledTimes(1);
+    expect(host.warn.mock.calls[0][0]).toBe('MainSite: fallback');
+    expect(host.warn.mock.calls[0][1]).toBeInstanceOf(Error);
   });
 });

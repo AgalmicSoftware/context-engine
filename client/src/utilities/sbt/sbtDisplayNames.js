@@ -22,6 +22,24 @@ import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
 import { toStr } from '../shared/primitives.js';
+import {
+  SBT_MASKED_FIELD_VALUE,
+  buildSbtDisplayCacheEntry,
+  buildSbtDisplayInflightLookupKey,
+  buildSbtDisplayLabelMemoKey,
+  buildSbtDisplayRetryStateKey,
+  getSbtMetadataDescriptionText,
+  getSbtMetadataDisplayNameValue,
+  isSbtMetadataFieldLocked,
+  normalizeSbtDisplayChainId as normalizeChainId,
+  resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
+  resolveSbtDisplayCacheWriteNetKey,
+  resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
+  resolveSbtDisplayRetryAllowed,
+  resolveSbtMetadataLookupDecision,
+  shouldPersistSbtDisplayMetadata,
+  shouldWriteSbtDisplayLabelMemoEntry,
+} from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
 const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
@@ -30,7 +48,6 @@ const DISPLAY_LABEL_MEMO_TTL_MS = 5 * 60 * 1000;
 const DISPLAY_LABEL_MEMO_MAX = 3000;
 const RETRY_STATE_TTL_MS = 24 * 60 * 60 * 1000;
 const RETRY_STATE_MAX = 4000;
-const MASKED_SBT_FIELD_VALUE = '[encrypted]';
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
 const inflightByKey = new Map();
@@ -48,13 +65,6 @@ const normalizeAddress = (value) => {
   } catch (_) {
     return '';
   }
-};
-
-const getAddressLower = (value) => toStr(value).trim().toLowerCase();
-
-const normalizeChainId = (value) => {
-  const chainId = Number(value);
-  return Number.isFinite(chainId) && chainId > 0 ? chainId : 0;
 };
 
 const isUnresolvedSessionConfig = (config) => (
@@ -105,9 +115,7 @@ const getNameLookupDelayMs = (attempts) => {
   return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
 };
 
-const getDisplayLabelMemoKey = ({ addressLower = '', preferredSlug = '', chainId = null } = {}) => (
-  `${toStr(addressLower).trim().toLowerCase()}|${sanitizeSlug(preferredSlug)}|${normalizeChainId(chainId)}`
-);
+const getDisplayLabelMemoKey = buildSbtDisplayLabelMemoKey;
 
 const readDisplayLabelMemoEntry = (memoKey) => {
   const key = toStr(memoKey).trim();
@@ -126,7 +134,7 @@ const readDisplayLabelMemoEntry = (memoKey) => {
 
 const writeDisplayLabelMemoEntry = (memoKey, value) => {
   const key = toStr(memoKey).trim();
-  if (!key || !value || typeof value !== 'object' || !value.name) return;
+  if (!shouldWriteSbtDisplayLabelMemoEntry({ memoKey: key, value })) return;
   displayLabelMemoByKey.delete(key);
   displayLabelMemoByKey.set(key, { value, ts: Date.now() });
   while (displayLabelMemoByKey.size > DISPLAY_LABEL_MEMO_MAX) {
@@ -145,55 +153,13 @@ const ensureSbtDisplayNameCacheSubscription = () => {
   });
 };
 
-const LEGACY_ENCRYPTED_FIELD_KEYS = Object.freeze({
-  name: ['nameEncrypted', 'encryptedName'],
-  description: ['descriptionEncrypted', 'encryptedDescription'],
-  tags: ['tagsEncrypted', 'encryptedTags'],
-  documentURLs: ['documentURLsEncrypted', 'docUrlsEncrypted'],
-  image: ['imageEncrypted', 'encryptedImage'],
-});
+export const isSbtFieldLocked = isSbtMetadataFieldLocked;
 
-export const isSbtFieldLocked = (info, fieldKey) => {
-  if (!info || typeof info !== 'object' || !fieldKey) return false;
-  if (info?.[`${fieldKey}Locked`] === true) return true;
-  const encryptedFields = (info?.encryptedFields && typeof info.encryptedFields === 'object')
-    ? info.encryptedFields
-    : null;
-  if (encryptedFields && Object.prototype.hasOwnProperty.call(encryptedFields, fieldKey) && encryptedFields[fieldKey]) {
-    return true;
-  }
-  const legacyKeys = LEGACY_ENCRYPTED_FIELD_KEYS[fieldKey] || [];
-  return legacyKeys.some((key) => !!info?.[key]);
-};
+export const getSbtMaskedFieldValue = () => SBT_MASKED_FIELD_VALUE;
 
-export const getSbtMaskedFieldValue = () => MASKED_SBT_FIELD_VALUE;
+export const getSbtDescriptionText = getSbtMetadataDescriptionText;
 
-export const getSbtDescriptionText = (info) => {
-  const description = toStr(info?.description).trim();
-  if (description) return description;
-  return isSbtFieldLocked(info, 'description') ? MASKED_SBT_FIELD_VALUE : '';
-};
-
-const getSbtDisplayNameValue = (info) => {
-  if (!info || typeof info !== 'object') return '';
-  const nameLocked = isSbtFieldLocked(info, 'name');
-  const candidates = nameLocked
-    ? [info.name]
-    : [
-        info.name,
-        info.title,
-      ];
-  if (!nameLocked) {
-    candidates.push(info.symbol);
-    candidates.push(info.contractName);
-  }
-  for (const candidate of candidates) {
-    const name = toStr(candidate).trim();
-    if (name) return name;
-  }
-  if (nameLocked) return MASKED_SBT_FIELD_VALUE;
-  return '';
-};
+const getSbtDisplayNameValue = getSbtMetadataDisplayNameValue;
 
 const ensureNetBucket = (cacheObj, netKey) => {
   const key = toStr(netKey).trim();
@@ -206,53 +172,6 @@ const ensureNetBucket = (cacheObj, netKey) => {
     cacheObj[key].sbtList = {};
   }
   return cacheObj[key];
-};
-
-const resolveEntryFromNetBucket = (bucket, addressLower) => {
-  if (!bucket || typeof bucket !== 'object') return null;
-  const sbtList = (bucket.sbtList && typeof bucket.sbtList === 'object') ? bucket.sbtList : null;
-  if (!sbtList) return null;
-
-  if (sbtList[addressLower]) return sbtList[addressLower];
-
-  for (const entry of Object.values(sbtList)) {
-    const lower = getAddressLower(entry?.sbtAddress);
-    if (lower && lower === addressLower) return entry;
-  }
-
-  return null;
-};
-
-const resolveEntryChainId = (entry, netKey = '') => normalizeChainId(
-  entry?.sbtInfo?.chainID ||
-  entry?.sbtInfo?.chainId ||
-  entry?.chainID ||
-  entry?.chainId ||
-  netKey
-);
-
-const resolveNameFromSbtCacheValue = (cacheValue, addressLower, { expectedChainId = 0 } = {}) => {
-  if (!cacheValue || typeof cacheValue !== 'object') return null;
-
-  for (const netKey of Object.keys(cacheValue)) {
-    const bucket = cacheValue[netKey];
-    const entry = resolveEntryFromNetBucket(bucket, addressLower);
-    if (!entry) continue;
-    const chainId = resolveEntryChainId(entry, netKey);
-    if (expectedChainId > 0 && chainId !== expectedChainId) continue;
-    const info = entry?.sbtInfo || null;
-    const name = getSbtDisplayNameValue(info);
-    if (!name) continue;
-    return {
-      name,
-      info,
-      netKey,
-      chainId: chainId || null,
-      entry,
-    };
-  }
-
-  return null;
 };
 
 const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = null, chainId = null } = {}) => {
@@ -291,9 +210,7 @@ const getMetadataLookupConfig = ({ preferredSlug = '', metadataLookupConfig = nu
   return out;
 };
 
-const getRetryStateKey = ({ addressLower = '', slug = '', chainId = null } = {}) => (
-  `${addressLower}|${sanitizeSlug(slug)}|${Number(chainId || 0) || 0}`
-);
+const getRetryStateKey = buildSbtDisplayRetryStateKey;
 
 const pruneRetryStateCache = (now = Date.now()) => {
   const staleBefore = now - RETRY_STATE_TTL_MS;
@@ -315,8 +232,7 @@ const pruneRetryStateCache = (now = Date.now()) => {
 
 const canRetryNameLookup = (retryKey, now = Date.now()) => {
   pruneRetryStateCache(now);
-  const retryAt = Number(retryStateByKey.get(retryKey)?.nextRetryAt || 0);
-  return !Number.isFinite(retryAt) || retryAt <= now;
+  return resolveSbtDisplayRetryAllowed(retryStateByKey.get(retryKey), now);
 };
 
 const markNameLookupFailure = (retryKey, now = Date.now()) => {
@@ -336,42 +252,6 @@ const clearNameLookupFailure = (retryKey) => {
   retryStateByKey.delete(retryKey);
 };
 
-const resolveNetKeyForWrite = ({ cacheObj, addressLower = '', chainId = null, info = null } = {}) => {
-  const cache = (cacheObj && typeof cacheObj === 'object') ? cacheObj : {};
-  const infoChainId = normalizeChainId(info?.chainID || info?.chainId || 0);
-  const preferredChainId = normalizeChainId(chainId);
-  const preferredNetKey = preferredChainId > 0 ? String(preferredChainId) : '';
-  const infoNetKey = infoChainId > 0 ? String(infoChainId) : '';
-  const entryNetKeys = [];
-
-  for (const netKey of Object.keys(cache)) {
-    const entry = resolveEntryFromNetBucket(cache[netKey], addressLower);
-    if (!entry) continue;
-    entryNetKeys.push(netKey);
-  }
-
-  if (preferredNetKey && entryNetKeys.includes(preferredNetKey)) {
-    return preferredNetKey;
-  }
-  if (infoNetKey && entryNetKeys.includes(infoNetKey)) {
-    return infoNetKey;
-  }
-  if (preferredNetKey) {
-    return preferredNetKey;
-  }
-  if (infoNetKey) {
-    return infoNetKey;
-  }
-  if (entryNetKeys.length > 0) {
-    return entryNetKeys[0];
-  }
-
-  const existingKeys = Object.keys(cache).filter((key) => key && key !== 'undefined');
-  if (existingKeys.length === 1) return existingKeys[0];
-
-  return '';
-};
-
 const persistSbtMetadataToCache = async ({
   address = '',
   preferredSlug = '',
@@ -379,12 +259,12 @@ const persistSbtMetadataToCache = async ({
   chainId = null,
 } = {}) => {
   const checksum = normalizeAddress(address);
-  if (!checksum || !metadata || typeof metadata !== 'object') return false;
+  if (!checksum || !shouldPersistSbtDisplayMetadata(metadata)) return false;
 
   const slug = sanitizeSlug(preferredSlug || metadata?.slug || '');
   const addressLower = checksum.toLowerCase();
   const cacheObj = (await readCache('sbtCache', slug)) || {};
-  const netKey = resolveNetKeyForWrite({
+  const netKey = resolveSbtDisplayCacheWriteNetKey({
     cacheObj,
     addressLower,
     chainId,
@@ -397,16 +277,12 @@ const persistSbtMetadataToCache = async ({
   if (!bucket) return false;
 
   const existingEntry = resolveEntryFromNetBucket(bucket, addressLower) || {};
-  const existingInfo = (existingEntry?.sbtInfo && typeof existingEntry.sbtInfo === 'object')
-    ? existingEntry.sbtInfo
-    : {};
-
-  bucket.sbtList[addressLower] = {
-    ...existingEntry,
-    sbtAddress: checksum,
-    sbtInfo: { ...existingInfo, ...metadata },
+  bucket.sbtList[addressLower] = buildSbtDisplayCacheEntry({
+    existingEntry,
+    checksum,
+    metadata,
     slug,
-  };
+  });
 
   return !!(await writeCache('sbtCache', slug, cacheObj));
 };
@@ -551,7 +427,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
 
   if (!canRetryNameLookup(retryKey)) return null;
 
-  const inFlightKey = `${retryKey}|lookup`;
+  const inFlightKey = buildSbtDisplayInflightLookupKey(retryKey);
   if (inflightByKey.has(inFlightKey)) {
     return inflightByKey.get(inFlightKey);
   }
@@ -565,7 +441,7 @@ export const hydrateSbtDisplayNameTargeted = async ({
       });
 
       const metadata = await contractScripts.getSbtMetadata('none', checksum, cfg);
-      if (!metadata || typeof metadata !== 'object') {
+      if (!shouldPersistSbtDisplayMetadata(metadata)) {
         markNameLookupFailure(retryKey);
         return null;
       }
@@ -579,13 +455,14 @@ export const hydrateSbtDisplayNameTargeted = async ({
         });
       }
 
-      const name = getSbtDisplayNameValue(metadata);
-      if (!name) {
+      const metadataDecision = resolveSbtMetadataLookupDecision(metadata);
+      if (!metadataDecision.shouldUseResult) {
         markNameLookupFailure(retryKey);
         return null;
       }
 
       clearNameLookupFailure(retryKey);
+      const name = metadataDecision.name;
 
       const resolved = {
         address: checksum,

@@ -149,6 +149,10 @@ export interface SessionSbtCacheController {
   ) => Promise<void>;
   startSbtEventListener: () => void;
   startSbtEventListenerForGroup: (slugIn?: string | null) => void;
+  startSbtDetailInstanceListenerForGroup: (
+    slugIn?: string | null,
+    addressesIn?: Array<string | null | undefined> | string | null
+  ) => boolean;
   onNewSbtEventDetected: (event?: SbtRealtimeEventLike | null) => Promise<void>;
   onNewSbtEventDetectedForGroup: (
     slug?: string | null,
