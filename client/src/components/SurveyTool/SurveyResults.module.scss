@@ -345,6 +345,228 @@
   font-size: 1.25em;
 }
 
+.htmlReportModal {
+  :global(.modal-content) {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: var(--ce-radius-12);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.34);
+    opacity: 1 !important;
+  }
+
+  :global(.btn-close),
+  :global(.close) {
+    color: #111827 !important;
+    opacity: 0.85 !important;
+    filter: none !important;
+
+    &:hover,
+    &:focus {
+      color: #000000 !important;
+      opacity: 1 !important;
+    }
+  }
+}
+
+.htmlReportModalHeader {
+  align-items: center;
+  background: #ffffff !important;
+  border-bottom: 1px solid #d7dde8 !important;
+  color: #111827 !important;
+  font-weight: 800;
+
+  :global(.modal-title) {
+    color: #111827 !important;
+    font-weight: 800;
+  }
+}
+
+.htmlReportModalBody {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  font-size: 1rem;
+  line-height: 1.55;
+
+  p,
+  strong,
+  td,
+  th {
+    color: #1f2937 !important;
+    opacity: 1 !important;
+  }
+
+  strong,
+  th {
+    font-weight: 800;
+  }
+}
+
+.htmlReportSectionTable {
+  margin: 1rem 0;
+  font-size: 0.92rem;
+
+  :global(table),
+  :global(.table) {
+    color: #1f2937 !important;
+  }
+
+  th {
+    background: #eef2f7 !important;
+    border-color: #d7dde8 !important;
+    color: #111827 !important;
+  }
+
+  td {
+    border-color: #e5e9f0 !important;
+    color: #1f2937 !important;
+    vertical-align: top;
+  }
+
+  input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    opacity: 1 !important;
+    visibility: visible !important;
+    accent-color: #0f5ec7;
+  }
+}
+
+.htmlReportOptionGroup {
+  margin: 1rem 0;
+  padding: 0.95rem;
+  border: 1px solid #d7dde8;
+  border-radius: var(--ce-radius-8);
+  background: #f8fafc;
+  color: #1f2937;
+
+  h6 {
+    margin: 0 0 0.75rem;
+    color: #111827;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0.45rem 0;
+    color: #334155 !important;
+  }
+}
+
+.htmlReportOptionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0.65rem 0;
+  padding: 0;
+
+  input[type='radio'] {
+    flex: 0 0 auto;
+    width: 1rem;
+    height: 1rem;
+    margin: 0.25rem 0 0;
+    opacity: 1 !important;
+    visibility: visible !important;
+    accent-color: #0f5ec7;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    color: #1f2937 !important;
+    line-height: 1.35;
+  }
+
+  span {
+    color: #475569 !important;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+}
+
+.htmlReportWarning {
+  background: #fff8e5 !important;
+  border-color: #f5c451 !important;
+  color: #422006 !important;
+  font-weight: 600;
+}
+
+.htmlReportInfo {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1e3a8a !important;
+  font-weight: 600;
+}
+
+.htmlReportModalFooter {
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+  gap: 0.75rem;
+}
+
+.htmlReportCancelButton,
+.htmlReportDownloadButton,
+.htmlReportGenerateButton {
+  border-radius: var(--ce-radius-8);
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0.6rem 1rem;
+}
+
+.htmlReportCancelButton {
+  background: #ffffff !important;
+  border: 1px solid #64748b !important;
+  color: #111827 !important;
+
+  &:hover,
+  &:focus {
+    background: #f1f5f9 !important;
+    border-color: #334155 !important;
+    color: #020617 !important;
+  }
+}
+
+.htmlReportDownloadButton {
+  background: #0f5ec7 !important;
+  border: 1px solid #0f5ec7 !important;
+  color: #ffffff !important;
+
+  &:hover,
+  &:focus {
+    background: #0b4da6 !important;
+    border-color: #0b4da6 !important;
+    color: #ffffff !important;
+  }
+
+  &:disabled {
+    background: #d8dee8 !important;
+    border-color: #c7d0dd !important;
+    color: #475569 !important;
+    opacity: 1 !important;
+  }
+}
+
+.htmlReportGenerateButton {
+  background: #ffffff !important;
+  border: 1px solid #0f5ec7 !important;
+  color: #0f3d8a !important;
+  margin-top: 0.65rem;
+
+  &:hover,
+  &:focus {
+    background: #eff6ff !important;
+    border-color: #0b4da6 !important;
+    color: #0b4da6 !important;
+  }
+
+  &:disabled {
+    background: #eef2f7 !important;
+    border-color: #cbd5e1 !important;
+    color: #475569 !important;
+    opacity: 1 !important;
+  }
+}
+
 .filterSection {
   margin-bottom: 1rem;
 }

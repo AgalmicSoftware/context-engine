@@ -149,7 +149,7 @@ What users can do:
 - Answer surveys and questions, including optional voice-to-text input.
 - After a successful submit, see a stable `Submitted` state (instead of `Submit (N)`) until making a new edit.
 - View results and filter responses by SBT membership and other criteria.
-- Export results for external analysis (CSV, CSV (Questions), and Polis-style report generation).
+- Export results for external analysis (CSV, JSON, redacted session-results HTML viewer/static HTML/PDF report options, and Polis-style PDF/report generation). Session-results exports require a logged-in authorized viewer, embed downloader metadata, and can derive local/session-private AI analysis sections using synthetic participant ids instead of sending wallet addresses to AI.
 - Generate/read Polis-style report views inside survey/question/session result surfaces (rather than on a standalone top-level route).
 
 Question types (current core set):

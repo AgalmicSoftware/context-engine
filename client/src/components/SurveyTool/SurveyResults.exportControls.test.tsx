@@ -33,6 +33,8 @@ import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionRes
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
+import { callAI } from '../../utilities/ai/aiScripts.js';
+import { downloadSessionResultsHtmlReport, downloadSessionResultsPdfReport } from '../../utilities/sessionResultsExport';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -46,6 +48,17 @@ jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   return null;
 });
 jest.mock('./QuestionFilter', () => () => null);
+jest.mock('../../utilities/sessionResultsExport', () => {
+  const actual = jest.requireActual('../../utilities/sessionResultsExport');
+  return {
+    ...actual,
+    downloadSessionResultsHtmlReport: jest.fn(),
+    downloadSessionResultsPdfReport: jest.fn(),
+  };
+});
+jest.mock('../../utilities/ai/aiScripts.js', () => ({
+  callAI: jest.fn(),
+}));
 const mockPolisReport = jest.fn((..._args: any[]) => null);
 jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
@@ -177,6 +190,9 @@ beforeEach(() => {
   mockDemoAnalysisWorkspace.mockClear();
   mockDebateMap.mockClear();
   mockRiskMatrix.mockClear();
+  (downloadSessionResultsHtmlReport as jest.Mock).mockClear();
+  (downloadSessionResultsPdfReport as jest.Mock).mockClear();
+  (callAI as jest.Mock).mockClear();
 });
 
 const treeHasText = (node: TreeNode, text: string): boolean => {
@@ -382,6 +398,316 @@ describe('SurveyResults export/view controls', () => {
       'JSON: Questions + Responses',
     ]);
     expect(optionLabels).not.toContain('Polis Report');
+  });
+
+  it('renders the HTML report export action in the expanded export area', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      filterState: {},
+      isResponsesCacheReady: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      exportAreaOpen: true,
+      sbtFilteredAggregatorQuestionResponses: {},
+      responses: [],
+      sbtFilteredResponses: [],
+    };
+
+    const tree = subject.render();
+    const exportButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-export-html-report'
+    );
+
+    expect(exportButton).toBeTruthy();
+    expect(treeHasText(exportButton, 'Export HTML Report')).toBe(true);
+  });
+
+  it('shows the HTML report confirmation modal in redacted mode and disables download without reportable data', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionSlug: 'demo',
+    });
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      sbtFilteredAggregatorQuestionResponses: {},
+      responses: [],
+      sbtFilteredResponses: [],
+    };
+
+    const tree = subject.renderHtmlReportExportModal();
+    const modal = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-modal'
+    );
+    const downloadButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-download'
+    );
+
+    expect(modal?.props?.className).toBe(styles.htmlReportModal);
+    expect(treeHasText(tree, 'Privacy mode:')).toBe(true);
+    expect(treeHasText(tree, 'Redacted')).toBe(true);
+    expect(treeHasText(tree, 'Exported viewer')).toBe(true);
+    expect(treeHasText(tree, 'Single HTML file')).toBe(true);
+    expect(treeHasText(tree, 'Single-page PDF')).toBe(true);
+    expect(treeHasText(tree, 'Embedded Snapshot JSON')).toBe(true);
+    expect(treeHasText(tree, 'Unavailable')).toBe(true);
+    expect(treeHasText(tree, 'Login required')).toBe(true);
+    expect(downloadButton?.props?.disabled).toBe(true);
+    expect(downloadButton?.props?.className).toBe(styles.htmlReportDownloadButton);
+  });
+
+  it('builds a redacted HTML report snapshot from hydrated SurveyResults state', () => {
+    const subject = createSubject({
+      viewMode: 'questions',
+      sessionSlug: 'demo',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xabc',
+            response: {
+              answer: { value: 'Raw answer' },
+              additional: { value: 'Raw note' },
+            },
+          },
+        ],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Should exports be redacted?',
+        type: 'binary',
+        options: ['Yes', 'No'],
+      },
+    }));
+
+    const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
+    const snapshotText = JSON.stringify(snapshot);
+
+    expect(snapshot.sections.report.available).toBe(true);
+    expect(snapshot.sections.report.questions).toEqual([
+      {
+        id: 'q1',
+        prompt: 'Should exports be redacted?',
+        type: 'binary',
+        tags: [],
+        options: ['Yes', 'No'],
+        responseCount: 1,
+      },
+    ]);
+    expect(snapshot.counts.participants).toBe(1);
+    expect(snapshot.privacyMode).toBe('redacted');
+    expect(snapshot.exportedBy).toEqual({
+      address: '0x9999999999999999999999999999999999999999',
+      chainId: 11155420,
+      displayAddress: '0x9999...9999',
+    });
+    expect(snapshotText).not.toContain('0xabc');
+    expect(snapshotText).not.toContain('Raw answer');
+    expect(snapshotText).not.toContain('Raw note');
+  });
+
+  it('downloads the confirmed HTML report through the browser helper', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xabc',
+            response: {
+              answer: { value: 'Agree' },
+            },
+          },
+        ],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Export this report?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    const tree = subject.renderHtmlReportExportModal();
+    const downloadButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-download'
+    );
+
+    expect(downloadButton?.props?.disabled).toBe(false);
+    await downloadButton.props.onClick();
+
+    expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1);
+    const [html, filename] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
+    expect(html).toContain('<!doctype html>');
+    expect(html).toContain('Export this report?');
+    expect(html).toContain('Downloaded by 0x9999...9999');
+    expect(html).toContain('"address": "0x9999999999999999999999999999999999999999"');
+    expect(html).not.toContain('0xabc');
+    expect(filename).toBe('contextEngine_sessionReport_demo_2026-05-25T18_30_00_000Z.html');
+    expect(subject.state.htmlReportModalOpen).toBe(false);
+  });
+
+  it('downloads the selected report as a single-page PDF when that format is selected', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportExportFormat: 'single-page-pdf',
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          {
+            responder: '0xabc',
+            response: {
+              answer: { value: 'Agree' },
+            },
+          },
+        ],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Export this report?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    await subject.downloadHtmlReport();
+
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).toHaveBeenCalledTimes(1);
+    expect((downloadSessionResultsPdfReport as jest.Mock).mock.calls[0][0]).toEqual(expect.objectContaining({
+      filename: 'contextEngine_sessionReport_demo_2026-05-25T18_30_00_000Z.pdf',
+      html: expect.stringContaining('ce-report-pdf'),
+    }));
+  });
+
+  it('generates AI analysis with synthetic participant IDs and stores the local artifact', async () => {
+    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
+      breakdown: {
+        summary: { overview: 'Participants broadly prioritize clear export controls.' },
+        groups: [{ id: 'group_1', label: 'Export controls', participantIds: ['participant_001'] }],
+      },
+      argumentMap: {
+        debates: [{ id: 'debate_1', title: 'Export scope', claims: [{ id: 'claim_1', participantIds: ['participant_001'] }] }],
+      },
+      riskMatrix: {
+        categories: [{ id: 'risk_1', label: 'Privacy leakage' }],
+        comments: [{ id: 'risk_comment_1', participantIds: ['participant_002'] }],
+        heatmap: { risk_1: { likelihood: 'medium', impact: 'high' } },
+      },
+      atlas: {
+        nodes: [{ id: 'atlas_1', label: 'Privacy-preserving exports', participantIds: ['participant_001'] }],
+        edges: [],
+      },
+    }));
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      totalQuestionsCount: 2,
+      totalResponsesCount: 3,
+      filteredResponsesCount: 3,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          { responder: '0x1111111111111111111111111111111111111111', response: { answer: { value: 'Use a viewer.' } } },
+          { responder: '0x2222222222222222222222222222222222222222', response: { answer: { value: 'Keep it private.' } } },
+        ],
+        q2: [
+          { responder: '0x1111111111111111111111111111111111111111', response: { answer: { value: 'Make PDF readable.' } } },
+        ],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { id: 'q1', prompt: 'What export should exist?', type: 'freeform' },
+      q2: { id: 'q2', prompt: 'What risk matters?', type: 'freeform' },
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(() => Promise.resolve());
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(1);
+    const prompt = (callAI as jest.Mock).mock.calls[0][0];
+    expect(prompt).toContain('participant_001');
+    expect(prompt).toContain('Use a viewer.');
+    expect(prompt).not.toContain('0x1111111111111111111111111111111111111111');
+    expect(prompt).not.toContain('0x2222222222222222222222222222222222222222');
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    expect(subject.state.htmlReportAnalysisArtifact.sections.argumentMap.available).toBe(true);
+
+    const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
+    expect(snapshot.sections.argumentMap.available).toBe(true);
+    expect(snapshot.sections.riskMatrix.available).toBe(true);
+    expect(snapshot.sections.atlas.available).toBe(true);
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
