@@ -1,25 +1,53 @@
-/** @file sessionStorageConfig.js */
+/** @file sessionStorageConfig.ts */
 
 import {
   STORAGE_BACKENDS,
   normalizeStorageBackend,
 } from './storageRefs.js';
+import type { StorageBackend } from './storageRefs.js';
 import { toStr } from '../shared/primitives.js';
 
-const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+type UnknownRecord = Record<string, unknown>;
+
+const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
   ACTIVE: 'active',
   STAGED: 'staged',
-});
+} as const);
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
   PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
-});
+} as const);
 
-const normalizePayloadAccessMode = (value) => {
+type SessionStorageResourceStage = typeof SESSION_STORAGE_RESOURCE_STAGES[keyof typeof SESSION_STORAGE_RESOURCE_STAGES];
+type SessionStoragePayloadAccessMode = typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES[keyof typeof SESSION_STORAGE_PAYLOAD_ACCESS_MODES];
+
+interface SessionStorageResources extends Record<string, string> {
+  docsContext: string;
+  questions: string;
+  surveys: string;
+  responses: string;
+  generatedArtifacts: string;
+  media: string;
+}
+
+interface NormalizedSessionStorageConfig {
+  backend: StorageBackend;
+  resources: SessionStorageResources;
+  payloadAccessControl: {
+    mode: SessionStoragePayloadAccessMode;
+  };
+}
+
+interface ResolveSessionStorageBackendOptions {
+  resource?: unknown;
+  encrypted?: unknown;
+}
+
+const normalizePayloadAccessMode = (value: unknown): SessionStoragePayloadAccessMode => {
   const normalized = toStr(value).trim().toLowerCase();
   if (
     normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
@@ -34,21 +62,30 @@ const normalizePayloadAccessMode = (value) => {
   return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
 };
 
-const resolvePayloadAccessMode = (raw) => normalizePayloadAccessMode(
-  raw?.payloadAccessControl?.mode ||
-  raw?.cloudflare?.payloadAccessMode ||
-  raw?.payloadAccessMode ||
-  raw?.accessControlMode
-);
+const resolvePayloadAccessMode = (raw: unknown): SessionStoragePayloadAccessMode => {
+  const rawRecord = isObj(raw) ? raw : {};
+  const payloadAccessControl = rawRecord.payloadAccessControl as { mode?: unknown } | null | undefined;
+  const cloudflare = rawRecord.cloudflare as { payloadAccessMode?: unknown } | null | undefined;
+  return normalizePayloadAccessMode(
+    payloadAccessControl?.mode ||
+    cloudflare?.payloadAccessMode ||
+    rawRecord.payloadAccessMode ||
+    rawRecord.accessControlMode
+  );
+};
 
-export const normalizeSessionStorageConfig = (sessionConfig = null) => {
+export const normalizeSessionStorageConfig = (sessionConfig: unknown = null): NormalizedSessionStorageConfig => {
   const cfg = isObj(sessionConfig) ? sessionConfig : {};
   const raw = isObj(cfg.storageProfile)
     ? cfg.storageProfile
     : (isObj(cfg.sessionStorageConfig) ? cfg.sessionStorageConfig : {});
-  const backend = normalizeStorageBackend(raw.backend || cfg.storageBackend || cfg.docLibrary?.provider);
+  const backend = normalizeStorageBackend(
+    raw.backend ||
+    cfg.storageBackend ||
+    (cfg.docLibrary as { provider?: unknown } | null | undefined)?.provider
+  );
   const resources = isObj(raw.resources) ? raw.resources : {};
-  const defaultCanonicalStage = backend === STORAGE_BACKENDS.CLOUDFLARE
+  const defaultCanonicalStage: SessionStorageResourceStage = backend === STORAGE_BACKENDS.CLOUDFLARE
     ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
     : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   return {
@@ -69,10 +106,10 @@ export const normalizeSessionStorageConfig = (sessionConfig = null) => {
   };
 };
 
-export const resolveSessionStorageBackend = (sessionConfig = null, {
+export const resolveSessionStorageBackend = (sessionConfig: unknown = null, {
   resource = 'docsContext',
   encrypted = false,
-} = {}) => {
+}: ResolveSessionStorageBackendOptions = {}): StorageBackend => {
   const storageConfig = normalizeSessionStorageConfig(sessionConfig);
   const resourceKey = toStr(resource).trim() || 'docsContext';
   const resourceStage = storageConfig.resources[resourceKey] || SESSION_STORAGE_RESOURCE_STAGES.ACTIVE;
@@ -83,7 +120,7 @@ export const resolveSessionStorageBackend = (sessionConfig = null, {
   return STORAGE_BACKENDS.ARWEAVE;
 };
 
-export const requiresLitForSessionStorage = (sessionConfig = null, opts = {}) => (
+export const requiresLitForSessionStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
   resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.LIT_ARWEAVE ||
   (
     resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE &&
@@ -91,16 +128,16 @@ export const requiresLitForSessionStorage = (sessionConfig = null, opts = {}) =>
   )
 );
 
-export const usesCloudflareSessionStorage = (sessionConfig = null, opts = {}) => (
+export const usesCloudflareSessionStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
   resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE
 );
 
-export const usesWorkerSbtGateCloudflareStorage = (sessionConfig = null, opts = {}) => (
+export const usesWorkerSbtGateCloudflareStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
   usesCloudflareSessionStorage(sessionConfig, opts) &&
   normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
 );
 
-export const usesPublicReadCloudflareStorage = (sessionConfig = null, opts = {}) => (
+export const usesPublicReadCloudflareStorage = (sessionConfig: unknown = null, opts: ResolveSessionStorageBackendOptions = {}): boolean => (
   usesCloudflareSessionStorage(sessionConfig, opts) &&
   normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
 );
