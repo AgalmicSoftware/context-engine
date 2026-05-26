@@ -24,21 +24,9 @@ import {
 import { toStr } from '../shared/primitives.js';
 import {
   SBT_MASKED_FIELD_VALUE,
-  buildSbtDisplayCacheEntry,
-  buildSbtDisplayInflightLookupKey,
-  buildSbtDisplayLabelMemoKey,
-  buildSbtDisplayRetryStateKey,
   getSbtMetadataDescriptionText,
   getSbtMetadataDisplayNameValue,
   isSbtMetadataFieldLocked,
-  normalizeSbtDisplayChainId as normalizeChainId,
-  resolveSbtCacheEntryFromBucket as resolveEntryFromNetBucket,
-  resolveSbtDisplayCacheWriteNetKey,
-  resolveSbtDisplayNameFromCacheValue as resolveNameFromSbtCacheValue,
-  resolveSbtDisplayRetryAllowed,
-  resolveSbtMetadataLookupDecision,
-  shouldPersistSbtDisplayMetadata,
-  shouldWriteSbtDisplayLabelMemoEntry,
 } from './sbtDisplayNameContracts.js';
 
 const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
