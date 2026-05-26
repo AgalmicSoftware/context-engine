@@ -120,6 +120,13 @@ import {
   buildAdminFaucetInvalidResource,
   buildAdminFaucetLoadingResource,
   buildAdminFaucetRpcUnavailableResource,
+  buildAdminLitErrorResource,
+  buildAdminLitLoadingResource,
+  buildAdminLitNotConfiguredResource,
+  buildAdminLitStatusNotLoadedResource,
+  buildAdminLitStatusResource,
+  buildAdminLitUnavailableResource,
+  getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 import {
   ADMIN_AI_PROVIDER_OPTIONS,
@@ -246,13 +253,7 @@ const AdminPage = ({
   const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
   const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
   const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
-  const [litResource, setLitResource] = useState<any>({
-    address: '',
-    display: 'Lit Chipotle not configured',
-    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-    loading: false,
-    manualRefreshAvailable: false,
-  });
+  const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
   const arweaveResourceRequestRef = useRef(0);
   const faucetResourceRequestRef = useRef(0);
   const litResourceRequestRef = useRef(0);
@@ -607,13 +608,7 @@ const AdminPage = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setLitResource({
-      address: '',
-      display: 'Lit Chipotle not configured',
-      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-      loading: false,
-      manualRefreshAvailable: false,
-    });
+    setLitResource(buildAdminLitNotConfiguredResource());
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -1091,60 +1086,34 @@ const AdminPage = ({
     const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
     if (!useChipotlePath && !baseUrl) {
-      setLitResource({
-        address: '',
-        display: 'Lit Chipotle not configured',
-        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
+      setLitResource(buildAdminLitNotConfiguredResource());
       return;
     }
 
     if (!baseUrl || !selectedConfig) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
-        meta: useChipotlePath
-          ? 'Resolve the worker URL to read Lit Chipotle status.'
-          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
+      setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
       return;
     }
 
     if (!includeSignedStatus) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Status not loaded',
-        meta: [
-          accountApiKey ? 'Unsaved account key' : '',
-          usageApiKey ? 'Unsaved usage key' : '',
-          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId ? 'PKP configured' : '',
-          configuredLitActionCid ? 'Action configured' : '',
-          'Click refresh to query the worker for Lit Chipotle status.',
-        ].filter(Boolean).join(' • '),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitStatusNotLoadedResource({
+        hasAccountApiKey: !!accountApiKey,
+        hasUsageApiKey: !!usageApiKey,
+        configuredLitApiBase,
+        configuredLitGroupId,
+        configuredLitPkpId,
+        configuredLitActionCid,
+        formatPreviewValue,
+      }));
       return;
     }
 
-    setLitResource({
-      address: '',
-      display: 'Loading...',
-      meta: configuredLitGroupId
-        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
-        : 'Checking Lit Chipotle worker status',
-      loading: true,
-      manualRefreshAvailable: true,
-    });
+    setLitResource(buildAdminLitLoadingResource({
+      configuredLitGroupId,
+      formatPreviewValue,
+    }));
 
     try {
       const slug = normalizeSlug(selectedSlug);
@@ -1161,59 +1130,27 @@ const AdminPage = ({
       });
       if (requestId !== litResourceRequestRef.current) return;
 
-      const ready = data?.ready === true;
       const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
       const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
         ? data.groupSummary
         : {};
-      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
-      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
-      const hasHardConfigMiss = (
-        groupSummary.hasConfiguredPkp === false ||
-        groupSummary.hasConfiguredAction === false
-      );
       const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-      setLitResource({
-        address: '',
-        display: ready
-          ? 'Ready'
-          : hasHardConfigMiss
-            ? 'Needs config'
-            : warnings.length
-              ? 'Needs review'
-              : 'Configured',
-        meta: [
-          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
-          balanceDisplay ? `balance ${balanceDisplay}` : '',
-          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
-          configuredLitPkpId
-            ? (groupSummary.hasConfiguredPkp === true
-              ? 'PKP ready'
-              : groupSummary.hasConfiguredPkp === false
-                ? 'PKP missing'
-                : 'PKP unchecked')
-            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
-          configuredLitActionCid
-            ? (groupSummary.hasConfiguredAction === true
-              ? 'Action ready'
-              : groupSummary.hasConfiguredAction === false
-                ? 'Action missing'
-                : 'Action unchecked')
-            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
-          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitStatusResource({
+        ready: data?.ready === true,
+        warnings,
+        groupSummary,
+        balanceDisplay,
+        configuredLitApiBase,
+        configuredLitGroupId,
+        configuredLitPkpId,
+        configuredLitActionCid,
+        formatPreviewValue,
+      }));
     } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource({
-        address: '',
-        display: 'Unable to load status',
-        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
-        loading: false,
-        manualRefreshAvailable: true,
-      });
+      setLitResource(buildAdminLitErrorResource(
+        getErrorMessage(error, 'Failed to load Lit Chipotle status.')
+      ));
     }
   }, [
     secrets.litAccountApiKey,
@@ -1239,13 +1176,15 @@ const AdminPage = ({
       ? selectedConfig.litCredentials
       : {};
     return (
-      toStr(secrets.litAccountApiKey).trim() ||
-      toStr(secrets.litUsageApiKey).trim() ||
-      toStr(litCredentials?.litApiBase).trim() ||
-      toStr(litCredentials?.litGroupId).trim() ||
-      toStr(litCredentials?.litPkpId).trim() ||
-      toStr(litCredentials?.litActionCid).trim()
-    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
+      getAdminLitResourceLabel({
+        hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
+        hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
+        configuredLitApiBase: litCredentials?.litApiBase,
+        configuredLitGroupId: litCredentials?.litGroupId,
+        configuredLitPkpId: litCredentials?.litPkpId,
+        configuredLitActionCid: litCredentials?.litActionCid,
+      })
+    );
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
