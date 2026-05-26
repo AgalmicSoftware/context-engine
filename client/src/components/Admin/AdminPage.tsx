@@ -102,6 +102,7 @@ import {
   resolveDefaultGateFromConfig,
 } from './adminPageSbtGateSelectionHelpers';
 import {
+  buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
