@@ -13,9 +13,11 @@
   - `SurveyQuestionsResponseView.tsx`: **119 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
+  - `SurveyResults.tsx`: **5,458 lines**
+  - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
   - `surveyQuestionsJsonDerivation.ts`: **119 lines**
-- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
+- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyResults.tsx` has started the same display-only decomposition with the question table extracted while keeping fetch, decrypt, cache, export, route, and mutation behavior in the parent.
 
 ## Current Runtime Hierarchy
 
@@ -30,6 +32,8 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
         -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
+     -> SurveyResults.tsx  [survey/question results runtime]
+        -> SurveyResultsQuestionTable.tsx  [question result table presentation]
 ```
 
 ## Responsibility Map
@@ -46,6 +50,8 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
+| `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export execution, route/session state, and result mutation behavior |
+| `SurveyResultsQuestionTable.tsx` | Question result table presentation | Renders the sortable question table from explicit row props while leaving row derivation, sorting state, bookmark mutation, and scroll/view behavior in `SurveyResults` |
 
 ## Boundary Map
 

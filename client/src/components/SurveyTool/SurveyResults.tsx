@@ -23,8 +23,7 @@ import {
   ModalBody,
   ModalFooter,
   Collapse,
-  Alert,
-  Table
+  Alert
 } from 'reactstrap';
 
 
@@ -54,7 +53,7 @@ import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress, getShortenedQuestionID, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
+import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
@@ -63,7 +62,6 @@ import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
-  buildQuestionRoutePath,
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
@@ -155,6 +153,13 @@ import {
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
   type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
+import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+
+export {
+  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
+  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
+  SURVEY_RESULTS_TABLE_CELL_STYLE,
+} from './SurveyResultsQuestionTable';
 
 export {
   countQuestionModeResponses,
@@ -535,20 +540,6 @@ export const SURVEY_RESULTS_METADATA_MISSING_STYLE: React.CSSProperties = {
   fontStyle: 'italic',
   color: '#bbb',
   padding: '1rem',
-};
-
-export const SURVEY_RESULTS_TABLE_CELL_STYLE: React.CSSProperties = {
-  textAlign: 'center',
-};
-
-export const SURVEY_RESULTS_SORTABLE_HEADER_STYLE: React.CSSProperties = {
-  textAlign: 'center',
-  cursor: 'pointer',
-};
-
-export const SURVEY_RESULTS_TABLE_BOOKMARK_STYLE: React.CSSProperties = {
-  marginRight: '6px',
-  cursor: 'pointer',
 };
 
 export const SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE: React.CSSProperties = {
@@ -4466,86 +4457,28 @@ const questionEntries = this.getMemoizedQuestionTableEntries(questionMap, networ
 const { questionIdSortBy, questionIdSortAsc } = this.state;
 
 return (
-  <div className={styles.questionIdTableWrapper}>
-    <Table striped bordered hover size="sm" className={styles.questionIdTable}>
-      <thead>
-        <tr>
-          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Question ID</th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('prompt')}
-          >
-            Prompt {questionIdSortBy === 'prompt' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('type')}
-          >
-            Type {questionIdSortBy === 'type' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('responses')}
-          >
-            Responses{' '}
-            {questionIdSortBy === 'responses' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {questionEntries.map((entry) => {
-          const shortened = getShortenedQuestionID(entry.questionId, false);
-          const bookmarked = this.state.bookmarkedQuestionIDs.includes(entry.questionId);
-          return (
-            <tr key={entry.questionId}>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <FontAwesomeIcon
-                  icon={faBookmark}
-                  style={SURVEY_RESULTS_TABLE_BOOKMARK_STYLE}
-                  color={bookmarked ? 'gold' : 'white'}
-                  onClick={() => this.toggleQuestionBookmark(entry.questionId)}
-                />
-                <a
-                  href={buildQuestionRoutePath(entry.questionId, {
-                    sessionSlug: entry.sessionSlug || this.getEffectiveSlug(),
-                  })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.clickableQuestionId}
-                >
-                  {shortened}
-                </a>
-              </td>
-              <td className={styles.promptColumn}>{entry.prompt || '(No prompt)'}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.type}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.responsesCount}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    // Use setState with a callback to guarantee the scroll happens after the render.
-                    // This ensures the card is expanded before we attempt to scroll to it.
-                    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
-                      forceValue: true,
-                      itemKey: entry.questionId,
-                      mapKey: 'activeQuestionToggles',
-                      prevState,
-                    }), () => {
-                      this.scrollToQuestion(entry.questionId);
-                    });
-                  }}
-                  className={styles.tableActionButton}
-                >
-                  View
-                </Button>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </Table>
-  </div>
+  <SurveyResultsQuestionTable
+    bookmarkedQuestionIDs={this.state.bookmarkedQuestionIDs}
+    entries={questionEntries}
+    fallbackSessionSlug={this.getEffectiveSlug()}
+    onSort={this.changeQuestionIdSort}
+    onToggleQuestionBookmark={this.toggleQuestionBookmark}
+    onViewQuestion={(questionId) => {
+      // Use setState with a callback to guarantee the scroll happens after the render.
+      // This ensures the card is expanded before we attempt to scroll to it.
+      this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+        forceValue: true,
+        itemKey: questionId,
+        mapKey: 'activeQuestionToggles',
+        prevState,
+      }), () => {
+        this.scrollToQuestion(questionId);
+      });
+    }}
+    sortAsc={questionIdSortAsc}
+    sortBy={questionIdSortBy}
+    styleMap={styles}
+  />
 );
 };
 
