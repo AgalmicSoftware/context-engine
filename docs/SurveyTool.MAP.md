@@ -7,7 +7,8 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,369 lines**
+  - `SurveyQuestions.tsx`: **9,331 lines**
+  - `SurveyQuestionsJsonControls.tsx`: **143 lines**
   - `SurveyQuestionsResponseView.tsx`: **119 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
@@ -21,6 +22,7 @@ SurveyTool.tsx  [top-level wrapper]
   -> SurveySelector.tsx  [survey/questions selector + filter + results]
      -> QuestionsDashboard.tsx  [question list in "questions" mode]
      -> SurveyQuestions.tsx  [shared full response runtime]
+        -> SurveyQuestionsJsonControls.tsx  [bottom JSON controls]
         -> SurveyQuestionsResponseView.tsx  [viewed-response presentation]
         -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
@@ -34,6 +36,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, and submission pipeline |
+| `SurveyQuestionsJsonControls.tsx` | Bottom JSON controls view | Renders question/response/survey JSON toggles and copy panels from explicit props while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
 | `SurveyQuestionsResponseView.tsx` | Viewed-response display view | Renders viewed-response loading, no-response, address heading, single-question answer, and full-survey answer states from explicit props while leaving answer rendering callbacks and response state in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
