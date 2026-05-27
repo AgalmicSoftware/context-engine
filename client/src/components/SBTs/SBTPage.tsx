@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -44,6 +44,7 @@ import {
   renderSbtPageFullImageModal,
   renderSbtPageHolderModal,
 } from './SBTPageModals';
+import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import {
   appendSbtPageBookmark,
@@ -4974,14 +4975,14 @@ renderMintButton() {
                 descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
                 descriptionText={sbtDescriptionText}
                 explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
-                imageAlt={identityPanelDisplayState.imageAlt}
+                imageAlt={sbtNameText}
                 imageUrl={imageUrl}
-                nameText={identityPanelDisplayState.nameText}
+                nameText={sbtNameText}
                 onBookmark={this.bookmarkSBT}
                 onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
                 onImageError={imageErrorHandler}
                 onImageOpen={this.toggleFullImage}
-                showDescriptionLockIcon={identityPanelDisplayState.showDescriptionLockIcon}
+                showDescriptionLockIcon={isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim()}
                 tokenUriHref={tokenUriHref}
               />
               <div className={styles.rightColumn}>
