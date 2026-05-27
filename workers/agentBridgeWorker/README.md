@@ -50,7 +50,7 @@ Initial Telegram-facing capabilities:
 | SBT claim/create, decrypt, storage access, OpenClaw events | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
 Settings updates currently accept only safe structured fields such as
-`draftStyle` (`concise`, `balanced`, `detailed`) and `telegramReminders`.
+`draftStyle` (`concise`, `balanced`, `detailed`).
 Freeform profile text, credentials, grants, keys, JWTs, gated content, and other
 private inputs must stay behind opaque refs collected in private chat or the
 Mini App.
@@ -288,14 +288,17 @@ Required values:
 | --- | --- |
 | `TELEGRAM_BOT_TOKEN` from BotFather | Paste into untracked `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_BOT_TOKEN` |
 | `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Paste into `.dev.vars`; deployed as plain Worker var |
+| Optional Telegram bot display name | Set `TELEGRAM_BOT_NAME` or `AGENT_BRIDGE_TELEGRAM_BOT_NAME` to override the default `Context Engine`; live apply calls Telegram `setMyName` |
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
+| `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
 | Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
+| Optional Telegram session cutoff | `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` filters `/start`, `/sessions`, and the Mini App session picker to Telegram-visible sessions with `createdAt`, `sessionCreatedAt`, `groupCreatedAt`, or a supported created timestamp at or after the cutoff. Accepts ISO timestamps or Unix seconds/milliseconds. Sessions missing creation metadata are hidden while this cutoff is set, except the configured default Telegram-only session remains selectable so a single active demo session can still boot |
 | Optional Telegram API timeout | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000` |
 | Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
@@ -352,7 +355,13 @@ a Cloudflare-backed session worker through `sessionWorkerUrl` plus
 `/storage/list?resource=questions` and `/storage/read` directly instead of
 scanning chain question events. `/sessions` hides `e2e`-named smoke-test
 sessions as a temporary cleanup heuristic and paginates tall inline-keyboard
-lists with `Load Next`. Group session selection through
+lists with `Load Next`. `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` can be set
+as a Cloudflare Worker plain-text var to hide older Telegram-only groups from
+`/start`, `/sessions`, and the Mini App picker. When that cutoff is active,
+policy entries need one of the normalized creation fields (`createdAt`,
+`sessionCreatedAt`, `groupCreatedAt`, `createdTimestamp`, or the timestamp
+aliases) or they are treated as older than the cutoff. Group session selection
+through
 `/sessions` or `/join <session>` persists the chat's selected session in
 `AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, `/results`, and
 `/attachments` use that session without repeating the slug. It also stores that
@@ -503,7 +512,7 @@ defaults to 24 hours.
 Current v0 scope:
 
 - Agent/account/settings action surface backed by the catalog, including safe
-  settings inputs for `draftStyle` and `telegramReminders`. The Mini App keeps
+  settings inputs for `draftStyle`. The Mini App keeps
   `showUnansweredFirst` as a local filter preference behind the filter button.
 - Start and joined-session launches expose the same session picker directly
   under the Mini App title. The picker
@@ -615,8 +624,9 @@ The product flow should not require manual Wrangler. The current
 operator UX is `/telegram-demo-setup`: it selects a CE session, pulls
 `CE_SESSION_WORKER_BASE_URL` and `DEFAULT_CHAIN_ID` from that session when
 available, preserves the default OP Sepolia POKT/PATH RPC, accepts optional
-additional RPC fallback input, generates `TELEGRAM_WEBHOOK_SECRET` and
-`DEMO_SIGNER_ROOT_SECRET`, derives the Workers.dev public URL, and creates a
+additional RPC fallback input, generates `TELEGRAM_WEBHOOK_SECRET`,
+`DEMO_SIGNER_ROOT_SECRET`, and `AGENT_BRIDGE_AGENT_API_TOKEN`, derives the
+Workers.dev public URL, and creates a
 redacted deploy plan. Wrangler remains a developer fallback only.
 
 This slice adds a planning/validation helper:
@@ -642,7 +652,7 @@ multiple accounts are visible because account selection is not implemented yet:
 - SQLite-backed Durable Object binding and migration for managed demo
   signer/runtime.
 - Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
-  `DEMO_SIGNER_ROOT_SECRET`.
+  `DEMO_SIGNER_ROOT_SECRET`, `AGENT_BRIDGE_AGENT_API_TOKEN`.
 - Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
   `CE_SESSION_WORKER_BASE_URL`, `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and
   optional `ADDITIONAL_RPC_URL`.
@@ -693,7 +703,7 @@ npm run deploy:apply -- --apply
 `deploy:plan`: account lookup when needed, workers.dev subdomain lookup, KV
 create-or-reuse, optional R2/D1 create-or-reuse for doc storage, module worker
 upload, Worker secret writes, workers.dev script enablement, Telegram
-`setWebhook` plus `setMyCommands`, and `/health` verification. Tests keep these network calls mocked
+`setWebhook`, `setMyName`, plus `setMyCommands`, and `/health` verification. Tests keep these network calls mocked
 unless the operator runs the command with `--apply`.
 
 Useful guarded variants:

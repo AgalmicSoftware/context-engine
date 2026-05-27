@@ -142,6 +142,38 @@ test('raw demo key export and recover are explicit private-only demo paths with 
   assert.equal(JSON.stringify(recovered.events).includes(revealed.reveal.privateKey), false);
 });
 
+test('managed demo signer refuses signing and key reveal without a root secret', async () => {
+  const signer = new ManagedDemoSignerDurableObject(createMemoryDurableObjectState(), {
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+  });
+  const account = await signer.getOrCreateAccount({
+    principal: { telegramUserId: '42' },
+  });
+  const signed = await signer.signCanonicalDemoEnvelope({
+    account,
+    grant: {
+      status: 'active',
+      sessions: ['alpha'],
+      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      riskCeiling: RISK_CEILINGS.SUBMIT,
+    },
+    sessionSlug: 'alpha',
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    requestedRisk: RISK_CEILINGS.SUBMIT,
+    canonicalPayload: { questionId: 'question-1' },
+  });
+  const revealed = await signer.exportDemoKey({
+    account,
+    principal: account.telegramPrincipal,
+    reveal: true,
+  });
+
+  assert.equal(signed.ok, false);
+  assert.equal(signed.reason, 'managed_demo_root_secret_missing');
+  assert.equal(revealed.ok, false);
+  assert.equal(revealed.reason, 'managed_demo_root_secret_missing');
+});
+
 test('managed demo signer rejects passkey, Porto, CE-CC local, linked wallet, and production modes', () => {
   for (const mode of [
     ACCOUNT_MODES.PASSKEY,

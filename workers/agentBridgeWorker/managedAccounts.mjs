@@ -45,6 +45,15 @@ export function assertManagedDemoAccountMode(mode = ACCOUNT_MODES.MANAGED_TELEGR
   return { ok: true, reason: 'managed_demo_account_allowed', action, accountMode: normalized };
 }
 
+export function assertManagedDemoRootSecret(rootSecret = '', {
+  action = 'managed_demo_signing',
+} = {}) {
+  if (!String(rootSecret || '').trim()) {
+    return { ok: false, reason: 'managed_demo_root_secret_missing', action };
+  }
+  return { ok: true, reason: 'managed_demo_root_secret_present', action };
+}
+
 export async function deriveManagedDemoAccount({
   principal = {},
   deploymentId = '',
@@ -132,6 +141,8 @@ export async function deriveDemoPrivateKeyMaterial({
   deploymentId = '',
   rootSecret = '',
 } = {}) {
+  const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'derive_demo_private_key' });
+  if (!secretCheck.ok) throw new Error(secretCheck.reason);
   const telegramPrincipal = normalizeTelegramPrincipal(principal);
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
   const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
@@ -150,6 +161,10 @@ export async function buildDemoKeyExportRecord({
   if (!modeCheck.ok) return modeCheck;
   if (account.chainScope && account.chainScope !== 'testnet') {
     return { ok: false, reason: 'managed_demo_testnet_only', action: 'export_demo_key' };
+  }
+  if (reveal === true) {
+    const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'export_demo_key' });
+    if (!secretCheck.ok) return secretCheck;
   }
   const privateKey = reveal
     ? await deriveDemoPrivateKeyMaterial({ principal, deploymentId, rootSecret })

@@ -229,6 +229,16 @@ test('worker serves Telegram Mini App shell', async () => {
   assert.match(text, /prompt\.textContent = question\.prompt \|\| question\.title/);
 });
 
+test('worker serves Telegram Mini App loading GIF asset', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/loading.gif'));
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/gif');
+  assert.equal(new TextDecoder().decode(bytes.slice(0, 6)), 'GIF89a');
+  assert.equal(bytes.length > 100000, true);
+});
+
 test('worker preview update is disabled unless explicitly enabled and does not mutate KV', async () => {
   const kv = new MemoryKv();
   const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
@@ -360,7 +370,6 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
       launch,
       settings: {
         draftStyle: 'concise',
-        telegramReminders: true,
       },
     }),
   }), env);
@@ -370,8 +379,9 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(settings.ok, true);
   assert.equal(settings.status, 'settings_update_request_created');
   assert.equal(settings.settings.draftStyle, 'concise');
+  assert.equal(Object.hasOwn(settings.settings, 'telegramReminders'), false);
   assert.equal(settings.request.canonicalApiRequest.path, '/api/agent/settings/update-request');
-  assert.equal(settings.request.canonicalApiRequest.body.settingsPatchSummary.telegramReminders, true);
+  assert.equal(Object.hasOwn(settings.request.canonicalApiRequest.body.settingsPatchSummary, 'telegramReminders'), false);
   assert.match(settings.request.requestId, /^ceab_[a-z0-9]{10,48}$/);
 
   const secretSettingsResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/settings', {

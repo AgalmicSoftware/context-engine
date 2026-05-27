@@ -72,6 +72,7 @@ export function normalizeDocumentRecord(input = {}) {
       storesBytes: false,
     },
     contentPreview: visibility === DOC_VISIBILITY.PUBLIC ? safeString(input.contentPreview || input.summary) : null,
+    externalUrl: safeString(input.externalUrl || input.url) || null,
     privateContentRef: safeString(input.privateContentRef || input.contentRef) || null,
     createdAt: input.createdAt || null,
   };

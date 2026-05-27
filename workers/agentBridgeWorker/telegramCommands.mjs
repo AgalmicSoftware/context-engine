@@ -59,8 +59,12 @@ import {
 } from './telegramResponseExport.mjs';
 import {
   buildQueuedSubmitRecord,
+  persistTelegramSubmitRecord,
   queueTelegramSubmitRecord,
+  SUBMIT_REQUEST_KV_PREFIX,
   SUBMITTED_RESULT_STATUSES,
+  submitRequestKvKey,
+  submitRequestSessionKvPrefix,
   telegramSubmitQueueEnabled,
 } from './telegramSubmitQueue.mjs';
 import {
@@ -80,10 +84,11 @@ const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
-const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 const RESULT_PHOTO_KV_PREFIX = 'telegram:result-photo:';
 const RESULTS_EXPOSURE_OVERRIDE_KV_PREFIX = 'telegram:results-exposure:';
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
+const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
+const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
@@ -101,6 +106,7 @@ const ANSWER_BUTTON_CONTROL_TYPES = new Set([
   'single_select',
   'multi_select_toggle',
 ]);
+const TELEGRAM_ATTACHMENT_IMAGE_TYPES = new Set(['png', 'jpg', 'jpeg', 'webp']);
 const RESULTS_EXPOSURE_TOGGLE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
   aggregate_results: 'aggregateResultsEnabled',
@@ -1127,15 +1133,88 @@ function loadDemoDocuments(env = {}) {
   return docs;
 }
 
+async function loadMiniAppUploadedDocumentRecords(env = {}, sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return [];
+  const records = await listKvRecordsByPrefix(env, `${MINI_APP_DOCUMENT_KV_PREFIX}${slug}:`, { limit: 1000 });
+  return records.filter((record) => sanitizeSessionSlug(record.sessionSlug) === slug);
+}
+
+function miniAppDocumentBytesKvKey({ sessionSlug = '', docId = '' } = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const id = safeString(docId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 96);
+  return slug && id ? `${MINI_APP_DOCUMENT_BYTES_KV_PREFIX}${slug}:${id}` : '';
+}
+
+async function listAttachmentDocumentRecords(env = {}, sessionSlug = '') {
+  const uploadedDocs = await loadMiniAppUploadedDocumentRecords(env, sessionSlug);
+  return listDocumentsForSession([...uploadedDocs, ...loadDemoDocuments(env)], {
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+  }).docs;
+}
+
+function telegramAttachmentImageContentType(fileType = '') {
+  const type = lower(fileType);
+  if (type === 'png') return 'image/png';
+  if (type === 'jpg' || type === 'jpeg') return 'image/jpeg';
+  if (type === 'webp') return 'image/webp';
+  return '';
+}
+
+function telegramAttachmentImageFilename(doc = {}) {
+  const title = safeString(doc.title || doc.docId || 'attachment').replace(/[^A-Za-z0-9_.-]+/g, '_').slice(0, 80) || 'attachment';
+  const extension = lower(doc.fileType) || 'png';
+  return `${title}.${extension}`;
+}
+
+async function materializeAttachmentImage(env = {}, doc = {}) {
+  const fileType = lower(doc.fileType);
+  if (!TELEGRAM_ATTACHMENT_IMAGE_TYPES.has(fileType)) {
+    return { ok: false, reason: 'attachment_image_type_unsupported' };
+  }
+  const contentType = telegramAttachmentImageContentType(fileType) || 'image/png';
+  const externalUrl = safeString(doc.externalUrl);
+  if (externalUrl) {
+    return {
+      ok: true,
+      photo: {
+        url: externalUrl,
+        filename: telegramAttachmentImageFilename(doc),
+        contentType,
+      },
+    };
+  }
+  const key = miniAppDocumentBytesKvKey({ sessionSlug: doc.sessionSlug, docId: doc.docId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') {
+    return { ok: false, reason: 'attachment_image_preview_unavailable' };
+  }
+  const preview = safeJsonParse(await kv.get(key).catch(() => null), null);
+  if (
+    !preview ||
+    safeString(preview.sessionSlug) !== safeString(doc.sessionSlug) ||
+    safeString(preview.docId) !== safeString(doc.docId) ||
+    !safeString(preview.dataBase64)
+  ) {
+    return { ok: false, reason: 'attachment_image_preview_unavailable' };
+  }
+  return {
+    ok: true,
+    photo: {
+      bytes: base64ToBytes(preview.dataBase64),
+      contentType: safeString(preview.contentType) || contentType,
+      filename: telegramAttachmentImageFilename(doc),
+    },
+  };
+}
+
 function loadAgentSettings(env = {}) {
   const parsed = safeJsonParse(env.AGENT_BRIDGE_DEMO_AGENT_SETTINGS_JSON, null);
   const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   const draftStyle = ['concise', 'balanced', 'detailed'].includes(lower(source.draftStyle))
     ? lower(source.draftStyle)
     : 'balanced';
-  const telegramReminders = source.telegramReminders === true ||
-    ['1', 'true', 'yes', 'on'].includes(lower(source.telegramReminders));
-  const settings = { draftStyle, telegramReminders };
+  const settings = { draftStyle };
   settings.showUnansweredFirst = source.showUnansweredFirst === false
     ? false
     : !['0', 'false', 'no', 'off'].includes(lower(source.showUnansweredFirst));
@@ -1571,7 +1650,7 @@ async function persistTelegramSubmitRequest({
   });
   const idempotencyKey = `telegram_bot_submit:${telegramUserId}:${slug}:${questionIdSeedPart(qid)}:${answerFingerprint}`;
   const requestId = buildOpaqueActionId(idempotencyKey);
-  const kvKey = `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`;
+  const kvKey = submitRequestKvKey(requestId);
   const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
     ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
     : null;
@@ -1696,9 +1775,7 @@ async function persistTelegramSubmitRequest({
       createdAt,
     };
     assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
-    await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
-      expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
-    });
+    await persistTelegramSubmitRecord({ env, kvKey, record });
     return directSubmit.ok === true
       ? {
         ok: true,
@@ -1755,9 +1832,7 @@ async function persistTelegramSubmitRequest({
     createdAt,
   };
   assertNoSecretShape(record, 'Telegram submit requests must not serialize secrets.');
-  await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
-    expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
-  });
+  await persistTelegramSubmitRecord({ env, kvKey, record });
   return {
     ok: true,
     requestId,
@@ -2237,32 +2312,92 @@ function answerControlsFromPoseState(state = {}) {
   ));
 }
 
-function formatHelpText() {
-  return [
-    'Context Engine',
-    '',
-    '/sessions - list linked sessions',
+function formatHelpText({
+  showSessions = true,
+  session = null,
+} = {}) {
+  const lines = ['Context Engine', ''];
+  if (session?.sessionSlug) {
+    lines.push(`Session: ${sessionLabel(session)}`, '');
+  }
+  if (showSessions) lines.push('/sessions - choose session');
+  lines.push(
     '/questions - view session questions',
-    '/groups - manage lightweight groups',
-    '/add_question <text> - add a group question',
     '/q <number> - pose a question',
     '/results [ consensus | group ] - view results',
-    '/attachments - view attachments',
     '/me - view your account',
-  ].join('\n');
+  );
+  return lines.join('\n');
 }
 
-function sessionVisibleInTelegram(session = {}) {
+function timestampMs(value = '') {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 0 && value < 10_000_000_000 ? Math.floor(value * 1000) : Math.floor(value);
+  }
+  const text = safeString(value);
+  if (!text) return null;
+  if (/^\d+$/.test(text)) {
+    const number = Number(text);
+    if (!Number.isFinite(number) || number <= 0) return null;
+    return number < 10_000_000_000 ? Math.floor(number * 1000) : Math.floor(number);
+  }
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function telegramSessionCreatedAfterMs(env = {}, policy = {}) {
+  return timestampMs(
+    env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER ||
+    env.AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER ||
+    env.AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER ||
+    env.AGENT_BRIDGE_SESSION_CREATED_AFTER ||
+    policy.telegramSessionCreatedAfter ||
+    policy.telegramSessionsCreatedAfter ||
+    policy.telegramGroupCreatedAfter ||
+    policy.sessionCreatedAfter
+  );
+}
+
+function sessionCreatedAtMs(session = {}) {
+  return timestampMs(
+    session.createdAt ||
+    session.createdTimestamp ||
+    session.createdAtMs ||
+    session.createdTimestampMs ||
+    session.sessionCreatedAt ||
+    session.groupCreatedAt ||
+    session.telegramCreatedAt ||
+    session.blockTimestamp ||
+    session.createdBlockTimestamp
+  );
+}
+
+function sessionVisibleInTelegram(session = {}, {
+  createdAfterMs = null,
+  defaultSessionSlug = '',
+} = {}) {
   const name = `${safeString(session.sessionSlug)} ${safeString(session.sessionName)}`;
+  const slug = sanitizeSessionSlug(session.sessionSlug || session.slug);
   // Temporary smoke-test hygiene: hide old E2E registry spam until session metadata
   // has a durable production flag for Telegram visibility.
   if (/\be2e\b|e2e/i.test(name)) return false;
+  if (Number.isFinite(createdAfterMs)) {
+    const createdAtMs = sessionCreatedAtMs(session);
+    const defaultTelegramSession = slug && slug === sanitizeSessionSlug(defaultSessionSlug);
+    if (!Number.isFinite(createdAtMs) && !defaultTelegramSession) return false;
+    if (Number.isFinite(createdAtMs) && createdAtMs < createdAfterMs) return false;
+  }
   return session.telegramBridgeEnabled === true && session.telegramOnly === true;
 }
 
-function telegramVisibleSessions(policy = {}) {
+function telegramVisibleSessions(policy = {}, env = {}) {
+  const createdAfterMs = telegramSessionCreatedAfterMs(env, policy);
   return (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : [])
-    .filter(sessionVisibleInTelegram);
+    .filter((session) => sessionVisibleInTelegram(session, {
+      createdAfterMs,
+      defaultSessionSlug: policy.defaultSessionSlug,
+    }));
 }
 
 async function makeResponseExportButton({
@@ -2383,19 +2518,65 @@ async function makeAdminActionsButton({
   });
 }
 
-async function buildHelpResponse({ normalized, command = COMMANDS.START, env, createdAt }) {
+async function buildHelpResponse({
+  normalized,
+  command = COMMANDS.START,
+  env,
+  createdAt,
+  waitUntil = null,
+} = {}) {
   const policy = await loadSessionPolicy(env);
-  const privateBinding = normalized.chat.isPrivate
+  const visibleSessions = telegramVisibleSessions(policy, env);
+  let activeBinding = normalized.chat.isPrivate
     ? await readPrivateSessionBinding(env, normalized)
-    : null;
+    : await readGroupSessionBinding(env, normalized);
+  let autoJoinedSession = null;
+  if (visibleSessions.length === 1 && activeBinding?.sessionSlug !== visibleSessions[0].sessionSlug) {
+    autoJoinedSession = visibleSessions[0];
+    if (normalized.chat.isPrivate) {
+      const saved = await persistPrivateSessionBinding({
+        env,
+        normalized,
+        session: autoJoinedSession,
+        createdAt,
+      });
+      if (saved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+    } else {
+      const [groupSaved, userSaved] = await Promise.all([
+        persistGroupSessionBinding({
+          env,
+          normalized,
+          session: autoJoinedSession,
+          createdAt,
+        }),
+        persistTelegramUserSessionBinding({
+          env,
+          normalized,
+          session: autoJoinedSession,
+          createdAt,
+          source: 'single_session_start',
+        }),
+      ]);
+      if (groupSaved.ok || userSaved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+    }
+    scheduleQuestionPrefetchForJoinedSession({
+      env,
+      sessionSlug: autoJoinedSession.sessionSlug,
+      waitUntil,
+    });
+  }
+  const resolvedActiveSession = activeBinding?.sessionSlug
+    ? resolveSessionInvocation(policy, activeBinding.sessionSlug)
+    : { ok: false };
+  const activeSession = resolvedActiveSession.ok ? resolvedActiveSession.session : autoJoinedSession;
   const miniAppButton = await makeMiniAppButton({
     env,
     label: 'Open Mini App',
     action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-    serverContextRef: privateBinding?.sessionSlug
-      ? { sessionSlug: privateBinding.sessionSlug }
+    serverContextRef: activeBinding?.sessionSlug
+      ? { sessionSlug: activeBinding.sessionSlug }
       : { sessionPicker: true },
-    seed: `help|mini_app|${privateBinding?.sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    seed: `help|mini_app|${activeBinding?.sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
     privateChat: normalized.chat.isPrivate,
     botUsername: env.TELEGRAM_BOT_USERNAME,
@@ -2409,13 +2590,16 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
     env,
     normalized,
     policy,
-    sessionSlug: privateBinding?.sessionSlug || '',
+    sessionSlug: activeBinding?.sessionSlug || '',
     createdAt,
   });
   if (adminActionsButton) keyboard.push([adminActionsButton]);
   return reply({
     chatId: normalized.chat.chatId,
-    text: formatHelpText(),
+    text: formatHelpText({
+      showSessions: visibleSessions.length > 1,
+      session: activeSession,
+    }),
     replyMarkup: keyboard.length ? { inline_keyboard: keyboard } : null,
     screen: 'setup_welcome',
     command,
@@ -2433,7 +2617,7 @@ async function buildSessionsResponse({
   pageOffset = 0,
 } = {}) {
   const policy = await loadSessionPolicy(env, { forceRefresh: true });
-  const availableSessions = telegramVisibleSessions(policy);
+  const availableSessions = telegramVisibleSessions(policy, env);
   const sessions = availableSessions;
   const offset = Math.max(0, Math.min(Number(pageOffset) || 0, Math.max(0, sessions.length - 1)));
   const visibleSessions = sessions.slice(offset, offset + TELEGRAM_SESSION_LIST_LIMIT);
@@ -3254,11 +3438,14 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.list !== 'function' || typeof kv.get !== 'function') return [];
   const records = [];
+  const maxRecords = Number.isFinite(Number(limit)) && Number(limit) > 0
+    ? Math.floor(Number(limit))
+    : Infinity;
   let cursor = undefined;
   do {
     const page = await kv.list({
       prefix,
-      limit: Math.min(1000, Math.max(1, Number(limit) || 200)),
+      limit: Math.min(1000, Math.max(1, Number.isFinite(maxRecords) ? maxRecords : 1000)),
       ...(cursor ? { cursor } : {}),
     }).catch(() => null);
     const keys = Array.isArray(page?.keys) ? page.keys : [];
@@ -3269,16 +3456,34 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
       if (record && typeof record === 'object' && !Array.isArray(record)) {
         records.push({ ...record, key });
       }
-      if (records.length >= limit) return records;
+      if (records.length >= maxRecords) return records;
     }
     cursor = page?.list_complete === false ? safeString(page.cursor) : '';
   } while (cursor);
   return records;
 }
 
+function dedupeSubmitRecords(records = []) {
+  const byId = new Map();
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
+    if (!requestId) return;
+    const existing = byId.get(requestId);
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
+      byId.set(requestId, record);
+    }
+  });
+  return Array.from(byId.values());
+}
+
 async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: 500 });
+  const indexedPrefix = submitRequestSessionKvPrefix(slug);
+  const indexedRecords = indexedPrefix
+    ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
+    : [];
+  const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
+  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords]);
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   return records
     .filter((record) => (
@@ -3290,6 +3495,7 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
       const answer = structuredResultAnswer(record);
       return {
         key: safeString(record.key),
+        requestId: safeString(record.requestId),
         createdAt: safeString(record.createdAt),
         telegramUserId: safeString(record.telegramUserId),
         questionId: safeString(record.questionId),
@@ -5273,13 +5479,37 @@ async function buildDocsResponse({
       messageId,
     });
   }
-  const docs = listDocumentsForSession(loadDemoDocuments(env), {
-    sessionSlug: resolved.session.sessionSlug,
-  });
-  const summaries = docs.docs.map((doc) => summarizeDocumentForGroup(doc)).filter((entry) => entry.ok);
+  const docRecords = await listAttachmentDocumentRecords(env, resolved.session.sessionSlug);
+  const summaries = docRecords.map((doc) => summarizeDocumentForGroup(doc)).filter((entry) => entry.ok);
   const lines = summaries.length
     ? summaries.map((entry, index) => `${index + 1}. ${entry.summary.docTitle} (${entry.summary.fileType}, ${entry.summary.visibility})`)
     : ['No attachments are linked to this session yet.'];
+  const imageButtons = await Promise.all(summaries.map((entry, index) => makeCallbackButton({
+    env,
+    label: telegramButtonLabel(`Show ${index + 1} as image`, `Show ${index + 1}`),
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_DOC_IMAGE,
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: {
+      sessionSlug: resolved.session.sessionSlug,
+      docId: entry.summary.docId,
+    },
+    seed: `docs|image|${resolved.session.sessionSlug}|${entry.summary.docId}|${normalized.updateId}`,
+    createdAt,
+  })));
+  const keyboard = [
+    ...imageButtons.map((button) => [button]),
+    [
+      await makeCallbackButton({
+        env,
+        label: 'View Questions',
+        action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+        lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+        serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+        seed: `docs|questions|${resolved.session.sessionSlug}|${normalized.updateId}`,
+        createdAt,
+      }),
+    ],
+  ];
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -5291,22 +5521,54 @@ async function buildDocsResponse({
       'Private or gated files open in the Mini App.',
     ].join('\n'),
     replyMarkup: {
-      inline_keyboard: [[
-        await makeCallbackButton({
-          env,
-          label: 'View Questions',
-          action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-          lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-          serverContextRef: { sessionSlug: resolved.session.sessionSlug },
-          seed: `docs|questions|${resolved.session.sessionSlug}|${normalized.updateId}`,
-          createdAt,
-        }),
-      ]],
+      inline_keyboard: keyboard,
     },
     screen: 'doc_library',
     command,
     normalized,
-    extra: { sessionSlug: resolved.session.sessionSlug, docCount: docs.count },
+    extra: { sessionSlug: resolved.session.sessionSlug, docCount: docRecords.length },
+  });
+}
+
+async function buildDocImageResponse({
+  normalized,
+  command,
+  env,
+  record,
+  createdAt,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(record?.serverContextRef?.sessionSlug);
+  const docId = safeString(record?.serverContextRef?.docId);
+  const docs = await listAttachmentDocumentRecords(env, sessionSlug);
+  const doc = docs.find((entry) => safeString(entry.docId) === docId);
+  if (!doc) {
+    return callbackOnly({
+      normalized,
+      command,
+      callbackAnswerText: 'Attachment is no longer available.',
+      callbackAnswerShowAlert: true,
+      screen: 'doc_image_unavailable',
+    });
+  }
+  const materialized = await materializeAttachmentImage(env, doc);
+  if (!materialized.ok) {
+    return callbackOnly({
+      normalized,
+      command,
+      callbackAnswerText: 'This attachment does not have an image preview yet.',
+      callbackAnswerShowAlert: true,
+      screen: 'doc_image_unavailable',
+    });
+  }
+  return reply({
+    method: 'sendPhoto',
+    chatId: normalized.chat.chatId,
+    text: `${doc.title} (${doc.fileType})`,
+    photo: materialized.photo,
+    screen: 'doc_image',
+    command,
+    normalized,
+    extra: { sessionSlug, docId, createdAt },
   });
 }
 
@@ -5582,7 +5844,6 @@ async function buildSettingsResponse({
     text: [
       'Agent settings',
       `Draft style: ${state.settings.draftStyle}`,
-      `Telegram reminders: ${state.settings.telegramReminders ? 'on' : 'off'}`,
       '',
       `Canonical: ${state.canonicalApiRequest.method} ${state.canonicalApiRequest.path}`,
     ].join('\n'),
@@ -5648,7 +5909,6 @@ async function buildSettingsEditResponse({
     text: [
       'Edit settings',
       `Draft style: ${state.fields.find((field) => field.field === 'draftStyle')?.value || 'balanced'}`,
-      `Telegram reminders: ${state.fields.find((field) => field.field === 'telegramReminders')?.value ? 'on' : 'off'}`,
       '',
       miniAppButton
         ? 'Use the Mini App to save settings.'
@@ -5746,7 +6006,7 @@ async function buildStartPayloadResponse({
 } = {}) {
   const parsed = parseOpaqueActionId(payload);
   if (!parsed.ok) {
-    return buildHelpResponse({ normalized, command, env, createdAt });
+    return buildHelpResponse({ normalized, command, env, createdAt, waitUntil });
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
@@ -6027,6 +6287,15 @@ async function buildCallbackResponse({
       waitUntil,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_DOC_IMAGE) {
+    return attachCallbackQueryId(await buildDocImageResponse({
+      normalized,
+      command: 'callback:view_doc_image',
+      env,
+      record,
+      createdAt,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION) {
     return attachCallbackQueryId(await buildPoseQuestionResponse({
       normalized,
@@ -6123,7 +6392,7 @@ export async function buildTelegramCommandResponse({
     };
   }
   if (!parsed.isCommand) {
-    return buildHelpResponse({ normalized, command: 'message', env, createdAt });
+    return buildHelpResponse({ normalized, command: 'message', env, createdAt, waitUntil });
   }
   if (parsed.command === COMMANDS.START) {
     return parsed.args[0]
@@ -6135,7 +6404,7 @@ export async function buildTelegramCommandResponse({
         createdAt,
         waitUntil,
       })
-      : buildHelpResponse({ normalized, command: parsed.command, env, createdAt });
+      : buildHelpResponse({ normalized, command: parsed.command, env, createdAt, waitUntil });
   }
   if ([COMMANDS.ACTIONS, COMMANDS.AGENT].includes(parsed.command)) {
     return buildAgentActionsResponse({
@@ -6275,7 +6544,7 @@ export async function buildTelegramCommandResponse({
     });
   }
 
-  return buildHelpResponse({ normalized, command: parsed.command, env, createdAt });
+  return buildHelpResponse({ normalized, command: parsed.command, env, createdAt, waitUntil });
 }
 
 function summarizeTelegramSendResult(result = {}) {
@@ -6574,4 +6843,5 @@ export {
   shortQuestionId,
   summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,
+  telegramVisibleSessions,
 };

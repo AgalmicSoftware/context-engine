@@ -262,7 +262,7 @@ export default {
         },
       });
     }
-    if (url.pathname === '/telegram/mini-app' || url.pathname.startsWith('/telegram/mini-app/api/')) {
+    if (url.pathname === '/telegram/mini-app' || url.pathname.startsWith('/telegram/mini-app/')) {
       return handleTelegramMiniAppRequest({
         request,
         env,

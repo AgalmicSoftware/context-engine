@@ -4,6 +4,8 @@ import {
   buildQueuedSubmitRecord,
   processTelegramSubmitQueueBatch,
   queueTelegramSubmitRecord,
+  submitRequestSessionKvKey,
+  submitRequestUserKvKey,
   telegramSubmitQueueEnabled,
 } from './telegramSubmitQueue.mjs';
 
@@ -82,6 +84,8 @@ test('Telegram submit queue persists accepted responses before async processing'
   assert.equal(queue.messages.length, 1);
   assert.equal(queue.messages[0].body.type, 'telegram_submit_direct_v1');
   assert.equal(JSON.parse(await kv.get('telegram:submit-request:submit-one')).status, 'submit_queued');
+  assert.equal(JSON.parse(await kv.get(submitRequestSessionKvKey(record))).status, 'submit_queued');
+  assert.equal(JSON.parse(await kv.get(submitRequestUserKvKey(record))).status, 'submit_queued');
 });
 
 test('Telegram submit queue consumer updates persisted records after processing', async () => {
@@ -131,8 +135,10 @@ test('Telegram submit queue consumer updates persisted records after processing'
   });
 
   const stored = JSON.parse(await kv.get('telegram:submit-request:submit-two'));
+  const indexed = JSON.parse(await kv.get(submitRequestSessionKvKey(record)));
   assert.equal(result.ok, false);
   assert.equal(acked, true);
   assert.equal(stored.status, 'direct_submit_failed');
+  assert.equal(indexed.status, 'direct_submit_failed');
   assert.equal(stored.onChain.reason, 'session_worker_url_missing');
 });

@@ -157,6 +157,27 @@ export function normalizeSessionPolicy(input = {}) {
     sessionMode: safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase(),
     sessionSlug: safeString(session.sessionSlug || session.slug || session.name).toLowerCase(),
     sessionName: safeString(session.sessionName || session.name || session.slug),
+    createdAt: safeString(
+      session.createdAt ||
+      session.created_at ||
+      session.created ||
+      session.sessionCreatedAt ||
+      session.telegramCreatedAt ||
+      session.groupCreatedAt ||
+      session.metadata?.createdAt ||
+      session.telegram?.createdAt
+    ) || null,
+    createdTimestamp: safeString(
+      session.createdTimestamp ||
+      session.createdAtMs ||
+      session.createdTimestampMs ||
+      session.sessionCreatedTimestamp ||
+      session.groupCreatedTimestamp ||
+      session.blockTimestamp ||
+      session.createdBlockTimestamp ||
+      session.metadata?.createdTimestamp ||
+      session.telegram?.createdTimestamp
+    ) || null,
     default: session.default === true,
     telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
     telegramOnly: (

@@ -18,6 +18,7 @@ function completeEnv(overrides = {}) {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root-secret',
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
     CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
@@ -181,6 +182,11 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
     if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setWebhook')) {
       return jsonResponse({ ok: true, result: true, description: 'Webhook was set' });
     }
+    if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyName')) {
+      const body = JSON.parse(options.body || '{}');
+      assert.equal(body.name, 'Context Engine');
+      return jsonResponse({ ok: true, result: true, description: 'Name was set' });
+    }
     if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')) {
       const body = JSON.parse(options.body || '{}');
       assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
@@ -219,14 +225,16 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(result.resources.r2Skipped, true);
   assert.equal(result.resources.d1Skipped, true);
   assert.equal(result.upload.mainModule, 'worker.js');
-  assert.equal(result.secrets.written.length, 3);
+  assert.equal(result.secrets.written.length, 4);
   assert.equal(result.health.version, 'test-version');
   assert.equal(calls.some((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker')), true);
   assert.equal(calls.some((call) => call.url.includes('/r2/buckets')), false);
   assert.equal(calls.some((call) => call.url.includes('/d1/database')), false);
-  assert.equal(calls.filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets')).length, 3);
+  assert.equal(calls.filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets')).length, 4);
   assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setWebhook')), true);
+  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyName')), true);
   assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')), true);
+  assert.equal(result.telegram.name.name, 'Context Engine');
   assert.equal(result.telegram.commands.count > 0, true);
   assert.equal(result.telegram.commands.commands.includes('sessions'), true);
   assert.equal(result.telegram.commands.commands.includes('groups'), true);

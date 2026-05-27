@@ -84,6 +84,7 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   GENERATE_QUESTION: 'generate_question',
   SAVE_GENERATED_QUESTION: 'save_generated_question',
   LIST_DOCS: 'list_docs',
+  VIEW_DOC_IMAGE: 'view_doc_image',
   SELECT_DOCS: 'select_docs',
   USE_DOCS_AS_ANSWER_CONTEXT: 'use_docs_as_answer_context',
   JOIN_SESSION: 'join_session',
@@ -114,7 +115,7 @@ export const ACCOUNT_MODES = Object.freeze({
   PRODUCTION: 'production',
 });
 
-export const SUPPORTED_DOC_TYPES = Object.freeze(['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp']);
+export const SUPPORTED_DOC_TYPES = Object.freeze(['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp', 'url']);
 
 export const DOC_VISIBILITY = Object.freeze({
   PUBLIC: 'public',

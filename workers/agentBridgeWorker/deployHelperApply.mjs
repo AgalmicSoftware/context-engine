@@ -20,6 +20,7 @@ const WORKER_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ENV_FILE = resolve(WORKER_DIR, '.dev.vars');
 const DEFAULT_ENTRYPOINT = 'worker.js';
 const SCRIPT_CONTENT_TYPE = 'application/javascript+module';
+const DEFAULT_TELEGRAM_BOT_NAME = 'Context Engine';
 const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const require = createRequire(import.meta.url);
 const TELEGRAM_BOT_COMMANDS = Object.freeze([
@@ -653,6 +654,42 @@ export async function setAgentBridgeTelegramBotCommands({
   };
 }
 
+export async function setAgentBridgeTelegramBotName({
+  botToken = '',
+  name = DEFAULT_TELEGRAM_BOT_NAME,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const displayName = safeString(name) || DEFAULT_TELEGRAM_BOT_NAME;
+  let response;
+  try {
+    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyName`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: displayName }),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      step: 'telegram_set_name',
+      status: 502,
+      error: `Telegram setMyName request failed: ${safeString(error?.message || error) || 'unknown error'}`,
+    };
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      step: 'telegram_set_name',
+      status: response.status || 502,
+      error: safeString(body?.description) || `Telegram setMyName failed (${response.status || 502})`,
+    };
+  }
+  return {
+    ok: true,
+    name: displayName,
+  };
+}
+
 function telegramProfilePhotoContentType(pathValue = '') {
   const ext = extname(safeString(pathValue)).toLowerCase();
   if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
@@ -885,6 +922,12 @@ export async function executeAgentBridgeDeployApply({
         fetchImpl,
       });
       if (!webhook.ok) return webhook;
+      const name = await setAgentBridgeTelegramBotName({
+        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
+        name: resolvedEnv.TELEGRAM_BOT_NAME || resolvedEnv.AGENT_BRIDGE_TELEGRAM_BOT_NAME || DEFAULT_TELEGRAM_BOT_NAME,
+        fetchImpl,
+      });
+      if (!name.ok) return name;
       const commands = await setAgentBridgeTelegramBotCommands({
         botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
         fetchImpl,
@@ -902,6 +945,7 @@ export async function executeAgentBridgeDeployApply({
         ok: true,
         description: webhook.description,
         webhook,
+        name,
         commands,
         profilePhoto,
       };
@@ -962,7 +1006,7 @@ function printUsage() {
     '',
     'Environment:',
     '  Reads workers/agentBridgeWorker/.dev.vars by default, then overlays process.env.',
-    '  Keep TELEGRAM_BOT_TOKEN, CLOUDFLARE_API_TOKEN, TELEGRAM_WEBHOOK_SECRET, and DEMO_SIGNER_ROOT_SECRET out of git.',
+    '  Keep TELEGRAM_BOT_TOKEN, CLOUDFLARE_API_TOKEN, TELEGRAM_WEBHOOK_SECRET, DEMO_SIGNER_ROOT_SECRET, and AGENT_BRIDGE_AGENT_API_TOKEN out of git.',
     '',
     'Flags:',
     '  --apply                         Execute live Cloudflare upload, Worker secret writes, Telegram setup, and health check',
