@@ -37,7 +37,6 @@ import {
   faSpinner,
   faSearch,
   faExpand,
-  faExternalLinkAlt,
   faFilter,
   faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
@@ -146,6 +145,7 @@ import {
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
 } from './surveyResultsExportDisplayHelpers.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
@@ -5142,92 +5142,58 @@ return (
       </div>
 
       {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-        <>
-          <div className={styles.responseList}>
-            {sbtFilteredResponses.length === 0 && !filterLoading ? (
-              <p>No results yet.</p>
-            ) : (
-              sbtFilteredResponses.map((response: SurveyResultsResponseListEntry, index: number) => {
-                const parsedResponse = response.response; // Already an object
-                const openToggle = !!this.state.activeToggles[index];
-                return (
-                  <Card key={index} className={styles.singleResponseCard}>
-                    <CardHeader
-                      onClick={() => this.toggleResponse(index)}
-                      className={styles.responseHeader}
-                    >
-                      <span className={styles.responderAddress}>
-                        <a
-                          href={`/u/${encodeURIComponent(response.responder)}`}
-                          className={styles.responderLink}
-                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
-                        >
-                          {getShortenedAddress(response.responder, false)}
-                        </a>
-                        <a
-                          href={`/survey/${encodeURIComponent(currentSurveyId)}/${encodeURIComponent(response.responder)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.externalLink}
-                        >
-                          <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        </a>
-                      </span>
-                      <FontAwesomeIcon
-                        icon={openToggle ? faCaretUp : faCaretDown}
-                        className={styles.biggerIcon}
+        <SurveyResultsIndividualResponsesList
+          activeToggles={this.state.activeToggles}
+          currentSurveyId={currentSurveyId}
+          effectiveSlug={this.getEffectiveSlug()}
+          filterLoading={filterLoading}
+          onToggleResponse={this.toggleResponse}
+          renderResponseBody={(response: SurveyResultsResponseListEntry) => {
+            const parsedResponse = response.response; // Already an object
+            return parsedResponse &&
+              parsedResponse.responses &&
+              parsedResponse.responses.length > 0 ? (
+                parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
+                  const questionId = getSurveyResponseQuestionId(answerItem);
+                  const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
+                  const responseKey = this.getLockedResponseKey({
+                    responder: response?.responder,
+                    questionId,
+                    surveyId: response?.surveyId || currentSurveyId,
+                    response: answerItem,
+                  });
+                  const displayResponse = this.applyDecryptedOverrideToResponse({
+                    response: answerItem,
+                    key: responseKey,
+                  });
+                  return (
+                    <div key={aIndex} className={styles.surveyResultsOverride}>
+                      <SingleQuestionResponse
+                        aggregatorResponseMode={false}
+                        question={questionData}
+                        response={displayResponse}
+                        mode="fullscreen"
+                        isOwnResponse={
+                          this.props.account?.toLowerCase() ===
+                          response.responder?.toLowerCase()
+                        }
+                        network={this.props.network}
+                        activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
+                        questionResponsesNonce={this.props.questionResponsesNonce}
+                        questionsCacheNonce={this.props.questionsCacheNonce}
+                        sbtCacheRevision={this.props.sbtCacheRevision}
+                        {...this.getSurveyResultsResponseCardProps()}
                       />
-                    </CardHeader>
-                    <Collapse isOpen={openToggle} id={styles.surveyResultsCollapse}>
-                      <CardBody className={styles.responseCard}>
-                        {parsedResponse &&
-                        parsedResponse.responses &&
-                        parsedResponse.responses.length > 0 ? (
-	                          parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
-	                            const questionId = getSurveyResponseQuestionId(answerItem);
-	                            const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
-                              const responseKey = this.getLockedResponseKey({
-                                responder: response?.responder,
-                                questionId,
-                                surveyId: response?.surveyId || currentSurveyId,
-                                response: answerItem,
-                              });
-                              const displayResponse = this.applyDecryptedOverrideToResponse({
-                                response: answerItem,
-                                key: responseKey,
-                              });
-	                            return (
-	                              <div key={aIndex} className={styles.surveyResultsOverride}>
-		                                <SingleQuestionResponse
-                                  aggregatorResponseMode={false}
-                                  question={questionData}
-                                  response={displayResponse}
-                                  mode="fullscreen"
-                                  isOwnResponse={
-                                    this.props.account?.toLowerCase() ===
-                                    response.responder?.toLowerCase()
-                                  }
-                                  network={this.props.network}
-                                  activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
-                                  questionResponsesNonce={this.props.questionResponsesNonce}
-                                  questionsCacheNonce={this.props.questionsCacheNonce}
-                                  sbtCacheRevision={this.props.sbtCacheRevision}
-                                  {...this.getSurveyResultsResponseCardProps()}
-                                />
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <p>No question-level responses found for this user.</p>
-                        )}
-                      </CardBody>
-                    </Collapse>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-        </>
+                    </div>
+                  );
+                })
+              ) : (
+                <p>No question-level responses found for this user.</p>
+              );
+          }}
+          responses={sbtFilteredResponses}
+          styleMap={styles}
+        />
       )}
 
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
