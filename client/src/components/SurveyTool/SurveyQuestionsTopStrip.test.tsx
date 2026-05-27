@@ -23,7 +23,7 @@ describe('SurveyQuestionsTopStrip', () => {
     const { container } = render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
+        className="top-strip"
       />
     );
 
@@ -39,7 +39,7 @@ describe('SurveyQuestionsTopStrip', () => {
       <SurveyQuestionsTopStrip
         {...baseProps}
         ref={ref}
-        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
+        className="top-strip"
       />
     );
 
@@ -50,12 +50,8 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        routeViewDisplayState={{
-          isOwnResponse: false,
-          isSingleQuestionView: false,
-          showViewAnswersButton: true,
-          viewAnswersButtonText: ' View 0xabc answers',
-        }}
+        showViewAnswersButton
+        viewAnswersButtonText=" View 0xabc answers"
       />
     );
 
@@ -71,17 +67,10 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        displayAnswerMode
         isEditing
         responseUrl="https://example.com/submitted-response"
-        routeViewDisplayState={{
-          isOwnResponse: true,
-          isSingleQuestionView: false,
-          showViewAnswersButton: false,
-          viewAnswersButtonText: '',
-        }}
-        submitDisplayState={{ submittedStateActive: true }}
-        userHasResponse
+        showUserResponseNotice
+        submittedStateActive
         userResponseEncrypted
       />
     );
@@ -98,25 +87,5 @@ describe('SurveyQuestionsTopStrip', () => {
       'href',
       'https://example.com/submitted-response'
     );
-  });
-
-  it('hides the existing-response notice when route display state is not own survey answers', () => {
-    render(
-      <SurveyQuestionsTopStrip
-        {...baseProps}
-        displayAnswerMode
-        routeViewDisplayState={{
-          isOwnResponse: true,
-          isSingleQuestionView: true,
-          showViewAnswersButton: false,
-          viewAnswersButtonText: '',
-        }}
-        submitDisplayState={{ submittedStateActive: true }}
-        userHasResponse
-        userResponseEncrypted
-      />
-    );
-
-    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).not.toBeInTheDocument();
   });
 });
