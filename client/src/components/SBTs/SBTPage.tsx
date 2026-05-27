@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -49,6 +49,7 @@ import {
 } from './SBTPageModals';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
@@ -5009,88 +5010,32 @@ renderMintButton() {
                 tokenUriHref={tokenUriHref}
               />
               <div className={styles.rightColumn}>
-                <div className={styles.statsSection}>
-                  <h2 className={sectionHeaderClassName} onClick={this.toggleStats}>
-                    STATS{' '}
-                    {statsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                    {statsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                  </h2>
-                  {statsSectionToggleState.isOpen && (
-                    <div className={styles.stats}>
-                      <p>
-                        <span className={styles.label}>{`${t('minted')}:`}</span>
-                        {/* Logic: Show spinner ONLY if we have no data and are loading. Else show count. */}
-                        {isInitialLoading ? (
-                          <FontAwesomeIcon icon={faSpinner} spin />
-                        ) : (
-                          <span title={mintedCountTitle}>
-                            {`${netMinted} / ${maxTokensDisplay}`}
-                          </span>
-                        )}
-                        {/* Logic: Show subtle spinner if we have data BUT are refreshing. */}
-                        {isRefreshing && (
-                          <span style={resolveSbtPageRefreshIndicatorStyle()} title="Refreshing...">
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                          </span>
-                        )}
-
-                        <button onClick={this.openMintedModal} className={styles.expandButton}>
-                          <FontAwesomeIcon icon={faUser} />
-                        </button>
-                      </p>
-                      {showScanProgress && (
-                        <div className={styles.scanProgress}>
-                          <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
-                          <div className={styles.scanProgressContent}>
-                            <span className={styles.scanProgressText}>{scanProgressText}</span>
-                            {scanProgressSessionText ? (
-                              <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-                            ) : null}
-                            <div
-                              className={styles.scanProgressBar}
-                              role="progressbar"
-                              aria-valuenow={scanProgressPct}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {mintEndDisplay}
-                      <p>
-                        <span className={styles.label}>Burnable by:</span> {burnLabel}
-                        <FontAwesomeIcon
-                          icon={faQuestionCircle}
-                          className={styles.tooltip}
-                          id="burnAuthQuestionMark"
-                          style={resolveSbtPageQuestionIconStyle()}
-                        />
-                        <CETooltip
-                          placement="right"
-                          target="burnAuthQuestionMark"
-                          delay={{ show: 0, hide: 2500 }}
-                          className={styles.tooltipBubble}
-                          innerClassName={styles.tooltipInner}
-                        >
-                          Specify who can burn the token: Admin Only, Owner Only, Both, or Neither.
-                        </CETooltip>
-                      </p>
-                      <p>
-                        <span className={styles.label}>Network:</span>{' '}
-                        {getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
-                      </p>
-
-                      <p>
-                        <span className={styles.label}>Admin:</span> {this.renderAddressLink(adminAddress, 'admin')}
-                      </p>
-                      <p>
-                        <span className={styles.label}>Creator:</span> {this.renderAddressLink(creatorAddress, 'creator')}
-                      </p>
-                    </div>
-                  )}
-                </div>
+                <SbtPageStatsSection
+                  adminAddressDisplay={this.renderAddressLink(adminAddress, 'admin')}
+                  burnLabel={burnLabel}
+                  creatorAddressDisplay={this.renderAddressLink(creatorAddress, 'creator')}
+                  isInitialLoading={isInitialLoading}
+                  isOpen={statsSectionToggleState.isOpen}
+                  isRefreshing={isRefreshing}
+                  maxTokensDisplay={maxTokensDisplay}
+                  mintedCountTitle={mintedCountTitle}
+                  mintedLabel={t('minted')}
+                  mintEndDisplay={mintEndDisplay}
+                  netMinted={netMinted}
+                  networkLabel={getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
+                  onOpenMintedModal={this.openMintedModal}
+                  onToggle={this.toggleStats}
+                  questionIconStyle={resolveSbtPageQuestionIconStyle()}
+                  refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
+                  scanProgressFillStyle={scanProgressFillStyle}
+                  scanProgressPct={scanProgressPct}
+                  scanProgressSessionText={scanProgressSessionText}
+                  scanProgressText={scanProgressText}
+                  sectionHeaderClassName={sectionHeaderClassName}
+                  shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
+                  shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
+                  showScanProgress={showScanProgress}
+                />
                 <div className={styles.actionsSection}>
                   <h2 className={sectionHeaderClassName} onClick={this.toggleActions}>
                     ACTIONS{' '}
