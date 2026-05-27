@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
+import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
@@ -63,6 +64,14 @@ const treeIncludesText = (node, text) => {
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
+};
+
+const renderIdentityPanelTree = (tree) => {
+  const identityPanel = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageIdentityPanel
+  );
+  return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
 };
 
 describe('SBTPage metadata display', () => {
@@ -162,7 +171,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -201,7 +210,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -240,7 +249,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -281,7 +290,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -319,7 +328,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -349,7 +358,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
     );
 
@@ -395,7 +404,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
     );
 

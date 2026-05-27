@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -47,6 +47,7 @@ import {
   renderSbtPageFullImageModal,
   renderSbtPageHolderModal,
 } from './SBTPageModals';
+import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import {
   appendSbtPageBookmark,
@@ -4990,67 +4991,23 @@ renderMintButton() {
         {sbtInfo ? (
           <>
             <div className={styles.sbtInfo}>
-              <div className={styles.leftColumn}>
-                <div className={styles.bookmarkIcon}>
-                  <button
-                    onClick={this.bookmarkSBT}
-                    className={styles.bookmarkButton}
-                    style={bookmarkButtonDisplayState.iconStyle}
-                  >
-                    <FontAwesomeIcon icon={faBookmark} />
-                  </button>
-                  <a
-                    href={this.getExplorerUrl(sbtAddressForDisplay)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.contractLink}
-                  >
-                    {addressDisplay}
-                  </a>
-                  <button
-                    onClick={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
-                    className={styles.copyButton}
-                  >
-                    {contractCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                    {contractCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                  </button>
-                  {tokenUriHref && (
-                    <a
-                      href={tokenUriHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.copyButton}
-                      title="Open token metadata"
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    </a>
-                  )}
-                </div>
-                <div className={styles.image}>
-                  <div className={styles.imageWrapper} onClick={this.toggleFullImage}>
-                    <img
-                      src={imageUrl}
-                      alt={sbtNameText}
-                      data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
-                      onError={imageErrorHandler}
-                    />
-                    <div className={styles.expandOverlay}>
-                      <FontAwesomeIcon icon={faExpand} />
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.description}>
-                  <h1 data-testid={E2E_TESTIDS.SBT_PAGE_NAME}>{sbtNameText}</h1>
-                  {sbtDescriptionText ? (
-                    <p data-testid={E2E_TESTIDS.SBT_PAGE_DESCRIPTION}>
-                      {isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim() ? (
-                        <FontAwesomeIcon icon={faLock} style={resolveSbtPageInlineLockIconStyle()} />
-                      ) : null}
-                      {sbtDescriptionText}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
+              <SbtPageIdentityPanel
+                addressDisplay={addressDisplay}
+                bookmarkIconStyle={bookmarkButtonDisplayState.iconStyle}
+                contractCopyIconState={contractCopyIconState}
+                descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
+                descriptionText={sbtDescriptionText}
+                explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
+                imageAlt={sbtNameText}
+                imageUrl={imageUrl}
+                nameText={sbtNameText}
+                onBookmark={this.bookmarkSBT}
+                onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
+                onImageError={imageErrorHandler}
+                onImageOpen={this.toggleFullImage}
+                showDescriptionLockIcon={isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim()}
+                tokenUriHref={tokenUriHref}
+              />
               <div className={styles.rightColumn}>
                 <div className={styles.statsSection}>
                   <h2 className={sectionHeaderClassName} onClick={this.toggleStats}>
