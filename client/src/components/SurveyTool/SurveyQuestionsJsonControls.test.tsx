@@ -7,25 +7,8 @@ describe('SurveyQuestionsJsonControls', () => {
   const renderJsonTree = jest.fn((json) => (
     <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
   ));
-  const buildJsonPanelDisplayState = (overrides = {}) => ({
-    showFullSurveyJsonControls: false,
-    showQuestionJsonControls: false,
-    showQuestionsJson: false,
-    showResponseJson: false,
-    showSurveyJsonPanel: false,
-    showQuestionsJsonPanel: false,
-    showResponseJsonPanel: false,
-    showSurveyJson: false,
-    surveyJsonRowClassName: undefined,
-    surveyJsonToggleClassName: undefined,
-    questionJsonToggleClassName: undefined,
-    responseJsonToggleClassName: undefined,
-    surveyJsonPanelClassName: undefined,
-    ...overrides,
-  });
 
   const baseProps = {
-    jsonPanelDisplayState: buildJsonPanelDisplayState(),
     onCopyQuestionsJson: jest.fn(),
     onCopyResponseJson: jest.fn(),
     onCopySurveyJson: jest.fn(),
@@ -50,9 +33,7 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         hidden
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showQuestionJsonControls: true,
-        })}
+        showQuestionJsonControls
       />
     );
 
@@ -64,9 +45,10 @@ describe('SurveyQuestionsJsonControls', () => {
     render(
       <SurveyQuestionsJsonControls
         {...baseProps}
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showFullSurveyJsonControls: true,
-        })}
+        isStandalone={false}
+        singleQuestionMode={false}
+        showResponseJson={false}
+        showSurveyJson={false}
       />
     );
 
@@ -80,26 +62,6 @@ describe('SurveyQuestionsJsonControls', () => {
     expect(renderJsonTree).not.toHaveBeenCalled();
   });
 
-  it('keeps full-survey toggles visible for direct callers without a display descriptor', () => {
-    render(
-      <SurveyQuestionsJsonControls
-        onCopyQuestionsJson={baseProps.onCopyQuestionsJson}
-        onCopyResponseJson={baseProps.onCopyResponseJson}
-        onCopySurveyJson={baseProps.onCopySurveyJson}
-        onToggleQuestionsJson={baseProps.onToggleQuestionsJson}
-        onToggleResponseJson={baseProps.onToggleResponseJson}
-        onToggleSurveyJson={baseProps.onToggleSurveyJson}
-        renderJsonTree={renderJsonTree}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'View Survey .json' }));
-    fireEvent.click(screen.getByRole('button', { name: 'View Response .json' }));
-
-    expect(baseProps.onToggleSurveyJson).toHaveBeenCalledTimes(1);
-    expect(baseProps.onToggleResponseJson).toHaveBeenCalledTimes(1);
-  });
-
   it('renders expanded survey JSON and copy actions', () => {
     const surveyJson = { id: 'survey-1', questionIDs: ['q1'] };
 
@@ -107,15 +69,13 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         copiedSurveyJson
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showFullSurveyJsonControls: true,
-          showSurveyJson: true,
-          showSurveyJsonPanel: true,
-          surveyJsonPanelClassName: 'single-panel',
-          surveyJsonRowClassName: 'survey-row',
-          surveyJsonToggleClassName: 'survey-toggle',
-        })}
+        isStandalone={false}
+        showSurveyJson
+        showSurveyJsonPanel
         surveyJson={surveyJson}
+        surveyJsonPanelClassName="single-panel"
+        surveyJsonRowClassName="survey-row"
+        surveyJsonToggleClassName="survey-toggle"
       />
     );
 
@@ -136,17 +96,17 @@ describe('SurveyQuestionsJsonControls', () => {
         {...baseProps}
         copiedQuestionsJson
         copiedResponseJson
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          questionJsonToggleClassName: 'question-toggle',
-          responseJsonToggleClassName: 'response-toggle',
-          showQuestionJsonControls: true,
-          showQuestionsJson: true,
-          showResponseJson: true,
-          showQuestionsJsonPanel: true,
-          showResponseJsonPanel: true,
-        })}
+        isStandalone
+        questionJsonToggleClassName="question-toggle"
         questionsJson={questionsJson}
         responseJson={responseJson}
+        responseJsonToggleClassName="response-toggle"
+        showQuestionJsonControls
+        showQuestionsJson
+        showQuestionsJsonPanel
+        showResponseJson
+        showResponseJsonPanel
+        singleQuestionMode
       />
     );
 
@@ -169,9 +129,7 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ info: 'Loading viewed response...' }}
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showResponseJsonPanel: true,
-        })}
+        showResponseJsonPanel
       />
     );
 
@@ -181,9 +139,7 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ message: 'No response found for survey from address: 0xabc' }}
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showResponseJsonPanel: true,
-        })}
+        showResponseJsonPanel
       />
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('No response found for survey from address: 0xabc');
@@ -192,9 +148,7 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ responses: [{ questionID: 'q1', answer: 'Other response' }] }}
-        jsonPanelDisplayState={buildJsonPanelDisplayState({
-          showResponseJsonPanel: true,
-        })}
+        showResponseJsonPanel
       />
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('Other response');
