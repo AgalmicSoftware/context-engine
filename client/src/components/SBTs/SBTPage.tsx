@@ -44,6 +44,7 @@ import {
   renderSbtPageFullImageModal,
   renderSbtPageHolderModal,
 } from './SBTPageModals';
+import SbtPageMiniCard from './SbtPageMiniCard';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
@@ -4709,45 +4710,21 @@ renderMintButton() {
             event.preventDefault();
             window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
           }}
-        >
-          <div className={styles.iconOverlay}>
-            {shouldRenderLiveIndicator && (
-              <div className={styles.liveIndicator} id={mintStatusId} aria-label={`${t('minting')} Live`}></div>
-            )}
-            {shouldRenderEndedIndicator && (
-              <div className={styles.endedIndicator} id={mintStatusId} aria-label={`${t('minting')} Ended`}></div>
-            )}
-            <CETooltip
-              placement="top"
-              target={mintStatusId}
-              trigger="hover focus click"
-              className={styles.tooltipBubble}
-              innerClassName={styles.tooltipInner}
-            >
-              {isMintingActive ? `${t('minting')} Live` : `${t('minting')} Ended`}
-            </CETooltip>
-            {(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint) && (
-              <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />
-            )}
-          </div>
-          <div
-            className={styles.miniImageContainer}
-            data-featured-card-ignore-nav="true"
-          >
-            <img
-              src={imageUrl}
-              alt={sbtName}
-              className={styles.sbtImage}
-              data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
-              onError={imageErrorHandler}
-            />
-          </div>
-          <p className={styles.miniSbtName}>{sbtName}</p>
-          {showMiniSbtAddress ? (
-            <p className={styles.miniSbtAddress}>{getShortenedAddress(sbtAddressForDisplay, false)}</p>
-          ) : null}
-          {miniMintArea}
-        </div>
+          onClaimWithInviteCode={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+          onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
+          onImageError={imageErrorHandler}
+          onManualPasswordInputChange={this.handleManualPasswordInputChange}
+          onMiniBurn={this.miniBurnHandler}
+          onMiniMint={this.miniMintHandler}
+          onMintUnlimitedWithGroupPassword={() => this.mintUnlimitedWithGroupPassword()}
+          onShowMiniPasswordInput={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
+          sbtAddress={sbtAddressForDisplay}
+          sbtName={sbtName}
+          shouldRenderEndedIndicator={shouldRenderEndedIndicator}
+          shouldRenderLiveIndicator={shouldRenderLiveIndicator}
+          showLockIcon={!!(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint)}
+          showMiniSbtAddress={showMiniSbtAddress}
+        />
       );
     }
 
