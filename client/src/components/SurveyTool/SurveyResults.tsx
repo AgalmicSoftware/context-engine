@@ -40,8 +40,8 @@ import {
   faQuestionCircle,
   faSearch,
   faExpand,
-  faExclamationCircle,
-  faComments
+  faFilter,
+  faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
@@ -112,6 +112,12 @@ import {
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
   type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
+import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -3412,40 +3418,60 @@ return (
     callbacks.forEach((callback) => callback());
   }, [state]);
 
-  // Class parity: componentDidMount / componentWillUnmount.
-  useLayoutEffect(() => {
-    return runSurveyResultsComponentDidMount({
-      instance: inst,
-      ports: {
-        appendSessionHintToSurveyPath,
-        applyStatePatch: (patch, afterApply) => {
-          setState(asSurveyResultsStatePatch(patch), afterApply);
-        },
-        destroyFetchResponsesRuntime: () => fetchResponsesRuntime.destroy(),
-        destroyLocalStoragePollingRuntime: () => localStoragePollingRuntime.destroy(),
-        destroyQueuedResultsRefreshRuntime: () => queuedResultsRefreshRuntime.destroy(),
-        getProps: () => propsRef.current,
-        getState: () => stateRef.current,
-        handleDocumentVisibilityChange,
-        handleManagedCacheUpdate: (update) => {
-          handleManagedCacheUpdate(
-            update && typeof update === 'object' ? (update as SurveyResultsManagedCacheUpdate) : {},
-          );
-        },
-        handleManualRefresh,
-        handleUrlBasedView,
-        handleUrlChange,
-        queueResultsRefresh,
-        reportDetachedRefreshError: (operation, error) => {
-          surveyLog.error(`[SurveyResults] ${operation} failed:`, error);
-        },
-        subscribeCacheUpdates: (listener) => surveyResultsCachePort.subscribeCacheUpdates(listener),
-        updateLocalStoragePollingState,
-        updateParentWithCurrentFiltersForUrl,
-      },
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      {viewMode === 'survey' && surveyViewMode === 'individuals' && (
+        <SurveyResultsIndividualResponsesList
+          activeToggles={this.state.activeToggles}
+          currentSurveyId={currentSurveyId}
+          effectiveSlug={this.getEffectiveSlug()}
+          filterLoading={filterLoading}
+          onToggleResponse={this.toggleResponse}
+          renderResponseBody={(response: SurveyResultsResponseListEntry) => {
+            const parsedResponse = response.response; // Already an object
+            return parsedResponse &&
+              parsedResponse.responses &&
+              parsedResponse.responses.length > 0 ? (
+                parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
+                  const questionId = getSurveyResponseQuestionId(answerItem);
+                  const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
+                  const responseKey = this.getLockedResponseKey({
+                    responder: response?.responder,
+                    questionId,
+                    surveyId: response?.surveyId || currentSurveyId,
+                    response: answerItem,
+                  });
+                  const displayResponse = this.applyDecryptedOverrideToResponse({
+                    response: answerItem,
+                    key: responseKey,
+                  });
+                  return (
+                    <div key={aIndex} className={styles.surveyResultsOverride}>
+                      <SingleQuestionResponse
+                        aggregatorResponseMode={false}
+                        question={questionData}
+                        response={displayResponse}
+                        mode="fullscreen"
+                        isOwnResponse={
+                          this.props.account?.toLowerCase() ===
+                          response.responder?.toLowerCase()
+                        }
+                        network={this.props.network}
+                        activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
+                        questionResponsesNonce={this.props.questionResponsesNonce}
+                        questionsCacheNonce={this.props.questionsCacheNonce}
+                        sbtCacheRevision={this.props.sbtCacheRevision}
+                        {...this.getSurveyResultsResponseCardProps()}
+                      />
+                    </div>
+                  );
+                })
+              ) : (
+                <p>No question-level responses found for this user.</p>
+              );
+          }}
+          responses={sbtFilteredResponses}
+          styleMap={styles}
+        />
+      )}
 
   return renderSurveyResultsRenderSurface({
     applyDecryptedOverrideToResponse,
