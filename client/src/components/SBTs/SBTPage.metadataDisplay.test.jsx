@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
@@ -74,6 +75,14 @@ const renderIdentityPanelTree = (tree) => {
   return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
 };
 
+const renderStatsSectionTree = (tree) => {
+  const statsSection = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageStatsSection
+  );
+  return statsSection ? SbtPageStatsSection(statsSection.props) : null;
+};
+
 describe('SBTPage metadata display', () => {
   afterEach(() => {
     try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
@@ -106,9 +115,10 @@ describe('SBTPage metadata display', () => {
     };
 
     const tree = subject.render();
-    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
-    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
-    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
+    const statsTree = renderStatsSectionTree(tree);
+    expect(treeIncludesText(statsTree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Deployer:')).toBe(false);
   });
 
   it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
