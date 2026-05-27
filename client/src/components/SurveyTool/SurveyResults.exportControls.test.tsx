@@ -32,6 +32,7 @@ import * as sessionScanScopeModule from '../../utilities/session/sessionScanScop
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -230,18 +231,19 @@ describe('SurveyResults export/view controls', () => {
     };
 
     const tree = subject.render();
-    const toggleSwitch = findElement(
+    const toggleNode = findElement(
       tree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('toggleSwitch')
+      (element) => element?.type === SurveyResultsSurveyViewModeToggle
     );
-    expect(toggleSwitch).toBeTruthy();
+    expect(toggleNode).toBeTruthy();
+    expect(toggleNode.props.isAggregate).toBe(false);
+    expect(toggleNode.props.knobStyle).toEqual(resolveSurveyResultsToggleKnobStyle(false));
 
-    expect(treeHasText(tree, 'Individual')).toBe(true);
-    expect(treeHasText(tree, 'Aggregate')).toBe(true);
-    expect(treeHasText(tree, 'Individuals View')).toBe(false);
-    expect(treeHasText(tree, 'Aggregate View')).toBe(false);
+    const markup = renderToStaticMarkup(<SurveyResultsSurveyViewModeToggle {...toggleNode.props} />);
+    expect(markup).toContain('Individual');
+    expect(markup).toContain('Aggregate');
+    expect(markup).not.toContain('Individuals View');
+    expect(markup).not.toContain('Aggregate View');
   });
 
   it('passes the light-surface filter button variant to survey-mode SBT filters', () => {

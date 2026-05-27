@@ -151,6 +151,7 @@ import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -5081,26 +5082,14 @@ return (
       )}
 
       {viewMode === 'survey' && (
-        <div className={styles.surveyViewModeToggle}>
-          <Label className={styles.toggleLabel}>Individual</Label>
-          <div
-            className={styles.toggleSwitch}
-            role="switch"
-            aria-label="Toggle between individual and aggregate view"
-            aria-checked={surveyViewMode === 'aggregate'}
-            tabIndex={0}
-            onClick={this.handleSurveyViewModeToggle}
-            onKeyDown={this.handleSurveyViewModeKeyDown}
-          >
-            <div
-              className={styles.toggleKnob}
-              style={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
-            />
-          </div>
-          <Label className={styles.toggleLabel} style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}>
-            Aggregate
-          </Label>
-        </div>
+        <SurveyResultsSurveyViewModeToggle
+          isAggregate={surveyViewMode === 'aggregate'}
+          knobStyle={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
+          onKeyDown={this.handleSurveyViewModeKeyDown}
+          onToggle={this.handleSurveyViewModeToggle}
+          styleMap={styles}
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {this.renderLockedResponsesBanner(lockedResponsesModel)}
