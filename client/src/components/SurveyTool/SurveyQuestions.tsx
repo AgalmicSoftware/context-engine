@@ -25,7 +25,7 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -50,7 +50,7 @@ import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceCon
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
-import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
+import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -9012,26 +9012,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       isLoadingResponse: this.state.isLoadingResponse,
     });
 
-    const userResponseNotice = (
-      <SurveyQuestionsUserResponseNotice
-        show={
-          this.state.userHasResponse &&
-          isOwnResponse &&
-          !isSingleQuestionView &&
-          this.state.displayAnswerMode
-        }
-        isDecrypting={this.state.isDecrypting}
-        isEditing={this.state.isEditing}
-        isSubmitting={this.state.isSubmitting}
-        onDecryptEdit={this.handleDecryptEdit}
-        onExitEditing={this.handleExitEditing}
-        onStartFresh={this.handleStartFresh}
-        responseUrl={this.state.responseUrl}
-        submittedStateActive={submittedStateActive}
-        userResponseEncrypted={this.state.userResponseEncrypted}
-      />
-    );
-
     const submitFooterClassName = [
       styles.footer,
       isSingleQuestionView ? styles.singleQuestionSubmitFooter : '',
@@ -9122,24 +9102,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         )}
       </div>
     );
-    const responseLink = this.state.responseUrl;
-
-    const viewAnswersButton =
-      showViewAnswersButton ? (
-        <Button onClick={this.toggleDisplayAnswerMode} id={styles.answerSurveyButton}>
-          <FontAwesomeIcon icon={faArrowLeft} id={styles.encryptIcon} />
-          <div id={styles.surveyButtonText}>
-            {viewAnswersButtonText}
-          </div>
-        </Button>
-      ) : null;
-
-    const exitEditingButton = this.state.isEditing ? (
-      <Button onClick={this.handleExitEditing} id={styles.exitEditingButton} data-testid={E2E_TESTIDS.SURVEY_EXIT_EDITING}>
-        Exit Editing
-      </Button>
-    ) : null;
-
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
       jsonPreview,
@@ -9209,10 +9171,28 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     return (
       <div className={surveyPageClassName}>
-        <div ref={this.topRef} className={topSectionClassName}>
-            {viewAnswersButton}
-            {userResponseNotice}
-        </div>
+        <SurveyQuestionsTopStrip
+          ref={this.topRef}
+          className={topSectionClassName}
+          isDecrypting={this.state.isDecrypting}
+          isEditing={this.state.isEditing}
+          isSubmitting={this.state.isSubmitting}
+          onDecryptEdit={this.handleDecryptEdit}
+          onExitEditing={this.handleExitEditing}
+          onStartFresh={this.handleStartFresh}
+          onToggleDisplayAnswerMode={this.toggleDisplayAnswerMode}
+          responseUrl={this.state.responseUrl}
+          showUserResponseNotice={
+            this.state.userHasResponse &&
+            isOwnResponse &&
+            !isSingleQuestionView &&
+            this.state.displayAnswerMode
+          }
+          showViewAnswersButton={showViewAnswersButton}
+          submittedStateActive={submittedStateActive}
+          userResponseEncrypted={this.state.userResponseEncrypted}
+          viewAnswersButtonText={viewAnswersButtonText}
+        />
 
         {viewingAnswers ? (
           <SurveyQuestionsResponseView
