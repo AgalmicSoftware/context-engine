@@ -31,6 +31,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 
@@ -902,11 +903,13 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const responderLink = findElement(
+    const responsesList = findElement(
       tree,
-      (element) => element?.type === 'a' && element?.props?.href === `/u/${encodeURIComponent(responder)}`
+      (element) => element?.type === SurveyResultsIndividualResponsesList
     );
-    expect(responderLink).toBeTruthy();
+    const markup = renderToStaticMarkup(responsesList);
+
+    expect(markup).toContain(`/u/${encodeURIComponent(responder)}`);
   });
 
   it('renders only the latest answer row in expanded survey individual view for duplicate question updates', async () => {
@@ -993,8 +996,12 @@ describe('SurveyResults survey/response links', () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
 
     await subject.fetchSurveyModeResponses();
-    const singleResponseNodes = collectTreeNodes(
+    const responsesList = findElement(
       subject.render(),
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+    const singleResponseNodes = collectTreeNodes(
+      responsesList?.props?.renderResponseBody(responsesList.props.responses[0], 0),
       (element) => (
         typeof element?.type === 'function' &&
         element?.props?.aggregatorResponseMode === false
