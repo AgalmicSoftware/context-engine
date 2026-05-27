@@ -27,7 +27,6 @@ import styles from './SurveyResults.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBookmark,
   faCaretUp,
   faCaretDown,
   faCheck,
@@ -40,8 +39,7 @@ import {
   faExpand,
   faExternalLinkAlt,
   faFilter,
-  faExclamationCircle,
-  faComments
+  faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
 import contractScripts, {
@@ -150,6 +148,7 @@ import {
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 export {
@@ -4417,78 +4416,40 @@ renderQuestionSummary = (
     };
   });
   const resolvedQuestionType = this.resolveSummaryQuestionType(question, displayResponses);
-  const isFreeform = resolvedQuestionType === 'freeform' || resolvedQuestionType === 'text';
   const viewableResponsesCount = this.getMemoizedViewableResponsesCount(displayResponses, resolvedQuestionType);
 
 const isActive = this.state.activeQuestionToggles[questionId];
 return (
-  <Card
+  <SurveyResultsQuestionSummaryCard
     key={questionId}
-    id={domId}
-    className={styles.aggregatorSummaryCard}
-  >
-    <CardHeader
-      onClick={() => this.toggleQuestionSummary(questionId)}
-      className={styles.questionSummaryHeader}
-    >
-      <div className={styles.headerLeft}>
-        <div className={styles.responseCountContainer}>
-          <FontAwesomeIcon icon={faComments} className={styles.responseCountIcon} />
-          <span className={styles.responseCountNumber}>{viewableResponsesCount}</span>
-        </div>
-        <span className={styles.questionTitle}>
-          {questionPrompt}
-        </span>
-      </div>
-      <div className={styles.questionSummaryHeaderIcons}>
-        <FontAwesomeIcon
-          icon={faBookmark}
-          className={styles.biggerIcon}
-          onClick={(e: React.MouseEvent<SVGSVGElement>) => {
-            e.stopPropagation();
-            this.toggleQuestionBookmark(questionId);
-          }}
-          color={this.state.bookmarkedQuestionIDs.includes(questionId) ? 'gold' : 'white'}
-          style={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
-        />
-        <FontAwesomeIcon
-          icon={isActive ? faCaretUp : faCaretDown}
-          className={styles.biggerIcon}
-        />
-      </div>
-    </CardHeader>
-    <Collapse
-      isOpen={this.state.activeQuestionToggles[questionId]}
-      id={styles.surveyResultsCollapse}
-    >
-      <CardBody className={styles.aggregatorDarkCardBody}>
-        {!question && (
-          <p style={SURVEY_RESULTS_METADATA_MISSING_STYLE}>
-            No metadata found for this question in local cache.
-          </p>
-        )}
-        <div className={styles.surveyResultsOverride}>
-          {isFreeform ? (
-            this.renderFreeformAggregatorSummary(displayResponses)
-          ) : resolvedQuestionType === 'multichoice' ? (
-            this.renderMultichoiceAggregatorSummary(displayResponses, question)
-          ) : (
-            <SingleQuestionResponse
-              aggregatorResponseMode={true}
-              question={question || this.getStableFallbackQuestion(questionId, 'summary')}
-              allResponses={displayResponses}
-              network={this.props.network}
-              activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              questionsCacheNonce={this.props.questionsCacheNonce}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-              {...this.getSurveyResultsResponseCardProps()}
-            />
-          )}
-        </div>
-      </CardBody>
-    </Collapse>
-  </Card>
+    bookmarked={this.state.bookmarkedQuestionIDs.includes(questionId)}
+    bookmarkIconStyle={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
+    domId={domId}
+    isActive={!!isActive}
+    metadataMissing={!question}
+    metadataMissingStyle={SURVEY_RESULTS_METADATA_MISSING_STYLE}
+    onToggleBookmark={() => this.toggleQuestionBookmark(questionId)}
+    onToggleSummary={() => this.toggleQuestionSummary(questionId)}
+    questionPrompt={questionPrompt}
+    renderDefaultSummary={() => (
+      <SingleQuestionResponse
+        aggregatorResponseMode={true}
+        question={question || this.getStableFallbackQuestion(questionId, 'summary')}
+        allResponses={displayResponses}
+        network={this.props.network}
+        activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
+        questionResponsesNonce={this.props.questionResponsesNonce}
+        questionsCacheNonce={this.props.questionsCacheNonce}
+        sbtCacheRevision={this.props.sbtCacheRevision}
+        {...this.getSurveyResultsResponseCardProps()}
+      />
+    )}
+    renderFreeformSummary={() => this.renderFreeformAggregatorSummary(displayResponses)}
+    renderMultichoiceSummary={() => this.renderMultichoiceAggregatorSummary(displayResponses, question)}
+    resolvedQuestionType={resolvedQuestionType}
+    styleMap={styles}
+    viewableResponsesCount={viewableResponsesCount}
+  />
 );
 };
 
