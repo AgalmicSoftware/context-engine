@@ -76,4 +76,74 @@ describe('SurveyQuestions controls', () => {
     expect(inactiveButton?.type).toBe(BullhornToggleButton);
     expect(inactiveButton?.props?.active).toBe(false);
   });
+
+  it('starts primary submit only when pending edits are available', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1 }));
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._submitGuard).toBe(true);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps submitted-without-new-edits clicks inert before completion', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+    };
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._submitGuard).toBe(false);
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+  });
+
+  it('routes completed survey submissions to the response view without resubmitting', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xSurveyABC',
+      account: '0xABC',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+    };
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge session');
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      {},
+      '',
+      '/survey/0xsurveyabc/0xabc?session=edge%20session'
+    );
+  });
 });
