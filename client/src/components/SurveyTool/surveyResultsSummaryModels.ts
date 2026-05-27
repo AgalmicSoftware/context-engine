@@ -44,21 +44,6 @@ export type SurveyResultsMultichoiceSummaryModel = {
   totalResponders: number;
 };
 
-export type SurveyResultsQuestionTableEntry = {
-  prompt?: string;
-  questionId: string;
-  responsesCount?: number;
-  sessionSlug?: string;
-  type?: string;
-};
-
-type BuildSurveyResultsQuestionTableEntriesArgs = {
-  networkQuestions?: unknown;
-  questionMap?: unknown;
-  sortAsc?: unknown;
-  sortBy?: unknown;
-};
-
 export const resolveSurveyResultsSummaryQuestionType = (
   question: SurveyResultsRecord | null = null,
   responses: unknown = []
@@ -101,44 +86,6 @@ export const getSurveyResultsLatestResponsesByResponder = (
     }
   });
   return Array.from(latestByResponder.values());
-};
-
-export const buildSurveyResultsQuestionTableEntries = ({
-  networkQuestions = {},
-  questionMap = {},
-  sortAsc = true,
-  sortBy = '',
-}: BuildSurveyResultsQuestionTableEntriesArgs = {}): SurveyResultsQuestionTableEntry[] => {
-  const questionRecord = Object(questionMap || {}) as Record<string, unknown>;
-  const networkQuestionRecord = Object(networkQuestions || {}) as Record<string, SurveyResultsRecord | undefined>;
-  const entries = Object.keys(questionRecord).map((questionId) => {
-    const responses = questionRecord[questionId] || [];
-    const lowerQuestionId = questionId.toLowerCase();
-    const questionData = networkQuestionRecord[lowerQuestionId] || {};
-    return {
-      questionId,
-      responsesCount: getSurveyResultsLatestResponsesByResponder(responses).length,
-      type: String(questionData.type || ''),
-      prompt: String(questionData.prompt || ''),
-      sessionSlug: String(questionData.sessionSlug || ''),
-    };
-  });
-
-  const normalizedSortBy = String(sortBy || '');
-  const ascending = sortAsc !== false;
-  entries.sort((a, b) => {
-    let comparison = 0;
-    if (normalizedSortBy === 'responses') {
-      comparison = a.responsesCount - b.responsesCount;
-    } else if (normalizedSortBy === 'type') {
-      comparison = a.type.localeCompare(b.type);
-    } else if (normalizedSortBy === 'prompt') {
-      comparison = a.prompt.localeCompare(b.prompt);
-    }
-    return ascending ? comparison : -comparison;
-  });
-
-  return entries;
 };
 
 export const buildSurveyResultsFreeformSummaryModel = (
