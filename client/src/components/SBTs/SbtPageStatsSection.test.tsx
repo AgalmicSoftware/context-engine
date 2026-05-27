@@ -14,31 +14,27 @@ const createProps = (
   adminAddressDisplay: <a href="https://explorer.example.test/admin">0xadmin</a>,
   burnLabel: 'Admin Only',
   creatorAddressDisplay: <a href="https://explorer.example.test/creator">0xcreator</a>,
+  isInitialLoading: false,
   isOpen: true,
-  holderCountStatus: {
-    isInitialLoading: false,
-    isRefreshing: false,
-    maxTokensDisplay: '100',
-    mintedCountTitle: '7 holders',
-    mintedLabel: 'Minted',
-    netMinted: 7,
-    refreshIndicatorStyle: { marginLeft: '8px' },
-  },
-  holderScanProgressDisplay: {
-    scanProgressFillStyle: { width: '40%' },
-    scanProgressPct: 40,
-    scanProgressSessionText: null,
-    scanProgressText: '',
-    showScanProgress: false,
-  },
+  isRefreshing: false,
+  maxTokensDisplay: '100',
+  mintedCountTitle: '7 holders',
+  mintedLabel: 'Minted',
   mintEndDisplay: <p>Minting ends: tomorrow</p>,
+  netMinted: 7,
   networkLabel: 'Base Sepolia',
   onOpenMintedModal: jest.fn(),
   onToggle: jest.fn(),
   questionIconStyle: { color: 'rgb(17, 17, 17)' },
+  refreshIndicatorStyle: { marginLeft: '8px' },
+  scanProgressFillStyle: { width: '40%' },
+  scanProgressPct: 40,
+  scanProgressSessionText: null,
+  scanProgressText: '',
   sectionHeaderClassName: 'section-header',
   shouldRenderClosedIcon: false,
   shouldRenderOpenIcon: true,
+  showScanProgress: false,
   ...overrides,
 });
 
@@ -88,18 +84,12 @@ describe('SbtPageStatsSection', () => {
     render(
       <SbtPageStatsSection
         {...createProps({
-          holderCountStatus: {
-            ...createProps().holderCountStatus,
-            isInitialLoading: true,
-            isRefreshing: true,
-          },
-          holderScanProgressDisplay: {
-            ...createProps().holderScanProgressDisplay,
-            scanProgressPct: 64,
-            scanProgressSessionText: 'Session: Alpha',
-            scanProgressText: 'Loading holders: 12 blocks remaining',
-            showScanProgress: true,
-          },
+          isInitialLoading: true,
+          isRefreshing: true,
+          scanProgressPct: 64,
+          scanProgressSessionText: 'Session: Alpha',
+          scanProgressText: 'Loading holders: 12 blocks remaining',
+          showScanProgress: true,
         })}
       />
     );

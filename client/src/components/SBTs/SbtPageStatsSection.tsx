@@ -4,48 +4,65 @@ import {
   faChevronDown,
   faChevronUp,
   faQuestionCircle,
+  faSpinner,
+  faUser,
 } from '@fortawesome/free-solid-svg-icons';
 
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
-import SbtPageHolderStatusDisplay from './SbtPageHolderStatusDisplay';
-import type {
-  SbtPageHolderCountStatus,
-  SbtPageHolderScanProgressDisplay,
-} from './SbtPageHolderStatusDisplay';
 
 type SbtPageStatsSectionProps = {
   adminAddressDisplay: React.ReactNode;
   burnLabel: string;
   creatorAddressDisplay: React.ReactNode;
+  isInitialLoading: boolean;
   isOpen: boolean;
-  holderCountStatus: SbtPageHolderCountStatus;
-  holderScanProgressDisplay: SbtPageHolderScanProgressDisplay;
+  isRefreshing: boolean;
+  maxTokensDisplay: string | number;
+  mintedCountTitle?: string;
+  mintedLabel: string;
   mintEndDisplay?: React.ReactNode;
+  netMinted: string | number;
   networkLabel: React.ReactNode;
   onOpenMintedModal: React.MouseEventHandler<HTMLButtonElement>;
   onToggle: React.MouseEventHandler<HTMLHeadingElement>;
   questionIconStyle?: React.CSSProperties;
+  refreshIndicatorStyle?: React.CSSProperties;
+  scanProgressFillStyle?: React.CSSProperties;
+  scanProgressPct: number;
+  scanProgressSessionText?: string | null;
+  scanProgressText?: string | null;
   sectionHeaderClassName: string;
   shouldRenderClosedIcon: boolean;
   shouldRenderOpenIcon: boolean;
+  showScanProgress: boolean;
 };
 
 const SbtPageStatsSection = ({
   adminAddressDisplay,
   burnLabel,
   creatorAddressDisplay,
+  isInitialLoading,
   isOpen,
-  holderCountStatus,
-  holderScanProgressDisplay,
+  isRefreshing,
+  maxTokensDisplay,
+  mintedCountTitle,
+  mintedLabel,
   mintEndDisplay,
+  netMinted,
   networkLabel,
   onOpenMintedModal,
   onToggle,
   questionIconStyle,
+  refreshIndicatorStyle,
+  scanProgressFillStyle,
+  scanProgressPct,
+  scanProgressSessionText = null,
+  scanProgressText = '',
   sectionHeaderClassName,
   shouldRenderClosedIcon,
   shouldRenderOpenIcon,
+  showScanProgress,
 }: SbtPageStatsSectionProps): React.ReactElement => (
   <div className={styles.statsSection}>
     <h2 className={sectionHeaderClassName} onClick={onToggle}>
@@ -55,11 +72,45 @@ const SbtPageStatsSection = ({
     </h2>
     {isOpen && (
       <div className={styles.stats}>
-        <SbtPageHolderStatusDisplay
-          countStatus={holderCountStatus}
-          onOpenMintedModal={onOpenMintedModal}
-          scanProgressDisplay={holderScanProgressDisplay}
-        />
+        <p>
+          <span className={styles.label}>{`${mintedLabel}:`}</span>
+          {isInitialLoading ? (
+            <FontAwesomeIcon icon={faSpinner} spin />
+          ) : (
+            <span title={mintedCountTitle}>
+              {`${netMinted} / ${maxTokensDisplay}`}
+            </span>
+          )}
+          {isRefreshing && (
+            <span style={refreshIndicatorStyle} title="Refreshing...">
+              <FontAwesomeIcon icon={faSpinner} spin />
+            </span>
+          )}
+
+          <button onClick={onOpenMintedModal} className={styles.expandButton}>
+            <FontAwesomeIcon icon={faUser} />
+          </button>
+        </p>
+        {showScanProgress && (
+          <div className={styles.scanProgress}>
+            <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
+            <div className={styles.scanProgressContent}>
+              <span className={styles.scanProgressText}>{scanProgressText}</span>
+              {scanProgressSessionText ? (
+                <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
+              ) : null}
+              <div
+                className={styles.scanProgressBar}
+                role="progressbar"
+                aria-valuenow={scanProgressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
+              </div>
+            </div>
+          </div>
+        )}
         {mintEndDisplay}
         <p>
           <span className={styles.label}>Burnable by:</span> {burnLabel}
