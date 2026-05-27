@@ -8,6 +8,7 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -349,6 +350,44 @@ describe('SurveyQuestions render helpers', () => {
     expect(links.props.questionHref).toContain('/question/q1');
     links.props.onBookmarkToggle();
     expect(subject.handleBookmarkToggle).toHaveBeenCalledWith('q1');
+  });
+
+  it('passes viewed-response JSON fallbacks to the bottom JSON controls', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      viewAddress: '0xdef',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    subject.getResponseJson = jest.fn(() => ({ generated: true }));
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      displayAnswerMode: true,
+      noResponse: true,
+      questionPool: [{ id: 'q1' }],
+      showResponseJson: true,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+
+    expect(controls).not.toBeNull();
+    expect(controls.props.responseJson).toEqual({
+      message: 'No response found for survey from address: 0xdef',
+    });
+    expect(subject.getResponseJson).not.toHaveBeenCalled();
   });
 
   it('renders pile freeform answers with the shared audio field input wrapper', () => {

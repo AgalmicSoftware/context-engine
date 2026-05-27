@@ -9164,7 +9164,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
     const surveyJson = jsonPanelDisplayState.showSurveyJsonPanel ? this.getSurveyJson() : null;
     const questionsJson = jsonPanelDisplayState.showQuestionsJsonPanel ? this.getQuestionsJson() : null;
-    const responseJson = jsonPanelDisplayState.showResponseJsonPanel ? this.getResponseJson() : null;
+    const responseJson = jsonPanelDisplayState.showResponseJsonPanel
+      ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
+      : null;
     const canEditQuestions = !this.state.userHasResponse || this.state.startFresh || this.state.isEditing;
     const hasPendingEdits = !!this.state.isDirty || Number(_pendingStats.total || 0) > 0;
     const genericShowInlineSubmit = shouldRenderInlineSubmitButton({
