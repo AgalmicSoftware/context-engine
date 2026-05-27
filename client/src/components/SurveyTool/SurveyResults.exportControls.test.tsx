@@ -246,6 +246,38 @@ describe('SurveyResults export/view controls', () => {
     expect(markup).not.toContain('Aggregate View');
   });
 
+  it('toggles survey view mode from keyboard activation and ignores other keys', () => {
+    const subject = attachStateHarness(createSubject());
+    subject.state = {
+      ...subject.state,
+      surveyViewMode: 'individuals',
+    };
+
+    const ignoredPreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: 'ArrowRight',
+      preventDefault: ignoredPreventDefault,
+    });
+    expect(ignoredPreventDefault).not.toHaveBeenCalled();
+    expect(subject.state.surveyViewMode).toBe('individuals');
+
+    const enterPreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: 'Enter',
+      preventDefault: enterPreventDefault,
+    });
+    expect(enterPreventDefault).toHaveBeenCalledTimes(1);
+    expect(subject.state.surveyViewMode).toBe('aggregate');
+
+    const spacePreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: ' ',
+      preventDefault: spacePreventDefault,
+    });
+    expect(spacePreventDefault).toHaveBeenCalledTimes(1);
+    expect(subject.state.surveyViewMode).toBe('individuals');
+  });
+
   it('passes the light-surface filter button variant to survey-mode SBT filters', () => {
     const subject = createSubject({
       isOpen: true,
