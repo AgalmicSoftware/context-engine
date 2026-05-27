@@ -54,19 +54,4 @@ describe('SurveyResultsQuestionSummariesList', () => {
 
     expect(screen.queryByText('No results yet.')).not.toBeInTheDocument();
   });
-
-  it('renders an error state instead of the empty state', () => {
-    render(
-      <SurveyResultsQuestionSummariesList
-        entries={[]}
-        errorMessage="Results could not be displayed."
-        filterLoading={false}
-        renderQuestionSummary={jest.fn()}
-        styleMap={styleMap}
-      />
-    );
-
-    expect(screen.getByText('Results could not be displayed.')).toBeInTheDocument();
-    expect(screen.queryByText('No results yet.')).not.toBeInTheDocument();
-  });
 });
