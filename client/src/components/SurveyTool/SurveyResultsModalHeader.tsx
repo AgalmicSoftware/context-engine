@@ -3,12 +3,12 @@ import { ModalHeader } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
-export type SurveyResultsDemoViewOption = {
+type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
 
-export type SurveyResultsModalHeaderProps = {
+type SurveyResultsModalHeaderProps = {
   bookmarkedSurveyIDs?: string[];
   currentSurveyId?: string | null;
   demoResultsViewMode?: string;
