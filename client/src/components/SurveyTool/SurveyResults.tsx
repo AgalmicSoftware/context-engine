@@ -17,8 +17,7 @@ import {
   Modal,
   ModalBody,
   ModalFooter,
-  Collapse,
-  Alert
+  Collapse
 } from 'reactstrap';
 
 
@@ -151,6 +150,7 @@ import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 export {
@@ -5068,18 +5068,11 @@ return (
         </div>
       ) : (
         <>
-      {alertMessage && !filterLoading && (
-        <Alert color="info" className={styles.alertMessage} fade={false}>
-          {alertMessage}
-        </Alert>
-      )}
-
-      {filterLoading && (
-        <div className={styles.loadingContainer}>
-          <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-          <p>Applying filter...</p>
-        </div>
-      )}
+      <SurveyResultsStatusMessages
+        alertMessage={alertMessage}
+        filterLoading={filterLoading}
+        styleMap={styles}
+      />
 
       {viewMode === 'survey' && (
         <SurveyResultsSurveyViewModeToggle
