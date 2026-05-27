@@ -19,7 +19,6 @@ import {
   InputGroup,
   InputGroupText,
   Modal,
-  ModalHeader,
   ModalBody,
   ModalFooter,
   Collapse,
@@ -153,6 +152,7 @@ import {
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
   type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 export {
@@ -4925,63 +4925,24 @@ return (
     toggle={this.closeModal}
     className={styles.resultsModal}
   >
-    <ModalHeader toggle={this.closeModal} className={styles.modalHeader}>
-      <div className={styles.modalHeaderContent}>
-        <div className={styles.modalHeaderTitleBlock}>
-          <h2 className={styles.modalTitle}>
-            {viewMode === 'survey'
-             ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
-              : 'Question Results'}
-          </h2>
-        </div>
-
-        {viewMode === 'survey' && currentSurveyId && (
-          <div className={styles.modalSubtitle}>
-            <span className={styles.surveyIdMeta}>
-              Survey ID:{' '}
-              <a
-                href={`/survey/${encodeURIComponent(currentSurveyId)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
-                className={styles.surveyIdLink}
-              >
-                {surveyIdAbbreviation || currentSurveyId}
-              </a>
-            </span>
-            <FontAwesomeIcon
-              icon={faBookmark}
-              className={styles.biggerIcon}
-              onClick={(e: React.MouseEvent<SVGSVGElement>) => {
-                e.stopPropagation();
-                this.toggleSurveyBookmark(currentSurveyId);
-              }}
-              color={
-                this.state.bookmarkedSurveyIDs.includes(currentSurveyId) ? 'gold' : 'grey'
-              }
-              style={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
-              title="Bookmark Survey ID"
-            />
-          </div>
-        )}
-        {viewMode === 'survey' && Array.isArray(surveyDocumentURLs) && surveyDocumentURLs.length > 0 && (
-          <div className={styles.surveyDocUrls}>
-            {surveyDocumentURLs.map((url: string, idx: number) => (
-              <a
-                key={idx}
-                href={url}
-                target='_blank'
-                rel='noopener noreferrer'
-                className={styles.surveyDocUrlLink}
-                title={url}
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} style={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE} />
-                {url.length > 50 ? `${url.slice(0, 47)}...` : url}
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className={styles.modalHeaderControls}>
-        {this.renderLockedResponsesToggle(lockedResponsesModel)}
-        {renderSurveyResultsSyncStatusPanel({
+    <SurveyResultsModalHeader
+      bookmarkedSurveyIDs={this.state.bookmarkedSurveyIDs}
+      currentSurveyId={currentSurveyId}
+      demoResultsViewMode={demoResultsViewMode}
+      demoResultsViewOptions={demoResultsViewOptions}
+      documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
+      effectiveSlug={this.getEffectiveSlug()}
+      isDemoQuestionResults={isDemoQuestionResults}
+      lockedResponsesToggleNode={this.renderLockedResponsesToggle(lockedResponsesModel)}
+      onClose={this.closeModal}
+      onDemoResultsViewSelect={this.handleDemoResultsViewSelect}
+      onToggleSurveyBookmark={this.toggleSurveyBookmark}
+      styleMap={styles}
+      surveyBookmarkStyle={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
+      surveyDocumentURLs={Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : []}
+      surveyIdAbbreviation={surveyIdAbbreviation}
+      surveyTitle={surveyTitle}
+      syncStatusNode={renderSurveyResultsSyncStatusPanel({
           isSynced,
           isSyncingOrLoading,
           syncStatusText,
@@ -5006,34 +4967,8 @@ return (
           miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
           miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
         })}
-        {isDemoQuestionResults && (
-          <div
-            className={styles.demoResultsViewNav}
-            aria-label="Demo results views"
-            data-testid="ce-surveyresults-demo-view-nav"
-          >
-            {demoResultsViewOptions.map((option: SurveyResultsDemoViewOption) => {
-              const isActiveView = demoResultsViewMode === option.key;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={[
-                    styles.demoResultsViewButton,
-                    isActiveView ? styles.demoResultsViewButtonActive : '',
-                  ].filter(Boolean).join(' ')}
-                  aria-pressed={isActiveView}
-                  data-testid={`ce-surveyresults-demo-view-${option.key}`}
-                  onClick={() => this.handleDemoResultsViewSelect(option.key)}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </ModalHeader>
+      viewMode={viewMode}
+    />
 
     <ModalBody className={styles.modalBody}>
       {isDemoAlternateResultsView ? (
