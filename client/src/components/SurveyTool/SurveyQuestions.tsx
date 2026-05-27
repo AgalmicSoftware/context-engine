@@ -25,7 +25,7 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faTimes, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -48,6 +48,7 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
@@ -116,7 +117,6 @@ import {
   runDedupedDecryptTask as runDedupedDecryptTaskHelper,
   syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
 } from './surveyToolDecryptFlow.js';
-import { JsonIconButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
 import contractScripts, {
@@ -9168,6 +9168,32 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
+    const submittedResponseView =
+      !viewingAnswers &&
+      this.state.userHasResponse &&
+      !this.state.startFresh &&
+      !this.state.isEditing ? (
+      <div>
+        {questionPoolReady && this.state.userAnswers ? (
+          this.props.singleQuestionMode ? (
+            this.state.questionPool[0] ? (
+              this.renderQuestionAnswer(
+                this.state.questionPool[0],
+                this.state.userAnswers,
+                0,
+                isOwnResponse
+              )
+            ) : (<div>Loading question...</div>)
+          ) : (
+            this.state.userAnswers.responses ? (
+              this.renderSurveyAnswers(this.state.userAnswers.responses, isOwnResponse)
+            ) : (<div>Loading answers...</div>)
+          )
+        ) : (
+          <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading submitted response...</div>
+        )}
+      </div>
+    ) : null;
 
     return (
       <div className={surveyPageClassName}>
@@ -9215,51 +9241,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             viewedAddressRaw={viewedAddressRaw}
           />
         ) : (
-            <>
-              {showTopInlineSubmit && submitResponseButton}
-              {/* Hidden in embedded full mode and single-question route mode */}
-              {!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode && (
-                  <JsonIconButton
-                    label=".json"
-                    onClick={this.handleShowJsonAtBottom}
-                    title="View JSON"
-                  />
-              )}
-              {/* Locked/decrypt banner is hidden only in embedded full mode */}
-              {!hideEmbeddedDebugUi && canEditQuestions && questionPoolReady && currentSurveyResponseState && lockedQuestionsBanner}
-              {renderedEditableQuestions}
-              {showInlineSubmit && submitResponseButton}
-              {canEditQuestions && !this.props.singleQuestionMode && (
-                  <JsonIconButton
-                    label="Back to top"
-                    icon={faCaretUp}
-                    onClick={this.handleScrollToTop}
-                    title="Back to top"
-                  />
-                )}
-              {this.state.userHasResponse && !this.state.startFresh && !this.state.isEditing && (
-                    <div>
-                        {questionPoolReady && this.state.userAnswers ? (
-                            this.props.singleQuestionMode ? (
-                                this.state.questionPool[0] ? (
-                                    this.renderQuestionAnswer(
-                                        this.state.questionPool[0],
-                                        this.state.userAnswers,
-                                        0,
-                                        isOwnResponse
-                                    )
-                                ) : (<div>Loading question...</div>)
-                            ) : (
-                                  this.state.userAnswers.responses ? (
-                                    this.renderSurveyAnswers(this.state.userAnswers.responses, isOwnResponse)
-                                  ) : (<div>Loading answers...</div>)
-                            )
-                        ) : (
-                              <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading submitted response...</div>
-                        )}
-                    </div>
-                )}
-            </>
+          <SurveyQuestionsAuthoringPanel
+            lockedQuestionsBanner={lockedQuestionsBanner}
+            onScrollToTop={this.handleScrollToTop}
+            onShowJsonAtBottom={this.handleShowJsonAtBottom}
+            renderedEditableQuestions={renderedEditableQuestions}
+            showBackToTopControl={canEditQuestions && !this.props.singleQuestionMode}
+            showInlineSubmit={showInlineSubmit}
+            showJsonControl={!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode}
+            showLockedQuestionsBanner={
+              !hideEmbeddedDebugUi &&
+              canEditQuestions &&
+              questionPoolReady &&
+              !!currentSurveyResponseState
+            }
+            showTopInlineSubmit={showTopInlineSubmit}
+            submittedResponseView={submittedResponseView}
+            submitResponseButton={submitResponseButton}
+          />
         )}
 
         <SurveyQuestionsJsonControls

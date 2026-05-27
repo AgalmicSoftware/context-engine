@@ -19,10 +19,8 @@ describe('SurveyQuestionsAuthoringPanel', () => {
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
         renderedEditableQuestions={<div data-testid="editable-question">Question card</div>}
-        submitDisplayState={{
-          showInlineSubmit: true,
-          showTopInlineSubmit: true,
-        }}
+        showInlineSubmit
+        showTopInlineSubmit
         submitResponseButton={<button type="button">Submit responses</button>}
       />
     );
@@ -36,10 +34,8 @@ describe('SurveyQuestionsAuthoringPanel', () => {
     render(
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
-        displayState={{
-          showBackToTopControl: true,
-          showJsonControl: true,
-        }}
+        showBackToTopControl
+        showJsonControl
       />
     );
 
@@ -65,10 +61,8 @@ describe('SurveyQuestionsAuthoringPanel', () => {
     rerender(
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
-        displayState={{
-          showLockedQuestionsBanner: true,
-        }}
         lockedQuestionsBanner={<div data-testid="locked-banner">Locked prompts</div>}
+        showLockedQuestionsBanner
         submittedResponseView={null}
       />
     );
