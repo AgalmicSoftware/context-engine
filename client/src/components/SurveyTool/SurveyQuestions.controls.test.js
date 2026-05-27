@@ -1,5 +1,63 @@
+import React from 'react';
 import { SurveyQuestions } from './SurveyQuestions';
 import BullhornToggleButton from './BullhornToggleButton';
+import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import {
+  findElement,
+  findFirstNodeByType,
+} from './surveyToolTreeTestHelpers.js';
+
+const emptyResponseSlice = () => ({
+  answers: {},
+  additionalComments: {},
+  importance: {},
+  conviction: {},
+});
+
+const createReadySubject = ({
+  props = {},
+  state = {},
+  question = { id: 'q1', type: 'freeform', prompt: 'Ready prompt' },
+} = {}) => {
+  const subject = new SurveyQuestions({
+    singleQuestionMode: false,
+    isStandalone: false,
+    surveyIndex: 0,
+    account: '0xabc',
+    loginComplete: true,
+    network: { id: 84532 },
+    isQuestionCacheReady: true,
+    ...props,
+  });
+  subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+  subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+  subject.renderLockedQuestionsPanel = jest.fn(() => null);
+  subject.renderQuestion = jest.fn((item) => (
+    React.createElement('div', { key: item.id, 'data-testid': 'mock-question-card' }, item.id)
+  ));
+  subject.state = {
+    ...subject.state,
+    questionPool: [question],
+    surveysResponseState: [emptyResponseSlice()],
+    ...state,
+  };
+  return subject;
+};
+
+const getAuthoringPanel = (subject) => {
+  const panel = findFirstNodeByType(subject.render(), SurveyQuestionsAuthoringPanel);
+  expect(panel).not.toBeNull();
+  return panel;
+};
+
+const findSubmitButton = (node) => (
+  findElement(node, (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT)
+);
+
+const findSubmittedIndicator = (node) => (
+  findElement(node, (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)
+);
 
 describe('SurveyQuestions controls', () => {
   afterEach(() => {
@@ -77,6 +135,104 @@ describe('SurveyQuestions controls', () => {
     expect(inactiveButton?.props?.active).toBe(false);
   });
 
+  it('keeps submit controls hidden until a survey has pending edits or submitted state', () => {
+    const subject = createReadySubject();
+
+    const panel = getAuthoringPanel(subject);
+
+    expect(panel.props.showInlineSubmit).toBe(false);
+    expect(panel.props.showTopInlineSubmit).toBe(false);
+    expect(subject.renderQuestion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'q1' }),
+      0,
+      expect.objectContaining({ answers: {} })
+    );
+  });
+
+  it('renders pending survey submit controls as enabled and wires the primary click handler', () => {
+    const subject = createReadySubject({
+      state: {
+        modifiedCount: 2,
+      },
+    });
+    subject.handlePrimarySubmitClick = jest.fn();
+
+    const panel = getAuthoringPanel(subject);
+    const button = findSubmitButton(panel.props.submitResponseButton);
+
+    expect(panel.props.showInlineSubmit).toBe(true);
+    expect(panel.props.showTopInlineSubmit).toBe(true);
+    expect(button).not.toBeNull();
+    expect(button.props.disabled).toBe(false);
+
+    button.props.onClick();
+
+    expect(subject.handlePrimarySubmitClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders submitted survey state without firing another submit before completion', () => {
+    const subject = createReadySubject({
+      state: {
+        responseUrl: 'https://example.com/submitted',
+        submittedSinceLastEdit: true,
+      },
+    });
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject.encryptAndUpload = jest.fn();
+
+    const panel = getAuthoringPanel(subject);
+    const button = findSubmitButton(panel.props.submitResponseButton);
+    const submittedIndicator = findSubmittedIndicator(panel.props.submitResponseButton);
+
+    expect(panel.props.showInlineSubmit).toBe(true);
+    expect(panel.props.showTopInlineSubmit).toBe(true);
+    expect(button).not.toBeNull();
+    expect(button.props.disabled).toBe(false);
+    expect(submittedIndicator).not.toBeNull();
+
+    button.props.onClick();
+
+    expect(subject._submitGuard).toBe(false);
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+  });
+
+  it('disables pending submit while an upload is already in progress', () => {
+    const subject = createReadySubject({
+      state: {
+        isSubmitting: true,
+        modifiedCount: 1,
+      },
+    });
+
+    const panel = getAuthoringPanel(subject);
+    const button = findSubmitButton(panel.props.submitResponseButton);
+
+    expect(panel.props.showInlineSubmit).toBe(true);
+    expect(button).not.toBeNull();
+    expect(button.props.disabled).toBe(true);
+  });
+
+  it('disables single-question submit when the active prompt is still masked', () => {
+    const subject = createReadySubject({
+      props: {
+        singleQuestionMode: true,
+        questionID: 'q1',
+      },
+      state: {
+        modifiedCount: 1,
+      },
+      question: { id: 'q1', type: 'freeform', prompt: '[encrypted]' },
+    });
+
+    const panel = getAuthoringPanel(subject);
+    const button = findSubmitButton(panel.props.submitResponseButton);
+
+    expect(panel.props.showInlineSubmit).toBe(true);
+    expect(panel.props.showTopInlineSubmit).toBe(false);
+    expect(button).not.toBeNull();
+    expect(button.props.disabled).toBe(true);
+  });
+
   it('starts primary submit only when pending edits are available', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
@@ -145,5 +301,57 @@ describe('SurveyQuestions controls', () => {
       '',
       '/survey/0xsurveyabc/0xabc?session=edge%20session'
     );
+  });
+
+  it('routes completed single-question submissions to the response view with the session slug', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'Q1',
+      account: '0xABC',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+    };
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(pushStateSpy).toHaveBeenCalledWith(
+      {},
+      '',
+      '/question/q1?session=edge&responder=0xabc'
+    );
+  });
+
+  it('keeps completed standalone submissions inert instead of routing or resubmitting', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xABC',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+    };
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
   });
 });
