@@ -4,10 +4,6 @@ import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import {
   Button,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  UncontrolledDropdown,
   FormGroup,
   Label,
   Input,
@@ -150,8 +146,8 @@ import {
   SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
-  type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
+import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
@@ -5173,52 +5169,15 @@ return (
           )}
         </div>
 
-        <div className={styles.exportDataBox}>
-          {!exportAreaOpen ? (
-            <Button
-              onClick={this.toggleExportArea}
-              className={styles.exportToggleButton}
-              aria-expanded={this.state.exportAreaOpen}
-              aria-controls="surveyResultsExportArea"
-            >
-              Export Data
-            </Button>
-          ) : (
-            <div className={styles.exportAreaExpanded} id="surveyResultsExportArea">
-              <div className={styles.exportAreaHeader}>
-                <Label for="exportType" className={styles.exportLabel}>
-                  Export Data:
-                </Label>
-                <Button
-                  type="button"
-                  color="link"
-                  className={styles.exportCollapseButton}
-                  onClick={this.toggleExportArea}
-                  aria-label="Collapse export area"
-                >
-                  <FontAwesomeIcon icon={faCaretUp} />
-                </Button>
-              </div>
-              <div id={styles.exportOptions}>
-                <UncontrolledDropdown direction="down" className={styles.exportDropdownBox}>
-                    <DropdownToggle caret className={styles.exportDropdown}>
-                    {getExportTypeLabel(exportType)}
-                  </DropdownToggle>
-                  <DropdownMenu>
-                    {EXPORT_OPTIONS.map((option: SurveyResultsExportOption) => (
-                      <DropdownItem key={option.value} onClick={() => this.handleExportTypeChange(option.value)}>
-                        {option.label}
-                      </DropdownItem>
-                    ))}
-                  </DropdownMenu>
-                </UncontrolledDropdown>
-                <Button onClick={this.downloadCSV} className={styles.downloadButton}>
-                  Download
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        <SurveyResultsExportControls
+          exportAreaOpen={exportAreaOpen}
+          exportOptions={EXPORT_OPTIONS}
+          exportTypeLabel={getExportTypeLabel(exportType)}
+          onDownload={this.downloadCSV}
+          onExportTypeChange={this.handleExportTypeChange}
+          onToggleExportArea={this.toggleExportArea}
+          styleMap={styles}
+        />
       </div>
 
       {viewMode === 'survey' && surveyViewMode === 'individuals' && (

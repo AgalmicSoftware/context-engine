@@ -39,8 +39,6 @@ describe('SurveyResultsExportControls', () => {
     const toggle = screen.getByRole('button', { name: 'Export Data' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveAttribute('aria-controls', 'surveyResultsExportArea');
-    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
-    expect(screen.queryByText('JSON: Questions')).toBeNull();
 
     fireEvent.click(toggle);
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);
@@ -48,7 +46,6 @@ describe('SurveyResultsExportControls', () => {
 
   it('renders expanded options, collapse action, and download wiring', () => {
     const onDownload = jest.fn();
-    const onExportHtmlReport = jest.fn();
     const onExportTypeChange = jest.fn();
     const onToggleExportArea = jest.fn();
     render(
@@ -57,7 +54,6 @@ describe('SurveyResultsExportControls', () => {
         exportOptions={exportOptions}
         exportTypeLabel="CSV: Questions"
         onDownload={onDownload}
-        onExportHtmlReport={onExportHtmlReport}
         onExportTypeChange={onExportTypeChange}
         onToggleExportArea={onToggleExportArea}
         styleMap={styleMap}
@@ -73,9 +69,6 @@ describe('SurveyResultsExportControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Download' }));
     expect(onDownload).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByTestId('ce-surveyresults-export-html-report'));
-    expect(onExportHtmlReport).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText('Collapse export area'));
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);

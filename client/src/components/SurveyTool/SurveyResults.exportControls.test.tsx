@@ -31,6 +31,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsExportControls from './SurveyResultsExportControls';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -332,12 +333,21 @@ describe('SurveyResults export/view controls', () => {
     };
 
     const tree = subject.render();
+    const exportControls = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsExportControls
+    );
+    const optionLabels = exportControls?.props?.exportOptions?.map((option: any) => option.label) || [];
 
-    expect(treeHasText(tree, 'CSV: Questions')).toBe(true);
-    expect(treeHasText(tree, 'CSV: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'Polis Report')).toBe(false);
+    expect(exportControls).toBeTruthy();
+    expect(exportControls.props.exportTypeLabel).toBe('CSV: Questions + Responses');
+    expect(optionLabels).toEqual([
+      'CSV: Questions',
+      'CSV: Questions + Responses',
+      'JSON: Questions',
+      'JSON: Questions + Responses',
+    ]);
+    expect(optionLabels).not.toContain('Polis Report');
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
