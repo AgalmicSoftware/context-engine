@@ -153,6 +153,7 @@ import {
   type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 export {
@@ -5147,79 +5148,42 @@ return (
       {this.renderLockedResponsesBanner(lockedResponsesModel)}
 
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <Card className={styles.questionListCard}>
-          <CardHeader
-            onClick={() => this.toggleQuestionSummary('__questionList__')}
-            className={styles.questionSummaryHeader}
-          >
-            <span className={styles.questionTitle}> View & Sort Questions</span>
-            <FontAwesomeIcon
-              icon={
-                this.state.activeQuestionToggles['__questionList__']
-                  ? faCaretUp
-                  : faCaretDown
-              }
-              className={styles.biggerIcon}
-              style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-            />
-          </CardHeader>
-          <Collapse
-            isOpen={this.state.activeQuestionToggles['__questionList__']}
-            id={styles.surveyResultsCollapse}
-          >
-            <CardBody className={styles.aggregatorDarkCardBody}>
-	              {aggregatorEntriesCount === 0 &&
-	              !filterLoading ? (
-	                <p>No questions found.</p>
-	              ) : (
-	                <div ref={this.questionIdTableRef}>
-	                  {this.renderQuestionIDsTable(
-	                    sbtFilteredAggregatorQuestionResponses,
-	                    preNetworkQuestions
-	                  )}
-	                </div>
-              )}
-            </CardBody>
-          </Collapse>
-        </Card>
+        <SurveyResultsQuestionListCard
+          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
+          onToggle={() => this.toggleQuestionSummary('__questionList__')}
+          questionTableNode={
+            aggregatorEntriesCount === 0 && !filterLoading
+              ? null
+              : this.renderQuestionIDsTable(
+                sbtFilteredAggregatorQuestionResponses,
+                preNetworkQuestions
+              )
+          }
+          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          styleMap={styles}
+          tableWrapperRef={this.questionIdTableRef}
+          title=" View & Sort Questions"
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {viewMode === 'questions' && (
-        <Card className={styles.questionListCard}>
-          <CardHeader
-            onClick={() => this.toggleQuestionSummary('__questionList__')}
-            className={styles.questionSummaryHeader}
-          >
-            <span className={styles.questionTitle}>View & Sort Questions</span>
-            <FontAwesomeIcon
-              icon={
-                this.state.activeQuestionToggles['__questionList__']
-                  ? faCaretUp
-                  : faCaretDown
-              }
-              className={styles.biggerIcon}
-              style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-            />
-          </CardHeader>
-          <Collapse
-            isOpen={this.state.activeQuestionToggles['__questionList__']}
-            id={styles.surveyResultsCollapse}
-          >
-            <CardBody className={styles.aggregatorDarkCardBody}>
-	              {aggregatorEntriesCount === 0 &&
-	              !filterLoading ? (
-	                <p>No questions found.</p>
-	              ) : (
-	                <div>
-	                  {this.renderQuestionIDsTable(
-	                    sbtFilteredAggregatorQuestionResponses,
-	                    preNetworkQuestions
-	                  )}
-	                </div>
-              )}
-            </CardBody>
-          </Collapse>
-        </Card>
+        <SurveyResultsQuestionListCard
+          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
+          onToggle={() => this.toggleQuestionSummary('__questionList__')}
+          questionTableNode={
+            aggregatorEntriesCount === 0 && !filterLoading
+              ? null
+              : this.renderQuestionIDsTable(
+                sbtFilteredAggregatorQuestionResponses,
+                preNetworkQuestions
+              )
+          }
+          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          styleMap={styles}
+          title="View & Sort Questions"
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {renderSurveyResultsFilterSummary({
