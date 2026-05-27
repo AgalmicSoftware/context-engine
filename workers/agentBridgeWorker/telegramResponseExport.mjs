@@ -5,9 +5,12 @@ import {
   resolveSessionWorkerUrl,
 } from './onChainResponses.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
+import {
+  SUBMIT_REQUEST_KV_PREFIX,
+  submitRequestSessionKvPrefix,
+} from './telegramSubmitQueue.mjs';
 import { buildZipArchive } from './zipArchive.mjs';
 
-const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 const RESPONSE_EXPORT_ALLOWLIST_KV_PREFIX = 'telegram:response-export-allowlist:v1:';
 
 function safeString(value) {
@@ -288,11 +291,14 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.list !== 'function' || typeof kv.get !== 'function') return [];
   const records = [];
+  const maxRecords = Number.isFinite(Number(limit)) && Number(limit) > 0
+    ? Math.floor(Number(limit))
+    : Infinity;
   let cursor = undefined;
   do {
     const page = await kv.list({
       prefix,
-      limit: Math.min(1000, Math.max(1, Number(limit) || 1000)),
+      limit: Math.min(1000, Math.max(1, Number.isFinite(maxRecords) ? maxRecords : 1000)),
       ...(cursor ? { cursor } : {}),
     }).catch(() => null);
     const keys = Array.isArray(page?.keys) ? page.keys : [];
@@ -303,11 +309,24 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
       if (record && typeof record === 'object' && !Array.isArray(record)) {
         records.push({ ...record, key });
       }
-      if (records.length >= limit) return records;
+      if (records.length >= maxRecords) return records;
     }
     cursor = page?.list_complete === false ? safeString(page.cursor) : '';
   } while (cursor);
   return records;
+}
+
+function dedupeSubmitRecords(records = []) {
+  const byId = new Map();
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
+    if (!requestId) return;
+    const existing = byId.get(requestId);
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
+      byId.set(requestId, record);
+    }
+  });
+  return Array.from(byId.values());
 }
 
 function normalizeTelegramSubmitRecord(record = {}) {
@@ -345,7 +364,12 @@ function normalizeTelegramSubmitRecord(record = {}) {
 
 async function listTelegramSubmitRecordsForSession(env = {}, sessionSlug = '') {
   const slug = lower(sessionSlug);
-  const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: 2000 });
+  const indexedPrefix = submitRequestSessionKvPrefix(slug);
+  const indexedRecords = indexedPrefix
+    ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
+    : [];
+  const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
+  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords]);
   return records
     .filter((record) => lower(record.sessionSlug) === slug)
     .map(normalizeTelegramSubmitRecord)
@@ -360,7 +384,7 @@ export async function findLatestResponseExportSessionSlugForTelegramUser({
   const account = await deriveTelegramResponseExportAccount({ env, normalized, createdAt });
   const accountAddress = normalizeAddress(account.accountAddress);
   if (!accountAddress) return '';
-  const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: 2000 });
+  const records = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
   const matched = records
     .map(normalizeTelegramSubmitRecord)
     .filter((record) => (

@@ -5,11 +5,13 @@ import {
   buildTelegramCommandResponse,
   dispatchTelegramCommandResponse,
   handleTelegramWebhookUpdate,
+  loadSubmittedResultRecords,
   loadSessionPolicy,
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
+import { submitRequestSessionKvKey } from './telegramSubmitQueue.mjs';
 
 class MemoryKv {
   constructor() {
@@ -341,8 +343,9 @@ test('agent create and settings commands route group inputs private and model ca
 
   assert.equal(privateSettings.screen, 'agent_settings_overview');
   assert.match(privateSettings.response.text, /Draft style: balanced/);
+  assert.equal(privateSettings.response.text.includes('Telegram reminders'), false);
   assert.equal(privateSettings.canonicalApiRequest.path, '/api/agent/settings');
-  assert.equal(privateSettings.settings.telegramReminders, false);
+  assert.equal(Object.hasOwn(privateSettings.settings, 'telegramReminders'), false);
 });
 
 test('settings edit callback stays private and points input collection at Mini App scaffold', async () => {
@@ -375,6 +378,7 @@ test('settings edit callback stays private and points input collection at Mini A
   assert.equal(callback.screen, 'agent_settings_edit');
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /Mini App is not configured/);
+  assert.equal(callback.response.text.includes('Telegram reminders'), false);
   assert.equal(callback.canonicalApiRequest.path, '/api/agent/settings/update-request');
   assert.equal(callback.canonicalApiRequest.body.settingsPatchRef, 'telegram_settings_patch_ref');
   assert.equal(callback.canonicalApiRequest.body.idempotencyKey, 'provided_on_submit');
@@ -551,6 +555,66 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
   assert.match(result.response.text, /- beta \(Beta Session\)/);
   assert.equal(result.response.text.includes('Gamma Session'), false);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
+});
+
+test('/sessions and /start honor the Cloudflare Telegram session created-after cutoff', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_MINI_APP_URL: 'https://mini.example/telegram/mini-app',
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'old-alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'old-alpha',
+          sessionName: 'Old Alpha',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-19T23:59:59.000Z',
+        },
+        {
+          sessionSlug: 'new-beta',
+          sessionName: 'New Beta',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-20T00:00:00.000Z',
+        },
+        {
+          sessionSlug: 'missing-created-at',
+          sessionName: 'Missing Created At',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-21T12:00:00.000Z',
+  });
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(1\/1\)/);
+  assert.match(sessions.response.text, /- new-beta \(New Beta\)/);
+  assert.equal(sessions.response.text.includes('Old Alpha'), false);
+  assert.equal(sessions.response.text.includes('Missing Created At'), false);
+  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), ['New Beta']);
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-21T12:00:01.000Z',
+  });
+  assert.equal(start.ok, true);
+  assert.match(start.response.text, /Session: New Beta/);
+  assert.equal(start.response.text.includes('/sessions'), false);
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'new-beta');
+  const miniApp = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Mini App');
+  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.serverContextRef.sessionSlug, 'new-beta');
 });
 
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
@@ -922,6 +986,37 @@ test('/results consensus shows top difference questions from submitted records',
   assert.match(next.response.text, /Most difference 4-4 of 4/);
   assert.match(next.response.text, /4\. ● Should the group run another pilot\?/);
   assert.deepEqual(flattenButtons(next.response.replyMarkup).map((button) => button.text), ['Previous 3']);
+});
+
+test('submitted result reads use per-session indexes instead of capped global scans', async () => {
+  const env = baseEnv();
+  for (let index = 0; index < 650; index += 1) {
+    await env.AGENT_ACTION_KV.put(`telegram:submit-request:noise-${String(index).padStart(3, '0')}`, JSON.stringify({
+      requestId: `noise-${index}`,
+      status: 'direct_submitted',
+      sessionSlug: 'other-session',
+      telegramUserId: `noise-${index}`,
+      questionId: 'q-noise',
+      answer: { label: 'Agree', value: 'agree' },
+      createdAt: `2026-05-08T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+    }));
+  }
+  for (let index = 0; index < 3; index += 1) {
+    const record = {
+      requestId: `alpha-${index}`,
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId: `user-${index}`,
+      questionId: `q-${index}`,
+      answer: { label: 'Agree', value: 'agree' },
+      createdAt: `2026-05-08T12:00:0${index}.000Z`,
+    };
+    await env.AGENT_ACTION_KV.put(submitRequestSessionKvKey(record), JSON.stringify(record));
+  }
+
+  const records = await loadSubmittedResultRecords(env, 'alpha');
+
+  assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
 });
 
 test('/results group shows participant graph with question legend', async () => {
@@ -2979,9 +3074,29 @@ test('callback dispatch answers callback queries before editing messages', async
 });
 
 test('/attachments lists public metadata and hides private storage refs', async () => {
+  const kv = new MemoryKv();
+  const imageBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0]);
+  await kv.put('telegram:mini-app-document:v1:alpha:mini-doc-uploaded-plan', JSON.stringify({
+    docId: 'mini-doc-uploaded-plan',
+    sessionSlug: 'alpha',
+    title: 'Mini App uploaded notes',
+    fileType: 'png',
+    visibility: 'session',
+    storageProfile: 'cloudflare',
+    privateContentRef: 'kv://telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan',
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+  await kv.put('telegram:mini-app-document-bytes:v1:alpha:mini-doc-uploaded-plan', JSON.stringify({
+    sessionSlug: 'alpha',
+    docId: 'mini-doc-uploaded-plan',
+    title: 'Mini App uploaded notes',
+    fileType: 'png',
+    contentType: 'image/png',
+    dataBase64: Buffer.from(imageBytes).toString('base64'),
+  }));
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/attachments alpha'),
-    env: baseEnv(),
+    env: baseEnv({ AGENT_ACTION_KV: kv }),
     now: '2026-05-08T12:00:00.000Z',
   });
 
@@ -2989,9 +3104,42 @@ test('/attachments lists public metadata and hides private storage refs', async 
   assert.equal(result.screen, 'doc_library');
   assert.match(result.response.text, /Attachments for alpha/);
   assert.match(result.response.text, /Private or gated files open in the Mini App/);
+  assert.match(result.response.text, /Mini App uploaded notes \(png, session\)/);
   assert.match(result.response.text, /Public plan \(md, public\)/);
   assert.match(result.response.text, /Gated appendix \(pdf, sbt_gated\)/);
   assert.equal(result.response.text.includes('r2://private'), false);
+  assert.equal(result.response.text.includes('kv://telegram'), false);
+  const buttons = flattenButtons(result.response.replyMarkup);
+  assert.deepEqual(buttons.map((button) => button.text), [
+    'Show 1 as image',
+    'Show 2 as image',
+    'Show 3 as image',
+    'View Questions',
+  ]);
+  assert.match(buttons[0].callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  const imageCallback = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7110,
+      callback_query: {
+        id: 'callback-doc-image',
+        data: buttons[0].callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env: baseEnv({ AGENT_ACTION_KV: kv }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  assert.equal(imageCallback.ok, true);
+  assert.equal(imageCallback.screen, 'doc_image');
+  assert.equal(imageCallback.response.method, 'sendPhoto');
+  assert.match(imageCallback.response.text, /Mini App uploaded notes \(png\)/);
+  assert.equal(imageCallback.response.photo.contentType, 'image/png');
+  assert.deepEqual(Array.from(imageCallback.response.photo.bytes), Array.from(imageBytes));
+  assert.equal(imageCallback.callbackQueryId, 'callback-doc-image');
 });
 
 test('/docs remains a legacy alias for attachments', async () => {
@@ -3047,7 +3195,10 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/actions'), false);
   assert.equal(result.response.text.includes('/settings'), false);
   assert.equal(result.response.text.includes('/join'), false);
-  assert.equal(result.response.text.includes('/sessions - list linked sessions'), true);
+  assert.equal(result.response.text.includes('/sessions'), false);
+  assert.equal(result.response.text.includes('/groups'), false);
+  assert.equal(result.response.text.includes('/add_question'), false);
+  assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.includes('/questions - view session questions'), true);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
@@ -3058,6 +3209,98 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(record.action, 'view_questions');
   assert.equal(record.serverContextRef.sessionPicker, true);
   assert.equal(record.serverContextRef.sessionSlug, undefined);
+});
+
+test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {
+  const policy = {
+    defaultSessionSlug: 'alpha',
+    riskCeiling: 'submit',
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      default: true,
+      telegramBridgeEnabled: true,
+      telegramOnly: true,
+      managedAccountSubmitAllowed: true,
+    }],
+  };
+  const privateEnv = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify(policy),
+  });
+  const privateStart = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env: privateEnv,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(privateStart.ok, true);
+  assert.equal(privateStart.screen, 'setup_welcome');
+  assert.match(privateStart.response.text, /Session: Alpha Session/);
+  assert.equal(privateStart.response.text.includes('/sessions'), false);
+  assert.equal(privateStart.response.text.includes('/groups'), false);
+  assert.equal(privateStart.response.text.includes('/add_question'), false);
+  assert.equal(privateStart.response.text.includes('/attachments'), false);
+  const privateBinding = JSON.parse(await privateEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(privateBinding.sessionSlug, 'alpha');
+  assert.equal(privateBinding.source, 'private_chat');
+  const privateMiniApp = flattenButtons(privateStart.response.replyMarkup).find((button) => button.text === 'Mini App');
+  const privateLaunch = new URL(privateMiniApp.web_app.url).searchParams.get('launch');
+  const privateRecord = JSON.parse(await privateEnv.AGENT_ACTION_KV.get(`telegram:action:${privateLaunch}`));
+  assert.equal(privateRecord.serverContextRef.sessionSlug, 'alpha');
+  assert.equal(privateRecord.serverContextRef.sessionPicker, undefined);
+
+  const groupEnv = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify(policy),
+  });
+  const groupStart = await buildTelegramCommandResponse({
+    update: groupMessage('/start'),
+    env: groupEnv,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  assert.equal(groupStart.ok, true);
+  assert.match(groupStart.response.text, /Session: Alpha Session/);
+  assert.equal(groupStart.response.text.includes('/sessions'), false);
+  const groupBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:group-session:-100123'));
+  assert.equal(groupBinding.sessionSlug, 'alpha');
+  const groupUserBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(groupUserBinding.sessionSlug, 'alpha');
+  assert.equal(groupUserBinding.source, 'single_session_start');
+  const groupMiniApp = flattenButtons(groupStart.response.replyMarkup).find((button) => button.text === 'Mini App');
+  const groupLaunch = new URL(groupMiniApp.url).searchParams.get('start');
+  const groupRecord = JSON.parse(await groupEnv.AGENT_ACTION_KV.get(`telegram:action:${groupLaunch}`));
+  assert.equal(groupRecord.serverContextRef.sessionSlug, 'alpha');
+});
+
+test('/start keeps session selection visible when multiple Telegram-only sessions are available', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.response.text.includes('/sessions - choose session'), true);
+  assert.equal(result.response.text.includes('/groups'), false);
+  assert.equal(result.response.text.includes('/add_question'), false);
+  assert.equal(result.response.text.includes('/attachments'), false);
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:private-session:42'), null);
+  const miniApp = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Mini App');
+  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.serverContextRef.sessionPicker, true);
 });
 
 test('group /start includes a Mini App deep link to the session picker', async () => {
@@ -3071,6 +3314,10 @@ test('group /start includes a Mini App deep link to the session picker', async (
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App']);
+  assert.equal(result.response.text.includes('/sessions'), false);
+  assert.equal(result.response.text.includes('/groups'), false);
+  assert.equal(result.response.text.includes('/add_question'), false);
+  assert.equal(result.response.text.includes('/attachments'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
   assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);

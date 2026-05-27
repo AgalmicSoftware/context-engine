@@ -5,6 +5,8 @@ import { assertNoSecretShape } from './redaction.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 
 export const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
+export const SUBMIT_REQUEST_SESSION_KV_PREFIX = 'telegram:submit-request-by-session:v1:';
+export const SUBMIT_REQUEST_USER_KV_PREFIX = 'telegram:submit-request-by-user:v1:';
 export const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const TELEGRAM_SUBMIT_QUEUE_MESSAGE_TYPE = 'telegram_submit_direct_v1';
 export const SUBMITTED_RESULT_STATUSES = Object.freeze([
@@ -41,6 +43,41 @@ function safeJsonParse(value, fallback = null) {
 
 function sanitizeSessionSlug(value = '') {
   return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+}
+
+export function submitRequestKvKey(requestId = '') {
+  const id = safeString(requestId);
+  return id ? `${SUBMIT_REQUEST_KV_PREFIX}${id}` : '';
+}
+
+export function submitRequestSessionKvPrefix(sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  return slug ? `${SUBMIT_REQUEST_SESSION_KV_PREFIX}${slug}:` : '';
+}
+
+export function submitRequestSessionKvKey(record = {}) {
+  const prefix = submitRequestSessionKvPrefix(record.sessionSlug);
+  const requestId = safeString(record.requestId);
+  return prefix && requestId ? `${prefix}${requestId}` : '';
+}
+
+export function submitRequestUserKvPrefix({
+  sessionSlug = '',
+  telegramUserId = '',
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const userId = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
+  return slug && userId ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${userId}:` : '';
+}
+
+export function submitRequestUserKvKey(record = {}) {
+  const prefix = submitRequestUserKvPrefix({
+    sessionSlug: record.sessionSlug,
+    telegramUserId: record.telegramUserId,
+  });
+  const questionId = safeString(record.questionId).replace(/[^0-9A-Za-z._:-]/g, '').slice(0, 160);
+  const requestId = safeString(record.requestId);
+  return prefix && requestId ? `${prefix}${questionId || 'question'}:${requestId}` : '';
 }
 
 export function telegramSubmitQueueEnabled(env = {}) {
@@ -93,10 +130,32 @@ export async function persistQueuedSubmitRecord({
     return { ok: false, reason: 'action_kv_unavailable' };
   }
   assertNoSecretShape(record, 'Queued Telegram submit records must not serialize secrets.');
-  await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
-    expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
-  });
+  await persistTelegramSubmitRecord({ env, kvKey, record });
   return { ok: true };
+}
+
+export async function persistTelegramSubmitRecord({
+  env = {},
+  kvKey = '',
+  record = {},
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const requestId = safeString(record.requestId);
+  const canonicalKey = kvKey || submitRequestKvKey(requestId);
+  if (!canonicalKey) return { ok: false, reason: 'submit_request_key_missing' };
+  assertNoSecretShape(record, 'Telegram submit records must not serialize secrets.');
+  const serialized = JSON.stringify(record);
+  const putOptions = { expirationTtl: SUBMIT_REQUEST_TTL_SECONDS };
+  await kv.put(canonicalKey, serialized, putOptions);
+  const indexKeys = [
+    submitRequestSessionKvKey(record),
+    submitRequestUserKvKey(record),
+  ].filter((key) => key && key !== canonicalKey);
+  await Promise.all(indexKeys.map((key) => kv.put(key, serialized, putOptions)));
+  return { ok: true, key: canonicalKey, indexKeys };
 }
 
 export async function enqueueTelegramSubmitRecord({
@@ -136,7 +195,7 @@ export async function processQueuedTelegramSubmitRecord({
   contractFactory = env.AGENT_BRIDGE_CONTRACT_FACTORY,
 } = {}) {
   const requestId = safeString(record.requestId);
-  const kvKey = `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`;
+  const kvKey = submitRequestKvKey(requestId);
   const existing = env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
     ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
     : null;
@@ -184,9 +243,7 @@ export async function processQueuedTelegramSubmitRecord({
   };
   assertNoSecretShape(updated, 'Queued Telegram submit records must not serialize secrets.');
   if (env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.put === 'function') {
-    await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(updated), {
-      expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
-    });
+    await persistTelegramSubmitRecord({ env, kvKey, record: updated });
   }
   return {
     ok: directSubmit.ok === true,

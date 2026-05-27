@@ -49,7 +49,7 @@ test('doc library lists supported docs by session and rejects unsupported types'
   const listed = listDocumentsForSession(DOCS, { sessionSlug: 'alpha' });
   assert.equal(listed.count, 2);
   assert.equal(listed.buttonLabel, 'Attachments');
-  assert.deepEqual([...SUPPORTED_DOC_TYPES], ['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp']);
+  assert.deepEqual([...SUPPORTED_DOC_TYPES], ['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp', 'url']);
 
   assert.equal(normalizeDocumentRecord({
     title: 'Spreadsheet',
@@ -59,6 +59,13 @@ test('doc library lists supported docs by session and rejects unsupported types'
     title: 'Photo',
     mimeType: 'image/jpeg',
   }).record.fileType, 'jpeg');
+  const urlDoc = normalizeDocumentRecord({
+    title: 'External brief',
+    fileType: 'url',
+    externalUrl: 'https://example.com/brief',
+  });
+  assert.equal(urlDoc.record.fileType, 'url');
+  assert.equal(urlDoc.record.externalUrl, 'https://example.com/brief');
   for (const fileType of SUPPORTED_DOC_TYPES) {
     assert.equal(normalizeDocumentRecord({
       title: `fixture.${fileType}`,

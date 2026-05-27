@@ -74,6 +74,27 @@ POST /telegram/agent/api/preferences
 
 The response reports `draftCount` and `skipped`. Send the user to the Mini App for review after drafts are saved.
 
+## Question Cadence
+
+CE does not schedule recurring Telegram prompts for the user. Keep reminder
+cadence in the OpenClaw or host-agent layer, where the agent can respect the
+user's requested frequency and quiet hours.
+
+Recommended loop for scheduled prompts:
+
+1. At the user's chosen cadence, call `GET /telegram/agent/api/questions`.
+2. Filter to relevant `answerable` questions.
+3. Ask one or a small batch in the OpenClaw conversation, or call
+   `POST /telegram/agent/api/questions/pose` when the question should appear in
+   the CE-bound Telegram group.
+4. Save the user's natural-language answers as drafts with
+   `POST /telegram/agent/api/preferences`.
+5. Send the user to the CE Mini App for review and final submission.
+
+Do not make CE-specific reminder promises from worker settings. Scheduling,
+retry cadence, notification quiet hours, and "ask me later" behavior belong in
+the agent scheduler until CE owns a dedicated notification service.
+
 ## Pose Questions
 
 Pose an existing active question:

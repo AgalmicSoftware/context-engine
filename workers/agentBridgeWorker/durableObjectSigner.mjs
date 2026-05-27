@@ -62,7 +62,7 @@ export class ManagedDemoSignerDurableObject {
   }
 
   rootSecret() {
-    return String(this.env.DEMO_SIGNER_ROOT_SECRET || this.env.AGENT_BRIDGE_DEMO_ROOT_SECRET || 'local-demo-root-secret');
+    return String(this.env.DEMO_SIGNER_ROOT_SECRET || this.env.AGENT_BRIDGE_DEMO_ROOT_SECRET || '');
   }
 
   deploymentId(inputDeploymentId = '') {
@@ -121,11 +121,20 @@ export class ManagedDemoSignerDurableObject {
     };
     assertNoSecretShape(payload, 'Signed demo envelopes must not embed secrets.');
     const canonical = canonicalJson(payload);
-    const privateKey = await deriveDemoPrivateKeyMaterial({
-      principal: managedAccount.telegramPrincipal,
-      deploymentId: managedAccount.workerDeploymentId,
-      rootSecret: this.rootSecret(),
-    });
+    let privateKey;
+    try {
+      privateKey = await deriveDemoPrivateKeyMaterial({
+        principal: managedAccount.telegramPrincipal,
+        deploymentId: managedAccount.workerDeploymentId,
+        rootSecret: this.rootSecret(),
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        reason: String(error?.message || error || 'managed_demo_signing_failed'),
+        account: redactSecrets(managedAccount),
+      };
+    }
     const signature = `0x${await hmacSha256Hex(privateKey, canonical)}`;
     const signedEnvelope = {
       ...payload,

@@ -23,6 +23,7 @@ function completeEnv(overrides = {}) {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root',
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
     CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
@@ -44,9 +45,11 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(config.secrets.TELEGRAM_BOT_TOKEN, '[set]');
   assert.equal(config.secrets.TELEGRAM_WEBHOOK_SECRET, '[set]');
   assert.equal(config.secrets.DEMO_SIGNER_ROOT_SECRET, '[set]');
+  assert.equal(config.secrets.AGENT_BRIDGE_AGENT_API_TOKEN, '[set]');
   assert.equal(JSON.stringify(config).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(config).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(config).includes('demo-root'), false);
+  assert.equal(JSON.stringify(config).includes('agent-api-token'), false);
 });
 
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {
@@ -62,6 +65,7 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
 
   assert.equal(missing.ok, false);
   assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), true);
+  assert.equal(missing.missing.includes('AGENT_BRIDGE_AGENT_API_TOKEN'), true);
   assert.equal(missing.missing.includes('DEFAULT_RPC_URL'), false);
   assert.equal(missing.missing.includes('CLOUDFLARE_ACCOUNT_ID'), false);
   assert.equal(missingWorkersSubdomain.ok, false);
@@ -196,6 +200,7 @@ test('generated secrets are high entropy hex values and never appear in deploy p
     env: completeEnv({
       TELEGRAM_WEBHOOK_SECRET: generated.TELEGRAM_WEBHOOK_SECRET,
       DEMO_SIGNER_ROOT_SECRET: generated.DEMO_SIGNER_ROOT_SECRET,
+      AGENT_BRIDGE_AGENT_API_TOKEN: generated.AGENT_BRIDGE_AGENT_API_TOKEN,
     }),
   });
   const plan = buildAgentBridgeDeployPlan(config);
@@ -204,8 +209,10 @@ test('generated secrets are high entropy hex values and never appear in deploy p
   assert.match(webhookSecret, /^[0-9a-f]{64}$/);
   assert.match(generated.TELEGRAM_WEBHOOK_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.DEMO_SIGNER_ROOT_SECRET, /^[0-9a-f]{64}$/);
+  assert.match(generated.AGENT_BRIDGE_AGENT_API_TOKEN, /^[0-9a-f]{64}$/);
   assert.equal(serialized.includes(generated.TELEGRAM_WEBHOOK_SECRET), false);
   assert.equal(serialized.includes(generated.DEMO_SIGNER_ROOT_SECRET), false);
+  assert.equal(serialized.includes(generated.AGENT_BRIDGE_AGENT_API_TOKEN), false);
 });
 
 test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev setup only', () => {
@@ -307,6 +314,7 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
       AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
       AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: '3600',
+      AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
       AGENT_BRIDGE_RPC_TIMEOUT_MS: '5000',
       AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS: '300',
       AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '100',
@@ -353,6 +361,10 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS' &&
     binding.text === '3600'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER' &&
+    binding.text === '2026-05-20T00:00:00.000Z'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_RPC_TIMEOUT_MS' &&

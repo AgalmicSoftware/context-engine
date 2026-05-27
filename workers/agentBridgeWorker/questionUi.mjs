@@ -1030,13 +1030,12 @@ export function buildTelegramAgentSettingsOverviewState({
 } = {}) {
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
-    telegramReminders: normalizeBoolean(settings.telegramReminders, false),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
     settings: normalizedSettings,
-    editableFields: ['draftStyle', 'telegramReminders', 'showUnansweredFirst'],
+    editableFields: ['draftStyle', 'showUnansweredFirst'],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.read',
       body: {
@@ -1055,7 +1054,6 @@ export function buildTelegramAgentSettingsEditState({
 } = {}) {
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
-    telegramReminders: normalizeBoolean(settings.telegramReminders, false),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
   });
   return buildTelegramScreenState('agent_settings_edit', {
@@ -1067,11 +1065,6 @@ export function buildTelegramAgentSettingsEditState({
       input: 'select',
       options: ['concise', 'balanced', 'detailed'],
       value: current.draftStyle,
-    }, {
-      field: 'telegramReminders',
-      label: 'Telegram reminders',
-      input: 'toggle',
-      value: current.telegramReminders,
     }, {
       field: 'showUnansweredFirst',
       label: 'Show un-answered questions first',
