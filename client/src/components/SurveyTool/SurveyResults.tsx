@@ -149,6 +149,7 @@ import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualRespo
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 export {
@@ -5197,25 +5198,21 @@ return (
       )}
 
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <>
-	          <div className={styles.questionSummaries}>
-	            {surveyAggregateEntries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
-	              <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
-	            ))}
-            {surveyAggregateEntries.length === 0 &&
-              !filterLoading && <p>No results yet.</p>}
-          </div>
-        </>
+        <SurveyResultsQuestionSummariesList
+          entries={surveyAggregateEntries}
+          filterLoading={filterLoading}
+          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
+          styleMap={styles}
+        />
       )}
 
 	      {viewMode === 'questions' && (
-	        <div className={styles.questionSummaries}>
-	          {questionModeEntries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
-	            <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
-	          ))}
-          {questionModeEntries.length === 0 &&
-            !filterLoading && <p>No results yet.</p>}
-        </div>
+        <SurveyResultsQuestionSummariesList
+          entries={questionModeEntries}
+          filterLoading={filterLoading}
+          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
+          styleMap={styles}
+        />
       )}
         </>
       )}
