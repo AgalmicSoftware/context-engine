@@ -7,7 +7,8 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,313 lines**
+  - `SurveyQuestions.tsx`: **9,312 lines**
+  - `SurveyQuestionsAuthoringPanel.tsx`: **57 lines**
   - `SurveyQuestionsJsonControls.tsx`: **143 lines**
   - `SurveyQuestionsResponseView.tsx`: **119 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
@@ -23,6 +24,7 @@ SurveyTool.tsx  [top-level wrapper]
   -> SurveySelector.tsx  [survey/questions selector + filter + results]
      -> QuestionsDashboard.tsx  [question list in "questions" mode]
      -> SurveyQuestions.tsx  [shared full response runtime]
+        -> SurveyQuestionsAuthoringPanel.tsx  [editable question presentation]
         -> SurveyQuestionsJsonControls.tsx  [bottom JSON controls]
         -> SurveyQuestionsResponseView.tsx  [viewed-response presentation]
         -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
@@ -38,6 +40,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, and submission pipeline |
+| `SurveyQuestionsAuthoringPanel.tsx` | Editable question presentation | Renders the edit-mode question list shell, JSON/back-to-top controls, locked banner, submit node placement, and submitted-response fallback from explicit props while leaving submit, JSON generation, question rendering, and gate/decrypt behavior in `SurveyQuestions` |
 | `SurveyQuestionsJsonControls.tsx` | Bottom JSON controls view | Renders question/response/survey JSON toggles and copy panels from explicit props while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
 | `SurveyQuestionsResponseView.tsx` | Viewed-response display view | Renders viewed-response loading, no-response, address heading, single-question answer, and full-survey answer states from explicit props while leaving answer rendering callbacks and response state in `SurveyQuestions` |
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
