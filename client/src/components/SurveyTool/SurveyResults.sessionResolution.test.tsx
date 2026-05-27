@@ -31,6 +31,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -1025,23 +1027,24 @@ describe('SurveyResults session resolution', () => {
     };
 
     const tree = subject.render();
-    const controls = findElement(
+    const headerNode = findElement(
       tree,
-      (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderControls')
+      (node) => node?.type === SurveyResultsModalHeader
     );
     const cornerActions = findElement(
       tree,
       (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderCornerActions')
     );
     const syncStatus = findElement(
-      controls,
+      headerNode?.props?.syncStatusNode,
       (child) => typeof child?.props?.className === 'string' && child.props.className.includes('syncStatusContainer')
     );
     const selectorInControls = findElement(
-      controls,
+      headerNode?.props?.syncStatusNode,
       (child) => child?.props?.['data-testid'] === 'ce-surveyresults-session-selector'
     );
 
+    expect(headerNode).toBeTruthy();
     expect(syncStatus).toBeTruthy();
     expect(selectorInControls).toBeNull();
     expect(cornerActions).toBeNull();
@@ -1067,10 +1070,17 @@ describe('SurveyResults session resolution', () => {
         bookmarkedQuestionIDs: [],
       };
 
-      return collectTreeNodes(
-        subject.render(),
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
-      ).map((node) => node.props.href);
+      const tree = subject.render();
+      const headerNode = findElement(tree, (node) => node?.type === SurveyResultsModalHeader);
+      const responseListNode = findElement(tree, (node) => node?.type === SurveyResultsIndividualResponsesList);
+      const markup = [
+        headerNode ? renderToStaticMarkup(<SurveyResultsModalHeader {...headerNode.props} />) : '',
+        responseListNode ? renderToStaticMarkup(<SurveyResultsIndividualResponsesList {...responseListNode.props} />) : '',
+      ].join('');
+
+      return Array.from(markup.matchAll(/href="([^"]+)"/g))
+        .map((match) => match[1])
+        .filter((href) => href.startsWith('/survey/'));
     };
 
     const debateLinks = collectSurveyLinks('DEBATE');
