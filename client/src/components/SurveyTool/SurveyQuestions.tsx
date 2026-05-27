@@ -48,6 +48,7 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
 import {
@@ -115,7 +116,7 @@ import {
   runDedupedDecryptTask as runDedupedDecryptTaskHelper,
   syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
 } from './surveyToolDecryptFlow.js';
-import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import { JsonIconButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
 import contractScripts, {
@@ -9279,76 +9280,37 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             </>
         )}
 
-        {/* Bottom JSON controls, gated by hideEmbeddedDebugUi for OnePageSession embedded full mode */}
-        {!hideEmbeddedDebugUi && (
-        <div ref={this.bottomRef}>
-            <JsonButtonRow className={jsonPanelDisplayState.surveyJsonRowClassName}>
-                {jsonPanelDisplayState.showQuestionJsonControls && (
-                    <>
-                        <JsonToggleButton
-                            label="question .json"
-                            active={this.state.showQuestionsJson}
-                            onClick={this.toggleShowQuestionsJson}
-                            className={jsonPanelDisplayState.questionJsonToggleClassName}
-                        />
-                        <JsonToggleButton
-                            label="response .json"
-                            active={this.state.showResponseJson}
-                            onClick={this.toggleShowResponseJson}
-                            className={jsonPanelDisplayState.responseJsonToggleClassName}
-                        />
-                    </>
-                )}
-                {!this.props.isStandalone && !this.props.singleQuestionMode && (
-                    <>
-                        <JsonToggleButton
-                            label={this.state.showSurveyJson ? 'Hide Survey .json' : 'View Survey .json'}
-                            active={this.state.showSurveyJson}
-                            onClick={this.toggleShowSurveyJson}
-                            className={jsonPanelDisplayState.surveyJsonToggleClassName}
-                        />
-                        <JsonToggleButton
-                            label={this.state.showResponseJson ? 'Hide Response .json' : 'View Response .json'}
-                            active={this.state.showResponseJson}
-                            onClick={this.toggleShowResponseJson}
-                            className={jsonPanelDisplayState.surveyJsonToggleClassName}
-                        />
-                    </>
-                )}
-            </JsonButtonRow>
-
-            {jsonPanelDisplayState.showSurveyJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(surveyJson, 'survey')}
-                    copied={this.state.copiedSurveyJson}
-                    copyTitle="Copy Survey Definition JSON"
-                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(surveyJson)}
-                </JsonPanel>
-            )}
-            {jsonPanelDisplayState.showQuestionsJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(questionsJson, 'questions')}
-                    copied={this.state.copiedQuestionsJson}
-                    copyTitle="Copy Question Definition JSON"
-                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(questionsJson)}
-                </JsonPanel>
-            )}
-            {jsonPanelDisplayState.showResponseJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(responseJson, 'response')}
-                    copied={this.state.copiedResponseJson}
-                    copyTitle="Copy Response JSON"
-                    className={jsonPanelDisplayState.surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(responseJson)}
-                </JsonPanel>
-            )}
-        </div>
-        )}
+        <SurveyQuestionsJsonControls
+          ref={this.bottomRef}
+          copiedQuestionsJson={this.state.copiedQuestionsJson}
+          copiedResponseJson={this.state.copiedResponseJson}
+          copiedSurveyJson={this.state.copiedSurveyJson}
+          hidden={hideEmbeddedDebugUi}
+          isStandalone={this.props.isStandalone}
+          onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
+          onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
+          onCopySurveyJson={() => this.copyJsonToClipboard(surveyJson, 'survey')}
+          onToggleQuestionsJson={this.toggleShowQuestionsJson}
+          onToggleResponseJson={this.toggleShowResponseJson}
+          onToggleSurveyJson={this.toggleShowSurveyJson}
+          questionJsonToggleClassName={jsonPanelDisplayState.questionJsonToggleClassName}
+          questionsJson={questionsJson}
+          renderJsonTree={this.jsonTreeDisplay}
+          responseJson={responseJson}
+          responseJsonToggleClassName={jsonPanelDisplayState.responseJsonToggleClassName}
+          showQuestionJsonControls={jsonPanelDisplayState.showQuestionJsonControls}
+          showQuestionsJson={this.state.showQuestionsJson}
+          showQuestionsJsonPanel={jsonPanelDisplayState.showQuestionsJsonPanel}
+          showResponseJson={this.state.showResponseJson}
+          showResponseJsonPanel={jsonPanelDisplayState.showResponseJsonPanel}
+          showSurveyJson={this.state.showSurveyJson}
+          showSurveyJsonPanel={jsonPanelDisplayState.showSurveyJsonPanel}
+          singleQuestionMode={this.props.singleQuestionMode}
+          surveyJson={surveyJson}
+          surveyJsonPanelClassName={jsonPanelDisplayState.surveyJsonPanelClassName}
+          surveyJsonRowClassName={jsonPanelDisplayState.surveyJsonRowClassName}
+          surveyJsonToggleClassName={jsonPanelDisplayState.surveyJsonToggleClassName}
+        />
         {useTagModal && (
           <TagModal
             isOpen={!!activeTagModalTag}
