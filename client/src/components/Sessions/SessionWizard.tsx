@@ -146,6 +146,7 @@ import {
   resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
 import {
   normalizeSessionWizardDeployErrorMessage,
   withSessionWizardDeployHelperWorkersDevStatus,
@@ -4577,21 +4578,23 @@ const SessionWizard = ({
     !isNewSessionBannerDismissedForCurrentContext &&
     !(shouldRespectPersistedNewSessionBannerDismissal && persistedNewSessionBannerDismissed) &&
     !sponsoredBundleOwnsNewSessionEntryFlow;
-  const canUploadMetadataNow = !!resolvedWorkerBaseUrl && (
-    workerMode === 'default' ||
-    usesDefaultWorkerUrl ||
-    (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl)
-  );
-  const uploadBlockedReason = !resolvedWorkerBaseUrl
-    ? 'Set a worker URL before uploading metadata.'
-    : (workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi)
-      ? 'Custom worker mode requires a successful deploy in this run before metadata upload.'
-      : (workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl)
-        ? 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.'
-        : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
-  const hasManualMetadata = !!normalizeArweaveUri(manualMetadataUrl);
-  const hasUploadedMetadata = !!normalizeArweaveUri(metadataUrl);
-  const canPublishNow = canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
+  const publishReadiness = resolveSessionWizardPublishReadiness({
+    resolvedWorkerBaseUrl,
+    workerMode,
+    usesDefaultWorkerUrl,
+    deployVerifiedInUi,
+    deployWorkerMatchesConfiguredUrl,
+    canUseSponsoredAutoDeployNow,
+    manualMetadataUrl,
+    metadataUrl,
+  });
+  const {
+    canUploadMetadataNow,
+    uploadBlockedReason,
+    hasManualMetadata,
+    hasUploadedMetadata,
+    canPublishNow,
+  } = publishReadiness;
   const deployStatusLower = toStr(deployStatus).toLowerCase();
   const deployStatusIsError = !!deployStatus &&
     !deployInFlight &&
