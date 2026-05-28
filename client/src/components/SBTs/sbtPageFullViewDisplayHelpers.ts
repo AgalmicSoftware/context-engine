@@ -1,5 +1,12 @@
-import { getSbtDescriptionText, getSbtDisplayName, isSbtFieldLocked } from '../../utilities/sbt/sbtDisplayNames.js';
-import { getDisplayImageRenderState, type SbtPageDisplayImageState } from './sbtPageMediaHelpers';
+import {
+  getSbtDescriptionText,
+  getSbtDisplayName,
+  isSbtFieldLocked,
+} from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  getDisplayImageRenderState,
+  type SbtPageDisplayImageState,
+} from './sbtPageMediaHelpers';
 
 type ResolveSbtPageFullViewShellStateArgs = {
   error?: unknown;
@@ -84,7 +91,9 @@ export const resolveSbtPageIdentityPanelDisplayState = ({
     ? getDisplayImageRenderState(sbtInfo as Record<string, unknown>, fallbackState, fallbackImage)
     : null;
   const nameText = getSbtDisplayName(sbtInfo) || String(unnamedLabel || '');
-  const rawDescription = sbtInfo && typeof sbtInfo === 'object' ? (sbtInfo as Record<string, unknown>).description : '';
+  const rawDescription = sbtInfo && typeof sbtInfo === 'object'
+    ? (sbtInfo as Record<string, unknown>).description
+    : '';
 
   return {
     descriptionText: getSbtDescriptionText(sbtInfo),
