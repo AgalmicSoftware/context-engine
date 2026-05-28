@@ -1,7 +1,26 @@
+import {
+  getSbtDescriptionText,
+  getSbtDisplayName,
+  isSbtFieldLocked,
+} from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  getDisplayImageRenderState,
+  type SbtPageDisplayImageState,
+} from './sbtPageMediaHelpers';
+
 type ResolveSbtPageFullViewShellStateArgs = {
   error?: unknown;
   hasSbtAddress?: unknown;
   sbtInfo?: unknown;
+};
+type ResolveSbtPageIdentityPanelDisplayStateArgs = {
+  defaultImage?: unknown;
+  fallbackState?: {
+    displayImageFallbackKey?: unknown;
+    displayImageFallbackIndex?: unknown;
+  };
+  sbtInfo?: unknown;
+  unnamedLabel?: unknown;
 };
 type ResolveSbtPageSectionToggleDisplayStateArgs = {
   open?: unknown;
@@ -23,6 +42,14 @@ type SbtPageFullViewShellState = {
   shouldRenderError: boolean;
   shouldRenderLoading: boolean;
   shouldRenderMissingAddress: boolean;
+};
+type SbtPageIdentityPanelDisplayState = {
+  descriptionText: string;
+  displayImageState: SbtPageDisplayImageState | null;
+  imageAlt: string;
+  imageUrl: string;
+  nameText: string;
+  showDescriptionLockIcon: boolean;
 };
 type SbtPageSectionToggleDisplayState = {
   isOpen: boolean;
@@ -50,6 +77,31 @@ export const resolveSbtPageFullViewShellState = ({
     shouldRenderError: hasAddress && hasError && !hasInfo,
     shouldRenderLoading: hasAddress && !hasInfo && !hasError,
     shouldRenderMissingAddress: !hasAddress,
+  };
+};
+
+export const resolveSbtPageIdentityPanelDisplayState = ({
+  defaultImage = '',
+  fallbackState = {},
+  sbtInfo = null,
+  unnamedLabel = '',
+}: ResolveSbtPageIdentityPanelDisplayStateArgs = {}): SbtPageIdentityPanelDisplayState => {
+  const fallbackImage = String(defaultImage || '');
+  const displayImageState = sbtInfo
+    ? getDisplayImageRenderState(sbtInfo as Record<string, unknown>, fallbackState, fallbackImage)
+    : null;
+  const nameText = getSbtDisplayName(sbtInfo) || String(unnamedLabel || '');
+  const rawDescription = sbtInfo && typeof sbtInfo === 'object'
+    ? (sbtInfo as Record<string, unknown>).description
+    : '';
+
+  return {
+    descriptionText: getSbtDescriptionText(sbtInfo),
+    displayImageState,
+    imageAlt: nameText,
+    imageUrl: displayImageState?.src || fallbackImage,
+    nameText,
+    showDescriptionLockIcon: isSbtFieldLocked(sbtInfo, 'description') && !String(rawDescription || '').trim(),
   };
 };
 

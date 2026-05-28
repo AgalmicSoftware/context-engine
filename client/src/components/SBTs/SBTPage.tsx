@@ -29,10 +29,8 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
-  getSbtDescriptionText,
   getSbtDisplayName,
   getSbtMaskedFieldValue,
-  isSbtFieldLocked,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
@@ -143,7 +141,6 @@ import {
   getDisplayImageFallbackCandidateCount,
   getErrorMessage,
   getExplicitSbtPageSessionSlug,
-  getDisplayImageRenderState,
   hasSbtPageAutoMintFlag,
   getNextDisplayImageFallbackState,
   hasUsableSbtPageScanProgress,
@@ -180,6 +177,7 @@ import {
   resolveSbtPageHolderResolutionState,
   resolveSbtPageHolderScanActive,
   resolveSbtPageHoldersDisplayCount,
+  resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageItalicNoteStyle,
@@ -4465,10 +4463,16 @@ renderMintButton() {
 
     const sbtAddressForDisplay = resolveSbtAddressString(SBTAddressProp);
     const sbtDetailPath = buildSbtDetailPath(sbtAddressForDisplay, this.getEffectiveSessionSlug());
-    const sbtNameText = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
-    const sbtDescriptionText = getSbtDescriptionText(sbtInfo);
-    const displayImageState = sbtInfo ? getDisplayImageRenderState(sbtInfo, this.state, defaultSbtImage) : null;
-    const imageUrl = displayImageState?.src || defaultSbtImage;
+    const identityPanelDisplayState = resolveSbtPageIdentityPanelDisplayState({
+      defaultImage: defaultSbtImage,
+      fallbackState: this.state,
+      sbtInfo,
+      unnamedLabel: `Unnamed ${t('sbt')}`,
+    });
+    const sbtNameText = identityPanelDisplayState.nameText;
+    const sbtDescriptionText = identityPanelDisplayState.descriptionText;
+    const displayImageState = identityPanelDisplayState.displayImageState;
+    const imageUrl = identityPanelDisplayState.imageUrl;
     const imageErrorHandler = displayImageState?.canRetry
       ? () => this.handleDisplayImageError(displayImageState)
       : undefined;
@@ -4911,14 +4915,14 @@ renderMintButton() {
                 descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
                 descriptionText={sbtDescriptionText}
                 explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
-                imageAlt={sbtNameText}
+                imageAlt={identityPanelDisplayState.imageAlt}
                 imageUrl={imageUrl}
-                nameText={sbtNameText}
+                nameText={identityPanelDisplayState.nameText}
                 onBookmark={this.bookmarkSBT}
                 onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
                 onImageError={imageErrorHandler}
                 onImageOpen={this.toggleFullImage}
-                showDescriptionLockIcon={isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim()}
+                showDescriptionLockIcon={identityPanelDisplayState.showDescriptionLockIcon}
                 tokenUriHref={tokenUriHref}
               />
               <div className={styles.rightColumn}>
