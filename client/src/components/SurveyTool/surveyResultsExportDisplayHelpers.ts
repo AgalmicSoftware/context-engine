@@ -36,13 +36,13 @@ export const SURVEY_RESULTS_EXPORT_OPTIONS: readonly SurveyResultsExportOption[]
   },
 ]);
 
-type SurveyResultsExportGeneratorKey =
+export type SurveyResultsExportGeneratorKey =
   | 'questions-csv'
   | 'questions-json'
   | 'questions-responses-csv'
   | 'questions-responses-json';
 
-type SurveyResultsExportGenerationPlanInvalid = {
+export type SurveyResultsExportGenerationPlanInvalid = {
   alertMessage: string;
   filename: '';
   generatorKey: null;
@@ -51,7 +51,7 @@ type SurveyResultsExportGenerationPlanInvalid = {
   status: 'invalid';
 };
 
-type SurveyResultsExportGenerationPlanReady = {
+export type SurveyResultsExportGenerationPlanReady = {
   alertMessage: '';
   filename: string;
   generatorKey: SurveyResultsExportGeneratorKey;
@@ -60,11 +60,11 @@ type SurveyResultsExportGenerationPlanReady = {
   status: 'ready';
 };
 
-type SurveyResultsExportGenerationPlan =
+export type SurveyResultsExportGenerationPlan =
   | SurveyResultsExportGenerationPlanInvalid
   | SurveyResultsExportGenerationPlanReady;
 
-type SurveyResultsExportDownloadPlanEmpty = {
+export type SurveyResultsExportDownloadPlanEmpty = {
   alertMessage: string;
   fileContent: '';
   filename: '';
@@ -72,7 +72,7 @@ type SurveyResultsExportDownloadPlanEmpty = {
   status: 'empty';
 };
 
-type SurveyResultsExportDownloadPlanReady = {
+export type SurveyResultsExportDownloadPlanReady = {
   alertMessage: '';
   fileContent: string;
   filename: string;
@@ -80,7 +80,7 @@ type SurveyResultsExportDownloadPlanReady = {
   status: 'download';
 };
 
-type SurveyResultsExportDownloadPlan =
+export type SurveyResultsExportDownloadPlan =
   | SurveyResultsExportDownloadPlanEmpty
   | SurveyResultsExportDownloadPlanReady;
 
