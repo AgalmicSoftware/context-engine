@@ -13,6 +13,7 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   const miniAppCapabilities = listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true });
   const settingsUpdate = getAgentApiCapability('agent.settings.update');
   const accountCreate = getAgentApiCapability('agent.account.create');
+  const nextQuestion = getAgentApiCapability('agent.telegram.questions.next');
 
   assert.equal(groupCapabilities.every((capability) => capability.groupSafe === true), true);
   assert.equal(groupCapabilities.some((capability) => capability.id === 'agent.actions.list'), true);
@@ -22,6 +23,8 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   assert.deepEqual(settingsUpdate.requiredFields, ['agentAccountRef', 'settingsPatchRef', 'idempotencyKey']);
   assert.equal(accountCreate.path, '/api/agent/accounts/create');
   assert.deepEqual(accountCreate.requiredFields, ['telegramPrincipalId', 'accountMode', 'idempotencyKey']);
+  assert.equal(nextQuestion.path, '/telegram/agent/api/questions/next');
+  assert.equal(nextQuestion.safeTelegramLanes.includes(TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT), true);
 });
 
 test('canonical request envelopes include catalog metadata and required field gaps', () => {

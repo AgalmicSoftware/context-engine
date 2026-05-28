@@ -299,7 +299,6 @@ test('group session card uses safe public copy and required lobby buttons', () =
   assert.deepEqual(card.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',
-    'Attachments',
     'Pose Question',
   ]);
   assert.equal(card.buttons.find((button) => button.label === 'Pose Question').command, '/pose_question');

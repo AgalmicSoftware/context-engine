@@ -270,6 +270,10 @@ The skeleton includes dependency-free pure modules for:
   sponsored-resource policy, Telegram question-card controls, SBT/account screen
   states, private-question lock/decrypt request states, and pose-question
   actions.
+- A Telegram agent next-question queue that lets a host agent request one
+  criteria-matched question at the user's chosen cadence. Session admins can set
+  sponsored/default question ids that are served first before the worker falls
+  back to preference-ranked active questions.
 
 The signer currently creates signed demo envelopes only. It does not broadcast
 transactions or touch production authority. Raw demo key export/recover is
@@ -321,7 +325,8 @@ embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/join`, `/questions`,
-`/pose_question`, `/q`, `/results consensus`, `/results group`, deprecated `/drop_question`, `/docs`,
+`/pose_question`, `/q`, `/results consensus`, `/results group`,
+deprecated `/drop_question`, hidden `/attachments`, hidden `/docs`,
 `/generate_questions`, `/me`, `/account`,
 `/sbt <sbt-address-or-group-id-or-link>`,
 `/join_sbt <sbt-address-or-invite-code-or-link>`,
@@ -329,7 +334,7 @@ Telegram screen/message helpers expose launch metadata on every
 opaque callback actions, `callback:<pose_question_action>`, or the
 `t.me/<bot>?start=<opaque-action-id>` template. The group session-linked card
 uses the safe public copy `Context Engine session linked: <session>` and the
-buttons `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed
+buttons `Join Session`, `View Questions`, `Groups`, and policy-allowed
 `Pose Question`. It does not include a default `Answer Privately` action. `View
 Questions` is the group-lobby default, while `Join Session` opens private chat
 and routes participants without a configured account to private account setup.
@@ -567,9 +572,10 @@ Rules:
   `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before
   handling live webhook updates. The first live demo handles `/start`,
   `/join <session>`, `/sessions`, `/questions`,
-  `/pose_question`, `/q`, `/attachments`, `/docs`, and `/me` through the
+  `/pose_question`, `/q`, and `/me` through the
   `https://<worker-name>.<workers-subdomain>.workers.dev/telegram/webhook`
-  endpoint. Legacy `/ce_*` command names remain hidden compatibility aliases.
+  endpoint. `/attachments`, `/docs`, and legacy `/ce_*` command names remain
+  hidden compatibility aliases.
 - Mini App `initData` must be validated server-side before trusting Telegram
   identity. The helper follows Telegram's official Mini App HMAC validation
   flow: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app

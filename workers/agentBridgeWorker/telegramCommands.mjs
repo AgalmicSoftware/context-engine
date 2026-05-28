@@ -53,6 +53,10 @@ import {
   sessionContextFromPolicySession,
 } from './telegramQuestionProposals.mjs';
 import {
+  loadTelegramQuestionQueueConfig,
+  saveTelegramQuestionQueueConfig,
+} from './telegramQuestionQueue.mjs';
+import {
   loadTelegramLightweightGroups,
   saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
@@ -156,6 +160,7 @@ const COMMANDS = Object.freeze({
   EXPORT_ACCESS: '/export_access',
   EXPORT_ALLOW: '/export_allow',
   EXPORT_REVOKE: '/export_revoke',
+  QUESTION_QUEUE: '/question_queue',
   ATTACHMENTS: '/attachments',
   DOCS: '/docs',
   ME: '/me',
@@ -184,6 +189,7 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_export_access': COMMANDS.EXPORT_ACCESS,
   '/ce_export_allow': COMMANDS.EXPORT_ALLOW,
   '/ce_export_revoke': COMMANDS.EXPORT_REVOKE,
+  '/ce_question_queue': COMMANDS.QUESTION_QUEUE,
   '/ce_attachments': COMMANDS.ATTACHMENTS,
   '/ce_docs': COMMANDS.DOCS,
   '/ce_me': COMMANDS.ME,
@@ -2948,7 +2954,7 @@ function formatHelpText({
   lines.push(
     '/questions',
     '/results',
-    '/me - view your account',
+    '/me - view account / get agent token',
   );
   return lines.join('\n');
 }
@@ -3441,8 +3447,6 @@ async function buildJoinResponse({
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${chainDisplayName(env.DEFAULT_CHAIN_ID || '11155420')}`,
         questionAvailabilityLine(questionPrefetch),
-        '',
-        'Use /attachments for session files.',
       ].join('\n'),
       replyMarkup: {
         inline_keyboard: [[
@@ -3523,15 +3527,6 @@ async function buildJoinResponse({
     }),
     await makeCallbackButton({
       env,
-      label: 'Attachments',
-      action: TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS,
-      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-      serverContextRef: { sessionSlug: resolved.session.sessionSlug, groupChatId: group.groupChatId },
-      seed: `group_join|docs|${resolved.session.sessionSlug}|${group.groupChatId}|${normalized.updateId}`,
-      createdAt,
-    }),
-    await makeCallbackButton({
-      env,
       label: 'Groups',
       action: TELEGRAM_BRIDGE_ACTIONS.VIEW_GROUPS,
       lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
@@ -3557,8 +3552,6 @@ async function buildJoinResponse({
     text: [
       state.text,
       questionAvailabilityLine(questionPrefetch),
-      '',
-      'Use /attachments for session files.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
@@ -5886,6 +5879,24 @@ async function makeResultsSettingsButton({
   });
 }
 
+async function makeQuestionQueueSettingsButton({
+  env,
+  normalized,
+  sessionSlug = '',
+  seed = '',
+  createdAt,
+} = {}) {
+  return makeCallbackButton({
+    env,
+    label: 'Question Queue',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTION_QUEUE_SETTINGS,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug },
+    seed: seed || `question_queue_settings|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+}
+
 async function makeResultsExposureToggleButton({
   env,
   normalized,
@@ -5969,6 +5980,13 @@ async function buildAdminActionsResponse({
     seed: `admin_actions|results_settings|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   })]);
+  rows.push([await makeQuestionQueueSettingsButton({
+    env,
+    normalized,
+    sessionSlug,
+    seed: `admin_actions|question_queue|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  })]);
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -6046,6 +6064,187 @@ async function buildResultsSettingsResponse({
     extra: {
       sessionSlug: context.session.sessionSlug,
       resultsExposure: context.session.resultsExposure || {},
+    },
+  });
+}
+
+function questionQueueCommandTokens(args = []) {
+  return safeString(Array.isArray(args) ? args.join(' ') : args)
+    .split(/[\s,]+/)
+    .map(safeString)
+    .filter(Boolean);
+}
+
+function publicQuestionQueueCandidates(questions = []) {
+  return orderQuestionsForPresentation(Array.isArray(questions) ? questions : [])
+    .filter((question) => questionIsAnswerable(question))
+    .filter((question) => questionId(question) && questionText(question));
+}
+
+function resolveQuestionQueueRefs(tokens = [], questions = []) {
+  const ids = [];
+  const skipped = [];
+  tokens.forEach((token) => {
+    const selected = findQuestion(questions, token);
+    const selectedId = questionId(selected || {});
+    if (!selected || !selectedId) {
+      skipped.push(token);
+      return;
+    }
+    if (!ids.includes(selectedId)) ids.push(selectedId);
+  });
+  return { ids, skipped };
+}
+
+function formatQuestionQueueStatus({
+  session = {},
+  queueConfig = {},
+  questions = [],
+  saved = null,
+  skipped = [],
+} = {}) {
+  const questionById = new Map(questions.map((question) => [questionId(question), question]));
+  const sponsoredIds = Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds : [];
+  const sponsoredLines = sponsoredIds.length
+    ? sponsoredIds.map((id, index) => {
+      const question = questionById.get(id);
+      const prompt = question ? questionText(question) : 'Question not currently loaded';
+      return `${index + 1}. ${shortQuestionId(id)} - ${prompt}`;
+    })
+    : ['None.'];
+  const availableLines = questions.slice(0, 10).map((question, index) => (
+    `${index + 1}. ${questionText(question)} (${shortQuestionId(questionId(question))})`
+  ));
+  return [
+    `Question queue for ${sessionLabel(session)}`,
+    `Session: ${session.sessionSlug}`,
+    '',
+    'Sponsored questions are served first by agent next-question requests.',
+    '',
+    'Sponsored queue:',
+    ...sponsoredLines,
+    skipped.length ? '' : null,
+    skipped.length ? `Skipped unknown refs: ${skipped.join(', ')}` : null,
+    saved ? '' : null,
+    saved ? `Saved ${sponsoredIds.length} sponsored question${sponsoredIds.length === 1 ? '' : 's'}.` : null,
+    '',
+    'Set: /question_queue 1 3 4',
+    'Clear: /question_queue clear',
+    '',
+    'Available questions:',
+    ...(availableLines.length ? availableLines : ['No answerable questions are loaded yet.']),
+  ].filter((line) => line !== null).join('\n');
+}
+
+async function buildQuestionQueueSettingsResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  sessionSlugOverride = '',
+  createdAt,
+  method = 'editMessageText',
+  messageId = '',
+} = {}) {
+  const context = await resolveAdminActionContext({ normalized, env, sessionSlugOverride, createdAt });
+  if (!context.ok) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: context.statusText,
+      screen: 'question_queue_settings_denied',
+      command,
+      normalized,
+      extra: { reason: context.reason, accountAddress: context.accountAddress || '' },
+    });
+  }
+  const loaded = await loadQuestionsForSession(env, context.session.sessionSlug);
+  const questions = publicQuestionQueueCandidates(loaded.questions);
+  const tokens = questionQueueCommandTokens(args);
+  const operation = lower(tokens[0]);
+  let saved = null;
+  let skipped = [];
+  if (tokens.length && !['list', 'show'].includes(operation)) {
+    const requestedTokens = ['set', 'sponsored'].includes(operation) ? tokens.slice(1) : tokens;
+    const clearRequested = ['clear', 'reset', 'none', 'empty'].includes(operation);
+    const resolvedRefs = clearRequested ? { ids: [], skipped: [] } : resolveQuestionQueueRefs(requestedTokens, questions);
+    const nextIds = clearRequested
+      ? []
+      : resolvedRefs.ids;
+    skipped = clearRequested
+      ? []
+      : resolvedRefs.skipped;
+    if (!nextIds.length && !clearRequested) {
+      return reply({
+        method,
+        chatId: normalized.chat.chatId,
+        messageId,
+        text: [
+          'No matching question refs were found.',
+          '',
+          'Use numbers from the list, for example /question_queue 1 3 4.',
+        ].join('\n'),
+        screen: 'question_queue_settings_invalid',
+        command,
+        normalized,
+        extra: { sessionSlug: context.session.sessionSlug, skipped },
+      });
+    }
+    saved = await saveTelegramQuestionQueueConfig({
+      env,
+      sessionSlug: context.session.sessionSlug,
+      sponsoredQuestionIds: nextIds,
+      updatedByTelegramUserId: normalized.user.telegramUserId,
+      updatedByAccountAddress: context.manager.accountAddress,
+      createdAt,
+    });
+    if (!saved.ok) {
+      return errorReply({
+        normalized,
+        command,
+        reason: saved.reason || 'question_queue_save_failed',
+        text: `Could not save question queue: ${saved.reason || 'question_queue_save_failed'}.`,
+        method,
+        messageId,
+      });
+    }
+  }
+  const queueConfig = saved?.config || await loadTelegramQuestionQueueConfig({
+    env,
+    sessionSlug: context.session.sessionSlug,
+  });
+  const backButton = await makeCallbackButton({
+    env,
+    label: 'Back to Admin Actions',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_ADMIN_ACTIONS,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: context.session.sessionSlug },
+    seed: `question_queue|back|${context.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: formatQuestionQueueStatus({
+      session: context.session,
+      queueConfig,
+      questions,
+      saved,
+      skipped,
+    }),
+    replyMarkup: { inline_keyboard: [[backButton]] },
+    screen: 'question_queue_settings',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: context.session.sessionSlug,
+      questionQueue: {
+        sponsoredQuestionIds: queueConfig.sponsoredQuestionIds || [],
+        source: queueConfig.source || '',
+      },
+      skipped,
     },
   });
 }
@@ -6787,7 +6986,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
       `Chain: ${chainDisplayName(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
       '',
-      'Use /questions or /attachments.',
+      'Use /questions.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: rows,
@@ -7537,6 +7736,17 @@ async function buildCallbackResponse({
       createdAt,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTION_QUEUE_SETTINGS) {
+    return attachCallbackQueryId(await buildQuestionQueueSettingsResponse({
+      normalized,
+      command: 'callback:question_queue_settings',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.TOGGLE_RESULTS_EXPOSURE) {
     return attachCallbackQueryId(await buildToggleResultsExposureResponse({
       normalized,
@@ -7859,6 +8069,16 @@ export async function buildTelegramCommandResponse({
       command: parsed.command,
       env,
       args: parsed.args,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.QUESTION_QUEUE) {
+    return buildQuestionQueueSettingsResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      method: 'sendMessage',
       createdAt,
     });
   }

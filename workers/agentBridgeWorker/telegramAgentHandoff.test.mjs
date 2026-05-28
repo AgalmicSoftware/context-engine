@@ -131,7 +131,15 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /^# CE Telegram Agent Handoff/m);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
   assert.match(source, /Non-Telegram Agent Token Flow/);
-  assert.match(source, /default token expiry is 7 days/i);
+  assert.match(source, /Install From Public Git/);
+  assert.match(source, /raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine/);
+  assert.match(source, /CE_SKILL_REF/);
+  assert.ok(source.includes('${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff'));
+  assert.match(source, /default token expiry is 28 days/i);
+  assert.match(source, /Authorization: Bearer ceagt_/);
+  assert.match(source, /refresh_token_via_telegram/);
+  assert.match(source, /POST \/telegram\/agent\/api\/questions\/next/);
+  assert.match(source, /\/question_queue 1 3 4/);
   assert.match(source, /allowedProfileFields/);
   assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
 });
@@ -171,6 +179,16 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   const questions = await jsonBody(questionsResponse);
   assert.equal(questionsResponse.status, 200);
   assert.equal(questions.questions.length, 2);
+  const nextResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/next?sessionSlug=alpha&queueKey=token-smoke', {
+      method: 'POST',
+      token: issued.token,
+    }),
+    env,
+  });
+  const next = await jsonBody(nextResponse);
+  assert.equal(nextResponse.status, 200);
+  assert.equal(next.question.questionId, 'q-binary');
 
   const mismatchResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions?sessionSlug=beta', {
@@ -212,6 +230,22 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   const expiredBody = await jsonBody(expiredResponse);
   assert.equal(expiredResponse.status, 401);
   assert.equal(expiredBody.reason, 'agent_token_expired');
+  assert.equal(expiredBody.action, 'refresh_token_via_telegram');
+  assert.equal(expiredBody.telegramCommand, '/me');
+  assert.equal(expiredBody.telegramButton, 'Create Agent Token');
+  assert.match(expiredBody.message, /open the Context Engine Telegram bot/i);
+  assert.match(expiredBody.message, /Create Agent Token/);
+
+  const missingTokenResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
+      token: 'ceagt_missing_or_kv_expired_token',
+    }),
+    env,
+  });
+  const missingTokenBody = await jsonBody(missingTokenResponse);
+  assert.equal(missingTokenResponse.status, 401);
+  assert.equal(missingTokenBody.reason, 'agent_token_not_found');
+  assert.equal(missingTokenBody.action, 'refresh_token_via_telegram');
 });
 
 test('Telegram agent can read active questions and draft preferences after group join', async () => {
@@ -322,6 +356,70 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   assert.equal(filtered.relevance.mode, 'filter');
   assert.deepEqual(filtered.questions.map((question) => question.questionId), ['q-freeform']);
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
+});
+
+test('Telegram agent next-question queue serves sponsored questions first and advances per criteria', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_QUESTION_QUEUE_JSON: JSON.stringify({ alpha: ['q-freeform'] }),
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const firstResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/next', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        queueKey: 'daily-default',
+      },
+    }),
+    env,
+  });
+  const first = await jsonBody(firstResponse);
+  const secondResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/next', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        queueKey: 'daily-default',
+      },
+    }),
+    env,
+  });
+  const second = await jsonBody(secondResponse);
+  const criteriaResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/next', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        queueKey: 'funding-only',
+        criteria: { tags: ['funding'] },
+      },
+    }),
+    env,
+  });
+  const criteria = await jsonBody(criteriaResponse);
+
+  assert.equal(firstResponse.status, 200);
+  assert.equal(first.question.questionId, 'q-freeform');
+  assert.equal(first.sponsored, true);
+  assert.equal(first.reason, 'sponsored_question_queue');
+  assert.equal(second.question.questionId, 'q-binary');
+  assert.equal(second.sponsored, false);
+  assert.equal(second.queue.advanced, true);
+  assert.equal(criteriaResponse.status, 200);
+  assert.equal(criteria.question.questionId, 'q-binary');
+  assert.equal(criteria.sponsored, false);
+  assert.deepEqual(criteria.queue.criteria.tags, ['funding']);
 });
 
 test('Telegram agent can recommend and auto-apply question importance votes with research metadata', async () => {

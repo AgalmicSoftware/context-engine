@@ -143,6 +143,25 @@ const CAPABILITIES = Object.freeze([
     miniAppRoutes: ['questions'],
   }),
   freezeEntry({
+    id: 'agent.telegram.questions.next',
+    category: 'questions',
+    label: 'Get Next Telegram Question',
+    canonicalActionId: 'agent.telegram.questions.next',
+    method: 'POST',
+    path: '/telegram/agent/api/questions/next',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['telegramUserId', 'sessionSlug'],
+    optionalFields: ['groupChatId', 'criteria', 'preferences', 'queueKey', 'advance', 'resetQueue'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Returns one answerable question for scheduled agent prompts, serving admin-sponsored question ids first before falling back to preference-ranked active questions.',
+    ],
+  }),
+  freezeEntry({
     id: 'agent.telegram.preferences.draft',
     category: 'responses',
     label: 'Draft Telegram Preferences',
