@@ -124,16 +124,14 @@ import {
   resolveUserPageAnalysisSessionConfigForSlug,
   resolveUserPageAnalysisSessionFallback,
   resolveUserPageAddressDisplayState,
-  resolveUserPageAiActionAvailability,
+  resolveUserPageAiActionPlan,
   resolveUserPageAiAvailabilityRefresh,
-  resolveUserPageAnalyzeButtonDisplayState,
   resolveUserPageAvatarDisplayState,
   resolveUserPageBlockieSeed,
   resolveUserPageBookmarkButtonDisplayState,
   resolveUserPageBookmarkNickname,
   resolveUserPageBookmarkStatus,
   resolveUserPageBookmarksLinkDisplayState,
-  resolveUserPageCompareButtonDisplayState,
   resolveUserPageCopyIconDisplayState,
   resolveUserPageInlineEnteredIndicatorDisplayState,
   resolveUserPageFullProfileModalDisplayState,
@@ -3766,19 +3764,14 @@ class UserPage extends Component<any, any> {
       loadingSBTs,
       loadingSurveys,
     });
-    const aiActionAvailability = resolveUserPageAiActionAvailability({
+    const aiActionPlan = resolveUserPageAiActionPlan({
       aiAvailable: this.state.aiAvailable,
+      analyzing,
+      collapseOpen,
       disabledByCache,
       walletLabel: t('walletLower'),
     });
-    const analyzeButtonDisplayState = resolveUserPageAnalyzeButtonDisplayState({
-      aiActionAvailability,
-      analyzing,
-    });
-    const compareButtonDisplayState = resolveUserPageCompareButtonDisplayState({
-      aiActionAvailability,
-      collapseOpen,
-    });
+    const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
     const analysisCacheStatusState = resolveUserPageAnalysisCacheStatusState({
       analysisCachedAt,
       analysisServedFromCache,
