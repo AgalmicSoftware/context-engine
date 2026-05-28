@@ -274,10 +274,10 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-sbt-create-success-page-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens `/sbt/:address`. | yes |  |
 | `ce-sbt-create-success-arweave-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens the tokenURI metadata on Arweave. | yes |  |
 | `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
-| `ce-sbt-page-name` | `client/src/components/SBTs/SBTPage.tsx` | Primary SBT display name heading on the detail page. | yes |  |
-| `ce-sbt-page-description` | `client/src/components/SBTs/SBTPage.tsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
-| `ce-sbt-page-image` | `client/src/components/SBTs/SBTPage.tsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
-| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SBTPage.tsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
+| `ce-sbt-page-name` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT display name heading on the detail page. | yes |  |
+| `ce-sbt-page-description` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
+| `ce-sbt-page-image` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
+| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SbtPageOpenMintUrlCard.tsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
 
 ## Gate Lock Popover
 
