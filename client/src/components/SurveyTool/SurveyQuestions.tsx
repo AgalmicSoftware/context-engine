@@ -3,7 +3,6 @@
 
 import React, { Component } from 'react';
 import {
-  Button,
   Dropdown,
   DropdownToggle,
   DropdownMenu,
@@ -25,7 +24,7 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faTimes, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faSpinner, faFilter, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -51,6 +50,7 @@ import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestion
 import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
+import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   processRatingEnvelopesForSubmit,
@@ -514,12 +514,9 @@ import {
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsRouteViewDisplayState,
-  buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
-  SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
-  SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
   toggleShowJsonState,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
@@ -9012,95 +9009,37 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       isLoadingResponse: this.state.isLoadingResponse,
     });
 
-    const submitFooterClassName = [
-      styles.footer,
-      isSingleQuestionView ? styles.singleQuestionSubmitFooter : '',
-    ].filter(Boolean).join(' ') || undefined;
     const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
-    const submitButtonClassName = [
-      isSingleQuestionView ? styles.singleQuestionSubmitButton : '',
-      _pendingStats.total > 0 ? styles.submitGlow : '',
-      singleQuestionSubmittedIndicatorActive ? styles.submittedButtonNoIcon : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const submitAuxClassName = [
-      styles.submitAux,
-      isSingleQuestionView ? styles.singleQuestionSubmitAux : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const submitLinkClassName = isSingleQuestionView ? styles.singleQuestionSubmitLink : undefined;
     const showSubmitAux =
       !isSingleQuestionView && (
         (_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
         (singleQuestionSubmittedIndicatorActive && this.state.responseUrl)
       );
+    const submitUploadStatusText =
+      this.state.isSubmitting &&
+      this.state.currentStep === 1 &&
+      this.hasEncryptedAnswers()
+        ? 'Encrypting...'
+        : 'Uploading...';
 
     const submitResponseButton = (
-      <div className={submitFooterClassName} id={styles.surveyFooter}>
-        <Button
-          id={styles.submitSurveyButton}
-          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          onClick={this.handlePrimarySubmitClick}
-          className={submitButtonClassName}
-          disabled={this.state.isSubmitting || (this.props.singleQuestionMode && this.hasMaskedCurrentQuestionPayload())}
-        >
-          {this.state.isSubmitting ? (
-            <div id={styles.uploadingEncryptingText}>
-              <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
-              {this.state.currentStep === 1 && this.hasEncryptedAnswers()
-                ? 'Encrypting...'
-                : 'Uploading...'}
-            </div>
-          ) : singleQuestionSubmittedIndicatorActive ? (
-            <div
-              className={styles.submittedIndicatorText}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-            >
-              Submitted
-            </div>
-          ) : this.state.submissionError ? (
-            <div
-              style={SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE}
-            >
-              <FontAwesomeIcon icon={faExclamationCircle} style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
-              {this.state.submissionError.length > 50 ? this.state.submissionError.substring(0, 47) + '...' : this.state.submissionError}
-            </div>
-          ) : isSingleQuestionView ? (
-            <div className={styles.singleQuestionSubmitButtonContent}>
-              <span className={styles.singleQuestionSubmitButtonLabel}>{submitButtonText}</span>
-              <FontAwesomeIcon icon={faArrowRight} className={styles.singleQuestionSubmitButtonIcon} />
-            </div>
-          ) : (
-            submitButtonText
-          )}
-        </Button>
-
-        {showSubmitAux && (
-          <div className={submitAuxClassName}>
-            {_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive && (
-              <button
-                type="button"
-                className={buildSurveyQuestionsSubmitAuxIconClassName(styles, isSingleQuestionView)}
-                onClick={this.handleRevertPendingChanges}
-                title="Clear changes"
-                aria-label="Clear pending changes"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            )}
-
-            {singleQuestionSubmittedIndicatorActive && this.state.responseUrl && (
-              <a
-                href={this.state.responseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={submitLinkClassName}
-                title="View submitted response"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            )}
-          </div>
-        )}
-      </div>
+      <SurveyQuestionsSubmitFooter
+        isSingleQuestionView={isSingleQuestionView}
+        isSubmitting={this.state.isSubmitting}
+        onPrimarySubmitClick={this.handlePrimarySubmitClick}
+        onRevertPendingChanges={this.handleRevertPendingChanges}
+        pendingEditCount={_pendingStats.total}
+        responseUrl={this.state.responseUrl}
+        showSubmitAux={showSubmitAux}
+        submitButtonText={submitButtonText}
+        submitDisabled={
+          this.state.isSubmitting ||
+          (this.props.singleQuestionMode && this.hasMaskedCurrentQuestionPayload())
+        }
+        submittedIndicatorActive={submittedIndicatorActive}
+        submissionError={this.state.submissionError}
+        uploadStatusText={submitUploadStatusText}
+      />
     );
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
