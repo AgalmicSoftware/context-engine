@@ -38,6 +38,7 @@ import {
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsPrimarySubmitPlan,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
@@ -487,6 +488,83 @@ describe('surveyQuestionsTypes', () => {
       isEditing: true,
       responderAddress: '0xdef',
     }).showViewAnswersButton).toBe(true);
+  });
+
+  it('builds primary submit plans for inert and submit boundaries', () => {
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      isSubmitting: true,
+      pendingEditCount: 1,
+    })).toEqual({
+      action: 'inert',
+      reason: 'submitting',
+      path: '',
+    });
+
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      submitGuardActive: true,
+      pendingEditCount: 1,
+    })).toEqual({
+      action: 'inert',
+      reason: 'submit_guard',
+      path: '',
+    });
+
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+      pendingEditCount: 0,
+    })).toEqual({
+      action: 'inert',
+      reason: 'submitted_without_new_edits',
+      path: '',
+    });
+
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      pendingEditCount: 2,
+      submittedSinceLastEdit: true,
+    })).toEqual({
+      action: 'submit',
+      reason: 'pending_edits',
+      path: '',
+    });
+  });
+
+  it('builds completed-response navigation plans without mutating route state', () => {
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      account: '0xABC',
+      draftSlug: 'edge session',
+      pendingEditCount: 0,
+      submissionComplete: true,
+      surveyId: '0xSurveyABC',
+    })).toEqual({
+      action: 'navigate',
+      reason: 'completed_survey_response',
+      path: '/survey/0xsurveyabc/0xabc?session=edge%20session',
+    });
+
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      account: '0xABC',
+      draftSlug: 'edge',
+      pendingEditCount: 0,
+      questionID: 'Q1',
+      singleQuestionMode: true,
+      submissionComplete: true,
+    })).toEqual({
+      action: 'navigate',
+      reason: 'completed_single_question_response',
+      path: '/question/q1?session=edge&responder=0xabc',
+    });
+
+    expect(buildSurveyQuestionsPrimarySubmitPlan({
+      account: '0xABC',
+      isStandalone: true,
+      pendingEditCount: 0,
+      submissionComplete: true,
+    })).toEqual({
+      action: 'inert',
+      reason: 'completed_standalone_response',
+      path: '',
+    });
   });
 
   it('builds SurveyQuestions submit footer affordance display state', () => {

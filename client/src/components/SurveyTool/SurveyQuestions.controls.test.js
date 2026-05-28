@@ -251,6 +251,33 @@ describe('SurveyQuestions controls', () => {
     expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps in-flight primary submit inert before reading pending stats or routes', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      isSubmitting: true,
+      submissionComplete: true,
+    };
+    subject.getPendingEditStats = jest.fn(() => {
+      throw new Error('pending stats should not run while submitting');
+    });
+    subject._getEffectiveDraftSlug = jest.fn();
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject.getPendingEditStats).not.toHaveBeenCalled();
+    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+  });
+
   it('keeps submitted-without-new-edits clicks inert before completion', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
