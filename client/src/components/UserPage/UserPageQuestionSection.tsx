@@ -1,0 +1,190 @@
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faChevronDown,
+  faChevronUp,
+} from '@fortawesome/free-solid-svg-icons';
+import { Collapse } from 'reactstrap';
+
+import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import styles from './UserPage.module.scss';
+
+type SingleQuestionResponseProps = React.ComponentProps<typeof SingleQuestionResponse>;
+
+type UserPageSectionToggleState = {
+  isOpen?: boolean;
+  shouldRenderClosedIcon?: boolean;
+  shouldRenderOpenIcon?: boolean;
+};
+
+type UserPageQuestionSectionDisplayState = {
+  hasCreatedQuestions?: boolean;
+  hasQuestionResponses?: boolean;
+  shouldRenderQuestionResponsesEmptyText?: boolean;
+  shouldRenderQuestionsCreatedEmptyText?: boolean;
+};
+
+type UserPageQuestionEntry = NonNullable<SingleQuestionResponseProps['question']> & {
+  canDecryptOtherResponses?: unknown;
+  id: string;
+  sessionSlug?: unknown;
+  slug?: unknown;
+};
+
+type UserPageQuestionSectionProps = {
+  activeSessionSlug?: unknown;
+  createdQuestionWrapperClassName: string;
+  detailedQuestionResponseMap: Record<string, SingleQuestionResponseProps['response'] | undefined>;
+  isQuestionLoadingAny?: boolean;
+  network?: SingleQuestionResponseProps['network'];
+  onDecryptQuestion: NonNullable<SingleQuestionResponseProps['onDecryptQuestion']>;
+  onQuestionResponsesSectionToggle: (event?: React.MouseEvent<HTMLElement>) => unknown;
+  onQuestionsCreatedSectionToggle: (event?: React.MouseEvent<HTMLElement>) => unknown;
+  onShowSurveysTab: (event: React.MouseEvent<HTMLElement>) => unknown;
+  questionCreationEntries: UserPageQuestionEntry[];
+  questionResponsesEmptyText: React.ReactNode;
+  questionResponsesLoadingIndicator?: React.ReactNode;
+  questionResponsesNonce?: unknown;
+  questionResponseEntries: UserPageQuestionEntry[];
+  questionResponsesSectionToggleState: UserPageSectionToggleState;
+  questionSectionDisplayState: UserPageQuestionSectionDisplayState;
+  questionsCreatedLoadingIndicator?: React.ReactNode;
+  questionsCreatedSectionToggleState: UserPageSectionToggleState;
+  responderAddress?: SingleQuestionResponseProps['responderAddress'];
+  sbtCacheRevision?: unknown;
+  surveysQuestionsToggle?: React.ReactNode;
+};
+
+const UserPageQuestionSection = ({
+  activeSessionSlug,
+  createdQuestionWrapperClassName,
+  detailedQuestionResponseMap,
+  isQuestionLoadingAny = false,
+  network,
+  onDecryptQuestion,
+  onQuestionResponsesSectionToggle,
+  onQuestionsCreatedSectionToggle,
+  onShowSurveysTab,
+  questionCreationEntries,
+  questionResponsesEmptyText,
+  questionResponsesLoadingIndicator = null,
+  questionResponsesNonce,
+  questionResponseEntries,
+  questionResponsesSectionToggleState,
+  questionSectionDisplayState,
+  questionsCreatedLoadingIndicator = null,
+  questionsCreatedSectionToggleState,
+  responderAddress,
+  sbtCacheRevision,
+  surveysQuestionsToggle = null,
+}: UserPageQuestionSectionProps): React.ReactElement => (
+  <div className={styles.leftColumn}>
+    {surveysQuestionsToggle}
+    <div className={styles.questionSection}>
+      <h2
+        onClick={onQuestionResponsesSectionToggle}
+        className={styles.sectionHeader}
+      >
+        {questionResponsesSectionToggleState.shouldRenderOpenIcon && (
+          <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+        )}
+        {questionResponsesSectionToggleState.shouldRenderClosedIcon && (
+          <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+        )}{' '}
+        <span className={styles.sectionSwitcher}>
+          <button
+            type="button"
+            className={styles.switchWordInactive}
+            onClick={onShowSurveysTab}
+            aria-label="Show Surveys"
+          >
+            Survey
+          </button>
+          <span className={styles.switchDivider}>/</span>
+          <span className={styles.switchWordActive}>Question Responses</span>
+        </span>
+        {isQuestionLoadingAny && questionResponsesLoadingIndicator}
+      </h2>
+      <Collapse isOpen={questionResponsesSectionToggleState.isOpen}>
+        {questionSectionDisplayState.hasQuestionResponses ? (
+          questionResponseEntries.map((question, index: number) => {
+            const userResp = detailedQuestionResponseMap[question.id];
+            if (!userResp) return null;
+            return (
+              <div key={index} className={styles.questionWrapper}>
+                <SingleQuestionResponse
+                  question={question}
+                  response={userResp}
+                  isOwnResponse={false}
+                  mode="mini"
+                  showImportance={true}
+                  compactEncryptedAnswerCta={true}
+                  stackCompactDecryptCta={true}
+                  onDecryptQuestion={onDecryptQuestion}
+                  canDecryptOtherResponses={!!question?.canDecryptOtherResponses}
+                  responderAddress={responderAddress}
+                  network={network}
+                  sessionSlug={question?.sessionSlug || question?.slug || activeSessionSlug}
+                  questionResponsesNonce={questionResponsesNonce}
+                  sbtCacheRevision={sbtCacheRevision}
+                />
+              </div>
+            );
+          })
+        ) : questionSectionDisplayState.shouldRenderQuestionResponsesEmptyText ? (
+          <p>{questionResponsesEmptyText}</p>
+        ) : null}
+      </Collapse>
+
+      <h2
+        onClick={onQuestionsCreatedSectionToggle}
+        className={styles.sectionHeaderWithMargin}
+      >
+        {questionsCreatedSectionToggleState.shouldRenderOpenIcon && (
+          <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+        )}
+        {questionsCreatedSectionToggleState.shouldRenderClosedIcon && (
+          <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+        )}{' '}
+        <span className={styles.sectionSwitcher}>
+          <button
+            type="button"
+            className={styles.switchWordInactive}
+            onClick={onShowSurveysTab}
+            aria-label="Show Surveys"
+          >
+            Surveys
+          </button>
+          <span className={styles.switchDivider}>/</span>
+          <span className={styles.switchWordActive}>Questions Created</span>
+        </span>
+        {isQuestionLoadingAny && questionsCreatedLoadingIndicator}
+      </h2>
+      <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
+        {questionSectionDisplayState.hasCreatedQuestions ? (
+          questionCreationEntries.map((question, index: number) => (
+            <div key={index} className={createdQuestionWrapperClassName}>
+              <SingleQuestionResponse
+                question={question}
+                response={null}
+                isOwnResponse={false}
+                mode="mini"
+                showImportance={false}
+                onDecryptQuestion={() => {}}
+                questionOnly={true}
+                network={network}
+                sessionSlug={question?.sessionSlug || question?.slug || activeSessionSlug}
+                questionResponsesNonce={questionResponsesNonce}
+                sbtCacheRevision={sbtCacheRevision}
+              />
+            </div>
+          ))
+        ) : questionSectionDisplayState.shouldRenderQuestionsCreatedEmptyText ? (
+          <p>No questions created.</p>
+        ) : null}
+      </Collapse>
+    </div>
+  </div>
+);
+
+export default UserPageQuestionSection;
