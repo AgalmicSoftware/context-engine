@@ -2,6 +2,8 @@ import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageRelevantInfo from './SbtPageRelevantInfo';
+import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
@@ -72,6 +74,22 @@ const renderIdentityPanelTree = (tree) => {
     (element) => element?.type === SbtPageIdentityPanel
   );
   return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
+};
+
+const renderStatsSectionTree = (tree) => {
+  const statsSection = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageStatsSection
+  );
+  return statsSection ? SbtPageStatsSection(statsSection.props) : null;
+};
+
+const renderRelevantInfoTree = (tree) => {
+  const relevantInfo = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageRelevantInfo
+  );
+  return relevantInfo ? SbtPageRelevantInfo(relevantInfo.props) : null;
 };
 
 describe('SBTPage metadata display', () => {
@@ -440,7 +458,7 @@ describe('SBTPage metadata display', () => {
           tags: ['AI Policy'],
         },
       };
-      const metadataTree = subject.renderRelevantInfo();
+      const metadataTree = renderRelevantInfoTree(subject.renderRelevantInfo());
       const docLink = findElementInTree(
         metadataTree,
         (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/')

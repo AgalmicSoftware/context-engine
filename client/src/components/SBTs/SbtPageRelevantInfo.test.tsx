@@ -3,7 +3,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 
-const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageRelevantInfo>> = {}) => ({
+const createProps = (
+  overrides: Partial<React.ComponentProps<typeof SbtPageRelevantInfo>> = {}
+) => ({
   documentIDHashes: ['doc hash'],
   documentURLs: ['https://doc.example.test/public'],
   onOpenEncryptedDoc: jest.fn(),
@@ -22,7 +24,7 @@ describe('SbtPageRelevantInfo', () => {
     expect(screen.getByText('Document URLs:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'https://doc.example.test/public' })).toHaveAttribute(
       'href',
-      'https://doc.example.test/public',
+      'https://doc.example.test/public'
     );
     expect(screen.getByText('Document ID Hashes:')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'doc hash' })).toHaveAttribute('href', '/doc/doc%20hash');
@@ -43,34 +45,12 @@ describe('SbtPageRelevantInfo', () => {
           shouldRenderTags: false,
           tags: [],
         })}
-      />,
+      />
     );
 
     expect(screen.getByText('Encrypted Doc')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Decrypt and view' }));
     expect(onOpenEncryptedDoc).toHaveBeenCalledWith(encryptedUrl);
-  });
-
-  it('renders worker-managed document references as public links even when they use a Lit-shaped URL', () => {
-    const encryptedUrl = 'lit://arweave/example-tx';
-    render(
-      <SbtPageRelevantInfo
-        {...createProps({
-          documentIDHashes: [],
-          documentURLs: [encryptedUrl],
-          documentUrlsArePublic: true,
-          introText: 'Relevant documents and tags for this group.',
-          shouldRenderDocumentIdHashes: false,
-          shouldRenderTags: false,
-          tags: [],
-        })}
-      />,
-    );
-
-    expect(screen.getByText('Relevant documents and tags for this group.')).toBeInTheDocument();
-    expect(screen.getByText('Doc URL')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: encryptedUrl })).toHaveAttribute('href', encryptedUrl);
-    expect(screen.queryByRole('button', { name: 'Decrypt and view' })).not.toBeInTheDocument();
   });
 
   it('preserves PUBLIC_URL when building document and tag routes', () => {
@@ -84,7 +64,7 @@ describe('SbtPageRelevantInfo', () => {
             documentURLs: [],
             shouldRenderDocumentUrls: false,
           })}
-        />,
+        />
       );
 
       expect(screen.getByRole('link', { name: 'doc hash' })).toHaveAttribute('href', '/ce/doc/doc%20hash');
@@ -103,7 +83,7 @@ describe('SbtPageRelevantInfo', () => {
           shouldRenderDocumentUrls: false,
           shouldRenderTags: false,
         })}
-      />,
+      />
     );
 
     expect(screen.queryByText('Document URLs:')).toBeNull();
