@@ -256,7 +256,7 @@ verify_private_planning_paths_absent() {
   findings=$(
     cd "$TEMP_CLONE"
     git ls-files |
-      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+      grep -Ei '(^|/)TODO(/|$)|(^|/)[^/]*prds?[^/]*(/|$)' || true
   )
 
   if [ -n "$findings" ]; then
