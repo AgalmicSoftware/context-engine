@@ -584,17 +584,17 @@ const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolv
 
 const HTML_REPORT_EXPORT_FORMATS: readonly { description: string; label: string; value: SessionResultsExportFormat }[] = Object.freeze([
   {
-    description: 'Interactive self-contained report with search and embedded snapshot data.',
+    description: 'Interactive local HTML',
     label: 'Exported viewer',
     value: SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   },
   {
-    description: 'Static standalone HTML with all selected sections expanded for review or archiving.',
+    description: 'Static local HTML',
     label: 'Single HTML file',
     value: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   },
   {
-    description: 'One-page PDF capture using the same selected sections and print-oriented layout.',
+    description: 'Print-oriented PDF preview',
     label: 'Single-page PDF',
     value: SESSION_RESULTS_EXPORT_FORMAT_PDF,
   },
@@ -1352,6 +1352,7 @@ class SurveyResults extends Component<any, any> {
       htmlReportAnalysisError: '',
       htmlReportAnalysisArtifact: null,
       htmlReportAnalysisInputSignature: '',
+      htmlReportDemoMode: false,
     };
 
     this.questionIdTableRef = React.createRef();
@@ -3407,7 +3408,28 @@ return this.getFilteredQuestionsForExport().map((question) => {
 });
 }
 
+isHtmlReportDemoSession = (): boolean => {
+const candidates = [
+  this.getEffectiveSlug(),
+  this.props.sessionSlug,
+  this.props.activeSessionSlug,
+  this.state.surveyTitle,
+].map((value) => String(value || '').trim().toLowerCase());
+return candidates.includes('demo');
+}
+
+isHtmlReportDemoModeActive = (): boolean => (
+  this.isHtmlReportDemoSession() && !!this.state.htmlReportDemoMode
+);
+
 getHtmlReportExporterMetadata = () => {
+if (this.isHtmlReportDemoModeActive()) {
+  return {
+    address: 'demo-preview',
+    chainId: this.getHtmlReportChainId(),
+    displayAddress: 'Demo preview',
+  };
+}
 const account = String(this.props.account || '').trim();
 if (!this.props.loginComplete || !account) return null;
 return {
@@ -3427,6 +3449,102 @@ getHtmlReportSelectedSections = (): Required<SessionResultsSectionSelection> => 
 getHtmlReportAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact | null => {
 const artifact = this.state.htmlReportAnalysisArtifact as SessionResultsGeneratedAnalysisArtifact | null;
 return artifact && artifact.kind ? artifact : null;
+}
+
+buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
+const built = this.buildSessionResultsAnalysisPayloadForAi();
+const questions = built.aiPayload.questions;
+const responseCounts = new Map<string, number>();
+built.aiPayload.responses.forEach((response) => {
+  const key = String(response.questionId || '').trim();
+  if (!key) return;
+  responseCounts.set(key, (responseCounts.get(key) || 0) + 1);
+});
+const questionModels = questions.length > 0
+  ? questions.slice(0, 6)
+  : [{ id: 'demo-results', prompt: 'Demo results', type: 'demo', options: [], tags: [] }];
+const groups = questionModels.slice(0, 4).map((question, index) => ({
+  id: `demo_group_${index + 1}`,
+  label: question.prompt || `Demo theme ${index + 1}`,
+  questionIds: [question.id],
+  responseCount: responseCounts.get(question.id) || 0,
+  summary: `Demo preview theme derived from ${responseCounts.get(question.id) || 0} visible response${(responseCounts.get(question.id) || 0) === 1 ? '' : 's'}.`,
+}));
+const nodes = questionModels.map((question, index) => ({
+  id: `demo_atlas_${index + 1}`,
+  label: question.prompt || `Demo node ${index + 1}`,
+  path: ['Demo Session', question.prompt || `Question ${index + 1}`],
+  questionIds: [question.id],
+  responseCount: responseCounts.get(question.id) || 0,
+  summary: 'Demo preview node generated from hydrated results.',
+}));
+const edges = nodes.slice(1).map((node, index) => ({
+  source: nodes[0]?.id || 'demo_atlas_1',
+  target: node.id,
+  label: index % 2 === 0 ? 'related theme' : 'adjacent concern',
+}));
+
+return {
+  generatedAt: new Date().toISOString(),
+  inputSignature: `demo-preview-${built.inputSignature}`,
+  kind: 'ce_session_results_analysis_artifact',
+  model: 'demo-preview',
+  participants: built.participants,
+  sections: {
+    argumentMap: {
+      available: true,
+      debates: questionModels.slice(0, 3).map((question, index) => ({
+        id: `demo_debate_${index + 1}`,
+        title: question.prompt || `Demo debate ${index + 1}`,
+        claims: [
+          {
+            id: `demo_claim_${index + 1}`,
+            label: `Participants surface tradeoffs around ${question.prompt || 'this result'}.`,
+            questionIds: [question.id],
+            responseCount: responseCounts.get(question.id) || 0,
+            stance: 'mixed',
+          },
+        ],
+      })),
+    },
+    atlas: {
+      available: true,
+      edges,
+      nodes,
+    },
+    breakdown: {
+      available: true,
+      groups,
+      summary: {
+        overview: 'Demo preview analysis generated locally from currently hydrated results.',
+      },
+    },
+    riskMatrix: {
+      available: true,
+      categories: questionModels.slice(0, 4).map((question, index) => ({
+        id: `demo_risk_${index + 1}`,
+        label: question.prompt || `Demo risk ${index + 1}`,
+        description: 'Demo preview category for PDF/HTML layout testing.',
+      })),
+      comments: questionModels.slice(0, 4).map((question, index) => ({
+        id: `demo_risk_comment_${index + 1}`,
+        categoryId: `demo_risk_${index + 1}`,
+        questionIds: [question.id],
+        summary: `Demo preview signal from ${responseCounts.get(question.id) || 0} visible response${(responseCounts.get(question.id) || 0) === 1 ? '' : 's'}.`,
+      })),
+      heatmap: questionModels.slice(0, 4).reduce<Record<string, unknown>>((acc, question, index) => {
+        acc[`demo_risk_${index + 1}`] = {
+          impact: index % 2 === 0 ? 'medium' : 'high',
+          likelihood: (responseCounts.get(question.id) || 0) > 1 ? 'medium' : 'low',
+        };
+        return acc;
+      }, {}),
+      scenarioLinks: [],
+    },
+  },
+  source: 'ai-generated',
+  version: 1,
+};
 }
 
 getSessionResultsAnalysisCacheSlug = (): string => this.getEffectiveSlug() || 'general';
@@ -3648,39 +3766,31 @@ snapshot: SessionResultsHtmlSnapshot
     available: snapshot.sections.report.available,
     key: 'report',
     label: 'Report',
-    reason: snapshot.sections.report.available ? 'Hydrated questions or responses are available.' : (
-      snapshot.sections.report.reason || 'No filtered questions or responses are hydrated yet.'
-    ),
+    reason: snapshot.sections.report.available ? 'Ready' : 'No hydrated results',
   },
   {
     available: snapshot.sections.argumentMap.available,
     key: 'argumentMap',
     label: 'Argument Map',
-    reason: snapshot.sections.argumentMap.available ? 'Generated analysis is available.' : (
-      snapshot.sections.argumentMap.reason || 'Generate analysis views to derive an argument map.'
-    ),
+    reason: snapshot.sections.argumentMap.available ? 'Ready' : 'Needs analysis',
   },
   {
     available: snapshot.sections.riskMatrix.available,
     key: 'riskMatrix',
     label: 'Risk Matrix',
-    reason: snapshot.sections.riskMatrix.available ? 'Generated analysis is available.' : (
-      snapshot.sections.riskMatrix.reason || 'Generate analysis views to derive a risk matrix.'
-    ),
+    reason: snapshot.sections.riskMatrix.available ? 'Ready' : 'Needs analysis',
   },
   {
     available: snapshot.sections.atlas.available,
     key: 'atlas',
     label: 'Atlas Nodes',
-    reason: snapshot.sections.atlas.available ? 'Generated analysis is available.' : (
-      snapshot.sections.atlas.reason || 'Generate analysis views to derive atlas nodes.'
-    ),
+    reason: snapshot.sections.atlas.available ? 'Ready' : 'Needs analysis',
   },
   {
     available: true,
     key: 'snapshotJson',
     label: 'Embedded Snapshot JSON',
-    reason: 'Embedded as inert application data for reproducibility and integrity checks.',
+    reason: 'Always available',
   },
 ]);
 
@@ -3748,11 +3858,41 @@ this.setState({
 });
 }
 
+toggleHtmlReportDemoMode = (): void => {
+const nextDemoMode = !this.state.htmlReportDemoMode;
+const currentArtifact = this.getHtmlReportAnalysisArtifact();
+this.setState({
+  htmlReportDemoMode: nextDemoMode,
+  htmlReportAnalysisArtifact: nextDemoMode
+    ? this.buildHtmlReportDemoAnalysisArtifact()
+    : currentArtifact?.model === 'demo-preview'
+      ? null
+      : currentArtifact,
+  htmlReportAnalysisError: '',
+  htmlReportSelectedSections: nextDemoMode
+    ? {
+      argumentMap: true,
+      atlas: true,
+      report: true,
+      riskMatrix: true,
+      snapshotJson: true,
+    }
+    : { ...DEFAULT_HTML_REPORT_SELECTED_SECTIONS },
+});
+}
+
 handleHtmlReportFormatChange = (format: SessionResultsExportFormat): void => {
 this.setState({ htmlReportExportFormat: format });
 }
 
 generateHtmlReportAnalysisViews = async (): Promise<void> => {
+if (this.isHtmlReportDemoModeActive()) {
+  this.setState({
+    htmlReportAnalysisArtifact: this.buildHtmlReportDemoAnalysisArtifact(),
+    htmlReportAnalysisError: '',
+  });
+  return;
+}
 if (!this.isHtmlReportExportAuthorized()) {
   this.setState({
     htmlReportAnalysisError: 'Connect a wallet with permission to view these results before generating analysis views.',
@@ -5224,9 +5364,14 @@ const sectionRows = this.getHtmlReportSectionRows(snapshot);
 const selectedSections = this.getHtmlReportSelectedSections();
 const canDownload = this.canDownloadHtmlReport(snapshot, selectedSections);
 const isAuthorized = this.isHtmlReportExportAuthorized();
+const isDemoSession = this.isHtmlReportDemoSession();
+const isDemoMode = this.isHtmlReportDemoModeActive();
 const needsAnalysisGeneration = this.needsHtmlReportAnalysisGeneration(snapshot, selectedSections);
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
-const canGenerateAnalysis = isAuthorized && analysisPayload.eligibility.eligible && !this.state.htmlReportAnalysisGenerating;
+const canGenerateAnalysis =
+  (isAuthorized || isDemoMode) &&
+  analysisPayload.eligibility.eligible &&
+  !this.state.htmlReportAnalysisGenerating;
 const sessionLabel = snapshot.session.name || snapshot.session.slug || 'Session';
 const exporterLabel = snapshot.exportedBy?.displayAddress || 'Not connected';
 const downloadLabel = this.state.htmlReportExportFormat === SESSION_RESULTS_EXPORT_FORMAT_PDF
@@ -5261,8 +5406,7 @@ return (
       </p>
       {!isAuthorized && (
         <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          Connect a wallet with permission to view these results before exporting. The downloader address
-          is embedded in report metadata and shown on exported artifacts.
+          Connect a wallet to download authenticated exports.
         </Alert>
       )}
       <div className={styles.htmlReportOptionGroup}>
@@ -5277,11 +5421,28 @@ return (
             />
             <Label check for={`html-report-format-${formatOption.value}`}>
               <strong>{formatOption.label}</strong>
-              <span>{formatOption.description}</span>
+              <small>{formatOption.description}</small>
             </Label>
           </FormGroup>
         ))}
       </div>
+      {isDemoSession && (
+        <div className={styles.htmlReportOptionGroup}>
+          <FormGroup check className={styles.htmlReportOptionRow}>
+            <Input
+              id="html-report-demo-mode"
+              type="checkbox"
+              checked={isDemoMode}
+              onChange={this.toggleHtmlReportDemoMode}
+              data-testid="ce-surveyresults-html-report-demo-mode"
+            />
+            <Label check for="html-report-demo-mode">
+              <strong>Demo preview mode</strong>
+              <small>Use local demo analysis sections without AI or wallet auth.</small>
+            </Label>
+          </FormGroup>
+        </div>
+      )}
       <Table size="sm" responsive className={styles.htmlReportSectionTable}>
         <thead>
           <tr>
@@ -5310,15 +5471,12 @@ return (
         </tbody>
       </Table>
       <div className={styles.htmlReportOptionGroup}>
-        <h6>Generated analysis</h6>
+        <h6>Analysis views</h6>
         <p>
-          AI payloads use synthetic participant IDs. Viewable freeform text can be sent for analysis,
-          but wallet addresses are not sent to the AI provider.
-        </p>
-        <p>
-          Current minimums: {analysisPayload.eligibility.counts.responses} viewable responses,
+          {analysisPayload.eligibility.counts.responses} responses,
           {' '}{analysisPayload.eligibility.counts.participants} participants,
-          {' '}{analysisPayload.eligibility.counts.questions} hydrated questions.
+          {' '}{analysisPayload.eligibility.counts.questions} questions.
+          {' '}AI mode uses synthetic participant IDs.
         </p>
         {analysisPayload.eligibility.reasons.length > 0 && (
           <Alert color="info" fade={false} className={styles.htmlReportInfo}>
@@ -5338,61 +5496,20 @@ return (
           className={styles.htmlReportGenerateButton}
           data-testid="ce-surveyresults-html-report-generate-analysis"
         >
-          {this.state.htmlReportAnalysisGenerating ? 'Generating Analysis Views...' : 'Generate Analysis Views'}
+          {this.state.htmlReportAnalysisGenerating
+            ? 'Generating Analysis Views...'
+            : isDemoMode
+              ? 'Refresh Demo Analysis'
+              : 'Generate Analysis Views'}
         </Button>
       </div>
-      <Table size="sm" responsive className={styles.htmlReportSectionTable}>
-        <thead>
-          <tr>
-            <th scope="col">Protection</th>
-            <th scope="col">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Exporter metadata</td>
-            <td>{isAuthorized ? `Embedded for ${exporterLabel}` : 'Login required'}</td>
-          </tr>
-          <tr>
-            <td>Generated analysis storage</td>
-            <td>{this.getHtmlReportAnalysisArtifact() ? 'Saved locally for this session' : 'Not generated yet'}</td>
-          </tr>
-          <tr>
-            <td>Integrity warning</td>
-            <td>Exported viewer warns and degrades rendering if embedded exporter metadata is removed.</td>
-          </tr>
-        </tbody>
-      </Table>
       {needsAnalysisGeneration && (
         <Alert color="info" fade={false} className={styles.htmlReportInfo}>
           Selected analysis sections need generated data before download.
         </Alert>
       )}
-      <Table size="sm" responsive className={styles.htmlReportSectionTable}>
-        <thead>
-          <tr>
-            <th scope="col">Redaction</th>
-            <th scope="col">Default</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Raw responses in snapshot</td>
-            <td>Omitted</td>
-          </tr>
-          <tr>
-            <td>Wallet addresses in AI payload</td>
-            <td>Replaced with synthetic participant IDs</td>
-          </tr>
-          <tr>
-            <td>Downloader address in artifact metadata</td>
-            <td>{isAuthorized ? 'Included' : 'Login required'}</td>
-          </tr>
-        </tbody>
-      </Table>
       <Alert color="warning" fade={false} className={styles.htmlReportWarning}>
-        The exported file is a portable local artifact. Redacted mode omits raw response records,
-        wallet addresses, encrypted payloads, gated values, and bridge identifiers by default.
+        Redacted exports omit raw response records, wallet addresses, encrypted payloads, and gated values by default.
       </Alert>
       {!canDownload && (
         <Alert color="info" fade={false} className={styles.htmlReportInfo}>
