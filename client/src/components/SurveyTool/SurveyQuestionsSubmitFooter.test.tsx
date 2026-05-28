@@ -69,6 +69,8 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toHaveTextContent('Submitted');
     expect(screen.getByTitle('View submitted response')).toHaveAttribute('href', 'https://example.test/response');
+    expect(screen.getByTitle('View submitted response')).toHaveAttribute('target', '_blank');
+    expect(screen.getByTitle('View submitted response')).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
 
     rerender(
@@ -90,5 +92,43 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     expect(screen.getByText('SUBMIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
+  });
+
+  it('keeps submit aux inert while uploading pending survey edits', () => {
+    render(
+      <SurveyQuestionsSubmitFooter
+        {...baseProps}
+        isSubmitting
+        pendingEditCount={3}
+        showSubmitAux
+        uploadStatusText="Uploading..."
+      />
+    );
+
+    expect(screen.getByText('Uploading...')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('submitGlow');
+    expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
+    expect(baseProps.onRevertPendingChanges).not.toHaveBeenCalled();
+  });
+
+  it('does not render submitted route affordances in single-question mode', () => {
+    render(
+      <SurveyQuestionsSubmitFooter
+        {...baseProps}
+        isSingleQuestionView
+        pendingEditCount={1}
+        responseUrl="https://example.test/question-response"
+        showSubmitAux
+        submitButtonText="SUBMIT"
+        submittedIndicatorActive
+      />
+    );
+
+    const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
+    expect(submitButton).toHaveClass('singleQuestionSubmitButton');
+    expect(submitButton).toHaveTextContent('SUBMIT');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
+    expect(screen.queryByTitle('View submitted response')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Clear pending changes' })).toBeInTheDocument();
   });
 });
