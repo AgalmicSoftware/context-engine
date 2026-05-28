@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
+import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
@@ -75,6 +76,11 @@ const renderIdentityPanelTree = (tree) => {
   );
   return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
 };
+
+const findActionsSection = (tree) => findElementInTree(
+  tree,
+  (element) => element?.type === SbtPageActionsSection
+);
 
 const renderStatsSectionTree = (tree) => {
   const statsSection = findElementInTree(
@@ -160,6 +166,37 @@ describe('SBTPage metadata display', () => {
     const tree = subject.render();
     expect(treeIncludesText(tree, 'DOCS')).toBe(false);
     expect(treeIncludesText(tree, 'MORE')).toBe(true);
+  });
+
+  it('keeps idle action feedback from formatting absent transaction hashes', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showActions: true,
+      transactionHash: null,
+      lastMintTxHash: null,
+      lastBurnTxHash: null,
+    };
+
+    expect(() => subject.render()).not.toThrow();
+    const actionsSection = findActionsSection(subject.render());
+    expect(actionsSection?.props?.mintSuccessText).toBe('');
+    expect(actionsSection?.props?.burnSuccessText).toBe('');
+    expect(actionsSection?.props?.transactionErrorText).toBe('');
   });
 
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
