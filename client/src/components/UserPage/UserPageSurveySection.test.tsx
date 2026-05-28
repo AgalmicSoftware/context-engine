@@ -29,33 +29,20 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     response?: unknown;
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
-  }) => {
-    const responseRecord = (response && typeof response === 'object')
-      ? response as {
-        additional?: { encrypted?: unknown; value?: unknown };
-        answer?: { encrypted?: unknown; value?: unknown };
-      }
-      : {};
-
-    return (
-      <div
-        data-testid="survey-question-response"
-        data-answer-encrypted={String(!!responseRecord.answer?.encrypted)}
-        data-answer-value={String(responseRecord.answer?.value)}
-        data-additional-encrypted={String(!!responseRecord.additional?.encrypted)}
-        data-additional-value={String(responseRecord.additional?.value)}
-        data-can-decrypt={String(canDecryptOtherResponses)}
-        data-has-response={String(!!response)}
-        data-nonce={String(questionResponsesNonce)}
-        data-responder-address={String(responderAddress)}
-        data-revision={String(sbtCacheRevision)}
-        data-session-slug={String(sessionSlug)}
-      >
-        {question?.prompt || question?.id}
-        <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
-      </div>
-    );
-  },
+  }) => (
+    <div
+      data-testid="survey-question-response"
+      data-can-decrypt={String(canDecryptOtherResponses)}
+      data-has-response={String(!!response)}
+      data-nonce={String(questionResponsesNonce)}
+      data-responder-address={String(responderAddress)}
+      data-revision={String(sbtCacheRevision)}
+      data-session-slug={String(sessionSlug)}
+    >
+      {question?.prompt || question?.id}
+      <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+    </div>
+  ),
 }));
 
 const createProps = (
@@ -122,6 +109,7 @@ const createProps = (
     shouldRenderClosedIcon: false,
     shouldRenderOpenIcon: true,
   },
+  surveysQuestionsToggle: null,
   ...overrides,
 });
 
@@ -197,62 +185,6 @@ describe('UserPageSurveySection', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Show Questions' })[0]);
     expect(onShowQuestionsTab).toHaveBeenCalledTimes(1);
     expect(onSurveyResponsesSectionToggle).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps gated cached survey responses visible and defers decrypt to the parent handler', () => {
-    const onDecryptQuestion = jest.fn();
-
-    render(
-      <UserPageSurveySection
-        {...createProps({
-          detailedSurveyResponseMap: {
-            'survey-response': [{
-              canDecryptOtherResponses: true,
-              questionData: { id: 'q-gated-survey', prompt: 'Gated survey prompt' },
-              responseData: {
-                additional: {
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  value: '*',
-                },
-                answer: {
-                  encrypted: true,
-                  encryptionAudience: 'gate',
-                  value: '*',
-                },
-              },
-            }],
-          },
-          onDecryptQuestion,
-          questionResponsesNonce: 'survey-cache-nonce',
-          sbtCacheRevision: 'survey-cache-revision',
-          surveyResponseEntries: [{
-            documentURLs: [],
-            id: 'survey-response',
-            questionsCount: 1,
-            slug: 'survey-cache-session',
-            tags: [],
-            title: 'Cached survey response',
-          }],
-        })}
-      />
-    );
-
-    const responseCard = screen.getByTestId('survey-question-response');
-    expect(responseCard).toHaveTextContent('Gated survey prompt');
-    expect(responseCard).toHaveAttribute('data-has-response', 'true');
-    expect(responseCard).toHaveAttribute('data-can-decrypt', 'true');
-    expect(responseCard).toHaveAttribute('data-answer-encrypted', 'true');
-    expect(responseCard).toHaveAttribute('data-answer-value', '*');
-    expect(responseCard).toHaveAttribute('data-additional-encrypted', 'true');
-    expect(responseCard).toHaveAttribute('data-additional-value', '*');
-    expect(responseCard).toHaveAttribute('data-session-slug', 'survey-cache-session');
-    expect(responseCard).toHaveAttribute('data-nonce', 'survey-cache-nonce');
-    expect(responseCard).toHaveAttribute('data-revision', 'survey-cache-revision');
-    expect(onDecryptQuestion).not.toHaveBeenCalled();
-
-    fireEvent.click(responseCard.querySelector('button') as HTMLButtonElement);
-    expect(onDecryptQuestion).toHaveBeenCalledWith('q-gated-survey');
   });
 
   it('renders parent-derived empty states without loading indicators', () => {

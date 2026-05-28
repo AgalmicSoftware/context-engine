@@ -141,10 +141,6 @@ import {
   resolveUserPageHeaderActionVisibility,
   resolveUserPageQuestionSectionDisplayState,
   resolveUserPageSbtDisplayState,
-  resolveUserPageSurveyCountDisplayState,
-  resolveUserPageSurveyCreatedCardState,
-  resolveUserPageSurveyPreviewDisplayState,
-  resolveUserPageSurveyResponseCardState,
   resolveUserPageSurveySectionDisplayState,
   resolveUserPageDeepScanSessionDisplayConfig,
   resolveUserPageDeepScanProgressStateUpdate,
@@ -156,7 +152,6 @@ import {
   resolveUserPageResponseNonceRefresh,
   resolveUserPageSectionToggleDisplayState,
   resolveUserPageUsernameErrorDisplayState,
-  shortenUserPageQuestionId,
   shouldApplyUserPageDeepScanResponse,
   shouldRetryUserPageQuestionData,
   toAnalysisCacheBucket,
@@ -173,10 +168,7 @@ import {
 } from './userPageHelpers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faExpand,
   faSpinner,
-  faChevronDown,
-  faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
 
 
@@ -191,9 +183,7 @@ import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
-
-// NEW IMPORT: for mini question display
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import UserPageSurveySection from './UserPageSurveySection';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
@@ -433,11 +423,6 @@ type UserPageRenderQuestionEntry = UnknownRecord & {
   canDecryptOtherResponses?: unknown;
   sessionSlug?: unknown;
   slug?: unknown;
-};
-
-type UserPageSurveyPreviewEntry = {
-  id?: unknown;
-  text?: unknown;
 };
 
 type SbtSectionResult = {
@@ -4086,309 +4071,53 @@ class UserPage extends Component<any, any> {
         {!minimized && (
           <div className={styles.content}>
             {selectedTab === 'surveys' && (
-              <div className={styles.leftColumn}>
-                {surveysQuestionsToggle}
-                <div className={styles.surveySection}>
-                  <h2
-                    onClick={this.toggleSurveyResponsesSection}
-                    className={styles.sectionHeader}
-                  >
-                    {surveyResponsesSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {surveyResponsesSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
-                        aria-label="Show Questions"
-                      >
-                        Questions
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Survey Responses</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isSurveyLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          surveySpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={surveyResponsesSectionToggleState.isOpen}>
-                    {surveySectionDisplayState.hasSurveyResponses ? (
-                      surveyResponseEntries.map((survey, index: number) => {
-                        const isExpanded = expandedSurveyResponseMap[survey.id] || false;
-                        const questionArray = detailedSurveyResponseMap[survey.id] || [];
-                        const surveyResponseCardToggleState = resolveUserPageSectionToggleDisplayState({
-                          open: isExpanded,
-                        });
-                        const surveyResponseCardState = resolveUserPageSurveyResponseCardState({
-                          questionArray,
-                          survey,
-                        });
-                        const surveyResponsePreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
-                          actionsClassName: styles.surveyPreviewWithActions,
-                          baseClassName: styles.surveyPreview,
-                          interactive: true,
-                        });
-
-                        return (
-                          <div key={index} className={styles.surveyWrapper}>
-                            <div
-                              className={surveyResponsePreviewDisplayState.className}
-                              onClick={() => this.toggleSurveyResponses(survey.id)}
-                              style={surveyResponsePreviewDisplayState.style}
-                            >
-                              <div className={styles.surveyTitle}>{survey.title}</div>
-                              <div className={styles.surveyInfo}>
-                                Questions: {survey.questionsCount}
-                              </div>
-                              {propViewAddress && (
-                                <button
-                                  type='button'
-                                  className={styles.surveyExpandIcon}
-                                  title='Open full survey page'
-                                  aria-label='Open full survey page'
-                                  onClick={(e: React.MouseEvent<HTMLElement>) => {
-                                    e.stopPropagation();
-                                    const surveyUrlParams = new URLSearchParams();
-                                    if (survey.slug) {
-                                      surveyUrlParams.set('session', survey.slug);
-                                    }
-                                    surveyUrlParams.set('responder', String(propViewAddress));
-                                    window.open(
-                                      buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
-                                      '_blank',
-                                      'noopener,noreferrer'
-                                    );
-                                  }}
-                                >
-                                  <FontAwesomeIcon icon={faExpand} />
-                                </button>
-                              )}
-                              <div className={styles.chevronContainer}>
-                                {surveyResponseCardToggleState.shouldRenderOpenIcon && (
-                                  <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
-                                )}
-                                {surveyResponseCardToggleState.shouldRenderClosedIcon && (
-                                  <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
-                                )}
-                              </div>
-                            </div>
-
-                            {surveyResponseCardToggleState.isOpen && surveyResponseCardState.hasResponses && (
-                              <div className={styles.responsesContainer}>
-                                {surveyResponseCardState.hasTags && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
-                                      <span key={ti} className={styles.surveyTag}>{tag}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {surveyResponseCardState.hasDocURLs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: string, ui: number) => (
-                                      <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
-                                        {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {questionArray.map((qObj: SurveyQuestionResponseDetail, qIndex: number) => (
-                                  <div key={qIndex} className={styles.responseItemWrapper}>
-                                    <SingleQuestionResponse
-                                      question={qObj.questionData}
-                                      response={qObj.responseData}
-                                      isOwnResponse={false}
-                                      mode="mini"
-                                      showImportance={true}
-                                      compactEncryptedAnswerCta={true}
-                                      stackCompactDecryptCta={true}
-                                      onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                                      canDecryptOtherResponses={!!qObj?.canDecryptOtherResponses}
-                                      responderAddress={propViewAddress}
-                                      sessionSlug={survey.slug}
-                                      questionResponsesNonce={this.props.questionResponsesNonce}
-                                      sbtCacheRevision={this.props.sbtCacheRevision}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {surveyResponseCardToggleState.isOpen && !surveyResponseCardState.hasResponses && (
-                              <div className={styles.noResponsesMsg}>
-                                No non-empty responses recorded for this survey.
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : surveySectionDisplayState.shouldRenderSurveyResponsesEmptyText ? (
-                      <p>No survey responses found.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-
-                  <h2
-                    onClick={this.toggleSurveysCreatedSection}
-                    className={styles.sectionHeaderWithMargin}
-                  >
-                    {surveysCreatedSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {surveysCreatedSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
-                        aria-label="Show Questions"
-                      >
-                        Questions
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Surveys Created</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isSurveyLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          surveysCreatedSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={surveysCreatedSectionToggleState.isOpen}>
-                    {surveySectionDisplayState.hasCreatedSurveys ? (
-                      surveyCreationEntries.map((survey, index: number) => {
-                        const isCreatedExpanded = expandedSurveyCreatedMap[survey.id] || false;
-                        const surveyCreatedCardToggleState = resolveUserPageSectionToggleDisplayState({
-                          open: isCreatedExpanded,
-                        });
-                        const {
-                          hasDocURLs,
-                          hasExpandContent,
-                          hasQuestionIDs,
-                          hasTags,
-                          questionPreviewEntries,
-                          surveyLinkSlug,
-                        } = resolveUserPageSurveyCreatedCardState({ survey });
-                        const surveyCreatedPreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
-                          actionsClassName: styles.surveyPreviewWithActions,
-                          baseClassName: styles.surveyPreview,
-                          interactive: hasExpandContent,
-                        });
-                        const surveyCountDisplayState = resolveUserPageSurveyCountDisplayState({
-                          count: survey.questionsCount,
-                          countOnlyClassName: styles.surveyCountOnly,
-                          infoClassName: styles.surveyInfo,
-                        });
-
-                        return (
-                          <div key={index} className={styles.surveyWrapper}>
-                            <div
-                              className={surveyCreatedPreviewDisplayState.className}
-                              onClick={() => hasExpandContent && this.toggleSurveyCreated(survey.id)}
-                              style={surveyCreatedPreviewDisplayState.style}
-                            >
-                              <a
-                                href={buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`)}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className={styles.surveyTitleLink}
-                                onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
-                              >
-                                <div className={styles.surveyTitle}>{survey.title}</div>
-                              </a>
-                              <div
-                                className={surveyCountDisplayState.className}
-                                aria-label={surveyCountDisplayState.ariaLabel}
-                                title={surveyCountDisplayState.title}
-                              >
-                                {survey.questionsCount}
-                              </div>
-                              {hasExpandContent && (
-                                <div className={styles.chevronContainer}>
-                                  {surveyCreatedCardToggleState.shouldRenderOpenIcon && (
-                                    <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
-                                  )}
-                                  {surveyCreatedCardToggleState.shouldRenderClosedIcon && (
-                                    <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {surveyCreatedCardToggleState.isOpen && hasExpandContent && (
-                              <div className={styles.responsesContainer}>
-                                {hasTags && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
-                                      <span key={ti} className={styles.surveyTag}>{tag}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {hasDocURLs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: string, ui: number) => (
-                                      <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
-                                        {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {hasQuestionIDs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Questions:</span>
-                                    <ul className={styles.surveyQuestionList}>
-                                      {(questionPreviewEntries as UserPageSurveyPreviewEntry[]).map((entry, qi: number) => {
-                                        const fullQuestionId = String(entry?.id || '');
-                                        const resolvedText = String(entry?.text || '').trim();
-                                        return (
-                                          <li key={`${fullQuestionId}_${qi}`} className={styles.surveyQuestionItem}>
-                                            {resolvedText ? resolvedText : (
-                                              <span
-                                                className={styles.surveyQuestionFallbackId}
-                                                title={fullQuestionId}
-                                              >
-                                                {shortenUserPageQuestionId(fullQuestionId)}
-                                              </span>
-                                            )}
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : surveySectionDisplayState.shouldRenderSurveysCreatedEmptyText ? (
-                      <p>No surveys created.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-                </div>
-              </div>
+              <UserPageSurveySection
+                detailedSurveyResponseMap={detailedSurveyResponseMap}
+                expandedSurveyCreatedMap={expandedSurveyCreatedMap}
+                expandedSurveyResponseMap={expandedSurveyResponseMap}
+                getSurveyCreatedHref={(survey, surveyLinkSlug) => buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(String(surveyLinkSlug))}` : ''}`)}
+                isSurveyLoadingAny={isSurveyLoadingAny}
+                onDecryptQuestion={this.handleDecryptQuestionAnswer}
+                onOpenSurveyResponse={(survey, e: React.MouseEvent<HTMLElement>) => {
+                  e.stopPropagation();
+                  const surveyUrlParams = new URLSearchParams();
+                  if (survey.slug) {
+                    surveyUrlParams.set('session', survey.slug);
+                  }
+                  surveyUrlParams.set('responder', String(propViewAddress));
+                  window.open(
+                    buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }}
+                onShowQuestionsTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
+                onSurveyCreatedToggle={this.toggleSurveyCreated}
+                onSurveyResponsesSectionToggle={this.toggleSurveyResponsesSection}
+                onSurveyResponseToggle={this.toggleSurveyResponses}
+                onSurveysCreatedSectionToggle={this.toggleSurveysCreatedSection}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                responderAddress={propViewAddress}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+                surveyCreationEntries={surveyCreationEntries}
+                surveyResponseEntries={surveyResponseEntries}
+                surveyResponsesLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
+                  surveySpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                surveyResponsesSectionToggleState={surveyResponsesSectionToggleState}
+                surveySectionDisplayState={surveySectionDisplayState}
+                surveysCreatedLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
+                  surveysCreatedSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
+                surveysQuestionsToggle={surveysQuestionsToggle}
+              />
             )}
 
             {selectedTab === 'questions' && (
