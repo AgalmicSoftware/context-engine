@@ -1,16 +1,11 @@
 import React from 'react';
 
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import {
-  getNormalizedUiRatingValue,
-  isSingleSelectMultichoice,
-  normalizeMultichoiceValue,
-} from './surveyToolUtils.js';
+import { buildSurveyQuestionsFullQuestionResponseInputDescriptor } from './surveyQuestionsFullQuestionResponseInputState';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -52,34 +47,39 @@ const SurveyQuestionsFullQuestionResponseInput = ({
   onRatingChangeComplete,
   onToggleAnswerEncryption,
 }: SurveyQuestionsFullQuestionResponseInputProps): React.ReactNode => {
-  switch (question.type) {
+  const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
+    question,
+    qIndex,
+    answer,
+    glowAnswer,
+    isSubmitting,
+    singleQuestionMode,
+  });
+
+  switch (inputDescriptor.kind) {
     case 'multichoice': {
-      const options = Array.isArray(question.options) ? question.options : [];
-      const isSingleSelect = isSingleSelectMultichoice(question);
-      const selectedValues = normalizeMultichoiceValue(answer.value);
       return (
         <MultichoiceQuestionInput
-          questionId={question.id}
-          options={options}
-          selectedValues={selectedValues}
-          isSingleSelect={isSingleSelect}
-          disabled={isSubmitting}
+          questionId={inputDescriptor.questionId}
+          options={inputDescriptor.options}
+          selectedValues={inputDescriptor.selectedValues}
+          isSingleSelect={inputDescriptor.isSingleSelect}
+          disabled={inputDescriptor.disabled}
           onChange={(newAnswer) => onAnswerChange?.(newAnswer)}
         />
       );
     }
     case 'rating': {
-      const ratingValue = getNormalizedUiRatingValue(answer.value);
-      return singleQuestionMode ? (
+      return inputDescriptor.useDeferredRating ? (
         <DeferredRatingSlider
-          value={ratingValue}
-          disabled={isSubmitting}
+          value={inputDescriptor.ratingValue}
+          disabled={inputDescriptor.disabled}
           onCommit={onDeferredRatingCommit}
         />
       ) : (
         <FullQuestionRatingInput
-          value={ratingValue}
-          disabled={isSubmitting}
+          value={inputDescriptor.ratingValue}
+          disabled={inputDescriptor.disabled}
           onChange={onRatingChange}
           onChangeComplete={onRatingChangeComplete}
         />
@@ -88,28 +88,28 @@ const SurveyQuestionsFullQuestionResponseInput = ({
     case 'binary':
       return (
         <BinaryChoiceInput
-          questionId={question.id}
-          value={String(answer.value || '')}
+          questionId={inputDescriptor.questionId}
+          value={inputDescriptor.value}
           onChange={(option) => onAnswerChange?.(option)}
-          disabled={isSubmitting}
+          disabled={inputDescriptor.disabled}
           showIcons
         />
       );
     default:
       return (
         <SurveyAudioFieldInput
-          qIndex={qIndex}
+          qIndex={inputDescriptor.qIndex}
           {...audioInputWorkerProps}
-          placeholder="response (optional)"
-          updateFunction={(answerValue: unknown) => onAnswerChange?.(answerValue)}
-          toggleEncryption={onToggleAnswerEncryption}
-          value={answer.value || ''}
-          encrypted={answer.encrypted || false}
-          dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
-          dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-          disabled={isSubmitting}
-          forceGlow={glowAnswer}
-          disableEncryption
+          placeholder={inputDescriptor.placeholder}
+          updateFunction={(nextAnswerValue: unknown) => onAnswerChange?.(nextAnswerValue)}
+          toggleEncryption={(nextEncryptedState: boolean) => onToggleAnswerEncryption?.(nextEncryptedState)}
+          value={inputDescriptor.value}
+          encrypted={inputDescriptor.encrypted}
+          dataTestId={inputDescriptor.dataTestId}
+          dataCeQuestionId={inputDescriptor.dataCeQuestionId}
+          disabled={inputDescriptor.disabled}
+          forceGlow={inputDescriptor.forceGlow}
+          disableEncryption={inputDescriptor.disableEncryption}
         />
       );
   }
