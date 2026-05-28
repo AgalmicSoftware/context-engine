@@ -7,10 +7,14 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,265 lines**
-  - `SurveyQuestions.tsx`: **9,312 lines**
+  - `SurveyQuestions.tsx`: **9,143 lines**
   - `SurveyQuestionsAuthoringPanel.tsx`: **57 lines**
   - `SurveyQuestionsJsonControls.tsx`: **143 lines**
+  - `SurveyQuestionsJsonTree.tsx`: **121 lines**
   - `SurveyQuestionsResponseView.tsx`: **119 lines**
+  - `SurveyQuestionsSubmittedResponseView.tsx`: **66 lines**
+  - `SurveyQuestionsSubmitFooter.tsx`: **145 lines**
+  - `SurveyQuestionsSurveyAnswersView.tsx`: **56 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
   - `SurveyResults.tsx`: **5,087 lines**
@@ -26,7 +30,7 @@
   - `surveyResultsSummaryModels.ts`: **205 lines**
   - `SurveyPileViewMode.tsx`: **2,787 lines**
   - `surveyQuestionsJsonDerivation.ts`: **131 lines**
-- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyResults.tsx` now has passive display sections and pure summary view-model helpers extracted while keeping fetch, decrypt, cache, export, route, and mutation behavior in the parent.
+- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections extracted while keeping submit, decrypt, cache, route, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections and pure summary view-model helpers extracted while keeping fetch, decrypt, cache, export, route, and mutation behavior in the parent.
 
 ## Current Runtime Hierarchy
 
@@ -37,7 +41,11 @@ SurveyTool.tsx  [top-level wrapper]
      -> SurveyQuestions.tsx  [shared full response runtime]
         -> SurveyQuestionsAuthoringPanel.tsx  [editable question presentation]
         -> SurveyQuestionsJsonControls.tsx  [bottom JSON controls]
+        -> SurveyQuestionsJsonTree.tsx  [JSON tree display]
         -> SurveyQuestionsResponseView.tsx  [viewed-response presentation]
+        -> SurveyQuestionsSubmittedResponseView.tsx  [submitted-response display]
+        -> SurveyQuestionsSubmitFooter.tsx  [submit/footer display]
+        -> SurveyQuestionsSurveyAnswersView.tsx  [survey answer list display]
         -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
         -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
@@ -64,7 +72,11 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, and submission pipeline |
 | `SurveyQuestionsAuthoringPanel.tsx` | Editable question presentation | Renders the edit-mode question list shell, JSON/back-to-top controls, locked banner, submit node placement, and submitted-response fallback from explicit props while leaving submit, JSON generation, question rendering, and gate/decrypt behavior in `SurveyQuestions` |
 | `SurveyQuestionsJsonControls.tsx` | Bottom JSON controls view | Renders question/response/survey JSON toggles and copy panels from explicit props while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
+| `SurveyQuestionsJsonTree.tsx` | JSON tree display | Normalizes display-only JSON input into the existing tree row presentation while leaving JSON generation and copy side effects in `SurveyQuestions` |
 | `SurveyQuestionsResponseView.tsx` | Viewed-response display view | Renders viewed-response loading, no-response, address heading, single-question answer, and full-survey answer states from explicit props while leaving answer rendering callbacks and response state in `SurveyQuestions` |
+| `SurveyQuestionsSubmittedResponseView.tsx` | Submitted-response display view | Renders the hidden/loading/single-question/survey submitted-response states from explicit props while leaving answer rendering callbacks and response state in `SurveyQuestions` |
+| `SurveyQuestionsSubmitFooter.tsx` | Submit footer display | Renders submit button states, submitted indicator, pending-clear affordance, and response link from explicit props while leaving submit/revert behavior and pending-state computation in `SurveyQuestions` |
+| `SurveyQuestionsSurveyAnswersView.tsx` | Survey answer list display | Matches submitted responses to the existing question-answer renderer from explicit props while leaving answer rendering and response state in `SurveyQuestions` |
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
