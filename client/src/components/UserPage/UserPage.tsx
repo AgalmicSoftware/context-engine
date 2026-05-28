@@ -175,7 +175,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faExpand,
   faSpinner,
-  faExternalLinkAlt,
   faChevronDown,
   faChevronUp,
   faSync,
@@ -183,13 +182,13 @@ import {
 
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import StatsSection from './UserStats';
 import SBTPage from '../SBTs/SBTPage';
 import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
 import UserPageDeepScanProgressPanel, {
   type UserPageDeepScanProgressPanelOptions,
 } from './UserPageDeepScanProgressPanel';
+import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 
 // NEW IMPORT: for mini question display
@@ -4640,90 +4639,27 @@ class UserPage extends Component<any, any> {
           </ModalBody>
         </Modal>
 
-        <Modal
+        <UserPageFullProfileModal
+          aiAnalysis={aiAnalysis}
+          bookmarksHref={buildPublicRoute('/bookmarks')}
+          collapseOpen={collapseOpen}
+          explorerUrl={explorerUrl}
+          fullProfileModalDisplayState={fullProfileModalDisplayState}
           isOpen={showFullProfileModal}
-          toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
-          size="lg"
-          className={styles.modalContent}
-        >
-          <ModalHeader
-            toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
-            className={styles.modalHeader}
-          >
-            Full User Profile
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            <div className={styles.modalSummary}>
-              <h3>User Summary</h3>
-              <p>{aiAnalysis || "Summary not available."}</p>
-            </div>
-            <StatsSection
-              userStats={userStats}
-              collapseOpen={collapseOpen}
-              toggleCollapse={this.toggleCollapse}
-            />
-            <div className={styles.modalSurveys}>
-              <h3>Survey Responses</h3>
-              {fullProfileModalDisplayState.shouldRenderSurveySpinner ? (
-                // If loading empty, rely on spinner logic or show nothing
-                <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : fullProfileModalDisplayState.shouldRenderSurveyEmptyText ? <p>No survey responses.</p> : (
-                fullProfileModalDisplayState.shouldRenderSurveyList ? (
-                  surveyResponseEntries.map((survey, index: number) => (
-                    <div key={index} className={styles.surveyPreview}>
-                      <div className={styles.surveyTitle}>{survey.title}</div>
-                      <div className={styles.surveyInfo}>
-                        Questions: {survey.questionsCount}
-                      </div>
-                    </div>
-                  ))
-                ) : null
-              )}
-            </div>
-            <div className={styles.modalSBTs}>
-              <h3>{`${t('minted')} ${t('sbts')}`}</h3>
-              {/* In modal, we can keep the spinner since there's no header spinner here */}
-              {sbtDisplayState.shouldRenderModalSpinner ? (
-                <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : sbtDisplayState.shouldRenderModalEmptyText ? <p>{sbtEmptyText}</p> : (
-                sbtEntries.map((sbtItem, index: number) => (
-                  <SBTPage
-                    key={index}
-                    SBTAddress={sbtItem.sbtInfo.sbtAddress}
-                    provider={provider}
-                    network={network}
-                    miniaturized={true}
-                    loginComplete={loginComplete}
-                    /* Use readiness passed from MainSite to control child spinners */
-                    isSBTCacheReady={this.props.isSBTCacheReady}
-                    /* NEW: mini cards are metadata-only, avoid any chain scans/persistence */
-                    metadataOnly={true}
-                    /* NEW: Pass source slug */
-                    sessionSlug={sbtItem.slug}
-                    refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
-                  />
-                ))
-              )}
-            </div>
-            {fullProfileModalDisplayState.shouldRenderModalActions && (
-              <div className={styles.modalActions}>
-                {fullProfileModalDisplayState.shouldRenderBookmarksLink && (
-                  <a href={buildPublicRoute('/bookmarks')} className={styles.bookmarksLink}>
-                    My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                )}
-                <a
-                  href={explorerUrl || undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.explorerLink}
-                >
-                  View on Explorer <FontAwesomeIcon icon={faExternalLinkAlt} />
-                </a>
-              </div>
-            )}
-          </ModalBody>
-        </Modal>
+          isSBTCacheReady={this.props.isSBTCacheReady}
+          loginComplete={loginComplete}
+          mintedSbtsHeading={`${t('minted')} ${t('sbts')}`}
+          network={network}
+          onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+          onStatsCollapseToggle={this.toggleCollapse}
+          onToggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
+          provider={provider}
+          sbtDisplayState={sbtDisplayState}
+          sbtEmptyText={sbtEmptyText}
+          sbtEntries={sbtEntries}
+          surveyResponseEntries={surveyResponseEntries}
+          userStats={userStats}
+        />
       </div>
     );
   }
