@@ -159,6 +159,7 @@ export {
   resolveSbtPageCopyErrorButtonStyle,
   resolveSbtPageCopyIconState,
   resolveSbtPageFullViewShellState,
+  resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageItalicNoteStyle,
