@@ -15,19 +15,21 @@ import {
   buildSurveyQuestionsSubmitAuxIconClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
-  type SurveyQuestionsSubmitFooterDisplayState,
 } from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsSubmitFooterProps = {
-  displayState?: Partial<SurveyQuestionsSubmitFooterDisplayState>;
   isSingleQuestionView?: boolean;
   isSubmitting?: boolean;
   onPrimarySubmitClick: () => void;
   onRevertPendingChanges: () => void;
   pendingEditCount?: number;
   responseUrl?: string;
+  showSubmitAux?: boolean;
   submitButtonText?: React.ReactNode;
+  submitDisabled?: boolean;
+  submittedIndicatorActive?: boolean;
   submissionError?: string;
+  uploadStatusText?: React.ReactNode;
 };
 
 const renderSubmissionErrorText = (submissionError: string): string => (
@@ -37,22 +39,19 @@ const renderSubmissionErrorText = (submissionError: string): string => (
 );
 
 const SurveyQuestionsSubmitFooter = ({
-  displayState = {},
   isSingleQuestionView = false,
   isSubmitting = false,
   onPrimarySubmitClick,
   onRevertPendingChanges,
   pendingEditCount = 0,
   responseUrl = '',
+  showSubmitAux = false,
   submitButtonText = '',
+  submitDisabled = false,
+  submittedIndicatorActive = false,
   submissionError = '',
+  uploadStatusText = 'Uploading...',
 }: SurveyQuestionsSubmitFooterProps): React.ReactElement => {
-  const {
-    showSubmitAux = false,
-    submitDisabled = false,
-    submittedIndicatorActive = false,
-    uploadStatusText = 'Uploading...',
-  } = displayState;
   const submitFooterClassName = [
     styles.footer,
     isSingleQuestionView ? styles.singleQuestionSubmitFooter : '',

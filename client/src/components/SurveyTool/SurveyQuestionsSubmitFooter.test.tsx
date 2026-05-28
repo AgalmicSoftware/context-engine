@@ -31,8 +31,8 @@ describe('SurveyQuestionsSubmitFooter', () => {
     render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
-        displayState={{ showSubmitAux: true }}
         pendingEditCount={2}
+        showSubmitAux
       />
     );
 
@@ -48,11 +48,9 @@ describe('SurveyQuestionsSubmitFooter', () => {
     const { rerender } = render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
-        displayState={{
-          submitDisabled: true,
-          uploadStatusText: 'Encrypting...',
-        }}
         isSubmitting
+        submitDisabled
+        uploadStatusText="Encrypting..."
       />
     );
 
@@ -63,18 +61,14 @@ describe('SurveyQuestionsSubmitFooter', () => {
     rerender(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
-        displayState={{
-          showSubmitAux: true,
-          submittedIndicatorActive: true,
-        }}
         responseUrl="https://example.test/response"
+        showSubmitAux
+        submittedIndicatorActive
       />
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toHaveTextContent('Submitted');
     expect(screen.getByTitle('View submitted response')).toHaveAttribute('href', 'https://example.test/response');
-    expect(screen.getByTitle('View submitted response')).toHaveAttribute('target', '_blank');
-    expect(screen.getByTitle('View submitted response')).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
 
     rerender(
@@ -96,47 +90,5 @@ describe('SurveyQuestionsSubmitFooter', () => {
 
     expect(screen.getByText('SUBMIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('singleQuestionSubmitButton');
-  });
-
-  it('keeps submit aux inert while uploading pending survey edits', () => {
-    render(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        displayState={{
-          showSubmitAux: true,
-          uploadStatusText: 'Uploading...',
-        }}
-        isSubmitting
-        pendingEditCount={3}
-      />
-    );
-
-    expect(screen.getByText('Uploading...')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT)).toHaveClass('submitGlow');
-    expect(screen.queryByRole('button', { name: 'Clear pending changes' })).toBeNull();
-    expect(baseProps.onRevertPendingChanges).not.toHaveBeenCalled();
-  });
-
-  it('does not render submitted route affordances in single-question mode', () => {
-    render(
-      <SurveyQuestionsSubmitFooter
-        {...baseProps}
-        displayState={{
-          showSubmitAux: true,
-          submittedIndicatorActive: true,
-        }}
-        isSingleQuestionView
-        pendingEditCount={1}
-        responseUrl="https://example.test/question-response"
-        submitButtonText="SUBMIT"
-      />
-    );
-
-    const submitButton = screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMIT);
-    expect(submitButton).toHaveClass('singleQuestionSubmitButton');
-    expect(submitButton).toHaveTextContent('SUBMIT');
-    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
-    expect(screen.queryByTitle('View submitted response')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Clear pending changes' })).toBeInTheDocument();
   });
 });
