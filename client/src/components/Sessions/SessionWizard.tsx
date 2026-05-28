@@ -123,6 +123,7 @@ import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
 import SessionWizardRequirementsBanner, {
   SESSION_WIZARD_REQUIREMENT_LINKS,
 } from './SessionWizardRequirementsBanner';
+import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
   buildNormalModeCards,
@@ -4848,34 +4849,10 @@ const SessionWizard = ({
         />
       ) : null}
 
-      {sponsoredBundleStatus ? (
-        <div
-          className={`${styles.statusNote} ${styles.sponsoredBundleStatus} ${
-            sponsoredBundleStatus.tone === 'success'
-              ? styles.sponsoredBundleStatusSuccess
-              : sponsoredBundleStatus.tone === 'error'
-                ? styles.sponsoredBundleStatusError
-                : styles.sponsoredBundleStatusInfo
-          }`}
-          data-testid={E2E_TESTIDS.WIZARD_SPONSORED_STATUS}
-        >
-          <div className={styles.sponsoredBundleStatusContent}>
-            <span>{sponsoredBundleStatus.message}</span>
-            {sponsoredBundleStatus.retryable ? (
-              <Button
-                type="button"
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.sponsoredBundleRetryButton}
-                onClick={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
-              >
-                Retry
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <SessionWizardSponsoredStatus
+        onRetry={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
+        status={sponsoredBundleStatus}
+      />
 
       {isNormalMode && (
         <SessionWizardNormalModeRail
