@@ -84,6 +84,20 @@ export type SurveyQuestionsRouteViewDisplayState = {
   viewAnswersButtonText: string;
 };
 
+export type SurveyQuestionsSubmitFooterDisplayState = {
+  submittedStateActive: boolean;
+  submittedIndicatorActive: boolean;
+  singleQuestionSubmittedIndicatorActive: boolean;
+  showSubmitAux: boolean;
+  uploadStatusText: string;
+  submitDisabled: boolean;
+  canEditQuestions: boolean;
+  hasPendingEdits: boolean;
+  genericShowInlineSubmit: boolean;
+  showInlineSubmit: boolean;
+  showTopInlineSubmit: boolean;
+};
+
 export type SurveyAutoDecryptDisabledStatePatch = {
   autoDecryptEnabled: boolean;
   decryptingByKey: Record<string, unknown>;
@@ -878,6 +892,87 @@ export const buildSurveyQuestionsRouteViewDisplayState = ({
     isSingleQuestionView,
     showViewAnswersButton,
     viewAnswersButtonText,
+  };
+};
+
+export const buildSurveyQuestionsSubmitFooterDisplayState = ({
+  currentStep = 0,
+  hasEncryptedAnswers = false,
+  hasMaskedCurrentQuestionPayload = false,
+  isDirty = false,
+  isEditing = false,
+  isLoadingResponse = false,
+  isSingleQuestionView = false,
+  isSubmitting = false,
+  pendingEditCount = 0,
+  responseUrl = '',
+  singleQuestionMode = false,
+  startFresh = false,
+  submissionComplete = false,
+  submittedSinceLastEdit = false,
+  useHeaderSubmit = false,
+  userHasResponse = false,
+}: {
+  currentStep?: unknown;
+  hasEncryptedAnswers?: unknown;
+  hasMaskedCurrentQuestionPayload?: unknown;
+  isDirty?: unknown;
+  isEditing?: unknown;
+  isLoadingResponse?: unknown;
+  isSingleQuestionView?: unknown;
+  isSubmitting?: unknown;
+  pendingEditCount?: unknown;
+  responseUrl?: unknown;
+  singleQuestionMode?: unknown;
+  startFresh?: unknown;
+  submissionComplete?: unknown;
+  submittedSinceLastEdit?: unknown;
+  useHeaderSubmit?: unknown;
+  userHasResponse?: unknown;
+} = {}): SurveyQuestionsSubmitFooterDisplayState => {
+  const pendingCount = Number(pendingEditCount || 0);
+  const isSingle = !!isSingleQuestionView;
+  const submittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
+  const submittedIndicatorActive = submittedStateActive && !isLoadingResponse;
+  const singleQuestionSubmittedIndicatorActive = !isSingle && submittedIndicatorActive;
+  const showSubmitAux =
+    !isSingle && (
+      (pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
+      (singleQuestionSubmittedIndicatorActive && !!responseUrl)
+    );
+  const uploadStatusText =
+    isSubmitting &&
+    Number(currentStep || 0) === 1 &&
+    !!hasEncryptedAnswers
+      ? 'Encrypting...'
+      : 'Uploading...';
+  const submitDisabled = !!(
+    isSubmitting ||
+    (singleQuestionMode && hasMaskedCurrentQuestionPayload)
+  );
+  const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
+  const hasPendingEdits = !!isDirty || pendingCount > 0;
+  const genericShowInlineSubmit = !useHeaderSubmit && (
+    canEditQuestions
+      ? hasPendingEdits || submittedIndicatorActive
+      : submittedIndicatorActive
+  );
+  const showInlineSubmit = isSingle
+    ? hasPendingEdits
+    : genericShowInlineSubmit;
+
+  return {
+    submittedStateActive,
+    submittedIndicatorActive,
+    singleQuestionSubmittedIndicatorActive,
+    showSubmitAux,
+    uploadStatusText,
+    submitDisabled,
+    canEditQuestions,
+    hasPendingEdits,
+    genericShowInlineSubmit,
+    showInlineSubmit,
+    showTopInlineSubmit: showInlineSubmit && !isSingle,
   };
 };
 
