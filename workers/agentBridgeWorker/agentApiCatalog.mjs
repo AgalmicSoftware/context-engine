@@ -162,6 +162,25 @@ const CAPABILITIES = Object.freeze([
     ],
   }),
   freezeEntry({
+    id: 'agent.telegram.question_queue.manage',
+    category: 'questions',
+    label: 'Manage Sponsored Question Queue',
+    canonicalActionId: 'agent.telegram.question_queue.manage',
+    method: 'POST',
+    path: '/telegram/agent/api/question-queue',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['telegramUserId', 'sessionSlug'],
+    optionalFields: ['sponsoredQuestionIds', 'questionIds', 'operation', 'clear'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Requires the shared service token plus a Telegram account whose managed wallet is a configured session admin; ordinary ceagt_ user tokens cannot change admin queues.',
+    ],
+  }),
+  freezeEntry({
     id: 'agent.telegram.preferences.draft',
     category: 'responses',
     label: 'Draft Telegram Preferences',

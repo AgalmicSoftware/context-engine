@@ -31,8 +31,10 @@ import {
 } from './telegramAgentActivity.mjs';
 import {
   loadTelegramQuestionQueueConfig,
+  saveTelegramQuestionQueueConfig,
   selectNextTelegramQuestion,
 } from './telegramQuestionQueue.mjs';
+import { canManageResponseExportAllowlist } from './telegramResponseExport.mjs';
 import {
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
@@ -169,13 +171,18 @@ function normalizeAgentTelegramContext(input = {}) {
   const username = safeString(input.username || telegram.username);
   const groupChatId = safeString(input.groupChatId || input.chatId || telegram.groupChatId || telegram.chatId);
   const chatId = groupChatId || telegramUserId;
+  const isPrivate = !groupChatId;
   return {
+    type: 'telegram_mock_update',
     updateId: safeString(input.updateId) || `agent-${Date.now()}`,
+    kind: 'agent_handoff',
+    lane: isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
     user: { telegramUserId, username },
     chat: {
       chatId,
+      chatType: groupChatId ? 'supergroup' : 'private',
       type: groupChatId ? 'supergroup' : 'private',
-      isPrivate: !groupChatId,
+      isPrivate,
     },
   };
 }
@@ -203,6 +210,11 @@ function inputFromRequest(request, body = {}) {
     resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
     includeSponsored: Object.hasOwn(body, 'includeSponsored') ? body.includeSponsored : url.searchParams.get('includeSponsored'),
     sponsoredFirst: Object.hasOwn(body, 'sponsoredFirst') ? body.sponsoredFirst : url.searchParams.get('sponsoredFirst'),
+    questionIds: Object.hasOwn(body, 'questionIds') ? body.questionIds : url.searchParams.get('questionIds'),
+    sponsoredQuestionIds: Object.hasOwn(body, 'sponsoredQuestionIds') ? body.sponsoredQuestionIds : url.searchParams.get('sponsoredQuestionIds'),
+    sponsoredQuestions: Object.hasOwn(body, 'sponsoredQuestions') ? body.sponsoredQuestions : url.searchParams.get('sponsoredQuestions'),
+    operation: safeString(body.operation || url.searchParams.get('operation')),
+    clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
   };
 }
 
@@ -266,6 +278,7 @@ async function resolveHandoffContext({
   env = {},
   input = {},
   auth = {},
+  requireQuestionAuthoring = true,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const normalized = normalizeAgentTelegramContext(input);
@@ -303,19 +316,22 @@ async function resolveHandoffContext({
       };
     }
   }
-  const permission = evaluateTelegramQuestionAuthoringPermission({
-    env,
-    normalized,
-    session: resolved.session,
-    groupBinding,
-    privateBinding: privateBinding || (delegation ? {
-      sessionSlug: resolved.session.sessionSlug,
-      source: 'telegram_agent_delegation_token',
-    } : null),
-    requestedSessionSlug: resolved.session.sessionSlug,
-  });
-  if (!permission.ok) {
-    return { ok: false, status: 403, reason: permission.reason, sessionSlug: resolved.session.sessionSlug };
+  let permission = { ok: true, mode: 'not_required' };
+  if (requireQuestionAuthoring) {
+    permission = evaluateTelegramQuestionAuthoringPermission({
+      env,
+      normalized,
+      session: resolved.session,
+      groupBinding,
+      privateBinding: privateBinding || (delegation ? {
+        sessionSlug: resolved.session.sessionSlug,
+        source: 'telegram_agent_delegation_token',
+      } : null),
+      requestedSessionSlug: resolved.session.sessionSlug,
+    });
+    if (!permission.ok) {
+      return { ok: false, status: 403, reason: permission.reason, sessionSlug: resolved.session.sessionSlug };
+    }
   }
   return {
     ok: true,
@@ -563,6 +579,186 @@ async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, w
     reason: selected.reason,
     queue: selected.queue,
   }, { status: selected.ok ? 200 : 404 });
+}
+
+function normalizeQuestionQueueRefs(value = []) {
+  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
+  return source
+    .map((entry) => {
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        return safeString(entry.questionId || entry.id || entry.value || entry.label || entry.name);
+      }
+      return safeString(entry);
+    })
+    .filter(Boolean)
+    .filter((entry, index, values) => values.indexOf(entry) === index)
+    .slice(0, 50);
+}
+
+function questionQueueCandidates(questions = []) {
+  return (Array.isArray(questions) ? questions : [])
+    .filter((question) => question?.answerable === true)
+    .filter((question) => safeString(question.questionId) && safeString(question.prompt));
+}
+
+function findQuestionQueueCandidate(questions = [], ref = '') {
+  const token = safeString(ref);
+  if (!token) return null;
+  const numeric = Number(token);
+  if (Number.isInteger(numeric) && numeric > 0 && numeric <= questions.length) {
+    return questions[numeric - 1] || null;
+  }
+  const normalized = lower(token);
+  return questions.find((question) => (
+    lower(question.questionId) === normalized ||
+    lower(question.id) === normalized ||
+    lower(question.questionId).startsWith(normalized)
+  )) || null;
+}
+
+function resolveQuestionQueueRefs(input = {}, questions = []) {
+  const refs = normalizeQuestionQueueRefs(
+    input.sponsoredQuestionIds ||
+    input.questionIds ||
+    input.sponsoredQuestions ||
+    input.questions ||
+    input.ids
+  );
+  const ids = [];
+  const skipped = [];
+  refs.forEach((ref) => {
+    const question = findQuestionQueueCandidate(questions, ref);
+    const questionId = safeString(question?.questionId);
+    if (!question || !questionId) {
+      skipped.push(ref);
+      return;
+    }
+    if (!ids.includes(questionId)) ids.push(questionId);
+  });
+  return { refs, ids, skipped };
+}
+
+function questionQueueCandidateSummary(question = {}, index = 0) {
+  return {
+    index: index + 1,
+    questionId: safeString(question.questionId),
+    questionType: safeString(question.questionType),
+    prompt: safeString(question.prompt),
+    tags: Array.isArray(question.tags) ? question.tags.map(safeString).filter(Boolean) : [],
+  };
+}
+
+function isQuestionQueueClearRequested(input = {}) {
+  const operation = lower(input.operation);
+  const clear = lower(input.clearQueue);
+  return ['clear', 'reset', 'none', 'empty'].includes(operation) ||
+    ['true', '1', 'yes', 'on'].includes(clear);
+}
+
+async function requireQuestionQueueAdmin({ env = {}, context = {}, input = {} } = {}) {
+  if (context.authMode !== 'service_token') {
+    return { ok: false, status: 403, reason: 'question_queue_service_token_required' };
+  }
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized: context.normalized,
+    session: context.session,
+    createdAt: input.createdAt || null,
+  });
+  if (!manager.ok) {
+    return {
+      ok: false,
+      status: 403,
+      reason: manager.reason || 'question_queue_admin_required',
+      accountAddress: manager.accountAddress || '',
+    };
+  }
+  return { ok: true, manager };
+}
+
+async function handleQuestionQueueRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+  method = 'GET',
+} = {}) {
+  const admin = await requireQuestionQueueAdmin({ env, context, input });
+  if (!admin.ok) {
+    return json({
+      ok: false,
+      reason: admin.reason,
+      accountAddress: admin.accountAddress || '',
+    }, { status: admin.status || 403 });
+  }
+
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const candidates = questionQueueCandidates(questions);
+  const candidateSummaries = candidates.map(questionQueueCandidateSummary);
+  const writeRequested = safeString(method).toUpperCase() !== 'GET';
+  const clearRequested = isQuestionQueueClearRequested(input);
+  let skipped = [];
+  let saved = null;
+
+  if (writeRequested) {
+    const resolved = clearRequested
+      ? { refs: [], ids: [], skipped: [] }
+      : resolveQuestionQueueRefs(input, candidates);
+    skipped = resolved.skipped;
+    if (!clearRequested && !resolved.refs.length) {
+      return json({
+        ok: false,
+        reason: 'question_queue_question_ids_required',
+        sessionSlug: context.session.sessionSlug,
+        candidates: candidateSummaries,
+      }, { status: 400 });
+    }
+    if (!clearRequested && !resolved.ids.length) {
+      return json({
+        ok: false,
+        reason: 'question_queue_no_matching_questions',
+        sessionSlug: context.session.sessionSlug,
+        skipped,
+        candidates: candidateSummaries,
+      }, { status: 400 });
+    }
+    saved = await saveTelegramQuestionQueueConfig({
+      env,
+      sessionSlug: context.session.sessionSlug,
+      sponsoredQuestionIds: clearRequested ? [] : resolved.ids,
+      updatedByTelegramUserId: context.normalized.user.telegramUserId,
+      updatedByAccountAddress: admin.manager.accountAddress,
+      createdAt: input.createdAt || null,
+    });
+    if (!saved.ok) {
+      return json({
+        ok: false,
+        reason: saved.reason || 'question_queue_save_failed',
+        sessionSlug: context.session.sessionSlug,
+      }, { status: 500 });
+    }
+  }
+
+  const queueConfig = saved?.config || await loadTelegramQuestionQueueConfig({
+    env,
+    sessionSlug: context.session.sessionSlug,
+  });
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    permissionMode: context.permission.mode,
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    questionQueue: {
+      source: queueConfig.source || (saved ? 'kv' : ''),
+      sponsoredQuestionIds: Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds : [],
+      sponsoredQuestionCount: Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds.length : 0,
+      updatedAt: safeString(queueConfig.updatedAt),
+    },
+    saved: saved?.ok === true,
+    skipped,
+    candidates: candidateSummaries,
+  });
 }
 
 function normalizeTelegramQuestionVote(value = '') {
@@ -1362,11 +1558,20 @@ export async function handleTelegramAgentHandoffRequest({
     }, { status: delegated.status || 403 });
   }
   const input = delegated.input;
-  const context = await resolveHandoffContext({ env, input, auth });
+  const routeRequiresQuestionAuthoring = url.pathname !== '/telegram/agent/api/question-queue';
+  const context = await resolveHandoffContext({
+    env,
+    input,
+    auth,
+    requireQuestionAuthoring: routeRequiresQuestionAuthoring,
+  });
   if (!context.ok) return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
 
   if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionsRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });
   }
   if (url.pathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
     return handleNextQuestionRequest({ env, context, input, waitUntil });

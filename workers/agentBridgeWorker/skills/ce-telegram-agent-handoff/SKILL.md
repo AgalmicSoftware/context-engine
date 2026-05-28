@@ -289,6 +289,20 @@ or `resetQueue: true` when the user asks to restart a cadence. Session admins
 can set the sponsored queue from the bot Admin Actions screen or with
 `/question_queue 1 3 4`.
 
+Operator agents can also manage that same sponsored queue through the worker:
+
+```http
+GET /telegram/agent/api/question-queue
+POST /telegram/agent/api/question-queue
+```
+
+This is an admin-only route. Use the worker service token, include
+`telegramUserId` for a Telegram user whose managed wallet is configured as a
+session admin, and send either `sponsoredQuestionIds` / `questionIds` or
+`{"clear": true}`. Ordinary user-scoped `ceagt_` tokens cannot call this route.
+Question refs may be exact IDs or 1-based candidate numbers from the `GET`
+response.
+
 Recommended loop for scheduled prompts:
 
 1. At the user's chosen cadence, call `POST /telegram/agent/api/questions/next`
