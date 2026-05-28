@@ -119,6 +119,7 @@ import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardHeader from './SessionWizardHeader';
 import SessionWizardModals from './SessionWizardModals';
+import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
 import SessionWizardRequirementsBanner, {
   SESSION_WIZARD_REQUIREMENT_LINKS,
 } from './SessionWizardRequirementsBanner';
@@ -4877,38 +4878,12 @@ const SessionWizard = ({
       ) : null}
 
       {isNormalMode && (
-        <section
-          className={styles.normalModeRail}
-          aria-label="Normal mode sections"
-          style={{ '--session-wizard-card-count': String(normalModeCards.length) }}
-        >
-          {normalModeCards.map((card, index) => {
-            const isOpen = !collapsedSections[card.key];
-            const showExpandedDetails = activeNormalModeIndex > index;
-            const toneClass = card.tone === 'ready'
-              ? styles.normalModeCardReady
-              : card.tone === 'pending'
-                ? styles.normalModeCardPending
-                : styles.normalModeCardNeutral;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                className={`${styles.normalModeCard} ${toneClass} ${isOpen ? styles.normalModeCardActive : ''}`}
-                onClick={() => focusNormalModeSection(card.key)}
-                aria-label={`Step ${card.stepNumber}: ${card.title}`}
-              >
-                <span className={styles.normalModeCardNumber}>{card.stepNumber}</span>
-                <span className={styles.normalModeCardContent}>
-                  <span className={styles.normalModeCardTitle}>{card.title}</span>
-                  {showExpandedDetails && (
-                    <span className={styles.normalModeCardSummary}>{card.summary}</span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </section>
+        <SessionWizardNormalModeRail
+          activeNormalModeIndex={activeNormalModeIndex}
+          collapsedSections={collapsedSections}
+          normalModeCards={normalModeCards}
+          onFocusSection={focusNormalModeSection}
+        />
       )}
 
       {(!isNormalMode || !collapsedSections.encryption) && (
