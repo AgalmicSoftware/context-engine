@@ -36,7 +36,6 @@ Session, gates, and the Worker:
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
-- `docs/telegram-public-session-equivalence-prd.md`: PRD for keeping public session behavior equivalent across the CE client, Telegram bot, and Telegram Mini App.
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
