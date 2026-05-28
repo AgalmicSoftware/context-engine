@@ -1,10 +1,13 @@
 import type { AnyRecord } from '../shellTypes';
+import { toStr } from '../../utilities/shared/primitives.js';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
   stepNumbers?: Record<string, number>;
 };
+
+export type SessionWizardPendingDraftLike = AnyRecord | null | undefined;
 
 export type SessionWizardPublishDeployWorkerResult = {
   ok?: boolean;
@@ -22,7 +25,7 @@ export type SessionWizardPublishControllerPorts = {
   deployWorker: () => Promise<SessionWizardPublishDeployWorkerResult | null | undefined>;
   deployPendingSbts?: (
     args: SessionWizardPublishDeployPendingSbtsArgs
-  ) => Promise<unknown[] | null | undefined>;
+  ) => Promise<SessionWizardPendingDraftLike[] | null | undefined>;
 };
 
 export type SessionWizardPublishControllerCallbacks = {
@@ -38,7 +41,43 @@ export type SessionWizardPublishControllerInput = {
 export type SessionWizardPublishControllerResult = {
   status: 'blocked' | 'completed';
   workerUrlOverride: string;
-  deployedPendingDrafts: unknown[];
+  deployedPendingDrafts: SessionWizardPendingDraftLike[];
+};
+
+export type SessionWizardPublishCompletionLinksInput = {
+  deployedDrafts: SessionWizardPendingDraftLike[];
+  pendingDraftSnapshot: SessionWizardPendingDraftLike[];
+  sessionSlug: string;
+};
+
+export type SessionWizardPublishCompletionControllerInput = {
+  publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
+  deployedPendingDrafts?: SessionWizardPendingDraftLike[];
+  pendingDraftSnapshot?: SessionWizardPendingDraftLike[];
+  sessionSlug?: unknown;
+};
+
+export type SessionWizardPublishCompletionControllerPorts = {
+  normalizePendingDrafts: (
+    drafts: SessionWizardPendingDraftLike[]
+  ) => SessionWizardPendingDraftLike[];
+  buildPublishedPendingSbtLinks: (
+    args: SessionWizardPublishCompletionLinksInput
+  ) => unknown[];
+};
+
+export type SessionWizardPublishCompletionControllerCallbacks = {
+  promoteDeployedPendingSbtSelections: (
+    deployedDrafts: SessionWizardPendingDraftLike[]
+  ) => void;
+  setPublishedPendingSbtLinks: (links: unknown[]) => void;
+  clearPendingSbtDrafts: () => void;
+  setPublishStep: (step: number) => void;
+};
+
+export type SessionWizardPublishCompletionControllerResult = {
+  normalizedDeployedPendingDrafts: SessionWizardPendingDraftLike[];
+  publishedPendingSbtLinks: unknown[];
 };
 
 const getPublishStepNumber = (
@@ -61,6 +100,10 @@ const assertVerifiedWorkerDeploy = (
   return deployResult.workerUrl;
 };
 
+const getPendingDraftAddressKey = (entry: SessionWizardPendingDraftLike): string => (
+  toStr(entry?.predictedAddress || entry?.deployedAddress).trim().toLowerCase()
+);
+
 export const runSessionWizardPublishController = async ({
   input,
   ports,
@@ -80,7 +123,7 @@ export const runSessionWizardPublishController = async ({
 
   const { publishExecutionPlan } = input;
   let workerUrlOverride = '';
-  let deployedPendingDrafts: unknown[] = [];
+  let deployedPendingDrafts: SessionWizardPendingDraftLike[] = [];
 
   if (publishExecutionPlan.shouldAutoDeployWorker) {
     callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'deploy-worker'));
@@ -106,7 +149,52 @@ export const runSessionWizardPublishController = async ({
   };
 };
 
+export const runSessionWizardPublishCompletionController = ({
+  input,
+  ports,
+  callbacks,
+}: {
+  input: SessionWizardPublishCompletionControllerInput;
+  ports: SessionWizardPublishCompletionControllerPorts;
+  callbacks: SessionWizardPublishCompletionControllerCallbacks;
+}): SessionWizardPublishCompletionControllerResult => {
+  const pendingDraftSnapshot = Array.isArray(input.pendingDraftSnapshot)
+    ? input.pendingDraftSnapshot
+    : [];
+  const normalizedDeployedPendingDrafts = ports.normalizePendingDrafts(
+    Array.isArray(input.deployedPendingDrafts) ? input.deployedPendingDrafts : []
+  );
+  const newlyDeployedPendingAddressSet = new Set(
+    normalizedDeployedPendingDrafts
+      .map((entry) => getPendingDraftAddressKey(entry))
+      .filter(Boolean)
+  );
+
+  callbacks.promoteDeployedPendingSbtSelections([
+    ...normalizedDeployedPendingDrafts,
+    ...pendingDraftSnapshot.filter((entry) => (
+      entry?.deployed === true &&
+      !newlyDeployedPendingAddressSet.has(getPendingDraftAddressKey(entry))
+    )),
+  ]);
+
+  const publishedPendingSbtLinks = ports.buildPublishedPendingSbtLinks({
+    deployedDrafts: normalizedDeployedPendingDrafts,
+    pendingDraftSnapshot,
+    sessionSlug: toStr(input.sessionSlug).trim(),
+  });
+  callbacks.setPublishedPendingSbtLinks(publishedPendingSbtLinks);
+  callbacks.clearPendingSbtDrafts();
+  callbacks.setPublishStep(getPublishStepNumber(input.publishExecutionPlan, 'done'));
+
+  return {
+    normalizedDeployedPendingDrafts,
+    publishedPendingSbtLinks,
+  };
+};
+
 export const __test__ = {
   assertVerifiedWorkerDeploy,
+  getPendingDraftAddressKey,
   getPublishStepNumber,
 } satisfies AnyRecord;
