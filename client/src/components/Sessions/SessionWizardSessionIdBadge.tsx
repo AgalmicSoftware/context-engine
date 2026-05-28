@@ -3,7 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy, faRedoAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type SessionWizardSessionIdBadgeProps = {
   isRegenerating?: boolean;
@@ -13,7 +12,7 @@ type SessionWizardSessionIdBadgeProps = {
     ariaLabel?: string;
     content?: React.ReactNode;
     id?: string;
-    placement?: SessionWizardTooltipRenderOptions['placement'];
+    placement?: string;
     testId?: string;
   }) => React.ReactNode;
   sessionIdDisplay?: string;
