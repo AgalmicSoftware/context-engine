@@ -50,6 +50,7 @@ import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestion
 import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
+import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
 import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
@@ -10895,32 +10896,23 @@ export class SurveyQuestions extends Component {
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
-    const submittedResponseView =
-      !viewingAnswers &&
-      this.state.userHasResponse &&
-      !this.state.startFresh &&
-      !this.state.isEditing ? (
-      <div>
-        {questionPoolReady && this.state.userAnswers ? (
-          this.props.singleQuestionMode ? (
-            this.state.questionPool[0] ? (
-              this.renderQuestionAnswer(
-                this.state.questionPool[0],
-                this.state.userAnswers,
-                0,
-                isOwnResponse
-              )
-            ) : (<div>Loading question...</div>)
-          ) : (
-            this.state.userAnswers.responses ? (
-              this.renderSurveyAnswers(this.state.userAnswers.responses, isOwnResponse)
-            ) : (<div>Loading answers...</div>)
-          )
-        ) : (
-          <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading submitted response...</div>
-        )}
-      </div>
-    ) : null;
+    const submittedResponseView = (
+      <SurveyQuestionsSubmittedResponseView
+        isOwnResponse={isOwnResponse}
+        isVisible={
+          !viewingAnswers &&
+          this.state.userHasResponse &&
+          !this.state.startFresh &&
+          !this.state.isEditing
+        }
+        questionPool={this.state.questionPool}
+        questionPoolReady={questionPoolReady}
+        renderQuestionAnswer={this.renderQuestionAnswer}
+        renderSurveyAnswers={this.renderSurveyAnswers}
+        singleQuestionMode={this.props.singleQuestionMode}
+        userAnswers={this.state.userAnswers}
+      />
+    );
 
     return (
       <div className={surveyPageClassName}>
