@@ -1,6 +1,7 @@
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 import {
+  buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
   normalizeRpcUrlList,
@@ -35,6 +36,55 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
       { 8453: ['https://ignored.example'] },
     )).toEqual({
       8453: ['https://first.example'],
+    });
+  });
+
+  it('builds worker URL resolution display state without changing missing-url semantics', () => {
+    const normalizeWorkerUrl = (value: unknown) => String(value || '').trim().replace(/\/+$/, '');
+
+    expect(buildWorkerUrlResolutionDisplay({
+      resolved: {
+        url: ' https://worker.example.test/ ',
+        source: 'session-config',
+        status: 'ok',
+      },
+      normalizeWorkerUrl,
+    })).toEqual({
+      url: 'https://worker.example.test',
+      debug: 'source=session-config status=ok url=https://worker.example.test',
+      status: 'Resolved (ok)',
+    });
+    expect(buildWorkerUrlResolutionDisplay({
+      resolved: {
+        url: '',
+        source: 'registry',
+        status: 'not-found',
+      },
+      normalizeWorkerUrl,
+    })).toEqual({
+      url: '',
+      debug: 'source=registry status=not-found url=(none)',
+      status: 'Missing (not-found)',
+    });
+    expect(buildWorkerUrlResolutionDisplay({
+      resolved: {},
+      normalizeWorkerUrl,
+    })).toEqual({
+      url: '',
+      debug: 'source=unknown status=ok url=(none)',
+      status: 'Missing worker URL',
+    });
+    expect(buildWorkerUrlResolutionDisplay({
+      resolved: {
+        url: '',
+        source: 'registry',
+        status: 0,
+      },
+      normalizeWorkerUrl,
+    })).toEqual({
+      url: '',
+      debug: 'source=registry status=ok url=(none)',
+      status: 'Missing worker URL',
     });
   });
 

@@ -1,4 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { getChainName } from './adminPageHelpers';
 import { normalizeSlug } from './adminPageHelpers';
 
 type SessionDisplayUrlArgs = {
@@ -12,6 +13,11 @@ type BuildSessionUrlOptions = {
 };
 
 type AdminEncryptedEntry = string | Record<string, unknown>;
+
+type AdminChainRegistryDisplayArgs = {
+  chainId?: unknown;
+  registryChainId?: unknown;
+};
 
 const asRecord = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value)
@@ -41,6 +47,25 @@ export const getAdminSessionDisplayUrl = ({
   if (!selectedConfig && !groupMetadata) return '';
   const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
   return buildSessionUrl(resolvedSlug, { allowGeneral: true });
+};
+
+export const buildAdminChainRegistryDisplay = ({
+  chainId: chainIdRaw,
+  registryChainId: registryChainIdRaw,
+}: AdminChainRegistryDisplayArgs = {}): string => {
+  const chainId = toStr(chainIdRaw).trim();
+  const chainName = getChainName(chainId);
+  const registryChainId = toStr(registryChainIdRaw).trim();
+  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
+  const chainNum = Number(chainId);
+  const registryNum = Number(registryChainId);
+  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
+    ? chainNum === registryNum
+    : registryChainId === chainId;
+  if (!registryChainId || sameChain) return chainDisplay;
+  const registryName = getChainName(registryChainId);
+  const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
+  return `${chainDisplay} / ${registryDisplay}`;
 };
 
 export const collectEncryptedEntries = (metadata: unknown): Record<string, AdminEncryptedEntry> => {

@@ -115,8 +115,10 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
+    writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private release planning\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
+    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
     commitAll(sourceDir, 'Private agent-only commit', {
       authorDate: '2025-01-03T06:07:08Z',
       committerDate: '2025-01-03T06:07:08Z',
@@ -132,8 +134,10 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '456_private-mixed-roadmap.md'), 'private mixed roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
+    writeFile(sourceDir, path.join('docs', 'telegram-cloudflare-500-user-scale-prd.md'), 'private telegram planning\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill v2\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'transportMock.mjs'), 'private bridge mock\n');
+    writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
       committerDate: '2025-01-04T05:06:07Z',
@@ -166,7 +170,7 @@ function parseSummaryValue(stdout, label) {
 
 function assertNoPrivatePlanningPaths(trackedPaths) {
   const planningToken = `${'PR'}${'D'}`;
-  const planningPathPattern = new RegExp(`(^|/)TODO(/|$)|(^|/)[^/\\n]*${planningToken}s?[^/\\n]*(/|$)`, 'm');
+  const planningPathPattern = new RegExp(`(^|/)TODO(/|$)|(^|/)[^/\\n]*${planningToken}s?[^/\\n]*(/|$)`, 'mi');
   assert.doesNotMatch(trackedPaths, planningPathPattern);
 }
 
@@ -195,6 +199,47 @@ test('sync-public-history accepts an explicit source branch', () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Source branch: dev-public-sync/);
     assert.match(result.stdout, /Branch name: release-candidate/);
+  });
+});
+
+test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    writeFile(sourceDir, 'main-only.txt', 'direct main change\n');
+    commitAll(sourceDir, 'Direct main commit', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const defaultResult = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(defaultResult.status, 1);
+    assert.match(defaultResult.stderr, /origin\/main is not an ancestor of dev/);
+    assert.match(defaultResult.stderr, /--allow-diverged-source/);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
+    assert.match(result.stdout, /Replay complete\./);
+    assert.match(result.stdout, /Branch name: release-candidate/);
+    assert.match(result.stdout, /Replayed commits: 2/);
+    assert.match(result.stdout, /Skipped commits: 2/);
+
+    const historySubjects = git(sourceDir, [
+      'log',
+      '--reverse',
+      '--format=%s',
+      'origin/main..release-candidate',
+    ]).trim().split('\n');
+    assert.deepEqual(historySubjects, [
+      'Public commit title',
+      'Mixed commit',
+    ]);
+
+    assert.equal(git(sourceDir, ['show', 'release-candidate:main-only.txt']), 'direct main change\n');
+    assert.equal(git(sourceDir, ['show', 'release-candidate:public.txt']), 'public one\npublic two\n');
   });
 });
 
@@ -266,8 +311,11 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
     assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.doesNotMatch(trackedPaths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
@@ -319,6 +367,29 @@ test('sync-public-history rejects replayed commit messages that mention private 
   });
 });
 
+test('sync-public-history can sanitize private tokens in otherwise public replay messages', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
+    commitAll(sourceDir, 'Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--sanitize-private-replay-messages', 'release-candidate']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /Sanitized private replay message tokens/);
+    assert.match(result.stdout, /Replayed commits: 3/);
+
+    const latestMessage = git(sourceDir, ['log', '-1', '--format=%B', 'release-candidate']);
+    assert.match(latestMessage, /Public sanitized change/);
+    assert.match(latestMessage, /private companion tooling/);
+    assert.match(latestMessage, /private integration/);
+    assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
+    assert.doesNotMatch(latestMessage, /agent-native/i);
+  });
+});
+
 test('sync-public-history rejects private replay tokens case-insensitively', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-lowercase-leak.txt', 'public change\n');
@@ -366,8 +437,11 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
     assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.doesNotMatch(trackedPaths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
@@ -443,8 +517,11 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
     assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.doesNotMatch(trackedPaths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);

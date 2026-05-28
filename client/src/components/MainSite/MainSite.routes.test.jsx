@@ -22,7 +22,6 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
-const mockTelegramDemoSetupPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
@@ -234,20 +233,6 @@ jest.mock('../DebateMap/DebateMap', () => {
   };
 });
 
-jest.mock('../TelegramDemoSetup/TelegramDemoSetupPage', () => {
-  const React = require('react');
-  return {
-    __esModule: true,
-    default: (props) => {
-      mockTelegramDemoSetupPage(props);
-      return React.createElement('div', {
-        'data-testid': 'mock-telegram-demo-setup-page',
-        'data-active-session-slug': String(props.activeSessionSlug || ''),
-      });
-    },
-  };
-});
-
 jest.mock('../../utilities/web3/contractScripts.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
@@ -258,6 +243,8 @@ jest.mock('../../utilities/web3/contractScripts.js', () => {
     getSbtHistorySummary: jest.fn(),
     getSbtMintBurnCountsByAddress: jest.fn(),
     getSbtMetadata: jest.fn(),
+    listenForSurveyEvents: jest.fn(),
+    removeSurveyEventsListener: jest.fn(),
   };
   return {
     __esModule: true,
@@ -663,6 +650,29 @@ describe('MainSite route render smoke', () => {
     expect(props.changeActiveSessionSlug).not.toHaveBeenCalled();
   });
 
+  it('routes survey listener events through the MainSite survey controller host', () => {
+    const subject = createSubject({
+      path: '/surveys',
+      activeSessionSlug: 'edge',
+    });
+    subject.onNewSurveyEventDetectedForGroup = jest.fn();
+
+    expect(subject.startSurveyAndQuestionEventListenerForGroup('edge')).toBe(true);
+
+    expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'edge');
+    expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
+      'none',
+      expect.any(Function),
+      'edge'
+    );
+
+    const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
+    const event = { type: 'SurveyCreated', surveyId: '0xsurvey' };
+    handler(event);
+
+    expect(subject.onNewSurveyEventDetectedForGroup).toHaveBeenCalledWith('edge', event);
+  });
+
   it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {
     globalThis.CE_SESSION_SCAN_SCOPE = 'list';
     globalThis.CE_SESSION_SCAN_SLUGS = [' Edge ', 'alpha'];
@@ -743,25 +753,6 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-sponsor-page')).toHaveAttribute('data-initial-session-id', 'edge-session-id');
     expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-initial-registry-chain-id', '84532');
     expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-network-id', '84532');
-  });
-
-  it('renders the Telegram demo setup route without waiting for cache bootstrap', async () => {
-    const subject = createSubject({
-      path: '/telegram-demo-setup',
-      activeSessionSlug: 'edge',
-    });
-    subject.state = {
-      ...subject.state,
-      isCacheManagerReady: false,
-      cacheHasLoaded: false,
-      isAllCachesReady: false,
-    };
-
-    render(subject.render());
-
-    expect(await screen.findByTestId('mock-telegram-demo-setup-page')).toHaveAttribute('data-active-session-slug', 'edge');
-    expect(mockTelegramDemoSetupPage.mock.calls[mockTelegramDemoSetupPage.mock.calls.length - 1][0]?.activeSessionSlug)
-      .toBe('edge');
   });
 
   it.each([

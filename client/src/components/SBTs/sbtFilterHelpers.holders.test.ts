@@ -16,7 +16,7 @@ import {
   resolveSbtFilterEntryCountMapUsage,
   resolveSbtFilterHolderScanFromBlock,
   setBoundedSbtHolderMemoEntry,
-} from './sbtFilterHelpers';
+} from './sbtFilterHolderHelpers';
 
 describe('sbtFilterHelpers holder helpers', () => {
   it('normalizes holder count maps to positive lower-case integer counts', () => {

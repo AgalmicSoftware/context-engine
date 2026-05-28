@@ -6,19 +6,13 @@
 
 For technical documentation, see [`spec.md`](../spec.md) and [`docs/`](../docs/README.md).
 
----
-
-keywords: sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, democracy, zk, homomorphic encryption
-
----
-
 ## Abstract
 
 The pace of AI development has exceeded the capacity of democratic and civic institutions to deliberate in a timely and coherent way. This is partially an infrastructure problem: we lack formats and interfaces for large-scale discourse, debate, and negotiation that can withstand information overwhelm and attention scarcity.
 
 Context Engine is an open-source toolkit enabling groups to create digital artifacts representing their preferences, beliefs, and points of agreement or disagreement over time. The approach can apply within and between groups, pointing to a future of collective intelligence via automated coordination and productive conflict – stemming from durable context and quantifiable preference data. The toolkit represents an extension on current SOTA large-group discourse software by leveraging cryptography (for private sessions and content), AI (for input UX and result interpretation), and decentralized protocols (for censorship-resistance and data permanence). A corresponding local version for use within organizations is planned.
 
-These tools are meant to be useful wherever groups coordinate and make decisions, from hyper-local to international settings. For companies and organizations, they facilitate the recording and incentivizing of predictions in a privacy-preserving way. For digital groups, a path is visible towards training AI models that represent shared interests to outsiders or other groups, while distilling and (optionally) monetizing preference data in an attributable and revocable way. In our cities these tools may help us identify shared priorities and reverse polarization, and it is our hope that they will ultimately help us define (in multimedia formats) AI futures to aim for and avoid.
+These tools are meant to be useful wherever groups coordinate and make decisions, from hyper-local to international settings. For companies and organizations, they facilitate the recording and incentivizing of predictions in a privacy-preserving way. For digital groups, a path is visible towards training AI models that represent shared interests to outsiders or other groups, while distilling and (optionally) monetizing preference data in an attributable way, with future access to continuous training data revocable under defined terms. In our cities these tools may help us identify shared priorities and reverse polarization, and it is our hope that they will ultimately help us define (in multimedia formats) AI futures to aim for and avoid.
 
 ---
 
@@ -28,7 +22,7 @@ Public AI discourse is often low-dimensional and reduced to competing slogans, s
 
 High-quality content on AI policy issues exists, but often in long-form formats that regular people don't have the time or capacity to engage with – even though everyone on earth will be affected by AI decisions.
 
-We don't yet have a time-efficient and intuitive "map" of AI questions, which allows leaders (in industry and government) to under-specify their positions and avoid public commitments. A step towards addressing this would be a simple toolkit to records views, preferences, and predictions on AI topics, such that responses:
+We don't yet have a time-efficient and intuitive "map" of AI questions, which allows leaders (in industry and government) to under-specify their positions and avoid public commitments. A step towards addressing this would be a simple toolkit to record views, preferences, and predictions on AI topics, such that responses:
 
 - Can be public and/or encrypted (for trusted groups and/or future evaluation) as appropriate
 - Are stored permanently, in a standard format AI can summarize / aggregate / evaluate / operate on
@@ -88,15 +82,17 @@ Organizations can run a local version of the decentralized stack described above
 
 Many online communities have norms, values, and tacit knowledge in forms that cannot be easily read by outsiders and/or AI systems: chat logs, moderation histories, ongoing discussions, and informal relationships.
 
-Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.-b; Posner & Weyl, 2018).
+Not every group should aim to formalize itself for outside interaction, but those which generate value through traffic, attention, and interpretation could begin to retain ownership over the data and value they create (RadicalxChange Foundation, n.d.-b).
 
 Context Engine points towards several directions:
 
 - **Preference codification** — views on norms, strategy, governance, aesthetics, and external events in a format that remains queryable over time
 - **Representative AI models** — accumulated response data can train models that represent the group's actual distribution of views, participate in negotiations with other groups, or respond to external queries
-- **Data sovereignty** — aggregated preference data attributed at the wallet level, licensable to model providers, and revocable if terms are violated. Local and tacit knowledge can be priced differently depending on who is asking
+- **Data sovereignty** — aggregated preference data attributed at the wallet level and licensable to model providers under explicit terms. Local and tacit knowledge can be priced differently depending on who is asking
 - **Content curation** — Reactions to content from other websites (rather than simple questions) could help establish a grassroots trust layer for content, where moderation / scoring is accomplished by a Community Notes style algorithm (within and between groups)
 - **New advertisements** – Groups could be the target of personalized (and privacy-preserving) ads, where the revenue is split among members or funds a shared group treasury
+
+In this context, "revocable" means the group can stop ongoing access: disabling API access, ending future continuous-training feeds, rotating encryption keys for newly produced or still-held data, and terminating contract rights after a violation. It does not mean that data already copied into a provider's model can be technically removed. Undoing past training would require legal remedies, provider cooperation, or machine-unlearning techniques that remain research-stage.
 
 Quantified measures of group membership, attention, and exchange are a related direction, especially work on community currencies and attention (see PCARE; Ohlhaver, 2025). Recent open-source Mixture-of-Experts architectures overlap with this vision of community-owned models, involving the training, governing, and licensing of separable parts of a model (see FlexOlmo; Shi et al., 2025).
 
@@ -112,7 +108,7 @@ Recurring or related communities can add or reference the same map, compare chan
 
 Groups are not only formal organizations or informal pre-existing communities. With zkTLS proofs, a group can be defined by any shared attribute or verifiable condition: web activity, student status, demographics, attendance of an event, shared beliefs, media consumption, purchase history, financial proofs, and more.
 
-This relates to the Plurality view that individuals are intersections of many groups. Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
+This relates to the Plurality view that individuals are intersections of many groups (Weyl, Tang, & the Plurality Community, 2023). Programmable cryptography makes these group definitions expressible in code, and future versions of this toolkit will allow people to prove membership in one group without exposing every other affiliation.
 
 
 ### Cities and Public Institutions
@@ -123,54 +119,50 @@ A standing session accumulates input between formal decision points: more nuance
 
 ## 5. Future Directions
 
+The roadmap is best understood as several related directions rather than a single linear feature list.
 
-- **Stronger privacy**: Unlinkable per-response and per-SBT accounts, zero-knowledge and FHE aggregation, proofs on properties of encrypted responses
+### Privacy, Credentials, and Safety
 
-- **Increased censorship-resistance and "Walkaway" resilience**: Front-end hosted on ENS (.eth) domain, core services as AVS (EigenLayer, n.d.)
+- **Stronger privacy** — unlinkable per-response and per-SBT accounts, zero-knowledge and FHE aggregation, and proofs on properties of encrypted responses.
+- **zkTLS group formation** — privacy-preserving groups based on age, occupation, location, interests, web and real-world activity, shared incentives, and other verifiable attributes.
+- **AI whistleblowing toolkit** — prove a relevant affiliation, such as control of an organizational email address, then make claims that can be public, encrypted, or conditionally time-locked.
+- **Post-quantum cryptography** — transition relevant cryptographic functionality to post-quantum primitives as libraries and standards mature.
 
-- **More Storage Options**: Add IPFS for storage of larger and (optionally) ephemeral files, add centralized storage options (AWS, etc) which can be configured per-session
+### Deployment and Resilience
 
-- **Ease of Deployment**: Make it possible to purchase the required bundle of credits and API keys (Arweave storage, Lit encryption, EVM gas, AI API) with stablecoins in a trustless and turnkey way
+- **Walkaway resilience** — host the front end on an ENS (.eth) domain and explore core services as AVSs (EigenLayer, n.d.).
+- **More storage options** — add IPFS for larger or optionally ephemeral files, plus centralized storage options that can be configured per session.
+- **Turnkey deployment** — make it possible to purchase the required bundle of credits and API keys, including Arweave storage, Lit encryption, EVM gas, and AI API access, with stablecoins in a trust-minimized way.
 
-- **Agent-first UX**: Make it easy to point OpenClaw or similar agent at a session and have it interface with you via natural language
+### Interfaces and Inputs
 
-- **Voice-only mode**: Make it possible to interact with the app purely via voice commands (in multiple languages)
+- **Agent-first UX** — let users point OpenClaw or similar agents at a session and interact through natural language.
+- **Voice-only mode** — support multilingual interaction through voice commands.
+- **Better document and context integration** — add document-grounded analysis, AI-generated knowledge maps, more fluid movement between discussion, clustering, and synthesis, and more advanced versions of the Debate Tree interface.
 
-- **Quadratic Voting**: Rank questions and priorities + vote for historical figures (or contemporary figures) to represent you in automated debate
+### Preference Data and Models
 
-- **Train AI models (to represent group)**: earn $ for invocations, expand into substrate for digital groups selling revocable data, special knowledge, and attention
+- **Group-representative AI models** — train models that represent group preferences, earn revenue from approved invocations, and sell ongoing access to preference updates, special knowledge, and attention under revocable future-access terms.
+- **Preference weighting** — rank questions and priorities, and explore weighted delegation to historical or contemporary figures in automated debate.
 
-- **Group Prompting / Multimedia Worldbuilding / “Backcasting”**: Take clusters from results → convert to scenarios each group is trying to aim for or avoid → turn into interactive video / media (community-generated Black Mirror episodes, positive and negative) → tie back to present-day policy
+### Deliberation and Negotiation
 
-- **Better document and context integration**: Document-grounded analysis, AI-generated knowledge maps, and more fluid movement between discussion, clustering, and synthesis. More advanced versions of Debate Tree interface
-
-- **Agent-to-Agent Negotiation Tooling**: multi-step negotiation processes involving private information
-
-- **zkTLS**: for (privacy-preserving) group formation / actions / filtering – plural groups based on age, occupation, location, interests, web and real-world activity, shared incentives, etc.
-
-- **AI Whistleblowing Toolkit**: prove you have @aiLab.com email address using ZK → Make claims (potentially encrypted or conditionally timelocked)
-
-- **Post-quantum Cryptography**: Transition cryptographic functionalities to post-quantum versions
+- **Group prompting and backcasting** — convert result clusters into scenarios groups are trying to aim for or avoid, render them as interactive media, and connect those scenarios back to present-day policy choices.
+- **Agent-to-agent negotiation tooling** — support multi-step negotiation processes involving private information.
 
 
 ## 6. Closing Thoughts
 
 Context Engine represents a step toward a world of automated debate and coalition building, as well as large-scale Coasean bargaining (Krier, 2025). It is our belief that the world needs better interfaces for negotiation, preference discovery, and coordination between and within groups.
 
-A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic treaties, enforced by an incorruptible arbiter (Griffith, 2019). In this way we might progressively disarm threats to our continued survival.
+A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic treaties, enforced by an incorruptible arbiter (Griffith, 2019). In that setting, policy commitments, monitoring rights, and negotiated constraints could be specified and audited with less reliance on unverifiable trust.
 
-Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). It is also worth taking storytelling seriously as a coordination tool and alignment strategy – What would a news broadcast look like from the good timeline, and would seeing that broadcast help us navigate towards it?
+Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). Storytelling still matters, but here it is treated as an interface for scenario comparison: groups can make futures legible, contestable, and connected back to present-day choices.
 
 Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ## References
-
-Huang, S., Carter, S., Eaton, J., Pollack, S., Callender, D., III, Makagiansar, N., Gonzalez, M., Carr, S., Hong, J., Handa, K., McCain, M., Millar, T., Julapalli, M., Yun, G., Alt, A. J., Larsson, C., Leibrock, J., Gallivan, M., Sumers, T., Durmus, E., Kearney, M., Shen, J. H., Clark, J., Stern, M., & Ganguli, D. (2026, March 18). "What 81,000 People Want from AI." *Anthropic.* https://anthropic.com/features/81k-interviews
-
-Buterin, V. (2023, November 27). "My techno-optimism." *vitalik.eth.limo.* https://vitalik.eth.limo/general/2023/11/27/techno_optimism.html
-
-Buterin, V., Hitzig, Z., & Weyl, E. G. (2019). "A Flexible Design for Funding Public Goods." *Management Science*, 65(11), 5171–5187. https://doi.org/10.1287/mnsc.2019.3337
 
 0xPARC. (2023). "Programmable Cryptography (Part 1)." *0xPARC.* https://0xparc.org/writings/programmable-cryptography-1
 
@@ -180,13 +172,9 @@ EigenLayer. (n.d.). "AVS Developer Guide." *EigenLayer Docs.* https://docs.eigen
 
 g0v. (2014). *vTaiwan: An Open Consultation Process for National Issues.* https://info.vtaiwan.tw/
 
-Griffin, C. (2024, May 30). "The AI Policy Atlas." *AI Policy Perspectives.* https://www.aipolicyperspectives.com/p/the-ai-policy-atlas
-
 Griffith, V. (2019, April 8). "Ethereum is game-changing technology, literally." *Medium.* https://medium.com/@virgilgr/ethereum-is-game-changing-technology-literally-d67e01a01cf8
 
 Henderson, J. (2025, February 7). "The Art of Broad Listening." *Combinations.* https://www.combinationsmag.com/the-art-of-broad-listening/
-
-Hogan, B. (n.d.). *Loophole: AI Policy Loophole Finder.* GitHub. https://github.com/brendanhogan/loophole
 
 Jigsaw. (n.d.). "Reimagining the Town Hall Meeting." *Jigsaw.* https://jigsaw.google/our-work/reimagining-the-town-hall-meeting/
 
@@ -194,19 +182,35 @@ Krier, S. (2025). "Coasean Bargaining at Scale." *Cosmos Institute.* https://blo
 
 Ohlhaver, P. (2025, January 2). *Community Currencies: The Price Of Attention And Cost Of Influence In A Networked Age -or- The Price Of Entry And Cost Of Exit In A Networked Age.* SSRN. https://doi.org/10.2139/ssrn.5136037
 
-Posner, E. A., & Weyl, E. G. (2018). *Radical Markets: Uprooting Capitalism and Democracy for a Just Society.* Princeton University Press.
-
 RadicalxChange Foundation. (n.d.-a). "Social Identity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/social-identity/
 
 RadicalxChange Foundation. (n.d.-b). "Data Dignity." *RadicalxChange Wiki.* https://www.radicalxchange.org/wiki/data-dignity/
 
-Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
-
-Ohlhaver, P., Weyl, E. G., & Buterin, V. (2022, May 10). *Decentralized Society: Finding Web3's Soul.* SSRN. https://doi.org/10.2139/ssrn.4105763
-
 Shi, W., Bhagia, A., Farhat, K., Muennighoff, N., Walsh, P., Morrison, J., Schwenk, D., Longpre, S., Poznanski, J., Ettinger, A., Liu, D., Li, M., Groeneveld, D., Lewis, M., Yih, W., Soldaini, L., Lo, K., Smith, N. A., Zettlemoyer, L., Koh, P. W., Hajishirzi, H., Farhadi, A., & Min, S. (2025). "FlexOlmo: Open Language Models for Flexible Data Use." *arXiv:2507.07024.* https://arxiv.org/abs/2507.07024
 
 Weyl, E. G., Tang, A., & the Plurality Community. (2023). *Plurality: The Future of Collaborative Technology and Democracy.* GitHub. https://github.com/pluralitybook/plurality/blob/main/contents/english
+
+## Recommended Reading
+
+Buterin, V. (2023, November 27). "My techno-optimism." *vitalik.eth.limo.* https://vitalik.eth.limo/general/2023/11/27/techno_optimism.html
+
+Buterin, V., Hitzig, Z., & Weyl, E. G. (2019). "A Flexible Design for Funding Public Goods." *Management Science*, 65(11), 5171-5187. https://doi.org/10.1287/mnsc.2019.3337
+
+Griffin, C. (2024, May 30). "The AI Policy Atlas." *AI Policy Perspectives.* https://www.aipolicyperspectives.com/p/the-ai-policy-atlas
+
+Hogan, B. (n.d.). *Loophole: AI Policy Loophole Finder.* GitHub. https://github.com/brendanhogan/loophole
+
+Huang, S., Carter, S., Eaton, J., Pollack, S., Callender, D., III, Makagiansar, N., Gonzalez, M., Carr, S., Hong, J., Handa, K., McCain, M., Millar, T., Julapalli, M., Yun, G., Alt, A. J., Larsson, C., Leibrock, J., Gallivan, M., Sumers, T., Durmus, E., Kearney, M., Shen, J. H., Clark, J., Stern, M., & Ganguli, D. (2026, March 18). "What 81,000 People Want from AI." *Anthropic.* https://anthropic.com/features/81k-interviews
+
+Ohlhaver, P., Weyl, E. G., & Buterin, V. (2022, May 10). *Decentralized Society: Finding Web3's Soul.* SSRN. https://doi.org/10.2139/ssrn.4105763
+
+Owocki, K. (2026, March 5). "Collective Intelligence Infrastructure: Protocols for Thinking Together." *Gitcoin.* https://gitcoin.co/research/collective-intelligence-protocols-for-thinking-together
+
+Posner, E. A., & Weyl, E. G. (2018). *Radical Markets: Uprooting Capitalism and Democracy for a Just Society.* Princeton University Press.
+
+## Keywords
+
+sensemaking, deliberation, collective intelligence, discourse, debate, ethereum, coasean bargaining, cryptography, programmable cryptography, decentralized networks, agi, social infrastructure, ai policy, community currencies, coordination, negotiation, voting, democracy, zk, homomorphic encryption
 
 ---
 

@@ -6,6 +6,11 @@ import {
 } from '../arweave/arweaveRetryHelpers.js';
 import { prepareSurveyMetadataCacheEntry } from '../../components/MainSite/metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../../components/MainSite/metadataSessionBinding.js';
+import {
+  normalizeSurveyResponseBatchResult,
+  resolveSurveyResponseWatermark,
+  type SurveyResponseItem,
+} from './sessionSurveyResponseHelpers.js';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -18,24 +23,6 @@ interface SurveyInitOptions {
 interface QueueLocalRevisionUpdateOptions {
   needsQuestionResponsesNonce?: boolean;
   checkAllCachesReady?: boolean;
-}
-
-interface SurveyResponseItem {
-  responder: string;
-  response: unknown;
-}
-
-interface NormalizedSurveyResponseBatchResult {
-  responses: SurveyResponseItem[];
-  hadPartialFailure: boolean;
-  lowestFailedBlock: number | null;
-}
-
-interface ResolveSurveyResponseWatermarkArgs {
-  startBlock: number;
-  latestBlock: number;
-  hadPartialFailure: boolean;
-  lowestFailedBlock: number | null;
 }
 
 interface SurveyMetadata extends CacheRecord {
@@ -137,6 +124,12 @@ interface SurveyContractScripts {
     latestBlock: number,
     slug: string
   ) => Promise<unknown>;
+  listenForSurveyEvents?: (
+    providerName: string,
+    handler: (event: unknown) => unknown,
+    slug: string
+  ) => unknown;
+  removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
 }
 
 export interface SessionSurveyCacheHost {
@@ -149,7 +142,9 @@ export interface SessionSurveyCacheHost {
   getActiveSessionSlug?: () => string;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string;
+  shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
+  onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -166,53 +161,14 @@ export interface SessionSurveyCacheHost {
 export interface SessionSurveyCacheController {
   initializeSurveyCacheForGroup: (slug: string, opts?: SurveyInitOptions) => Promise<void>;
   refreshSurveyResponsesByIDForGroup: (slug: string, surveyID: string) => Promise<void>;
+  startSurveyAndQuestionEventListener: () => boolean;
+  startSurveyAndQuestionEventListenerForGroup: (slugIn?: string | null) => boolean;
   isInitInFlight: (slug: string) => boolean;
   destroy: () => void;
 }
 
 const mainSiteLog = createLogger('mainSite');
 const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
-
-const normalizeSurveyResponseBatchResult = (
-  batchResult: unknown
-): NormalizedSurveyResponseBatchResult => {
-  if (Array.isArray(batchResult)) {
-    return {
-      responses: batchResult as SurveyResponseItem[],
-      hadPartialFailure: false,
-      lowestFailedBlock: null,
-    };
-  }
-  const batchRecord = (
-    batchResult && typeof batchResult === 'object'
-      ? batchResult
-      : {}
-  ) as CacheRecord;
-  const responses = Array.isArray(batchRecord.responses)
-    ? (batchRecord.responses as SurveyResponseItem[])
-    : [];
-  const lowestFailedBlock = Number(batchRecord.lowestFailedBlock);
-  return {
-    responses,
-    hadPartialFailure: !!batchRecord.hadPartialFailure,
-    lowestFailedBlock: Number.isFinite(lowestFailedBlock) ? lowestFailedBlock : null,
-  };
-};
-
-const resolveSurveyResponseWatermark = ({
-  startBlock,
-  latestBlock,
-  hadPartialFailure,
-  lowestFailedBlock,
-}: ResolveSurveyResponseWatermarkArgs): number => {
-  if (!hadPartialFailure) return latestBlock;
-  const failedBlock = Number(lowestFailedBlock);
-  if (!Number.isFinite(failedBlock)) return latestBlock;
-  return Math.max(
-    Math.max(0, Number(startBlock) - 1),
-    Math.min(Number(latestBlock) || 0, failedBlock - 1)
-  );
-};
 
 export const createSessionSurveyCacheController = (
   host: SessionSurveyCacheHost = {}
@@ -248,6 +204,16 @@ export const createSessionSurveyCacheController = (
   );
   const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
     typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
+  );
+  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean => (
+    typeof host.shouldSkipSessionScanForSlug === 'function'
+      ? host.shouldSkipSessionScanForSlug(slug, op, scopeCtx)
+      : false
+  );
+  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown => (
+    typeof host.onSurveyEventDetectedForGroup === 'function'
+      ? host.onSurveyEventDetectedForGroup(slug, event)
+      : undefined
   );
   const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') {
@@ -899,6 +865,27 @@ export const createSessionSurveyCacheController = (
     }
   };
 
+  const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
+    if (typeof surveyContractScripts.removeSurveyEventsListener === 'function') {
+      surveyContractScripts.removeSurveyEventsListener('none', slug);
+    }
+    if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
+    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
+    surveyContractScripts.listenForSurveyEvents(
+      'none',
+      (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
+      slug
+    );
+    mainSiteLog.log('Survey & Question event listener started');
+    return true;
+  };
+
+  const startSurveyAndQuestionEventListener = (): boolean => (
+    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug())
+  );
+
   const refreshSurveyResponsesByIDForGroup = async (slugIn: string, surveyID: string): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
     mainSiteLog.log('refreshSurveyResponsesByIDForGroup() for surveyID:', surveyID, 'slug:', slug);
@@ -981,6 +968,8 @@ export const createSessionSurveyCacheController = (
   return {
     initializeSurveyCacheForGroup,
     refreshSurveyResponsesByIDForGroup,
+    startSurveyAndQuestionEventListener,
+    startSurveyAndQuestionEventListenerForGroup,
     isInitInFlight,
     destroy,
   };

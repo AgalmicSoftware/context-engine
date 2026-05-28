@@ -1,4 +1,3 @@
-import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import {
   isPlainAnalysisObject,
   toAnalysisRecord,
@@ -294,30 +293,58 @@ export type {
   BuildUserPageSbtSectionArgs,
   UserPageSbtSectionResult,
 } from './userPageAnalysisContentHelpers';
-export type UserPageEffectiveAiConfigRequest = {
-  sessionSlug: string;
-  thinking: boolean;
-  resolveSecrets: boolean;
-};
-export type UserPageEffectiveAiConfigResult = {
-  provider?: unknown;
-  model?: unknown;
-};
-export type UserPageEffectiveAiConfigGetter = (
-  request: UserPageEffectiveAiConfigRequest
-) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
-export type UserPageAnalysisAiContextLogger = {
-  warn?: (...args: unknown[]) => void;
-};
-export type ResolveUserPageAnalysisAiContextArgs = {
-  getEffectiveAiConfig?: UserPageEffectiveAiConfigGetter;
-  logger?: UserPageAnalysisAiContextLogger;
-  sessionConfig?: UserPageUnknownRecord;
-  sessionSlug?: unknown;
-};
+export {
+  buildUserPageDeriveTelemetrySnapshot,
+  buildUserPageNoSbtVisibleTelemetryState,
+  buildUserPageRefreshTelemetrySignature,
+  buildUserPageRefreshTelemetrySnapshot,
+  readBoolishUserPageTelemetryFlag,
+} from './userPageTelemetryHelpers';
+export type {
+  BuildUserPageDeriveTelemetrySnapshotArgs,
+  BuildUserPageNoSbtVisibleTelemetryStateArgs,
+  BuildUserPageRefreshTelemetrySnapshotArgs,
+  UserPageNoSbtVisibleTelemetryState,
+} from './userPageTelemetryHelpers';
+export {
+  buildUserPageAiSessionScopeContext,
+  buildUserPageAiSessionSlugCandidates,
+  buildUserPageAnalysisCandidateLogRows,
+  buildUserPageAnalysisExcludeSlugSet,
+  deriveAnalysisAiContextFromSessionConfig,
+  resolveUserPageAnalysisAiContext,
+  resolveUserPageAnalysisSessionConfigForSlug,
+  resolveUserPageAnalysisSessionFallback,
+  resolveUserPageQuestionSourceSessionSlug,
+} from './userPageAnalysisSessionHelpers';
+export type {
+  BuildUserPageAiSessionScopeContextArgs,
+  BuildUserPageAiSessionSlugCandidatesArgs,
+  BuildUserPageAnalysisExcludeSlugSetArgs,
+  ResolveUserPageAnalysisAiContextArgs,
+  ResolveUserPageAnalysisSessionConfigForSlugArgs,
+  ResolveUserPageAnalysisSessionFallbackArgs,
+  ResolveUserPageQuestionSourceSessionSlugArgs,
+  UserPageAiSessionScopeContext,
+  UserPageAnalysisAiContextLogger,
+  UserPageAnalysisCandidateLogRow,
+  UserPageAnalysisSessionFallback,
+  UserPageEffectiveAiConfigGetter,
+  UserPageEffectiveAiConfigRequest,
+  UserPageEffectiveAiConfigResult,
+} from './userPageAnalysisSessionHelpers';
+export {
+  buildUserPageAiAvailabilityStatePatch,
+  resolveUserPageAiAvailabilityRefresh,
+} from './userPageAiAvailabilityHelpers';
+export type {
+  BuildUserPageAiAvailabilityStatePatchArgs,
+  ResolveUserPageAiAvailabilityRefreshArgs,
+  UserPageAiAvailabilityRefreshDecision,
+  UserPageAiAvailabilityStatePatch,
+} from './userPageAiAvailabilityHelpers';
 type UserPageNamespaceSlugReader = (namespace: unknown) => unknown;
 type UserPageNamespacePresenceReader = (namespace: unknown) => boolean;
-type UserPageDeepScanSlugReader = (namespace: string) => unknown[];
 type UserPageDeepScanCacheReader = (
   namespace: string,
   slug: string,
@@ -341,33 +368,6 @@ export type UserPageCacheSourceSnapshot = UserPageCacheSourcePresence & {
   questionSourcesSignature: string;
   sbtSourcesSignature: string;
   membershipSignature: string;
-};
-type UserPageLengthLike = {
-  length: number;
-};
-type UserPageSessionConfigReader = (slug: string) => unknown;
-type UserPageSessionSlugByNameReader = (sessionName: unknown) => unknown;
-type ResolveUserPageAnalysisSessionConfigForSlugArgs = {
-  getSessionConfigBySlug?: UserPageSessionConfigReader;
-  getSessionConfigBySlugOrDefault?: UserPageSessionConfigReader;
-  slugIn?: unknown;
-};
-type ResolveUserPageQuestionSourceSessionSlugArgs = {
-  fallbackSlug?: unknown;
-  getSessionSlugByName?: UserPageSessionSlugByNameReader;
-  questionData?: unknown;
-};
-type BuildUserPageAiSessionScopeContextArgs = {
-  activeSessionSlug?: unknown;
-  scanScope?: unknown;
-  scanSlugs?: unknown;
-};
-type BuildUserPageAiSessionSlugCandidatesArgs = {
-  activeSessionSlug?: unknown;
-  listNamespaceSlugs?: UserPageDeepScanSlugReader;
-  namespaces?: string[];
-  sbtList?: unknown;
-  scopeContext?: UserPageAiSessionScopeContext | null;
 };
 type ReadUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
@@ -423,34 +423,6 @@ type ResolveUserPageCacheUpdateRefreshArgs = {
 type BuildUserPageAddressContextResetStatePatchArgs = {
   viewAddress?: unknown;
 };
-type ResolveUserPageAiAvailabilityRefreshArgs = {
-  nextAccount?: unknown;
-  nextIsQuestionCacheReady?: unknown;
-  nextIsResponsesCacheReady?: unknown;
-  nextIsSBTCacheReady?: unknown;
-  nextIsSurveyCacheReady?: unknown;
-  nextNetworkId?: unknown;
-  nextViewAddress?: unknown;
-  prevAccount?: unknown;
-  prevIsQuestionCacheReady?: unknown;
-  prevIsResponsesCacheReady?: unknown;
-  prevIsSBTCacheReady?: unknown;
-  prevIsSurveyCacheReady?: unknown;
-  prevNetworkId?: unknown;
-  prevViewAddress?: unknown;
-};
-type BuildUserPageAiAvailabilityStatePatchArgs = {
-  available?: unknown;
-};
-type UserPageAiAvailabilityStatePatch = {
-  aiAvailable: boolean | null;
-};
-type UserPageAiAvailabilityRefreshDecision = {
-  allCachesReady: boolean;
-  contextChanged: boolean;
-  shouldCheckAfterReset: boolean;
-  shouldCheckNow: boolean;
-};
 type UserPageResponseNonceRefreshOptions = {
   bypassSignature?: boolean;
   force?: boolean;
@@ -504,46 +476,6 @@ type BuildUserPageCacheLoadingHoldFlagsArgs = {
   sbtReady?: unknown;
   surveysReady?: unknown;
 };
-type BuildUserPageDeriveTelemetrySnapshotArgs = {
-  aggregate?: unknown;
-  questionSection?: unknown;
-  sbtSection?: unknown;
-  surveySection?: unknown;
-};
-type BuildUserPageNoSbtVisibleTelemetryStateArgs = {
-  hasUncertainGateAccess?: unknown;
-  hasUncertainSbtData?: unknown;
-  hasUncertainUserData?: unknown;
-  isDeepScanning?: unknown;
-  isSBTReady?: unknown;
-  latestRefreshTelemetry?: unknown;
-  loadingSBTs?: unknown;
-  networkID?: unknown;
-  sbtList?: unknown;
-  viewAddress?: unknown;
-};
-type UserPageNoSbtVisibleTelemetryState = {
-  payload: UserPageUnknownRecord | null;
-  shouldEmit: boolean;
-  signature: string;
-};
-type BuildUserPageRefreshTelemetrySnapshotArgs = {
-  aggregate?: unknown;
-  bypassSignature?: unknown;
-  deepScanTooltipLines?: unknown;
-  force?: unknown;
-  hasSbtSources?: unknown;
-  hasUncertainGateAccess?: unknown;
-  hasUncertainUserData?: unknown;
-  holdSbtLoading?: unknown;
-  isDeepScanning?: unknown;
-  markLoading?: unknown;
-  networkID?: unknown;
-  sbtReady?: unknown;
-  sbtSection?: unknown;
-  sourcePresence?: unknown;
-  viewAddressLower?: unknown;
-};
 type UserPageQueuedCacheRefreshFlags = {
   bypassSignature: boolean;
   force: boolean;
@@ -565,22 +497,6 @@ type UserPageCacheUpdateRefreshDecision = {
   sbtRevisionChanged: boolean;
   shouldQueueCacheRefresh: boolean;
   shouldResetGateAccess: boolean;
-};
-type BuildUserPageAnalysisExcludeSlugSetArgs = {
-  excludeSlugs?: unknown;
-};
-type UserPageAnalysisCandidateLogRow = {
-  slug: unknown;
-  status: unknown;
-};
-type ResolveUserPageAnalysisSessionFallbackArgs = {
-  activeCandidate?: unknown;
-  checked?: unknown;
-  firstUsable?: unknown;
-};
-type UserPageAnalysisSessionFallback = {
-  candidate: UserPageUnknownRecord;
-  reason: string;
 };
 type BuildUserPageNamespaceSourceMembershipSignatureArgs = {
   listNamespaceSlugs?: UserPageNamespaceSlugReader;
@@ -618,11 +534,6 @@ type BuildUserPageSbtSectionDeriveSignatureArgs = {
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
-export type UserPageAiSessionScopeContext = {
-  mode: string;
-  strict: boolean;
-  allowedSlugs: string[];
-};
 export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   version?: unknown;
   fingerprint?: unknown;
@@ -640,82 +551,6 @@ export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => 
 export const isUserPageGateAccessContext = (value: unknown): boolean => {
   const record = toAnalysisRecord(value);
   return record.pendingKeys instanceof Set && record.uncertainResources instanceof Set;
-};
-
-export const readBoolishUserPageTelemetryFlag = (raw: unknown, fallback: unknown = false): boolean => {
-  if (typeof raw === 'boolean') return raw;
-  const val = (raw == null ? '' : String(raw)).trim().toLowerCase();
-  if (val === '1' || val === 'true' || val === 'yes' || val === 'on') return true;
-  if (val === '0' || val === 'false' || val === 'no' || val === 'off') return false;
-  return !!fallback;
-};
-
-export const buildUserPageAiSessionScopeContext = ({
-  activeSessionSlug = '',
-  scanScope = '',
-  scanSlugs = [],
-}: BuildUserPageAiSessionScopeContextArgs = {}): UserPageAiSessionScopeContext => {
-  const mode = String(scanScope || '').trim().toLowerCase();
-  const activeSlug = normalizeSessionSlug(activeSessionSlug || '');
-  const toList = (raw: unknown): string[] => (
-    Array.isArray(raw)
-      ? Array.from(new Set(raw.map((item: unknown) => normalizeSessionSlug(item || ''))))
-      : []
-  );
-  if (mode === 'general') {
-    return { mode, strict: true, allowedSlugs: [''] };
-  }
-  if (mode === 'active') {
-    return { mode, strict: !!activeSlug, allowedSlugs: activeSlug ? [activeSlug] : [] };
-  }
-  if (mode === 'list') {
-    const list = toList(scanSlugs);
-    return { mode, strict: list.length > 0, allowedSlugs: list };
-  }
-  return { mode: mode || 'all', strict: false, allowedSlugs: [] };
-};
-
-export const buildUserPageAiSessionSlugCandidates = ({
-  activeSessionSlug = '',
-  listNamespaceSlugs = () => [],
-  namespaces = ['userCache', 'surveysCache', 'questionsCache', 'sbtCache'],
-  sbtList = [],
-  scopeContext = null,
-}: BuildUserPageAiSessionSlugCandidatesArgs = {}): string[] => {
-  const ordered: string[] = [];
-  const seen = new Set<string>();
-  const push = (rawSlug: unknown): void => {
-    const slug = normalizeSessionSlug(rawSlug || '');
-    if (seen.has(slug)) return;
-    seen.add(slug);
-    ordered.push(slug);
-  };
-
-  const activeSlug = normalizeSessionSlug(activeSessionSlug || '');
-  const resolvedScopeContext = scopeContext || buildUserPageAiSessionScopeContext({ activeSessionSlug });
-  const allowedSlugs = Array.isArray(resolvedScopeContext.allowedSlugs)
-    ? resolvedScopeContext.allowedSlugs
-    : [];
-
-  // Keep the actively viewed session eligible even when strict scan scope is narrower.
-  push(activeSlug);
-  allowedSlugs.forEach((slug: unknown) => push(slug));
-  namespaces.forEach((namespace: string) => {
-    listNamespaceSlugs(namespace).forEach((slug: unknown) => push(slug));
-  });
-  if (Array.isArray(sbtList)) {
-    sbtList.forEach((item: unknown) => {
-      const record = toAnalysisRecord(item);
-      push(record.slug);
-    });
-  }
-  if (!ordered.length) push('');
-  if (!resolvedScopeContext.strict) return ordered;
-
-  const allowed = new Set<string>(allowedSlugs);
-  if (activeSlug) allowed.add(activeSlug);
-  const filtered = ordered.filter((slug: string) => allowed.has(slug));
-  return filtered.length > 0 ? filtered : ordered;
 };
 
 export const readUserPageAnalysisCacheEntry = ({
@@ -810,30 +645,6 @@ export const buildUserPageAnalysisCacheWritePayload = ({
   networkBucket[addressKey] = addressBucket;
   next[networkKey] = networkBucket;
   return next;
-};
-
-export const resolveUserPageQuestionSourceSessionSlug = ({
-  questionData = null,
-  fallbackSlug = '',
-  getSessionSlugByName = () => null,
-}: ResolveUserPageQuestionSourceSessionSlugArgs = {}): string => {
-  const record = toAnalysisRecord(questionData);
-  const explicitSlug = normalizeSessionSlug(
-    record.sessionSlug ??
-    record._sessionSlug ??
-    record.groupSlug ??
-    record.session ??
-    ''
-  );
-  if (explicitSlug) return explicitSlug;
-
-  const mappedNameSlug = getSessionSlugByName(record.sessionName);
-  if (mappedNameSlug != null) return normalizeSessionSlug(mappedNameSlug);
-
-  const nameSlug = normalizeSessionSlug(record.sessionName);
-  if (nameSlug && /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(nameSlug)) return nameSlug;
-
-  return normalizeSessionSlug(fallbackSlug);
 };
 
 export const buildUserPageNamespaceSourceMembershipSignature = ({
@@ -1018,113 +829,6 @@ export const buildUserPageSbtSectionDeriveSignature = ({
   ].join('|')
 );
 
-export const resolveUserPageAnalysisSessionConfigForSlug = ({
-  getSessionConfigBySlug: readSessionConfig = () => null,
-  getSessionConfigBySlugOrDefault: readDefaultSessionConfig = () => null,
-  slugIn = '',
-}: ResolveUserPageAnalysisSessionConfigForSlugArgs = {}): UserPageUnknownRecord | null => {
-  const slug = normalizeSessionSlug(slugIn || '');
-  const cfg = slug ? readSessionConfig(slug) : readDefaultSessionConfig('');
-  return isPlainAnalysisObject(cfg) ? cfg : null;
-};
-
-export const buildUserPageAnalysisExcludeSlugSet = ({
-  excludeSlugs = [],
-}: BuildUserPageAnalysisExcludeSlugSetArgs = {}): Set<string> => {
-  const list = Array.isArray(excludeSlugs)
-    ? excludeSlugs.filter((slug: unknown) => slug != null)
-    : [];
-  return new Set<string>(list.map((slug: unknown) => normalizeSessionSlug(slug || '')));
-};
-
-export const resolveUserPageAnalysisSessionFallback = ({
-  activeCandidate = null,
-  checked = [],
-  firstUsable = null,
-}: ResolveUserPageAnalysisSessionFallbackArgs = {}): UserPageAnalysisSessionFallback | null => {
-  const active = isPlainAnalysisObject(activeCandidate) ? activeCandidate : null;
-  const usable = isPlainAnalysisObject(firstUsable) ? firstUsable : null;
-  const checkedList = Array.isArray(checked)
-    ? checked.filter((entry): entry is UserPageUnknownRecord => isPlainAnalysisObject(entry))
-    : [];
-  const fallback = active || usable || checkedList[0] || null;
-  if (!fallback) return null;
-  const reason = fallback === active
-    ? 'fallback-active-session'
-    : fallback === usable
-      ? 'fallback-first-usable-session'
-      : 'fallback-first-checked-session';
-  return { candidate: fallback, reason };
-};
-
-export const buildUserPageAnalysisCandidateLogRows = (
-  checked: unknown = []
-): UserPageAnalysisCandidateLogRow[] => (
-  (Array.isArray(checked) ? checked : [])
-    .map((entry: unknown) => {
-      const record = toAnalysisRecord(entry);
-      return {
-        slug: record.slug || 'general',
-        status: record.status,
-      };
-    })
-);
-
-export const deriveAnalysisAiContextFromSessionConfig = (
-  sessionSlug: unknown,
-  sessionConfig: UserPageUnknownRecord = {}
-) => {
-  const ai = toAnalysisRecord(sessionConfig.ai);
-  const models = toAnalysisRecord(ai.models);
-  const modelProviders = toAnalysisRecord(ai.modelProviders);
-  const thinkingModel = models.thinking || models.reasoning || models.default;
-  const thinkingModelRecord = toAnalysisRecord(thinkingModel);
-  const fallbackProvider = String(ai.mode || ai.provider || 'openai').trim().toLowerCase() || 'openai';
-  const provider = String(
-    (isPlainAnalysisObject(thinkingModel) ? thinkingModelRecord.provider : '') ||
-    modelProviders.thinking ||
-    modelProviders.reasoning ||
-    modelProviders.default ||
-    fallbackProvider
-  ).trim().toLowerCase() || 'openai';
-  const model = String(
-    (isPlainAnalysisObject(thinkingModel)
-      ? (thinkingModelRecord.model || thinkingModelRecord.name || thinkingModelRecord.value)
-      : thinkingModel) ||
-    'gpt-5'
-  ).trim() || 'gpt-5';
-  return {
-    sessionSlug: String(sessionSlug || ''),
-    provider,
-    model,
-  };
-};
-
-export const resolveUserPageAnalysisAiContext = async ({
-  getEffectiveAiConfig,
-  logger,
-  sessionConfig = {},
-  sessionSlug,
-}: ResolveUserPageAnalysisAiContextArgs = {}) => {
-  const fallback = deriveAnalysisAiContextFromSessionConfig(sessionSlug, sessionConfig);
-  try {
-    if (typeof getEffectiveAiConfig !== 'function') return fallback;
-    const effective = await getEffectiveAiConfig({
-      sessionSlug: String(sessionSlug || ''),
-      thinking: true,
-      resolveSecrets: false,
-    });
-    return {
-      sessionSlug: String(sessionSlug || ''),
-      provider: String(effective?.provider || fallback.provider || 'openai').trim().toLowerCase() || 'openai',
-      model: String(effective?.model || fallback.model || 'gpt-5').trim() || 'gpt-5',
-    };
-  } catch (error) {
-    logger?.warn?.('[UserPage] analysis AI context fallback:', error);
-    return fallback;
-  }
-};
-
 export const resolveUserPageResponseNonceRefresh = ({
   account = '',
   connectedAddress = '',
@@ -1290,212 +994,6 @@ export const buildUserPageCacheLoadingHoldFlags = ({
   holdSbtLoading: !force && (!sbtReady && !hasSbtSources),
 });
 
-export const buildUserPageDeriveTelemetrySnapshot = ({
-  aggregate = null,
-  questionSection = null,
-  sbtSection = null,
-  surveySection = null,
-}: BuildUserPageDeriveTelemetrySnapshotArgs = {}): UserPageUnknownRecord => {
-  const aggregateRecord = aggregate as UserPageUnknownRecord | null | undefined;
-  const questionRecord = questionSection as UserPageUnknownRecord | null | undefined;
-  const sbtRecord = sbtSection as UserPageUnknownRecord | null | undefined;
-  const surveyRecord = surveySection as UserPageUnknownRecord | null | undefined;
-  return {
-    aggregateBuilt: !!aggregate,
-    combinedSurveys: aggregate ? Object.keys((aggregateRecord?.combinedSurveys || {}) as object).length : 0,
-    combinedQuestions: aggregate ? Object.keys((aggregateRecord?.combinedQuestions || {}) as object).length : 0,
-    combinedSurveyResponses: aggregate
-      ? Object.keys((aggregateRecord?.combinedSurveyResponses || {}) as object).length
-      : 0,
-    combinedQuestionResponses: aggregate
-      ? Object.keys((aggregateRecord?.combinedQuestionResponses || {}) as object).length
-      : 0,
-    sbtAggregateKeys: aggregate ? Object.keys((aggregateRecord?.sbtAggregate || {}) as object).length : 0,
-    surveySection: surveySection ? {
-      responseCount: (surveyRecord?.surveyResponseInfo as UserPageLengthLike | null | undefined)?.length,
-      createdCount: (surveyRecord?.surveyCreationInfo as UserPageLengthLike | null | undefined)?.length,
-    } : null,
-    questionSection: questionSection ? {
-      responseCount: (questionRecord?.questionResponseInfo as UserPageLengthLike | null | undefined)?.length,
-      createdCount: (questionRecord?.questionCreationInfo as UserPageLengthLike | null | undefined)?.length,
-    } : null,
-    sbtSection: sbtSection ? {
-      sbtCount: (sbtRecord?.sbtList as UserPageLengthLike | null | undefined)?.length,
-    } : null,
-  };
-};
-
-export const buildUserPageNoSbtVisibleTelemetryState = ({
-  hasUncertainGateAccess = false,
-  hasUncertainSbtData = false,
-  hasUncertainUserData = false,
-  isDeepScanning = false,
-  isSBTReady = false,
-  latestRefreshTelemetry = null,
-  loadingSBTs = false,
-  networkID = '',
-  sbtList = [],
-  viewAddress = '',
-}: BuildUserPageNoSbtVisibleTelemetryStateArgs = {}): UserPageNoSbtVisibleTelemetryState => {
-  const viewAddressLower = String(viewAddress || '').toLowerCase();
-  const resolvedIsSBTReady = !!isSBTReady;
-  const resolvedLoadingSBTs = !!loadingSBTs;
-  const resolvedIsDeepScanning = !!isDeepScanning;
-  const isSbtLoadingAny = !!(resolvedLoadingSBTs || !resolvedIsSBTReady || resolvedIsDeepScanning);
-  const sbtListCount = Array.isArray(sbtList) ? sbtList.length : 0;
-  if (isSbtLoadingAny || sbtListCount > 0) {
-    return {
-      payload: null,
-      shouldEmit: false,
-      signature: '',
-    };
-  }
-
-  const latestRefresh = toAnalysisRecord(latestRefreshTelemetry);
-  const signature = [
-    viewAddressLower,
-    String(networkID || ''),
-    String(resolvedLoadingSBTs ? 1 : 0),
-    String(resolvedIsSBTReady ? 1 : 0),
-    String(resolvedIsDeepScanning ? 1 : 0),
-    String(hasUncertainUserData ? 1 : 0),
-    String(hasUncertainSbtData ? 1 : 0),
-    String(hasUncertainGateAccess ? 1 : 0),
-    String(sbtListCount),
-    String(latestRefresh.aggregateSbtAddresses || 0),
-    String(latestRefresh.heldAggregateSbtCount || 0),
-    String(latestRefresh.derivedSbtCount ?? ''),
-  ].join('|');
-
-  return {
-    payload: {
-      viewAddress: viewAddressLower,
-      networkID: String(networkID || ''),
-      loadingSBTs: resolvedLoadingSBTs,
-      isSBTReady: resolvedIsSBTReady,
-      isDeepScanning: resolvedIsDeepScanning,
-      hasUncertainUserData: !!hasUncertainUserData,
-      hasUncertainSbtData: !!hasUncertainSbtData,
-      hasUncertainGateAccess: !!hasUncertainGateAccess,
-      sbtListCount,
-      refreshSnapshot: latestRefresh,
-    },
-    shouldEmit: true,
-    signature,
-  };
-};
-
-export const buildUserPageRefreshTelemetrySnapshot = ({
-  aggregate = null,
-  bypassSignature = false,
-  deepScanTooltipLines = null,
-  force = false,
-  hasSbtSources = false,
-  hasUncertainGateAccess = false,
-  hasUncertainUserData = false,
-  holdSbtLoading = false,
-  isDeepScanning = false,
-  markLoading = false,
-  networkID = '',
-  sbtReady = false,
-  sbtSection = null,
-  sourcePresence = {},
-  viewAddressLower = '',
-}: BuildUserPageRefreshTelemetrySnapshotArgs = {}): UserPageUnknownRecord => {
-  const aggregateRecord = aggregate as UserPageUnknownRecord | null | undefined;
-  const sbtSectionRecord = sbtSection as UserPageUnknownRecord | null | undefined;
-  const aggregateSbt = aggregateRecord?.sbtAggregate || {};
-  const aggregateSbtKeys = Object.keys(aggregateSbt as object);
-  const heldAggregateSbtKeys = aggregateSbtKeys.filter((key: string) => {
-    const entry = (aggregateSbt as UserPageUnknownRecord)[key] as UserPageUnknownRecord | null | undefined;
-    return !!(
-      entry &&
-      (entry.mintedSet as { has?: (value: unknown) => boolean } | null | undefined)?.has?.(viewAddressLower) &&
-      !(entry.burnedSet as { has?: (value: unknown) => boolean } | null | undefined)?.has?.(viewAddressLower)
-    );
-  });
-  const aggregateSurveyMap = aggregateRecord?.combinedSurveys || {};
-  const aggregateQuestionMap = aggregateRecord?.combinedQuestions || {};
-  const aggregateSurveyResponseMap = aggregateRecord?.combinedSurveyResponses || {};
-  const aggregateQuestionResponseMap = aggregateRecord?.combinedQuestionResponses || {};
-  const aggregateSurveyResponseIds = Object.keys(aggregateSurveyResponseMap as object).filter((sidRaw: string) => {
-    const sid = String(sidRaw || '').toLowerCase();
-    if (!sid) return false;
-    const row = (
-      (aggregateSurveyResponseMap as UserPageUnknownRecord)[sidRaw] ||
-      (aggregateSurveyResponseMap as UserPageUnknownRecord)[sid] ||
-      {}
-    );
-    return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower as PropertyKey));
-  });
-  const aggregateQuestionResponseIds = Object.keys(aggregateQuestionResponseMap as object).filter((qidRaw: string) => {
-    const qid = String(qidRaw || '').toLowerCase();
-    if (!qid) return false;
-    const row = (
-      (aggregateQuestionResponseMap as UserPageUnknownRecord)[qidRaw] ||
-      (aggregateQuestionResponseMap as UserPageUnknownRecord)[qid] ||
-      {}
-    );
-    return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower as PropertyKey));
-  });
-
-  return {
-    viewAddress: viewAddressLower,
-    networkID: String(networkID || ''),
-    force: !!force,
-    markLoading: !!markLoading,
-    bypassSignature: !!bypassSignature,
-    isDeepScanning: !!isDeepScanning,
-    hasUncertainUserData: !!hasUncertainUserData,
-    hasUncertainGateAccess: !!hasUncertainGateAccess,
-    sbtReady: !!sbtReady,
-    holdSbtLoading: !!holdSbtLoading,
-    hasSbtSources: !!hasSbtSources,
-    aggregateSbtAddresses: aggregateSbtKeys.length,
-    heldAggregateSbtCount: heldAggregateSbtKeys.length,
-    heldAggregateSbtSample: heldAggregateSbtKeys.slice(0, 12),
-    aggregateSurveyCount: Object.keys(aggregateSurveyMap as object).length,
-    aggregateQuestionCount: Object.keys(aggregateQuestionMap as object).length,
-    aggregateSurveyResponseCount: aggregateSurveyResponseIds.length,
-    aggregateQuestionResponseCount: aggregateQuestionResponseIds.length,
-    aggregateSurveyResponseSample: aggregateSurveyResponseIds.slice(0, 12),
-    aggregateQuestionResponseSample: aggregateQuestionResponseIds.slice(0, 12),
-    derivedSbtCount: Array.isArray(sbtSectionRecord?.sbtList)
-      ? sbtSectionRecord.sbtList.length
-      : null,
-    sourcePresence,
-    deepScanTooltipLines: Array.isArray(deepScanTooltipLines)
-      ? deepScanTooltipLines.slice(0, 8)
-      : [],
-  };
-};
-
-export const buildUserPageRefreshTelemetrySignature = (
-  refreshTelemetry: unknown = {}
-): string => {
-  const telemetry = refreshTelemetry as UserPageUnknownRecord;
-  const deepScanTooltipLines = Array.isArray(telemetry.deepScanTooltipLines)
-    ? telemetry.deepScanTooltipLines
-    : [];
-  return [
-    telemetry.viewAddress,
-    telemetry.networkID,
-    String(telemetry.isDeepScanning ? 1 : 0),
-    String(telemetry.hasUncertainUserData ? 1 : 0),
-    String(telemetry.sbtReady ? 1 : 0),
-    String(telemetry.holdSbtLoading ? 1 : 0),
-    String(telemetry.hasSbtSources ? 1 : 0),
-    String(telemetry.aggregateSbtAddresses),
-    String(telemetry.heldAggregateSbtCount),
-    String(telemetry.aggregateSurveyCount || 0),
-    String(telemetry.aggregateQuestionCount || 0),
-    String(telemetry.aggregateSurveyResponseCount || 0),
-    String(telemetry.aggregateQuestionResponseCount || 0),
-    String(telemetry.derivedSbtCount ?? ''),
-    deepScanTooltipLines.join('|'),
-  ].join('|');
-};
-
 export const buildUserPageMissingAddressCacheStatePatch = (): UserPageUnknownRecord => ({
   loadingSurveys: false,
   loadingQuestions: false,
@@ -1562,50 +1060,3 @@ export const buildUserPageAddressContextResetStatePatch = ({
   deepScanTooltipLines: null,
   deepScanProgressRows: null,
 });
-
-export const buildUserPageAiAvailabilityStatePatch = ({
-  available = null,
-}: BuildUserPageAiAvailabilityStatePatchArgs = {}): UserPageAiAvailabilityStatePatch => ({
-  aiAvailable: available === null ? null : Boolean(available),
-});
-
-export const resolveUserPageAiAvailabilityRefresh = ({
-  nextAccount = '',
-  nextIsQuestionCacheReady = false,
-  nextIsResponsesCacheReady = false,
-  nextIsSBTCacheReady = false,
-  nextIsSurveyCacheReady = false,
-  nextNetworkId = null,
-  nextViewAddress = '',
-  prevAccount = '',
-  prevIsQuestionCacheReady = false,
-  prevIsResponsesCacheReady = false,
-  prevIsSBTCacheReady = false,
-  prevIsSurveyCacheReady = false,
-  prevNetworkId = null,
-  prevViewAddress = '',
-}: ResolveUserPageAiAvailabilityRefreshArgs = {}): UserPageAiAvailabilityRefreshDecision => {
-  const allCachesReady = !!(
-    nextIsSBTCacheReady &&
-    nextIsSurveyCacheReady &&
-    nextIsQuestionCacheReady &&
-    nextIsResponsesCacheReady
-  );
-  const prevAllCachesReady = !!(
-    prevIsSBTCacheReady &&
-    prevIsSurveyCacheReady &&
-    prevIsQuestionCacheReady &&
-    prevIsResponsesCacheReady
-  );
-  const contextChanged = (
-    prevAccount !== nextAccount ||
-    prevViewAddress !== nextViewAddress ||
-    prevNetworkId !== nextNetworkId
-  );
-  return {
-    allCachesReady,
-    contextChanged,
-    shouldCheckAfterReset: contextChanged && allCachesReady,
-    shouldCheckNow: !contextChanged && allCachesReady && !prevAllCachesReady,
-  };
-};
