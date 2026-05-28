@@ -31,6 +31,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -229,18 +231,51 @@ describe('SurveyResults export/view controls', () => {
     };
 
     const tree = subject.render();
-    const toggleSwitch = findElement(
+    const toggleNode = findElement(
       tree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('toggleSwitch')
+      (element) => element?.type === SurveyResultsSurveyViewModeToggle
     );
-    expect(toggleSwitch).toBeTruthy();
+    expect(toggleNode).toBeTruthy();
+    expect(toggleNode.props.isAggregate).toBe(false);
+    expect(toggleNode.props.knobStyle).toEqual(resolveSurveyResultsToggleKnobStyle(false));
 
-    expect(treeHasText(tree, 'Individual')).toBe(true);
-    expect(treeHasText(tree, 'Aggregate')).toBe(true);
-    expect(treeHasText(tree, 'Individuals View')).toBe(false);
-    expect(treeHasText(tree, 'Aggregate View')).toBe(false);
+    const markup = renderToStaticMarkup(<SurveyResultsSurveyViewModeToggle {...toggleNode.props} />);
+    expect(markup).toContain('Individual');
+    expect(markup).toContain('Aggregate');
+    expect(markup).not.toContain('Individuals View');
+    expect(markup).not.toContain('Aggregate View');
+  });
+
+  it('toggles survey view mode from keyboard activation and ignores other keys', () => {
+    const subject = attachStateHarness(createSubject());
+    subject.state = {
+      ...subject.state,
+      surveyViewMode: 'individuals',
+    };
+
+    const ignoredPreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: 'ArrowRight',
+      preventDefault: ignoredPreventDefault,
+    });
+    expect(ignoredPreventDefault).not.toHaveBeenCalled();
+    expect(subject.state.surveyViewMode).toBe('individuals');
+
+    const enterPreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: 'Enter',
+      preventDefault: enterPreventDefault,
+    });
+    expect(enterPreventDefault).toHaveBeenCalledTimes(1);
+    expect(subject.state.surveyViewMode).toBe('aggregate');
+
+    const spacePreventDefault = jest.fn();
+    subject.handleSurveyViewModeKeyDown({
+      key: ' ',
+      preventDefault: spacePreventDefault,
+    });
+    expect(spacePreventDefault).toHaveBeenCalledTimes(1);
+    expect(subject.state.surveyViewMode).toBe('individuals');
   });
 
   it('passes the light-surface filter button variant to survey-mode SBT filters', () => {
@@ -332,12 +367,21 @@ describe('SurveyResults export/view controls', () => {
     };
 
     const tree = subject.render();
+    const exportControls = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsExportControls
+    );
+    const optionLabels = exportControls?.props?.exportOptions?.map((option: any) => option.label) || [];
 
-    expect(treeHasText(tree, 'CSV: Questions')).toBe(true);
-    expect(treeHasText(tree, 'CSV: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions')).toBe(true);
-    expect(treeHasText(tree, 'JSON: Questions + Responses')).toBe(true);
-    expect(treeHasText(tree, 'Polis Report')).toBe(false);
+    expect(exportControls).toBeTruthy();
+    expect(exportControls.props.exportTypeLabel).toBe('CSV: Questions + Responses');
+    expect(optionLabels).toEqual([
+      'CSV: Questions',
+      'CSV: Questions + Responses',
+      'JSON: Questions',
+      'JSON: Questions + Responses',
+    ]);
+    expect(optionLabels).not.toContain('Polis Report');
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {

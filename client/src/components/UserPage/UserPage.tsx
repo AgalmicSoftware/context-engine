@@ -1,5 +1,5 @@
 /** @file UserPage.tsx */
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
@@ -141,10 +141,6 @@ import {
   resolveUserPageHeaderActionVisibility,
   resolveUserPageQuestionSectionDisplayState,
   resolveUserPageSbtDisplayState,
-  resolveUserPageSurveyCountDisplayState,
-  resolveUserPageSurveyCreatedCardState,
-  resolveUserPageSurveyPreviewDisplayState,
-  resolveUserPageSurveyResponseCardState,
   resolveUserPageSurveySectionDisplayState,
   resolveUserPageDeepScanSessionDisplayConfig,
   resolveUserPageDeepScanProgressStateUpdate,
@@ -156,7 +152,6 @@ import {
   resolveUserPageResponseNonceRefresh,
   resolveUserPageSectionToggleDisplayState,
   resolveUserPageUsernameErrorDisplayState,
-  shortenUserPageQuestionId,
   shouldApplyUserPageDeepScanResponse,
   shouldRetryUserPageQuestionData,
   toAnalysisCacheBucket,
@@ -171,33 +166,16 @@ import {
   type UserPageSourceSlugMap,
   applyUserPageDecryptedPatchToResponseField,
 } from './userPageHelpers';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCopy,
-  faCheck,
-  faExpand,
-  faSpinner,
-  faExternalLinkAlt,
-  faBookmark,
-  faChevronDown,
-  faChevronUp,
-  faExclamationTriangle,
-  faSync,
-  faPen
-} from '@fortawesome/free-solid-svg-icons';
-
-
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import StatsSection from './UserStats';
-import SBTPage from '../SBTs/SBTPage';
-import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
-import CETooltip from '../Shared/CETooltip';
-import UserPageDeepScanProgressPanel, {
-  type UserPageDeepScanProgressPanelOptions,
-} from './UserPageDeepScanProgressPanel';
-
-// NEW IMPORT: for mini question display
-import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import UserPageAnalysisModal from './UserPageAnalysisModal';
+import UserPageComparePanel from './UserPageComparePanel';
+import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
+import UserPageFullProfileModal from './UserPageFullProfileModal';
+import UserPageHeader from './UserPageHeader';
+import UserPageQuestionSection from './UserPageQuestionSection';
+import UserPageSbtSection from './UserPageSbtSection';
+import UserPageSimulatedActions from './UserPageSimulatedActions';
+import UserPageSurveySection from './UserPageSurveySection';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
@@ -437,11 +415,6 @@ type UserPageRenderQuestionEntry = UnknownRecord & {
   canDecryptOtherResponses?: unknown;
   sessionSlug?: unknown;
   slug?: unknown;
-};
-
-type UserPageSurveyPreviewEntry = {
-  id?: unknown;
-  text?: unknown;
 };
 
 type SbtSectionResult = {
@@ -1073,80 +1046,19 @@ class UserPage extends Component<any, any> {
     }) || null
   );
 
-  renderDeepScanProgressPanel = (
-    progressRows: DeepScanProgressRow[] | null | undefined,
-    options: UserPageDeepScanProgressPanelOptions = {},
-  ): React.ReactNode => (
-    UserPageDeepScanProgressPanel({
-      headerText: options.headerText,
-      progressRows,
-      showScannedText: options.showScannedText,
-      styles,
-    })
-  );
-
-  renderDeepScanTooltipContent = (
-    tooltipLines: string[] | null | undefined,
-    progressRows: DeepScanProgressRow[] | null | undefined,
-  ): React.ReactNode => {
-    if (Array.isArray(progressRows) && progressRows.length > 0) {
-      return this.renderDeepScanProgressPanel(progressRows, {
-        headerText: 'Deep scan in progress',
-        showScannedText: true,
-      });
-    }
-
-    if (!Array.isArray(tooltipLines) || tooltipLines.length === 0) return null;
-    return tooltipLines.map((line, idx) => (
-      <div key={`deepScanTextLine_${idx}`}>{line}</div>
-    ));
-  };
-
-  renderDeepScanTooltip = (
-    targetId: string,
-    tooltipLines: string[] | null | undefined,
-    progressRows: DeepScanProgressRow[] | null | undefined,
-  ): React.ReactNode => {
-    if ((!Array.isArray(tooltipLines) || tooltipLines.length === 0) &&
-        (!Array.isArray(progressRows) || progressRows.length === 0)) return null;
-    return (
-      <CETooltip
-        placement="right"
-        target={targetId}
-        className={styles.deepScanTooltip}
-        innerClassName={styles.deepScanTooltipInner}
-        trigger="hover focus click"
-        autohide={false}
-      >
-        {this.renderDeepScanTooltipContent(tooltipLines, progressRows)}
-      </CETooltip>
-    );
-  };
-
   renderDeepScanStatusIndicator = (
     targetId: string,
     tooltipLines: string[] | null | undefined,
     progressRows: DeepScanProgressRow[] | null | undefined,
     titleText: string,
   ): React.ReactNode => (
-    <>
-      <span
-        className={styles.cornerLoadingStatus}
-        onClick={this.stopSpinnerEventPropagation}
-        onMouseDown={this.stopSpinnerEventPropagation}
-      >
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          className={styles.cornerSpinner}
-          id={targetId}
-          title={titleText || undefined}
-          onClick={this.stopSpinnerEventPropagation}
-          onMouseDown={this.stopSpinnerEventPropagation}
-        />
-      </span>
-      {this.renderDeepScanTooltip(targetId, tooltipLines, progressRows)}
-    </>
+    <UserPageDeepScanStatusIndicator
+      onSpinnerEvent={this.stopSpinnerEventPropagation}
+      progressRows={progressRows}
+      targetId={targetId}
+      titleText={titleText}
+      tooltipLines={tooltipLines}
+    />
   );
 
   parseCachedResponsePayload = (rawValue: unknown): unknown => {
@@ -4038,870 +3950,205 @@ class UserPage extends Component<any, any> {
 
     return (
       <div className={rootClassName}>
-        <div className={styles.header}>
-          <div className={styles.addressAndActionsContainer}>
-            <div className={styles.userInfo}>
-              <div className={styles.avatarContainer}>
-                {/* Use background-image on the existing avatar div to avoid structural changes */}
-                <div
-                  className={styles.avatar}
-                  style={avatarDisplayState.avatarStyle}
-                  aria-label="User avatar"
-                  role="img"
-                ></div>
-              </div>
-              <h1 id={styles.userPageAddress}>
-                {addressDisplay}
-                {/* Nickname Pen (for others) */}
-                {showPen && (
-                  <button
-                    onClick={this.onPenClick}
-                    className={styles.copyButton}
-                    aria-label="Edit nickname"
-                    title="Edit nickname"
-                  >
-                    <FontAwesomeIcon icon={faPen} />
-                  </button>
-                )}
-                {/* Username Pen (for self) */}
-                {showUsernamePen && (
-                  <button
-                    onClick={this.onUsernamePenClick}
-                    className={styles.copyButton}
-                    aria-label="Set username"
-                    title="Set username"
-                  >
-                    <FontAwesomeIcon icon={faPen} />
-                  </button>
-                )}
-                {headerActionVisibility.showSimulatedBadge && (
-                  <span className={styles.simulatedBadge} id="simulatedUserTooltip">
-                    <FontAwesomeIcon icon={faExclamationTriangle} />
-                  </span>
-                )}
-                {headerActionVisibility.showSimulatedBadge && (
-                  <CETooltip placement="right" target="simulatedUserTooltip">
-                    This is a simulated user whose answers are generated based on documents.
-                  </CETooltip>
-                )}
-                {headerActionVisibility.showCopyAddressButton && (
-                  <button onClick={this.copyToClipboard} className={styles.copyButton}>
-                    <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
-                    <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
-                  </button>
-                )}
-                {headerActionVisibility.showExplorerLink && (
-                  <a
-                    href={explorerUrl || undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.expandButton}
-                    aria-label="View address on explorer"
-                    title="View address on explorer"
-                  >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                )}
+        <UserPageHeader
+          addressDisplay={addressDisplay}
+          analyzeButtonDisplayState={analyzeButtonDisplayState}
+          avatarDisplayState={avatarDisplayState}
+          bookmarkButtonDisplayState={bookmarkButtonDisplayState}
+          bookmarksHref={buildPublicRoute('/bookmarks')}
+          bookmarksLinkDisplayState={bookmarksLinkDisplayState}
+          compareButtonDisplayState={compareButtonDisplayState}
+          copyIconDisplayState={copyIconDisplayState}
+          explorerUrl={explorerUrl}
+          headerActionVisibility={headerActionVisibility}
+          headerBookmarkClassName={headerBookmarkClassName}
+          isEditingUsername={this.state.isEditingUsername}
+          isOwner={isOwner}
+          minimized={minimized}
+          nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
+          nicknameInput={this.state.nicknameInput || ''}
+          onAnalyzeUser={this.analyzeUser}
+          onBookmark={this.toggleBookmark}
+          onCollapseToggle={this.toggleCollapse}
+          onCopyAddress={this.copyToClipboard}
+          onNicknameBlur={this.saveNickname}
+          onNicknameChange={this.handleNicknameChange}
+          onNicknameEdit={this.onPenClick}
+          onNicknameKeyDown={this.handleNicknameKeyDown}
+          onUsernameBlur={this.setUsername}
+          onUsernameChange={this.handleUsernameChange}
+          onUsernameEdit={this.onUsernamePenClick}
+          onUsernameKeyDown={this.handleUsernameKeyDown}
+          showPen={showPen}
+          showUsernamePen={showUsernamePen}
+          username={this.state.username}
+          usernameEnteredIndicatorDisplayState={usernameEnteredIndicatorDisplayState}
+          usernameErrorDisplayState={usernameErrorDisplayState}
+        />
 
-                {/* NEW: Bookmark Icon Logic */}
-                {headerActionVisibility.showBookmarkButton && (
-                  <button
-                    onClick={this.toggleBookmark}
-                    className={headerBookmarkClassName}
-                    style={bookmarkButtonDisplayState.iconStyle}
-                    aria-label={bookmarkButtonDisplayState.ariaLabel}
-                    title={bookmarkButtonDisplayState.title}
-                  >
-                    <FontAwesomeIcon icon={faBookmark} />
-                  </button>
-                )}
-              </h1>
-
-              {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
-              {headerActionVisibility.showBookmarksLink && (
-                <a
-                  href={buildPublicRoute('/bookmarks')}
-                  className={bookmarksLinkDisplayState.className}
-                  style={bookmarksLinkDisplayState.style}
-                >
-                  My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
-                </a>
-              )}
-
-              {/* RELOCATED: Inline nickname field — shown only when editing */}
-              {headerActionVisibility.showNicknameEditor && (
-                <div className={styles.usernameInline}>
-                  <input
-                    type="text"
-                    value={this.state.nicknameInput || ''}
-                    onChange={this.handleNicknameChange}
-                    onBlur={this.saveNickname}
-                    onKeyDown={this.handleNicknameKeyDown}
-                    placeholder="set nickname"
-                    aria-label="Set nickname"
-                    // BUG FIX: Removed el.select() from render cycle.
-                    // Focus/select is handled once in onPenClick.
-                    ref={(el: HTMLInputElement | null) => { if (el && this.state.isEditingNickname) { /* just render ref */ } }}
-                    autoFocus
-                  />
-                  {nicknameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
-                    <button
-                      type="button"
-                      className={styles.usernameCheck}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      title="Nickname entered"
-                      disabled
-                    >
-                      <FontAwesomeIcon icon={faCheck} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* NEW: Inline username field (for self) — mirroring nickname logic */}
-              {isOwner && this.state.isEditingUsername && (
-                <div className={styles.usernameInline}>
-                  <input
-                    type="text"
-                    value={this.state.username}
-                    onChange={this.handleUsernameChange}
-                    onBlur={this.setUsername}
-                    onKeyDown={this.handleUsernameKeyDown}
-                    placeholder="set username"
-                    aria-label="Set username"
-                    autoFocus
-                  />
-                  {usernameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
-                    <button
-                      type="button"
-                      className={styles.usernameCheck}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      title="Username entered"
-                      disabled
-                    >
-                      <FontAwesomeIcon icon={faCheck} />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {!minimized && (
-              <div className={styles.headerActionsRight}>
-                {/* Nickname input moved to .userInfo above */}
-                {/* Username input moved to .userInfo above */}
-                {/* Bookmarks link moved to .userInfo above */}
-
-                {usernameErrorDisplayState.shouldRenderUsernameError && (
-                  <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
-                )}
-
-                {/* Compare (gated until all caches are ready) */}
-                <button
-                  onClick={this.toggleCollapse}
-                  className={styles.collapseButton}
-                  disabled={compareButtonDisplayState.disabled}
-                  title={compareButtonDisplayState.title}
-                >
-                  Compare{' '}
-                  {compareButtonDisplayState.shouldRenderCollapseOpenIcon && (
-                    <FontAwesomeIcon icon={faChevronUp} />
-                  )}
-                  {compareButtonDisplayState.shouldRenderCollapseClosedIcon && (
-                    <FontAwesomeIcon icon={faChevronDown} />
-                  )}
-                </button>
-
-                {/* Analyze (gated + shows spinner while running) */}
-                <button
-                  onClick={this.analyzeUser}
-                  className={styles.analyzeButton}
-                  disabled={analyzeButtonDisplayState.disabled}
-                  aria-busy={analyzeButtonDisplayState.ariaBusy}
-                  title={analyzeButtonDisplayState.title}
-                >
-                  {analyzeButtonDisplayState.shouldRenderAnalyzing ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin />&nbsp;{analyzeButtonDisplayState.label}
-                    </>
-                  ) : (
-                    analyzeButtonDisplayState.label
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* In minimized view, keep header actions WITHOUT nickname/username input */}
-            {minimized && (
-              <div className={styles.headerActionsRight}>
-                 {/* Empty for now, but keeping container for layout stability if needed */}
-                 {usernameErrorDisplayState.shouldRenderUsernameError && (
-                   <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
-                 )}
-              </div>
-            )}
-          </div>
-
-          {/* (Old) separate username bar removed; now integrated above */}
-
-        </div>
-
-        {/* Compare section collapses right under header */}
-        {!minimized && (
-          <Collapse isOpen={collapseOpen}>
-            <Suspense fallback={null}>
-              <CompareAddressSection
-                firstAddress={propViewAddress}
-                account={account}
-                scanSpecificUserProfile={this.props.scanSpecificUserProfile}
-              />
-            </Suspense>
-          </Collapse>
-        )}
+        <UserPageComparePanel
+          collapseOpen={collapseOpen}
+          minimized={minimized}
+        >
+          <CompareAddressSection
+            firstAddress={propViewAddress}
+            account={account}
+            scanSpecificUserProfile={this.props.scanSpecificUserProfile}
+          />
+        </UserPageComparePanel>
 
         {!minimized && (
           <div className={styles.content}>
             {selectedTab === 'surveys' && (
-              <div className={styles.leftColumn}>
-                {surveysQuestionsToggle}
-                <div className={styles.surveySection}>
-                  <h2
-                    onClick={this.toggleSurveyResponsesSection}
-                    className={styles.sectionHeader}
-                  >
-                    {surveyResponsesSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {surveyResponsesSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
-                        aria-label="Show Questions"
-                      >
-                        Questions
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Survey Responses</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isSurveyLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          surveySpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={surveyResponsesSectionToggleState.isOpen}>
-                    {surveySectionDisplayState.hasSurveyResponses ? (
-                      surveyResponseEntries.map((survey, index: number) => {
-                        const isExpanded = expandedSurveyResponseMap[survey.id] || false;
-                        const questionArray = detailedSurveyResponseMap[survey.id] || [];
-                        const surveyResponseCardToggleState = resolveUserPageSectionToggleDisplayState({
-                          open: isExpanded,
-                        });
-                        const surveyResponseCardState = resolveUserPageSurveyResponseCardState({
-                          questionArray,
-                          survey,
-                        });
-                        const surveyResponsePreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
-                          actionsClassName: styles.surveyPreviewWithActions,
-                          baseClassName: styles.surveyPreview,
-                          interactive: true,
-                        });
-
-                        return (
-                          <div key={index} className={styles.surveyWrapper}>
-                            <div
-                              className={surveyResponsePreviewDisplayState.className}
-                              onClick={() => this.toggleSurveyResponses(survey.id)}
-                              style={surveyResponsePreviewDisplayState.style}
-                            >
-                              <div className={styles.surveyTitle}>{survey.title}</div>
-                              <div className={styles.surveyInfo}>
-                                Questions: {survey.questionsCount}
-                              </div>
-                              {propViewAddress && (
-                                <button
-                                  type='button'
-                                  className={styles.surveyExpandIcon}
-                                  title='Open full survey page'
-                                  aria-label='Open full survey page'
-                                  onClick={(e: React.MouseEvent<HTMLElement>) => {
-                                    e.stopPropagation();
-                                    const surveyUrlParams = new URLSearchParams();
-                                    if (survey.slug) {
-                                      surveyUrlParams.set('session', survey.slug);
-                                    }
-                                    surveyUrlParams.set('responder', String(propViewAddress));
-                                    window.open(
-                                      buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
-                                      '_blank',
-                                      'noopener,noreferrer'
-                                    );
-                                  }}
-                                >
-                                  <FontAwesomeIcon icon={faExpand} />
-                                </button>
-                              )}
-                              <div className={styles.chevronContainer}>
-                                {surveyResponseCardToggleState.shouldRenderOpenIcon && (
-                                  <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
-                                )}
-                                {surveyResponseCardToggleState.shouldRenderClosedIcon && (
-                                  <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
-                                )}
-                              </div>
-                            </div>
-
-                            {surveyResponseCardToggleState.isOpen && surveyResponseCardState.hasResponses && (
-                              <div className={styles.responsesContainer}>
-                                {surveyResponseCardState.hasTags && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
-                                      <span key={ti} className={styles.surveyTag}>{tag}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {surveyResponseCardState.hasDocURLs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: string, ui: number) => (
-                                      <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
-                                        {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {questionArray.map((qObj: SurveyQuestionResponseDetail, qIndex: number) => (
-                                  <div key={qIndex} className={styles.responseItemWrapper}>
-                                    <SingleQuestionResponse
-                                      question={qObj.questionData}
-                                      response={qObj.responseData}
-                                      isOwnResponse={false}
-                                      mode="mini"
-                                      showImportance={true}
-                                      compactEncryptedAnswerCta={true}
-                                      stackCompactDecryptCta={true}
-                                      onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                                      canDecryptOtherResponses={!!qObj?.canDecryptOtherResponses}
-                                      responderAddress={propViewAddress}
-                                      sessionSlug={survey.slug}
-                                      questionResponsesNonce={this.props.questionResponsesNonce}
-                                      sbtCacheRevision={this.props.sbtCacheRevision}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {surveyResponseCardToggleState.isOpen && !surveyResponseCardState.hasResponses && (
-                              <div className={styles.noResponsesMsg}>
-                                No non-empty responses recorded for this survey.
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : surveySectionDisplayState.shouldRenderSurveyResponsesEmptyText ? (
-                      <p>No survey responses found.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-
-                  <h2
-                    onClick={this.toggleSurveysCreatedSection}
-                    className={styles.sectionHeaderWithMargin}
-                  >
-                    {surveysCreatedSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {surveysCreatedSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
-                        aria-label="Show Questions"
-                      >
-                        Questions
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Surveys Created</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isSurveyLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          surveysCreatedSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={surveysCreatedSectionToggleState.isOpen}>
-                    {surveySectionDisplayState.hasCreatedSurveys ? (
-                      surveyCreationEntries.map((survey, index: number) => {
-                        const isCreatedExpanded = expandedSurveyCreatedMap[survey.id] || false;
-                        const surveyCreatedCardToggleState = resolveUserPageSectionToggleDisplayState({
-                          open: isCreatedExpanded,
-                        });
-                        const {
-                          hasDocURLs,
-                          hasExpandContent,
-                          hasQuestionIDs,
-                          hasTags,
-                          questionPreviewEntries,
-                          surveyLinkSlug,
-                        } = resolveUserPageSurveyCreatedCardState({ survey });
-                        const surveyCreatedPreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
-                          actionsClassName: styles.surveyPreviewWithActions,
-                          baseClassName: styles.surveyPreview,
-                          interactive: hasExpandContent,
-                        });
-                        const surveyCountDisplayState = resolveUserPageSurveyCountDisplayState({
-                          count: survey.questionsCount,
-                          countOnlyClassName: styles.surveyCountOnly,
-                          infoClassName: styles.surveyInfo,
-                        });
-
-                        return (
-                          <div key={index} className={styles.surveyWrapper}>
-                            <div
-                              className={surveyCreatedPreviewDisplayState.className}
-                              onClick={() => hasExpandContent && this.toggleSurveyCreated(survey.id)}
-                              style={surveyCreatedPreviewDisplayState.style}
-                            >
-                              <a
-                                href={buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`)}
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className={styles.surveyTitleLink}
-                                onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
-                              >
-                                <div className={styles.surveyTitle}>{survey.title}</div>
-                              </a>
-                              <div
-                                className={surveyCountDisplayState.className}
-                                aria-label={surveyCountDisplayState.ariaLabel}
-                                title={surveyCountDisplayState.title}
-                              >
-                                {survey.questionsCount}
-                              </div>
-                              {hasExpandContent && (
-                                <div className={styles.chevronContainer}>
-                                  {surveyCreatedCardToggleState.shouldRenderOpenIcon && (
-                                    <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
-                                  )}
-                                  {surveyCreatedCardToggleState.shouldRenderClosedIcon && (
-                                    <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            {surveyCreatedCardToggleState.isOpen && hasExpandContent && (
-                              <div className={styles.responsesContainer}>
-                                {hasTags && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
-                                      <span key={ti} className={styles.surveyTag}>{tag}</span>
-                                    ))}
-                                  </div>
-                                )}
-                                {hasDocURLs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: string, ui: number) => (
-                                      <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
-                                        {url.length > 60 ? url.slice(0, 57) + '...' : url}
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {hasQuestionIDs && (
-                                  <div className={styles.surveyDetailRow}>
-                                    <span className={styles.surveyDetailLabel}>Questions:</span>
-                                    <ul className={styles.surveyQuestionList}>
-                                      {(questionPreviewEntries as UserPageSurveyPreviewEntry[]).map((entry, qi: number) => {
-                                        const fullQuestionId = String(entry?.id || '');
-                                        const resolvedText = String(entry?.text || '').trim();
-                                        return (
-                                          <li key={`${fullQuestionId}_${qi}`} className={styles.surveyQuestionItem}>
-                                            {resolvedText ? resolvedText : (
-                                              <span
-                                                className={styles.surveyQuestionFallbackId}
-                                                title={fullQuestionId}
-                                              >
-                                                {shortenUserPageQuestionId(fullQuestionId)}
-                                              </span>
-                                            )}
-                                          </li>
-                                        );
-                                      })}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    ) : surveySectionDisplayState.shouldRenderSurveysCreatedEmptyText ? (
-                      <p>No surveys created.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-                </div>
-              </div>
+              <UserPageSurveySection
+                detailedSurveyResponseMap={detailedSurveyResponseMap}
+                expandedSurveyCreatedMap={expandedSurveyCreatedMap}
+                expandedSurveyResponseMap={expandedSurveyResponseMap}
+                getSurveyCreatedHref={(survey, surveyLinkSlug) => buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(String(surveyLinkSlug))}` : ''}`)}
+                isSurveyLoadingAny={isSurveyLoadingAny}
+                onDecryptQuestion={this.handleDecryptQuestionAnswer}
+                onOpenSurveyResponse={(survey, e: React.MouseEvent<HTMLElement>) => {
+                  e.stopPropagation();
+                  const surveyUrlParams = new URLSearchParams();
+                  if (survey.slug) {
+                    surveyUrlParams.set('session', survey.slug);
+                  }
+                  surveyUrlParams.set('responder', String(propViewAddress));
+                  window.open(
+                    buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }}
+                onShowQuestionsTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
+                onSurveyCreatedToggle={this.toggleSurveyCreated}
+                onSurveyResponsesSectionToggle={this.toggleSurveyResponsesSection}
+                onSurveyResponseToggle={this.toggleSurveyResponses}
+                onSurveysCreatedSectionToggle={this.toggleSurveysCreatedSection}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                responderAddress={propViewAddress}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+                surveyCreationEntries={surveyCreationEntries}
+                surveyResponseEntries={surveyResponseEntries}
+                surveyResponsesLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
+                  surveySpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                surveyResponsesSectionToggleState={surveyResponsesSectionToggleState}
+                surveySectionDisplayState={surveySectionDisplayState}
+                surveysCreatedLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
+                  surveysCreatedSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
+                surveysQuestionsToggle={surveysQuestionsToggle}
+              />
             )}
 
             {selectedTab === 'questions' && (
-              <div className={styles.leftColumn}>
-                {surveysQuestionsToggle}
-                <div className={styles.questionSection}>
-                  <h2
-                    onClick={this.toggleQuestionResponsesSection}
-                    className={styles.sectionHeader}
-                  >
-                    {questionResponsesSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {questionResponsesSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
-                        aria-label="Show Surveys"
-                      >
-                        Survey
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Question Responses</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isQuestionLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          questionSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={questionResponsesSectionToggleState.isOpen}>
-                    {questionSectionDisplayState.hasQuestionResponses ? (
-                      questionResponseEntries.map((question, index: number) => {
-                        const userResp = detailedQuestionResponseMap[question.id];
-                        if (!userResp) return null;
-                        return (
-                          <div key={index} className={styles.questionWrapper}>
-                            <SingleQuestionResponse
-                              question={question}
-                              response={userResp}
-                              isOwnResponse={false}
-                              mode="mini"
-                              showImportance={true}
-                              compactEncryptedAnswerCta={true}
-                              stackCompactDecryptCta={true}
-                              onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                              canDecryptOtherResponses={!!question?.canDecryptOtherResponses}
-                              responderAddress={propViewAddress}
-                              network={network}
-                              sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
-                              questionResponsesNonce={this.props.questionResponsesNonce}
-                              sbtCacheRevision={this.props.sbtCacheRevision}
-                            />
-                          </div>
-                        );
-                      })
-                    ) : questionSectionDisplayState.shouldRenderQuestionResponsesEmptyText ? (
-                      <p>{questionResponsesEmptyText}</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-
-                  <h2
-                    onClick={this.toggleQuestionsCreatedSection}
-                    className={styles.sectionHeaderWithMargin}
-                  >
-                    {questionsCreatedSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {questionsCreatedSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
-                        aria-label="Show Surveys"
-                      >
-                        Surveys
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Questions Created</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isQuestionLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          questionsCreatedSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
-                    {questionSectionDisplayState.hasCreatedQuestions ? (
-                      questionCreationEntries.map((question, index: number) => (
-                        <div key={index} className={createdQuestionWrapperClassName}>
-                          <SingleQuestionResponse
-                            question={question}
-                            response={null}
-                            isOwnResponse={false}
-                            mode="mini"
-                            showImportance={false}
-                            onDecryptQuestion={() => {}}
-                            /* NEW: non-interactive render for created questions */
-                            questionOnly={true}
-                            network={network}
-                            sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
-                            questionResponsesNonce={this.props.questionResponsesNonce}
-                            sbtCacheRevision={this.props.sbtCacheRevision}
-                          />
-                        </div>
-                      ))
-                    ) : questionSectionDisplayState.shouldRenderQuestionsCreatedEmptyText ? (
-                      <p>No questions created.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-                </div>
-              </div>
+              <UserPageQuestionSection
+                activeSessionSlug={this.props.activeSessionSlug}
+                createdQuestionWrapperClassName={createdQuestionWrapperClassName}
+                detailedQuestionResponseMap={detailedQuestionResponseMap}
+                isQuestionLoadingAny={isQuestionLoadingAny}
+                network={network}
+                onDecryptQuestion={this.handleDecryptQuestionAnswer}
+                onQuestionResponsesSectionToggle={this.toggleQuestionResponsesSection}
+                onQuestionsCreatedSectionToggle={this.toggleQuestionsCreatedSection}
+                onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
+                questionCreationEntries={questionCreationEntries}
+                questionResponsesEmptyText={questionResponsesEmptyText}
+                questionResponsesLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
+                  questionSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                questionResponseEntries={questionResponseEntries}
+                questionResponsesSectionToggleState={questionResponsesSectionToggleState}
+                questionSectionDisplayState={questionSectionDisplayState}
+                questionsCreatedLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
+                  questionsCreatedSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
+                responderAddress={propViewAddress}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+                surveysQuestionsToggle={surveysQuestionsToggle}
+              />
             )}
 
-            <div className={styles.rightColumn}>
-              <div className={styles.sbtSection}>
-                <h2>
-                  {`${t('minted')} ${t('sbts')}:`}
-                  {/* Corner spinner (Green) for ANY loading activity */}
-                  {isSbtLoadingAny && (
-                    this.renderDeepScanStatusIndicator(
-                        sbtSpinnerId,
-                        deepScanTooltipContent,
-                        deepScanProgressRows,
-                        deepScanTooltipTitle
-                      )
-                  )}
-                </h2>
-                {sbtDisplayState.hasSbts ? (
-                  <div className={styles.sbtGrid}>
-                    {sbtEntries.map((sbtItem, index: number) => (
-                      <SBTPage
-                        key={index}
-                        SBTAddress={sbtItem.sbtInfo.sbtAddress}
-                        account={account}
-                        provider={provider}
-                        network={network}
-                        miniaturized={true}
-                        loginComplete={loginComplete}
-                        /* Use readiness passed from MainSite to control child spinners */
-                        isSBTCacheReady={this.props.isSBTCacheReady}
-                        /* NEW: mini cards are metadata-only, avoid any chain scans/persistence */
-                        metadataOnly={true}
-                        /* NEW: Pass the source slug to allow cross-group hydration */
-                        sessionSlug={sbtItem.slug}
-                        refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
-                      />
-                    ))}
-                  </div>
-                ) : sbtDisplayState.shouldRenderMainEmptyText ? (
-                  <p>{sbtEmptyText}</p>
-                ) : (
-                   // Suppress white spinner; rely on green corner spinner
-                   null
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isSimulated && (
-          <div className={styles.simulatedUserActions}>
-            <button onClick={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}>
-              View Simulated Responses
-            </button>
-          </div>
-        )}
-
-        <Modal
-          isOpen={showAnalysisModal}
-          toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
-          className={styles.modalContent}
-        >
-          <ModalHeader
-            toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
-            className={styles.modalHeader}
-          >
-            {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
-            <div className={styles.modalTitleRow}>
-              {analysisName || 'User Analysis'}
-              <button
-                type="button"
-                className={styles.refreshIconButton}
-                onClick={() => this.analyzeUser(true)}
-                title="Refresh analysis"
-                disabled={analyzing}
-                aria-label="Refresh analysis"
-              >
-                <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
-              </button>
-            </div>
-            {analysisCacheStatusState.shouldRenderAnalysisCacheStatus && (
-              <div className={styles.analysisCacheStatus}>
-                Cached analysis from {analysisCacheStatusState.analysisCacheAge}
-              </div>
-            )}
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            {analysisModalDisplayState.shouldRenderAnalyzing && (
-              <div className={styles.analyzingContainer}>
-                <FontAwesomeIcon icon={faSpinner} spin />
-                <span>
-                  Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s
-                </span>
-              </div>
-            )}
-            {analysisModalDisplayState.shouldRenderError && (
-              <p className={styles.placeholderNote}>{analysisError}</p>
-            )}
-            {analysisModalDisplayState.shouldRenderAnalysisBody && (
-              <>
-                <p className={styles.placeholderNote}>{aiAnalysis}</p>
-                {analysisModalDisplayState.shouldRenderDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
-                {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
-                  <div className={styles.historicalAlignment}>
-                    <h4>Historical Alignment</h4>
-                    {analysisModalDisplayState.shouldRenderHistoricalFigure && (
-                      <p>{analysisHistoricalFigure}</p>
-                    )}
-                    {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
-                      <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-          </ModalBody>
-        </Modal>
-
-        <Modal
-          isOpen={showFullProfileModal}
-          toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
-          size="lg"
-          className={styles.modalContent}
-        >
-          <ModalHeader
-            toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
-            className={styles.modalHeader}
-          >
-            Full User Profile
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            <div className={styles.modalSummary}>
-              <h3>User Summary</h3>
-              <p>{aiAnalysis || "Summary not available."}</p>
-            </div>
-            <StatsSection
-              userStats={userStats}
-              collapseOpen={collapseOpen}
-              toggleCollapse={this.toggleCollapse}
+            <UserPageSbtSection
+              account={account}
+              heading={`${t('minted')} ${t('sbts')}:`}
+              isLoading={isSbtLoadingAny}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              loadingIndicator={isSbtLoadingAny ? this.renderDeepScanStatusIndicator(
+                sbtSpinnerId,
+                deepScanTooltipContent,
+                deepScanProgressRows,
+                deepScanTooltipTitle
+              ) : null}
+              loginComplete={loginComplete}
+              network={network}
+              onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+              provider={provider}
+              sbtDisplayState={sbtDisplayState}
+              sbtEmptyText={sbtEmptyText}
+              sbtEntries={sbtEntries}
             />
-            <div className={styles.modalSurveys}>
-              <h3>Survey Responses</h3>
-              {fullProfileModalDisplayState.shouldRenderSurveySpinner ? (
-                // If loading empty, rely on spinner logic or show nothing
-                <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : fullProfileModalDisplayState.shouldRenderSurveyEmptyText ? <p>No survey responses.</p> : (
-                fullProfileModalDisplayState.shouldRenderSurveyList ? (
-                  surveyResponseEntries.map((survey, index: number) => (
-                    <div key={index} className={styles.surveyPreview}>
-                      <div className={styles.surveyTitle}>{survey.title}</div>
-                      <div className={styles.surveyInfo}>
-                        Questions: {survey.questionsCount}
-                      </div>
-                    </div>
-                  ))
-                ) : null
-              )}
-            </div>
-            <div className={styles.modalSBTs}>
-              <h3>{`${t('minted')} ${t('sbts')}`}</h3>
-              {/* In modal, we can keep the spinner since there's no header spinner here */}
-              {sbtDisplayState.shouldRenderModalSpinner ? (
-                <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : sbtDisplayState.shouldRenderModalEmptyText ? <p>{sbtEmptyText}</p> : (
-                sbtEntries.map((sbtItem, index: number) => (
-                  <SBTPage
-                    key={index}
-                    SBTAddress={sbtItem.sbtInfo.sbtAddress}
-                    provider={provider}
-                    network={network}
-                    miniaturized={true}
-                    loginComplete={loginComplete}
-                    /* Use readiness passed from MainSite to control child spinners */
-                    isSBTCacheReady={this.props.isSBTCacheReady}
-                    /* NEW: mini cards are metadata-only, avoid any chain scans/persistence */
-                    metadataOnly={true}
-                    /* NEW: Pass source slug */
-                    sessionSlug={sbtItem.slug}
-                    refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
-                  />
-                ))
-              )}
-            </div>
-            {fullProfileModalDisplayState.shouldRenderModalActions && (
-              <div className={styles.modalActions}>
-                {fullProfileModalDisplayState.shouldRenderBookmarksLink && (
-                  <a href={buildPublicRoute('/bookmarks')} className={styles.bookmarksLink}>
-                    My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                )}
-                <a
-                  href={explorerUrl || undefined}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.explorerLink}
-                >
-                  View on Explorer <FontAwesomeIcon icon={faExternalLinkAlt} />
-                </a>
-              </div>
-            )}
-          </ModalBody>
-        </Modal>
+          </div>
+        )}
+
+        <UserPageSimulatedActions
+          isSimulated={isSimulated}
+          onViewResponses={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}
+        />
+
+        <UserPageAnalysisModal
+          aiAnalysis={aiAnalysis}
+          analysisCacheStatusState={analysisCacheStatusState}
+          analysisDetails={analysisDetails}
+          analysisElapsedMs={analysisElapsedMs}
+          analysisError={analysisError}
+          analysisHistoricalFigure={analysisHistoricalFigure}
+          analysisHistoricalReasoning={analysisHistoricalReasoning}
+          analysisModalDisplayState={analysisModalDisplayState}
+          analysisName={analysisName}
+          analyzing={analyzing}
+          isOpen={showAnalysisModal}
+          onRefreshAnalysis={() => this.analyzeUser(true)}
+          onToggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
+        />
+
+        <UserPageFullProfileModal
+          aiAnalysis={aiAnalysis}
+          bookmarksHref={buildPublicRoute('/bookmarks')}
+          collapseOpen={collapseOpen}
+          explorerUrl={explorerUrl}
+          fullProfileModalDisplayState={fullProfileModalDisplayState}
+          isOpen={showFullProfileModal}
+          isSBTCacheReady={this.props.isSBTCacheReady}
+          loginComplete={loginComplete}
+          mintedSbtsHeading={`${t('minted')} ${t('sbts')}`}
+          network={network}
+          onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+          onStatsCollapseToggle={this.toggleCollapse}
+          onToggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
+          provider={provider}
+          sbtDisplayState={sbtDisplayState}
+          sbtEmptyText={sbtEmptyText}
+          sbtEntries={sbtEntries}
+          surveyResponseEntries={surveyResponseEntries}
+          userStats={userStats}
+        />
       </div>
     );
   }

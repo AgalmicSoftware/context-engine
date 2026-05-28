@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faExternalLinkAlt, faImage, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -94,7 +94,6 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import CETooltip from '../Shared/CETooltip';
 import {
   SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
   buildSessionWizardRegistrySessionFields,
@@ -117,7 +116,17 @@ import useSponsoredBundleLifecycle from './hooks/useSponsoredBundleLifecycle';
 import useSessionWizardWorkerDeploy from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
+import SessionWizardHeader from './SessionWizardHeader';
+import SessionWizardInfoTooltip, {
+  type SessionWizardTooltipRenderOptions,
+} from './SessionWizardInfoTooltip';
 import SessionWizardModals from './SessionWizardModals';
+import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
+import SessionWizardRequirementsBanner, {
+  SESSION_WIZARD_REQUIREMENT_LINKS,
+} from './SessionWizardRequirementsBanner';
+import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
+import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
   buildNormalModeCards,
@@ -475,14 +484,6 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   lit?: UnknownRecord;
 };
 
-type TooltipRenderOptions = {
-  id?: string;
-  content?: React.ReactNode;
-  placement?: React.ComponentProps<typeof CETooltip>['placement'];
-  testId?: string;
-  ariaLabel?: string;
-};
-
 type SessionWizardProps = {
   account?: string;
   provider?: UnknownRecord | null;
@@ -532,13 +533,6 @@ type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploa
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
-const NEW_SESSION_RESOURCE_LINKS = Object.freeze({
-  openaiApiKey: 'https://platform.openai.com/api-keys',
-  litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
-  arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
-  optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
-});
-
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS));
@@ -1159,7 +1153,7 @@ const SessionWizard = ({
     return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
   }, [newSessionFundingChain]);
   const newSessionFundingRequirementHref = Number(newSessionFundingChain?.id || 0) === 11155420
-    ? NEW_SESSION_RESOURCE_LINKS.optimismSepoliaFaucet
+    ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet
     : '';
 
   const buildWorkerName = (rawName) => {
@@ -4324,52 +4318,24 @@ const SessionWizard = ({
     }));
   };
 
-  const renderSessionWizardTooltipContent = useCallback(({
-    id,
-    content,
-    placement = 'right',
-  }: TooltipRenderOptions = {}) => {
-    const tooltipText = toStr(content).trim();
-    if (!sessionWizardTooltipsEnabled || !id || !tooltipText) return null;
-    return (
-      <CETooltip
-        placement={placement as React.ComponentProps<typeof CETooltip>['placement']}
-        trigger="hover focus click"
-        target={id}
-        className={styles.tooltipBubble}
-        delay={0}
-        container="body"
-      >
-        {content}
-      </CETooltip>
-    );
-  }, [sessionWizardTooltipsEnabled]);
-
   const renderSessionWizardInfoTooltip = useCallback(({
     id,
     content,
     placement = 'right',
     testId = '',
     ariaLabel = 'Show more info',
-  }: TooltipRenderOptions = {}) => {
-    const tooltipText = toStr(content).trim();
-    if (!sessionWizardTooltipsEnabled || !id || !tooltipText) return null;
+  }: SessionWizardTooltipRenderOptions = {}) => {
     return (
-      <>
-        <span
-          id={id}
-          className={styles.tooltipTrigger}
-          data-testid={testId || undefined}
-          role="button"
-          tabIndex={0}
-          aria-label={ariaLabel}
-        >
-          <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} />
-        </span>
-        {renderSessionWizardTooltipContent({ id, content, placement })}
-      </>
+      <SessionWizardInfoTooltip
+        enabled={sessionWizardTooltipsEnabled}
+        id={id}
+        content={content}
+        placement={placement}
+        testId={testId}
+        ariaLabel={ariaLabel}
+      />
     );
-  }, [renderSessionWizardTooltipContent, sessionWizardTooltipsEnabled]);
+  }, [sessionWizardTooltipsEnabled]);
 
   const renderResourceInputs = (resourceKey: string) => {
     const fields = getResourceSecretFields(resourceKey);
@@ -4782,28 +4748,6 @@ const SessionWizard = ({
     elapsedMs: publishStepElapsedMs,
   });
   const publishProgressPercentRounded = Math.round(publishProgressPercent);
-  const wizardModeControls = (
-    <div className={styles.wizardModeToggle} role="group" aria-label="Session wizard mode">
-      <button
-        type="button"
-        className={`${styles.wizardModeBtn} ${wizardMode === 'normal' ? styles.wizardModeBtnActive : ''}`}
-        onClick={handleEnterNormalMode}
-        aria-pressed={wizardMode === 'normal'}
-        data-testid={E2E_TESTIDS.WIZARD_MODE_NORMAL}
-      >
-        Normal
-      </button>
-      <button
-        type="button"
-        className={`${styles.wizardModeBtn} ${wizardMode === 'advanced' ? styles.wizardModeBtnActive : ''}`}
-        onClick={handleEnterAdvancedMode}
-        aria-pressed={wizardMode === 'advanced'}
-        data-testid={E2E_TESTIDS.WIZARD_MODE_ADVANCED}
-      >
-        Advanced
-      </button>
-    </div>
-  );
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
@@ -4814,256 +4758,56 @@ const SessionWizard = ({
     }
   }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
 
-  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' && sessionIdDisplay ? (
-    <span className={styles.sessionIdBadge} title={sessionIdDisplay}>
-      {sessionIdDisplay.length > 14 ? sessionIdDisplay.slice(0, 14) + '…' : sessionIdDisplay}
-      <button
-        type="button"
-        className={styles.iconButton}
-        onClick={handleRegenerateSessionId}
-        title="Generate a new session ID"
-        aria-label="Generate a new session ID"
-      >
-        <FontAwesomeIcon icon={faRedoAlt} spin={isSessionIdRegenerating} />
-      </button>
-      <button type="button" className={styles.iconButton} onClick={handleCopySessionId} title="Copy session ID" aria-label="Copy session ID">
-        <FontAwesomeIcon icon={faCopy} />
-      </button>
-      {renderSessionWizardInfoTooltip({
-        id: 'gw-session-id',
-        content: 'On-chain session identifier. Use with /admin?sessionId=<uuid>&chainId=<id>.',
-        placement: 'bottom',
-        testId: 'ce-wizard-tooltip-gw-session-id',
-        ariaLabel: 'Session ID info',
-      })}
-    </span>
+  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' ? (
+    <SessionWizardSessionIdBadge
+      isRegenerating={isSessionIdRegenerating}
+      onCopy={handleCopySessionId}
+      onRegenerate={handleRegenerateSessionId}
+      renderInfoTooltip={renderSessionWizardInfoTooltip}
+      sessionIdDisplay={sessionIdDisplay}
+    />
   ) : null;
 
   return (
     <div className={styles.groupWizard}>
-      <header className={styles.header}>
-        <div className={styles.headerTitleBlock}>
-          <h1>Session Setup</h1>
-          {!isNormalMode && (
-            <div className={styles.modeHint}>
-              Advanced mode shows the full session configuration.
-            </div>
-          )}
-        </div>
-        <div className={styles.headerActions}>
-          {hasSponsoredBundleLink ? (
-            <div className={styles.wizardSettingsMenu}>
-              {wizardDisplaySettingsOpen ? (
-                <button
-                  type="button"
-                  className={styles.wizardSettingsBackdrop}
-                  aria-label="Close session wizard display settings"
-                  onClick={() => setWizardDisplaySettingsOpen(false)}
-                />
-              ) : null}
-              <button
-                type="button"
-                className={`${styles.iconButton} ${styles.wizardSettingsButton} ${wizardDisplaySettingsOpen ? styles.iconButtonActive : ''}`}
-                onClick={() => setWizardDisplaySettingsOpen((prev) => !prev)}
-                title="Session wizard display settings"
-                aria-label="Session wizard display settings"
-                aria-expanded={wizardDisplaySettingsOpen}
-                aria-haspopup="dialog"
-              >
-                <FontAwesomeIcon icon={faCog} />
-              </button>
-              <div
-                className={styles.wizardSettingsPanel}
-                role="dialog"
-                aria-label="Session wizard display settings"
-                hidden={!wizardDisplaySettingsOpen}
-              >
-                <div className={styles.wizardSettingsLabel}>Display mode</div>
-                {wizardModeControls}
-              </div>
-            </div>
-          ) : wizardModeControls}
-          {wizardMode === 'advanced' && (
-            <div className={styles.headerChainSelector}>
-              <span className={styles.headerChainLabel}>Network:</span>
-              <Input
-                type="select"
-                value={registryChainId || ''}
-                onChange={(e) => setRegistryChainId(e.target.value)}
-                className={styles.headerChainInput}
-              >
-                {registryChainOptions.length ? (
-                  registryChainOptions.map((chain) => (
-                    <option key={chain.id} value={chain.id}>
-                      {chain.name} ({chain.id})
-                    </option>
-                  ))
-                ) : (
-                  <option value={registryChainId || ''}>
-                    {registryChainName || registryChainId || 'Select a chain'}
-                  </option>
-                )}
-              </Input>
-              {renderSessionWizardInfoTooltip({
-                id: 'gw-registry-chain',
-                content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
-                placement: 'bottom',
-                testId: 'ce-wizard-tooltip-gw-registry-chain',
-                ariaLabel: 'Registry chain info',
-              })}
-            </div>
-          )}
-        </div>
-      </header>
+      <SessionWizardHeader
+        hasSponsoredBundleLink={hasSponsoredBundleLink}
+        isNormalMode={isNormalMode}
+        onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
+        onEnterAdvancedMode={handleEnterAdvancedMode}
+        onEnterNormalMode={handleEnterNormalMode}
+        onRegistryChainIdChange={setRegistryChainId}
+        onToggleDisplaySettings={() => setWizardDisplaySettingsOpen((prev) => !prev)}
+        registryAddress={registryAddress}
+        registryChainId={registryChainId}
+        registryChainName={registryChainName}
+        registryChainOptions={registryChainOptions}
+        renderInfoTooltip={renderSessionWizardInfoTooltip}
+        wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
+        wizardMode={wizardMode}
+      />
 
       {showNewSessionRequirementsBanner ? (
-        <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
-          <div className={styles.newSessionBannerHeader}>
-            <h2 id="new-session-requirements-title" className={styles.newSessionBannerTitle}>
-              To create a session you&apos;ll need:
-            </h2>
-            <button
-              type="button"
-              className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
-              aria-label="Dismiss session setup requirements"
-              title="Dismiss session setup requirements"
-              onClick={handleDismissNewSessionRequirementsBanner}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-          <div className={styles.newSessionBannerBody}>
-            <ul className={styles.newSessionBannerList}>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.openaiApiKey}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  OpenAI API key
-                </a>
-                {' '}for text and transcription
-              </li>
-              <li>
-                {newSessionRequiresLitCredential ? (
-                  <>
-                    <a
-                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.newSessionBannerLink}
-                    >
-                      Lit API key
-                    </a>
-                    {' '}for encrypted access automation
-                  </>
-                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
-              </li>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.arweaveWallet}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  Arweave wallet (JWK)
-                </a>
-                {' '}for permanent storage
-              </li>
-              <li>
-                {newSessionFundingRequirementHref ? (
-                  <a
-                    href={newSessionFundingRequirementHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.newSessionBannerLink}
-                  >
-                    {newSessionFundingRequirementLabel}
-                  </a>
-                ) : newSessionFundingRequirementLabel}
-              </li>
-              <li>(Optional) A faucet private key for sponsoring user gas</li>
-            </ul>
-            <p className={styles.newSessionBannerCopy}>
-              A turnkey tool for bundling these resources is in development.
-            </p>
-            <p className={styles.newSessionBannerCopy}>
-              In the meantime, you can get a sponsored session URL by contacting{' '}
-              <a
-                href="mailto:contextengine@protonmail.com"
-                className={styles.newSessionBannerLink}
-              >
-                contextengine@protonmail.com
-              </a>
-              .
-            </p>
-          </div>
-        </section>
+        <SessionWizardRequirementsBanner
+          fundingRequirementHref={newSessionFundingRequirementHref}
+          fundingRequirementLabel={newSessionFundingRequirementLabel}
+          newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+          onDismiss={handleDismissNewSessionRequirementsBanner}
+        />
       ) : null}
 
-      {sponsoredBundleStatus ? (
-        <div
-          className={`${styles.statusNote} ${styles.sponsoredBundleStatus} ${
-            sponsoredBundleStatus.tone === 'success'
-              ? styles.sponsoredBundleStatusSuccess
-              : sponsoredBundleStatus.tone === 'error'
-                ? styles.sponsoredBundleStatusError
-                : styles.sponsoredBundleStatusInfo
-          }`}
-          data-testid={E2E_TESTIDS.WIZARD_SPONSORED_STATUS}
-        >
-          <div className={styles.sponsoredBundleStatusContent}>
-            <span>{sponsoredBundleStatus.message}</span>
-            {sponsoredBundleStatus.retryable ? (
-              <Button
-                type="button"
-                size="sm"
-                color="secondary"
-                outline
-                className={styles.sponsoredBundleRetryButton}
-                onClick={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
-              >
-                Retry
-              </Button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <SessionWizardSponsoredStatus
+        onRetry={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
+        status={sponsoredBundleStatus}
+      />
 
       {isNormalMode && (
-        <section
-          className={styles.normalModeRail}
-          aria-label="Normal mode sections"
-          style={{ '--session-wizard-card-count': String(normalModeCards.length) }}
-        >
-          {normalModeCards.map((card, index) => {
-            const isOpen = !collapsedSections[card.key];
-            const showExpandedDetails = activeNormalModeIndex > index;
-            const toneClass = card.tone === 'ready'
-              ? styles.normalModeCardReady
-              : card.tone === 'pending'
-                ? styles.normalModeCardPending
-                : styles.normalModeCardNeutral;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                className={`${styles.normalModeCard} ${toneClass} ${isOpen ? styles.normalModeCardActive : ''}`}
-                onClick={() => focusNormalModeSection(card.key)}
-                aria-label={`Step ${card.stepNumber}: ${card.title}`}
-              >
-                <span className={styles.normalModeCardNumber}>{card.stepNumber}</span>
-                <span className={styles.normalModeCardContent}>
-                  <span className={styles.normalModeCardTitle}>{card.title}</span>
-                  {showExpandedDetails && (
-                    <span className={styles.normalModeCardSummary}>{card.summary}</span>
-                  )}
-                </span>
-              </button>
-            );
-          })}
-        </section>
+        <SessionWizardNormalModeRail
+          activeNormalModeIndex={activeNormalModeIndex}
+          collapsedSections={collapsedSections}
+          normalModeCards={normalModeCards}
+          onFocusSection={focusNormalModeSection}
+        />
       )}
 
       {(!isNormalMode || !collapsedSections.encryption) && (

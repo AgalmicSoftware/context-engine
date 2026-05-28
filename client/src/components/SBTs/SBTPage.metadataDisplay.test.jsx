@@ -1,6 +1,10 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
+import SbtPageActionsSection from './SbtPageActionsSection';
+import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageRelevantInfo from './SbtPageRelevantInfo';
+import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
@@ -65,6 +69,35 @@ const treeIncludesText = (node, text) => {
   return false;
 };
 
+const renderIdentityPanelTree = (tree) => {
+  const identityPanel = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageIdentityPanel
+  );
+  return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
+};
+
+const findActionsSection = (tree) => findElementInTree(
+  tree,
+  (element) => element?.type === SbtPageActionsSection
+);
+
+const renderStatsSectionTree = (tree) => {
+  const statsSection = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageStatsSection
+  );
+  return statsSection ? SbtPageStatsSection(statsSection.props) : null;
+};
+
+const renderRelevantInfoTree = (tree) => {
+  const relevantInfo = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageRelevantInfo
+  );
+  return relevantInfo ? SbtPageRelevantInfo(relevantInfo.props) : null;
+};
+
 describe('SBTPage metadata display', () => {
   afterEach(() => {
     try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
@@ -97,9 +130,10 @@ describe('SBTPage metadata display', () => {
     };
 
     const tree = subject.render();
-    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
-    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
-    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
+    const statsTree = renderStatsSectionTree(tree);
+    expect(treeIncludesText(statsTree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(statsTree, 'Deployer:')).toBe(false);
   });
 
   it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
@@ -134,6 +168,37 @@ describe('SBTPage metadata display', () => {
     expect(treeIncludesText(tree, 'MORE')).toBe(true);
   });
 
+  it('keeps idle action feedback from formatting absent transaction hashes', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showActions: true,
+      transactionHash: null,
+      lastMintTxHash: null,
+      lastBurnTxHash: null,
+    };
+
+    expect(() => subject.render()).not.toThrow();
+    const actionsSection = findActionsSection(subject.render());
+    expect(actionsSection?.props?.mintSuccessText).toBe('');
+    expect(actionsSection?.props?.burnSuccessText).toBe('');
+    expect(actionsSection?.props?.transactionErrorText).toBe('');
+  });
+
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
     const dataUriPayload = Buffer
@@ -162,7 +227,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -201,7 +266,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -240,7 +305,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -281,7 +346,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -319,7 +384,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -349,7 +414,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
     );
 
@@ -395,7 +460,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      tree,
+      renderIdentityPanelTree(tree),
       (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
     );
 
@@ -431,7 +496,7 @@ describe('SBTPage metadata display', () => {
           tags: ['AI Policy'],
         },
       };
-      const metadataTree = subject.renderRelevantInfo();
+      const metadataTree = renderRelevantInfoTree(subject.renderRelevantInfo());
       const docLink = findElementInTree(
         metadataTree,
         (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/')

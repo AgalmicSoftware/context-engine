@@ -3,11 +3,15 @@ import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
+import GatedPromptNotice from './GatedPromptNotice';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -349,6 +353,238 @@ describe('SurveyQuestions render helpers', () => {
     expect(links.props.questionHref).toContain('/question/q1');
     links.props.onBookmarkToggle();
     expect(subject.handleBookmarkToggle).toHaveBeenCalledWith('q1');
+  });
+
+  it('passes viewed-response JSON fallbacks to the bottom JSON controls', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      viewAddress: '0xdef',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    subject.getResponseJson = jest.fn(() => ({ generated: true }));
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      displayAnswerMode: true,
+      noResponse: true,
+      questionPool: [{ id: 'q1', type: 'freeform' }],
+      showResponseJson: true,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+
+    expect(controls).not.toBeNull();
+    expect(controls.props.responseJson).toEqual({
+      message: 'No response found for survey from address: 0xdef',
+    });
+    expect(subject.getResponseJson).not.toHaveBeenCalled();
+  });
+
+  it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.handleReloadMaskedPrompt = jest.fn();
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderQuestion(
+      {
+        id: 'Q-Worker',
+        type: 'freeform',
+        prompt: '[encrypted]',
+        payloadAccessMode: 'worker_sbt_gate',
+      },
+      0,
+      {
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }
+    );
+    const promptButton = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_DECRYPT_PROMPT
+    );
+    const notice = findFirstNodeByType(tree, GatedPromptNotice);
+
+    expect(promptButton).not.toBeNull();
+    expect(promptButton.props.title).toBe('Load gated prompt');
+    expect(treeHasText(tree, 'Requires session access')).toBe(true);
+    expect(notice).not.toBeNull();
+    expect(notice.props.statusText).toBe('requires session access');
+    expect(notice.props.actionLabel).toBe('Load Prompt');
+    expect(notice.props.actionTitle).toBe('Load gated prompt');
+    expect(findFirstNodeByType(tree, SurveyAudioFieldInput)).toBeNull();
+    expect(findFirstNodeByType(tree, QuestionDecryptControl)).toBeNull();
+
+    notice.props.onAction();
+
+    expect(subject.handleReloadMaskedPrompt).toHaveBeenCalledWith('q-worker');
+  });
+
+  it('renders encrypted full-question fields as disabled decrypt controls without a decrypt context', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      showComments: { q1: true },
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderQuestion(
+      { id: 'q1', type: 'freeform', prompt: 'Visible prompt' },
+      0,
+      {
+        answers: { q1: { value: '*', encrypted: true } },
+        additionalComments: { q1: { value: '*', encrypted: true } },
+        importance: {},
+        conviction: {},
+      }
+    );
+    const shell = findFirstNodeByType(tree, SurveyQuestionsFullQuestionCardShell);
+    const answerDecryptControl = findElement(
+      shell?.props?.mainContent,
+      (node) => node?.type === QuestionDecryptControl && node?.props?.actionLabel === 'Decrypt Answer'
+    );
+    const commentsDecryptControl = findElement(
+      shell?.props?.commentsSection,
+      (node) => node?.type === QuestionDecryptControl && node?.props?.actionLabel === 'Decrypt Comments'
+    );
+    const answerLockControl = findFirstNodeByType(shell?.props?.footerIcons, SurveyQuestionsLockAudienceControl);
+
+    expect(answerDecryptControl).not.toBeNull();
+    expect(answerDecryptControl.props.disabled).toBe(true);
+    expect(answerDecryptControl.props.title).toBe('Login to decrypt this encrypted field.');
+    expect(commentsDecryptControl).not.toBeNull();
+    expect(commentsDecryptControl.props.disabled).toBe(true);
+    expect(commentsDecryptControl.props.title).toBe('Login to decrypt this encrypted field.');
+    expect(answerLockControl).not.toBeNull();
+    expect(answerLockControl.props.isLockDisabled).toBe(true);
+    expect(answerLockControl.props.buttonTitle).toBe('Choose encryption audience');
+  });
+
+  it('wires enabled encrypted field decrypt controls to answer and comment handlers', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.handleDecryptQuestionAnswer = jest.fn();
+    subject.state = {
+      ...subject.state,
+      showComments: { q1: true },
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderQuestion(
+      { id: 'q1', type: 'freeform', prompt: 'Visible prompt' },
+      0,
+      {
+        answers: { q1: { value: '*', encrypted: true } },
+        additionalComments: { q1: { value: '*', encrypted: true } },
+        importance: {},
+        conviction: {},
+      }
+    );
+    const shell = findFirstNodeByType(tree, SurveyQuestionsFullQuestionCardShell);
+    const answerDecryptControl = findElement(
+      shell?.props?.mainContent,
+      (node) => node?.type === QuestionDecryptControl && node?.props?.actionLabel === 'Decrypt Answer'
+    );
+    const commentsDecryptControl = findElement(
+      shell?.props?.commentsSection,
+      (node) => node?.type === QuestionDecryptControl && node?.props?.actionLabel === 'Decrypt Comments'
+    );
+
+    expect(answerDecryptControl).not.toBeNull();
+    expect(answerDecryptControl.props.disabled).toBe(false);
+    expect(answerDecryptControl.props.title).toBeUndefined();
+    expect(commentsDecryptControl).not.toBeNull();
+    expect(commentsDecryptControl.props.disabled).toBe(false);
+    expect(commentsDecryptControl.props.title).toBeUndefined();
+
+    answerDecryptControl.props.onClick();
+    commentsDecryptControl.props.onClick();
+
+    expect(subject.handleDecryptQuestionAnswer).toHaveBeenCalledWith('q1', 'answer');
+    expect(subject.handleDecryptQuestionAnswer).toHaveBeenCalledWith('q1', 'additional');
+  });
+
+  it('surfaces hidden masked question ids through the locked banner without rendering editable cards', () => {
+    const lockedBanner = <div data-testid="locked-banner">Locked banner</div>;
+    const lockedGateDetails = [{
+      id: 'gate-1',
+      label: 'Gate One',
+      questionCount: 1,
+      sbts: [],
+    }];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => lockedGateDetails);
+    subject.renderLockedQuestionsPanel = jest.fn(() => lockedBanner);
+    subject.renderQuestion = jest.fn(() => <div data-testid="editable-card" />);
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'Q-Locked', type: 'freeform', prompt: '[encrypted]' }],
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const panel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
+
+    expect(panel).not.toBeNull();
+    expect(panel.props.showLockedQuestionsBanner).toBe(true);
+    expect(panel.props.lockedQuestionsBanner).toBe(lockedBanner);
+    expect(panel.props.renderedEditableQuestions).toBeNull();
+    expect(subject.renderQuestion).not.toHaveBeenCalled();
+    expect(subject.getMemoizedLockedQuestionGateDetails).toHaveBeenCalledWith(['q-locked']);
+    expect(subject.renderLockedQuestionsPanel).toHaveBeenCalledWith({
+      hiddenMaskedQuestionIds: ['q-locked'],
+      lockedGateDetails,
+    });
   });
 
   it('renders pile freeform answers with the shared audio field input wrapper', () => {

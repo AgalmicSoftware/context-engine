@@ -4,10 +4,6 @@ import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import {
   Button,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  UncontrolledDropdown,
   FormGroup,
   Label,
   Input,
@@ -19,12 +15,9 @@ import {
   InputGroup,
   InputGroupText,
   Modal,
-  ModalHeader,
   ModalBody,
   ModalFooter,
-  Collapse,
-  Alert,
-  Table
+  Collapse
 } from 'reactstrap';
 
 
@@ -33,7 +26,6 @@ import styles from './SurveyResults.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBookmark,
   faCaretUp,
   faCaretDown,
   faCheck,
@@ -44,17 +36,15 @@ import {
   faSpinner,
   faSearch,
   faExpand,
-  faExternalLinkAlt,
   faFilter,
-  faExclamationCircle,
-  faComments
+  faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
 import contractScripts, {
   getAllSessionSlugs,
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress, getShortenedQuestionID, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
+import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
@@ -63,7 +53,6 @@ import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
-  buildQuestionRoutePath,
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
@@ -142,6 +131,12 @@ import {
   SurveyResultsMultichoiceAggregatorSummary,
 } from './SurveyResultsAggregatorSummaries';
 import {
+  buildSurveyResultsFreeformSummaryModel,
+  buildSurveyResultsMultichoiceSummaryModel,
+  getSurveyResultsLatestResponsesByResponder,
+  resolveSurveyResultsSummaryQuestionType,
+} from './surveyResultsSummaryModels';
+import {
   renderSurveyResultsFilterSummary,
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
@@ -153,8 +148,22 @@ import {
   SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   getSurveyResultsExportTypeLabel as getExportTypeLabel,
-  type SurveyResultsExportOption,
 } from './surveyResultsExportDisplayHelpers.js';
+import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
+import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
+
+export {
+  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
+  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
+  SURVEY_RESULTS_TABLE_CELL_STYLE,
+} from './SurveyResultsQuestionTable';
 
 export {
   countQuestionModeResponses,
@@ -535,20 +544,6 @@ export const SURVEY_RESULTS_METADATA_MISSING_STYLE: React.CSSProperties = {
   fontStyle: 'italic',
   color: '#bbb',
   padding: '1rem',
-};
-
-export const SURVEY_RESULTS_TABLE_CELL_STYLE: React.CSSProperties = {
-  textAlign: 'center',
-};
-
-export const SURVEY_RESULTS_SORTABLE_HEADER_STYLE: React.CSSProperties = {
-  textAlign: 'center',
-  cursor: 'pointer',
-};
-
-export const SURVEY_RESULTS_TABLE_BOOKMARK_STYLE: React.CSSProperties = {
-  marginRight: '6px',
-  cursor: 'pointer',
 };
 
 export const SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE: React.CSSProperties = {
@@ -3631,161 +3626,20 @@ getMemoizedPolisQuestionResponses = (
   return result;
 };
 
-resolveSummaryQuestionType = (
-  question: SurveyResultsRecord | null = null,
-  responses: unknown = []
-): string => {
-  const resolvedType = String(question?.type || '').trim().toLowerCase();
-  const isFreeform = resolvedType === 'freeform' || resolvedType === 'text';
-  if (isFreeform) return 'freeform';
-  if (resolvedType) return resolvedType;
-  const responseRows = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
-  for (let index = 0; index < responseRows.length; index += 1) {
-    const inferredType = String(
-      responseRows[index]?.response?.type ||
-      responseRows[index]?.response?.questionType ||
-      responseRows[index]?.response?.answer?.type ||
-      ''
-    ).trim().toLowerCase();
-    const inferredIsFreeform = inferredType === 'freeform' || inferredType === 'text';
-    if (inferredIsFreeform) return 'freeform';
-    if (inferredType) return inferredType;
-  }
-  return '';
-};
+resolveSummaryQuestionType = resolveSurveyResultsSummaryQuestionType;
 
-getLatestResponsesByResponder = (responses: unknown = []): SurveyResultsSummaryResponseRow[] => {
-  const responseRows = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
-  const latestByResponder = new Map<string, SurveyResultsSummaryResponseRow>();
-  responseRows.forEach((row, index) => {
-    const responderKey = String(row?.responder || `__row_${index}`).trim().toLowerCase();
-    const timestamp = getSurveyResponseAggregateTimestampMs(row?.response, row);
-    const existing = latestByResponder.get(responderKey);
-    const existingTimestamp = getSurveyResponseAggregateTimestampMs(existing?.response, existing);
-    if (!existing || timestamp >= existingTimestamp) {
-      latestByResponder.set(responderKey, row);
-    }
-  });
-  return Array.from(latestByResponder.values());
-};
+getLatestResponsesByResponder = getSurveyResultsLatestResponsesByResponder as (
+  responses?: unknown
+) => SurveyResultsSummaryResponseRow[];
 
-buildFreeformSummaryModel = (responses: unknown = []): SurveyResultsFreeformSummaryModel => {
-  const latestRows = this.getLatestResponsesByResponder(responses);
+buildFreeformSummaryModel = buildSurveyResultsFreeformSummaryModel as (
+  responses?: unknown
+) => SurveyResultsFreeformSummaryModel;
 
-  let encryptedCount = 0;
-  let blankCount = 0;
-  const displayedResponses: SurveyResultsFreeformDisplayedResponse[] = [];
-
-  latestRows.forEach((row) => {
-    const parsedResponse = row?.response;
-    if (!parsedResponse || !parsedResponse.answer) {
-      blankCount += 1;
-      return;
-    }
-
-    if (isFreeformBlankAnswer('freeform', parsedResponse)) {
-      blankCount += 1;
-      return;
-    }
-
-    const isEncryptedPlaceholder =
-      parsedResponse.answer.encrypted === true &&
-      parsedResponse.answer.value === '*';
-    if (isEncryptedPlaceholder) {
-      encryptedCount += 1;
-      return;
-    }
-
-    const additionalEncrypted = parsedResponse.additional?.encrypted === true;
-    const rawAdditional = additionalEncrypted ? '' : (parsedResponse.additional?.value || '');
-    const safeAdditional = typeof rawAdditional === 'string' ? rawAdditional : JSON.stringify(rawAdditional);
-
-    displayedResponses.push({
-      responder: row?.responder || '',
-      value: parsedResponse.answer.value,
-      additional: safeAdditional,
-    });
-  });
-
-  const totalResponses = Math.max(latestRows.length - blankCount, 0);
-  return {
-    totalResponses,
-    encryptedCount,
-    blankCount,
-    displayedResponses,
-  };
-};
-
-buildMultichoiceSummaryModel = (
-  responses: unknown = [],
-  question: SurveyResultsRecord | null = null
-): SurveyResultsMultichoiceSummaryModel => {
-  const latestRows = this.getLatestResponsesByResponder(responses);
-  const normalizeChoiceLabel = (choice: unknown) => {
-    if (typeof choice === 'string') return choice;
-    if (!choice || typeof choice !== 'object') return '';
-    const choiceRecord = choice as SurveyResultsRecord;
-    return choiceRecord.label ?? choiceRecord.text ?? choiceRecord.name ?? choiceRecord.value ?? '';
-  };
-
-  const displayByKey = new Map<string, string>();
-  const addOption = (option: unknown) => {
-    const label = String(normalizeChoiceLabel(option) || '').trim();
-    if (!label) return;
-    const key = label.toLowerCase();
-    if (!displayByKey.has(key)) {
-      displayByKey.set(key, label);
-    }
-  };
-
-  (Array.isArray(question?.options) ? question.options : []).forEach(addOption);
-
-  if (displayByKey.size === 0) {
-    latestRows.forEach((row) => {
-      const value = row?.response?.answer?.value;
-      const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
-      items.forEach(addOption);
-    });
-  }
-
-  const countsByKey = new Map<string, number>();
-  Array.from(displayByKey.keys()).forEach((key) => countsByKey.set(key, 0));
-
-  let totalResponders = 0;
-  latestRows.forEach((row) => {
-    const parsedResponse = row?.response;
-    if (!parsedResponse?.answer || parsedResponse.answer.encrypted === true) return;
-    const value = parsedResponse.answer.value;
-    const items = Array.isArray(value) ? value : (value == null ? [] : [value]);
-    const picks = new Set<string>();
-    items.forEach((choice) => {
-      const label = String(normalizeChoiceLabel(choice) || '').trim();
-      if (!label) return;
-      const key = label.toLowerCase();
-      if (displayByKey.has(key)) {
-        picks.add(key);
-      }
-    });
-    if (picks.size === 0) return;
-    totalResponders += 1;
-    picks.forEach((key) => {
-      countsByKey.set(key, (countsByKey.get(key) || 0) + 1);
-    });
-  });
-
-  return {
-    totalResponders,
-    options: Array.from(displayByKey.entries()).map(([key, label]) => ({
-      key,
-      label,
-      count: countsByKey.get(key) || 0,
-    })),
-  };
-};
+buildMultichoiceSummaryModel = buildSurveyResultsMultichoiceSummaryModel as (
+  responses?: unknown,
+  question?: SurveyResultsRecord | null
+) => SurveyResultsMultichoiceSummaryModel;
 
 renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
   const summary = this.buildFreeformSummaryModel(responses);
@@ -4301,78 +4155,40 @@ renderQuestionSummary = (
     };
   });
   const resolvedQuestionType = this.resolveSummaryQuestionType(question, displayResponses);
-  const isFreeform = resolvedQuestionType === 'freeform' || resolvedQuestionType === 'text';
   const viewableResponsesCount = this.getMemoizedViewableResponsesCount(displayResponses, resolvedQuestionType);
 
 const isActive = this.state.activeQuestionToggles[questionId];
 return (
-  <Card
+  <SurveyResultsQuestionSummaryCard
     key={questionId}
-    id={domId}
-    className={styles.aggregatorSummaryCard}
-  >
-    <CardHeader
-      onClick={() => this.toggleQuestionSummary(questionId)}
-      className={styles.questionSummaryHeader}
-    >
-      <div className={styles.headerLeft}>
-        <div className={styles.responseCountContainer}>
-          <FontAwesomeIcon icon={faComments} className={styles.responseCountIcon} />
-          <span className={styles.responseCountNumber}>{viewableResponsesCount}</span>
-        </div>
-        <span className={styles.questionTitle}>
-          {questionPrompt}
-        </span>
-      </div>
-      <div className={styles.questionSummaryHeaderIcons}>
-        <FontAwesomeIcon
-          icon={faBookmark}
-          className={styles.biggerIcon}
-          onClick={(e: React.MouseEvent<SVGSVGElement>) => {
-            e.stopPropagation();
-            this.toggleQuestionBookmark(questionId);
-          }}
-          color={this.state.bookmarkedQuestionIDs.includes(questionId) ? 'gold' : 'white'}
-          style={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
-        />
-        <FontAwesomeIcon
-          icon={isActive ? faCaretUp : faCaretDown}
-          className={styles.biggerIcon}
-        />
-      </div>
-    </CardHeader>
-    <Collapse
-      isOpen={this.state.activeQuestionToggles[questionId]}
-      id={styles.surveyResultsCollapse}
-    >
-      <CardBody className={styles.aggregatorDarkCardBody}>
-        {!question && (
-          <p style={SURVEY_RESULTS_METADATA_MISSING_STYLE}>
-            No metadata found for this question in local cache.
-          </p>
-        )}
-        <div className={styles.surveyResultsOverride}>
-          {isFreeform ? (
-            this.renderFreeformAggregatorSummary(displayResponses)
-          ) : resolvedQuestionType === 'multichoice' ? (
-            this.renderMultichoiceAggregatorSummary(displayResponses, question)
-          ) : (
-            <SingleQuestionResponse
-              aggregatorResponseMode={true}
-              question={question || this.getStableFallbackQuestion(questionId, 'summary')}
-              allResponses={displayResponses}
-              network={this.props.network}
-              activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              questionsCacheNonce={this.props.questionsCacheNonce}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-              {...this.getSurveyResultsResponseCardProps()}
-            />
-          )}
-        </div>
-      </CardBody>
-    </Collapse>
-  </Card>
+    bookmarked={this.state.bookmarkedQuestionIDs.includes(questionId)}
+    bookmarkIconStyle={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
+    domId={domId}
+    isActive={!!isActive}
+    metadataMissing={!question}
+    metadataMissingStyle={SURVEY_RESULTS_METADATA_MISSING_STYLE}
+    onToggleBookmark={() => this.toggleQuestionBookmark(questionId)}
+    onToggleSummary={() => this.toggleQuestionSummary(questionId)}
+    questionPrompt={questionPrompt}
+    renderDefaultSummary={() => (
+      <SingleQuestionResponse
+        aggregatorResponseMode={true}
+        question={question || this.getStableFallbackQuestion(questionId, 'summary')}
+        allResponses={displayResponses}
+        network={this.props.network}
+        activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
+        questionResponsesNonce={this.props.questionResponsesNonce}
+        questionsCacheNonce={this.props.questionsCacheNonce}
+        sbtCacheRevision={this.props.sbtCacheRevision}
+        {...this.getSurveyResultsResponseCardProps()}
+      />
+    )}
+    renderFreeformSummary={() => this.renderFreeformAggregatorSummary(displayResponses)}
+    renderMultichoiceSummary={() => this.renderMultichoiceAggregatorSummary(displayResponses, question)}
+    resolvedQuestionType={resolvedQuestionType}
+    styleMap={styles}
+    viewableResponsesCount={viewableResponsesCount}
+  />
 );
 };
 
@@ -4466,86 +4282,28 @@ const questionEntries = this.getMemoizedQuestionTableEntries(questionMap, networ
 const { questionIdSortBy, questionIdSortAsc } = this.state;
 
 return (
-  <div className={styles.questionIdTableWrapper}>
-    <Table striped bordered hover size="sm" className={styles.questionIdTable}>
-      <thead>
-        <tr>
-          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Question ID</th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('prompt')}
-          >
-            Prompt {questionIdSortBy === 'prompt' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('type')}
-          >
-            Type {questionIdSortBy === 'type' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th
-            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
-            onClick={() => this.changeQuestionIdSort('responses')}
-          >
-            Responses{' '}
-            {questionIdSortBy === 'responses' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
-          </th>
-          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {questionEntries.map((entry) => {
-          const shortened = getShortenedQuestionID(entry.questionId, false);
-          const bookmarked = this.state.bookmarkedQuestionIDs.includes(entry.questionId);
-          return (
-            <tr key={entry.questionId}>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <FontAwesomeIcon
-                  icon={faBookmark}
-                  style={SURVEY_RESULTS_TABLE_BOOKMARK_STYLE}
-                  color={bookmarked ? 'gold' : 'white'}
-                  onClick={() => this.toggleQuestionBookmark(entry.questionId)}
-                />
-                <a
-                  href={buildQuestionRoutePath(entry.questionId, {
-                    sessionSlug: entry.sessionSlug || this.getEffectiveSlug(),
-                  })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.clickableQuestionId}
-                >
-                  {shortened}
-                </a>
-              </td>
-              <td className={styles.promptColumn}>{entry.prompt || '(No prompt)'}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.type}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.responsesCount}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    // Use setState with a callback to guarantee the scroll happens after the render.
-                    // This ensures the card is expanded before we attempt to scroll to it.
-                    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
-                      forceValue: true,
-                      itemKey: entry.questionId,
-                      mapKey: 'activeQuestionToggles',
-                      prevState,
-                    }), () => {
-                      this.scrollToQuestion(entry.questionId);
-                    });
-                  }}
-                  className={styles.tableActionButton}
-                >
-                  View
-                </Button>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </Table>
-  </div>
+  <SurveyResultsQuestionTable
+    bookmarkedQuestionIDs={this.state.bookmarkedQuestionIDs}
+    entries={questionEntries}
+    fallbackSessionSlug={this.getEffectiveSlug()}
+    onSort={this.changeQuestionIdSort}
+    onToggleQuestionBookmark={this.toggleQuestionBookmark}
+    onViewQuestion={(questionId) => {
+      // Use setState with a callback to guarantee the scroll happens after the render.
+      // This ensures the card is expanded before we attempt to scroll to it.
+      this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+        forceValue: true,
+        itemKey: questionId,
+        mapKey: 'activeQuestionToggles',
+        prevState,
+      }), () => {
+        this.scrollToQuestion(questionId);
+      });
+    }}
+    sortAsc={questionIdSortAsc}
+    sortBy={questionIdSortBy}
+    styleMap={styles}
+  />
 );
 };
 
@@ -4992,63 +4750,24 @@ return (
     toggle={this.closeModal}
     className={styles.resultsModal}
   >
-    <ModalHeader toggle={this.closeModal} className={styles.modalHeader}>
-      <div className={styles.modalHeaderContent}>
-        <div className={styles.modalHeaderTitleBlock}>
-          <h2 className={styles.modalTitle}>
-            {viewMode === 'survey'
-             ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
-              : 'Question Results'}
-          </h2>
-        </div>
-
-        {viewMode === 'survey' && currentSurveyId && (
-          <div className={styles.modalSubtitle}>
-            <span className={styles.surveyIdMeta}>
-              Survey ID:{' '}
-              <a
-                href={`/survey/${encodeURIComponent(currentSurveyId)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
-                className={styles.surveyIdLink}
-              >
-                {surveyIdAbbreviation || currentSurveyId}
-              </a>
-            </span>
-            <FontAwesomeIcon
-              icon={faBookmark}
-              className={styles.biggerIcon}
-              onClick={(e: React.MouseEvent<SVGSVGElement>) => {
-                e.stopPropagation();
-                this.toggleSurveyBookmark(currentSurveyId);
-              }}
-              color={
-                this.state.bookmarkedSurveyIDs.includes(currentSurveyId) ? 'gold' : 'grey'
-              }
-              style={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
-              title="Bookmark Survey ID"
-            />
-          </div>
-        )}
-        {viewMode === 'survey' && Array.isArray(surveyDocumentURLs) && surveyDocumentURLs.length > 0 && (
-          <div className={styles.surveyDocUrls}>
-            {surveyDocumentURLs.map((url: string, idx: number) => (
-              <a
-                key={idx}
-                href={url}
-                target='_blank'
-                rel='noopener noreferrer'
-                className={styles.surveyDocUrlLink}
-                title={url}
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} style={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE} />
-                {url.length > 50 ? `${url.slice(0, 47)}...` : url}
-              </a>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className={styles.modalHeaderControls}>
-        {this.renderLockedResponsesToggle(lockedResponsesModel)}
-        {renderSurveyResultsSyncStatusPanel({
+    <SurveyResultsModalHeader
+      bookmarkedSurveyIDs={this.state.bookmarkedSurveyIDs}
+      currentSurveyId={currentSurveyId}
+      demoResultsViewMode={demoResultsViewMode}
+      demoResultsViewOptions={demoResultsViewOptions}
+      documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
+      effectiveSlug={this.getEffectiveSlug()}
+      isDemoQuestionResults={isDemoQuestionResults}
+      lockedResponsesToggleNode={this.renderLockedResponsesToggle(lockedResponsesModel)}
+      onClose={this.closeModal}
+      onDemoResultsViewSelect={this.handleDemoResultsViewSelect}
+      onToggleSurveyBookmark={this.toggleSurveyBookmark}
+      styleMap={styles}
+      surveyBookmarkStyle={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
+      surveyDocumentURLs={Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : []}
+      surveyIdAbbreviation={surveyIdAbbreviation}
+      surveyTitle={surveyTitle}
+      syncStatusNode={renderSurveyResultsSyncStatusPanel({
           isSynced,
           isSyncingOrLoading,
           syncStatusText,
@@ -5073,34 +4792,8 @@ return (
           miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
           miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
         })}
-        {isDemoQuestionResults && (
-          <div
-            className={styles.demoResultsViewNav}
-            aria-label="Demo results views"
-            data-testid="ce-surveyresults-demo-view-nav"
-          >
-            {demoResultsViewOptions.map((option: SurveyResultsDemoViewOption) => {
-              const isActiveView = demoResultsViewMode === option.key;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  className={[
-                    styles.demoResultsViewButton,
-                    isActiveView ? styles.demoResultsViewButtonActive : '',
-                  ].filter(Boolean).join(' ')}
-                  aria-pressed={isActiveView}
-                  data-testid={`ce-surveyresults-demo-view-${option.key}`}
-                  onClick={() => this.handleDemoResultsViewSelect(option.key)}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </ModalHeader>
+      viewMode={viewMode}
+    />
 
     <ModalBody className={styles.modalBody}>
       {isDemoAlternateResultsView ? (
@@ -5112,118 +4805,62 @@ return (
         </div>
       ) : (
         <>
-      {alertMessage && !filterLoading && (
-        <Alert color="info" className={styles.alertMessage} fade={false}>
-          {alertMessage}
-        </Alert>
-      )}
-
-      {filterLoading && (
-        <div className={styles.loadingContainer}>
-          <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-          <p>Applying filter...</p>
-        </div>
-      )}
+      <SurveyResultsStatusMessages
+        alertMessage={alertMessage}
+        filterLoading={filterLoading}
+        styleMap={styles}
+      />
 
       {viewMode === 'survey' && (
-        <div className={styles.surveyViewModeToggle}>
-          <Label className={styles.toggleLabel}>Individual</Label>
-          <div
-            className={styles.toggleSwitch}
-            role="switch"
-            aria-label="Toggle between individual and aggregate view"
-            aria-checked={surveyViewMode === 'aggregate'}
-            tabIndex={0}
-            onClick={this.handleSurveyViewModeToggle}
-            onKeyDown={this.handleSurveyViewModeKeyDown}
-          >
-            <div
-              className={styles.toggleKnob}
-              style={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
-            />
-          </div>
-          <Label className={styles.toggleLabel} style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}>
-            Aggregate
-          </Label>
-        </div>
+        <SurveyResultsSurveyViewModeToggle
+          isAggregate={surveyViewMode === 'aggregate'}
+          knobStyle={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
+          onKeyDown={this.handleSurveyViewModeKeyDown}
+          onToggle={this.handleSurveyViewModeToggle}
+          styleMap={styles}
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {this.renderLockedResponsesBanner(lockedResponsesModel)}
 
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <Card className={styles.questionListCard}>
-          <CardHeader
-            onClick={() => this.toggleQuestionSummary('__questionList__')}
-            className={styles.questionSummaryHeader}
-          >
-            <span className={styles.questionTitle}> View & Sort Questions</span>
-            <FontAwesomeIcon
-              icon={
-                this.state.activeQuestionToggles['__questionList__']
-                  ? faCaretUp
-                  : faCaretDown
-              }
-              className={styles.biggerIcon}
-              style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-            />
-          </CardHeader>
-          <Collapse
-            isOpen={this.state.activeQuestionToggles['__questionList__']}
-            id={styles.surveyResultsCollapse}
-          >
-            <CardBody className={styles.aggregatorDarkCardBody}>
-	              {aggregatorEntriesCount === 0 &&
-	              !filterLoading ? (
-	                <p>No questions found.</p>
-	              ) : (
-	                <div ref={this.questionIdTableRef}>
-	                  {this.renderQuestionIDsTable(
-	                    sbtFilteredAggregatorQuestionResponses,
-	                    preNetworkQuestions
-	                  )}
-	                </div>
-              )}
-            </CardBody>
-          </Collapse>
-        </Card>
+        <SurveyResultsQuestionListCard
+          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
+          onToggle={() => this.toggleQuestionSummary('__questionList__')}
+          questionTableNode={
+            aggregatorEntriesCount === 0 && !filterLoading
+              ? null
+              : this.renderQuestionIDsTable(
+                sbtFilteredAggregatorQuestionResponses,
+                preNetworkQuestions
+              )
+          }
+          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          styleMap={styles}
+          tableWrapperRef={this.questionIdTableRef}
+          title=" View & Sort Questions"
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {viewMode === 'questions' && (
-        <Card className={styles.questionListCard}>
-          <CardHeader
-            onClick={() => this.toggleQuestionSummary('__questionList__')}
-            className={styles.questionSummaryHeader}
-          >
-            <span className={styles.questionTitle}>View & Sort Questions</span>
-            <FontAwesomeIcon
-              icon={
-                this.state.activeQuestionToggles['__questionList__']
-                  ? faCaretUp
-                  : faCaretDown
-              }
-              className={styles.biggerIcon}
-              style={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-            />
-          </CardHeader>
-          <Collapse
-            isOpen={this.state.activeQuestionToggles['__questionList__']}
-            id={styles.surveyResultsCollapse}
-          >
-            <CardBody className={styles.aggregatorDarkCardBody}>
-	              {aggregatorEntriesCount === 0 &&
-	              !filterLoading ? (
-	                <p>No questions found.</p>
-	              ) : (
-	                <div>
-	                  {this.renderQuestionIDsTable(
-	                    sbtFilteredAggregatorQuestionResponses,
-	                    preNetworkQuestions
-	                  )}
-	                </div>
-              )}
-            </CardBody>
-          </Collapse>
-        </Card>
+        <SurveyResultsQuestionListCard
+          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
+          onToggle={() => this.toggleQuestionSummary('__questionList__')}
+          questionTableNode={
+            aggregatorEntriesCount === 0 && !filterLoading
+              ? null
+              : this.renderQuestionIDsTable(
+                sbtFilteredAggregatorQuestionResponses,
+                preNetworkQuestions
+              )
+          }
+          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          styleMap={styles}
+          title="View & Sort Questions"
+          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
+        />
       )}
 
       {renderSurveyResultsFilterSummary({
@@ -5341,163 +4978,88 @@ return (
           )}
         </div>
 
-        <div className={styles.exportDataBox}>
-          {!exportAreaOpen ? (
-            <Button
-              onClick={this.toggleExportArea}
-              className={styles.exportToggleButton}
-              aria-expanded={this.state.exportAreaOpen}
-              aria-controls="surveyResultsExportArea"
-            >
-              Export Data
-            </Button>
-          ) : (
-            <div className={styles.exportAreaExpanded} id="surveyResultsExportArea">
-              <div className={styles.exportAreaHeader}>
-                <Label for="exportType" className={styles.exportLabel}>
-                  Export Data:
-                </Label>
-                <Button
-                  type="button"
-                  color="link"
-                  className={styles.exportCollapseButton}
-                  onClick={this.toggleExportArea}
-                  aria-label="Collapse export area"
-                >
-                  <FontAwesomeIcon icon={faCaretUp} />
-                </Button>
-              </div>
-              <div id={styles.exportOptions}>
-                <UncontrolledDropdown direction="down" className={styles.exportDropdownBox}>
-                    <DropdownToggle caret className={styles.exportDropdown}>
-                    {getExportTypeLabel(exportType)}
-                  </DropdownToggle>
-                  <DropdownMenu>
-                    {EXPORT_OPTIONS.map((option: SurveyResultsExportOption) => (
-                      <DropdownItem key={option.value} onClick={() => this.handleExportTypeChange(option.value)}>
-                        {option.label}
-                      </DropdownItem>
-                    ))}
-                  </DropdownMenu>
-                </UncontrolledDropdown>
-                <Button onClick={this.downloadCSV} className={styles.downloadButton}>
-                  Download
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
+        <SurveyResultsExportControls
+          exportAreaOpen={exportAreaOpen}
+          exportOptions={EXPORT_OPTIONS}
+          exportTypeLabel={getExportTypeLabel(exportType)}
+          onDownload={this.downloadCSV}
+          onExportTypeChange={this.handleExportTypeChange}
+          onToggleExportArea={this.toggleExportArea}
+          styleMap={styles}
+        />
       </div>
 
       {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-        <>
-          <div className={styles.responseList}>
-            {sbtFilteredResponses.length === 0 && !filterLoading ? (
-              <p>No results yet.</p>
-            ) : (
-              sbtFilteredResponses.map((response: SurveyResultsResponseListEntry, index: number) => {
-                const parsedResponse = response.response; // Already an object
-                const openToggle = !!this.state.activeToggles[index];
-                return (
-                  <Card key={index} className={styles.singleResponseCard}>
-                    <CardHeader
-                      onClick={() => this.toggleResponse(index)}
-                      className={styles.responseHeader}
-                    >
-                      <span className={styles.responderAddress}>
-                        <a
-                          href={`/u/${encodeURIComponent(response.responder)}`}
-                          className={styles.responderLink}
-                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
-                        >
-                          {getShortenedAddress(response.responder, false)}
-                        </a>
-                        <a
-                          href={`/survey/${encodeURIComponent(currentSurveyId)}/${encodeURIComponent(response.responder)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.externalLink}
-                        >
-                          <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        </a>
-                      </span>
-                      <FontAwesomeIcon
-                        icon={openToggle ? faCaretUp : faCaretDown}
-                        className={styles.biggerIcon}
+        <SurveyResultsIndividualResponsesList
+          activeToggles={this.state.activeToggles}
+          currentSurveyId={currentSurveyId}
+          effectiveSlug={this.getEffectiveSlug()}
+          filterLoading={filterLoading}
+          onToggleResponse={this.toggleResponse}
+          renderResponseBody={(response: SurveyResultsResponseListEntry) => {
+            const parsedResponse = response.response; // Already an object
+            return parsedResponse &&
+              parsedResponse.responses &&
+              parsedResponse.responses.length > 0 ? (
+                parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
+                  const questionId = getSurveyResponseQuestionId(answerItem);
+                  const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
+                  const responseKey = this.getLockedResponseKey({
+                    responder: response?.responder,
+                    questionId,
+                    surveyId: response?.surveyId || currentSurveyId,
+                    response: answerItem,
+                  });
+                  const displayResponse = this.applyDecryptedOverrideToResponse({
+                    response: answerItem,
+                    key: responseKey,
+                  });
+                  return (
+                    <div key={aIndex} className={styles.surveyResultsOverride}>
+                      <SingleQuestionResponse
+                        aggregatorResponseMode={false}
+                        question={questionData}
+                        response={displayResponse}
+                        mode="fullscreen"
+                        isOwnResponse={
+                          this.props.account?.toLowerCase() ===
+                          response.responder?.toLowerCase()
+                        }
+                        network={this.props.network}
+                        activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
+                        questionResponsesNonce={this.props.questionResponsesNonce}
+                        questionsCacheNonce={this.props.questionsCacheNonce}
+                        sbtCacheRevision={this.props.sbtCacheRevision}
+                        {...this.getSurveyResultsResponseCardProps()}
                       />
-                    </CardHeader>
-                    <Collapse isOpen={openToggle} id={styles.surveyResultsCollapse}>
-                      <CardBody className={styles.responseCard}>
-                        {parsedResponse &&
-                        parsedResponse.responses &&
-                        parsedResponse.responses.length > 0 ? (
-	                          parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
-	                            const questionId = getSurveyResponseQuestionId(answerItem);
-	                            const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
-                              const responseKey = this.getLockedResponseKey({
-                                responder: response?.responder,
-                                questionId,
-                                surveyId: response?.surveyId || currentSurveyId,
-                                response: answerItem,
-                              });
-                              const displayResponse = this.applyDecryptedOverrideToResponse({
-                                response: answerItem,
-                                key: responseKey,
-                              });
-	                            return (
-	                              <div key={aIndex} className={styles.surveyResultsOverride}>
-		                                <SingleQuestionResponse
-                                  aggregatorResponseMode={false}
-                                  question={questionData}
-                                  response={displayResponse}
-                                  mode="fullscreen"
-                                  isOwnResponse={
-                                    this.props.account?.toLowerCase() ===
-                                    response.responder?.toLowerCase()
-                                  }
-                                  network={this.props.network}
-                                  activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
-                                  questionResponsesNonce={this.props.questionResponsesNonce}
-                                  questionsCacheNonce={this.props.questionsCacheNonce}
-                                  sbtCacheRevision={this.props.sbtCacheRevision}
-                                  {...this.getSurveyResultsResponseCardProps()}
-                                />
-                              </div>
-                            );
-                          })
-                        ) : (
-                          <p>No question-level responses found for this user.</p>
-                        )}
-                      </CardBody>
-                    </Collapse>
-                  </Card>
-                );
-              })
-            )}
-          </div>
-        </>
+                    </div>
+                  );
+                })
+              ) : (
+                <p>No question-level responses found for this user.</p>
+              );
+          }}
+          responses={sbtFilteredResponses}
+          styleMap={styles}
+        />
       )}
 
       {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <>
-	          <div className={styles.questionSummaries}>
-	            {surveyAggregateEntries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
-	              <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
-	            ))}
-            {surveyAggregateEntries.length === 0 &&
-              !filterLoading && <p>No results yet.</p>}
-          </div>
-        </>
+        <SurveyResultsQuestionSummariesList
+          entries={surveyAggregateEntries}
+          filterLoading={filterLoading}
+          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
+          styleMap={styles}
+        />
       )}
 
 	      {viewMode === 'questions' && (
-	        <div className={styles.questionSummaries}>
-	          {questionModeEntries.map(([qId, arr]: SurveyResultsAggregatorEntry) => (
-	            <div key={qId}>{this.renderQuestionSummary(qId, arr, preNetworkQuestions)}</div>
-	          ))}
-          {questionModeEntries.length === 0 &&
-            !filterLoading && <p>No results yet.</p>}
-        </div>
+        <SurveyResultsQuestionSummariesList
+          entries={questionModeEntries}
+          filterLoading={filterLoading}
+          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
+          styleMap={styles}
+        />
       )}
         </>
       )}

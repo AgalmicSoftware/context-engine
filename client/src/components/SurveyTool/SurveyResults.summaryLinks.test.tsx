@@ -31,6 +31,9 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -152,12 +155,6 @@ const collectTreeNodes = (
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
   return collectTreeNodes(node?.props?.children, predicate, acc);
-};
-
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
 };
 
 const renderSubjectTree = (subject: any) => (
@@ -309,13 +306,12 @@ describe('SurveyResults multichoice aggregator summary', () => {
       }
     );
 
-    const countNode = findElement(
+    const summaryCard = findElement(
       tree,
-      (element) => typeof element?.props?.className === 'string' &&
-        element.props.className.includes(styles.responseCountNumber)
+      (element) => element?.type === SurveyResultsQuestionSummaryCard
     );
 
-    expect(countNode?.props?.children).toBe(1);
+    expect(summaryCard?.props?.viewableResponsesCount).toBe(1);
   });
 });
 
@@ -518,11 +514,12 @@ describe('SurveyResults demo results views', () => {
     };
 
     const nonDemoTree = nonDemoSubject.render();
-    const nonDemoNav = findElement(
+    const nonDemoHeader = findElement(
       nonDemoTree,
-      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
+      (element) => element?.type === SurveyResultsModalHeader
     );
-    expect(nonDemoNav).toBeNull();
+    const nonDemoMarkup = renderToStaticMarkup(nonDemoHeader);
+    expect(nonDemoMarkup).not.toContain('ce-surveyresults-demo-view-nav');
 
     const demoSubject = createSubject({
       isOpen: true,
@@ -535,31 +532,19 @@ describe('SurveyResults demo results views', () => {
     };
 
     const demoTree = demoSubject.render();
-    const demoNav = findElement(
+    const demoHeader = findElement(
       demoTree,
-      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
+      (element) => element?.type === SurveyResultsModalHeader
     );
-    const headerControls = findElement(
-      demoTree,
-      (element) =>
-        typeof element?.props?.className === 'string' &&
-        element.props.className.includes('modalHeaderControls')
-    );
-    const headerControlChildren = normalizeChildren(headerControls?.props?.children);
-    const syncIndex = headerControlChildren.findIndex(
-      (child) =>
-        typeof child?.props?.className === 'string' &&
-        child.props.className.includes('syncStatusContainer')
-    );
-    const demoNavIndex = headerControlChildren.findIndex(
-      (child) => child?.props?.['data-testid'] === 'ce-surveyresults-demo-view-nav'
-    );
+    const demoMarkup = renderToStaticMarkup(demoHeader);
+    const syncIndex = demoMarkup.indexOf('syncStatusContainer');
+    const demoNavIndex = demoMarkup.indexOf('ce-surveyresults-demo-view-nav');
 
-    expect(demoNav).toBeTruthy();
-    expect(treeHasText(demoNav, 'Report')).toBe(true);
-    expect(treeHasText(demoNav, 'Breakdown')).toBe(true);
-    expect(treeHasText(demoNav, 'Atlas')).toBe(true);
-    expect(treeHasText(demoNav, 'Risk Matrix')).toBe(true);
+    expect(demoNavIndex).toBeGreaterThanOrEqual(0);
+    expect(demoMarkup).toContain('Report');
+    expect(demoMarkup).toContain('Breakdown');
+    expect(demoMarkup).toContain('Atlas');
+    expect(demoMarkup).toContain('Risk Matrix');
     expect(syncIndex).toBeGreaterThanOrEqual(0);
     expect(demoNavIndex).toBeGreaterThan(syncIndex);
   });
@@ -841,11 +826,13 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const surveyLink = findElement(
+    const header = findElement(
       tree,
-      (element) => element?.type === 'a' && element?.props?.href && element.props.href.startsWith(`/survey/${encodeURIComponent(surveyId)}`)
+      (element) => element?.type === SurveyResultsModalHeader
     );
-    expect(surveyLink).toBeTruthy();
+    const markup = renderToStaticMarkup(header);
+
+    expect(markup).toContain(`/survey/${encodeURIComponent(surveyId)}`);
   });
 
   it('appends session query to survey links when an effective slug exists', () => {
@@ -872,16 +859,14 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const surveyLink = findElement(
+    const header = findElement(
       tree,
-      (element) => (
-        element?.type === 'a' &&
-        element?.props?.href &&
-        element.props.href.startsWith(`/survey/${encodeURIComponent(surveyId)}`) &&
-        element.props.href.includes(`session=${encodeURIComponent('edge')}`)
-      )
+      (element) => element?.type === SurveyResultsModalHeader
     );
-    expect(surveyLink).toBeTruthy();
+    const markup = renderToStaticMarkup(header);
+
+    expect(markup).toContain(`/survey/${encodeURIComponent(surveyId)}`);
+    expect(markup).toContain(`session=${encodeURIComponent('edge')}`);
   });
 
   it('encodes responder addresses in /u/:address links', () => {
@@ -918,11 +903,13 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const responderLink = findElement(
+    const responsesList = findElement(
       tree,
-      (element) => element?.type === 'a' && element?.props?.href === `/u/${encodeURIComponent(responder)}`
+      (element) => element?.type === SurveyResultsIndividualResponsesList
     );
-    expect(responderLink).toBeTruthy();
+    const markup = renderToStaticMarkup(responsesList);
+
+    expect(markup).toContain(`/u/${encodeURIComponent(responder)}`);
   });
 
   it('renders only the latest answer row in expanded survey individual view for duplicate question updates', async () => {
@@ -1009,8 +996,12 @@ describe('SurveyResults survey/response links', () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
 
     await subject.fetchSurveyModeResponses();
-    const singleResponseNodes = collectTreeNodes(
+    const responsesList = findElement(
       subject.render(),
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+    const singleResponseNodes = collectTreeNodes(
+      responsesList?.props?.renderResponseBody(responsesList.props.responses[0], 0),
       (element) => (
         typeof element?.type === 'function' &&
         element?.props?.aggregatorResponseMode === false
@@ -1052,15 +1043,14 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const docLink = findElement(
+    const header = findElement(
       tree,
-      (element) =>
-        element?.type === 'a' &&
-        element?.props?.href === docUrl &&
-        element?.props?.target === '_blank'
+      (element) => element?.type === SurveyResultsModalHeader
     );
+    const markup = renderToStaticMarkup(header);
 
-    expect(docLink).toBeTruthy();
+    expect(markup).toContain(`href="${docUrl}"`);
+    expect(markup).toContain('target="_blank"');
   });
 
   it('does not render survey document URL links in question view', () => {
@@ -1085,11 +1075,12 @@ describe('SurveyResults survey/response links', () => {
     };
 
     const tree = subject.render();
-    const docLink = findElement(
+    const header = findElement(
       tree,
-      (element) => element?.type === 'a' && element?.props?.href === docUrl
+      (element) => element?.type === SurveyResultsModalHeader
     );
+    const markup = renderToStaticMarkup(header);
 
-    expect(docLink).toBeNull();
+    expect(markup).not.toContain(docUrl);
   });
 });

@@ -3,7 +3,6 @@
 
 import React, { Component } from 'react';
 import {
-  Button,
   Dropdown,
   DropdownToggle,
   DropdownMenu,
@@ -25,7 +24,7 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faSpinner, faFilter, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -45,8 +44,17 @@ import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
+import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
+import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
+import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
+import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
+import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -112,7 +120,6 @@ import {
   runDedupedDecryptTask as runDedupedDecryptTaskHelper,
   syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
 } from './surveyToolDecryptFlow.js';
-import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 
 // Crypto and contract utilities
 import contractScripts, {
@@ -229,7 +236,6 @@ import {
   buildQuestionDashboardLoadContextSignature,
   buildQuestionFilterStorageKeyPrefix,
   buildQuestionIdScopeSignature,
-  buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildDraftHydrationRunPlan,
@@ -283,11 +289,9 @@ import {
   canUseRecentQuestionPayloadForAccount,
   clampSliderValue,
   computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
   mergePersistedDraftPayloads,
   ensureQuestionsNet,
   ensureSurveysNet,
-  formatQuestionScanBlockCount,
   getActiveSessionSlugFromProps,
   getBlockedQuestionIdsSet,
   getConvictionFromResponse,
@@ -312,7 +316,6 @@ import {
   mergeQuestionResponses,
   mergeSurveyResponsePayloads,
   normalizeQuestionIdKey,
-  normalizeQuestionProgressSlug,
   normalizeSessionSlugValue,
   normalizeSurveyToolFilterState,
   readQuestionsCache,
@@ -508,14 +511,14 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
-  buildSurveyQuestionsJsonTreeItemStyle,
-  buildSurveyQuestionsFullLoadingProgressFillStyle,
-  buildSurveyQuestionsSubmitAuxIconClassName,
+  buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonForDisplayState,
+  buildSurveyQuestionsJsonPanelDisplayState,
+  buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
-  SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
-  SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
   toggleShowJsonState,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
@@ -6650,90 +6653,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.setState(buildJsonPreviewState(this.prepareJsonAndHash(surveyIndex)));
   };
 
-  processJsonToTree = (json, level = 0) => {
-    let output = [];
-    if (json === null || json === undefined) {
-      return output;
-    }
-
-    if (Array.isArray(json)) {
-      json.forEach((item, index) => {
-        if (item !== null && typeof item === 'object') {
-          output.push({ type: 'arrayItem', key: index, level });
-          output = [...output, ...this.processJsonToTree(item, level + 1)];
-        } else {
-          output.push({ type: 'arrayItemValue', key: index, value: item, level });
-        }
-      });
-    } else if (typeof json === 'object') {
-      Object.keys(json).forEach((key) => {
-        if (json[key] !== null && typeof json[key] === 'object') {
-          output.push({ type: 'objectKey', key, level });
-          output = [...output, ...this.processJsonToTree(json[key], level + 1)];
-        } else {
-          output.push({ type: 'objectKeyValue', key, value: json[key], level });
-        }
-      });
-    }
-    return output;
-  };
-
-  jsonTreeDisplay = (jsonInput) => {
-    let jsonObject;
-    if (jsonInput === null || jsonInput === undefined) {
-      jsonObject = {};
-    } else if (typeof jsonInput === 'string') {
-      try {
-        jsonObject = JSON.parse(jsonInput);
-      } catch (e) {
-        surveyLog.error("Invalid JSON string for display:", e, "Input:", jsonInput);
-        jsonObject = { error: "Invalid JSON input", original: jsonInput };
-      }
-    } else if (typeof jsonInput === 'object') {
-      jsonObject = jsonInput;
-    } else {
-      surveyLog.error("Invalid input for jsonTreeDisplay: Expected string or object, got", typeof jsonInput);
-      jsonObject = { error: "Invalid input type", original: String(jsonInput) };
-    }
-
-    if (!jsonObject) {
-      jsonObject = { error: "JSON became null after processing" };
-    }
-
-    const treeData = this.processJsonToTree(jsonObject);
-
-    if (treeData.length === 0) {
-      return (
-        <ul className={styles.tree}>
-          <li className={styles.treeItem}>{'{}'}</li>
-        </ul>
-      );
-    }
-
-    return (
-      <ul className={styles.tree}>
-        {treeData.map((node, index) => (
-          <li
-            key={index}
-            className={styles.treeItem}
-            style={buildSurveyQuestionsJsonTreeItemStyle(node.level)}
-          >
-            <span className={styles.keyValueContainer}>
-              {node.type === 'arrayItemValue' && (
-                <span>[{node.key}]: {String(node.value)}</span>
-              )}
-              {node.type === 'objectKeyValue' && (
-                <span>{node.key}: {String(node.value)}</span>
-              )}
-              {node.type === 'arrayItem' && <span>[{node.key}]</span>}
-              {node.type === 'objectKey' && <span>{node.key}:</span>}
-              {node.type === 'value' && <span>{String(node.value)}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
+  jsonTreeDisplay = (jsonInput) => (
+    <SurveyQuestionsJsonTree
+      jsonInput={jsonInput}
+      onInvalidInput={(...args) => surveyLog.error(...args)}
+    />
+  );
 
   handlePrimarySubmitClick = () => {
     if (this.state.isSubmitting || this._submitGuard) return;
@@ -8836,37 +8761,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   renderSurveyAnswers = (responses, isOwnResponse) => {
-    if (!this.state.questionPool || !Array.isArray(responses)) {
-      surveyLog.warn('renderSurveyAnswers: questionPool or responses not ready.', this.state.questionPool, responses);
-      return <div>Loading answers...</div>;
-    }
-
-    const questionMap = {};
-    this.state.questionPool.forEach(q => {
-       if (q && q.id) {
-           questionMap[q.id] = q;
-       } else {
-            surveyLog.warn("Invalid question object found in questionPool:", q);
-       }
-    });
-
     return (
-      <>
-        {responses.map((response, index) => {
-          if (!response || !response.questionID) {
-              surveyLog.warn("Invalid response object at index:", index, response);
-              return null;
-          }
-
-          const question = questionMap[response.questionID];
-          if (question) {
-            return this.renderQuestionAnswer(question, response, index, isOwnResponse);
-          } else {
-            surveyLog.warn(`Question not found in pool for response ID: ${response.questionID}`);
-             return null;
-          }
-        })}
-      </>
+      <SurveyQuestionsSurveyAnswersView
+        isOwnResponse={isOwnResponse}
+        onWarning={(...args) => surveyLog.warn(...args)}
+        questionPool={this.state.questionPool}
+        renderQuestionAnswer={this.renderQuestionAnswer}
+        responses={responses}
+      />
     );
   };
 
@@ -8942,24 +8844,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       visibleQuestionPool.length === 0 &&
       !!this.props.isQuestionCacheReady;
     const hasHiddenMaskedQuestions = hiddenMaskedQuestionIds.length > 0;
-    const progressSlug = normalizeQuestionProgressSlug(
-      (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : '') ||
-      resolveEffectiveSlug(this.props) ||
-      ''
-    );
-    const questionScanProgress =
-      this.props.questionScanProgress &&
-      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
-        ? this.props.questionScanProgress
-        : null;
-    const scanProgressDisplay = buildQuestionScanProgressDisplay(questionScanProgress);
-    const scanTotalBlocks = scanProgressDisplay.totalBlocks;
-    const scanRemainingBlocks = scanProgressDisplay.remainingBlocks;
-    const scanPercent = scanProgressDisplay.percentComplete;
-    const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
-    const hydrateDone = Math.max(0, Number(questionScanProgress?.hydratedQuestions || 0));
-    const isHydrating = questionScanProgress?.phase === 'hydrate';
-    const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
+    const fullLoadingProgress = buildSurveyQuestionsFullLoadingProgressState({
+      questionScanProgress: this.props.questionScanProgress,
+      progressSlug:
+        (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : '') ||
+        resolveEffectiveSlug(this.props) ||
+        '',
+    });
 
     if (
       !currentSurveyResponseState ||
@@ -8970,37 +8861,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         // fall-through to render below
       } else {
         return (
-          <div className={styles.loadingContainer}>
-            <FontAwesomeIcon icon={faSpinner} spin />
-            <div className={styles.fullLoadingHeadline}>Loading questions...</div>
-            {hasFullLoadingProgress && (
-              <div className={styles.fullLoadingProgressWrap}>
-                <div className={styles.fullLoadingProgressMeta}>
-                  <span>
-                    {isHydrating
-                      ? `${Math.max(0, hydrateDiscovered - Math.min(hydrateDone, hydrateDiscovered))} items left`
-                      : scanProgressDisplay.metaLeftText}
-                  </span>
-                  <span>
-                    {isHydrating
-                      ? `${Math.min(hydrateDone, hydrateDiscovered)} / ${hydrateDiscovered}`
-                      : scanProgressDisplay.metaRightText}
-                  </span>
-                </div>
-                <div className={styles.fullLoadingProgressBar}>
-                  <div
-                    className={styles.fullLoadingProgressFill}
-                    style={buildSurveyQuestionsFullLoadingProgressFillStyle({
-                      hydrateDiscovered,
-                      hydrateDone,
-                      isHydrating,
-                      scanPercent,
-                    })}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+          <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
         );
       }
     }
@@ -9011,28 +8872,26 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       (viewingAnswers && this.state.questionPool && Array.isArray(this.state.questionPool));
     const jsonPreview = canBuildJsonPreview ? (this.state.jsonPreview || {}) : null;
 
-    const notClickable = false;
-    const viewedAddressRaw = String(this.props.viewAddress || this.props.responderAddress || '').trim();
-    const viewedAddressLower = viewedAddressRaw.toLowerCase();
-    const shortenedViewAddress =
-      viewedAddressRaw
-        ? getShortenedAddress(
-            viewedAddressRaw,
-            notClickable
-          )
-        : '';
-    const isOwnResponse =
-      (this.props.viewAddress &&
-        this.props.account &&
-        this.props.viewAddress.toLowerCase() === this.props.account.toLowerCase()) ||
-      (this.props.responderAddress &&
-        this.props.account &&
-        this.props.responderAddress.toLowerCase() === this.props.account.toLowerCase()) ||
-      (!this.props.viewAddress && !this.props.responderAddress && this.props.account && this.state.userHasResponse);
-
-    const isSingleQuestionView =
-      this.props.singleQuestionMode ||
-      (this.props.isStandalone && Array.isArray(this.state.questionPool) && this.state.questionPool.length === 1);
+    const {
+      viewedAddressRaw,
+      viewedAddressLower,
+      shortenedViewAddress,
+      isOwnResponse,
+      isSingleQuestionView,
+      showViewAnswersButton,
+      viewAnswersButtonText,
+    } = buildSurveyQuestionsRouteViewDisplayState({
+      account: this.props.account,
+      isEditing: this.state.isEditing,
+      isStandalone: this.props.isStandalone,
+      questionPool: this.state.questionPool,
+      responderAddress: this.props.responderAddress,
+      shortenAddress: getShortenedAddress,
+      singleQuestionMode: this.props.singleQuestionMode,
+      userHasResponse: this.state.userHasResponse,
+      viewAddress: this.props.viewAddress,
+      viewingAnswers,
+    });
 
     // Submit button label block (centralized)
     const _pendingStats = this.getPendingStatsSnapshot();
@@ -9051,193 +8910,65 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       isLoadingResponse: this.state.isLoadingResponse,
     });
 
-    const userResponseNotice =
-      this.state.userHasResponse &&
-      isOwnResponse &&
-      !isSingleQuestionView &&
-      this.state.displayAnswerMode ? (
-        <div className={styles.userResponseNotice} data-testid={E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE}>
-          <p className={styles.userResponseNoticeTitle}>
-            Existing survey response detected
-          </p>
-          <div className={styles.userResponseNoticeActions}>
-            <Button
-              onClick={this.handleStartFresh}
-              id={styles.startFreshButton}
-              data-testid={E2E_TESTIDS.SURVEY_START_FRESH}
-              disabled={this.state.isSubmitting || this.state.isDecrypting}
-            >
-              Start Fresh
-            </Button>
-            <Button
-              onClick={this.handleDecryptEdit}
-              id={styles.decryptEditButton}
-              data-testid={E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL}
-              disabled={this.state.isDecrypting || this.state.isSubmitting || !this.state.userResponseEncrypted}
-            >
-              {this.state.isDecrypting ? 'Decrypting...' : 'Decrypt / Edit All'}
-            </Button>
-            {submittedStateActive && this.state.responseUrl && (
-              <a
-                href={this.state.responseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.userResponseNoticeLink}
-                title="View submitted response"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            )}
-            {this.state.isEditing && (
-              <Button
-                onClick={this.handleExitEditing}
-                id={styles.exitEditingButton}
-                data-testid={E2E_TESTIDS.SURVEY_EXIT_EDITING}
-                disabled={this.state.isSubmitting}
-              >
-                Exit Editing
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : null;
-
-    const submitFooterClassName = [
-      styles.footer,
-      isSingleQuestionView ? styles.singleQuestionSubmitFooter : '',
-    ].filter(Boolean).join(' ') || undefined;
     const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
-    const submitButtonClassName = [
-      isSingleQuestionView ? styles.singleQuestionSubmitButton : '',
-      _pendingStats.total > 0 ? styles.submitGlow : '',
-      singleQuestionSubmittedIndicatorActive ? styles.submittedButtonNoIcon : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const submitAuxClassName = [
-      styles.submitAux,
-      isSingleQuestionView ? styles.singleQuestionSubmitAux : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const submitLinkClassName = isSingleQuestionView ? styles.singleQuestionSubmitLink : undefined;
     const showSubmitAux =
       !isSingleQuestionView && (
         (_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
         (singleQuestionSubmittedIndicatorActive && this.state.responseUrl)
       );
+    const submitUploadStatusText =
+      this.state.isSubmitting &&
+      this.state.currentStep === 1 &&
+      this.hasEncryptedAnswers()
+        ? 'Encrypting...'
+        : 'Uploading...';
 
     const submitResponseButton = (
-      <div className={submitFooterClassName} id={styles.surveyFooter}>
-        <Button
-          id={styles.submitSurveyButton}
-          data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-          onClick={this.handlePrimarySubmitClick}
-          className={submitButtonClassName}
-          disabled={this.state.isSubmitting || (this.props.singleQuestionMode && this.hasMaskedCurrentQuestionPayload())}
-        >
-          {this.state.isSubmitting ? (
-            <div id={styles.uploadingEncryptingText}>
-              <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
-              {this.state.currentStep === 1 && this.hasEncryptedAnswers()
-                ? 'Encrypting...'
-                : 'Uploading...'}
-            </div>
-          ) : singleQuestionSubmittedIndicatorActive ? (
-            <div
-              className={styles.submittedIndicatorText}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-            >
-              Submitted
-            </div>
-          ) : this.state.submissionError ? (
-            <div
-              style={SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE}
-            >
-              <FontAwesomeIcon icon={faExclamationCircle} style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
-              {this.state.submissionError.length > 50 ? this.state.submissionError.substring(0, 47) + '...' : this.state.submissionError}
-            </div>
-          ) : isSingleQuestionView ? (
-            <div className={styles.singleQuestionSubmitButtonContent}>
-              <span className={styles.singleQuestionSubmitButtonLabel}>{submitButtonText}</span>
-              <FontAwesomeIcon icon={faArrowRight} className={styles.singleQuestionSubmitButtonIcon} />
-            </div>
-          ) : (
-            submitButtonText
-          )}
-        </Button>
-
-        {showSubmitAux && (
-          <div className={submitAuxClassName}>
-            {_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive && (
-              <button
-                type="button"
-                className={buildSurveyQuestionsSubmitAuxIconClassName(styles, isSingleQuestionView)}
-                onClick={this.handleRevertPendingChanges}
-                title="Clear changes"
-                aria-label="Clear pending changes"
-              >
-                <FontAwesomeIcon icon={faTimes} />
-              </button>
-            )}
-
-            {singleQuestionSubmittedIndicatorActive && this.state.responseUrl && (
-              <a
-                href={this.state.responseUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={submitLinkClassName}
-                title="View submitted response"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            )}
-          </div>
-        )}
-      </div>
+      <SurveyQuestionsSubmitFooter
+        isSingleQuestionView={isSingleQuestionView}
+        isSubmitting={this.state.isSubmitting}
+        onPrimarySubmitClick={this.handlePrimarySubmitClick}
+        onRevertPendingChanges={this.handleRevertPendingChanges}
+        pendingEditCount={_pendingStats.total}
+        responseUrl={this.state.responseUrl}
+        showSubmitAux={showSubmitAux}
+        submitButtonText={submitButtonText}
+        submitDisabled={
+          this.state.isSubmitting ||
+          (this.props.singleQuestionMode && this.hasMaskedCurrentQuestionPayload())
+        }
+        submittedIndicatorActive={submittedIndicatorActive}
+        submissionError={this.state.submissionError}
+        uploadStatusText={submitUploadStatusText}
+      />
     );
-    const responseLink = this.state.responseUrl;
-
-    const viewAnswersButton =
-      (this.props.viewAddress || this.props.responderAddress) && (!isOwnResponse || !this.state.isEditing) ? (
-        <Button onClick={this.toggleDisplayAnswerMode} id={styles.answerSurveyButton}>
-          <FontAwesomeIcon icon={faArrowLeft} id={styles.encryptIcon} />
-          <div id={styles.surveyButtonText}>
-            {viewingAnswers
-              ? ` Fill out ${this.props.singleQuestionMode ? 'question' : 'survey'}`
-              : ` View ${shortenedViewAddress} ${
-                  this.props.singleQuestionMode ? 'answer' : 'answers'
-                }`}
-          </div>
-        </Button>
-      ) : null;
-
-    const exitEditingButton = this.state.isEditing ? (
-      <Button onClick={this.handleExitEditing} id={styles.exitEditingButton} data-testid={E2E_TESTIDS.SURVEY_EXIT_EDITING}>
-        Exit Editing
-      </Button>
-    ) : null;
-
-    let jsonForDisplay;
-    if (viewingAnswers) {
-      if (this.state.noResponse) {
-        jsonForDisplay = {
-          message: `No response found for ${this.props.singleQuestionMode ? 'question' : 'survey'} from address: ${
-            this.props.viewAddress || this.props.responderAddress || 'N/A'
-          }`
-        };
-      } else {
-        jsonForDisplay = isOwnResponse ? (this.state.userAnswers || jsonPreview) : (this.state.parsedViewAddressAnswers || { info: "Loading viewed response..."});
-      }
-    } else {
-      jsonForDisplay = jsonPreview;
-    }
+    const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse,
+      jsonPreview,
+      noResponse: this.state.noResponse,
+      parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+      responderAddress: this.props.responderAddress,
+      singleQuestionMode: this.props.singleQuestionMode,
+      userAnswers: this.state.userAnswers,
+      viewAddress: this.props.viewAddress,
+      viewingAnswers,
+    });
 
     const hideEmbeddedDebugUi = !!this.props.hideEmbeddedDebugUi;
-    const showQuestionJsonControls = !!(this.props.singleQuestionMode || this.props.isStandalone);
-    const showSurveyJsonPanel =
-      this.state.showSurveyJson && !this.props.isStandalone && !this.props.singleQuestionMode;
-    const showQuestionsJsonPanel = this.state.showQuestionsJson && showQuestionJsonControls;
-    const showResponseJsonPanel = this.state.showResponseJson;
-    const surveyJson = showSurveyJsonPanel ? this.getSurveyJson() : null;
-    const questionsJson = showQuestionsJsonPanel ? this.getQuestionsJson() : null;
-    const responseJson = showResponseJsonPanel ? this.getResponseJson() : null;
+    const jsonPanelDisplayState = buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView,
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      showQuestionsJson: this.state.showQuestionsJson,
+      showResponseJson: this.state.showResponseJson,
+      showSurveyJson: this.state.showSurveyJson,
+      styleMap: styles,
+    });
+    const surveyJson = jsonPanelDisplayState.showSurveyJsonPanel ? this.getSurveyJson() : null;
+    const questionsJson = jsonPanelDisplayState.showQuestionsJsonPanel ? this.getQuestionsJson() : null;
+    const responseJson = jsonPanelDisplayState.showResponseJsonPanel
+      ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
+      : null;
     const canEditQuestions = !this.state.userHasResponse || this.state.startFresh || this.state.isEditing;
     const hasPendingEdits = !!this.state.isDirty || Number(_pendingStats.total || 0) > 0;
     const genericShowInlineSubmit = shouldRenderInlineSubmitButton({
@@ -9251,31 +8982,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ? hasPendingEdits
       : genericShowInlineSubmit;
     const showTopInlineSubmit = showInlineSubmit && !isSingleQuestionView;
-    const showBottomInlineSubmit = showInlineSubmit;
-    const useTagModal = !this.props.singleQuestionMode && !this.props.isStandalone;
-    const activeTagModalTag = useTagModal
-      ? String(this.state.activeTagModalTag || '').trim()
-      : '';
-    const surveyPageClassName = [
-      isSingleQuestionView ? styles.singleQuestionPage : '',
-      isSingleQuestionView && viewingAnswers ? styles.singleQuestionReadPage : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const topSectionClassName = isSingleQuestionView ? styles.singleQuestionTopBar : undefined;
-    const responseViewClassName = isSingleQuestionView ? styles.singleQuestionResponseView : undefined;
-    const surveyJsonRowClassName = [
-      styles.surveyJsonRow,
-      isSingleQuestionView ? styles.singleQuestionJsonRow : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const surveyJsonToggleClassName = isSingleQuestionView ? styles.singleQuestionJsonToggle : undefined;
-    const questionJsonToggleClassName = [
-      surveyJsonToggleClassName,
-      isSingleQuestionView ? styles.singleQuestionJsonToggleQuestion : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const responseJsonToggleClassName = [
-      surveyJsonToggleClassName,
-      isSingleQuestionView ? styles.singleQuestionJsonToggleResponse : '',
-    ].filter(Boolean).join(' ') || undefined;
-    const surveyJsonPanelClassName = isSingleQuestionView ? styles.singleQuestionJsonPanel : undefined;
+    const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: this.state.activeTagModalTag,
+      isSingleQuestionView,
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      styleMap: styles,
+      viewingAnswers,
+    });
+    const { activeTagModalTag, responseViewClassName, surveyPageClassName, topSectionClassName, useTagModal } = layoutDisplayState;
     const hasRenderedEditableQuestions =
       canEditQuestions &&
       questionPoolReady &&
@@ -9293,178 +9008,121 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
+    const submittedResponseView = (
+      <SurveyQuestionsSubmittedResponseView
+        isOwnResponse={isOwnResponse}
+        isVisible={
+          !viewingAnswers &&
+          this.state.userHasResponse &&
+          !this.state.startFresh &&
+          !this.state.isEditing
+        }
+        questionPool={this.state.questionPool}
+        questionPoolReady={questionPoolReady}
+        renderQuestionAnswer={this.renderQuestionAnswer}
+        renderSurveyAnswers={this.renderSurveyAnswers}
+        singleQuestionMode={this.props.singleQuestionMode}
+        userAnswers={this.state.userAnswers}
+      />
+    );
 
     return (
       <div className={surveyPageClassName}>
-        <div ref={this.topRef} className={topSectionClassName}>
-            {viewAnswersButton}
-            {userResponseNotice}
-        </div>
+        <SurveyQuestionsTopStrip
+          ref={this.topRef}
+          className={topSectionClassName}
+          isDecrypting={this.state.isDecrypting}
+          isEditing={this.state.isEditing}
+          isSubmitting={this.state.isSubmitting}
+          onDecryptEdit={this.handleDecryptEdit}
+          onExitEditing={this.handleExitEditing}
+          onStartFresh={this.handleStartFresh}
+          onToggleDisplayAnswerMode={this.toggleDisplayAnswerMode}
+          responseUrl={this.state.responseUrl}
+          showUserResponseNotice={
+            this.state.userHasResponse &&
+            isOwnResponse &&
+            !isSingleQuestionView &&
+            this.state.displayAnswerMode
+          }
+          showViewAnswersButton={showViewAnswersButton}
+          submittedStateActive={submittedStateActive}
+          userResponseEncrypted={this.state.userResponseEncrypted}
+          viewAnswersButtonText={viewAnswersButtonText}
+        />
 
         {viewingAnswers ? (
-          this.state.isLoadingResponse ? (
-            <div className={styles.loadingContainer}>
-              <FontAwesomeIcon icon={faSpinner} spin /> Loading...
-            </div>
-          ) : this.state.noResponse ? (
-            <div>
-              {this.state.responseLookupWarning || (
-                <>
-                  No response for this{' '}
-                  {this.props.singleQuestionMode ? 'question' : 'survey'} from address:{' '}
-                  {this.props.viewAddress || this.props.responderAddress}
-                </>
-              )}
-            </div>
-          ) : (
-              <div className={responseViewClassName}>
-                  {viewedAddressRaw && (
-                      <h2 className={styles.viewAddressHeading}>
-                        <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
-                          {shortenedViewAddress}
-                        </a>
-                        <span className={styles.viewAddressHeadingSuffix}>Response:</span>
-                      </h2>
-                  )}
-                  {(this.props.singleQuestionMode && questionPoolReady && this.state.questionPool[0] && (isOwnResponse || this.state.parsedViewAddressAnswers)) || (!this.props.singleQuestionMode && questionPoolReady) || (!this.props.singleQuestionMode && this.state.parsedViewAddressAnswers) ? (
-                      this.props.singleQuestionMode ? (
-                        this.renderQuestionAnswer(
-                            this.state.questionPool[0],
-                            isOwnResponse ? (this.state.userAnswers || {}) : (this.state.parsedViewAddressAnswers || {}),
-                            0,
-                            isOwnResponse
-                        )
-                      ) : (
-                          this.renderSurveyAnswers(
-                              isOwnResponse
-                              ? (this.state.userAnswers?.responses || [])
-                              : (this.state.parsedViewAddressAnswers?.responses || []),
-                              isOwnResponse
-                          )
-                      )
-                  ) : (
-                      !this.state.noResponse && <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading answer data...</div>
-                  )}
-              </div>
-          )
+          <SurveyQuestionsResponseView
+            isLoadingResponse={this.state.isLoadingResponse}
+            isOwnResponse={isOwnResponse}
+            noResponse={this.state.noResponse}
+            parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
+            questionPool={this.state.questionPool}
+            questionPoolReady={questionPoolReady}
+            renderQuestionAnswer={this.renderQuestionAnswer}
+            renderSurveyAnswers={this.renderSurveyAnswers}
+            responderAddress={this.props.responderAddress}
+            responseLookupWarning={this.state.responseLookupWarning}
+            responseViewClassName={responseViewClassName}
+            shortenedViewAddress={shortenedViewAddress}
+            singleQuestionMode={this.props.singleQuestionMode}
+            userAnswers={this.state.userAnswers}
+            viewAddress={this.props.viewAddress}
+            viewedAddressLower={viewedAddressLower}
+            viewedAddressRaw={viewedAddressRaw}
+          />
         ) : (
-            <>
-              {showTopInlineSubmit && submitResponseButton}
-              {/* Hidden in embedded full mode and single-question route mode */}
-              {!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode && (
-                  <JsonIconButton
-                    label=".json"
-                    onClick={this.handleShowJsonAtBottom}
-                    title="View JSON"
-                  />
-              )}
-              {/* Locked/decrypt banner is hidden only in embedded full mode */}
-              {!hideEmbeddedDebugUi && canEditQuestions && questionPoolReady && currentSurveyResponseState && lockedQuestionsBanner}
-              {renderedEditableQuestions}
-              {showBottomInlineSubmit && submitResponseButton}
-              {canEditQuestions && !this.props.singleQuestionMode && (
-                  <JsonIconButton
-                    label="Back to top"
-                    icon={faCaretUp}
-                    onClick={this.handleScrollToTop}
-                    title="Back to top"
-                  />
-                )}
-              {this.state.userHasResponse && !this.state.startFresh && !this.state.isEditing && (
-                    <div>
-                        {questionPoolReady && this.state.userAnswers ? (
-                            this.props.singleQuestionMode ? (
-                                this.state.questionPool[0] ? (
-                                    this.renderQuestionAnswer(
-                                        this.state.questionPool[0],
-                                        this.state.userAnswers,
-                                        0,
-                                        isOwnResponse
-                                    )
-                                ) : (<div>Loading question...</div>)
-                            ) : (
-                                  this.state.userAnswers.responses ? (
-                                    this.renderSurveyAnswers(this.state.userAnswers.responses, isOwnResponse)
-                                  ) : (<div>Loading answers...</div>)
-                            )
-                        ) : (
-                              <div className={styles.loadingContainer}><FontAwesomeIcon icon={faSpinner} spin /> Loading submitted response...</div>
-                        )}
-                    </div>
-                )}
-            </>
+          <SurveyQuestionsAuthoringPanel
+            lockedQuestionsBanner={lockedQuestionsBanner}
+            onScrollToTop={this.handleScrollToTop}
+            onShowJsonAtBottom={this.handleShowJsonAtBottom}
+            renderedEditableQuestions={renderedEditableQuestions}
+            showBackToTopControl={canEditQuestions && !this.props.singleQuestionMode}
+            showInlineSubmit={showInlineSubmit}
+            showJsonControl={!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode}
+            showLockedQuestionsBanner={
+              !hideEmbeddedDebugUi &&
+              canEditQuestions &&
+              questionPoolReady &&
+              !!currentSurveyResponseState
+            }
+            showTopInlineSubmit={showTopInlineSubmit}
+            submittedResponseView={submittedResponseView}
+            submitResponseButton={submitResponseButton}
+          />
         )}
 
-        {/* Bottom JSON controls, gated by hideEmbeddedDebugUi for OnePageSession embedded full mode */}
-        {!hideEmbeddedDebugUi && (
-        <div ref={this.bottomRef}>
-            <JsonButtonRow className={surveyJsonRowClassName}>
-                {showQuestionJsonControls && (
-                    <>
-                        <JsonToggleButton
-                            label="question .json"
-                            active={this.state.showQuestionsJson}
-                            onClick={this.toggleShowQuestionsJson}
-                            className={questionJsonToggleClassName}
-                        />
-                        <JsonToggleButton
-                            label="response .json"
-                            active={this.state.showResponseJson}
-                            onClick={this.toggleShowResponseJson}
-                            className={responseJsonToggleClassName}
-                        />
-                    </>
-                )}
-                {!this.props.isStandalone && !this.props.singleQuestionMode && (
-                    <>
-                        <JsonToggleButton
-                            label={this.state.showSurveyJson ? 'Hide Survey .json' : 'View Survey .json'}
-                            active={this.state.showSurveyJson}
-                            onClick={this.toggleShowSurveyJson}
-                            className={surveyJsonToggleClassName}
-                        />
-                        <JsonToggleButton
-                            label={this.state.showResponseJson ? 'Hide Response .json' : 'View Response .json'}
-                            active={this.state.showResponseJson}
-                            onClick={this.toggleShowResponseJson}
-                            className={surveyJsonToggleClassName}
-                        />
-                    </>
-                )}
-            </JsonButtonRow>
-
-            {showSurveyJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(surveyJson, 'survey')}
-                    copied={this.state.copiedSurveyJson}
-                    copyTitle="Copy Survey Definition JSON"
-                    className={surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(surveyJson)}
-                </JsonPanel>
-            )}
-            {showQuestionsJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(questionsJson, 'questions')}
-                    copied={this.state.copiedQuestionsJson}
-                    copyTitle="Copy Question Definition JSON"
-                    className={surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(questionsJson)}
-                </JsonPanel>
-            )}
-            {showResponseJsonPanel && (
-                <JsonPanel
-                    onCopy={() => this.copyJsonToClipboard(responseJson, 'response')}
-                    copied={this.state.copiedResponseJson}
-                    copyTitle="Copy Response JSON"
-                    className={surveyJsonPanelClassName}
-                >
-                    {this.jsonTreeDisplay(responseJson)}
-                </JsonPanel>
-            )}
-        </div>
-        )}
+        <SurveyQuestionsJsonControls
+          ref={this.bottomRef}
+          copiedQuestionsJson={this.state.copiedQuestionsJson}
+          copiedResponseJson={this.state.copiedResponseJson}
+          copiedSurveyJson={this.state.copiedSurveyJson}
+          hidden={hideEmbeddedDebugUi}
+          isStandalone={this.props.isStandalone}
+          onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
+          onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
+          onCopySurveyJson={() => this.copyJsonToClipboard(surveyJson, 'survey')}
+          onToggleQuestionsJson={this.toggleShowQuestionsJson}
+          onToggleResponseJson={this.toggleShowResponseJson}
+          onToggleSurveyJson={this.toggleShowSurveyJson}
+          questionJsonToggleClassName={jsonPanelDisplayState.questionJsonToggleClassName}
+          questionsJson={questionsJson}
+          renderJsonTree={this.jsonTreeDisplay}
+          responseJson={responseJson}
+          responseJsonToggleClassName={jsonPanelDisplayState.responseJsonToggleClassName}
+          showQuestionJsonControls={jsonPanelDisplayState.showQuestionJsonControls}
+          showQuestionsJson={this.state.showQuestionsJson}
+          showQuestionsJsonPanel={jsonPanelDisplayState.showQuestionsJsonPanel}
+          showResponseJson={this.state.showResponseJson}
+          showResponseJsonPanel={jsonPanelDisplayState.showResponseJsonPanel}
+          showSurveyJson={this.state.showSurveyJson}
+          showSurveyJsonPanel={jsonPanelDisplayState.showSurveyJsonPanel}
+          singleQuestionMode={this.props.singleQuestionMode}
+          surveyJson={surveyJson}
+          surveyJsonPanelClassName={jsonPanelDisplayState.surveyJsonPanelClassName}
+          surveyJsonRowClassName={jsonPanelDisplayState.surveyJsonRowClassName}
+          surveyJsonToggleClassName={jsonPanelDisplayState.surveyJsonToggleClassName}
+        />
         {useTagModal && (
           <TagModal
             isOpen={!!activeTagModalTag}
