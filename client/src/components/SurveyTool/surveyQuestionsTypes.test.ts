@@ -43,6 +43,7 @@ import {
   buildSurveyQuestionsLockAudienceToggleClassName,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
+  buildSurveyQuestionsSubmitFooterDisplayState,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
   buildViewingResponseModeState,
@@ -486,6 +487,71 @@ describe('surveyQuestionsTypes', () => {
       isEditing: true,
       responderAddress: '0xdef',
     }).showViewAnswersButton).toBe(true);
+  });
+
+  it('builds SurveyQuestions submit footer affordance display state', () => {
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      currentStep: 1,
+      hasEncryptedAnswers: true,
+      isDirty: true,
+      isSubmitting: true,
+      pendingEditCount: 3,
+    })).toEqual({
+      submittedStateActive: false,
+      submittedIndicatorActive: false,
+      singleQuestionSubmittedIndicatorActive: false,
+      showSubmitAux: false,
+      uploadStatusText: 'Encrypting...',
+      submitDisabled: true,
+      canEditQuestions: true,
+      hasPendingEdits: true,
+      genericShowInlineSubmit: true,
+      showInlineSubmit: true,
+      showTopInlineSubmit: true,
+    });
+
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      isLoadingResponse: false,
+      responseUrl: 'https://example.test/response',
+      submissionComplete: true,
+      userHasResponse: true,
+    })).toMatchObject({
+      submittedStateActive: true,
+      submittedIndicatorActive: true,
+      singleQuestionSubmittedIndicatorActive: true,
+      showSubmitAux: true,
+      uploadStatusText: 'Uploading...',
+      canEditQuestions: false,
+      hasPendingEdits: false,
+      genericShowInlineSubmit: true,
+      showInlineSubmit: true,
+      showTopInlineSubmit: true,
+    });
+  });
+
+  it('builds SurveyQuestions single-question submit display state without route affordances', () => {
+    expect(buildSurveyQuestionsSubmitFooterDisplayState({
+      hasMaskedCurrentQuestionPayload: true,
+      isDirty: true,
+      isSingleQuestionView: true,
+      pendingEditCount: 1,
+      responseUrl: 'https://example.test/response',
+      singleQuestionMode: true,
+      submittedSinceLastEdit: true,
+      userHasResponse: true,
+    })).toEqual({
+      submittedStateActive: true,
+      submittedIndicatorActive: true,
+      singleQuestionSubmittedIndicatorActive: false,
+      showSubmitAux: false,
+      uploadStatusText: 'Uploading...',
+      submitDisabled: true,
+      canEditQuestions: false,
+      hasPendingEdits: true,
+      genericShowInlineSubmit: true,
+      showInlineSubmit: true,
+      showTopInlineSubmit: false,
+    });
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {
