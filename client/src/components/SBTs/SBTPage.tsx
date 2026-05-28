@@ -163,7 +163,7 @@ import {
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageAdminCreatorAddresses,
   resolveSbtPageAddressLinkState,
-  resolveSbtPageBurnButtonState,
+  resolveSbtPageBurnActionPlan,
   resolveSbtPageBurnStatusButtonState,
   resolveSbtPageBurnAuthLabel,
   resolveSbtPageBookmarkButtonDisplayState,
@@ -194,6 +194,7 @@ import {
   resolveSbtPageMiniOpenMintButtonState,
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
+  resolveSbtPageMintActionPlan,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageOpenMintButtonState,
   resolveSbtPageOwnerLookupFallbackDecision,
@@ -231,7 +232,6 @@ import {
   resolveSbtPageTokenMetadataHref,
   sanitizeSbtPageMintedTokensOverride,
   shouldShowSbtPageScanProgress,
-  shouldRenderSbtPageMintButton,
   shouldRunSbtPagePropListAutoMint,
   shouldRunSbtPagePropPasswordAutoMint,
 } from './sbtPageHelpers';
@@ -3850,12 +3850,13 @@ class SBTPage extends Component<any, any> {
 
 renderMintButton() {
   const { sbtInfo, mintStep, claimCountdown, mintingStatus, userHasSBT, burningStatus, manualPasswordInput, lastMintTxHash, groupPasswordInput } = this.state;
-  if (!shouldRenderSbtPageMintButton({
+  const mintActionPlan = resolveSbtPageMintActionPlan({
     burningStatus,
     nowSeconds: Math.floor(Date.now() / 1000),
     sbtInfo,
     userHasSBT,
-  })) return null;
+  });
+  if (!mintActionPlan.shouldRenderMintButton) return null;
   const passwordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
     groupPasswordInput,
     mintingStatus,
@@ -4056,7 +4057,7 @@ renderMintButton() {
     const { sbtInfo, userHasSBT, burningStatus } = this.state;
     if (!sbtInfo) return null;
 
-    const { shouldRenderBurnButton } = resolveSbtPageBurnButtonState({
+    const { shouldRenderBurnButton } = resolveSbtPageBurnActionPlan({
       account: this.props.account,
       sbtInfo,
       userHasSBT,
