@@ -310,6 +310,52 @@ export const buildGatedPromptNoticeState = ({
   };
 };
 
+export const buildQuestionPromptDecryptDisplayState = ({
+  questionId = '',
+  promptText = 'Question',
+  promptMasked = false,
+  promptReloading = false,
+  payloadDisplay = null,
+  loginComplete = false,
+  account = '',
+  canReloadPrompt = false,
+}: {
+  questionId?: unknown;
+  promptText?: unknown;
+  promptMasked?: unknown;
+  promptReloading?: unknown;
+  payloadDisplay?: UnknownRecord | null;
+  loginComplete?: unknown;
+  account?: unknown;
+  canReloadPrompt?: unknown;
+} = {}) => {
+  const qid = String(questionId || '').trim().toLowerCase();
+  const normalizedPromptText = promptText || 'Question';
+  const display = payloadDisplay && typeof payloadDisplay === 'object' ? payloadDisplay : {};
+  const requiresLogin = !!display.requiresAuth && (!loginComplete || !account);
+  const actionTitle = requiresLogin
+    ? 'Login required to decrypt gated prompts.'
+    : (display.actionTitle || 'Decrypt gated prompt');
+
+  return {
+    qid,
+    promptText: normalizedPromptText,
+    promptMasked: !!promptMasked,
+    showPromptAction: !!promptMasked && !!qid,
+    promptTitle: actionTitle,
+    promptLabel: promptMasked ? (display.label || normalizedPromptText) : normalizedPromptText,
+    promptBusyLabel: display.busyLabel || 'Decrypting...',
+    noticeLeadingText: display.noticeLeadingText,
+    noticeStatusText: display.noticeStatusText,
+    noticeSuffix: display.noticeSuffix,
+    noticeActionBusy: !!promptReloading,
+    noticeActionDisabled: !!promptReloading,
+    noticeActionLabel: display.actionLabel || 'Decrypt Prompt',
+    noticeActionTitle: actionTitle,
+    canReloadPrompt: !!canReloadPrompt,
+  };
+};
+
 export const buildLockAudienceDisplayState = ({
   questionId,
   fieldKey = 'answer',
