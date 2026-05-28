@@ -1,8 +1,50 @@
+const getNodeTypeName = (node) => {
+  const type = node?.type;
+  if (!type) return '';
+  if (typeof type === 'string') return type;
+  if (typeof type === 'function') return String(type.displayName || type.name || '');
+  if (typeof type === 'object') {
+    return String(type.displayName || type.render?.displayName || type.render?.name || '');
+  }
+  return '';
+};
+
+const RESOLVABLE_SURVEY_TOOL_COMPONENTS = new Set([
+  'JsonButtonRow',
+  'JsonIconButton',
+  'JsonPanel',
+  'JsonToggleButton',
+  'SurveyQuestionsAuthoringPanel',
+  'SurveyQuestionsJsonControls',
+  'SurveyQuestionsResponseView',
+  'SurveyQuestionsTopStrip',
+  'SurveyQuestionsUserResponseNotice',
+]);
+
+const resolvedComponentCache = new WeakMap();
+
+const renderResolvableComponent = (node) => {
+  const typeName = getNodeTypeName(node);
+  if (!RESOLVABLE_SURVEY_TOOL_COMPONENTS.has(typeName)) return null;
+  const type = node?.type;
+  if (resolvedComponentCache.has(node)) return resolvedComponentCache.get(node);
+  let rendered = null;
+  if (typeof type === 'function') {
+    rendered = type(node.props || {});
+  } else if (type && typeof type.render === 'function') {
+    rendered = type.render(node.props || {}, null);
+  }
+  resolvedComponentCache.set(node, rendered);
+  return rendered;
+};
+
 export const treeHasDataTestId = (node, testId) => {
   if (node == null) return false;
   if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
   if (typeof node !== 'object') return false;
   if (node?.props?.['data-testid'] === testId) return true;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return treeHasDataTestId(rendered, testId);
   return treeHasDataTestId(node?.props?.children, testId);
 };
 
@@ -11,6 +53,8 @@ export const treeHasLabel = (node, label) => {
   if (Array.isArray(node)) return node.some((child) => treeHasLabel(child, label));
   if (typeof node !== 'object') return false;
   if (node?.props?.label === label) return true;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return treeHasLabel(rendered, label);
   return treeHasLabel(node?.props?.children, label);
 };
 
@@ -21,6 +65,8 @@ export const treeHasText = (node, text) => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return treeHasText(rendered, text);
   return treeHasText(node?.props?.children, text);
 };
 
@@ -37,6 +83,11 @@ export const findElement = (node, predicate) => {
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    const rendered = renderResolvableComponent(current);
+    if (rendered !== null) {
+      stack.push(rendered);
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -54,6 +105,8 @@ export const findFirstNodeByType = (node, targetType) => {
   }
   if (typeof node !== 'object') return null;
   if (node?.type === targetType) return node;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return findFirstNodeByType(rendered, targetType);
   return findFirstNodeByType(node?.props?.children, targetType);
 };
 
@@ -88,6 +141,11 @@ export const countElements = (node, predicate) => {
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) count += 1;
+    const rendered = renderResolvableComponent(current);
+    if (rendered !== null) {
+      stack.push(rendered);
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
