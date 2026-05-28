@@ -134,8 +134,7 @@ import {
 } from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
-  buildSessionWizardPublishPlan,
-  buildSessionWizardPublishStepNumbers,
+  buildSessionWizardPublishExecutionPlan,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
   getSessionWizardPublishProgressPercent,
   resolveSessionWizardBundleUrlForMode,
@@ -143,7 +142,6 @@ import {
   resolveSessionWizardDeployBundlePayload,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
-  resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
@@ -3785,20 +3783,19 @@ const SessionWizard = ({
         hasBundleFile: !!bundleFile,
         normalModeBundleUrlOverride,
       });
-      const shouldAutoDeployWorker = resolveSessionWizardShouldAutoDeployWorker({
+      const publishExecutionPlan = buildSessionWizardPublishExecutionPlan({
         workerMode,
         sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
         deployComplete,
-      });
-      const publishStepNumbers = buildSessionWizardPublishStepNumbers({
-        shouldAutoDeployWorker,
         hasPendingDrafts,
         hasManualMetadata,
+        canUploadMetadataNow,
       });
+      const publishStepNumbers = publishExecutionPlan.stepNumbers;
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
-      if (shouldAutoDeployWorker) {
+      if (publishExecutionPlan.shouldAutoDeployWorker) {
         setPublishStep(publishStepNumbers['deploy-worker']);
         const deployResult = await handleDeployWorker({ forceSponsoredAutoDeploy: true });
         if (!deployResult?.ok) {
@@ -3809,14 +3806,14 @@ const SessionWizard = ({
         }
         workerUrlOverride = deployResult.workerUrl;
       }
-      if (hasPendingDrafts) {
+      if (publishExecutionPlan.shouldDeployPendingSbts) {
         setPublishStep(publishStepNumbers['deploy-sbts']);
         deployedPendingDrafts = await deployPendingSbtDrafts({
           workerUrlOverride,
           signerAccountOverride: resolvedPublisher,
         });
       }
-      if ((canUploadMetadataNow || sponsoredAutoDeployState.ready) && !hasManualMetadata) {
+      if (publishExecutionPlan.shouldUploadMetadata) {
         setPublishStep(publishStepNumbers['upload-metadata']);
         uploadResult = await handleUploadMetadata({
           workerUrlOverride,
@@ -4695,15 +4692,15 @@ const SessionWizard = ({
     contractKey: selectedWizardContract?.key || '',
     sessionSlug: selectedWizardContractSessionSlug,
   }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
-  const publishProgressSteps = buildSessionWizardPublishPlan({
-    shouldAutoDeployWorker: resolveSessionWizardShouldAutoDeployWorker({
-      workerMode,
-      sponsoredAutoDeployReady: canUseSponsoredAutoDeployNow,
-      deployComplete,
-    }),
+  const publishProgressPlan = buildSessionWizardPublishExecutionPlan({
+    workerMode,
+    sponsoredAutoDeployReady: canUseSponsoredAutoDeployNow,
+    deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     hasManualMetadata,
-  }).map((key) => ({
+    canUploadMetadataNow,
+  });
+  const publishProgressSteps = publishProgressPlan.steps.map((key) => ({
     key,
     label: key === 'deploy-worker'
       ? 'Deploy Worker'
