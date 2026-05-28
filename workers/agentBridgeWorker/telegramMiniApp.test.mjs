@@ -291,6 +291,12 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /typeof action === 'string'/);
   assert.match(html, /button\.dataset\.action = action\.action;/);
   assert.match(html, /Use \/export_allow 0x\.\.\. ' \+ sessionSlug/);
+  assert.match(toolMenu, /id="showActivity"[^>]*aria-label="Activity"[\s\S]*<span>Activity<\/span>/);
+  assert.match(html, /id="activityPanel"[^>]*aria-label="Activity"/);
+  assert.match(html, /id="closeActivity"[^>]*aria-label="Close activity"/);
+  assert.match(html, /function renderActivity\(\)/);
+  assert.match(html, /\/telegram\/mini-app\/api\/activity/);
+  assert.match(html, /bindPanelClose\(el\.closeActivity, el\.activityPanel, el\.showActivity\);/);
   assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsTitleSession"/);

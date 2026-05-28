@@ -231,10 +231,10 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(expiredResponse.status, 401);
   assert.equal(expiredBody.reason, 'agent_token_expired');
   assert.equal(expiredBody.action, 'refresh_token_via_telegram');
-  assert.equal(expiredBody.telegramCommand, '/me');
-  assert.equal(expiredBody.telegramButton, 'Create Agent Token');
+  assert.equal(expiredBody.telegramCommand, '/start');
+  assert.equal(expiredBody.telegramButton, 'Onboard Agent');
   assert.match(expiredBody.message, /open the Context Engine Telegram bot/i);
-  assert.match(expiredBody.message, /Create Agent Token/);
+  assert.match(expiredBody.message, /Onboard Agent/);
 
   const missingTokenResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
@@ -246,6 +246,62 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(missingTokenResponse.status, 401);
   assert.equal(missingTokenBody.reason, 'agent_token_not_found');
   assert.equal(missingTokenBody.action, 'refresh_token_via_telegram');
+});
+
+test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user and session', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:alpha:q-binary', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-binary',
+    answerLabel: 'Delegated user draft',
+    answerValue: 'Delegated user draft',
+    selectedAt: '2026-12-01T12:01:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:beta:q-binary', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '42',
+    sessionSlug: 'beta',
+    questionId: 'q-binary',
+    answerLabel: 'Wrong session draft',
+    answerValue: 'Wrong session draft',
+    selectedAt: '2026-12-01T12:02:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '43',
+    sessionSlug: 'alpha',
+    questionId: 'q-binary',
+    answerLabel: 'Wrong user draft',
+    answerValue: 'Wrong user draft',
+    selectedAt: '2026-12-01T12:03:00.000Z',
+  }));
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/actions?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const serialized = JSON.stringify(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.telegramUserId, '42');
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.actions.length, 1);
+  assert.match(serialized, /Delegated user draft/);
+  assert.equal(serialized.includes('Wrong user draft'), false);
+  assert.equal(serialized.includes('Wrong session draft'), false);
+  assert.equal(serialized.includes(issued.token), false);
 });
 
 test('Telegram agent can read active questions and draft preferences after group join', async () => {
@@ -302,6 +358,33 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(drafted.reviewRequired, true);
   assert.equal(binaryDraft.answerLabel, 'Agree');
   assert.match(binaryDraft.answerValue, /Matches the stated priority/);
+  assert.equal(binaryDraft.source, 'agent_handoff');
+  assert.equal(binaryDraft.actionMetadata.authMode, 'service_token');
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '43',
+    sessionSlug: 'alpha',
+    questionId: 'q-binary',
+    answerLabel: 'Other user draft',
+    answerValue: 'Other user draft',
+    selectedAt: '2026-05-08T12:01:00.000Z',
+  }));
+
+  const actionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/actions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
+    env,
+  });
+  const actions = await jsonBody(actionsResponse);
+  assert.equal(actionsResponse.status, 200);
+  assert.equal(actions.actions.some((item) => (
+    item.type === 'answer_draft' &&
+    item.sessionSlug === 'alpha' &&
+    item.questionId === 'q-binary' &&
+    item.pendingAction === 'review_draft' &&
+    item.content.answerLabel === 'Agree'
+  )), true);
+  assert.equal(JSON.stringify(actions).includes('Other user draft'), false);
+  assert.equal(JSON.stringify(actions).includes('agent-test-token'), false);
 });
 
 test('Telegram agent can rank or filter questions by preference-derived tags', async () => {
@@ -356,6 +439,86 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   assert.equal(filtered.relevance.mode, 'filter');
   assert.deepEqual(filtered.questions.map((question) => question.questionId), ['q-freeform']);
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
+});
+
+test('Telegram agent handoff rejects group calls from sessions with a different approved chat', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        approvedTelegramGroupChatIds: ['-100999'],
+      }],
+    }),
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 403);
+  assert.equal(body.reason, 'telegram_group_not_approved_for_session');
+  assert.equal(body.sessionSlug, 'alpha');
+});
+
+test('Telegram agent handoff accepts dynamically approved Telegram groups', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupApprovalRequired: true,
+      }],
+    }),
+  });
+  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
+    version: 1,
+    type: 'telegram_group_approval',
+    sessionSlug: 'alpha',
+    chatId: '-100123',
+    approvedAt: '2026-05-08T12:00:00.000Z',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:group-session:-100123', JSON.stringify({
+    version: 1,
+    chatId: '-100123',
+    sessionSlug: 'alpha',
+    sessionName: 'Alpha Session',
+    linkedAt: '2026-05-08T12:00:00.000Z',
+  }));
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.questions.length > 0, true);
 });
 
 test('Telegram agent next-question queue serves sponsored questions first and advances per criteria', async () => {
@@ -429,6 +592,13 @@ test('Telegram agent can recommend and auto-apply question importance votes with
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
+  await saveTelegramAgentSettingsPatch({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    patch: { agentAutoApplyQuestionVotes: true },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  });
 
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/question-votes/recommend', {
@@ -480,7 +650,42 @@ test('Telegram agent can recommend and auto-apply question importance votes with
   )), true);
   assert.equal(decisionRecords.length, 1);
   assert.equal(decisionRecords[0].actionMetadata.runId, 'run-123');
+  assert.equal(decisionRecords[0].actionMetadata.source, 'agent_handoff');
+  assert.equal(decisionRecords[0].actionMetadata.authMode, 'service_token');
+  assert.equal(decisionRecords[0].actionMetadata.clientSource, 'openclaw');
   assert.equal(Object.hasOwn(decisionRecords[0].actionMetadata, 'apiKey'), false);
+});
+
+test('Telegram agent question auto-votes are opt-in by default', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-votes/recommend', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        autoApply: true,
+        preferences: { interests: ['funding'] },
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const voteRecordCount = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:mini-app-question-vote:v1:alpha:'))
+    .length;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.settings.agentAutoApplyQuestionVotes, false);
+  assert.equal(body.autoApply.ok, false);
+  assert.equal(body.autoApply.reason, 'agent_question_vote_auto_apply_disabled');
+  assert.equal(voteRecordCount, 0);
 });
 
 test('Telegram agent question vote apply records human overrides and respects auto-apply setting', async () => {

@@ -338,6 +338,14 @@ buttons `Join Session`, `View Questions`, `Groups`, and policy-allowed
 `Pose Question`. It does not include a default `Answer Privately` action. `View
 Questions` is the group-lobby default, while `Join Session` opens private chat
 and routes participants without a configured account to private account setup.
+Session policy may restrict Telegram-only sessions to approved Telegram group
+chat IDs. Group `/sessions`, `/join`, questions/results/group actions, and
+group-scoped agent handoff calls must reject unapproved `chat.id` values; `/group_id`
+is the safe discovery command for copying the current group ID into policy.
+Sessions can also set `telegramGroupApprovalRequired` and let a configured
+session admin generate a one-use Telegram `startgroup` link with `/group_link`;
+the first group that opens the opaque link is persisted in Worker KV as an
+approved group for that session.
 
 `View Questions` pulls existing session questions through
 `GET /api/agent/questions`. `Pose Question` lets an allowed user choose one

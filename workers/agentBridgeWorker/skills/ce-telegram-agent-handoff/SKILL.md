@@ -9,23 +9,48 @@ Use this skill when acting as an OpenClaw-style agent for a Telegram user who is
 
 ## Install From Public Git
 
-Give this command to an agent host that supports Codex-style local skills:
+For Hermes, install the skill directly from the public branch:
 
 ```bash
-CE_SKILL_REF="${CE_SKILL_REF:-main}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+hermes skills install https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md
 ```
 
-Set `CE_SKILL_REF=release-staging` or another public branch/tag before running if the skill is not on `main` yet. After installation, tell the agent to use the `ce-telegram-agent-handoff` skill and ask the user for a CE agent token from the Telegram bot `/me` screen.
+For agent hosts that support Codex-style local skills:
+
+```bash
+CE_SKILL_REF="${CE_SKILL_REF:-edge-2026}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+```
+
+Set `CE_SKILL_REF=main` after the skill lands on the default public branch. After installation, tell the agent to use the `ce-telegram-agent-handoff` skill and ask the user for the copied CE agent install info from the Telegram bot `/start` screen's `Onboard Agent` button.
 
 ## Preconditions
 
-- The CE worker base URL is known.
+- The CE worker base URL is `https://ce-agent-bridge-worker.agalmic.workers.dev` for the current Edge City deployment. Operators may override this with `AGENT_BRIDGE_PUBLIC_URL`.
 - Use either a worker service token or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
-- For a user-scoped agent token, the user creates a token from the CE bot `/me` screen or `/agent_token`. The default expiry is 28 days. Send it as `Authorization: Bearer <token>`.
+- For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
+
+Worked `ceagt_` token smoke test:
+
+```bash
+curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/questions?sessionSlug=telegram-demo-4" \
+  -H "Authorization: Bearer ceagt_REPLACE_WITH_USER_TOKEN"
+```
+
+## Quickstart For Any HTTP-Capable Agent
+
+Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
+
+1. Ask the user to open the Context Engine bot and tap `Onboard Agent`.
+2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, `Session`, and the `ceagt_...` token.
+3. Call `GET <Worker>/telegram/agent/api/questions?sessionSlug=<Session>` with `Authorization: Bearer <token>`.
+4. Ask the user which personal data may be used for this CE flow. Keep the consent choices in your agent memory for this user.
+5. Draft responses with `POST <Worker>/telegram/agent/api/preferences`; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
+6. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
+7. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
 
@@ -41,21 +66,21 @@ Example shape:
 https://t.me/contextengineer_bot
 ```
 
-If the deployment uses a Telegram deep-link payload, use the configured link, for example:
+If the deployment uses a Telegram deep-link payload, use the configured link. The current worker recognizes `sensemaking_trial` and routes it into the same onboarding flow:
 
 ```text
 https://t.me/contextengineer_bot?start=sensemaking_trial
 ```
 
-After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account, bind the Telegram user to the selected Telegram-only session, and route the user into the private bot or Mini App flow. From then on, use this skill's API calls with the same `telegramUserId` and `sessionSlug`. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
+After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account, bind the Telegram user to the selected Telegram-only session, and route the user into the private bot or Mini App flow. The `/start` screen includes `Onboard Agent`, which returns a private masked token screen with a copy button for full install info. From then on, use this skill's API calls with the token-bound `sessionSlug`. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
 
 ## Non-Telegram Agent Token Flow
 
 Use this path when the user's assistant is not running inside the CE Telegram bot but the user wants it to act against CE on their behalf.
 
-1. Ask the user to open the CE bot and run `/me`.
-2. The user clicks `Create Agent Token`, or runs `/agent_token`.
-3. The user copies the token into the trusted external agent. The default token expiry is 28 days.
+1. Ask the user to open the CE bot and run `/start`.
+2. The user taps `Onboard Agent`, then `Copy Agent Install Info`. `/me` also links to account details and activity after onboarding.
+3. The user copies the install info into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
 5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and token-bound session.
 
@@ -101,9 +126,9 @@ reason plus `action: "refresh_token_via_telegram"`, stop the CE action and ask
 the user to refresh the token in Telegram:
 
 1. Open the Context Engine bot.
-2. Run `/me`.
-3. Tap `Create Agent Token`.
-4. Paste the new token back into the trusted agent.
+2. Run `/start`.
+3. Tap `Onboard Agent`.
+4. Paste the copied install info back into the trusted agent.
 
 Do not keep retrying an expired token.
 
@@ -129,7 +154,7 @@ Do not infer or submit demographic group membership from private user data unles
 Use this path when the user should become a CE participant by answering one CE question in a Telegram group that already has the CE bot enabled.
 
 1. Direct the user to the Telegram group/thread where the CE bot is present.
-2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session.
+2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session. If the session uses an approved Telegram group allowlist or `telegramGroupApprovalRequired`, the group must be approved first. A participant can run `/group_id` in that group and send the numeric chat id to a session admin, or a configured session admin can generate a one-use Add Bot To Group link with `/group_link <session>` and send that link to the group owner.
 3. Ask the user to answer any visible CE bot question by tapping a CE inline response button.
 4. After the tap, CE can bind `telegramUserId` to the group/session, derive or recover the CE-managed Telegram EVM account, and mark the user as an approved participant for worker calls.
 5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
@@ -161,7 +186,9 @@ For personalized question selection, send a POST body with preferences:
 }
 ```
 
-The default `rank` mode returns all questions sorted by inferred relevance. Use `relevanceMode: "filter"` only when the user wants unrelated questions hidden. Relevance is inferred from explicit question tags, prompt text, selected session metadata, and attended-session hints.
+The `GET` endpoint also accepts `tags=<tag-a>,<tag-b>` and `relevanceMode=filter` when the caller only wants tag matches. The default `rank` mode returns all questions sorted by inferred relevance. Use `relevanceMode: "filter"` only when the user wants unrelated questions hidden. Relevance is inferred from explicit question tags, prompt text, selected session metadata, and attended-session hints.
+
+For queue-driven reads, `POST /telegram/agent/api/questions/next` supports `sponsoredFirst` and `includeSponsored` so admin-selected sponsored questions can be served before the general queue.
 
 If the user is interacting in an OpenClaw DM, use this endpoint to fetch CE questions, then ask the user in natural language. Save their answer through `POST /telegram/agent/api/preferences` for CE Mini App review. Do not claim the response is submitted.
 
@@ -200,6 +227,30 @@ POST /telegram/agent/api/preferences
 ```
 
 The response reports `draftCount` and `skipped`. Send the user to the Mini App for review after drafts are saved.
+
+## Review Activity
+
+Use this endpoint as the agent's read surface for previous mutations and pending suggestions:
+
+```http
+GET /telegram/agent/api/actions?sessionSlug=<slug>
+```
+
+With a `ceagt_` token, the worker scopes results to the token-bound Telegram user and session. The response includes only mutation-oriented records: answer drafts, pending vote recommendations, applied vote decisions, proposed questions, and group suggestions. It does not include pure read calls. Items have this shape:
+
+```json
+{
+  "type": "answer_draft",
+  "sessionSlug": "telegram-demo-4",
+  "questionId": "q-binary",
+  "createdAt": "2026-05-28T12:00:00.000Z",
+  "status": "draft_saved",
+  "summary": "Draft: Agree",
+  "pendingAction": "review_draft"
+}
+```
+
+Use this endpoint before prompting the user so you can say what is already pending, what needs approval, and what the agent previously changed. Do not expose activity records in group chats unless the worker has already reduced them to counts.
 
 ## Question Cadence
 
@@ -330,7 +381,7 @@ The response includes a `metaQuestion`, relevance fields, and
 If you want the agent to auto-apply these question up/down votes, pass
 `"autoApply": true`. Auto-apply is controlled by the user's Mini App setting
 `agentAutoApplyQuestionVotes`, scoped to the Telegram account and session; it
-defaults to enabled for now. When auto-applied, CE records the vote as
+defaults to off and must be opted into by the user. When auto-applied, CE records the vote as
 `agent_auto_applied_pending_human_review` so later human approval or override
 can be distinguished.
 
@@ -438,3 +489,14 @@ one overall Telegram-only session. Use question tags and session context to
 represent subtopics such as events, tracks, rooms, cohorts, or source material.
 When an agent needs a new topical lane, create or reuse a tag, then pose or
 draft questions with that tag.
+
+## Parked Design Note
+
+Named `/start` deep-link payloads could later drive a permission-preferences onboarding: a short series of yes/no consent questions pre-loaded and served from the worker before any session questions:
+
+1. Can your agent pass preference info to CE to tailor which questions you see?
+2. Can your agent share non-identifying demographics for research only, never published in connection to you?
+3. Can your agent draft question responses for you based on your activity and user file?
+4. Can your agent upvote questions it thinks you will find relevant?
+
+This maps onto the existing consent fields: `allowedProfileFields`, `allowedUses`, `approvalMode`, and `agentAutoApplyQuestionVotes`. This design is parked; the current implemented onboarding is the fixed `Onboard Agent` token handoff.

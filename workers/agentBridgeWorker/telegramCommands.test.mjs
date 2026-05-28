@@ -130,13 +130,22 @@ function dotenvEscapedJson(value = {}) {
 }
 
 function groupMessage(text) {
+  return groupMessageFrom(text);
+}
+
+function groupMessageFrom(text, {
+  chatId = -100123,
+  title = 'Alpha Lobby',
+  telegramUserId = 42,
+  username = 'host',
+} = {}) {
   return {
     update_id: 7001,
     message: {
       message_id: 11,
       text,
-      chat: { id: -100123, type: 'supergroup', title: 'Alpha Lobby' },
-      from: { id: 42, username: 'host' },
+      chat: { id: chatId, type: 'supergroup', title },
+      from: { id: telegramUserId, username },
     },
   };
 }
@@ -498,6 +507,141 @@ test('/sessions reads the current telegram_only policy list', async () => {
   assert.equal(stale.response.text.includes('new-beta'), false);
   assert.match(fresh.response.text, /- old-alpha \(Old Alpha\)/);
   assert.match(fresh.response.text, /- new-beta \(New Beta\)/);
+});
+
+test('Telegram group allowlist filters and blocks group session binding', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          approvedTelegramGroupChatIds: ['-100999'],
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          approvedTelegramGroupChatIds: [{ chatId: '-100123', title: 'Alpha Lobby' }],
+        },
+        {
+          sessionSlug: 'gamma',
+          sessionName: 'Gamma Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          approvedTelegramGroupChatIds: ['-100123'],
+        },
+      ],
+    }),
+  });
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const denied = await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const allowed = await buildTelegramCommandResponse({
+    update: groupMessage('/join beta'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const groupId = await buildTelegramCommandResponse({
+    update: groupMessage('/group_id'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+  await env.AGENT_ACTION_KV.put('telegram:group-session:-100123', JSON.stringify({
+    version: 1,
+    chatId: '-100123',
+    sessionSlug: 'alpha',
+    sessionName: 'Alpha Session',
+    linkedAt: '2026-05-08T12:00:04.000Z',
+  }));
+  const staleStart = await buildTelegramCommandResponse({
+    update: groupMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:05.000Z',
+  });
+
+  assert.equal(sessions.response.text.includes('- alpha (Alpha Session)'), false);
+  assert.match(sessions.response.text, /- beta \(Beta Session\)/);
+  assert.match(sessions.response.text, /- gamma \(Gamma Session\)/);
+  assert.equal(denied.screen, 'telegram_group_access_denied');
+  assert.match(denied.response.text, /not approved for Alpha Session/);
+  assert.match(denied.response.text, /Group ID: -100123/);
+  assert.equal(allowed.screen, 'group_session_card');
+  assert.match(allowed.response.text, /Session: Beta Session/);
+  assert.equal(groupId.screen, 'telegram_group_id');
+  assert.match(groupId.response.text, /Telegram group ID: -100123/);
+  assert.match(groupId.response.text, /Selected session: beta/);
+  assert.equal(staleStart.response.text.includes('Session: Alpha Session'), false);
+  assert.match(staleStart.response.text, /\/sessions - choose session/);
+});
+
+test('admin-generated group approval link approves the first Telegram group that uses it', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const env = baseEnv({
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupApprovalRequired: true,
+      }],
+    }),
+  });
+  const beforeApproval = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now,
+  });
+  const link = await buildTelegramCommandResponse({
+    update: privateMessage('/group_link alpha'),
+    env,
+    now,
+  });
+  const invite = flattenButtons(link.response.replyMarkup).find((button) => button.text === 'Add Bot To Group');
+  const payload = new URL(invite.url).searchParams.get('startgroup');
+  const approved = await buildTelegramCommandResponse({
+    update: groupMessage(`/start ${payload}`),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const approvalRecord = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'));
+  const afterApproval = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const reusedElsewhere = await buildTelegramCommandResponse({
+    update: groupMessageFrom(`/start ${payload}`, { chatId: -100999, title: 'Other Lobby' }),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(beforeApproval.response.text.includes('- alpha (Alpha Session)'), false);
+  assert.equal(link.screen, 'telegram_group_approval_link');
+  assert.match(invite.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
+  assert.equal(payload.length <= 64, true);
+  assert.equal(approved.screen, 'telegram_group_approved');
+  assert.match(approved.response.text, /Group approved for Alpha Session/);
+  assert.equal(approvalRecord.chatId, '-100123');
+  assert.equal(approvalRecord.sessionSlug, 'alpha');
+  assert.match(afterApproval.response.text, /- alpha \(Alpha Session\)/);
+  assert.equal(reusedElsewhere.screen, 'telegram_group_approval_token_used');
+  assert.equal((await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100999')), null);
 });
 
 test('/sessions paginates tall Telegram session lists', async () => {
@@ -1701,17 +1845,18 @@ test('/start and /me show admin actions only to the configured export admin', as
   const policyAfterToggle = await loadSessionPolicy(allowedEnv);
   const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
-  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Admin Actions']);
+  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'), true);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), false);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), false);
-  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App']);
+  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
   assert.equal(adminView.screen, 'admin_actions');
   assert.deepEqual(flattenButtons(adminView.response.replyMarkup).map((button) => button.text), [
     'Export Responses',
     'Export Access',
     'Results Settings',
     'Question Queue',
+    'Add Bot To Group Link',
   ]);
   assert.equal(settingsView.screen, 'results_settings');
   assert.match(settingsView.response.text, /Anonymized groups: off/);
@@ -1884,7 +2029,7 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App']);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
   assert.equal(guestGrantAttempt.screen, 'response_export_access_denied');
@@ -3595,11 +3740,12 @@ test('/me returns managed demo account metadata without the root secret', async 
   const copyAddress = buttons.find((button) => button.text === 'Copy Address');
   assert.deepEqual(copyAddress?.copy_text, { text: accountAddress });
   assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
-  assert.equal(buttons.some((button) => button.text === 'Create Agent Token'), true);
+  assert.equal(buttons.some((button) => button.text === 'Copy Agent Install Info'), true);
+  assert.equal(buttons.some((button) => button.text === 'Activity'), true);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 
-test('/agent_token creates a 28-day scoped delegation token without exporting key material', async () => {
+test('/agent_token creates a 28-day scoped delegation token with masked chat body', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const env = agentTokenEnv();
   const result = await buildTelegramCommandResponse({
@@ -3610,14 +3756,19 @@ test('/agent_token creates a 28-day scoped delegation token without exporting ke
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /^Agent token/m);
+  assert.match(result.response.text, /^Agent install info/m);
   assert.match(result.response.text, /Expires: 2026-06-05T12:00:00.000Z/);
-  assert.match(result.response.text, /does not expose your wallet key/);
-  const token = result.response.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
-  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   const copyToken = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token');
-  assert.deepEqual(copyToken?.copy_text, { text: token });
+    .find((button) => button.text === 'Copy Agent Install Info');
+  const installInfo = copyToken?.copy_text?.text || '';
+  const token = installInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
+  assert.match(result.response.text, /ceagt_…[A-Za-z0-9_-]{4}/);
+  assert.match(result.response.text, /chat only shows the masked token/i);
+  assert.match(installInfo, /Worker: https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(installInfo, /Skill: https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026/);
+  assert.match(installInfo, /Authorization: Bearer <token>/);
 
   const loaded = await loadTelegramAgentDelegationToken({ env, token, now });
   assert.equal(loaded.ok, true);
@@ -3629,6 +3780,40 @@ test('/agent_token creates a 28-day scoped delegation token without exporting ke
   const storedRecords = Array.from(env.AGENT_ACTION_KV.store.values()).join('\n');
   assert.equal(storedRecords.includes(token), false);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/start Onboard Agent deep-link mints private install info without exposing tokens in group', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({
+    AGENT_BRIDGE_MINI_APP_SHORT_NAME: 'context_engine',
+  });
+  const groupStart = await buildTelegramCommandResponse({
+    update: groupMessage('/start'),
+    env,
+    now,
+  });
+  const onboard = flattenButtons(groupStart.response.replyMarkup)
+    .find((button) => button.text === 'Onboard Agent');
+  assert.ok(onboard?.url);
+  assert.equal(JSON.stringify(groupStart).includes('ceagt_'), false);
+  assert.equal(JSON.stringify(onboard).includes('copy_text'), false);
+  const onboardUrl = new URL(onboard.url);
+  assert.equal(onboardUrl.pathname, `/${env.TELEGRAM_BOT_USERNAME}`);
+  assert.equal(onboardUrl.searchParams.has('startapp'), false);
+  const payload = onboardUrl.searchParams.get('start');
+  const privateStart = await buildTelegramCommandResponse({
+    update: privateMessage(`/start ${payload}`),
+    env,
+    now,
+  });
+  const copyInfo = flattenButtons(privateStart.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+
+  assert.equal(privateStart.screen, 'agent_token');
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(privateStart.response.text.includes(token), false);
+  assert.match(copyInfo, /Context Engine agent install info/);
 });
 
 test('/agent_token refuses explicit sessions that are not selectable for the Telegram account', async () => {
@@ -3675,7 +3860,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
   const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
-  assert.deepEqual(buttonLabels, ['Mini App']);
+  assert.deepEqual(buttonLabels, ['Mini App', 'Onboard Agent']);
   assert.equal(result.response.text.includes('/results [ consensus | group ]'), false);
   assert.equal(result.response.text.split('\n').includes('/results'), true);
   assert.equal(result.response.text.includes('/q <number>'), false);
@@ -3687,7 +3872,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.split('\n').includes('/questions'), true);
-  assert.equal(result.response.text.split('\n').includes('/me - view account / get agent token'), true);
+  assert.equal(result.response.text.split('\n').includes('/me - My Account'), true);
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
@@ -3802,7 +3987,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App']);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
   assert.equal(result.response.text.includes('/sessions'), false);
   assert.equal(result.response.text.includes('/groups'), false);
   assert.equal(result.response.text.includes('/add_question'), false);

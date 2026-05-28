@@ -289,6 +289,7 @@ export async function persistTelegramProposedQuestion({
   options = [],
   tags = [],
   sessionContext = '',
+  metadata = null,
   createdAt = null,
   ttlSeconds = DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
 } = {}) {
@@ -334,6 +335,9 @@ export async function persistTelegramProposedQuestion({
     createdFromChatId: chatId || null,
     createdAt: nowIso(createdAt),
   };
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    record.actionMetadata = { ...metadata };
+  }
   assertNoSecretShape(record, 'Telegram proposed questions must not serialize secrets.');
   await env.AGENT_ACTION_KV.put(`${prefix}${questionId}`, JSON.stringify(record), {
     expirationTtl: ttlSeconds,
