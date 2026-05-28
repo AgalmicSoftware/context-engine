@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -39,7 +39,6 @@ import {
   getSbtPasswordRecoveryCodes,
   upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
 import {
@@ -47,6 +46,12 @@ import {
   renderSbtPageFullImageModal,
   renderSbtPageHolderModal,
 } from './SBTPageModals';
+import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageActionsSection from './SbtPageActionsSection';
+import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
+import SbtPageRelevantInfo from './SbtPageRelevantInfo';
+import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
@@ -226,7 +231,6 @@ import {
   resolveSbtAddressString,
   resolveSbtChainId,
   resolveSbtPageTokenMetadataHref,
-  resolveSbtPageMutedInfoIconStyle,
   sanitizeSbtPageMintedTokensOverride,
   shouldShowSbtPageScanProgress,
   shouldRenderSbtPageMintButton,
@@ -4113,78 +4117,15 @@ renderMintButton() {
     });
 
     return (
-      <div className={styles.relevantInfo}>
-        <Alert color="info" fade={false}>
-          <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()}/>
-          This section shows relevant documents, URLs, tags, and IDs.
-        </Alert>
-        {relevantInfoDisplayState.shouldRenderDocumentUrls && (
-          <div className={styles.docUrlsSection}>
-            <h4>Document URLs:</h4>
-            <ul className={styles.docUrlList}>
-              {documentURLs.map((url, index) => {
-                const litDoc = litStorage.isLitArweaveUrl(url);
-                return (
-                  <li key={index} className={styles.docUrlItem}>
-                    <span className={styles.docUrlBadge}>
-                      {litDoc ? 'Encrypted Doc' : 'Doc URL'}
-                    </span>
-                    {litDoc ? (
-                      <button
-                        type="button"
-                        className={styles.docUrlButton}
-                        onClick={() => this.openEncryptedDoc(url)}
-                      >
-                        Decrypt and view
-                      </button>
-                    ) : (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
-                        {url}
-                      </a>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        {relevantInfoDisplayState.shouldRenderDocumentIdHashes && (
-          <div className={styles.docIDsSection}>
-            <h4>Document ID Hashes:</h4>
-            <ul className={styles.docIdList}>
-              {documentIDHashes.map((hash, index) => {
-                const docHash = encodeURIComponent(hash);
-                return (
-                  <li key={index} className={styles.docIdItem}>
-                    <span className={styles.docIdBadge}>Doc ID</span>
-                    <a href={buildPublicRoute(`/doc/${docHash}`)} target="_blank" rel="noopener noreferrer">
-                      {hash}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        {relevantInfoDisplayState.shouldRenderTags && (
-          <div className={styles.tagsSection}>
-            <h4>Tags:</h4>
-            <ul className={styles.tagList}>
-              {tags.map((tag, index) => {
-                const tagEnc = encodeURIComponent(tag);
-                return (
-                  <li key={index} className={styles.tagItem}>
-                    <span className={styles.tagBadge}>Tag</span>
-                    <a href={buildPublicRoute(`/tag/${tagEnc}`)} target="_blank" rel="noopener noreferrer">
-                      {tag}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
+      <SbtPageRelevantInfo
+        documentIDHashes={documentIDHashes}
+        documentURLs={documentURLs}
+        onOpenEncryptedDoc={this.openEncryptedDoc}
+        shouldRenderDocumentIdHashes={relevantInfoDisplayState.shouldRenderDocumentIdHashes}
+        shouldRenderDocumentUrls={relevantInfoDisplayState.shouldRenderDocumentUrls}
+        shouldRenderTags={relevantInfoDisplayState.shouldRenderTags}
+        tags={tags}
+      />
     );
   };
 
@@ -4299,37 +4240,11 @@ renderMintButton() {
     return (
       <div className={styles.adminActions}>
         {openMintAutoJoinUrl && (
-          <div className={styles.autoMintUrlCard} data-testid={E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL}>
-            <h4>URL Where Anyone Can Join</h4>
-            <p className={styles.autoMintUrlHelp}>
-              Share this session link to trigger the open-mint flow for this group.
-            </p>
-            <div className={styles.autoMintUrlRow}>
-              <span className={styles.autoMintUrlText} title={openMintAutoJoinUrl}>
-                {openMintAutoJoinUrl}
-              </span>
-              <button
-                type="button"
-                className={styles.autoMintUrlButton}
-                onClick={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
-                aria-label="Copy open mint URL"
-                title="Copy open mint URL"
-              >
-                {openMintUrlCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                {openMintUrlCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-              </button>
-              <a
-                href={openMintAutoJoinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.autoMintUrlButton}
-                aria-label="Open open mint URL"
-                title="Open open mint URL"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            </div>
-          </div>
+          <SbtPageOpenMintUrlCard
+            copyIconState={openMintUrlCopyIconState}
+            onCopy={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
+            openMintAutoJoinUrl={openMintAutoJoinUrl}
+          />
         )}
         {canAdminBurn && (
           <div className={styles.adminBurnSection}>
@@ -4656,267 +4571,97 @@ renderMintButton() {
         showMiniPasswordInput: this.state.showMiniPasswordInput,
       });
 
-      let miniMintArea: React.ReactNode = null;
-
-      if (!hasTokenMini) {
-        if (miniMintable) {
-          if (this.state.hasGroupPasswordMint) {
-            if (miniMintFlowDisplayState.shouldRenderGroupPasswordDisclosureButton) {
-              miniMintArea = (
-                <button
-                  onClick={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
-                  className={miniMintActionButtonClassName}
-                  style={miniControlDisplayState.topMarginStyle}
-                >
-                  Join
-                </button>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderGroupPasswordInput) {
-              miniMintArea = (
-                <div className={styles.miniMintPasswordArea} style={miniControlDisplayState.topMarginStyle}>
-                  <input
-                    type="password"
-                    className={styles.miniPasswordInput}
-                    value={this.state.groupPasswordInput || ''}
-                    onChange={this.handleGroupPasswordInputChange}
-                    placeholder="Password"
-                    disabled={miniPasswordJoinButtonState.isPending}
-                    style={miniPasswordControlDisplayState.inputStyle}
-                  />
-                  <button
-                    onClick={() => this.mintUnlimitedWithGroupPassword()}
-                    disabled={miniPasswordJoinButtonState.disabled}
-                    className={miniMintActionButtonClassName}
-                  >
-                    {miniPasswordJoinContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                    {miniPasswordJoinContentState.shouldRenderLabel && miniPasswordJoinContentState.label}
-                  </button>
-                </div>
-              );
-            }
-          }
-          else if (this.state.hasInviteMint) {
-            if (miniMintFlowDisplayState.shouldRenderInviteDisclosureButton) {
-              miniMintArea = (
-                <button
-                  onClick={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
-                  className={miniMintActionButtonClassName}
-                  style={miniControlDisplayState.topMarginStyle}
-                >
-                  Join
-                </button>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderInviteInput) {
-              miniMintArea = (
-                <div className={styles.miniMintPasswordArea} style={miniControlDisplayState.topMarginStyle}>
-                  <input
-                    type="password"
-                    className={styles.miniPasswordInput}
-                    value={this.state.groupPasswordInput || ''}
-                    onChange={this.handleGroupPasswordInputChange}
-                    placeholder="Invite Code"
-                    disabled={miniPasswordJoinButtonState.isPending}
-                    style={miniInviteControlDisplayState.inputStyle}
-                  />
-                  <button
-                    onClick={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
-                    disabled={miniPasswordJoinButtonState.disabled}
-                    className={miniMintActionButtonClassName}
-                  >
-                    {miniPasswordJoinContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                    {miniPasswordJoinContentState.shouldRenderLabel && miniPasswordJoinContentState.label}
-                  </button>
-                </div>
-              );
-            }
-          }
-          else if (sbtInfo.hasPasswordMint) {
-            if (miniMintFlowDisplayState.shouldRenderManualPasswordDisclosureButton) {
-              miniMintArea = (
-                <button
-                  onClick={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
-                  className={miniMintActionButtonClassName}
-                  style={miniControlDisplayState.topMarginStyle}
-                >
-                  Join
-                </button>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderManualPasswordStartInput) {
-              miniMintArea = (
-                <div className={styles.miniMintPasswordArea} style={miniControlDisplayState.topMarginStyle}>
-                  <input
-                    type="text"
-                    className={styles.miniPasswordInput}
-                    value={manualPasswordInput}
-                    onChange={this.handleManualPasswordInputChange}
-                    placeholder="Password"
-                    disabled={miniManualClaimButtonState.isPending}
-                    style={miniPasswordControlDisplayState.inputStyle}
-                  />
-                  <button
-                    onClick={this.miniMintHandler}
-                    disabled={miniManualClaimButtonState.disabled}
-                    className={miniMintActionButtonClassName}
-                  >
-                    {miniManualClaimStartContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                    {miniManualClaimStartContentState.shouldRenderLabel && miniManualClaimStartContentState.label}
-                  </button>
-                </div>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderManualClaimCountdown) {
-              miniMintArea = (
-                <div className={styles.miniActionStatus} style={miniActionStatusDisplayState.style}>
-                  Wait: {claimCountdown}s
-                </div>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderManualPasswordFinishInput) {
-              miniMintArea = (
-                <div className={styles.miniMintPasswordArea} style={miniControlDisplayState.topMarginStyle}>
-                  <input
-                    type="text"
-                    className={styles.miniPasswordInput}
-                    value={manualPasswordInput}
-                    onChange={this.handleManualPasswordInputChange}
-                    placeholder="Password"
-                    disabled={miniManualClaimButtonState.isPending}
-                  />
-                  <button
-                    onClick={this.miniMintHandler}
-                    disabled={miniManualClaimButtonState.disabled}
-                    className={miniMintActionButtonClassName}
-                  >
-                    {miniManualClaimFinishContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                    {miniManualClaimFinishContentState.shouldRenderLabel && miniManualClaimFinishContentState.label}
-                  </button>
-                </div>
-              );
-            } else if (miniMintFlowDisplayState.shouldRenderManualClaimSuccess) {
-              miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusDisplayState.style}>{`${t('minted')}!`}</div>;
-            }
-          }
-          else if (miniMintFlowDisplayState.shouldRenderOpenMintButton) {
-            miniMintArea = (
-              <button
-                onClick={this.miniMintHandler}
-                className={miniMintActionButtonClassName}
-                style={miniControlDisplayState.topMarginStyle}
-                disabled={miniOpenMintButtonState.disabled}
-              >
-                {miniOpenMintButtonContentState.shouldRenderIdleLabel && miniOpenMintButtonContentState.idleLabel}
-                {miniOpenMintButtonContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                {miniOpenMintButtonContentState.shouldRenderFailure && (
-                  <>{miniOpenMintButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
-                )}
-                {miniOpenMintButtonContentState.shouldRenderSuccess && (
-                  <>{miniOpenMintButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
-                )}
-              </button>
-            );
-          }
-        }
-      } else {
+      let miniTokenActionDisplayState: ReturnType<typeof resolveSbtPageMiniTokenActionDisplayState> | null = null;
+      let miniBurnButtonState: ReturnType<typeof resolveSbtPageMiniBurnButtonState> | null = null;
+      let miniBurnContentState: ReturnType<typeof resolveSbtPagePendingButtonContentState> | null = null;
+      if (hasTokenMini) {
         const { canBurnMini } = resolveSbtPageMiniBurnPermission({
           account: this.props.account,
           sbtInfo,
           userIsSbtAdmin,
         });
-        const miniTokenActionDisplayState = resolveSbtPageMiniTokenActionDisplayState({
+        miniTokenActionDisplayState = resolveSbtPageMiniTokenActionDisplayState({
           burningStatus,
           canBurnMini,
         });
-
-        if (miniTokenActionDisplayState.shouldRenderBurnedStatus) {
-          miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusDisplayState.style}>{`${t('burned')}!`}</div>;
-        } else if (miniTokenActionDisplayState.shouldRenderBurnButton) {
-          const miniBurnButtonState = resolveSbtPageMiniBurnButtonState({
+        if (miniTokenActionDisplayState.shouldRenderBurnButton) {
+          miniBurnButtonState = resolveSbtPageMiniBurnButtonState({
             burningStatus,
           });
-          const miniBurnContentState = resolveSbtPagePendingButtonContentState({
+          miniBurnContentState = resolveSbtPagePendingButtonContentState({
             isPending: miniBurnButtonState.isPending,
             label: t('burn'),
           });
-          miniMintArea = (
-            <button
-              onClick={this.miniBurnHandler}
-              className={miniBurnActionButtonClassName}
-              style={miniControlDisplayState.topMarginStyle}
-              disabled={miniBurnButtonState.disabled}
-            >
-              {miniBurnContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-              {miniBurnContentState.shouldRenderLabel && miniBurnContentState.label}
-            </button>
-          );
-        } else if (miniTokenActionDisplayState.shouldRenderJoinedStatus) {
-          miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusDisplayState.style}>Joined!</div>;
         }
       }
 
-      if (miniActionFailureState.showMintFailedStatus) {
-        miniMintArea = <div className={styles.miniActionStatus} style={miniActionFailureStatusDisplayState.style}>{`${t('mint')} Failed`}</div>;
-      }
-      if (miniActionFailureState.showBurnFailedStatus) {
-        miniMintArea = <div className={styles.miniActionStatus} style={miniActionFailureStatusDisplayState.style}>{`${t('burn')} Failed`}</div>;
-      }
-
       return (
-        <div
-          className={styles.sbtItem}
-          style={resolveSbtPageInteractiveCursorStyle()}
-          role='button'
-          tabIndex={0}
-          onClick={(event: React.MouseEvent<HTMLDivElement>) => {
+        <SbtPageMiniCard
+          burnLabel={t('burn')}
+          burnedLabel={t('burned')}
+          cardStyle={resolveSbtPageInteractiveCursorStyle()}
+          claimCountdown={claimCountdown}
+          groupPasswordInput={this.state.groupPasswordInput || ''}
+          hasGroupPasswordMint={this.state.hasGroupPasswordMint}
+          hasInviteMint={this.state.hasInviteMint}
+          hasPasswordMint={sbtInfo.hasPasswordMint}
+          hasTokenMini={hasTokenMini}
+          imageUrl={imageUrl}
+          isMintingActive={isMintingActive}
+          manualPasswordInput={manualPasswordInput}
+          miniActionFailureState={miniActionFailureState}
+          miniActionFailureStatusStyle={miniActionFailureStatusDisplayState.style}
+          miniActionStatusStyle={miniActionStatusDisplayState.style}
+          miniBurnActionButtonClassName={miniBurnActionButtonClassName}
+          miniBurnButtonState={miniBurnButtonState}
+          miniBurnContentState={miniBurnContentState}
+          miniControlTopMarginStyle={miniControlDisplayState.topMarginStyle}
+          miniInviteInputStyle={miniInviteControlDisplayState.inputStyle}
+          miniManualClaimButtonState={miniManualClaimButtonState}
+          miniManualClaimFinishContentState={miniManualClaimFinishContentState}
+          miniManualClaimStartContentState={miniManualClaimStartContentState}
+          miniMintActionButtonClassName={miniMintActionButtonClassName}
+          miniMintFlowDisplayState={miniMintFlowDisplayState}
+          miniMintable={miniMintable}
+          miniOpenMintButtonContentState={miniOpenMintButtonContentState}
+          miniOpenMintButtonState={miniOpenMintButtonState}
+          miniPasswordControlInputStyle={miniPasswordControlDisplayState.inputStyle}
+          miniPasswordJoinButtonState={miniPasswordJoinButtonState}
+          miniPasswordJoinContentState={miniPasswordJoinContentState}
+          miniTokenActionDisplayState={miniTokenActionDisplayState}
+          mintFailedLabel={`${t('mint')} Failed`}
+          mintStatusId={mintStatusId}
+          mintedLabel={t('minted')}
+          mintingLabel={t('minting')}
+          onCardClick={(event: React.MouseEvent<HTMLDivElement>) => {
             const interactiveAncestor = findNestedInteractiveElement(event.target);
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
             event.preventDefault();
             event.stopPropagation();
             window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
           }}
-          onKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
+          onCardKeyDown={(event: React.KeyboardEvent<HTMLDivElement>) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             const interactiveAncestor = findNestedInteractiveElement(event.target);
             if (interactiveAncestor && interactiveAncestor !== event.currentTarget) return;
             event.preventDefault();
             window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
           }}
-        >
-          <div className={styles.iconOverlay}>
-            {shouldRenderLiveIndicator && (
-              <div className={styles.liveIndicator} id={mintStatusId} aria-label={`${t('minting')} Live`}></div>
-            )}
-            {shouldRenderEndedIndicator && (
-              <div className={styles.endedIndicator} id={mintStatusId} aria-label={`${t('minting')} Ended`}></div>
-            )}
-            <CETooltip
-              placement="top"
-              target={mintStatusId}
-              trigger="hover focus click"
-              className={styles.tooltipBubble}
-              innerClassName={styles.tooltipInner}
-            >
-              {isMintingActive ? `${t('minting')} Live` : `${t('minting')} Ended`}
-            </CETooltip>
-            {(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint) && (
-              <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />
-            )}
-          </div>
-          <div
-            className={styles.miniImageContainer}
-            data-featured-card-ignore-nav="true"
-          >
-            <img
-              src={imageUrl}
-              alt={sbtName}
-              className={styles.sbtImage}
-              data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
-              onError={imageErrorHandler}
-            />
-          </div>
-          <p className={styles.miniSbtName}>{sbtName}</p>
-          {showMiniSbtAddress ? (
-            <p className={styles.miniSbtAddress}>{getShortenedAddress(sbtAddressForDisplay, false)}</p>
-          ) : null}
-          {miniMintArea}
-        </div>
+          onClaimWithInviteCode={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+          onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
+          onImageError={imageErrorHandler}
+          onManualPasswordInputChange={this.handleManualPasswordInputChange}
+          onMiniBurn={this.miniBurnHandler}
+          onMiniMint={this.miniMintHandler}
+          onMintUnlimitedWithGroupPassword={() => this.mintUnlimitedWithGroupPassword()}
+          onShowMiniPasswordInput={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
+          sbtAddress={sbtAddressForDisplay}
+          sbtName={sbtName}
+          shouldRenderEndedIndicator={shouldRenderEndedIndicator}
+          shouldRenderLiveIndicator={shouldRenderLiveIndicator}
+          showLockIcon={!!(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint)}
+          showMiniSbtAddress={showMiniSbtAddress}
+        />
       );
     }
 
@@ -5159,218 +4904,75 @@ renderMintButton() {
         {sbtInfo ? (
           <>
             <div className={styles.sbtInfo}>
-              <div className={styles.leftColumn}>
-                <div className={styles.bookmarkIcon}>
-                  <button
-                    onClick={this.bookmarkSBT}
-                    className={styles.bookmarkButton}
-                    style={bookmarkButtonDisplayState.iconStyle}
-                  >
-                    <FontAwesomeIcon icon={faBookmark} />
-                  </button>
-                  <a
-                    href={this.getExplorerUrl(sbtAddressForDisplay)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.contractLink}
-                  >
-                    {addressDisplay}
-                  </a>
-                  <button
-                    onClick={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
-                    className={styles.copyButton}
-                  >
-                    {contractCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                    {contractCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                  </button>
-                  {tokenUriHref && (
-                    <a
-                      href={tokenUriHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.copyButton}
-                      title="Open token metadata"
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    </a>
-                  )}
-                </div>
-                <div className={styles.image}>
-                  <div className={styles.imageWrapper} onClick={this.toggleFullImage}>
-                    <img
-                      src={imageUrl}
-                      alt={sbtNameText}
-                      data-testid={E2E_TESTIDS.SBT_PAGE_IMAGE}
-                      onError={imageErrorHandler}
-                    />
-                    <div className={styles.expandOverlay}>
-                      <FontAwesomeIcon icon={faExpand} />
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.description}>
-                  <h1 data-testid={E2E_TESTIDS.SBT_PAGE_NAME}>{sbtNameText}</h1>
-                  {sbtDescriptionText ? (
-                    <p data-testid={E2E_TESTIDS.SBT_PAGE_DESCRIPTION}>
-                      {isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim() ? (
-                        <FontAwesomeIcon icon={faLock} style={resolveSbtPageInlineLockIconStyle()} />
-                      ) : null}
-                      {sbtDescriptionText}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
+              <SbtPageIdentityPanel
+                addressDisplay={addressDisplay}
+                bookmarkIconStyle={bookmarkButtonDisplayState.iconStyle}
+                contractCopyIconState={contractCopyIconState}
+                descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
+                descriptionText={sbtDescriptionText}
+                explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
+                imageAlt={sbtNameText}
+                imageUrl={imageUrl}
+                nameText={sbtNameText}
+                onBookmark={this.bookmarkSBT}
+                onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
+                onImageError={imageErrorHandler}
+                onImageOpen={this.toggleFullImage}
+                showDescriptionLockIcon={isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim()}
+                tokenUriHref={tokenUriHref}
+              />
               <div className={styles.rightColumn}>
-                <div className={styles.statsSection}>
-                  <h2 className={sectionHeaderClassName} onClick={this.toggleStats}>
-                    STATS{' '}
-                    {statsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                    {statsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                  </h2>
-                  {statsSectionToggleState.isOpen && (
-                    <div className={styles.stats}>
-                      <p>
-                        <span className={styles.label}>{`${t('minted')}:`}</span>
-                        {/* Logic: Show spinner ONLY if we have no data and are loading. Else show count. */}
-                        {isInitialLoading ? (
-                          <FontAwesomeIcon icon={faSpinner} spin />
-                        ) : (
-                          <span title={mintedCountTitle}>
-                            {`${netMinted} / ${maxTokensDisplay}`}
-                          </span>
-                        )}
-                        {/* Logic: Show subtle spinner if we have data BUT are refreshing. */}
-                        {isRefreshing && (
-                          <span style={resolveSbtPageRefreshIndicatorStyle()} title="Refreshing...">
-                            <FontAwesomeIcon icon={faSpinner} spin />
-                          </span>
-                        )}
-
-                        <button onClick={this.openMintedModal} className={styles.expandButton}>
-                          <FontAwesomeIcon icon={faUser} />
-                        </button>
-                      </p>
-                      {showScanProgress && (
-                        <div className={styles.scanProgress}>
-                          <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
-                          <div className={styles.scanProgressContent}>
-                            <span className={styles.scanProgressText}>{scanProgressText}</span>
-                            {scanProgressSessionText ? (
-                              <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-                            ) : null}
-                            <div
-                              className={styles.scanProgressBar}
-                              role="progressbar"
-                              aria-valuenow={scanProgressPct}
-                              aria-valuemin={0}
-                              aria-valuemax={100}
-                            >
-                              <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {mintEndDisplay}
-                      <p>
-                        <span className={styles.label}>Burnable by:</span> {burnLabel}
-                        <FontAwesomeIcon
-                          icon={faQuestionCircle}
-                          className={styles.tooltip}
-                          id="burnAuthQuestionMark"
-                          style={resolveSbtPageQuestionIconStyle()}
-                        />
-                        <CETooltip
-                          placement="right"
-                          target="burnAuthQuestionMark"
-                          delay={{ show: 0, hide: 2500 }}
-                          className={styles.tooltipBubble}
-                          innerClassName={styles.tooltipInner}
-                        >
-                          Specify who can burn the token: Admin Only, Owner Only, Both, or Neither.
-                        </CETooltip>
-                      </p>
-                      <p>
-                        <span className={styles.label}>Network:</span>{' '}
-                        {getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
-                      </p>
-
-                      <p>
-                        <span className={styles.label}>Admin:</span> {this.renderAddressLink(adminAddress, 'admin')}
-                      </p>
-                      <p>
-                        <span className={styles.label}>Creator:</span> {this.renderAddressLink(creatorAddress, 'creator')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.actionsSection}>
-                  <h2 className={sectionHeaderClassName} onClick={this.toggleActions}>
-                    ACTIONS{' '}
-                    {actionsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                    {actionsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                  </h2>
-                  {actionsSectionToggleState.isOpen && (
-                    <div className={styles.actions}>
-                      {this.renderMintButton()}
-                      {this.renderBurnButton()}
-                      {actionFeedbackState.showMintSuccess && (
-                        <div className={styles.mintProcess}>
-                          <p className={styles.mintSuccess}>
-                            {`${t('sbt')} successfully ${t('mintedLower')}!`}
-                            <br />
-                            {`${t('mint')} Tx Hash:`}{' '}
-                            <a
-                              href={this.getExplorerLink(lastMintTxHash)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {getShortenedTransactionHash(lastMintTxHash)}
-                            </a>
-                          </p>
-                        </div>
-                      )}
-                      {actionFeedbackState.showBurnSuccess && (
-                        <div className={styles.mintProcess}>
-                          <p className={styles.mintSuccess}>
-                            {`${t('sbt')} successfully ${t('burnedLower')}!`}
-                            <br />
-                            {`${t('burn')} Tx Hash:`}{' '}
-                            <a
-                              href={this.getExplorerLink(lastBurnTxHash)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {getShortenedTransactionHash(lastBurnTxHash)}
-                            </a>
-                          </p>
-                        </div>
-                      )}
-                      {actionFeedbackState.showTransactionError && (
-                        <Alert color="danger" className={styles.txErrorAlert} fade={false}>
-                          <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
-                          <button
-                            onClick={this.copyErrorToClipboard}
-                            aria-label="Copy error message"
-                            title="Copy error message"
-                            style={resolveSbtPageCopyErrorButtonStyle()}
-                          >
-                            {errorCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                            {errorCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                          </button>
-                          {actionFeedbackState.showErrorTransactionHash && (
-                            <>
-                              <br />
-                              Tx Hash:{' '}
-                              <a href={this.getExplorerLink(transactionHash)} target="_blank" rel="noopener noreferrer">
-                                {getShortenedTransactionHash(transactionHash)}
-                              </a>
-                            </>
-                          )}
-                        </Alert>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <SbtPageStatsSection
+                  adminAddressDisplay={this.renderAddressLink(adminAddress, 'admin')}
+                  burnLabel={burnLabel}
+                  creatorAddressDisplay={this.renderAddressLink(creatorAddress, 'creator')}
+                  isInitialLoading={isInitialLoading}
+                  isOpen={statsSectionToggleState.isOpen}
+                  isRefreshing={isRefreshing}
+                  maxTokensDisplay={maxTokensDisplay}
+                  mintedCountTitle={mintedCountTitle}
+                  mintedLabel={t('minted')}
+                  mintEndDisplay={mintEndDisplay}
+                  netMinted={netMinted}
+                  networkLabel={getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
+                  onOpenMintedModal={this.openMintedModal}
+                  onToggle={this.toggleStats}
+                  questionIconStyle={resolveSbtPageQuestionIconStyle()}
+                  refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
+                  scanProgressFillStyle={scanProgressFillStyle}
+                  scanProgressPct={scanProgressPct}
+                  scanProgressSessionText={scanProgressSessionText}
+                  scanProgressText={scanProgressText}
+                  sectionHeaderClassName={sectionHeaderClassName}
+                  shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
+                  shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
+                  showScanProgress={showScanProgress}
+                />
+                <SbtPageActionsSection
+                  actionFeedbackState={actionFeedbackState}
+                  burnButton={this.renderBurnButton()}
+                  burnLabel={t('burn')}
+                  burnSuccessHref={actionFeedbackState.showBurnSuccess ? this.getExplorerLink(lastBurnTxHash) : ''}
+                  burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
+                  burnedLowerLabel={t('burnedLower')}
+                  copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
+                  errorCopyIconState={errorCopyIconState}
+                  errorMessage={this.state.error}
+                  isOpen={actionsSectionToggleState.isOpen}
+                  mintButton={this.renderMintButton()}
+                  mintLabel={t('mint')}
+                  mintSuccessHref={actionFeedbackState.showMintSuccess ? this.getExplorerLink(lastMintTxHash) : ''}
+                  mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
+                  mintedLowerLabel={t('mintedLower')}
+                  onCopyError={this.copyErrorToClipboard}
+                  onToggle={this.toggleActions}
+                  sbtLabel={t('sbt')}
+                  sectionHeaderClassName={sectionHeaderClassName}
+                  shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
+                  shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
+                  transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? this.getExplorerLink(transactionHash) : ''}
+                  transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
+                />
                 {userIsSbtAdmin && (
                   <div className={styles.adminSection}>
                     <h2 className={sectionHeaderClassName} onClick={this.toggleAdminSection}>

@@ -33,10 +33,15 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
+  buildSurveyQuestionsFullLoadingProgressState,
+  buildSurveyQuestionsJsonForDisplayState,
+  buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
+  buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
@@ -134,6 +139,353 @@ describe('surveyQuestionsTypes', () => {
     })).toEqual({ width: '92%' });
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, true)).toBe('icon single-submit-icon');
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, false)).toBe('icon');
+  });
+
+  it('builds SurveyQuestions full loading progress state for scan progress', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: 'session-a',
+      questionScanProgress: {
+        slug: 'session-a',
+        totalBlocks: 100,
+        scannedBlocks: 25,
+      },
+    });
+
+    expect(progressState.hasFullLoadingProgress).toBe(true);
+    expect(progressState.isHydrating).toBe(false);
+    expect(progressState.metaLeftText).toBe('75 blocks left');
+    expect(progressState.metaRightText).toBe('25 / 100');
+    expect(progressState.fillStyle).toEqual({ width: '25%' });
+  });
+
+  it('builds SurveyQuestions hydrate progress labels and clamps completed counts', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: '',
+      questionScanProgress: {
+        slug: 'GENERAL',
+        phase: 'hydrate',
+        discoveredQuestions: 8,
+        hydratedQuestions: 12,
+      },
+    });
+
+    expect(progressState.hasFullLoadingProgress).toBe(true);
+    expect(progressState.isHydrating).toBe(true);
+    expect(progressState.hydrateDiscovered).toBe(8);
+    expect(progressState.hydrateDone).toBe(12);
+    expect(progressState.metaLeftText).toBe('0 items left');
+    expect(progressState.metaRightText).toBe('8 / 8');
+    expect(progressState.fillStyle).toEqual({ width: '100%' });
+  });
+
+  it('ignores SurveyQuestions full loading progress for unrelated slugs', () => {
+    const progressState = buildSurveyQuestionsFullLoadingProgressState({
+      progressSlug: 'session-a',
+      questionScanProgress: {
+        slug: 'session-b',
+        totalBlocks: 100,
+        scannedBlocks: 25,
+      },
+    });
+
+    expect(progressState.questionScanProgress).toBeNull();
+    expect(progressState.hasFullLoadingProgress).toBe(false);
+    expect(progressState.metaLeftText).toBe('0 blocks left');
+    expect(progressState.metaRightText).toBe('0 / 0');
+    expect(progressState.fillStyle).toEqual({ width: '0%' });
+  });
+
+  it('builds SurveyQuestions JSON panel display state for full survey flows', () => {
+    const styleMap = {
+      singleQuestionJsonPanel: 'single-panel',
+      singleQuestionJsonRow: 'single-row',
+      singleQuestionJsonToggle: 'single-toggle',
+      singleQuestionJsonToggleQuestion: 'question-toggle',
+      singleQuestionJsonToggleResponse: 'response-toggle',
+      surveyJsonRow: 'json-row',
+    };
+
+    expect(buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView: false,
+      isStandalone: false,
+      singleQuestionMode: false,
+      showQuestionsJson: true,
+      showResponseJson: true,
+      showSurveyJson: true,
+      styleMap,
+    })).toEqual({
+      showQuestionJsonControls: false,
+      showSurveyJsonPanel: true,
+      showQuestionsJsonPanel: false,
+      showResponseJsonPanel: true,
+      surveyJsonRowClassName: 'json-row',
+      surveyJsonToggleClassName: undefined,
+      questionJsonToggleClassName: undefined,
+      responseJsonToggleClassName: undefined,
+      surveyJsonPanelClassName: undefined,
+    });
+  });
+
+  it('builds SurveyQuestions JSON panel display state for single-question flows', () => {
+    const styleMap = {
+      singleQuestionJsonPanel: 'single-panel',
+      singleQuestionJsonRow: 'single-row',
+      singleQuestionJsonToggle: 'single-toggle',
+      singleQuestionJsonToggleQuestion: 'question-toggle',
+      singleQuestionJsonToggleResponse: 'response-toggle',
+      surveyJsonRow: 'json-row',
+    };
+
+    expect(buildSurveyQuestionsJsonPanelDisplayState({
+      isSingleQuestionView: true,
+      isStandalone: true,
+      singleQuestionMode: false,
+      showQuestionsJson: true,
+      showResponseJson: true,
+      showSurveyJson: true,
+      styleMap,
+    })).toEqual({
+      showQuestionJsonControls: true,
+      showSurveyJsonPanel: false,
+      showQuestionsJsonPanel: true,
+      showResponseJsonPanel: true,
+      surveyJsonRowClassName: 'json-row single-row',
+      surveyJsonToggleClassName: 'single-toggle',
+      questionJsonToggleClassName: 'single-toggle question-toggle',
+      responseJsonToggleClassName: 'single-toggle response-toggle',
+      surveyJsonPanelClassName: 'single-panel',
+    });
+  });
+
+  it('builds SurveyQuestions JSON display payloads for preview and viewed responses', () => {
+    const jsonPreview = { preview: true };
+    const userAnswers = { responses: [{ q: 'own' }] };
+    const parsedViewAddressAnswers = { responses: [{ q: 'other' }] };
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      jsonPreview,
+      viewingAnswers: false,
+    }).jsonForDisplay).toBe(jsonPreview);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: true,
+      jsonPreview,
+      userAnswers,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(userAnswers);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: false,
+      parsedViewAddressAnswers,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(parsedViewAddressAnswers);
+  });
+
+  it('builds SurveyQuestions JSON display fallbacks for missing responses', () => {
+    const jsonPreview = { preview: true };
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: true,
+      jsonPreview,
+      userAnswers: null,
+      viewingAnswers: true,
+    }).jsonForDisplay).toBe(jsonPreview);
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      isOwnResponse: false,
+      parsedViewAddressAnswers: null,
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({ info: 'Loading viewed response...' });
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      noResponse: true,
+      viewAddress: '0xabc',
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({
+      message: 'No response found for survey from address: 0xabc',
+    });
+
+    expect(buildSurveyQuestionsJsonForDisplayState({
+      noResponse: true,
+      singleQuestionMode: true,
+      viewingAnswers: true,
+    }).jsonForDisplay).toEqual({
+      message: 'No response found for question from address: N/A',
+    });
+  });
+
+  it('builds SurveyQuestions layout display state for full survey flows', () => {
+    const styleMap = {
+      singleQuestionPage: 'single-page',
+      singleQuestionReadPage: 'single-read',
+      singleQuestionResponseView: 'single-response',
+      singleQuestionTopBar: 'single-top',
+    };
+
+    expect(buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: ' governance ',
+      isStandalone: false,
+      singleQuestionMode: false,
+      styleMap,
+      viewingAnswers: true,
+    })).toEqual({
+      activeTagModalTag: 'governance',
+      responseViewClassName: undefined,
+      surveyPageClassName: undefined,
+      topSectionClassName: undefined,
+      useTagModal: true,
+    });
+  });
+
+  it('builds SurveyQuestions layout display state for single-question flows', () => {
+    const styleMap = {
+      singleQuestionPage: 'single-page',
+      singleQuestionReadPage: 'single-read',
+      singleQuestionResponseView: 'single-response',
+      singleQuestionTopBar: 'single-top',
+    };
+
+    expect(buildSurveyQuestionsLayoutDisplayState({
+      activeTagModalTag: ' governance ',
+      isSingleQuestionView: true,
+      isStandalone: true,
+      singleQuestionMode: true,
+      styleMap,
+      viewingAnswers: true,
+    })).toEqual({
+      activeTagModalTag: '',
+      responseViewClassName: 'single-response',
+      surveyPageClassName: 'single-page single-read',
+      topSectionClassName: 'single-top',
+      useTagModal: false,
+    });
+  });
+
+  it('builds SurveyQuestions route view display state for viewed addresses', () => {
+    const shortenAddress = jest.fn((address, notClickable) => `${address}:${notClickable}`);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xdef',
+      shortenAddress,
+      viewAddress: ' 0xABC ',
+    })).toEqual({
+      viewedAddressRaw: '0xABC',
+      viewedAddressLower: '0xabc',
+      shortenedViewAddress: '0xABC:false',
+      isOwnResponse: false,
+      isSingleQuestionView: undefined,
+      showViewAnswersButton: true,
+      viewAnswersButtonText: ' View 0xABC:false answers',
+    });
+    expect(shortenAddress).toHaveBeenCalledWith('0xABC', false);
+  });
+
+  it('preserves SurveyQuestions route view fallback and own-response checks', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xABC',
+    })).toMatchObject({
+      viewedAddressRaw: '0xABC',
+      viewedAddressLower: '0xabc',
+      shortenedViewAddress: '0xABC',
+      isOwnResponse: true,
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      responderAddress: '0xABC',
+      viewAddress: '0xdef',
+    })).toMatchObject({
+      viewedAddressRaw: '0xdef',
+      isOwnResponse: true,
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      userHasResponse: true,
+    }).isOwnResponse).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      viewAddress: '0xABC',
+    }).isOwnResponse).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      viewAddress: ' 0xABC ',
+    }).isOwnResponse).toBe(false);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState().shortenedViewAddress).toBe('');
+  });
+
+  it('builds SurveyQuestions single-question route flags without moving state', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      singleQuestionMode: true,
+    }).isSingleQuestionView).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: [{ id: 'q1' }],
+    }).isSingleQuestionView).toBe(true);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+    }).isSingleQuestionView).toBe(false);
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isStandalone: true,
+      questionPool: null,
+    }).isSingleQuestionView).toBe(false);
+  });
+
+  it('builds SurveyQuestions view-answer toggle labels', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      viewingAnswers: true,
+    })).toMatchObject({
+      viewAnswersButtonText: ' Fill out survey',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      singleQuestionMode: true,
+      viewingAnswers: true,
+    })).toMatchObject({
+      viewAnswersButtonText: ' Fill out question',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      shortenAddress: () => '0xabc...1234',
+      viewAddress: '0xabcdef1234',
+    })).toMatchObject({
+      viewAnswersButtonText: ' View 0xabc...1234 answers',
+    });
+
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      shortenAddress: () => '0xabc...1234',
+      singleQuestionMode: true,
+      viewAddress: '0xabcdef1234',
+    })).toMatchObject({
+      viewAnswersButtonText: ' View 0xabc...1234 answer',
+    });
+  });
+
+  it('builds SurveyQuestions view-answer toggle visibility', () => {
+    expect(buildSurveyQuestionsRouteViewDisplayState().showViewAnswersButton).toBeUndefined();
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isEditing: true,
+      account: '0xabc',
+      viewAddress: '0xabc',
+    }).showViewAnswersButton).toBe(false);
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      account: '0xabc',
+      isEditing: false,
+      viewAddress: '0xabc',
+    }).showViewAnswersButton).toBe(true);
+    expect(buildSurveyQuestionsRouteViewDisplayState({
+      isEditing: true,
+      responderAddress: '0xdef',
+    }).showViewAnswersButton).toBe(true);
   });
 
   it('reports no pending question-pool work for standalone and single-question flows', () => {
