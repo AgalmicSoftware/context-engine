@@ -7,6 +7,39 @@ description: Use when an OpenClaw or similar agent needs to onboard a Telegram u
 
 Use this skill when acting as an OpenClaw-style agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
+## What Context Engine Does
+
+When a user asks what Context Engine is or what this integration can do, answer
+in practical terms:
+
+- CE turns loose natural-language preferences into structured question
+  responses that the user can review before they are saved or submitted.
+- CE can fetch the active questions for a Telegram-first session and help the
+  user's agent decide which questions are relevant based on interests, tags,
+  attended sessions, and consented personal context.
+- CE can draft answers from ordinary conversation. For example, if the user says
+  "I care more about privacy than convenience," the agent can map that into
+  candidate answers for relevant agree/disagree, rating, freeform, or
+  multichoice questions and ask the user to approve or edit them.
+- CE can turn a user's natural-language idea into new questions for a session.
+  For example, "ask people whether the organizer recap should happen daily" can
+  become a binary question, while "ask which format people prefer" can become a
+  multichoice question with options.
+- CE can rank, filter, upvote, or downvote questions based on what the user says
+  they care about. Auto-applying votes is opt-in; otherwise the agent should
+  show suggestions and ask for approval.
+- CE can show the user pending drafts, vote suggestions, proposed questions, and
+  previous agent actions so the user can understand and override the agent's
+  choices.
+- CE can help admins sponsor important questions. Admin agents should first plan
+  the sponsored-question change, show the exact questions to the admin, and only
+  apply it after explicit confirmation.
+
+Do not describe CE as a generic survey form. The core value is converting
+natural language and user context into reviewable, structured sensemaking
+actions: answer drafts, relevant-question queues, question proposals, and
+admin-curated priority questions.
+
 ## Install From Public Git
 
 For Hermes, install the skill directly from the public branch:
@@ -96,10 +129,14 @@ Default token scope permits:
 Default token scope does not permit:
 
 - response export
-- admin actions
+- broad admin actions such as response export allowlist management
 - wallet/private-key export
 - raw response access
 - final answer submission unless a separate CE user-approved submit path is enabled
+
+If the user is a session admin, the same `ceagt_...` token can check its own
+admin status and manage sponsored questions through the confirmation-gated
+routes documented in Question Cadence. Do not assume admin capability; check it.
 
 Treat the token like a password. Do not paste it into shared chats, logs, issue trackers, prompts that may be retained by third parties, or public tools.
 
@@ -118,7 +155,10 @@ With `ceagt_...` tokens:
 - omit `telegramUserId` by default, because the worker infers it from the token;
 - do not send the token as a URL query parameter, request body field, prompt
   transcript, log line, or shared note;
-- do not call admin/export endpoints with this token.
+- do not call export, raw-response, wallet/private-key, or broad admin endpoints
+  with this token. The sponsored-question admin-status/plan/apply routes are
+  allowed only when `GET /telegram/agent/api/admin/status` confirms the user is
+  a session admin, and `apply` still requires explicit admin approval.
 
 If the worker returns `401` with `reason` equal to `agent_token_expired`,
 `agent_token_not_found`, `agent_token_inactive`, or another `agent_token_*`
@@ -302,6 +342,65 @@ session admin, and send either `sponsoredQuestionIds` / `questionIds` or
 `{"clear": true}`. Ordinary user-scoped `ceagt_` tokens cannot call this route.
 Question refs may be exact IDs or 1-based candidate numbers from the `GET`
 response.
+
+For a user-scoped `ceagt_` token, first check whether the user is an admin for
+the token-bound session:
+
+```http
+GET /telegram/agent/api/admin/status?sessionSlug=telegram-demo-4
+```
+
+If the response has `admin: true` and
+`capabilities.canManageSponsoredQuestions: true`, an agent may help the admin
+manage sponsored questions without needing exact question IDs. Use a two-step
+confirm-before-write flow:
+
+```http
+POST /telegram/agent/api/question-queue/plan
+POST /telegram/agent/api/question-queue/apply
+```
+
+`plan` accepts natural-language references to existing questions plus one or
+more draft questions. It does not write anything. Show the returned
+`resolvedExistingQuestions`, `draftQuestions`, and `skipped` items to the admin
+and ask for explicit approval before calling `apply`.
+
+Example: make an existing question sponsored by description, and create another
+sponsored question in the same operation:
+
+```json
+{
+  "sessionSlug": "telegram-demo-4",
+  "references": ["the question about food preference", "pizza"],
+  "createQuestions": [
+    {
+      "prompt": "Should Agent Village prioritize organizer follow-up interviews?",
+      "questionType": "binary"
+    }
+  ]
+}
+```
+
+Example apply after the admin has approved the exact plan:
+
+```json
+{
+  "sessionSlug": "telegram-demo-4",
+  "references": ["the question about food preference", "pizza"],
+  "createQuestions": [
+    {
+      "prompt": "Should Agent Village prioritize organizer follow-up interviews?",
+      "questionType": "binary"
+    }
+  ],
+  "approvalText": "Approved, make these sponsored questions."
+}
+```
+
+Multiple references and multiple new questions are allowed. By default, apply
+appends to the existing sponsored queue; send `replace: true` only when the
+admin explicitly asked to replace the whole sponsored queue. The agent must not
+call `apply` from its own inference alone.
 
 Recommended loop for scheduled prompts:
 
