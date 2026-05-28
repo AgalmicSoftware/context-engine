@@ -1,6 +1,7 @@
 import {
   SURVEY_RESULTS_EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES,
+  buildSurveyResultsExportControlsDisplayDescriptor,
   getSurveyResultsExportTypeLabel,
 } from './surveyResultsExportDisplayHelpers.js';
 
@@ -29,5 +30,22 @@ describe('surveyResultsExportDisplayHelpers', () => {
     expect(getSurveyResultsExportTypeLabel(null)).toBe('');
 
     expect(JSON.stringify(SURVEY_RESULTS_EXPORT_OPTIONS)).toBe(before);
+  });
+
+  it('builds export controls display descriptors from shell state', () => {
+    expect(buildSurveyResultsExportControlsDisplayDescriptor({
+      exportAreaOpen: 1,
+      exportType: ' json-questions-and-responses ',
+    })).toEqual({
+      exportAreaOpen: true,
+      exportOptions: SURVEY_RESULTS_EXPORT_OPTIONS,
+      exportTypeLabel: 'JSON: Questions + Responses',
+    });
+
+    expect(buildSurveyResultsExportControlsDisplayDescriptor()).toEqual({
+      exportAreaOpen: false,
+      exportOptions: SURVEY_RESULTS_EXPORT_OPTIONS,
+      exportTypeLabel: '',
+    });
   });
 });
