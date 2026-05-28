@@ -17,6 +17,7 @@ const RESOLVABLE_SURVEY_TOOL_COMPONENTS = new Set([
   'SurveyQuestionsAuthoringPanel',
   'SurveyQuestionsJsonControls',
   'SurveyQuestionsResponseView',
+  'SurveyQuestionsSubmitFooter',
   'SurveyQuestionsTopStrip',
   'SurveyQuestionsUserResponseNotice',
 ]);
