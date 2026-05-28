@@ -1,5 +1,5 @@
 /** @file UserPage.tsx */
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
@@ -167,13 +167,14 @@ import {
   applyUserPageDecryptedPatchToResponseField,
 } from './userPageHelpers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import { Collapse } from 'reactstrap';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
+import UserPageComparePanel from './UserPageComparePanel';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
+import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
@@ -3985,18 +3986,16 @@ class UserPage extends Component<any, any> {
           usernameErrorDisplayState={usernameErrorDisplayState}
         />
 
-        {/* Compare section collapses right under header */}
-        {!minimized && (
-          <Collapse isOpen={collapseOpen}>
-            <Suspense fallback={null}>
-              <CompareAddressSection
-                firstAddress={propViewAddress}
-                account={account}
-                scanSpecificUserProfile={this.props.scanSpecificUserProfile}
-              />
-            </Suspense>
-          </Collapse>
-        )}
+        <UserPageComparePanel
+          collapseOpen={collapseOpen}
+          minimized={minimized}
+        >
+          <CompareAddressSection
+            firstAddress={propViewAddress}
+            account={account}
+            scanSpecificUserProfile={this.props.scanSpecificUserProfile}
+          />
+        </UserPageComparePanel>
 
         {!minimized && (
           <div className={styles.content}>
@@ -4108,13 +4107,10 @@ class UserPage extends Component<any, any> {
           </div>
         )}
 
-        {isSimulated && (
-          <div className={styles.simulatedUserActions}>
-            <button onClick={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}>
-              View Simulated Responses
-            </button>
-          </div>
-        )}
+        <UserPageSimulatedActions
+          isSimulated={isSimulated}
+          onViewResponses={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}
+        />
 
         <UserPageAnalysisModal
           aiAnalysis={aiAnalysis}
