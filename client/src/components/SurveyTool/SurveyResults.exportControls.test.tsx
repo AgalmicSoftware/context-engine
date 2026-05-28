@@ -401,14 +401,14 @@ describe('SurveyResults export/view controls', () => {
   });
 
   it('renders the HTML report export action in the expanded export area', () => {
-    const subject = createSubject({
+    const subject = attachStateHarness(createSubject({
       isOpen: true,
       viewMode: 'questions',
       filterState: {},
       isResponsesCacheReady: true,
       isQuestionCacheReady: true,
       isSBTCacheReady: true,
-    });
+    }));
 
     subject.state = {
       ...subject.state,
@@ -420,13 +420,16 @@ describe('SurveyResults export/view controls', () => {
     };
 
     const tree = subject.render();
-    const exportButton = findElement(
+    const exportControls = findElement(
       tree,
-      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-export-html-report'
+      (element) => element?.type === SurveyResultsExportControls
     );
 
-    expect(exportButton).toBeTruthy();
-    expect(treeHasText(exportButton, 'Export HTML Report')).toBe(true);
+    expect(exportControls).toBeTruthy();
+    expect(exportControls.props.onExportHtmlReport).toBe(subject.openHtmlReportExportModal);
+
+    exportControls.props.onExportHtmlReport();
+    expect(subject.state.htmlReportModalOpen).toBe(true);
   });
 
   it('shows the HTML report confirmation modal in redacted mode and disables download without reportable data', () => {
@@ -464,9 +467,92 @@ describe('SurveyResults export/view controls', () => {
     expect(treeHasText(tree, 'Single-page PDF')).toBe(true);
     expect(treeHasText(tree, 'Embedded Snapshot JSON')).toBe(true);
     expect(treeHasText(tree, 'Unavailable')).toBe(true);
-    expect(treeHasText(tree, 'Login required')).toBe(true);
+    expect(treeHasText(tree, 'Connect a wallet to download authenticated exports.')).toBe(true);
+    expect(treeHasText(tree, 'Protection')).toBe(false);
+    expect(treeHasText(tree, 'Exporter metadata')).toBe(false);
+    expect(treeHasText(tree, 'Integrity warning')).toBe(false);
+    expect(treeHasText(tree, 'Redaction')).toBe(false);
+    expect(treeHasText(tree, 'Raw responses in snapshot')).toBe(false);
+    expect(treeHasText(tree, 'Downloader address in artifact metadata')).toBe(false);
     expect(downloadButton?.props?.disabled).toBe(true);
     expect(downloadButton?.props?.className).toBe(styles.htmlReportDownloadButton);
+  });
+
+  it('enables demo preview mode with local analysis sections without a connected wallet', () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 2,
+      totalResponsesCount: 3,
+      filteredResponsesCount: 3,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          { responder: '0x1111111111111111111111111111111111111111', response: { answer: { value: 'Use a viewer.' } } },
+          { responder: '0x2222222222222222222222222222222222222222', response: { answer: { value: 'Make it readable.' } } },
+        ],
+        q2: [
+          { responder: '0x1111111111111111111111111111111111111111', response: { answer: { value: 'Show risk clearly.' } } },
+        ],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { id: 'q1', prompt: 'What export should exist?', type: 'freeform' },
+      q2: { id: 'q2', prompt: 'What risk matters?', type: 'freeform' },
+    }));
+
+    let tree = subject.renderHtmlReportExportModal();
+    const demoToggle = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-demo-mode'
+    );
+
+    expect(demoToggle).toBeTruthy();
+    expect(demoToggle?.props?.checked).toBe(false);
+    expect(treeHasText(tree, 'Demo preview mode')).toBe(true);
+
+    demoToggle?.props?.onChange();
+
+    expect(subject.state.htmlReportDemoMode).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact?.model).toBe('demo-preview');
+    expect(subject.state.htmlReportSelectedSections).toEqual({
+      argumentMap: true,
+      atlas: true,
+      report: true,
+      riskMatrix: true,
+      snapshotJson: true,
+    });
+
+    tree = subject.renderHtmlReportExportModal();
+    const downloadButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-download'
+    );
+    const argumentMapCheckbox = findElement(
+      tree,
+      (element) => element?.props?.['aria-label'] === 'Include Argument Map'
+    );
+    const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
+
+    expect(argumentMapCheckbox?.props?.checked).toBe(true);
+    expect(downloadButton?.props?.disabled).toBe(false);
+    expect(snapshot.exportedBy).toEqual({
+      address: 'demo-preview',
+      chainId: 84532,
+      displayAddress: 'Demo preview',
+    });
+    expect(snapshot.sections.argumentMap.available).toBe(true);
+    expect(snapshot.sections.riskMatrix.available).toBe(true);
+    expect(snapshot.sections.atlas.available).toBe(true);
   });
 
   it('builds a redacted HTML report snapshot from hydrated SurveyResults state', () => {
