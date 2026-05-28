@@ -137,6 +137,15 @@ describe('surveyToolViewState', () => {
       lockTitle: 'Encrypted',
     });
 
+    expect(buildAnswerLockDisplayState({
+      field: { encrypted: false },
+      masked: false,
+      isSubmitting: true,
+    })).toEqual({
+      lockDisabled: true,
+      lockTitle: 'Not encrypted',
+    });
+
     expect(buildGatedPromptNoticeState({
       questionId: 'Q 1',
       tooltipIdSuffix: 'pile',
@@ -160,6 +169,18 @@ describe('surveyToolViewState', () => {
     })).toEqual({
       tooltipId: 'ce-gated-prompt-tip-fallback-id-full',
       tooltipText: 'SBT gate required',
+    });
+
+    expect(buildGatedPromptNoticeState({
+      questionId: ' Q/2 ',
+      tooltipIdSuffix: 'full',
+      gateNames: [' ', 'Contributors'],
+      sbtLabel: 'Badge',
+      gateLabel: 'audience',
+      gatesLabel: 'audiences',
+    })).toEqual({
+      tooltipId: 'ce-gated-prompt-tip-q-2-full',
+      tooltipText: 'Required Badge audience: Contributors',
     });
   });
 
