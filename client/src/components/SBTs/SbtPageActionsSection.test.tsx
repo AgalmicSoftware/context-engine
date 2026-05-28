@@ -75,11 +75,15 @@ describe('SbtPageActionsSection', () => {
       'href',
       'https://explorer.example.test/mint'
     );
+    expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/SBT successfully burned!/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '0xburn' })).toHaveAttribute(
       'href',
       'https://explorer.example.test/burn'
     );
+    expect(screen.getByRole('link', { name: '0xburn' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: '0xburn' })).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
   it('renders transaction error copy controls and optional transaction link', () => {
@@ -101,6 +105,8 @@ describe('SbtPageActionsSection', () => {
       'href',
       'https://explorer.example.test/error'
     );
+    expect(screen.getByRole('link', { name: '0xerror' })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: '0xerror' })).toHaveAttribute('rel', 'noopener noreferrer');
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy error message' }));
     expect(onCopyError).toHaveBeenCalledTimes(1);
