@@ -1,7 +1,7 @@
 import SBTPage from './SBTPage';
+import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import { ethers } from 'ethers';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
 
@@ -57,6 +57,14 @@ const flattenText = (node) => {
   return '';
 };
 
+const renderOpenMintUrlCardTree = (tree) => {
+  const card = findElementInTree(
+    tree,
+    (element) => element?.type === SbtPageOpenMintUrlCard
+  );
+  return card ? SbtPageOpenMintUrlCard(card.props) : null;
+};
+
 describe('SBTPage admin open-mint URL', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -94,10 +102,7 @@ describe('SBTPage admin open-mint URL', () => {
     };
 
     const tree = subject.render();
-    const cardNode = findElementInTree(
-      tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
-    );
+    const cardNode = renderOpenMintUrlCardTree(tree);
 
     expect(cardNode).not.toBeNull();
     expect(flattenText(cardNode)).toContain('URL Where Anyone Can Join');
@@ -296,10 +301,7 @@ describe('SBTPage admin open-mint URL', () => {
     };
 
     const tree = subject.render();
-    const cardNode = findElementInTree(
-      tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
-    );
+    const cardNode = renderOpenMintUrlCardTree(tree);
 
     expect(cardNode).toBeNull();
   });
