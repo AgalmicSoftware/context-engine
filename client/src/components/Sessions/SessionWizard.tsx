@@ -144,6 +144,10 @@ import {
   resolveSponsoredBundleDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+import {
+  runSessionWizardPublishCompletionController,
+  runSessionWizardPublishController,
+} from './sessionWizardPublishController';
 import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
 import {
   normalizeSessionWizardDeployErrorMessage,
@@ -3795,24 +3799,26 @@ const SessionWizard = ({
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
-      if (publishExecutionPlan.shouldAutoDeployWorker) {
-        setPublishStep(publishStepNumbers['deploy-worker']);
-        const deployResult = await handleDeployWorker({ forceSponsoredAutoDeploy: true });
-        if (!deployResult?.ok) {
-          throw new Error(deployResult?.error || 'Worker deploy failed.');
-        }
-        if (!deployResult?.deployComplete || !deployResult?.workerUrl) {
-          throw new Error('Worker deploy did not return a verified worker URL.');
-        }
-        workerUrlOverride = deployResult.workerUrl;
-      }
-      if (publishExecutionPlan.shouldDeployPendingSbts) {
-        setPublishStep(publishStepNumbers['deploy-sbts']);
-        deployedPendingDrafts = await deployPendingSbtDrafts({
-          workerUrlOverride,
+      const publishControllerResult = await runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan,
           signerAccountOverride: resolvedPublisher,
-        });
-      }
+        },
+        ports: {
+          deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+          deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) => (
+            deployPendingSbtDrafts({
+              workerUrlOverride: pendingWorkerUrlOverride,
+              signerAccountOverride,
+            })
+          ),
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      });
+      workerUrlOverride = publishControllerResult.workerUrlOverride;
+      deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
       if (publishExecutionPlan.shouldUploadMetadata) {
         setPublishStep(publishStepNumbers['upload-metadata']);
         uploadResult = await handleUploadMetadata({
@@ -3825,31 +3831,24 @@ const SessionWizard = ({
         metadataUriOverride: uploadResult?.metadataUri,
         sessionFieldsOverride: uploadResult?.onChainFields,
       });
-      const normalizedDeployedPendingDrafts = normalizePendingSbtDrafts(deployedPendingDrafts);
-      const newlyDeployedPendingAddressSet = new Set(
-        normalizedDeployedPendingDrafts
-          .map((entry) => toStr(entry?.predictedAddress || entry?.deployedAddress).trim().toLowerCase())
-          .filter(Boolean)
-      );
-      // Retry publish can resume with some drafts already marked deployed from a
-      // previous partial failure. Promote those selectors too before clearing
-      // pending drafts, or the stale pending entries get pruned on success.
-      promoteDeployedPendingSbtSelections([
-        ...normalizedDeployedPendingDrafts,
-        ...pendingDraftSnapshot.filter((entry) => (
-          entry?.deployed === true &&
-          !newlyDeployedPendingAddressSet.has(
-            toStr(entry?.predictedAddress || entry?.deployedAddress).trim().toLowerCase()
-          )
-        )),
-      ]);
-      setPublishedPendingSbtLinks(buildPublishedPendingSbtLinks({
-        deployedDrafts: normalizedDeployedPendingDrafts,
-        pendingDraftSnapshot,
-        sessionSlug: toStr(draft?.slug).trim(),
-      }));
-      setPendingSbtDrafts([]);
-      setPublishStep(publishStepNumbers.done);
+      runSessionWizardPublishCompletionController({
+        input: {
+          publishExecutionPlan,
+          deployedPendingDrafts,
+          pendingDraftSnapshot,
+          sessionSlug: draft?.slug,
+        },
+        ports: {
+          normalizePendingDrafts: normalizePendingSbtDrafts,
+          buildPublishedPendingSbtLinks,
+        },
+        callbacks: {
+          promoteDeployedPendingSbtSelections,
+          setPublishedPendingSbtLinks,
+          clearPendingSbtDrafts: () => setPendingSbtDrafts([]),
+          setPublishStep,
+        },
+      });
     } catch (err) {
       setStatus(err?.message || 'Publish failed.');
       setPublishStep(0);

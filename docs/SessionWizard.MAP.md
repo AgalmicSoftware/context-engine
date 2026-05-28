@@ -3,16 +3,16 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **~5,022 lines**
+- Current length: **~4,990 lines**
 - Component type: **React function component**
 - Hook inventory: **45 `useEffect` calls**, **32 `useMemo` calls**, **13 `useCallback` calls**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
 - Status note: the section ranges below are approximate current anchors; use the live file for exact line references.
-- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, narrow modal shells, and passive wizard chrome/status pieces while keeping the top-level `SessionWizard` public surface and publish orchestration in place. The remaining high-risk seam is the publish path.
+- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, narrow modal shells, passive wizard chrome/status pieces, and the first publish controller slices. `SessionWizard` still owns the public surface and low-level publish side effects; `sessionWizardPublishController.ts` owns the publish worker auto-deploy, pending-SBT step sequencing, and successful completion callbacks.
 
 ## Navigation Rules
 
-- Start in `SessionWizard.tsx` only if you need the top-level UI flow or the full publish pipeline.
+- Start in `SessionWizard.tsx` only if you need the top-level UI flow, publish guards, metadata upload, registry writes, or low-level side-effect implementations.
 - Start in `CollapsibleFieldGroup.tsx` for collapsible advanced-section chrome.
 - Start in `AiFieldSelect.tsx` for AI/gate select field rendering and its option/placeholder behavior.
 - Start in `sessionWizardFieldDescriptors.ts` for ordered draft field descriptors, labels, tooltip text, and normal/advanced field visibility.
@@ -24,6 +24,7 @@
 - Start in `SessionWizardInfoTooltip.tsx` for shared SessionWizard tooltip trigger markup.
 - Start in `SessionMetadataEditor.tsx` for the metadata panel composition, JSON preview controls, and More Options surface.
 - Start in `SessionPublishSummary.tsx` for publish controls, publish progress, generated URLs, manual metadata/gas overrides, and published pending-SBT links.
+- Start in `sessionWizardPublishController.ts` for publish step and completion sequencing that calls injected side-effect ports/callbacks.
 - Start in `SessionWizardModals.tsx` for top-level `/new` modal ownership; it delegates to `SessionWizardCreateSbtModal.tsx`, `SessionWizardContractViewerModal.tsx`, and `SessionHeaderPreviewModal.tsx`.
 - Start in `WorkerPanel.tsx` for worker setup composition; its subsections live in `WorkerSecretsSection.tsx`, `WorkerDeploySection.tsx`, and `WorkerConnectionSection.tsx`.
 - Start in `hooks/useSponsoredBundleLifecycle.ts` for sponsored-bundle loading, apply/restore, and baseline override behavior.
@@ -49,6 +50,7 @@ SessionWizard.tsx
   -> SessionMetadataEditor.tsx
        -> SessionWizardSessionIdBadge.tsx
   -> SessionPublishSummary.tsx
+  -> sessionWizardPublishController.ts
   -> SessionWizardInfoTooltip.tsx
   -> SessionWizardModals.tsx
        -> SessionWizardCreateSbtModal.tsx
@@ -79,9 +81,9 @@ SessionWizard.tsx
 | Draft mutation and modal orchestration | 2238-2405 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
 | Field renderer and advanced metadata fields | 2406-3329 | Recursive field rendering, lock/gate UI, compact header image controls, normal-vs-advanced metadata fields | `renderCompactSessionHeaderField`, `renderSessionHeaderPreviewSurface`, `renderField` |
 | Publish prep: metadata, SBT drafts, registry writes | 3330-3776 | Builds metadata payloads, uploads Arweave metadata, finalizes deferred SBT uploads, and prepares on-chain registration | `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts` |
-| Publish orchestration and deploy helpers | 3777-4339 | Coordinates publish flow, copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `handleCopyAdminUrl`, `handleDeployWorker` |
+| Publish orchestration and deploy helpers | 3777-4339 | Coordinates publish flow, delegates worker auto-deploy, pending-SBT step sequencing, and successful completion callbacks to `sessionWizardPublishController.ts`, handles copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `runSessionWizardPublishController`, `runSessionWizardPublishCompletionController`, `handleCopyAdminUrl`, `handleDeployWorker` |
 | Worker/resource cards and derived publish UI | 4340-4770 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, contract modal selection, and publish progress state | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, selected contract memoization |
-| Main render tree and composed panels | 4771-5022 | Renders the full `/new` surface by composing header, requirements, sponsored status, normal rail, encryption, metadata, worker, publish, and modal modules | `SessionWizardHeader`, `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals`, `export default SessionWizard` |
+| Main render tree and composed panels | 4771-4990 | Renders the full `/new` surface by composing header, requirements, sponsored status, normal rail, encryption, metadata, worker, publish, and modal modules | `SessionWizardHeader`, `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals`, `export default SessionWizard` |
 
 ## Key Workflows
 
@@ -108,11 +110,12 @@ CreateSBTGroup modal
 
 ```text
 draft + gates + worker state
-  -> optional worker deploy
-  -> optional pending SBT deploy/finalize
+  -> sessionWizardPublishController optional worker deploy
+  -> sessionWizardPublishController optional pending SBT deploy/finalize
   -> metadata upload
   -> session registry write
   -> session/admin URL generation
+  -> sessionWizardPublishController completion callbacks
 ```
 
 ### Sponsored bundle flow
