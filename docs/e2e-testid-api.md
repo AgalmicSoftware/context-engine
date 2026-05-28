@@ -237,35 +237,35 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-sbts-create-toggle` | `client/src/components/SBTs/SBTsPage.jsx` | Button that toggles the inline Create Group panel on `/sbts/:slug`. | yes |  |
-| `ce-sbt-create-name-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the SBT name input and gate lock. | yes |  |
-| `ce-sbt-create-description-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the SBT description textarea and gate lock. | yes |  |
-| `ce-sbt-create-image-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable section for the SBT image controls and image gate lock. | yes |  |
-| `ce-sbt-create-docs-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable row containing the document URL input/add button and gate lock. | yes |  |
-| `ce-sbt-create-tags-lock-row` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Lockable section for tags and the tags gate lock. | yes |  |
-| `ce-sbt-create-name-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT name input in the Create Group form. | yes |  |
-| `ce-sbt-create-description-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | SBT description textarea in the Create Group form. | yes |  |
-| `ce-sbt-create-image-file-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Hidden file input used for image upload mode. | yes |  |
-| `ce-sbt-create-image-paste` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Compact Image field `Paste` button used to pull an SBT image blob or URL from the clipboard. | yes |  |
-| `ce-sbt-create-image-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | URL input used when image URL mode is selected. | yes |  |
-| `ce-sbt-create-doc-url-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Pending document URL input. | yes |  |
-| `ce-sbt-create-doc-url-add` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Button that appends the pending document URL to the list. | yes |  |
-| `ce-sbt-create-tag-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Pending tag input. | yes |  |
-| `ce-sbt-create-tag-add` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Button that appends the pending tag to the tag list. | yes |  |
-| `ce-sbt-create-section-header` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Collapsible section header button inside the Create SBT modal/form. | yes | `data-ce-section-key` (`tokenInfoCollapsed`, `mintOptionsCollapsed`, `distributionOptionsCollapsed`) |
-| `ce-sbt-create-error` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Visible error banner for deferred-draft, upload, or mint validation failures. | yes |  |
-| `ce-sbt-create-predictable-toggle` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Toggle that enables predictable-before-deploy CREATE2 planning (forced on in deferred session mode). | yes |  |
-| `ce-sbt-create-predicted-address` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Predicted deterministic SBT address preview. | yes |  |
-| `ce-sbt-create-salt-input` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Advanced/custom salt input shown when the predictable-address card is expanded. | yes |  |
-| `ce-sbt-create-submit` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Primary create/mint button for the Create Group flow. | yes |  |
-| `ce-sbt-create-success` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success confirmation wrapper shown after the SBT contract is created. | yes |  |
-| `ce-sbt-create-success-page-link` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success action link that opens `/sbt/:address`. | yes |  |
-| `ce-sbt-create-success-arweave-link` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Success action link that opens the tokenURI metadata on Arweave. | yes |  |
-| `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.jsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
-| `ce-sbt-page-name` | `client/src/components/SBTs/SBTPage.jsx` | Primary SBT display name heading on the detail page. | yes |  |
-| `ce-sbt-page-description` | `client/src/components/SBTs/SBTPage.jsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
-| `ce-sbt-page-image` | `client/src/components/SBTs/SBTPage.jsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
-| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SBTPage.jsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
+| `ce-sbts-create-toggle` | `client/src/components/SBTs/SBTsPage.tsx` | Button that toggles the inline Create Group panel on `/sbts/:slug`. | yes |  |
+| `ce-sbt-create-name-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the SBT name input and gate lock. | yes |  |
+| `ce-sbt-create-description-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the SBT description textarea and gate lock. | yes |  |
+| `ce-sbt-create-image-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable section for the SBT image controls and image gate lock. | yes |  |
+| `ce-sbt-create-docs-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable row containing the document URL input/add button and gate lock. | yes |  |
+| `ce-sbt-create-tags-lock-row` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Lockable section for tags and the tags gate lock. | yes |  |
+| `ce-sbt-create-name-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | SBT name input in the Create Group form. | yes |  |
+| `ce-sbt-create-description-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | SBT description textarea in the Create Group form. | yes |  |
+| `ce-sbt-create-image-file-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Hidden file input used for image upload mode. | yes |  |
+| `ce-sbt-create-image-paste` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Compact Image field `Paste` button used to pull an SBT image blob or URL from the clipboard. | yes |  |
+| `ce-sbt-create-image-url-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | URL input used when image URL mode is selected. | yes |  |
+| `ce-sbt-create-doc-url-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Pending document URL input. | yes |  |
+| `ce-sbt-create-doc-url-add` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Button that appends the pending document URL to the list. | yes |  |
+| `ce-sbt-create-tag-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Pending tag input. | yes |  |
+| `ce-sbt-create-tag-add` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Button that appends the pending tag to the tag list. | yes |  |
+| `ce-sbt-create-section-header` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Collapsible section header button inside the Create SBT modal/form. | yes | `data-ce-section-key` (`tokenInfoCollapsed`, `mintOptionsCollapsed`, `distributionOptionsCollapsed`) |
+| `ce-sbt-create-error` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Visible error banner for deferred-draft, upload, or mint validation failures. | yes |  |
+| `ce-sbt-create-predictable-toggle` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Toggle that enables predictable-before-deploy CREATE2 planning (forced on in deferred session mode). | yes |  |
+| `ce-sbt-create-predicted-address` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Predicted deterministic SBT address preview. | yes |  |
+| `ce-sbt-create-salt-input` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Advanced/custom salt input shown when the predictable-address card is expanded. | yes |  |
+| `ce-sbt-create-submit` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Primary create/mint button for the Create Group flow. | yes |  |
+| `ce-sbt-create-success` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success confirmation wrapper shown after the SBT contract is created. | yes |  |
+| `ce-sbt-create-success-page-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens `/sbt/:address`. | yes |  |
+| `ce-sbt-create-success-arweave-link` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Success action link that opens the tokenURI metadata on Arweave. | yes |  |
+| `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
+| `ce-sbt-page-name` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT display name heading on the detail page. | yes |  |
+| `ce-sbt-page-description` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
+| `ce-sbt-page-image` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
+| `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SbtPageOpenMintUrlCard.tsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
 
 ## Gate Lock Popover
 
