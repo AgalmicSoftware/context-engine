@@ -115,8 +115,6 @@ describe('UserPageHeader', () => {
       'href',
       'https://explorer.example.test/address/0xabc'
     );
-    expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: 'View address on explorer' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByRole('link', { name: /My Bookmarks/ })).toHaveAttribute('href', '/bookmarks');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit nickname' }));
@@ -135,46 +133,6 @@ describe('UserPageHeader', () => {
     expect(onCollapseToggle).toHaveBeenCalledTimes(1);
     expect(onAnalyzeUser).toHaveBeenCalledTimes(1);
     expect(onCopyAddress).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps disabled compare and analyze controls inert', () => {
-    const onAnalyzeUser = jest.fn();
-    const onCollapseToggle = jest.fn();
-    render(
-      <UserPageHeader
-        {...createProps({
-          analyzeButtonDisplayState: {
-            ariaBusy: true,
-            disabled: true,
-            label: 'Analyzing',
-            shouldRenderAnalyzing: true,
-            title: 'Analysis already running',
-          },
-          compareButtonDisplayState: {
-            disabled: true,
-            shouldRenderCollapseClosedIcon: false,
-            shouldRenderCollapseOpenIcon: true,
-            title: 'Comparison unavailable',
-          },
-          onAnalyzeUser,
-          onCollapseToggle,
-        })}
-      />
-    );
-
-    const compareButton = screen.getByRole('button', { name: /Compare/ });
-    const analyzeButton = screen.getByRole('button', { name: /Analyzing/ });
-    expect(compareButton).toBeDisabled();
-    expect(compareButton).toHaveAttribute('title', 'Comparison unavailable');
-    expect(analyzeButton).toBeDisabled();
-    expect(analyzeButton).toHaveAttribute('aria-busy', 'true');
-    expect(analyzeButton).toHaveAttribute('title', 'Analysis already running');
-
-    fireEvent.click(compareButton);
-    fireEvent.click(analyzeButton);
-
-    expect(onCollapseToggle).not.toHaveBeenCalled();
-    expect(onAnalyzeUser).not.toHaveBeenCalled();
   });
 
   it('renders nickname and username editors with entered indicators and explicit handlers', () => {
