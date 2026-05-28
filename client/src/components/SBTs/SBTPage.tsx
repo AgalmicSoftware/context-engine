@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -50,6 +50,7 @@ import {
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   appendSbtPageBookmark,
@@ -230,7 +231,6 @@ import {
   resolveSbtAddressString,
   resolveSbtChainId,
   resolveSbtPageTokenMetadataHref,
-  resolveSbtPageMutedInfoIconStyle,
   sanitizeSbtPageMintedTokensOverride,
   shouldShowSbtPageScanProgress,
   shouldRenderSbtPageMintButton,
@@ -4117,78 +4117,15 @@ renderMintButton() {
     });
 
     return (
-      <div className={styles.relevantInfo}>
-        <Alert color="info" fade={false}>
-          <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()}/>
-          This section shows relevant documents, URLs, tags, and IDs.
-        </Alert>
-        {relevantInfoDisplayState.shouldRenderDocumentUrls && (
-          <div className={styles.docUrlsSection}>
-            <h4>Document URLs:</h4>
-            <ul className={styles.docUrlList}>
-              {documentURLs.map((url, index) => {
-                const litDoc = litStorage.isLitArweaveUrl(url);
-                return (
-                  <li key={index} className={styles.docUrlItem}>
-                    <span className={styles.docUrlBadge}>
-                      {litDoc ? 'Encrypted Doc' : 'Doc URL'}
-                    </span>
-                    {litDoc ? (
-                      <button
-                        type="button"
-                        className={styles.docUrlButton}
-                        onClick={() => this.openEncryptedDoc(url)}
-                      >
-                        Decrypt and view
-                      </button>
-                    ) : (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
-                        {url}
-                      </a>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        {relevantInfoDisplayState.shouldRenderDocumentIdHashes && (
-          <div className={styles.docIDsSection}>
-            <h4>Document ID Hashes:</h4>
-            <ul className={styles.docIdList}>
-              {documentIDHashes.map((hash, index) => {
-                const docHash = encodeURIComponent(hash);
-                return (
-                  <li key={index} className={styles.docIdItem}>
-                    <span className={styles.docIdBadge}>Doc ID</span>
-                    <a href={buildPublicRoute(`/doc/${docHash}`)} target="_blank" rel="noopener noreferrer">
-                      {hash}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        {relevantInfoDisplayState.shouldRenderTags && (
-          <div className={styles.tagsSection}>
-            <h4>Tags:</h4>
-            <ul className={styles.tagList}>
-              {tags.map((tag, index) => {
-                const tagEnc = encodeURIComponent(tag);
-                return (
-                  <li key={index} className={styles.tagItem}>
-                    <span className={styles.tagBadge}>Tag</span>
-                    <a href={buildPublicRoute(`/tag/${tagEnc}`)} target="_blank" rel="noopener noreferrer">
-                      {tag}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
+      <SbtPageRelevantInfo
+        documentIDHashes={documentIDHashes}
+        documentURLs={documentURLs}
+        onOpenEncryptedDoc={this.openEncryptedDoc}
+        shouldRenderDocumentIdHashes={relevantInfoDisplayState.shouldRenderDocumentIdHashes}
+        shouldRenderDocumentUrls={relevantInfoDisplayState.shouldRenderDocumentUrls}
+        shouldRenderTags={relevantInfoDisplayState.shouldRenderTags}
+        tags={tags}
+      />
     );
   };
 
@@ -5041,8 +4978,8 @@ renderMintButton() {
                   actionFeedbackState={actionFeedbackState}
                   burnButton={this.renderBurnButton()}
                   burnLabel={t('burn')}
-                  burnSuccessHref={this.getExplorerLink(lastBurnTxHash)}
-                  burnSuccessText={getShortenedTransactionHash(lastBurnTxHash)}
+                  burnSuccessHref={actionFeedbackState.showBurnSuccess ? this.getExplorerLink(lastBurnTxHash) : ''}
+                  burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
                   burnedLowerLabel={t('burnedLower')}
                   copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
                   errorCopyIconState={errorCopyIconState}
@@ -5050,8 +4987,8 @@ renderMintButton() {
                   isOpen={actionsSectionToggleState.isOpen}
                   mintButton={this.renderMintButton()}
                   mintLabel={t('mint')}
-                  mintSuccessHref={this.getExplorerLink(lastMintTxHash)}
-                  mintSuccessText={getShortenedTransactionHash(lastMintTxHash)}
+                  mintSuccessHref={actionFeedbackState.showMintSuccess ? this.getExplorerLink(lastMintTxHash) : ''}
+                  mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
                   mintedLowerLabel={t('mintedLower')}
                   onCopyError={this.copyErrorToClipboard}
                   onToggle={this.toggleActions}
@@ -5059,8 +4996,8 @@ renderMintButton() {
                   sectionHeaderClassName={sectionHeaderClassName}
                   shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
                   shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
-                  transactionErrorHref={this.getExplorerLink(transactionHash)}
-                  transactionErrorText={getShortenedTransactionHash(transactionHash)}
+                  transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? this.getExplorerLink(transactionHash) : ''}
+                  transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
                 />
                 {userIsSbtAdmin && (
                   <div className={styles.adminSection}>
