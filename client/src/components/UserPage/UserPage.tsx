@@ -166,19 +166,10 @@ import {
   type UserPageSourceSlugMap,
   applyUserPageDecryptedPatchToResponseField,
 } from './userPageHelpers';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
-
-
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { Collapse } from 'reactstrap';
-import CETooltip from '../Shared/CETooltip';
-import UserPageDeepScanProgressPanel, {
-  type UserPageDeepScanProgressPanelOptions,
-} from './UserPageDeepScanProgressPanel';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
+import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 import UserPageQuestionSection from './UserPageQuestionSection';
@@ -1054,80 +1045,19 @@ class UserPage extends Component<any, any> {
     }) || null
   );
 
-  renderDeepScanProgressPanel = (
-    progressRows: DeepScanProgressRow[] | null | undefined,
-    options: UserPageDeepScanProgressPanelOptions = {},
-  ): React.ReactNode => (
-    UserPageDeepScanProgressPanel({
-      headerText: options.headerText,
-      progressRows,
-      showScannedText: options.showScannedText,
-      styles,
-    })
-  );
-
-  renderDeepScanTooltipContent = (
-    tooltipLines: string[] | null | undefined,
-    progressRows: DeepScanProgressRow[] | null | undefined,
-  ): React.ReactNode => {
-    if (Array.isArray(progressRows) && progressRows.length > 0) {
-      return this.renderDeepScanProgressPanel(progressRows, {
-        headerText: 'Deep scan in progress',
-        showScannedText: true,
-      });
-    }
-
-    if (!Array.isArray(tooltipLines) || tooltipLines.length === 0) return null;
-    return tooltipLines.map((line, idx) => (
-      <div key={`deepScanTextLine_${idx}`}>{line}</div>
-    ));
-  };
-
-  renderDeepScanTooltip = (
-    targetId: string,
-    tooltipLines: string[] | null | undefined,
-    progressRows: DeepScanProgressRow[] | null | undefined,
-  ): React.ReactNode => {
-    if ((!Array.isArray(tooltipLines) || tooltipLines.length === 0) &&
-        (!Array.isArray(progressRows) || progressRows.length === 0)) return null;
-    return (
-      <CETooltip
-        placement="right"
-        target={targetId}
-        className={styles.deepScanTooltip}
-        innerClassName={styles.deepScanTooltipInner}
-        trigger="hover focus click"
-        autohide={false}
-      >
-        {this.renderDeepScanTooltipContent(tooltipLines, progressRows)}
-      </CETooltip>
-    );
-  };
-
   renderDeepScanStatusIndicator = (
     targetId: string,
     tooltipLines: string[] | null | undefined,
     progressRows: DeepScanProgressRow[] | null | undefined,
     titleText: string,
   ): React.ReactNode => (
-    <>
-      <span
-        className={styles.cornerLoadingStatus}
-        onClick={this.stopSpinnerEventPropagation}
-        onMouseDown={this.stopSpinnerEventPropagation}
-      >
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          className={styles.cornerSpinner}
-          id={targetId}
-          title={titleText || undefined}
-          onClick={this.stopSpinnerEventPropagation}
-          onMouseDown={this.stopSpinnerEventPropagation}
-        />
-      </span>
-      {this.renderDeepScanTooltip(targetId, tooltipLines, progressRows)}
-    </>
+    <UserPageDeepScanStatusIndicator
+      onSpinnerEvent={this.stopSpinnerEventPropagation}
+      progressRows={progressRows}
+      targetId={targetId}
+      titleText={titleText}
+      tooltipLines={tooltipLines}
+    />
   );
 
   parseCachedResponsePayload = (rawValue: unknown): unknown => {
