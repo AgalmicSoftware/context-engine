@@ -55,8 +55,12 @@ describe('SurveyResultsIndividualResponsesList', () => {
       `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=alpha`
     );
     expect(screen.getAllByRole('link')[1]).toHaveAttribute('target', '_blank');
+    expect(screen.getAllByRole('link')[1]).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByTestId('response-body')).toHaveTextContent('Response body');
     expect(renderResponseBody).toHaveBeenCalledWith({ responder: '0xabc123/def456' }, 0);
+
+    fireEvent.click(screen.getAllByRole('link')[0]);
+    expect(onToggleResponse).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getAllByRole('link')[0].closest('.responseHeader') as HTMLElement);
     expect(onToggleResponse).toHaveBeenCalledWith(0);

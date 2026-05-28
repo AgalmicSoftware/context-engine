@@ -39,6 +39,8 @@ describe('SurveyResultsExportControls', () => {
     const toggle = screen.getByRole('button', { name: 'Export Data' });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(toggle).toHaveAttribute('aria-controls', 'surveyResultsExportArea');
+    expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+    expect(screen.queryByText('JSON: Questions')).toBeNull();
 
     fireEvent.click(toggle);
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);
