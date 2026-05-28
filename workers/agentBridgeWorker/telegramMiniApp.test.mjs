@@ -295,6 +295,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsTitleSession"/);
   assert.match(html, /\.resultsTitleSession \{[\s\S]*opacity: 0\.5;/);
+  assert.match(html, /class="resultsTitleRow"[\s\S]*id="showResultFilters"[^>]*aria-label="Filter results"/);
+  assert.match(html, /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*state\.resultSectionsOpen\.filters = !state\.resultSectionsOpen\.filters;[\s\S]*scrollPanelIntoView\(el\.resultFilters\);/);
+  assert.equal(html.includes("state.resultsData.sessionName + ' | ' +"), false);
+  assert.match(html, /el\.resultsSummary\.textContent = state\.resultsData\.responseCount \+ ' responses \| ' \+/);
   assert.equal(html.includes('id="refreshResults"'), false);
   assert.equal(html.includes('id="resultsSessionOptions"'), false);
   assert.match(html, /id="closeResults"[^>]*aria-label="Close results"/);
@@ -366,6 +370,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function clearQuestionFilters\(\)[\s\S]*state\.popularQuestionLimit = POPULAR_QUESTION_LIMIT_DEFAULT;/);
   assert.match(html, /function renderFilters\(\)[\s\S]*el\.filterTopPopularLimit\.value = String\(state\.popularQuestionLimit\);/);
   assert.match(html, /entries\.sort\(popularitySort\)\.slice\(0, normalizePopularQuestionLimit\(state\.popularQuestionLimit\)\)/);
+  assert.match(html, /Temporary linear popularity score; replace with weighted\/decayed scoring once we have enough signal\./);
+  assert.match(html, /return voteSummaryForQuestion\(question\)\.score \+ responseCountForQuestion\(question\);/);
+  assert.match(html, /responseCountForQuestion\(right\.question\) - responseCountForQuestion\(left\.question\)/);
   assert.match(html, /el\.filterTopPopularLimit\.onchange = \(\) => setPopularQuestionLimit\(el\.filterTopPopularLimit\.value, \{ enable: true \}\);/);
   assert.match(html, /el\.decrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit - POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/);
   assert.match(html, /el\.incrementTopPopular\.onclick = \(\) => setPopularQuestionLimit\(state\.popularQuestionLimit \+ POPULAR_QUESTION_LIMIT_STEP, \{ enable: true \}\);/);
@@ -1819,6 +1826,67 @@ test('Mini App question vote response includes the new vote when KV list is stal
   assert.equal(body.voteSummary.up, 1);
   assert.equal(body.voteSummary.down, 0);
   assert.equal(body.voteSummary.userVote, 'up');
+});
+
+test('Mini App state exposes per-question response counts for popularity scoring', async () => {
+  const kv = new MemoryKv();
+  const records = [
+    ['r1', 'user-a', 'q-many', 'Agree'],
+    ['r2', 'user-b', 'q-many', 'Unsure'],
+    ['r3', 'user-c', 'q-few', 'Disagree'],
+  ];
+  for (const [requestId, telegramUserId, questionId, label] of records) {
+    await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}${requestId}`, JSON.stringify({
+      version: 1,
+      requestId,
+      status: 'direct_submitted',
+      telegramUserId,
+      sessionSlug: 'alpha',
+      questionId,
+      answer: { label, value: label.toLowerCase() },
+      createdAt: `2026-05-08T12:00:0${requestId.slice(1)}.000Z`,
+    }));
+  }
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-many',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should answered questions count toward popularity?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-few',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should lightly answered questions rank lower?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-none',
+        questionType: 'agree_unsure_disagree',
+        prompt: 'Should unanswered questions start at zero?',
+      },
+    ]),
+  };
+
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-05-08T12:00:04.000Z',
+  });
+
+  const counts = Object.fromEntries(state.questions.map((question) => [question.prompt, question.responseCount]));
+  assert.equal(counts['Should answered questions count toward popularity?'], 2);
+  assert.equal(counts['Should lightly answered questions rank lower?'], 1);
+  assert.equal(counts['Should unanswered questions start at zero?'], 0);
 });
 
 test('Mini App results endpoint summarizes consensus, divisive questions, groups, and group analysis', async () => {
