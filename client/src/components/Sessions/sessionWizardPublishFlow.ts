@@ -145,6 +145,47 @@ export const buildSessionWizardPublishStepNumbers = (options: AnyRecord = {}): R
   }, {})
 );
 
+export const buildSessionWizardPublishExecutionPlan = ({
+  workerMode = 'default',
+  sponsoredAutoDeployReady = false,
+  deployComplete = false,
+  hasPendingDrafts = false,
+  hasManualMetadata = false,
+  canUploadMetadataNow = false,
+}: {
+  workerMode?: unknown;
+  sponsoredAutoDeployReady?: boolean;
+  deployComplete?: boolean;
+  hasPendingDrafts?: boolean;
+  hasManualMetadata?: boolean;
+  canUploadMetadataNow?: boolean;
+} = {}) => {
+  const shouldAutoDeployWorker = resolveSessionWizardShouldAutoDeployWorker({
+    workerMode,
+    sponsoredAutoDeployReady,
+    deployComplete,
+  });
+  const shouldDeployPendingSbts = !!hasPendingDrafts;
+  const shouldUploadMetadata = (!!canUploadMetadataNow || !!sponsoredAutoDeployReady) && !hasManualMetadata;
+  const steps = buildSessionWizardPublishPlan({
+    shouldAutoDeployWorker,
+    hasPendingDrafts: shouldDeployPendingSbts,
+    hasManualMetadata,
+  });
+
+  return {
+    shouldAutoDeployWorker,
+    shouldDeployPendingSbts,
+    shouldUploadMetadata,
+    shouldRegisterSession: true,
+    steps,
+    stepNumbers: steps.reduce<Record<string, number>>((acc, stepKey, index) => {
+      acc[stepKey] = index + 1;
+      return acc;
+    }, {}),
+  };
+};
+
 export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
   wizardMode = 'advanced',
   sponsoredBundle = {},
