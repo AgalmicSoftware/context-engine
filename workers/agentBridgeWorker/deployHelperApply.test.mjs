@@ -217,6 +217,9 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
       assert.equal(body.commands.some((command) => command.command === 'results' && command.description === 'Results'), true);
       assert.equal(body.commands.some((command) => command.command === 'groups'), true);
       assert.equal(body.commands.some((command) => command.command === 'add_question'), true);
+      assert.equal(body.commands.some((command) => command.command === 'me' && command.description === 'View account / get agent token'), true);
+      assert.equal(body.commands.some((command) => command.command === 'attachments'), false);
+      assert.equal(body.commands.some((command) => command.command === 'docs'), false);
       assert.equal(body.commands.some((command) => command.command === 'q'), false);
       assert.equal(body.commands.some((command) => command.command === 'actions'), false);
       assert.equal(body.commands.some((command) => command.command === 'settings'), false);
@@ -264,6 +267,8 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(result.telegram.commands.commands.includes('sessions'), true);
   assert.equal(result.telegram.commands.commands.includes('groups'), true);
   assert.equal(result.telegram.commands.commands.includes('add_question'), true);
+  assert.equal(result.telegram.commands.commands.includes('attachments'), false);
+  assert.equal(result.telegram.commands.commands.includes('docs'), false);
   assert.equal(result.telegram.commands.commands.includes('q'), false);
   assert.equal(result.telegram.commands.commands.includes('actions'), false);
   assert.equal(result.telegram.commands.commands.includes('settings'), false);

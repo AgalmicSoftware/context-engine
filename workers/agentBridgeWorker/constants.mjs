@@ -56,6 +56,7 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   VIEW_RESULTS: 'view_results',
   VIEW_ADMIN_ACTIONS: 'view_admin_actions',
   VIEW_RESULTS_SETTINGS: 'view_results_settings',
+  VIEW_QUESTION_QUEUE_SETTINGS: 'view_question_queue_settings',
   TOGGLE_RESULTS_EXPOSURE: 'toggle_results_exposure',
   EXPORT_ALL_RESPONSES: 'export_all_responses',
   MANAGE_RESPONSE_EXPORT_ACCESS: 'manage_response_export_access',

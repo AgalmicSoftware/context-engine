@@ -7,12 +7,22 @@ description: Use when an OpenClaw or similar agent needs to onboard a Telegram u
 
 Use this skill when acting as an OpenClaw-style agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
+## Install From Public Git
+
+Give this command to an agent host that supports Codex-style local skills:
+
+```bash
+CE_SKILL_REF="${CE_SKILL_REF:-main}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+```
+
+Set `CE_SKILL_REF=release-staging` or another public branch/tag before running if the skill is not on `main` yet. After installation, tell the agent to use the `ce-telegram-agent-handoff` skill and ask the user for a CE agent token from the Telegram bot `/me` screen.
+
 ## Preconditions
 
 - The CE worker base URL is known.
 - Use either a worker service token or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
-- For a user-scoped agent token, the user creates a token from the CE bot `/me` screen or `/agent_token`. The default expiry is 7 days. Send it as `Authorization: Bearer <token>`.
+- For a user-scoped agent token, the user creates a token from the CE bot `/me` screen or `/agent_token`. The default expiry is 28 days. Send it as `Authorization: Bearer <token>`.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
@@ -45,7 +55,7 @@ Use this path when the user's assistant is not running inside the CE Telegram bo
 
 1. Ask the user to open the CE bot and run `/me`.
 2. The user clicks `Create Agent Token`, or runs `/agent_token`.
-3. The user copies the token into the trusted external agent. The default token expiry is 7 days.
+3. The user copies the token into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
 5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and token-bound session.
 
@@ -67,6 +77,35 @@ Default token scope does not permit:
 - final answer submission unless a separate CE user-approved submit path is enabled
 
 Treat the token like a password. Do not paste it into shared chats, logs, issue trackers, prompts that may be retained by third parties, or public tools.
+
+### Calling CE With A User-Scoped Token
+
+Use this exact auth shape for every worker call:
+
+```http
+Authorization: Bearer ceagt_...
+Content-Type: application/json
+```
+
+With `ceagt_...` tokens:
+
+- include `sessionSlug` in the query string or JSON body;
+- omit `telegramUserId` by default, because the worker infers it from the token;
+- do not send the token as a URL query parameter, request body field, prompt
+  transcript, log line, or shared note;
+- do not call admin/export endpoints with this token.
+
+If the worker returns `401` with `reason` equal to `agent_token_expired`,
+`agent_token_not_found`, `agent_token_inactive`, or another `agent_token_*`
+reason plus `action: "refresh_token_via_telegram"`, stop the CE action and ask
+the user to refresh the token in Telegram:
+
+1. Open the Context Engine bot.
+2. Run `/me`.
+3. Tap `Create Agent Token`.
+4. Paste the new token back into the trusted agent.
+
+Do not keep retrying an expired token.
 
 Before using personal data, ask the user what may be used in this CE flow. Recommended consent fields:
 
@@ -168,10 +207,43 @@ CE does not schedule recurring Telegram prompts for the user. Keep reminder
 cadence in the OpenClaw or host-agent layer, where the agent can respect the
 user's requested frequency and quiet hours.
 
+When the user has elected to see one question every so often, prefer the
+next-question queue endpoint:
+
+```http
+POST /telegram/agent/api/questions/next
+```
+
+Example request:
+
+```json
+{
+  "sessionSlug": "telegram-demo-4",
+  "queueKey": "daily-ai-governance",
+  "criteria": {
+    "tags": ["ai-governance"],
+    "questionTypes": ["binary"],
+    "sponsoredFirst": true
+  },
+  "preferences": {
+    "interests": ["organizer-feedback", "agent-village"]
+  }
+}
+```
+
+The worker returns one `question`, advances a per-user queue cursor by default,
+and marks `sponsored: true` when the selected question came from the
+admin-configured sponsored queue. Send `advance: false` for preview-only calls,
+or `resetQueue: true` when the user asks to restart a cadence. Session admins
+can set the sponsored queue from the bot Admin Actions screen or with
+`/question_queue 1 3 4`.
+
 Recommended loop for scheduled prompts:
 
-1. At the user's chosen cadence, call `GET /telegram/agent/api/questions`.
-2. Filter to relevant `answerable` questions.
+1. At the user's chosen cadence, call `POST /telegram/agent/api/questions/next`
+   with the user's selected criteria.
+2. Confirm the returned question is `answerable`; if no question is returned,
+   ask whether to broaden criteria or reset the queue.
 3. Ask one or a small batch in the OpenClaw conversation, or call
    `POST /telegram/agent/api/questions/pose` when the question should appear in
    the CE-bound Telegram group.

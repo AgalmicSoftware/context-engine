@@ -31,9 +31,7 @@ const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'groups', description: 'Manage lightweight groups' },
   { command: 'add_question', description: 'Add a session question' },
   { command: 'results', description: 'Results' },
-  { command: 'attachments', description: 'View session files' },
-  { command: 'docs', description: 'View session files' },
-  { command: 'me', description: 'View your account' },
+  { command: 'me', description: 'View account / get agent token' },
   { command: 'account', description: 'View your account' },
 ]);
 

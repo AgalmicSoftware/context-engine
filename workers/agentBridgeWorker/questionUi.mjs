@@ -379,7 +379,6 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'account_created') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions'),
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.START_ONBOARDING, 'Enter Startup Info'),
     ];
   }
@@ -633,10 +632,6 @@ export function buildTelegramGroupSessionCardState({
     buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
       command: '/questions',
       default: true,
-    }),
-    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/attachments',
-      aliases: ['/docs'],
     }),
   ];
   if (policy.allowPoseQuestion !== false) {
