@@ -12,13 +12,13 @@ const LARGE_FILE_GROWTH_TOLERANCE = 25;
 const LARGE_FILE_SHRINK_TOLERANCE = 100;
 
 const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
-  'client/src/components/SurveyTool/SurveyQuestions.tsx': 9468,
+  'client/src/components/SurveyTool/SurveyQuestions.tsx': 9144,
   'client/src/components/MainSite/MainSite.tsx': 6361,
-  'client/src/components/SurveyTool/SurveyResults.tsx': 5574,
+  'client/src/components/SurveyTool/SurveyResults.tsx': 5088,
   'client/src/utilities/web3/contractScripts.impl.ts': 5441,
-  'client/src/components/SBTs/SBTPage.tsx': 5458,
-  'client/src/components/Sessions/SessionWizard.tsx': 5271,
-  'client/src/components/UserPage/UserPage.tsx': 4911,
+  'client/src/components/SBTs/SBTPage.tsx': 5060,
+  'client/src/components/Sessions/SessionWizard.tsx': 5023,
+  'client/src/components/UserPage/UserPage.tsx': 4158,
   'client/src/components/SBTs/CreateSBTGroup.tsx': 4469,
   'client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx': 4048,
   'client/src/components/PolisReport/PolisReport.tsx': 4018,
