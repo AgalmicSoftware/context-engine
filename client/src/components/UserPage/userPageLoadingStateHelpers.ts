@@ -92,6 +92,14 @@ export type ResolveUserPageCompareButtonDisplayStateArgs = {
   collapseOpen?: unknown;
 };
 
+export type ResolveUserPageAiActionPlanArgs = {
+  aiAvailable?: unknown;
+  analyzing?: unknown;
+  collapseOpen?: unknown;
+  disabledByCache?: unknown;
+  walletLabel?: unknown;
+};
+
 export type ResolveUserPageSectionToggleDisplayStateArgs = {
   open?: unknown;
 };
@@ -140,6 +148,12 @@ export type UserPageCompareButtonDisplayState = {
   shouldRenderCollapseClosedIcon: boolean;
   shouldRenderCollapseOpenIcon: boolean;
   title?: string;
+};
+
+export type UserPageAiActionPlan = {
+  aiActionAvailability: UserPageAiActionAvailability;
+  analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
+  compareButtonDisplayState: UserPageCompareButtonDisplayState;
 };
 
 export type UserPageSectionToggleDisplayState = {
@@ -230,6 +244,31 @@ export const resolveUserPageCompareButtonDisplayState = ({
     shouldRenderCollapseClosedIcon: !shouldRenderCollapseOpenIcon,
     shouldRenderCollapseOpenIcon,
     title: aiActionAvailability?.title,
+  };
+};
+
+export const resolveUserPageAiActionPlan = ({
+  aiAvailable = null,
+  analyzing = false,
+  collapseOpen = false,
+  disabledByCache = false,
+  walletLabel = 'wallet',
+}: ResolveUserPageAiActionPlanArgs = {}): UserPageAiActionPlan => {
+  const aiActionAvailability = resolveUserPageAiActionAvailability({
+    aiAvailable,
+    disabledByCache,
+    walletLabel,
+  });
+  return {
+    aiActionAvailability,
+    analyzeButtonDisplayState: resolveUserPageAnalyzeButtonDisplayState({
+      aiActionAvailability,
+      analyzing,
+    }),
+    compareButtonDisplayState: resolveUserPageCompareButtonDisplayState({
+      aiActionAvailability,
+      collapseOpen,
+    }),
   };
 };
 

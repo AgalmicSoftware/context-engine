@@ -5,6 +5,7 @@ import {
   buildUserPageUncertaintyLoadingFlags,
   buildUserPageUserStatsMergePatch,
   resolveUserPageAiActionAvailability,
+  resolveUserPageAiActionPlan,
   resolveUserPageAnalyzeButtonDisplayState,
   resolveUserPageCompareButtonDisplayState,
   resolveUserPageSectionToggleDisplayState,
@@ -83,6 +84,59 @@ describe('userPageLoadingStateHelpers', () => {
       isOpen: true,
       shouldRenderClosedIcon: false,
       shouldRenderOpenIcon: true,
+    });
+  });
+
+  it('plans AI-bound header actions without invoking analysis handlers', () => {
+    expect(resolveUserPageAiActionPlan({
+      aiAvailable: false,
+      analyzing: false,
+      collapseOpen: false,
+      disabledByCache: false,
+      walletLabel: 'wallet',
+    })).toEqual({
+      aiActionAvailability: {
+        disabled: true,
+        title: 'AI not available — connect a wallet or use a session with sponsored AI',
+      },
+      analyzeButtonDisplayState: {
+        ariaBusy: 'false',
+        disabled: true,
+        label: 'Analyze',
+        shouldRenderAnalyzing: false,
+        title: 'AI not available — connect a wallet or use a session with sponsored AI',
+      },
+      compareButtonDisplayState: {
+        disabled: true,
+        shouldRenderCollapseClosedIcon: true,
+        shouldRenderCollapseOpenIcon: false,
+        title: 'AI not available — connect a wallet or use a session with sponsored AI',
+      },
+    });
+
+    expect(resolveUserPageAiActionPlan({
+      aiAvailable: true,
+      analyzing: true,
+      collapseOpen: true,
+      disabledByCache: false,
+    })).toEqual({
+      aiActionAvailability: {
+        disabled: false,
+        title: undefined,
+      },
+      analyzeButtonDisplayState: {
+        ariaBusy: 'true',
+        disabled: true,
+        label: 'Analyzing',
+        shouldRenderAnalyzing: true,
+        title: undefined,
+      },
+      compareButtonDisplayState: {
+        disabled: false,
+        shouldRenderCollapseClosedIcon: false,
+        shouldRenderCollapseOpenIcon: true,
+        title: undefined,
+      },
     });
   });
 
