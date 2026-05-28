@@ -63,6 +63,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('.codex-tmp', 'scratch.txt'), 'scratch\n');
     writeFile(sourceDir, path.join('docs', 'codebase-health-modernization-2026-05-07.md'), 'local audit notes\n');
     writeFile(sourceDir, path.join('docs', 'assets', 'codebase-health-modernization-2026-05-07.png'), 'local audit chart\n');
+    writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
@@ -78,12 +79,31 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
+    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify(
+        {
+          scripts: {
+            test: 'node scripts/run-node-tests.js',
+            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /files stripped, output at /);
 
     assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep\n');
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
+      test: 'node scripts/run-node-tests.js',
+    });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.secrets.baseline')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.local')), false);
@@ -104,6 +124,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, '.codex-tmp')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'codebase-health-modernization-2026-05-07.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'assets', 'codebase-health-modernization-2026-05-07.png')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
@@ -116,6 +137,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);
@@ -129,6 +152,7 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.doesNotMatch(manifestText, /\.env\.e2e/);
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
+    assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
   } finally {
@@ -152,12 +176,12 @@ test('prepare-public-release fails if private planning paths survive strip rules
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
     writeFile(sourceDir, 'public.txt', 'keep\n');
-    writeFile(sourceDir, path.join('docs', `${'PR'}${'D'}-leak.md`), 'private planning in a public path\n');
+    writeFile(sourceDir, path.join('docs', 'public', 'telegram-prd-leak.md'), 'private planning in a public path\n');
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 1);
     assert.match(result.stderr, /Private planning paths are still visible/);
-    assert.match(result.stderr, new RegExp(`${'PR'}${'D'}-leak`));
+    assert.match(result.stderr, /telegram-prd-leak/);
     assert.equal(fs.existsSync(outputDir), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

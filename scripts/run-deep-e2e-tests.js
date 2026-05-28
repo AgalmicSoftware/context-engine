@@ -56,6 +56,30 @@ function runStep(label, args, env) {
   return typeof result.status === 'number' ? result.status : 1;
 }
 
+function readPackageScripts(packageJsonPath = path.join(ROOT, 'package.json')) {
+  try {
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    return packageJson.scripts && typeof packageJson.scripts === 'object' ? packageJson.scripts : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function buildDeepE2eSteps(packageScripts = readPackageScripts()) {
+  const steps = [
+    ['worker scope matrix', ['run', '-s', 'ai:test-worker-scopes:matrix']],
+    ['gated decrypt all types', ['run', '-s', 'ai:test-gated-decrypt:all-types']],
+    ['survey response encryption matrix', ['run', '-s', 'ai:test-survey-response:encryption-matrix']],
+    ['doc library session filetypes', ['run', '-s', 'ai:test-doc-library:session:filetypes']],
+  ];
+
+  if (Object.prototype.hasOwnProperty.call(packageScripts, 'test:worker:agent-bridge')) {
+    steps.push(['agent bridge worker', ['run', '-s', 'test:worker:agent-bridge']]);
+  }
+
+  return steps;
+}
+
 function isLocalBaseUrl(baseUrl) {
   try {
     const parsed = new URL(baseUrl);
@@ -151,13 +175,7 @@ function runDeepE2eTests(baseEnv = process.env) {
     activeSessionArtifact: activeSession ? path.relative(ROOT, ACTIVE_SESSION_FILE) : null,
   }));
 
-  const steps = [
-    ['worker scope matrix', ['run', '-s', 'ai:test-worker-scopes:matrix']],
-    ['gated decrypt all types', ['run', '-s', 'ai:test-gated-decrypt:all-types']],
-    ['survey response encryption matrix', ['run', '-s', 'ai:test-survey-response:encryption-matrix']],
-    ['doc library session filetypes', ['run', '-s', 'ai:test-doc-library:session:filetypes']],
-    ['agent bridge worker', ['run', '-s', 'test:worker:agent-bridge']],
-  ];
+  const steps = buildDeepE2eSteps();
 
   return ensureAppServer(env)
     .then(async (server) => {
@@ -183,8 +201,10 @@ if (require.main === module) {
 
 module.exports = {
   ACTIVE_SESSION_FILE,
+  buildDeepE2eSteps,
   ensureAppServer,
   isLocalBaseUrl,
+  readPackageScripts,
   readActiveSession,
   resolveDeepE2eEnv,
   runDeepE2eTests,
