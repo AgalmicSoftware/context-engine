@@ -83,6 +83,54 @@ export type SurveyQuestionsFullLoadingProgressState = {
   fillStyle: { width: string };
 };
 
+export type SurveyQuestionsJsonPanelDisplayState = {
+  showQuestionJsonControls: boolean;
+  showSurveyJsonPanel: boolean;
+  showQuestionsJsonPanel: boolean;
+  showResponseJsonPanel: boolean;
+  surveyJsonRowClassName: string | undefined;
+  surveyJsonToggleClassName: string | undefined;
+  questionJsonToggleClassName: string | undefined;
+  responseJsonToggleClassName: string | undefined;
+  surveyJsonPanelClassName: string | undefined;
+};
+
+export type SurveyQuestionsJsonForDisplayState = {
+  jsonForDisplay: unknown;
+};
+
+export type SurveyQuestionsLayoutDisplayState = {
+  activeTagModalTag: string;
+  responseViewClassName: string | undefined;
+  surveyPageClassName: string | undefined;
+  topSectionClassName: string | undefined;
+  useTagModal: boolean;
+};
+
+export type SurveyQuestionsRouteViewDisplayState = {
+  viewedAddressRaw: string;
+  viewedAddressLower: string;
+  shortenedViewAddress: string;
+  isOwnResponse: unknown;
+  isSingleQuestionView: unknown;
+  showViewAnswersButton: unknown;
+  viewAnswersButtonText: string;
+};
+
+export type SurveyQuestionsSubmitFooterDisplayState = {
+  submittedStateActive: boolean;
+  submittedIndicatorActive: boolean;
+  singleQuestionSubmittedIndicatorActive: boolean;
+  showSubmitAux: boolean;
+  uploadStatusText: string;
+  submitDisabled: boolean;
+  canEditQuestions: boolean;
+  hasPendingEdits: boolean;
+  genericShowInlineSubmit: boolean;
+  showInlineSubmit: boolean;
+  showTopInlineSubmit: boolean;
+};
+
 export type SurveyAutoDecryptDisabledStatePatch = {
   autoDecryptEnabled: boolean;
   decryptingByKey: Record<string, unknown>;
@@ -1980,17 +2028,30 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
   const submittedIndicatorActive = submittedStateActive && !isLoadingResponse;
   const singleQuestionSubmittedIndicatorActive = !isSingle && submittedIndicatorActive;
   const showSubmitAux =
-    !isSingle &&
-    ((pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
-      (singleQuestionSubmittedIndicatorActive && !!responseUrl));
+    !isSingle && (
+      (pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
+      (singleQuestionSubmittedIndicatorActive && !!responseUrl)
+    );
   const uploadStatusText =
-    isSubmitting && Number(currentStep || 0) === 1 && !!hasEncryptedAnswers ? 'Encrypting...' : 'Uploading...';
-  const submitDisabled = !!(isSubmitting || (singleQuestionMode && hasMaskedCurrentQuestionPayload));
+    isSubmitting &&
+    Number(currentStep || 0) === 1 &&
+    !!hasEncryptedAnswers
+      ? 'Encrypting...'
+      : 'Uploading...';
+  const submitDisabled = !!(
+    isSubmitting ||
+    (singleQuestionMode && hasMaskedCurrentQuestionPayload)
+  );
   const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
   const hasPendingEdits = !!isDirty || pendingCount > 0;
-  const genericShowInlineSubmit =
-    !useHeaderSubmit && (canEditQuestions ? hasPendingEdits || submittedIndicatorActive : submittedIndicatorActive);
-  const showInlineSubmit = isSingle ? hasPendingEdits : genericShowInlineSubmit;
+  const genericShowInlineSubmit = !useHeaderSubmit && (
+    canEditQuestions
+      ? hasPendingEdits || submittedIndicatorActive
+      : submittedIndicatorActive
+  );
+  const showInlineSubmit = isSingle
+    ? hasPendingEdits
+    : genericShowInlineSubmit;
 
   return {
     submittedStateActive,
@@ -2004,130 +2065,6 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     genericShowInlineSubmit,
     showInlineSubmit,
     showTopInlineSubmit: showInlineSubmit && !isSingle,
-  };
-};
-
-const normalizeSubmitReadinessCount = (value: unknown): number => {
-  const count = Number(value || 0);
-  return Number.isFinite(count) ? count : 0;
-};
-
-export const buildSurveyQuestionsSubmitReadinessDescriptor = ({
-  currentStep = 0,
-  isSubmitting = false,
-  pendingStats = null,
-  resolveMaskedCurrentQuestionPayload,
-  singleQuestionMode = false,
-}: {
-  currentStep?: unknown;
-  isSubmitting?: unknown;
-  pendingStats?: { total?: unknown; encrypted?: unknown } | null;
-  resolveMaskedCurrentQuestionPayload?: () => unknown;
-  singleQuestionMode?: unknown;
-} = {}): SurveyQuestionsSubmitReadinessDescriptor => {
-  const normalizedCurrentStep = normalizeSubmitReadinessCount(currentStep);
-  const normalizedPendingStats = pendingStats || {};
-  const pendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.total);
-  const encryptedPendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.encrypted);
-  const submitting = !!isSubmitting;
-  const isSingleQuestion = !!singleQuestionMode;
-  const shouldCheckMaskedCurrentQuestionPayload = !submitting && isSingleQuestion;
-  const hasMaskedCurrentQuestionPayload = shouldCheckMaskedCurrentQuestionPayload
-    ? !!resolveMaskedCurrentQuestionPayload?.()
-    : false;
-  const hasEncryptedAnswers = submitting && normalizedCurrentStep === 1 && encryptedPendingEditCount > 0;
-
-  return {
-    currentStep: normalizedCurrentStep,
-    encryptedPendingEditCount,
-    hasEncryptedAnswers,
-    hasMaskedCurrentQuestionPayload,
-    isSubmitting: submitting,
-    pendingEditCount,
-    shouldCheckMaskedCurrentQuestionPayload,
-    singleQuestionMode: isSingleQuestion,
-    uploadPhase: hasEncryptedAnswers ? 'encrypting' : 'uploading',
-  };
-};
-
-export const buildSurveyQuestionsPrimarySubmitPlan = ({
-  account = '',
-  draftSlug = '',
-  isStandalone = false,
-  isSubmitting = false,
-  pendingEditCount = 0,
-  questionID = '',
-  singleQuestionMode = false,
-  submissionComplete = false,
-  submitGuardActive = false,
-  submittedSinceLastEdit = false,
-  surveyId = '',
-}: {
-  account?: unknown;
-  draftSlug?: unknown;
-  isStandalone?: unknown;
-  isSubmitting?: unknown;
-  pendingEditCount?: unknown;
-  questionID?: unknown;
-  singleQuestionMode?: unknown;
-  submissionComplete?: unknown;
-  submitGuardActive?: unknown;
-  submittedSinceLastEdit?: unknown;
-  surveyId?: unknown;
-} = {}): SurveyQuestionsPrimarySubmitPlan => {
-  if (isSubmitting) {
-    return { action: 'inert', reason: 'submitting', path: '' };
-  }
-  if (submitGuardActive) {
-    return { action: 'inert', reason: 'submit_guard', path: '' };
-  }
-
-  const pendingCount = Number(pendingEditCount || 0);
-  const hasPendingEdits = pendingCount > 0;
-  const completed = !!submissionComplete;
-  const submittedStateActive = !!(submittedSinceLastEdit || completed);
-  if (submittedStateActive && !completed && !hasPendingEdits) {
-    return { action: 'inert', reason: 'submitted_without_new_edits', path: '' };
-  }
-
-  if (completed && !hasPendingEdits) {
-    const accountLower = String(account || '').toLowerCase();
-    if (!accountLower) {
-      return { action: 'inert', reason: 'missing_account', path: '' };
-    }
-    if (singleQuestionMode) {
-      const questionIdLower = String(questionID || '').toLowerCase();
-      if (!questionIdLower) {
-        return { action: 'inert', reason: 'missing_question_id', path: '' };
-      }
-      return {
-        action: 'navigate',
-        reason: 'completed_single_question_response',
-        path: buildQuestionRoutePath(questionIdLower, {
-          responderAddress: accountLower,
-          sessionSlug: draftSlug,
-        }),
-      };
-    }
-    if (!isStandalone) {
-      const surveyIdLower = String(surveyId || '').toLowerCase();
-      if (!surveyIdLower) {
-        return { action: 'inert', reason: 'missing_survey_id', path: '' };
-      }
-      const normalizedDraftSlug = String(draftSlug || '');
-      return {
-        action: 'navigate',
-        reason: 'completed_survey_response',
-        path: `/survey/${surveyIdLower}/${accountLower}${normalizedDraftSlug ? `?session=${encodeURIComponent(normalizedDraftSlug)}` : ''}`,
-      };
-    }
-    return { action: 'inert', reason: 'completed_standalone_response', path: '' };
-  }
-
-  return {
-    action: 'submit',
-    reason: hasPendingEdits ? 'pending_edits' : 'submit_requested',
-    path: '',
   };
 };
 
