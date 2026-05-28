@@ -39,7 +39,6 @@ import {
   getSbtPasswordRecoveryCodes,
   upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
 import {
@@ -50,6 +49,7 @@ import {
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
@@ -4240,37 +4240,11 @@ renderMintButton() {
     return (
       <div className={styles.adminActions}>
         {openMintAutoJoinUrl && (
-          <div className={styles.autoMintUrlCard} data-testid={E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL}>
-            <h4>URL Where Anyone Can Join</h4>
-            <p className={styles.autoMintUrlHelp}>
-              Share this session link to trigger the open-mint flow for this group.
-            </p>
-            <div className={styles.autoMintUrlRow}>
-              <span className={styles.autoMintUrlText} title={openMintAutoJoinUrl}>
-                {openMintAutoJoinUrl}
-              </span>
-              <button
-                type="button"
-                className={styles.autoMintUrlButton}
-                onClick={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
-                aria-label="Copy open mint URL"
-                title="Copy open mint URL"
-              >
-                {openMintUrlCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                {openMintUrlCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-              </button>
-              <a
-                href={openMintAutoJoinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.autoMintUrlButton}
-                aria-label="Open open mint URL"
-                title="Open open mint URL"
-              >
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            </div>
-          </div>
+          <SbtPageOpenMintUrlCard
+            copyIconState={openMintUrlCopyIconState}
+            onCopy={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
+            openMintAutoJoinUrl={openMintAutoJoinUrl}
+          />
         )}
         {canAdminBurn && (
           <div className={styles.adminBurnSection}>
