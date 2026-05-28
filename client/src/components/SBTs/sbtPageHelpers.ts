@@ -207,7 +207,6 @@ export {
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
-  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,

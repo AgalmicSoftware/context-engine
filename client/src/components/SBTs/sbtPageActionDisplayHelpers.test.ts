@@ -23,7 +23,6 @@ import {
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
-  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,
@@ -580,142 +579,70 @@ describe('sbtPageActionDisplayHelpers', () => {
   });
 
   it('describes primary action availability without invoking SBT side effects', () => {
-    expect(
-      resolveSbtPageMintActionPlan({
-        burningStatus: 'idle',
-        nowSeconds: 100,
-        sbtInfo: { mintingEndTime: 0 },
-        userHasSBT: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMintActionPlan({
+      burningStatus: 'idle',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+      userHasSBT: true,
+    })).toEqual({
       blockedReason: 'already-has-token',
       shouldRenderMintButton: false,
     });
-    expect(
-      resolveSbtPageMintActionPlan({
-        burningStatus: 'success',
-        nowSeconds: 100,
-        sbtInfo: { mintingEndTime: 0 },
-        userHasSBT: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMintActionPlan({
+      burningStatus: 'success',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+      userHasSBT: true,
+    })).toEqual({
       blockedReason: 'none',
       shouldRenderMintButton: true,
     });
-    expect(
-      resolveSbtPageMintActionPlan({
-        nowSeconds: 100,
-        sbtInfo: { mintingEndTime: 90 },
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMintActionPlan({
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 90 },
+    })).toEqual({
       blockedReason: 'mint-ended',
       shouldRenderMintButton: false,
     });
-    expect(
-      resolveSbtPageMintActionPlan({
-        nowSeconds: 100,
-        sbtInfo: { mintingEndTime: 100 },
-      }),
-    ).toEqual({
-      blockedReason: 'mint-ended',
-      shouldRenderMintButton: false,
-    });
-    expect(
-      resolveSbtPageMintActionPlan({
-        nowSeconds: 100,
-        sbtInfo: null,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageMintActionPlan({
+      nowSeconds: 100,
+      sbtInfo: null,
+    })).toEqual({
       blockedReason: 'missing-sbt',
       shouldRenderMintButton: false,
     });
-    expect(
-      resolveSbtPageBurnActionPlan({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: 1 },
-        userHasSBT: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageBurnActionPlan({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: 1 },
+      userHasSBT: true,
+    })).toEqual({
       blockedReason: 'none',
       canOwnerBurn: true,
       shouldRenderBurnButton: true,
     });
-    expect(
-      resolveSbtPageBurnActionPlan({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: 0 },
-        userHasSBT: true,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageBurnActionPlan({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: 0 },
+      userHasSBT: true,
+    })).toEqual({
       blockedReason: 'owner-burn-disabled',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
     });
-    expect(
-      resolveSbtPageBurnActionPlan({
-        account: '0xOwner',
-        sbtInfo: { burnAuth: 1 },
-        userHasSBT: false,
-      }),
-    ).toEqual({
+    expect(resolveSbtPageBurnActionPlan({
+      account: '0xOwner',
+      sbtInfo: { burnAuth: 1 },
+      userHasSBT: false,
+    })).toEqual({
       blockedReason: 'missing-token',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
     });
   });
 
-  it('builds the full mint button display descriptor without dispatch ownership', () => {
-    const hidden = resolveSbtPageMintButtonDisplayState({
-      burningStatus: 'idle',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-      userHasSBT: true,
-    });
-    expect(hidden.mintActionPlan).toEqual({
-      blockedReason: 'already-has-token',
-      shouldRenderMintButton: false,
-    });
-    expect(hidden.openMintButtonState.readinessDescriptor).toMatchObject({
-      canOpenMintTx: false,
-      hasMintTransactionHash: false,
-    });
-
-    const openMint = resolveSbtPageMintButtonDisplayState({
-      burningStatus: 'idle',
-      lastMintTxHash: '0xmint',
-      mintLowerLabel: 'claim',
-      mintedLabel: 'Claimed',
-      mintingStatus: 'success',
-      nowSeconds: 100,
-      sbtInfo: { mintingEndTime: 0 },
-    });
-    expect(openMint.mintActionPlan).toEqual({
-      blockedReason: 'none',
-      shouldRenderMintButton: true,
-    });
-    expect(openMint.mintFlowDisplayState.shouldRenderOpenMintButton).toBe(true);
-    expect(openMint.openMintButtonState).toMatchObject({
-      canOpenMintTx: true,
-      disabled: false,
-      title: 'View claim transaction',
-    });
-    expect(openMint.openMintButtonContentState).toMatchObject({
-      shouldRenderSuccess: true,
-      successLabel: 'Claimed',
-    });
-  });
-
-  it('builds the full action display plan without execution callbacks', () => {
-    const plan = resolveSbtPageFullActionDisplayPlan({
-      account: '0xOwner',
-      actionClassName: 'action',
-      burnedLabel: 'Removed',
-      burningStatus: 'idle',
-      burnButtonClassName: 'burn',
-      burnLabel: 'Remove',
-      groupPasswordInput: 'group-code',
-      hasGroupPasswordMint: true,
-      mintButtonClassName: 'mint',
+  it('resolves status content, action feedback, and control styles', () => {
+    expect(resolveSbtPagePasswordJoinButtonState({
+      groupPasswordInput: ' code ',
       mintingStatus: 'idle',
       nowSeconds: 100,
       sbtInfo: {
