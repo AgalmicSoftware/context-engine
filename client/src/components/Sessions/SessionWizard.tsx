@@ -144,6 +144,7 @@ import {
   resolveSponsoredBundleDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+import { runSessionWizardPublishController } from './sessionWizardPublishController';
 import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
 import {
   normalizeSessionWizardDeployErrorMessage,
@@ -3795,17 +3796,18 @@ const SessionWizard = ({
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
-      if (publishExecutionPlan.shouldAutoDeployWorker) {
-        setPublishStep(publishStepNumbers['deploy-worker']);
-        const deployResult = await handleDeployWorker({ forceSponsoredAutoDeploy: true });
-        if (!deployResult?.ok) {
-          throw new Error(deployResult?.error || 'Worker deploy failed.');
-        }
-        if (!deployResult?.deployComplete || !deployResult?.workerUrl) {
-          throw new Error('Worker deploy did not return a verified worker URL.');
-        }
-        workerUrlOverride = deployResult.workerUrl;
-      }
+      const publishControllerResult = await runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan,
+        },
+        ports: {
+          deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      });
+      workerUrlOverride = publishControllerResult.workerUrlOverride;
       if (publishExecutionPlan.shouldDeployPendingSbts) {
         setPublishStep(publishStepNumbers['deploy-sbts']);
         deployedPendingDrafts = await deployPendingSbtDrafts({
