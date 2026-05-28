@@ -1,5 +1,6 @@
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
+  buildSessionWizardPublishExecutionPlan,
   buildSessionWizardPublishPlan,
   buildSessionWizardPublishStepNumbers,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
@@ -56,6 +57,71 @@ describe('sessionWizardPublishFlow', () => {
       'register-session': 1,
       done: 2,
     });
+  });
+
+  it('pins publish side-effect decisions in a pure execution plan', () => {
+    expect(buildSessionWizardPublishExecutionPlan({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: true,
+      deployComplete: false,
+      hasPendingDrafts: true,
+      hasManualMetadata: false,
+      canUploadMetadataNow: false,
+    })).toEqual({
+      shouldAutoDeployWorker: true,
+      shouldDeployPendingSbts: true,
+      shouldUploadMetadata: true,
+      shouldRegisterSession: true,
+      steps: [
+        'deploy-worker',
+        'deploy-sbts',
+        'upload-metadata',
+        'register-session',
+        'done',
+      ],
+      stepNumbers: {
+        'deploy-worker': 1,
+        'deploy-sbts': 2,
+        'upload-metadata': 3,
+        'register-session': 4,
+        done: 5,
+      },
+    });
+
+    expect(buildSessionWizardPublishExecutionPlan({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: false,
+      deployComplete: false,
+      hasPendingDrafts: false,
+      hasManualMetadata: false,
+      canUploadMetadataNow: false,
+    })).toEqual(expect.objectContaining({
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldUploadMetadata: false,
+      shouldRegisterSession: true,
+    }));
+  });
+
+  it('keeps manual metadata and upload readiness out of the upload side-effect decision', () => {
+    expect(buildSessionWizardPublishExecutionPlan({
+      workerMode: 'default',
+      sponsoredAutoDeployReady: false,
+      deployComplete: false,
+      hasPendingDrafts: true,
+      hasManualMetadata: true,
+      canUploadMetadataNow: true,
+    })).toEqual(expect.objectContaining({
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: true,
+      shouldUploadMetadata: false,
+      steps: ['deploy-sbts', 'register-session', 'done'],
+      stepNumbers: {
+        'deploy-sbts': 1,
+        'register-session': 2,
+        done: 3,
+      },
+    }));
   });
 
   it('validates and resolves the normal-mode bundle URL without leaking stale advanced URLs', () => {
