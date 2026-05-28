@@ -172,14 +172,17 @@ export {
   resolveUserPageAddressDisplayState,
   resolveUserPageBlockieSeed,
   resolveUserPageHeaderActionVisibility,
+  resolveUserPageHeaderPassiveDisplayState,
 } from './userPageProfileDisplayHelpers';
 export type {
   BuildUserPageProfileEditVisibilityArgs,
   ResolveUserPageAddressDisplayStateArgs,
   ResolveUserPageBlockieSeedArgs,
   ResolveUserPageHeaderActionVisibilityArgs,
+  ResolveUserPageHeaderPassiveDisplayStateArgs,
   UserPageAddressDisplayState,
   UserPageHeaderActionVisibility,
+  UserPageHeaderPassiveDisplayState,
   UserPageProfileEditVisibility,
 } from './userPageProfileDisplayHelpers';
 export {
