@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
+import { createTelegramAgentDelegationToken } from './telegramAgentDelegationTokens.mjs';
 
 class MemoryKv {
   constructor() {
@@ -129,6 +130,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
+  assert.match(source, /Non-Telegram Agent Token Flow/);
+  assert.match(source, /default token expiry is 7 days/i);
+  assert.match(source, /allowedProfileFields/);
   assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
 });
 
@@ -144,6 +148,70 @@ test('Telegram agent handoff requires the configured token', async () => {
 
   assert.equal(response.status, 401);
   assert.equal(body.reason, 'agent_api_token_invalid');
+});
+
+test('Telegram agent handoff accepts scoped user delegation tokens without a shared service token', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+
+  assert.equal(issued.ok, true);
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const questions = await jsonBody(questionsResponse);
+  assert.equal(questionsResponse.status, 200);
+  assert.equal(questions.questions.length, 2);
+
+  const mismatchResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=beta', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const mismatch = await jsonBody(mismatchResponse);
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal(mismatch.reason, 'agent_token_session_mismatch');
+
+  const childSessionResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/sessions/child', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        sessionName: 'Child should not be allowed',
+      },
+    }),
+    env,
+  });
+  const child = await jsonBody(childSessionResponse);
+  assert.equal(childSessionResponse.status, 403);
+  assert.equal(child.reason, 'agent_token_scope_denied');
+
+  const expired = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  });
+  const expiredResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
+      token: expired.token,
+    }),
+    env,
+  });
+  const expiredBody = await jsonBody(expiredResponse);
+  assert.equal(expiredResponse.status, 401);
+  assert.equal(expiredBody.reason, 'agent_token_expired');
 });
 
 test('Telegram agent can read active questions and draft preferences after group join', async () => {

@@ -11,6 +11,11 @@ import {
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
+import {
+  loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
+} from './telegramAgentDelegationTokens.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import { submitRequestSessionKvKey } from './telegramSubmitQueue.mjs';
 
@@ -98,6 +103,26 @@ function baseEnv(overrides = {}) {
     AGENT_ACTION_KV: new MemoryKv(),
     ...overrides,
   };
+}
+
+function agentTokenEnv(overrides = {}) {
+  return baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        managedAccountSubmitAllowed: true,
+      }],
+    }),
+    ...overrides,
+  });
 }
 
 function dotenvEscapedJson(value = {}) {
@@ -3520,10 +3545,11 @@ test('/docs remains a legacy alias for attachments', async () => {
 
 test('/me returns managed demo account metadata without the root secret', async () => {
   const now = '2026-05-08T12:00:00.000Z';
-  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const env = agentTokenEnv();
+  const accountAddress = await privateManagedAccountAddress(env, now);
   const result = await buildTelegramCommandResponse({
     update: privateMessage('/me'),
-    env: baseEnv(),
+    env,
     now,
   });
 
@@ -3540,7 +3566,73 @@ test('/me returns managed demo account metadata without the root secret', async 
   const copyAddress = buttons.find((button) => button.text === 'Copy Address');
   assert.deepEqual(copyAddress?.copy_text, { text: accountAddress });
   assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
+  assert.equal(buttons.some((button) => button.text === 'Create Agent Token'), true);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/agent_token creates a seven-day scoped delegation token without exporting key material', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token'),
+    env,
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'agent_token');
+  assert.match(result.response.text, /^Agent token/m);
+  assert.match(result.response.text, /Expires: 2026-05-15T12:00:00.000Z/);
+  assert.match(result.response.text, /does not expose your wallet key/);
+  const token = result.response.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  const copyToken = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Token');
+  assert.deepEqual(copyToken?.copy_text, { text: token });
+
+  const loaded = await loadTelegramAgentDelegationToken({ env, token, now });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.record.telegramUserId, '42');
+  assert.equal(loaded.record.sessionSlug, 'alpha');
+  assert.equal(loaded.record.ttlSeconds, TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS);
+  assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), true);
+  assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), true);
+  const storedRecords = Array.from(env.AGENT_ACTION_KV.store.values()).join('\n');
+  assert.equal(storedRecords.includes(token), false);
+  assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/agent_token refuses explicit sessions that are not selectable for the Telegram account', async () => {
+  const env = agentTokenEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Normal CE Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: false,
+        },
+      ],
+    }),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token beta'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, 'agent_token_session_not_selectable');
+  assert.match(result.response.text, /Join or select a Telegram-enabled session first/);
 });
 
 test('/start includes a Mini App button that opens the session picker before a private session is selected', async () => {

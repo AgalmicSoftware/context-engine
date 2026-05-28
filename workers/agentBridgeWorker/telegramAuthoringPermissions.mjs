@@ -71,15 +71,21 @@ export function evaluateTelegramQuestionAuthoringPermission({
     session.telegramOnly === true &&
     privateSessionMatches &&
     !privateBoundAuthoringDisabled;
+  const delegatedPrivateParticipant = isPrivate &&
+    privateBinding?.source === 'telegram_agent_delegation_token' &&
+    privateSessionMatches &&
+    !privateBoundAuthoringDisabled;
 
   if (!effectiveGroupChatId) {
-    if (telegramOnlyPrivateParticipant) {
+    if (telegramOnlyPrivateParticipant || delegatedPrivateParticipant) {
       return {
         ok: true,
         mode,
         groupChatId: '',
         privateBound: true,
-        reason: 'telegram_only_private_participant_allowed',
+        reason: delegatedPrivateParticipant
+          ? 'telegram_agent_delegation_token_allowed'
+          : 'telegram_only_private_participant_allowed',
       };
     }
     return {
