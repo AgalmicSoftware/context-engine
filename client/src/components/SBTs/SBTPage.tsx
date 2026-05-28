@@ -47,6 +47,7 @@ import {
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
