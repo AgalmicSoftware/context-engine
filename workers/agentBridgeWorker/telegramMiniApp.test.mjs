@@ -178,9 +178,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="showToolMenu"[^>]*aria-label="Open tools menu"/);
   assert.match(html, /id="toolMenu"[^>]*aria-label="Mini App tools"/);
   assert.match(toolMenu, /id="showSessions"[^>]*aria-label="Sessions"[\s\S]*<span>Sessions<\/span>/);
-  assert.match(html, /id="showDocuments"[^>]*aria-label="Documents"/);
+  assert.equal(html.includes('id="showDocuments"'), false);
   assert.match(html, /id="showAdmin"[^>]*aria-label="Admin actions"[^>]*hidden/);
-  assert.match(toolMenu, /<span>Documents<\/span>/);
+  assert.equal(toolMenu.includes('<span>Documents</span>'), false);
   assert.equal(toolMenu.includes('<span>Results</span>'), false);
   assert.match(toolMenu, /<span>Groups<\/span>/);
   assert.equal(toolMenu.includes('<span>Add question</span>'), false);
@@ -286,7 +286,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="adminPanel"[^>]*aria-label="Admin actions"/);
   assert.match(html, /id="closeAdmin"[^>]*aria-label="Close admin actions"/);
   assert.match(html, /el\.showAdmin\.onclick = \(\) => \{[\s\S]*state\.sessionsPanelOpen = false;[\s\S]*renderSessionPicker\(\);[\s\S]*renderAdmin\(\);[\s\S]*setPanelOpen\(el\.adminPanel, el\.showAdmin, true\);/);
-  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
+  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
   assert.match(html, /function normalizeAdminActions\(adminActions = \[\]\)/);
   assert.match(html, /typeof action === 'string'/);
   assert.match(html, /button\.dataset\.action = action\.action;/);
@@ -327,7 +327,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="closeSettings"[^>]*aria-label="Close settings"/);
   assert.match(html, /bindPanelClose\(el\.closeResults, el\.resultsPanel, el\.showResults\);/);
   assert.equal(html.includes('state.resultSectionsOpen.panel'), false);
-  assert.match(html, /state\.documentsSectionOpen = true;/);
+  assert.match(html, /if \(el\.showDocuments\) \{/);
   assert.equal(html.includes('>Refresh</button>'), false);
   assert.equal(html.includes('Result images'), false);
   assert.equal(html.includes('id="renderConsensusImage"'), false);
@@ -1139,8 +1139,10 @@ test('Mini App exposes admin state only for configured export admin managed wall
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_all'), true);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_allow'), true);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_revoke'), true);
+  assert.equal(adminState.admin.actions.map((action) => action.action).includes('question_queue'), true);
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_all').label, 'Export data');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_access').label, 'Manage permissions');
+  assert.equal(adminState.admin.actions.find((action) => action.action === 'question_queue').label, 'Question queue');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_allow').label, 'Add admin');
   assert.equal(guestState.admin.available, false);
   assert.equal(guestState.admin.reason, 'response_export_admin_required');

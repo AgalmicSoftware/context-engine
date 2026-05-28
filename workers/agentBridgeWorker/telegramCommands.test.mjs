@@ -427,7 +427,7 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   assert.equal(result.screen, 'group_session_card');
   assert.equal(result.response.chatId, '-100123');
   assert.match(result.response.text, /Session: Alpha Session/);
-  assert.match(result.response.text, /Use \/attachments for session files/);
+  assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.includes('/me'), false);
   assert.equal(result.response.text.includes('Use /questions'), false);
 
@@ -436,7 +436,7 @@ test('group /join returns a Workers-safe session card with opaque buttons only',
   const callbackButtons = buttons.filter((button) => button.callback_data);
   assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
   assert.equal(startButton.url.includes('alpha'), false);
-  assert.equal(callbackButtons.length, 4);
+  assert.equal(callbackButtons.length, 3);
   for (const button of callbackButtons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
     assert.equal(button.callback_data.includes('alpha'), false);
@@ -1641,6 +1641,8 @@ test('/start and /me show admin actions only to the configured export admin', as
   });
   const resultsSettingsButton = flattenButtons(adminView.response.replyMarkup)
     .find((button) => button.text === 'Results Settings');
+  const questionQueueButton = flattenButtons(adminView.response.replyMarkup)
+    .find((button) => button.text === 'Question Queue');
   const settingsView = await buildTelegramCommandResponse({
     update: {
       update_id: 7102,
@@ -1675,6 +1677,27 @@ test('/start and /me show admin actions only to the configured export admin', as
     env: allowedEnv,
     now,
   });
+  const questionQueueView = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7104,
+      callback_query: {
+        id: 'callback-question-queue',
+        data: questionQueueButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 71,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env: allowedEnv,
+    now,
+  });
+  const savedQuestionQueue = await buildTelegramCommandResponse({
+    update: privateMessage('/question_queue 1'),
+    env: allowedEnv,
+    now,
+  });
   const policyAfterToggle = await loadSessionPolicy(allowedEnv);
   const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
@@ -1688,12 +1711,18 @@ test('/start and /me show admin actions only to the configured export admin', as
     'Export Responses',
     'Export Access',
     'Results Settings',
+    'Question Queue',
   ]);
   assert.equal(settingsView.screen, 'results_settings');
   assert.match(settingsView.response.text, /Anonymized groups: off/);
   assert.equal(toggled.screen, 'results_settings');
   assert.match(toggled.response.text, /Anonymized groups: on/);
   assert.equal(alphaAfterToggle.resultsExposure.anonymizedGroupsEnabled, true);
+  assert.equal(questionQueueView.screen, 'question_queue_settings');
+  assert.match(questionQueueView.response.text, /Sponsored questions are served first/);
+  assert.match(questionQueueView.response.text, /Set: \/question_queue 1 3 4/);
+  assert.equal(savedQuestionQueue.screen, 'question_queue_settings');
+  assert.deepEqual(savedQuestionQueue.questionQueue.sponsoredQuestionIds, ['q-readiness']);
 });
 
 test('/start admin actions target the latest submitted session before the registry default', async () => {
@@ -2265,7 +2294,7 @@ test('group session binding makes later question and doc commands use the joined
   assert.equal(joinedUserBinding.sessionSlug, 'demo');
   assert.equal(joinedUserBinding.source, 'group_session_select');
   assert.equal(joinedUserBinding.sourceChatId, '-100123');
-  assert.match(joined.response.text, /Use \/attachments for session files/);
+  assert.equal(joined.response.text.includes('/attachments'), false);
   assert.equal(joined.response.text.includes('/me'), false);
   assert.equal(joined.response.text.includes('Use /questions'), false);
   assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
@@ -3570,7 +3599,7 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 
-test('/agent_token creates a seven-day scoped delegation token without exporting key material', async () => {
+test('/agent_token creates a 28-day scoped delegation token without exporting key material', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const env = agentTokenEnv();
   const result = await buildTelegramCommandResponse({
@@ -3582,7 +3611,7 @@ test('/agent_token creates a seven-day scoped delegation token without exporting
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
   assert.match(result.response.text, /^Agent token/m);
-  assert.match(result.response.text, /Expires: 2026-05-15T12:00:00.000Z/);
+  assert.match(result.response.text, /Expires: 2026-06-05T12:00:00.000Z/);
   assert.match(result.response.text, /does not expose your wallet key/);
   const token = result.response.text.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
@@ -3658,6 +3687,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.split('\n').includes('/questions'), true);
+  assert.equal(result.response.text.split('\n').includes('/me - view account / get agent token'), true);
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');

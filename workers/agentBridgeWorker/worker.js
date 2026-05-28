@@ -119,7 +119,6 @@ function telegramPreviewHtml() {
         <button data-command="/add_question What should we decide next?">/add_question</button>
         <button data-command="/pose_question">/pose_question</button>
         <button data-command="/q 1">/q 1</button>
-        <button data-command="/attachments">/attachments</button>
         <button data-command="/me">/me</button>
       </div>
     </aside>

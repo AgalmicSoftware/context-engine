@@ -209,7 +209,7 @@ test('worker preview route renders an interactive mock Telegram surface when ena
   assert.match(text, /mock\/telegram\/preview-update/);
   assert.match(text, /data-command="\/join alpha"/);
   assert.match(text, /data-command="\/questions"/);
-  assert.match(text, /data-command="\/attachments"/);
+  assert.equal(text.includes('data-command="/attachments"'), false);
   assert.equal(text.includes('data-command="/ce_join alpha"'), false);
   assert.equal(text.includes('data-command="/ce_questions"'), false);
   assert.equal(text.includes('data-command="/ce_attachments"'), false);
@@ -1244,7 +1244,7 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
 
   assert.match(byCommand['/start'].text, /Context Engine/);
   assert.match(byCommand['/join alpha'].text, /Session: Alpha Session/);
-  assert.match(byCommand['/join alpha'].text, /Use \/attachments for session files/);
+  assert.equal(byCommand['/join alpha'].text.includes('/attachments'), false);
   assert.match(byCommand['/sessions'].text, /Sessions \(2\/2\)/);
   assert.match(byCommand['/questions'].text, /^Questions \(2\/2\)/);
   assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?/);
