@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -119,6 +119,9 @@ import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardHeader from './SessionWizardHeader';
 import SessionWizardModals from './SessionWizardModals';
+import SessionWizardRequirementsBanner, {
+  SESSION_WIZARD_REQUIREMENT_LINKS,
+} from './SessionWizardRequirementsBanner';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
   buildNormalModeCards,
@@ -533,13 +536,6 @@ type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploa
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
-const NEW_SESSION_RESOURCE_LINKS = Object.freeze({
-  openaiApiKey: 'https://platform.openai.com/api-keys',
-  litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
-  arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
-  optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
-});
-
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS));
@@ -1160,7 +1156,7 @@ const SessionWizard = ({
     return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
   }, [newSessionFundingChain]);
   const newSessionFundingRequirementHref = Number(newSessionFundingChain?.id || 0) === 11155420
-    ? NEW_SESSION_RESOURCE_LINKS.optimismSepoliaFaucet
+    ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet
     : '';
 
   const buildWorkerName = (rawName) => {
@@ -4843,89 +4839,12 @@ const SessionWizard = ({
       />
 
       {showNewSessionRequirementsBanner ? (
-        <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
-          <div className={styles.newSessionBannerHeader}>
-            <h2 id="new-session-requirements-title" className={styles.newSessionBannerTitle}>
-              To create a session you&apos;ll need:
-            </h2>
-            <button
-              type="button"
-              className={`${styles.iconButton} ${styles.newSessionBannerDismissButton}`}
-              aria-label="Dismiss session setup requirements"
-              title="Dismiss session setup requirements"
-              onClick={handleDismissNewSessionRequirementsBanner}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-          <div className={styles.newSessionBannerBody}>
-            <ul className={styles.newSessionBannerList}>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.openaiApiKey}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  OpenAI API key
-                </a>
-                {' '}for text and transcription
-              </li>
-              <li>
-                {newSessionRequiresLitCredential ? (
-                  <>
-                    <a
-                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.newSessionBannerLink}
-                    >
-                      Lit API key
-                    </a>
-                    {' '}for encrypted access automation
-                  </>
-                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
-              </li>
-              <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.arweaveWallet}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  Arweave wallet (JWK)
-                </a>
-                {' '}for permanent storage
-              </li>
-              <li>
-                {newSessionFundingRequirementHref ? (
-                  <a
-                    href={newSessionFundingRequirementHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.newSessionBannerLink}
-                  >
-                    {newSessionFundingRequirementLabel}
-                  </a>
-                ) : newSessionFundingRequirementLabel}
-              </li>
-              <li>(Optional) A faucet private key for sponsoring user gas</li>
-            </ul>
-            <p className={styles.newSessionBannerCopy}>
-              A turnkey tool for bundling these resources is in development.
-            </p>
-            <p className={styles.newSessionBannerCopy}>
-              In the meantime, you can get a sponsored session URL by contacting{' '}
-              <a
-                href="mailto:contextengine@protonmail.com"
-                className={styles.newSessionBannerLink}
-              >
-                contextengine@protonmail.com
-              </a>
-              .
-            </p>
-          </div>
-        </section>
+        <SessionWizardRequirementsBanner
+          fundingRequirementHref={newSessionFundingRequirementHref}
+          fundingRequirementLabel={newSessionFundingRequirementLabel}
+          newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+          onDismiss={handleDismissNewSessionRequirementsBanner}
+        />
       ) : null}
 
       {sponsoredBundleStatus ? (
