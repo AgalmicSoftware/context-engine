@@ -3799,22 +3799,23 @@ const SessionWizard = ({
       const publishControllerResult = await runSessionWizardPublishController({
         input: {
           publishExecutionPlan,
+          signerAccountOverride: resolvedPublisher,
         },
         ports: {
           deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+          deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) => (
+            deployPendingSbtDrafts({
+              workerUrlOverride: pendingWorkerUrlOverride,
+              signerAccountOverride,
+            })
+          ),
         },
         callbacks: {
           setPublishStep,
         },
       });
       workerUrlOverride = publishControllerResult.workerUrlOverride;
-      if (publishExecutionPlan.shouldDeployPendingSbts) {
-        setPublishStep(publishStepNumbers['deploy-sbts']);
-        deployedPendingDrafts = await deployPendingSbtDrafts({
-          workerUrlOverride,
-          signerAccountOverride: resolvedPublisher,
-        });
-      }
+      deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
       if (publishExecutionPlan.shouldUploadMetadata) {
         setPublishStep(publishStepNumbers['upload-metadata']);
         uploadResult = await handleUploadMetadata({
