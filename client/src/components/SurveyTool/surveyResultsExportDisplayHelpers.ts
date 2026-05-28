@@ -40,3 +40,21 @@ export const getSurveyResultsExportTypeLabel = (value: unknown = ''): string => 
   const key = String(value || '').trim();
   return SURVEY_RESULTS_EXPORT_TYPE_LABELS[key] || key;
 };
+
+export type SurveyResultsExportControlsDisplayDescriptor = {
+  exportAreaOpen: boolean;
+  exportOptions: readonly SurveyResultsExportOption[];
+  exportTypeLabel: string;
+};
+
+export const buildSurveyResultsExportControlsDisplayDescriptor = ({
+  exportAreaOpen = false,
+  exportType = '',
+}: {
+  exportAreaOpen?: unknown;
+  exportType?: unknown;
+} = {}): SurveyResultsExportControlsDisplayDescriptor => ({
+  exportAreaOpen: !!exportAreaOpen,
+  exportOptions: SURVEY_RESULTS_EXPORT_OPTIONS,
+  exportTypeLabel: getSurveyResultsExportTypeLabel(exportType),
+});

@@ -145,9 +145,8 @@ import {
   type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
 import {
-  SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
-  getSurveyResultsExportTypeLabel as getExportTypeLabel,
+  buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
@@ -4528,6 +4527,10 @@ const slug = this.getEffectiveSlug();
 const preQuestionNetworkData = this.getScopedQuestionNetworkDataSync(viewMode);
 const preNetworkQuestions = preQuestionNetworkData.questions || {};
 const questionFilterQuestions = this.getMemoizedQuestionFilterQuestions(preNetworkQuestions);
+const exportControlsDisplay = buildSurveyResultsExportControlsDisplayDescriptor({
+  exportAreaOpen,
+  exportType,
+});
 const aggregatorEntries = this.getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
 const aggregatorEntriesCount = aggregatorEntries.length;
 const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQuestions);
@@ -4979,9 +4982,9 @@ return (
         </div>
 
         <SurveyResultsExportControls
-          exportAreaOpen={exportAreaOpen}
-          exportOptions={EXPORT_OPTIONS}
-          exportTypeLabel={getExportTypeLabel(exportType)}
+          exportAreaOpen={exportControlsDisplay.exportAreaOpen}
+          exportOptions={exportControlsDisplay.exportOptions}
+          exportTypeLabel={exportControlsDisplay.exportTypeLabel}
           onDownload={this.downloadCSV}
           onExportTypeChange={this.handleExportTypeChange}
           onToggleExportArea={this.toggleExportArea}
