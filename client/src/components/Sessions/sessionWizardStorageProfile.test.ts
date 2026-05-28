@@ -2,6 +2,8 @@ import {
   SESSION_STORAGE_BACKENDS,
   SESSION_STORAGE_CLOUDFLARE_PRIMITIVES,
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  SESSION_STORAGE_PROFILE_DISPLAY_COPY,
+  buildSessionStorageProfileDisplayDescriptor,
   buildDefaultSessionStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
@@ -98,5 +100,47 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.payloadAccessControl.label).toBe('Public-read Cloudflare payloads');
     expect(profile.sbtGatedAccess.litRequired).toBe('not_required_public_read');
     expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ);
+  });
+
+  test('describes backend display options and helper copy', () => {
+    const litArweave = buildSessionStorageProfileDisplayDescriptor({ backend: 'lit-arweave' });
+
+    expect(litArweave.backendOptions).toEqual([
+      { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave', selected: false },
+      { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave', selected: true },
+      { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare', selected: false },
+    ]);
+    expect(litArweave.backendHelperText).toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.litArweave);
+    expect(litArweave.showCloudflarePayloadAccessControls).toBe(false);
+    expect(litArweave.cloudflarePayloadAccessOptions).toEqual([]);
+  });
+
+  test('describes Cloudflare payload access mode display options and helper copy', () => {
+    const publicRead = buildSessionStorageProfileDisplayDescriptor({
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'public_read' },
+    });
+    const litEncrypted = buildSessionStorageProfileDisplayDescriptor({
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'lit_encrypted' },
+    });
+    const workerSbtGate = buildSessionStorageProfileDisplayDescriptor({
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    });
+
+    expect(publicRead.backendHelperText).toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.cloudflare);
+    expect(publicRead.showCloudflarePayloadAccessControls).toBe(true);
+    expect(publicRead.cloudflarePayloadAccessOptions).toEqual([
+      { mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ, label: 'Public read', selected: true },
+      { mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE, label: 'Worker SBT gate', selected: false },
+      { mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED, label: 'Lit encrypted', selected: false },
+    ]);
+    expect(publicRead.cloudflarePayloadAccessHelperText)
+      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.publicRead);
+    expect(litEncrypted.cloudflarePayloadAccessHelperText)
+      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.litEncrypted);
+    expect(workerSbtGate.cloudflarePayloadAccessHelperText)
+      .toBe(SESSION_STORAGE_PROFILE_DISPLAY_COPY.workerSbtGate);
   });
 });
