@@ -322,15 +322,13 @@ export const buildQuestionPromptDecryptDisplayState = ({
   account?: unknown;
   canReloadPrompt?: unknown;
 } = {}) => {
-  const qid = String(questionId || '')
-    .trim()
-    .toLowerCase();
+  const qid = String(questionId || '').trim().toLowerCase();
   const normalizedPromptText = promptText || 'Question';
   const display = payloadDisplay && typeof payloadDisplay === 'object' ? payloadDisplay : {};
   const requiresLogin = !!display.requiresAuth && (!loginComplete || !account);
   const actionTitle = requiresLogin
     ? 'Login required to decrypt gated prompts.'
-    : display.actionTitle || 'Decrypt gated prompt';
+    : (display.actionTitle || 'Decrypt gated prompt');
 
   return {
     qid,
@@ -338,7 +336,7 @@ export const buildQuestionPromptDecryptDisplayState = ({
     promptMasked: !!promptMasked,
     showPromptAction: !!promptMasked && !!qid,
     promptTitle: actionTitle,
-    promptLabel: promptMasked ? display.label || normalizedPromptText : normalizedPromptText,
+    promptLabel: promptMasked ? (display.label || normalizedPromptText) : normalizedPromptText,
     promptBusyLabel: display.busyLabel || 'Decrypting...',
     noticeLeadingText: display.noticeLeadingText,
     noticeStatusText: display.noticeStatusText,

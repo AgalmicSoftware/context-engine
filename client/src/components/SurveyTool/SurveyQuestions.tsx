@@ -177,7 +177,8 @@ import {
   buildGatedPromptNoticeState,
   buildLockAudienceButtonAction,
   buildLockAudienceDisplayState,
-  isQuestionPromptMasked as isQuestionPromptMaskedHelper,
+  buildQuestionPromptDecryptDisplayState,
+  isQuestionPromptMasked,
 } from './surveyToolViewState.js';
 import {
   buildCanDecryptOtherResponsesSnapshot,
@@ -2903,37 +2904,42 @@ export class SurveyQuestions extends Component {
     const promptMasked = this.isMaskedPromptText(promptText);
     const payloadDisplay = this.getQuestionPayloadDisplayState(question);
     const promptReloading = this.isQuestionFieldBusy(qid, 'prompt');
-    const promptTitle = payloadDisplay.requiresAuth && (!this.props.loginComplete || !this.props.account)
-        ? 'Login required to decrypt gated prompts.'
-        : (payloadDisplay.actionTitle || 'Decrypt gated prompt');
-    const promptLabel = promptMasked ? (payloadDisplay.label || promptText) : promptText;
-    const promptBusyLabel = payloadDisplay.busyLabel || 'Decrypting...';
+    const promptDisplay = buildQuestionPromptDecryptDisplayState({
+      questionId: qid,
+      promptText,
+      promptMasked,
+      promptReloading,
+      payloadDisplay,
+      loginComplete: this.props.loginComplete,
+      account: this.props.account,
+      canReloadPrompt: promptMasked && qid,
+    });
 
     return (
       <div className={styles.promptTitleBlock}>
         <h4 id={styles.questionTitle}>
-          {promptMasked && qid ? (
+          {promptDisplay.showPromptAction ? (
             <button
               type="button"
               className={styles.maskedPromptActionButton}
               data-testid={E2E_TESTIDS.SURVEY_DECRYPT_PROMPT}
-              data-ce-question-id={qid}
-              onClick={() => this.handleReloadMaskedPrompt(qid)}
-              disabled={promptReloading}
-              aria-busy={promptReloading}
-              title={promptTitle}
+              data-ce-question-id={promptDisplay.qid}
+              onClick={() => this.handleReloadMaskedPrompt(promptDisplay.qid)}
+              disabled={promptDisplay.noticeActionDisabled}
+              aria-busy={promptDisplay.noticeActionBusy}
+              title={promptDisplay.promptTitle}
             >
-              {promptReloading ? (
+              {promptDisplay.noticeActionBusy ? (
                 <span className={styles.maskedPromptLoading}>
                   <FontAwesomeIcon icon={faSpinner} spin className={styles.maskedPromptLoadingSpinner} />
-                  <span>{promptBusyLabel}</span>
+                  <span>{promptDisplay.promptBusyLabel}</span>
                 </span>
               ) : (
-                promptLabel
+                promptDisplay.promptLabel
               )}
             </button>
           ) : (
-            promptText
+            promptDisplay.promptText
           )}
         </h4>
       </div>
@@ -3364,24 +3370,31 @@ export class SurveyQuestions extends Component {
     const promptReloading = qid ? this.isQuestionFieldBusy(qid, 'prompt') : false;
     const canReloadPrompt = qid && this.isQuestionPromptMasked(question);
     const payloadDisplay = this.getQuestionPayloadDisplayState(question);
-    const actionTitle = payloadDisplay.requiresAuth && (!this.props.loginComplete || !this.props.account)
-      ? 'Login required to decrypt gated prompts.'
-      : (payloadDisplay.actionTitle || 'Decrypt gated prompt');
+    const promptDisplay = buildQuestionPromptDecryptDisplayState({
+      questionId: qid,
+      promptText: question?.prompt || 'Question',
+      promptMasked: this.isMaskedPromptText(question?.prompt || 'Question'),
+      promptReloading,
+      payloadDisplay,
+      loginComplete: this.props.loginComplete,
+      account: this.props.account,
+      canReloadPrompt,
+    });
 
     return (
       <GatedPromptNotice
         questionId={question.id}
         tooltipId={tooltipId}
         tooltipText={tooltipText}
-        leadingText={payloadDisplay.noticeLeadingText}
-        statusText={payloadDisplay.noticeStatusText}
-        suffix={payloadDisplay.noticeSuffix}
-        actionBusy={promptReloading}
-        actionDisabled={promptReloading}
-        actionLabel={payloadDisplay.actionLabel || 'Decrypt Prompt'}
+        leadingText={promptDisplay.noticeLeadingText}
+        statusText={promptDisplay.noticeStatusText}
+        suffix={promptDisplay.noticeSuffix}
+        actionBusy={promptDisplay.noticeActionBusy}
+        actionDisabled={promptDisplay.noticeActionDisabled}
+        actionLabel={promptDisplay.noticeActionLabel}
         actionTestId={E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE}
-        actionTitle={actionTitle}
-        onAction={canReloadPrompt ? () => this.handleReloadMaskedPrompt(qid) : undefined}
+        actionTitle={promptDisplay.noticeActionTitle}
+        onAction={promptDisplay.canReloadPrompt ? () => this.handleReloadMaskedPrompt(promptDisplay.qid) : undefined}
       />
     );
   };
@@ -10749,6 +10762,7 @@ export class SurveyQuestions extends Component {
     const responseJson = jsonPanelDisplayState.showResponseJsonPanel
       ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
       : null;
+    const submittedStateActive = submitFooterDisplayState.submittedStateActive;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
     const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
     const showInlineSubmit = submitFooterDisplayState.showInlineSubmit;
