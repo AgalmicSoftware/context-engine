@@ -181,7 +181,6 @@ import {
 
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
-import SBTPage from '../SBTs/SBTPage';
 import { Collapse } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
 import UserPageDeepScanProgressPanel, {
@@ -190,6 +189,7 @@ import UserPageDeepScanProgressPanel, {
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
+import UserPageSbtSection from './UserPageSbtSection';
 
 // NEW IMPORT: for mini question display
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -4523,49 +4523,25 @@ class UserPage extends Component<any, any> {
               </div>
             )}
 
-            <div className={styles.rightColumn}>
-              <div className={styles.sbtSection}>
-                <h2>
-                  {`${t('minted')} ${t('sbts')}:`}
-                  {/* Corner spinner (Green) for ANY loading activity */}
-                  {isSbtLoadingAny && (
-                    this.renderDeepScanStatusIndicator(
-                        sbtSpinnerId,
-                        deepScanTooltipContent,
-                        deepScanProgressRows,
-                        deepScanTooltipTitle
-                      )
-                  )}
-                </h2>
-                {sbtDisplayState.hasSbts ? (
-                  <div className={styles.sbtGrid}>
-                    {sbtEntries.map((sbtItem, index: number) => (
-                      <SBTPage
-                        key={index}
-                        SBTAddress={sbtItem.sbtInfo.sbtAddress}
-                        account={account}
-                        provider={provider}
-                        network={network}
-                        miniaturized={true}
-                        loginComplete={loginComplete}
-                        /* Use readiness passed from MainSite to control child spinners */
-                        isSBTCacheReady={this.props.isSBTCacheReady}
-                        /* NEW: mini cards are metadata-only, avoid any chain scans/persistence */
-                        metadataOnly={true}
-                        /* NEW: Pass the source slug to allow cross-group hydration */
-                        sessionSlug={sbtItem.slug}
-                        refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
-                      />
-                    ))}
-                  </div>
-                ) : sbtDisplayState.shouldRenderMainEmptyText ? (
-                  <p>{sbtEmptyText}</p>
-                ) : (
-                   // Suppress white spinner; rely on green corner spinner
-                   null
-                )}
-              </div>
-            </div>
+            <UserPageSbtSection
+              account={account}
+              heading={`${t('minted')} ${t('sbts')}:`}
+              isLoading={isSbtLoadingAny}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              loadingIndicator={isSbtLoadingAny ? this.renderDeepScanStatusIndicator(
+                sbtSpinnerId,
+                deepScanTooltipContent,
+                deepScanProgressRows,
+                deepScanTooltipTitle
+              ) : null}
+              loginComplete={loginComplete}
+              network={network}
+              onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+              provider={provider}
+              sbtDisplayState={sbtDisplayState}
+              sbtEmptyText={sbtEmptyText}
+              sbtEntries={sbtEntries}
+            />
           </div>
         )}
 
