@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
   dispatchTelegramCommandResponse,
+  fetchUrlQuestionSource,
   handleTelegramWebhookUpdate,
   loadSubmittedResultRecords,
   loadSessionPolicy,
@@ -97,6 +98,10 @@ function baseEnv(overrides = {}) {
     AGENT_ACTION_KV: new MemoryKv(),
     ...overrides,
   };
+}
+
+function dotenvEscapedJson(value = {}) {
+  return JSON.stringify(value).replaceAll('"', '\\"');
 }
 
 function groupMessage(text) {
@@ -518,6 +523,7 @@ test('/sessions paginates tall Telegram session lists', async () => {
 
 test('/sessions lists only Telegram-enabled sessions', async () => {
   const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
@@ -1088,6 +1094,7 @@ test('/results group shows participant graph with question legend', async () => 
 test('/results group analysis callback uses session worker AI for the selected participant group', async () => {
   const calls = [];
   const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
@@ -1125,6 +1132,7 @@ test('/results group analysis callback uses session worker AI for the selected p
     if (target.endsWith('/ai')) {
       assert.equal(init.headers.Authorization, 'Bearer worker-token');
       const body = JSON.parse(init.body || '{}');
+      assert.equal(body.apiKey, 'sk-bridge-openai');
       assert.match(body.messages?.[1]?.content || '', /Top statements/);
       assert.match(body.messages?.[1]?.content || '', /Additional comments and freeform responses/);
       assert.match(body.messages?.[1]?.content || '', /Shipping is okay if rollback is ready/);
@@ -2694,6 +2702,12 @@ test('/add_question exposes type chooser, supports multichoice syntax, and allow
         default: true,
         telegramBridgeEnabled: true,
         telegramOnly: true,
+        defaultGroupChatId: '-100123',
+      }, {
+        sessionSlug: 'beta',
+        sessionName: 'Beta Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
       }],
     }),
   });
@@ -2731,11 +2745,12 @@ test('/add_question exposes type chooser, supports multichoice syntax, and allow
   assert.match(typed.response.text, /Type: Multi-choice/);
   assert.match(typed.response.text, /Pizza \| Salad \| Tacos/);
 
-  await buildTelegramCommandResponse({
-    update: privateMessage('/join alpha'),
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
     env,
     now: '2026-05-08T12:00:02.000Z',
   });
+  assert.equal(start.ok, true);
   const added = await buildTelegramCommandResponse({
     update: privateMessage('/add_question multichoice: What should lunch be? options: Pizza, Salad, Tacos'),
     env,
@@ -2750,6 +2765,355 @@ test('/add_question exposes type chooser, supports multichoice syntax, and allow
   assert.equal(added.ok, true);
   assert.match(added.response.text, /Question added to Alpha Session/);
   assert.match(questions.response.text, /What should lunch be\?/);
+});
+
+test('URL question generation drafts numbered candidates and keeps selected questions', async () => {
+  const aiPrompts = [];
+  let aiGenerationCall = 0;
+  const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      allowAddQuestion: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        defaultGroupChatId: '-100123',
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        workerSessionSlug: 'alpha',
+        sessionContext: 'Alpha focuses on source-grounded AI governance tradeoffs.',
+        questionTags: ['ai', 'governance'],
+      }, {
+        sessionSlug: 'beta',
+        sessionName: 'Beta Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+    AGENT_BRIDGE_FETCH: async (url, options = {}) => {
+      const target = String(url);
+      if (target === 'https://example.com/article') {
+        return new Response(`<!doctype html><html><head><title>AI Governance Article</title></head><body>
+          <h1>AI Governance Article</h1>
+          <p>This article argues that communities need practical AI governance norms, clear consent,
+          participant review, and lightweight ways to surface disagreement before decisions are made.</p>
+          <p>It also says source material should lead to questions that expose tradeoffs rather than
+          quizzes about the article itself.</p>
+        </body></html>`, {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      if (target.endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/auth/login')) {
+        return new Response(JSON.stringify({ token: 'session-token' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/ai')) {
+        const body = JSON.parse(options.body || '{}');
+        assert.equal(body.apiKey, 'sk-bridge-openai');
+        const prompt = body.messages?.[1]?.content || '';
+        aiPrompts.push(prompt);
+        aiGenerationCall += 1;
+        const regenerated = /Regeneration Feedback:/i.test(prompt);
+        const prefix = regenerated ? 'Regenerated organizer tradeoff question' : 'AI governance question';
+        return new Response(JSON.stringify({
+          completion: JSON.stringify({
+            surveyTitle: 'AI Governance Article',
+            questions: Array.from({ length: 5 }, (_, index) => ({
+              prompt: `${prefix} ${index + 1} should be discussed by the group.`,
+              questionType: 'binary',
+              tags: ['ai', 'governance'],
+            })),
+          }),
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch ${target}`);
+    },
+  });
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  assert.equal(start.ok, true);
+  const generated = await buildTelegramCommandResponse({
+    update: privateMessage('Create some questions based on this URL: https://example.com/article'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  assert.equal(generated.ok, true);
+  assert.equal(generated.screen, 'generate_questions');
+  assert.match(generated.response.text, /Drafted 5 Agree questions for Alpha Session/);
+  assert.match(generated.response.text, /1\. AI governance question 1/);
+  assert.match(generated.response.text, /1\. AI governance question 1 should be discussed by the group\.\n\n2\. AI governance question 2/);
+  assert.doesNotMatch(generated.response.text, /6\. AI governance question 6/);
+  assert.match(generated.response.text, /Reply with numbers to keep/);
+  assert.match(generated.response.text, /Reply regenerate with <feedback>/);
+  assert.equal(aiPrompts.length, 1);
+  assert.equal(aiGenerationCall, 1);
+  assert.match(aiPrompts[0], /Group Custom Instructions: Alpha focuses on source-grounded AI governance tradeoffs\./);
+  assert.match(aiPrompts[0], /These should not be about the document itself, or in any sort of quiz format/);
+  assert.match(aiPrompts[0], /Prioritize questions that clarify contested terms, surface trade-offs, and invite constructive next steps/);
+  assert.match(aiPrompts[0], /prioritizing the most contentious or interesting hotspots first/);
+  assert.match(aiPrompts[0], /Count fidelity: generate exactly the requested count/);
+  assert.match(aiPrompts[0], /numberOfSeedStatementsOrPrompts: 5/);
+  assert.match(aiPrompts[0], /TypeOfQuestionsToInclude: binary/);
+
+  const regenerated = await buildTelegramCommandResponse({
+    update: privateMessage('regenerate with focus on organizer decision tradeoffs'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  assert.equal(regenerated.ok, true);
+  assert.equal(regenerated.screen, 'generate_questions');
+  assert.match(regenerated.response.text, /Regenerated 5 Agree questions for Alpha Session/);
+  assert.match(regenerated.response.text, /Feedback: focus on organizer decision tradeoffs/);
+  assert.match(regenerated.response.text, /1\. Regenerated organizer tradeoff question 1/);
+  assert.match(regenerated.response.text, /1\. Regenerated organizer tradeoff question 1 should be discussed by the group\.\n\n2\. Regenerated organizer tradeoff question 2/);
+  assert.equal(aiPrompts.length, 2);
+  assert.match(aiPrompts[1], /Regeneration Feedback:\s+focus on organizer decision tradeoffs/);
+  assert.match(aiPrompts[1], /Previous Candidates To Improve Or Replace/);
+  assert.match(aiPrompts[1], /AI governance question 1 should be discussed by the group\./);
+
+  const kept = await buildTelegramCommandResponse({
+    update: privateMessage('1 3 5'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+  assert.equal(kept.ok, true);
+  assert.equal(kept.screen, 'generate_questions');
+  assert.match(kept.response.text, /Kept 3 questions in Alpha Session/);
+  assert.match(kept.response.text, /Regenerated organizer tradeoff question 1/);
+  assert.match(kept.response.text, /Regenerated organizer tradeoff question 3/);
+  assert.match(kept.response.text, /Regenerated organizer tradeoff question 5/);
+
+  const questions = await buildTelegramCommandResponse({
+    update: privateMessage('/questions alpha'),
+    env,
+    now: '2026-05-08T12:00:04.000Z',
+  });
+  assert.match(questions.response.text, /Regenerated organizer tradeoff question 1/);
+  assert.match(questions.response.text, /Regenerated organizer tradeoff question 3/);
+  assert.match(questions.response.text, /Regenerated organizer tradeoff question 5/);
+});
+
+test('URL question generation retries empty AI output and accepts compact string candidates', async () => {
+  let aiCalls = 0;
+  const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        workerSessionSlug: 'alpha',
+      }],
+    }),
+    AGENT_BRIDGE_FETCH: async (url, options = {}) => {
+      const target = String(url);
+      if (target === 'https://example.com/source') {
+        return new Response('<html><head><title>Source</title></head><body>Agent village organizers need questions about participant onboarding, governance, consent, and experiment outcomes. The group wants practical deliberation prompts rather than quizzes.</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      if (target.endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/auth/login')) {
+        return new Response(JSON.stringify({ token: 'session-token' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/ai')) {
+        aiCalls += 1;
+        const body = JSON.parse(options.body || '{}');
+        assert.equal(body.apiKey, 'sk-bridge-openai');
+        if (aiCalls === 1) {
+          assert.equal(body.max_output_tokens, 6000);
+          return new Response(JSON.stringify({ completion: JSON.stringify({ questions: [] }) }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        assert.equal(body.max_output_tokens, 12000);
+        assert.equal(body.reasoning_effort, 'minimal');
+        return new Response(JSON.stringify({
+          completion: JSON.stringify({
+            questions: [
+              'Organizers should prioritize participant onboarding before adding more agent features.',
+              { statement: 'The experiment should measure governance outcomes explicitly.', type: 'binary' },
+            ],
+          }),
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch ${target}`);
+    },
+  });
+
+  const generated = await buildTelegramCommandResponse({
+    update: privateMessage('Generate 2 questions based on this URL: https://example.com/source'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(generated.ok, true);
+  assert.equal(aiCalls, 2);
+  assert.match(generated.response.text, /Drafted 2 Agree questions for Alpha Session/);
+  assert.match(generated.response.text, /1\. Organizers should prioritize participant onboarding/);
+  assert.match(generated.response.text, /2\. The experiment should measure governance outcomes explicitly\./);
+});
+
+test('URL question generation falls back to source-grounded local drafts when AI stays empty', async () => {
+  let aiCalls = 0;
+  const env = baseEnv({
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Agent Village Organizers',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        workerSessionSlug: 'alpha',
+      }],
+    }),
+    AGENT_BRIDGE_FETCH: async (url) => {
+      const target = String(url);
+      if (target === 'https://example.com/source') {
+        return new Response('<html><head><title>Source</title></head><body>Agent village organizers need questions about personal AI agents, participant consent, community governance, and experiment outcomes. The session should help organizers decide how to run a useful coordination experiment.</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        });
+      }
+      if (target.endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/auth/login')) {
+        return new Response(JSON.stringify({ token: 'session-token' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (target.endsWith('/ai')) {
+        aiCalls += 1;
+        return new Response(JSON.stringify({ completion: JSON.stringify({ questions: [] }) }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch ${target}`);
+    },
+  });
+
+  const generated = await buildTelegramCommandResponse({
+    update: privateMessage('Generate 3 questions based on this URL: https://example.com/source'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(generated.ok, true);
+  assert.equal(aiCalls, 2);
+  assert.match(generated.response.text, /Drafted 3 Agree questions for Agent Village Organizers/);
+  assert.match(generated.response.text, /agent coordination|participant onboarding|community governance/i);
+});
+
+test('URL question source fetch rejects oversized responses before buffering content', async () => {
+  const fetched = await fetchUrlQuestionSource({
+    url: 'https://example.com/huge',
+    fetchImpl: async () => new Response('small placeholder body', {
+      status: 200,
+      headers: {
+        'content-type': 'text/html',
+        'content-length': '1000001',
+      },
+    }),
+  });
+
+  assert.equal(fetched.ok, false);
+  assert.equal(fetched.reason, 'url_response_too_large');
+  assert.equal(fetched.finalUrl, 'https://example.com/huge');
+});
+
+test('private Telegram-only authoring accepts dotenv-escaped session policy JSON', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: dotenvEscapedJson({
+      defaultSessionSlug: 'telegram-demo-4',
+      riskCeiling: 'submit',
+      allowAddQuestion: true,
+      sessions: [{
+        sessionSlug: 'telegram-demo-4',
+        sessionName: 'Agent Village Organizers (Demo)',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        managedAccountSubmitAllowed: true,
+        defaultGroupChatId: '-100123',
+      }],
+    }),
+  });
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-27T18:30:00.000Z',
+  });
+  assert.equal(start.ok, true);
+  assert.match(start.response.text, /Session: Agent Village Organizers \(Demo\)/);
+
+  const added = await buildTelegramCommandResponse({
+    update: privateMessage('/add_question binary: Organizers should publish explicit agent override rules.'),
+    env,
+    now: '2026-05-27T18:30:01.000Z',
+  });
+
+  assert.equal(added.ok, true);
+  assert.equal(added.screen, 'add_question');
+  assert.match(added.response.text, /Question added to Agent Village Organizers \(Demo\)/);
 });
 
 test('/groups manages lightweight Telegram-only group selections from the private bot', async () => {
@@ -3191,7 +3555,9 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.screen, 'setup_welcome');
   const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
   assert.deepEqual(buttonLabels, ['Mini App']);
-  assert.equal(result.response.text.includes('/results [ consensus | group ]'), true);
+  assert.equal(result.response.text.includes('/results [ consensus | group ]'), false);
+  assert.equal(result.response.text.split('\n').includes('/results'), true);
+  assert.equal(result.response.text.includes('/q <number>'), false);
   assert.equal(result.response.text.includes('/actions'), false);
   assert.equal(result.response.text.includes('/settings'), false);
   assert.equal(result.response.text.includes('/join'), false);
@@ -3199,7 +3565,8 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/groups'), false);
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
-  assert.equal(result.response.text.includes('/questions - view session questions'), true);
+  assert.equal(result.response.text.split('\n').includes('/questions'), true);
+  assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);

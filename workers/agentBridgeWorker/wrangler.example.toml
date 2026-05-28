@@ -105,5 +105,6 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 #   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 #   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
 #   npx wrangler secret put AGENT_BRIDGE_AGENT_API_TOKEN
+#   npx wrangler secret put AGENT_BRIDGE_OPENAI_API_KEY
 # Keep CLOUDFLARE_API_TOKEN out of deployed Worker secrets. Use it only from an
 # untracked local shell/.env/.dev.vars for deploy planning or apply automation.

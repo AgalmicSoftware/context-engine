@@ -1031,11 +1031,12 @@ export function buildTelegramAgentSettingsOverviewState({
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, true),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
     settings: normalizedSettings,
-    editableFields: ['draftStyle', 'showUnansweredFirst'],
+    editableFields: ['draftStyle', 'showUnansweredFirst', 'agentAutoApplyQuestionVotes'],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.read',
       body: {
@@ -1055,6 +1056,7 @@ export function buildTelegramAgentSettingsEditState({
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
+    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, true),
   });
   return buildTelegramScreenState('agent_settings_edit', {
     preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
@@ -1065,12 +1067,17 @@ export function buildTelegramAgentSettingsEditState({
       input: 'select',
       options: ['concise', 'balanced', 'detailed'],
       value: current.draftStyle,
-    }, {
-      field: 'showUnansweredFirst',
-      label: 'Show un-answered questions first',
-      input: 'toggle',
-      value: current.showUnansweredFirst,
-    }],
+  }, {
+    field: 'showUnansweredFirst',
+    label: 'Show un-answered questions first',
+    input: 'toggle',
+    value: current.showUnansweredFirst,
+  }, {
+    field: 'agentAutoApplyQuestionVotes',
+    label: 'Allow agents to auto-apply question votes',
+    input: 'toggle',
+    value: current.agentAutoApplyQuestionVotes,
+  }],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.update',
       body: {

@@ -7,6 +7,7 @@ import {
   executeAgentBridgeDeployApply,
   parseAgentBridgeEnvText,
   verifyAgentBridgeHealth,
+  writeAgentBridgeWorkerSecrets,
 } from './deployHelperApply.mjs';
 
 function completeEnv(overrides = {}) {
@@ -38,12 +39,14 @@ test('parseAgentBridgeEnvText treats template placeholders as literal values', (
     'AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev',
     'CE_SESSION_WORKER_BASE_URL=https://<session-worker>.<workers-subdomain>.workers.dev',
     'QUOTED_VALUE="value # not comment"',
+    'JSON_VALUE="{\\"defaultSessionSlug\\":\\"telegram-demo-4\\"}"',
     'PLAIN_VALUE=value # comment',
   ].join('\n'));
 
   assert.equal(parsed.AGENT_BRIDGE_PUBLIC_URL, 'https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev');
   assert.equal(parsed.CE_SESSION_WORKER_BASE_URL, 'https://<session-worker>.<workers-subdomain>.workers.dev');
   assert.equal(parsed.QUOTED_VALUE, 'value # not comment');
+  assert.deepEqual(JSON.parse(parsed.JSON_VALUE), { defaultSessionSlug: 'telegram-demo-4' });
   assert.equal(parsed.PLAIN_VALUE, 'value');
 });
 
@@ -88,6 +91,26 @@ test('deploy apply validation rejects placeholder session worker URLs before mut
   assert.equal(result.ok, false);
   assert.equal(result.error, 'deploy:apply validation failed before making resource changes');
   assert.equal(result.validation.missing.some((entry) => entry.includes('CE_SESSION_WORKER_BASE_URL')), true);
+});
+
+test('writeAgentBridgeWorkerSecrets stores optional bridge OpenAI key when present', async () => {
+  const written = [];
+  const result = await writeAgentBridgeWorkerSecrets({
+    apiToken: 'cf-token',
+    accountId: 'account-123',
+    workerName: 'ce-agent-bridge-worker',
+    env: completeEnv({
+      OPENAI_API_KEY: 'sk-bridge-openai',
+    }),
+    fetchImpl: async (url, init = {}) => {
+      written.push(JSON.parse(init.body || '{}'));
+      return jsonResponse({ success: true, result: {} });
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.written.includes('AGENT_BRIDGE_OPENAI_API_KEY'), true);
+  assert.equal(written.find((entry) => entry.name === 'AGENT_BRIDGE_OPENAI_API_KEY')?.text, 'sk-bridge-openai');
 });
 
 test('verifyAgentBridgeHealth returns structured network failures', async () => {
@@ -190,9 +213,11 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
     if (String(url).startsWith('https://api.telegram.org/bot123456:test-token/setMyCommands')) {
       const body = JSON.parse(options.body || '{}');
       assert.equal(body.commands.some((command) => command.command === 'sessions'), true);
-      assert.equal(body.commands.some((command) => command.command === 'results'), true);
+      assert.equal(body.commands.some((command) => command.command === 'questions' && command.description === 'Questions'), true);
+      assert.equal(body.commands.some((command) => command.command === 'results' && command.description === 'Results'), true);
       assert.equal(body.commands.some((command) => command.command === 'groups'), true);
       assert.equal(body.commands.some((command) => command.command === 'add_question'), true);
+      assert.equal(body.commands.some((command) => command.command === 'q'), false);
       assert.equal(body.commands.some((command) => command.command === 'actions'), false);
       assert.equal(body.commands.some((command) => command.command === 'settings'), false);
       assert.equal(body.commands.some((command) => command.command === 'join'), false);
@@ -239,6 +264,7 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(result.telegram.commands.commands.includes('sessions'), true);
   assert.equal(result.telegram.commands.commands.includes('groups'), true);
   assert.equal(result.telegram.commands.commands.includes('add_question'), true);
+  assert.equal(result.telegram.commands.commands.includes('q'), false);
   assert.equal(result.telegram.commands.commands.includes('actions'), false);
   assert.equal(result.telegram.commands.commands.includes('settings'), false);
   assert.equal(result.telegram.commands.commands.includes('join'), false);

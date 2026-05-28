@@ -1023,6 +1023,7 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
     body: JSON.stringify({
       update_id: 101,
       message: {
+        message_id: 11,
         text: '/start',
         chat: { id: 55, type: 'private' },
         from: { id: 77, username: 'demo_user' },
@@ -1058,8 +1059,10 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
   assert.equal(body.command, '/start');
   assert.equal(body.screen, 'setup_welcome');
   assert.equal(body.telegram.ok, true);
-  assert.equal(telegramCalls.length, 1);
-  assert.equal(String(telegramCalls[0][0]).includes('/sendMessage'), true);
+  const telegramMethods = telegramCalls.map((call) => String(call[0]).split('/').pop());
+  assert.equal(telegramMethods.includes('setMessageReaction'), true);
+  assert.equal(telegramMethods.includes('sendChatAction'), true);
+  assert.equal(telegramMethods.includes('sendMessage'), true);
   assert.equal(JSON.stringify(body).includes('bot-token'), false);
   assert.equal(JSON.stringify(body).includes('webhook-secret'), false);
 });
@@ -1069,6 +1072,7 @@ test('worker Telegram webhook defers Telegram sends when waitUntil is available'
   const request = telegramWebhookRequest({
     update_id: 103,
     message: {
+      message_id: 13,
       text: '/start',
       chat: { id: 55, type: 'private' },
       from: { id: 77, username: 'demo_user' },
@@ -1094,9 +1098,11 @@ test('worker Telegram webhook defers Telegram sends when waitUntil is available'
   assert.equal(body.ok, true);
   assert.equal(body.telegram.ok, true);
   assert.equal(body.telegram.queued, true);
-  assert.equal(waited.length, 1);
-  assert.equal(telegramCalls.length, 1);
-  assert.equal(String(telegramCalls[0][0]).includes('/sendMessage'), true);
+  assert.equal(waited.length, 2);
+  const telegramMethods = telegramCalls.map((call) => String(call[0]).split('/').pop());
+  assert.equal(telegramMethods.includes('setMessageReaction'), true);
+  assert.equal(telegramMethods.includes('sendChatAction'), true);
+  assert.equal(telegramMethods.includes('sendMessage'), true);
 });
 
 test('worker Telegram webhook mocked live-bot smoke covers core commands with safe opaque payloads', async () => {
@@ -1211,7 +1217,10 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
     bodies.push(body);
   }
 
-  assert.equal(telegramCalls.length, commands.length);
+  assert.equal(telegramCalls.length, commands.length * 3);
+  assert.equal(telegramCalls.filter((call) => String(call[0]).endsWith('/sendMessage')).length, commands.length);
+  assert.equal(telegramCalls.filter((call) => String(call[0]).endsWith('/sendChatAction')).length, commands.length);
+  assert.equal(telegramCalls.filter((call) => String(call[0]).endsWith('/setMessageReaction')).length, commands.length);
   assert.deepEqual(bodies.map((body) => body.screen), [
     'setup_welcome',
     'group_session_card',
@@ -1223,10 +1232,11 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
     'my_account',
   ]);
 
-  const payloads = telegramCalls.map(parseTelegramCallPayload);
+  const messageCalls = telegramCalls.filter((call) => String(call[0]).endsWith('/sendMessage'));
+  const payloads = messageCalls.map(parseTelegramCallPayload);
   const byCommand = Object.fromEntries(commands.map((command, index) => [command.text, payloads[index]]));
   for (const [index, payload] of payloads.entries()) {
-    assert.equal(telegramCalls[index][0], 'https://api.telegram.org/bot123456:test-token/sendMessage');
+    assert.equal(messageCalls[index][0], 'https://api.telegram.org/bot123456:test-token/sendMessage');
     assertOpaqueTelegramButtons(flattenButtons(payload.reply_markup));
     assert.equal(JSON.stringify(payload.reply_markup || {}).includes('q-readiness'), false);
     assert.equal(JSON.stringify(payload.reply_markup || {}).includes('alpha'), false);

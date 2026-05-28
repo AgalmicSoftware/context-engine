@@ -39,6 +39,10 @@ export const REQUIRED_AGENT_BRIDGE_SECRET_NAMES = Object.freeze([
   'AGENT_BRIDGE_AGENT_API_TOKEN',
 ]);
 
+export const OPTIONAL_AGENT_BRIDGE_SECRET_NAMES = Object.freeze([
+  'AGENT_BRIDGE_OPENAI_API_KEY',
+]);
+
 export const REQUIRED_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'TELEGRAM_BOT_USERNAME',
   'AGENT_BRIDGE_PUBLIC_URL',
@@ -274,10 +278,16 @@ export function resolveAgentBridgeDeployConfig({
       AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN: safeString(env.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN || 'true'),
       AGENT_AI_PROVIDER: safeString(flags['agent-ai-provider'] || env.AGENT_AI_PROVIDER || 'ce_session_policy'),
     },
-    secrets: Object.fromEntries(REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => [
-      name,
-      redactPresence(flags[name.toLowerCase().replace(/_/g, '-')] || env[name]),
-    ])),
+    secrets: Object.fromEntries([
+      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => [
+        name,
+        redactPresence(flags[name.toLowerCase().replace(/_/g, '-')] || env[name]),
+      ]),
+      ...OPTIONAL_AGENT_BRIDGE_SECRET_NAMES.map((name) => [
+        name,
+        redactPresence(env[name] || (name === 'AGENT_BRIDGE_OPENAI_API_KEY' ? env.OPENAI_API_KEY || env.E2E_OPENAI_KEY : '')),
+      ]),
+    ]),
   };
   return config;
 }
@@ -542,6 +552,14 @@ export function buildAgentBridgeDeployPlan(config = {}) {
       path: `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
       body: { name, type: 'secret_text', text: '<redacted-secret-value>' },
     })),
+    ...OPTIONAL_AGENT_BRIDGE_SECRET_NAMES
+      .filter((name) => config.secrets?.[name] === '[set]')
+      .map((name) => ({
+        purpose: `Write optional ${name} as a Worker secret`,
+        method: 'PUT',
+        path: `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
+        body: { name, type: 'secret_text', text: '<redacted-secret-value>' },
+      })),
     {
       purpose: 'Enable the script on the default workers.dev URL',
       method: 'POST',
