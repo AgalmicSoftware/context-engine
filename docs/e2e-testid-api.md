@@ -89,22 +89,22 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-wizard-mode-normal` | `client/src/components/Sessions/SessionWizard.jsx` | Wizard mode toggle button for Normal mode. | yes |  |
-| `ce-wizard-mode-advanced` | `client/src/components/Sessions/SessionWizard.jsx` | Wizard mode toggle button for Advanced mode. | yes |  |
-| `ce-wizard-metadata-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for the advanced-mode "Session Information" section. | yes |  |
-| `ce-wizard-session-header-url-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `URL` toggle used in Normal mode to reveal the header URL input. | yes |  |
-| `ce-wizard-session-header-paste` | `client/src/components/Sessions/SessionWizard.jsx` | Compact Image field `Paste` button used in Normal mode to pull an image blob or URL from the clipboard. | yes |  |
-| `ce-wizard-worker-mode-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Wrapper around the default/custom worker mode pills in the worker panel. | yes |  |
-| `ce-wizard-worker-mode-button` | `client/src/components/Sessions/SessionWizard.jsx` | Individual worker mode pill button. | yes | `data-ce-worker-mode` (`default` or `custom`) |
-| `ce-wizard-worker-panel-toggle` | `client/src/components/Sessions/SessionWizard.jsx` | Collapsible panel toggle for "Worker deployment & secrets". | yes |  |
-| `ce-wizard-bundle-mode-upload` | `client/src/components/Sessions/SessionWizard.jsx` | Advanced-mode radio that switches worker deployment to local file upload. | yes |  |
-| `ce-wizard-bundle-mode-url` | `client/src/components/Sessions/SessionWizard.jsx` | Advanced-mode radio that switches worker deployment to remote bundle URL mode. | yes |  |
-| `ce-wizard-bundle-file-input` | `client/src/components/Sessions/SessionWizard.jsx` | Worker bundle file input used in both normal-mode upload and advanced upload-mode deploys. | yes |  |
-| `ce-wizard-add-gate` | `client/src/components/Sessions/SessionWizard.jsx` | Add-encryption-gate button in the Encryption panel (main button and ghost card variant). | yes | `data-ce-gate-add-kind` (`panel` or `ghost`) |
-| `ce-wizard-create-sbt` | `client/src/components/Sessions/SessionWizard.jsx` | Opens the inline CreateSBTGroup modal from `/session/new`. | yes | `data-ce-sbt-target` (`defaultFeaturedSBTs` or gate id) |
-| `ce-wizard-pending-sbt` | `client/src/components/Sessions/SessionWizard.jsx` | Pending SBT draft card shown in the Privacy panel before Publish. | yes | `data-ce-sbt-address` |
-| `ce-wizard-resource-card` | `client/src/components/Sessions/SessionWizard.jsx` | Resource-gate card container used for per-resource lock selection. | yes | `data-ce-resource-key` (for example `ai`, `docUploads`) |
-| `ce-wizard-sponsored-status` | `client/src/components/Sessions/SessionWizard.jsx` | Sponsored-bundle status note shown while `/new?sponsored=...#k=...` loads, applies, or fails. | yes |  |
+| `ce-wizard-mode-normal` | `client/src/components/Sessions/SessionWizardHeader.tsx` | Wizard mode toggle button for Normal mode. | yes |  |
+| `ce-wizard-mode-advanced` | `client/src/components/Sessions/SessionWizardHeader.tsx` | Wizard mode toggle button for Advanced mode. | yes |  |
+| `ce-wizard-metadata-panel-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Collapsible panel toggle for the advanced-mode "Session Information" section. | yes |  |
+| `ce-wizard-session-header-url-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Compact Image field `URL` toggle used in Normal mode to reveal the header URL input. | yes |  |
+| `ce-wizard-session-header-paste` | `client/src/components/Sessions/SessionWizard.tsx` | Compact Image field `Paste` button used in Normal mode to pull an image blob or URL from the clipboard. | yes |  |
+| `ce-wizard-worker-mode-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Wrapper around the default/custom worker mode pills in the worker panel. | yes |  |
+| `ce-wizard-worker-mode-button` | `client/src/components/Sessions/SessionWizard.tsx` | Individual worker mode pill button. | yes | `data-ce-worker-mode` (`default` or `custom`) |
+| `ce-wizard-worker-panel-toggle` | `client/src/components/Sessions/SessionWizard.tsx` | Collapsible panel toggle for "Worker deployment & secrets". | yes |  |
+| `ce-wizard-bundle-mode-upload` | `client/src/components/Sessions/SessionWizard.tsx` | Advanced-mode radio that switches worker deployment to local file upload. | yes |  |
+| `ce-wizard-bundle-mode-url` | `client/src/components/Sessions/SessionWizard.tsx` | Advanced-mode radio that switches worker deployment to remote bundle URL mode. | yes |  |
+| `ce-wizard-bundle-file-input` | `client/src/components/Sessions/SessionWizard.tsx` | Worker bundle file input used in both normal-mode upload and advanced upload-mode deploys. | yes |  |
+| `ce-wizard-add-gate` | `client/src/components/Sessions/SessionWizard.tsx` | Add-encryption-gate button in the Encryption panel (main button and ghost card variant). | yes | `data-ce-gate-add-kind` (`panel` or `ghost`) |
+| `ce-wizard-create-sbt` | `client/src/components/Sessions/SessionWizard.tsx` | Opens the inline CreateSBTGroup modal from `/session/new`. | yes | `data-ce-sbt-target` (`defaultFeaturedSBTs` or gate id) |
+| `ce-wizard-pending-sbt` | `client/src/components/Sessions/SessionWizard.tsx` | Pending SBT draft card shown in the Privacy panel before Publish. | yes | `data-ce-sbt-address` |
+| `ce-wizard-resource-card` | `client/src/components/Sessions/SessionWizard.tsx` | Resource-gate card container used for per-resource lock selection. | yes | `data-ce-resource-key` (for example `ai`, `docUploads`) |
+| `ce-wizard-sponsored-status` | `client/src/components/Sessions/SessionWizardSponsoredStatus.tsx` | Sponsored-bundle status note shown while `/new?sponsored=...#k=...` loads, applies, or fails. | yes |  |
 
 ## SponsorPage (`/sponsor`)
 
@@ -173,7 +173,7 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-survey-locked-banner-caret` | `client/src/components/SurveyTool/SurveyTool.tsx` | Caret toggle at the bottom-right of the locked banner that expands/collapses gate/SBT requirements. | yes |  |
 | `ce-survey-locked-decrypt` | `client/src/components/SurveyTool/SurveyTool.tsx` | Locked-banner decrypt action button (manual gated prompt retry). | yes |  |
 | `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
-| `ce-survey-submit` | `client/src/components/SurveyTool/SurveyTool.tsx` | Primary submit button (header, footer, or pile view). | yes |  |
+| `ce-survey-submit` | `client/src/components/SurveyTool/SurveyQuestionsSubmitFooter.tsx`; `client/src/components/SurveyTool/SurveySelector.tsx`; `client/src/components/SurveyTool/surveyPileInteractionSurface.tsx` | Primary submit button (header, footer, or pile view). | yes |  |
 | `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Header create icon toggle (open/close CreateQuestionsAndSurveys panel). | yes |  |
 | `ce-survey-create-toggle-pile` | `client/src/components/SurveyTool/SurveyTool.tsx` | Pile view create icon toggle (open/close create interface). | yes |  |
 | `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.tsx` | Pile view "View All Questions" control. | yes |  |
@@ -181,11 +181,11 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-survey-pile-hologram-panel` | `client/src/components/SurveyTool/PileHologramAssistant.tsx` | Full-card light-blue hologram face takeover rendered while the pile hologram toggle is active. | yes |  |
 | `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
 | `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
-| `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyTool.tsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
-| `ce-survey-submitted-indicator` | `client/src/components/SurveyTool/SurveyTool.tsx` | Submitted-state indicator shown after a successful submit (full + pile views) until any new edit is made. | yes |  |
-| `ce-survey-start-fresh` | `client/src/components/SurveyTool/SurveyTool.tsx` | Clears the current draft and lets the user submit a new response even when one already exists. | yes |  |
-| `ce-survey-decrypt-edit-all` | `client/src/components/SurveyTool/SurveyTool.tsx` | Decrypts all encrypted fields in the existing response and enters editing mode (when supported). | yes |  |
-| `ce-survey-exit-editing` | `client/src/components/SurveyTool/SurveyTool.tsx` | Exits editing mode and returns to viewing the existing submitted response. | yes |  |
+| `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyQuestionsUserResponseNotice.tsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
+| `ce-survey-submitted-indicator` | `client/src/components/SurveyTool/SurveyQuestionsSubmitFooter.tsx`; `client/src/components/SurveyTool/surveyPileInteractionSurface.tsx` | Submitted-state indicator shown after a successful submit (full + pile views) until any new edit is made. | yes |  |
+| `ce-survey-start-fresh` | `client/src/components/SurveyTool/SurveyQuestionsUserResponseNotice.tsx` | Clears the current draft and lets the user submit a new response even when one already exists. | yes |  |
+| `ce-survey-decrypt-edit-all` | `client/src/components/SurveyTool/SurveyQuestionsUserResponseNotice.tsx` | Decrypts all encrypted fields in the existing response and enters editing mode (when supported). | yes |  |
+| `ce-survey-exit-editing` | `client/src/components/SurveyTool/SurveyQuestionsUserResponseNotice.tsx` | Exits editing mode and returns to viewing the existing submitted response. | yes |  |
 | `ce-survey-filter-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Opens/closes the QuestionFilter panel (header + pile action bar). | yes |  |
 | `ce-question-filter-modal` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Root wrapper for the QuestionFilter panel (inline and modal variants). | yes |  |
 | `ce-question-filter-section-ai` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Collapsible section header for AI filter controls. | yes |  |
@@ -264,7 +264,7 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-sbt-create-open-mint-url` | `client/src/components/SBTs/CreateSBTGroup.tsx` | Open-mint success card showing the `/session/:slug?sbt=:address&auto=1` URL for public no-password SBTs. | yes |  |
 | `ce-sbt-page-name` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT display name heading on the detail page. | yes |  |
 | `ce-sbt-page-description` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Primary SBT description text on the detail page, including masked locked copy. | yes |  |
-| `ce-sbt-page-image` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx` | Main SBT image element used for placeholder/decrypted image assertions. | yes |  |
+| `ce-sbt-page-image` | `client/src/components/SBTs/SbtPageIdentityPanel.tsx`; `client/src/components/SBTs/SbtPageMiniCard.tsx` | SBT detail and mini-card image element used for placeholder/decrypted image assertions. | yes |  |
 | `ce-sbt-page-open-mint-url` | `client/src/components/SBTs/SbtPageOpenMintUrlCard.tsx` | Admin-only info card showing the open-mint auto-join URL for eligible public no-password SBTs. | yes |  |
 
 ## Gate Lock Popover
