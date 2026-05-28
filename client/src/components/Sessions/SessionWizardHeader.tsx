@@ -5,7 +5,6 @@ import { faCog } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RegistryChainOption = {
   id: string | number;
@@ -28,7 +27,7 @@ type SessionWizardHeaderProps = {
     ariaLabel?: string;
     content?: React.ReactNode;
     id?: string;
-    placement?: SessionWizardTooltipRenderOptions['placement'];
+    placement?: string;
     testId?: string;
   }) => React.ReactNode;
   wizardDisplaySettingsOpen?: boolean;
