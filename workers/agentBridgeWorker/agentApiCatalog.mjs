@@ -219,6 +219,25 @@ const CAPABILITIES = Object.freeze([
     ],
   }),
   freezeEntry({
+    id: 'agent.telegram.actions.list',
+    category: 'agent',
+    label: 'List Agent Activity',
+    canonicalActionId: 'agent.telegram.actions.list',
+    method: 'GET',
+    path: '/telegram/agent/api/actions',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['telegramUserId', 'sessionSlug'],
+    optionalFields: ['groupChatId', 'limit'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Returns this user’s mutation history and pending agent suggestions for the token-scoped session.',
+    ],
+  }),
+  freezeEntry({
     id: 'agent.telegram.questions.pose',
     category: 'questions',
     label: 'Pose Telegram Question',

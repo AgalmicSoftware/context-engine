@@ -1026,7 +1026,7 @@ export function buildTelegramAgentSettingsOverviewState({
   const normalizedSettings = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
-    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, true),
+    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
@@ -1051,7 +1051,7 @@ export function buildTelegramAgentSettingsEditState({
   const current = sanitizeForGroup({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
-    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, true),
+    agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
   });
   return buildTelegramScreenState('agent_settings_edit', {
     preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,

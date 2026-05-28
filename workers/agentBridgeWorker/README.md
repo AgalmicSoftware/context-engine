@@ -57,17 +57,23 @@ Mini App.
 
 ### Agent Skill Install
 
-Once this repo is public, an external Codex/OpenClaw-style agent can install
-the packaged CE Telegram handoff skill with:
+Once this repo is public, a Hermes agent can install the packaged CE Telegram
+handoff skill with:
 
 ```bash
-CE_SKILL_REF="${CE_SKILL_REF:-main}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+hermes skills install https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md
 ```
 
-Set `CE_SKILL_REF=release-staging` or another public branch/tag while testing
-before the skill lands on `main`. After install, the agent should use the
-`ce-telegram-agent-handoff` skill and ask the user to create a 28-day token
-from the CE bot `/me` screen.
+For Codex-style local skill hosts, use:
+
+```bash
+CE_SKILL_REF="${CE_SKILL_REF:-edge-2026}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+```
+
+Set `CE_SKILL_REF=main` after the skill lands on the default public branch.
+After install, the agent should use the `ce-telegram-agent-handoff` skill and
+ask the user to tap `Onboard Agent` from the CE bot `/start` screen, then paste
+the copied 28-day install info into the agent.
 
 ## Telegram Screens
 
@@ -120,8 +126,11 @@ underneath.
 
 `/me` shows an abbreviated managed address as an inline chain-explorer link,
 renders known chains by name, for example `OP Sepolia Testnet (11155420)`, and
-offers a private `Create Agent Token` action when the user has a selectable
-Telegram session. The default user-scoped agent token lifespan is 28 days.
+offers private `Copy Agent Install Info` and `Activity` actions when the user
+has a selectable Telegram session. The `/start` screen also exposes `Onboard
+Agent` so the setup path is not buried under `/me`. The default user-scoped
+agent token lifespan is 28 days, and the raw token is only included in the
+private copy payload, never in message body text.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
@@ -319,6 +328,7 @@ Required values:
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
 | Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
 | Optional Telegram session cutoff | `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` filters `/start`, `/sessions`, and the Mini App session picker to Telegram-visible sessions with `createdAt`, `sessionCreatedAt`, `groupCreatedAt`, or a supported created timestamp at or after the cutoff. Accepts ISO timestamps or Unix seconds/milliseconds. Sessions missing creation metadata are hidden while this cutoff is set, except the configured default Telegram-only session remains selectable so a single active demo session can still boot |
+| Optional per-session Telegram group allowlist | Add `approvedTelegramGroupChatIds` / `telegramApprovedGroupChatIds` / `approvedTelegramChats` to a session policy entry to restrict which Telegram groups can bind to that session. Set `telegramGroupApprovalRequired: true` when a session should require static approval or an admin-generated invite link even before any groups are listed. Run `/group_id` inside the target Telegram group to have the bot display the numeric `chat.id` to copy into the policy. Configured export admins can run `/group_link [session]` or use Admin Actions to create a one-use `https://t.me/<bot>?startgroup=<opaque>` link that approves the first group that opens it. Sessions without an allowlist or approval-required flag remain available to any group where the bot is present |
 | Optional Telegram API timeout | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000` |
 | Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
@@ -389,7 +399,17 @@ selected session for the Telegram user who made the selection, so their private
 bot and Mini App flows start from the same session. Private `/join <session>`
 persists the selected session for that Telegram user as well, so private
 `/questions`, `/q <number>`, and `/results` use the same session unless a
-command supplies an explicit slug. When a participant answers a posed group
+command supplies an explicit slug. If a session policy entry includes
+`approvedTelegramGroupChatIds` or equivalent approved-chat fields, group
+`/sessions`, `/join`, `/questions`, `/q`, `/results`, `/groups`, add-question,
+and agent handoff calls that include `groupChatId` are limited to those
+approved Telegram group IDs. If `telegramGroupApprovalRequired` is true, the
+same checks apply even before a static list is populated. `/group_id` returns
+the current group's `chat.id` so a session admin can copy it into policy.
+Configured export admins can also generate a one-use Add Bot To Group link from
+Admin Actions or `/group_link [session]`; the first group that opens the
+`startgroup` link is stored in Worker KV as an approved group and bound to that
+session. When a participant answers a posed group
 question before opening a private chat, the worker derives or reuses their
 managed Telegram demo account on demand and binds that question's session to
 the user. If a session cannot direct-submit because policy, gate, faucet, or
@@ -674,6 +694,7 @@ OpenClaw-style agents can call:
 GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
 POST /telegram/agent/api/questions
 POST /telegram/agent/api/questions/next
+GET  /telegram/agent/api/actions
 POST /telegram/agent/api/preferences
 POST /telegram/agent/api/questions/pose
 POST /telegram/agent/api/question-votes/recommend
@@ -692,9 +713,16 @@ questions with a positive relevance score. `questions/pose` accepts `tags` and
 `POST /telegram/agent/api/questions/next` is the queue-friendly cadence route.
 It accepts `criteria` / `preferences`, optional `questionTypes`, `queueKey`,
 `advance`, and `resetQueue`. The worker serves admin-sponsored question ids
-first when they match the criteria, advances a per-user cursor in
+first when `sponsoredFirst` / `includeSponsored` allow them and they match the criteria, advances a per-user cursor in
 `AGENT_ACTION_KV`, and then falls back to the same preference-ranked active
 question list used by `/telegram/agent/api/questions`.
+
+`GET /telegram/agent/api/actions` returns mutation-oriented activity for the
+resolved user: agent-created answer drafts, pending vote recommendations,
+applied vote decisions, proposed questions, and group proposals. With a
+`ceagt_` token, the worker scopes the response to that token's Telegram user and
+session. The bot mirrors the same data through `/activity`: full details in
+private chat and counts only in groups.
 
 Agents can also ask the worker for a meta-level importance view with
 `POST /telegram/agent/api/question-votes/recommend`. The response returns a
@@ -702,7 +730,7 @@ Agents can also ask the worker for a meta-level importance view with
 an `agentNote` intended for user review. If the request includes
 `autoApply: true`, the worker applies those votes only when the current
 Telegram account/session Mini App setting `agentAutoApplyQuestionVotes` is
-enabled. That setting is account/session-scoped and defaults to enabled.
+enabled. That setting is account/session-scoped and defaults to off.
 `POST /telegram/agent/api/question-votes/apply` records human-approved,
 rejected, or overridden decisions from explicit fields or natural-language
 approval text. Applied votes use the same Cloudflare vote records read by the

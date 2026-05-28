@@ -56,6 +56,23 @@ export function buildRandomTelegramCallbackId({
   return id;
 }
 
+export function buildRandomTelegramStartId({
+  byteLength = 16,
+  cryptoImpl = globalThis.crypto,
+} = {}) {
+  const length = Math.max(16, Math.min(29, Math.floor(Number(byteLength) || 16)));
+  if (!cryptoImpl || typeof cryptoImpl.getRandomValues !== 'function') {
+    throw new Error('Secure random source unavailable.');
+  }
+  const bytes = new Uint8Array(length);
+  cryptoImpl.getRandomValues(bytes);
+  const id = `cetg_${bytesToHex(bytes)}`;
+  if (!START_ID_RE.test(id)) {
+    throw new Error('Invalid opaque action id.');
+  }
+  return id;
+}
+
 export function parseOpaqueActionId(value = '') {
   const actionId = String(value || '').trim();
   if (!ACTION_ID_RE.test(actionId) && !CALLBACK_ID_RE.test(actionId) && !START_ID_RE.test(actionId)) {
@@ -121,4 +138,25 @@ export function createTelegramStartAction(input = {}) {
     deepLinkPayload: buildTelegramStartId(record.actionId),
     record,
   };
+}
+
+export function createRandomTelegramStartAction({
+  action = '',
+  lane = '',
+  serverContextRef = {},
+  expiresAt = null,
+  createdAt = null,
+} = {}, options = {}) {
+  const deepLinkPayload = buildRandomTelegramStartId(options);
+  const record = {
+    type: 'agent_bridge_opaque_action',
+    actionId: deepLinkPayload,
+    action: String(action || '').trim(),
+    lane: String(lane || '').trim(),
+    serverContextRef: { ...serverContextRef },
+    createdAt,
+    expiresAt,
+  };
+  assertNoSecretShape(record, 'Opaque action records must not contain secrets.');
+  return { deepLinkPayload, record };
 }

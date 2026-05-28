@@ -16,6 +16,7 @@ import {
   buildOpaqueActionId,
   createTelegramCallbackAction,
   createRandomTelegramCallbackAction,
+  createRandomTelegramStartAction,
   createTelegramStartAction,
   parseOpaqueActionId,
 } from './opaqueActions.mjs';
@@ -60,6 +61,14 @@ import {
   loadTelegramLightweightGroups,
   saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
+import {
+  evaluateTelegramGroupSessionAccessForEnv,
+  persistTelegramGroupApproval,
+} from './telegramGroupApprovals.mjs';
+import {
+  listTelegramAgentActivity,
+  summarizeTelegramAgentActivityCounts,
+} from './telegramAgentActivity.mjs';
 import {
   addResponseExportAllowedAddress,
   buildTelegramResponseExportArchive,
@@ -106,9 +115,12 @@ const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:'
 const QUESTION_GENERATION_BATCH_KV_PREFIX = 'telegram:question-generation-batch:v1:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const QUESTION_GENERATION_BATCH_TTL_SECONDS = 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
+const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
 const TELEGRAM_RESULTS_PAGE_SIZE = 3;
@@ -161,12 +173,15 @@ const COMMANDS = Object.freeze({
   EXPORT_ALLOW: '/export_allow',
   EXPORT_REVOKE: '/export_revoke',
   QUESTION_QUEUE: '/question_queue',
+  GROUP_ID: '/group_id',
+  GROUP_LINK: '/group_link',
   ATTACHMENTS: '/attachments',
   DOCS: '/docs',
   ME: '/me',
   ACCOUNT: '/account',
   AGENT_TOKEN: '/agent_token',
   EXPORT_TOKEN: '/export_token',
+  ACTIVITY: '/activity',
 });
 
 const LEGACY_COMMAND_ALIASES = Object.freeze({
@@ -190,12 +205,15 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_export_allow': COMMANDS.EXPORT_ALLOW,
   '/ce_export_revoke': COMMANDS.EXPORT_REVOKE,
   '/ce_question_queue': COMMANDS.QUESTION_QUEUE,
+  '/ce_group_id': COMMANDS.GROUP_ID,
+  '/ce_group_link': COMMANDS.GROUP_LINK,
   '/ce_attachments': COMMANDS.ATTACHMENTS,
   '/ce_docs': COMMANDS.DOCS,
   '/ce_me': COMMANDS.ME,
   '/ce_account': COMMANDS.ACCOUNT,
   '/ce_agent_token': COMMANDS.AGENT_TOKEN,
   '/ce_export_token': COMMANDS.EXPORT_TOKEN,
+  '/ce_activity': COMMANDS.ACTIVITY,
 });
 
 function safeString(value) {
@@ -384,6 +402,45 @@ function copyTextButton(label = '', value = '') {
   const text = safeString(label);
   const copyText = safeString(value);
   return text && copyText ? { text, copy_text: { text: copyText } } : null;
+}
+
+function agentBridgePublicUrl(env = {}) {
+  return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+}
+
+function agentSkillUrl(env = {}) {
+  return safeString(
+    env.AGENT_BRIDGE_AGENT_SKILL_URL ||
+      env.CE_TELEGRAM_AGENT_SKILL_URL ||
+      DEFAULT_AGENT_SKILL_URL
+  );
+}
+
+function maskAgentToken(token = '') {
+  const value = safeString(token);
+  if (!value) return '';
+  return value.length > 11 ? `${value.slice(0, 6)}…${value.slice(-4)}` : `${value.slice(0, 6)}…`;
+}
+
+function buildAgentInstallInfo({
+  token = '',
+  sessionSlug = '',
+  workerUrl = '',
+  skillUrl = '',
+} = {}) {
+  return [
+    'Context Engine agent install info',
+    '',
+    `Worker: ${workerUrl}`,
+    `Skill: ${skillUrl}`,
+    `Session: ${sessionSlug}`,
+    '',
+    'Use this token as the Context Engine agent token:',
+    token,
+    '',
+    'Install/read the skill, then call the worker with Authorization: Bearer <token>.',
+    'Start by listing active questions, drafting responses for user review, and checking /telegram/agent/api/actions for pending suggestions.',
+  ].join('\n');
 }
 
 function telegramButtonLabel(value = '', fallback = 'Question') {
@@ -1268,9 +1325,8 @@ function loadAgentSettings(env = {}) {
   settings.showUnansweredFirst = source.showUnansweredFirst === false
     ? false
     : !['0', 'false', 'no', 'off'].includes(lower(source.showUnansweredFirst));
-  settings.agentAutoApplyQuestionVotes = source.agentAutoApplyQuestionVotes === false
-    ? false
-    : !['0', 'false', 'no', 'off'].includes(lower(source.agentAutoApplyQuestionVotes));
+  settings.agentAutoApplyQuestionVotes = source.agentAutoApplyQuestionVotes === true ||
+    ['1', 'true', 'yes', 'on'].includes(lower(source.agentAutoApplyQuestionVotes));
   assertNoSecretShape(settings, 'Telegram agent settings fixtures must not serialize secrets.');
   return settings;
 }
@@ -2021,7 +2077,7 @@ async function evaluateQuestionAuthoringForSession({
   ]);
   if (!privateBinding?.sessionSlug && normalized.chat?.isPrivate && session.telegramOnly === true) {
     const policy = await loadSessionPolicy(env);
-    const visibleSessions = telegramVisibleSessions(policy, env);
+    const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
     const requestedSessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
     const visibleSessionMatch = visibleSessions.some((visibleSession) => (
       sanitizeSessionSlug(visibleSession.sessionSlug || visibleSession.slug) === requestedSessionSlug
@@ -2227,6 +2283,7 @@ async function persistAnswerDraft({
   answerValue = '',
   controlType = '',
   submitLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+  metadata = null,
   createdAt = null,
 } = {}) {
   const key = answerDraftKey({ normalized, sessionSlug, questionId: selectedQuestionId });
@@ -2246,6 +2303,10 @@ async function persistAnswerDraft({
     submitLane: safeString(submitLane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     selectedAt: createdAt || nowIso(),
   };
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    record.source = safeString(metadata.source) || null;
+    record.actionMetadata = { ...metadata };
+  }
   if (!record.telegramUserId || !record.sessionSlug || !record.questionId || !record.answerLabel) {
     return { ok: false, reason: 'answer_draft_incomplete' };
   }
@@ -2628,6 +2689,79 @@ async function makePrivateStartActionButton({
   };
 }
 
+function parseAgentOnboardingStartParam(value = '') {
+  const payload = safeString(value);
+  if (payload === 'sensemaking_trial') return { ok: true, sessionSlug: '' };
+  if (payload === 'agent_onboarding') return { ok: true, sessionSlug: '' };
+  const match = /^agent_onboarding__([a-z0-9_-]{1,128})$/.exec(payload);
+  return match ? { ok: true, sessionSlug: sanitizeSessionSlug(match[1]) } : { ok: false };
+}
+
+async function makeAgentOnboardingButton({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const label = 'Onboard Agent';
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (normalized.chat?.isPrivate) {
+    return makeCallbackButton({
+      env,
+      label,
+      action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
+      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      serverContextRef: { sessionSlug: slug },
+      seed: `agent_onboarding|private|${slug || 'default'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+      createdAt,
+    });
+  }
+  return makePrivateStartActionButton({
+    env,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+    label,
+    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
+    serverContextRef: { sessionSlug: slug },
+    seed: `agent_onboarding|dm|${slug || 'default'}|${normalized.chat?.chatId}|${normalized.updateId}`,
+    createdAt,
+  });
+}
+
+async function buildAgentOnboardingStartResponse({
+  normalized,
+  command,
+  env,
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  if (normalized.chat?.isPrivate) {
+    return buildAgentTokenResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride,
+      createdAt,
+    });
+  }
+  const button = await makePrivateStartActionButton({
+    env,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+    label: 'Onboard Agent',
+    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
+    serverContextRef: { sessionSlug: sanitizeSessionSlug(sessionSlugOverride) },
+    seed: `agent_onboarding|group_prompt|${sessionSlugOverride || 'default'}|${normalized.chat?.chatId}|${normalized.updateId}`,
+    createdAt,
+  });
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: 'Agent onboarding is private. Tap Onboard Agent to open a private chat and copy your install info.',
+    replyMarkup: button ? { inline_keyboard: [[button]] } : null,
+    screen: 'agent_onboarding_private_required',
+    command,
+    normalized,
+  });
+}
+
 function resolveMiniAppBaseUrl(env = {}) {
   const configured = safeString(env.AGENT_BRIDGE_MINI_APP_URL);
   const publicUrl = safeString(env.AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
@@ -2950,11 +3084,12 @@ function formatHelpText({
   if (session?.sessionSlug) {
     lines.push(`Session: ${sessionLabel(session)}`, '');
   }
+  lines.push('Onboard Agent: let your trusted agent pull questions and draft responses for review.', '');
   if (showSessions) lines.push('/sessions - choose session');
   lines.push(
     '/questions',
     '/results',
-    '/me - view account / get agent token',
+    '/me - My Account',
   );
   return lines.join('\n');
 }
@@ -3020,6 +3155,11 @@ function sessionVisibleInTelegram(session = {}, {
   return session.telegramBridgeEnabled === true && session.telegramOnly === true;
 }
 
+async function sessionAllowedInCurrentTelegramChat(session = {}, normalized = {}, env = {}) {
+  if (!normalized?.chat || normalized.chat.isPrivate) return true;
+  return (await evaluateTelegramGroupSessionAccessForEnv({ env, session, normalized })).ok;
+}
+
 function telegramVisibleSessions(policy = {}, env = {}) {
   const createdAfterMs = telegramSessionCreatedAfterMs(env, policy);
   return (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : [])
@@ -3027,6 +3167,64 @@ function telegramVisibleSessions(policy = {}, env = {}) {
       createdAfterMs,
       defaultSessionSlug: policy.defaultSessionSlug,
     }));
+}
+
+async function telegramVisibleSessionsForChat(policy = {}, env = {}, normalized = {}) {
+  const sessions = telegramVisibleSessions(policy, env);
+  const out = [];
+  for (const session of sessions) {
+    if (await sessionAllowedInCurrentTelegramChat(session, normalized, env)) out.push(session);
+  }
+  return out;
+}
+
+function telegramGroupAccessDeniedText(session = {}, access = {}) {
+  const chatId = safeString(access.groupChatId);
+  const sessionSlug = safeString(session.sessionSlug || session.slug);
+  return [
+    `This Telegram group is not approved for ${sessionLabel(session)}.`,
+    chatId ? `Group ID: ${chatId}` : '',
+    '',
+    `Ask a session admin to add this group to ${sessionSlug}'s approved Telegram groups or send an admin group invite link, then run /join ${sessionSlug} again.`,
+  ].filter((line) => line !== '').join('\n');
+}
+
+function telegramGroupAccessErrorReply({
+  normalized,
+  command,
+  session = {},
+  access = {},
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: telegramGroupAccessDeniedText(session, access),
+    screen: 'telegram_group_access_denied',
+    command,
+    normalized,
+    extra: {
+      reason: access.reason || 'telegram_group_not_approved_for_session',
+      sessionSlug: session.sessionSlug || session.slug || '',
+      groupChatId: access.groupChatId || normalized.chat?.chatId || '',
+    },
+  });
+}
+
+async function ensureTelegramGroupSessionAccess({
+  env = {},
+  normalized,
+  command,
+  session = {},
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  if (normalized.chat?.isPrivate) return null;
+  const access = await evaluateTelegramGroupSessionAccessForEnv({ env, session, normalized });
+  if (access.ok) return null;
+  return telegramGroupAccessErrorReply({ normalized, command, session, access, method, messageId });
 }
 
 async function makeResponseExportButton({
@@ -3155,10 +3353,16 @@ async function buildHelpResponse({
   waitUntil = null,
 } = {}) {
   const policy = await loadSessionPolicy(env);
-  const visibleSessions = telegramVisibleSessions(policy, env);
+  const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
   let activeBinding = normalized.chat.isPrivate
     ? await readPrivateSessionBinding(env, normalized)
     : await readGroupSessionBinding(env, normalized);
+  if (activeBinding?.sessionSlug && !normalized.chat.isPrivate) {
+    const activeResolved = resolveSessionInvocation(policy, activeBinding.sessionSlug);
+    if (activeResolved.ok && !(await sessionAllowedInCurrentTelegramChat(activeResolved.session, normalized, env))) {
+      activeBinding = null;
+    }
+  }
   let autoJoinedSession = null;
   if (visibleSessions.length === 1 && activeBinding?.sessionSlug !== visibleSessions[0].sessionSlug) {
     autoJoinedSession = visibleSessions[0];
@@ -3215,6 +3419,13 @@ async function buildHelpResponse({
     miniAppButton.text = 'Mini App';
     keyboard.push([miniAppButton]);
   }
+  const agentOnboardingButton = await makeAgentOnboardingButton({
+    env,
+    normalized,
+    sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+    createdAt,
+  });
+  if (agentOnboardingButton) keyboard.push([agentOnboardingButton]);
   const adminActionsButton = await makeAdminActionsButton({
     env,
     normalized,
@@ -3246,7 +3457,7 @@ async function buildSessionsResponse({
   pageOffset = 0,
 } = {}) {
   const policy = await loadSessionPolicy(env, { forceRefresh: true });
-  const availableSessions = telegramVisibleSessions(policy, env);
+  const availableSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
   const sessions = availableSessions;
   const offset = Math.max(0, Math.min(Number(pageOffset) || 0, Math.max(0, sessions.length - 1)));
   const visibleSessions = sessions.slice(offset, offset + TELEGRAM_SESSION_LIST_LIMIT);
@@ -3288,6 +3499,42 @@ async function buildSessionsResponse({
     screen: 'group_session_card',
     command,
     normalized,
+  });
+}
+
+async function buildGroupIdResponse({
+  normalized,
+  command,
+  env,
+} = {}) {
+  if (normalized.chat?.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'Run /group_id inside the Telegram group you want to approve.',
+      screen: 'telegram_group_id_private_required',
+      command,
+      normalized,
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const binding = await readGroupSessionBinding(env, normalized);
+  const resolved = binding?.sessionSlug ? resolveSessionInvocation(policy, binding.sessionSlug) : { ok: false };
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      `Telegram group ID: ${normalized.chat.chatId}`,
+      normalized.chat.title ? `Group: ${normalized.chat.title}` : '',
+      resolved.ok ? `Selected session: ${resolved.session.sessionSlug}` : 'Selected session: none',
+      '',
+      'Add this ID to the session approved Telegram groups list, then run /join <session> here.',
+    ].filter(Boolean).join('\n'),
+    screen: 'telegram_group_id',
+    command,
+    normalized,
+    extra: {
+      groupChatId: normalized.chat.chatId,
+      sessionSlug: resolved.ok ? resolved.session.sessionSlug : '',
+    },
   });
 }
 
@@ -3477,6 +3724,14 @@ async function buildJoinResponse({
     });
   }
 
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+  });
+  if (groupAccessError) return groupAccessError;
+
   const group = normalizeTelegramGroup(normalized);
   const groupSessionBinding = await persistGroupSessionBinding({
     env,
@@ -3597,6 +3852,15 @@ async function buildQuestionsResponse({
       messageId,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+    method,
+    messageId,
+  });
+  if (groupAccessError) return groupAccessError;
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
   const questions = loadedQuestions.questions;
   const state = buildTelegramQuestionListState({
@@ -3688,6 +3952,15 @@ async function buildGroupsResponse({
       messageId,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+    method,
+    messageId,
+  });
+  if (groupAccessError) return groupAccessError;
   if (resolved.session.telegramOnly !== true) {
     return errorReply({
       normalized,
@@ -3897,6 +4170,15 @@ async function buildAddQuestionResponse({
       messageId,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+    method,
+    messageId,
+  });
+  if (groupAccessError) return groupAccessError;
 
   if (parseUrlQuestionGenerationRequest(Array.isArray(args) ? args.join(' ') : args, { commandMode: true })) {
     return buildGenerateQuestionsFromUrlResponse({
@@ -4220,6 +4502,15 @@ async function buildGenerateQuestionsFromUrlResponse({
       messageId,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+    method,
+    messageId,
+  });
+  if (groupAccessError) return groupAccessError;
 
   const generated = await generateUrlQuestionCandidates({
     env,
@@ -5436,6 +5727,13 @@ async function buildResultsResponse({
       text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+  });
+  if (groupAccessError) return groupAccessError;
   if (!mode) {
     return buildResultsOptionsResponse({
       normalized,
@@ -5925,6 +6223,145 @@ async function makeResultsExposureToggleButton({
   });
 }
 
+async function makeTelegramGroupApprovalLinkButton({
+  env,
+  normalized,
+  sessionSlug = '',
+  seed = '',
+  createdAt,
+} = {}) {
+  return makeCallbackButton({
+    env,
+    label: 'Add Bot To Group Link',
+    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_TELEGRAM_GROUP_APPROVAL_LINK,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug },
+    seed: seed || `telegram_group_link|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+}
+
+function telegramGroupApprovalLinkTtlSeconds(env = {}) {
+  return Math.max(60, Math.min(
+    30 * 24 * 60 * 60,
+    normalizePositiveInteger(
+      env.AGENT_BRIDGE_TELEGRAM_GROUP_APPROVAL_LINK_TTL_SECONDS ||
+        env.TELEGRAM_GROUP_APPROVAL_LINK_TTL_SECONDS,
+      DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS
+    )
+  ));
+}
+
+function actionRecordExpired(record = {}, createdAt = null) {
+  const expiresMs = Date.parse(safeString(record.expiresAt));
+  if (!Number.isFinite(expiresMs)) return false;
+  const nowMs = Date.parse(createdAt || nowIso());
+  return Number.isFinite(nowMs) && nowMs > expiresMs;
+}
+
+function telegramAddBotToGroupUrl(env = {}, payload = '') {
+  const username = normalizeBotUsername(env.TELEGRAM_BOT_USERNAME);
+  const token = safeString(payload);
+  return username && token
+    ? `https://t.me/${username}?startgroup=${encodeURIComponent(token)}`
+    : '';
+}
+
+async function buildTelegramGroupApprovalLinkResponse({
+  normalized,
+  command,
+  env,
+  sessionSlugOverride = '',
+  createdAt,
+  method = 'editMessageText',
+  messageId = '',
+} = {}) {
+  const context = await resolveAdminActionContext({ normalized, env, sessionSlugOverride, createdAt });
+  if (!context.ok) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: context.statusText,
+      screen: 'telegram_group_approval_link_denied',
+      command,
+      normalized,
+      extra: { reason: context.reason, accountAddress: context.accountAddress || '' },
+    });
+  }
+  const ttlSeconds = telegramGroupApprovalLinkTtlSeconds(env);
+  const expiresAt = new Date(Date.parse(createdAt || nowIso()) + ttlSeconds * 1000).toISOString();
+  const start = createRandomTelegramStartAction({
+    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: {
+      sessionSlug: context.session.sessionSlug,
+      approvedByTelegramUserId: normalized.user.telegramUserId,
+      approvedByAccountAddress: context.manager.accountAddress,
+    },
+    createdAt,
+    expiresAt,
+  });
+  await persistActionRecord(env, start.deepLinkPayload, {
+    ...start.record,
+    deepLinkPayload: start.deepLinkPayload,
+    oneUse: true,
+  }, {
+    ttlSeconds,
+  });
+  const url = telegramAddBotToGroupUrl(env, start.deepLinkPayload);
+  if (!url) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: 'Could not create a Telegram group invite link because TELEGRAM_BOT_USERNAME is not configured.',
+      screen: 'telegram_group_approval_link_unavailable',
+      command,
+      normalized,
+      extra: { sessionSlug: context.session.sessionSlug, reason: 'telegram_bot_username_missing' },
+    });
+  }
+  const backButton = await makeCallbackButton({
+    env,
+    label: 'Back to Admin Actions',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_ADMIN_ACTIONS,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: context.session.sessionSlug },
+    seed: `telegram_group_link|back|${context.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      `Telegram group invite for ${sessionLabel(context.session)}`,
+      `Session: ${context.session.sessionSlug}`,
+      `Expires: ${expiresAt}`,
+      '',
+      'Send this one-use link to add the bot to a Telegram group. The first group that opens it is approved and selected for this session.',
+      '',
+      url,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [
+        [{ text: 'Add Bot To Group', url }],
+        [backButton],
+      ],
+    },
+    screen: 'telegram_group_approval_link',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: context.session.sessionSlug,
+      expiresAt,
+      startPayload: start.deepLinkPayload,
+      url,
+    },
+  });
+}
+
 async function buildAdminActionsResponse({
   normalized,
   command,
@@ -5985,6 +6422,13 @@ async function buildAdminActionsResponse({
     normalized,
     sessionSlug,
     seed: `admin_actions|question_queue|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  })]);
+  rows.push([await makeTelegramGroupApprovalLinkButton({
+    env,
+    normalized,
+    sessionSlug,
+    seed: `admin_actions|group_link|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   })]);
   return reply({
@@ -6518,6 +6962,15 @@ async function buildPoseQuestionResponse({
       text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
     });
   }
+  const groupAccessError = await ensureTelegramGroupSessionAccess({
+    env,
+    normalized,
+    command,
+    session: resolved.session,
+    method,
+    messageId,
+  });
+  if (groupAccessError) return groupAccessError;
 
   const selector = safeString(questionIdOverride || args.join(' '));
   if (!selector) {
@@ -6962,11 +7415,20 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     : null;
   const agentTokenButton = agentTokenSession?.ok ? await makeCallbackButton({
     env,
-    label: 'Create Agent Token',
+    label: 'Copy Agent Install Info',
     action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
     lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     serverContextRef: { sessionSlug: agentTokenSession.session.sessionSlug },
     seed: `me|agent_token|${agentTokenSession.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  }) : null;
+  const activityButton = normalized.chat.isPrivate ? await makeCallbackButton({
+    env,
+    label: 'Activity',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_ACTIVITY,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: agentTokenSession?.ok ? agentTokenSession.session.sessionSlug : policy.defaultSessionSlug },
+    seed: `me|activity|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   }) : null;
   const rows = [[questionButton]];
@@ -6975,6 +7437,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     : null;
   if (copyAddress) rows.push([copyAddress]);
   if (agentTokenButton) rows.push([agentTokenButton]);
+  if (activityButton) rows.push([activityButton]);
   if (adminActionsButton) rows.push([adminActionsButton]);
   return reply({
     method,
@@ -6999,6 +7462,96 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
   });
 }
 
+function activityItemLine(item = {}) {
+  const status = safeString(item.status || 'recorded').replace(/_/g, ' ');
+  const summary = safeString(item.summary || item.type || 'Activity').replace(/\s+/g, ' ');
+  const qid = safeString(item.questionId);
+  return `- ${summary}${qid ? ` (${shortQuestionId(qid)})` : ''} — ${status}`;
+}
+
+async function resolveActivitySessions({
+  env = {},
+  normalized = {},
+  policy = {},
+  explicitSessionSlug = '',
+} = {}) {
+  const visible = await telegramVisibleSessionsForChat(policy, env, normalized);
+  const visibleSlugs = visible.map((session) => sanitizeSessionSlug(session.sessionSlug)).filter(Boolean);
+  const binding = normalized.chat?.isPrivate
+    ? await readPrivateSessionBinding(env, normalized)
+    : await readGroupSessionBinding(env, normalized);
+  const explicit = sanitizeSessionSlug(explicitSessionSlug);
+  if (explicit) return visibleSlugs.includes(explicit) ? [explicit] : [];
+  const bound = sanitizeSessionSlug(binding?.sessionSlug);
+  if (bound && visibleSlugs.includes(bound)) return [bound];
+  return normalized.chat?.isPrivate ? visibleSlugs : visibleSlugs.slice(0, 1);
+}
+
+async function buildActivityResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  sessionSlugOverride = '',
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const sessionSlugs = await resolveActivitySessions({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || args[0] || '',
+  });
+  const items = await listTelegramAgentActivity({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+    sessionSlugs,
+    includeContent: normalized.chat?.isPrivate === true,
+    limit: 20,
+  });
+  if (!normalized.chat?.isPrivate) {
+    const counts = summarizeTelegramAgentActivityCounts(items);
+    assertNoSecretShape(counts, 'Telegram group activity counts must not serialize secrets.');
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'Activity',
+        sessionSlugs.length ? `Session: ${sessionSlugs.join(', ')}` : 'Session: none',
+        '',
+        `${counts.drafts} drafts, ${counts.pendingVotes} pending vote suggestions, ${counts.voteDecisions} vote decisions, ${counts.proposedQuestions} proposed questions, ${counts.groupProposals} group suggestions.`,
+      ].join('\n'),
+      screen: 'agent_activity_counts',
+      command,
+      normalized,
+      extra: { counts },
+    });
+  }
+  const lines = [
+    'Activity',
+    sessionSlugs.length ? `Sessions: ${sessionSlugs.join(', ')}` : 'Sessions: none',
+    '',
+  ];
+  if (!items.length) {
+    lines.push('No agent activity yet.');
+  } else {
+    items.slice(0, 12).forEach((item) => lines.push(activityItemLine(item)));
+  }
+  assertNoSecretShape({ text: lines.join('\n') }, 'Telegram activity response must not serialize secrets.');
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: lines.join('\n'),
+    screen: 'agent_activity',
+    command,
+    normalized,
+    extra: { itemCount: items.length },
+  });
+}
+
 async function resolveAgentTokenSession({
   env = {},
   normalized = {},
@@ -7006,7 +7559,7 @@ async function resolveAgentTokenSession({
   explicitSessionSlug = '',
 } = {}) {
   const activeBinding = await readPrivateSessionBinding(env, normalized);
-  const visibleSessions = telegramVisibleSessions(policy, env);
+  const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
   const visibleSlugs = new Set(visibleSessions.map((session) => sanitizeSessionSlug(session.sessionSlug)));
   const activeSlug = sanitizeSessionSlug(activeBinding?.sessionSlug);
   const explicitSlug = sanitizeSessionSlug(explicitSessionSlug);
@@ -7086,7 +7639,16 @@ async function buildAgentTokenResponse({
       text: 'Could not create an agent token for this account.',
     });
   }
-  const copyToken = copyTextButton('Copy Agent Token', issued.token);
+  const workerUrl = agentBridgePublicUrl(env);
+  const skillUrl = agentSkillUrl(env);
+  const installInfo = buildAgentInstallInfo({
+    token: issued.token,
+    sessionSlug: resolved.session.sessionSlug,
+    workerUrl,
+    skillUrl,
+  });
+  const maskedToken = maskAgentToken(issued.token);
+  const copyToken = copyTextButton('Copy Agent Install Info', installInfo);
   const accountButton = await makeCallbackButton({
     env,
     label: 'Back to Account',
@@ -7099,21 +7661,23 @@ async function buildAgentTokenResponse({
   const rows = [];
   if (copyToken) rows.push([copyToken]);
   rows.push([accountButton]);
+  const bodyText = [
+    'Agent install info',
+    `Session: ${sessionLabel(resolved.session)}`,
+    `Token: ${maskedToken}`,
+    `Expires: ${issued.record.expiresAt}`,
+    '',
+    'Tap Copy Agent Install Info, then paste it into your trusted agent.',
+    `Skill: ${skillUrl}`,
+    '',
+    'The copied text includes the full token and worker URL. The chat only shows the masked token.',
+  ].join('\n');
+  assertNoSecretShape({ bodyText }, 'Agent token response body must not expose secret-shaped values.');
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
-    text: [
-      'Agent token',
-      `Session: ${sessionLabel(resolved.session)}`,
-      `Expires: ${issued.record.expiresAt}`,
-      '',
-      'Paste this into a trusted agent. It can read questions, draft answers for review, recommend or apply question votes, suggest groups, and pose questions for this session.',
-      '',
-      'It cannot perform admin/export actions and does not expose your wallet key.',
-      '',
-      issued.token,
-    ].join('\n'),
+    text: bodyText,
     replyMarkup: {
       inline_keyboard: rows,
     },
@@ -7486,6 +8050,125 @@ function buildMiniAppStartResponse({
   });
 }
 
+async function buildApproveTelegramGroupResponse({
+  normalized,
+  command,
+  env,
+  record = {},
+  payload = '',
+  createdAt,
+  waitUntil = null,
+} = {}) {
+  if (normalized.chat?.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'This link approves a Telegram group.',
+        '',
+        'Open the Add Bot To Group link and choose a group instead of this private chat.',
+      ].join('\n'),
+      screen: 'telegram_group_approval_private_required',
+      command,
+      normalized,
+      extra: { startPayload: payload },
+    });
+  }
+  const sessionSlug = sanitizeSessionSlug(record.serverContextRef?.sessionSlug);
+  const consumedGroupChatId = safeString(record.consumedGroupChatId);
+  if (record.consumedAt && consumedGroupChatId && consumedGroupChatId !== safeString(normalized.chat.chatId)) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'This group approval link has already been used.',
+        '',
+        'Ask a session admin to generate a fresh Add Bot To Group link.',
+      ].join('\n'),
+      screen: 'telegram_group_approval_token_used',
+      command,
+      normalized,
+      extra: {
+        startPayload: payload,
+        sessionSlug,
+        consumedGroupChatId,
+      },
+    });
+  }
+  if (!record.consumedAt && actionRecordExpired(record, createdAt)) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'This group approval link has expired.',
+        '',
+        'Ask a session admin to generate a fresh Add Bot To Group link.',
+      ].join('\n'),
+      screen: 'telegram_group_approval_token_expired',
+      command,
+      normalized,
+      extra: { startPayload: payload, sessionSlug },
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Ask a session admin for a fresh group invite link.`,
+    });
+  }
+  const approval = await persistTelegramGroupApproval({
+    env,
+    session: resolved.session,
+    normalized,
+    approvedByTelegramUserId: record.serverContextRef?.approvedByTelegramUserId || '',
+    approvedByAccountAddress: record.serverContextRef?.approvedByAccountAddress || '',
+    approvalTokenId: payload,
+    createdAt,
+  });
+  if (!approval.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: approval.reason || 'telegram_group_approval_failed',
+      text: `Could not approve this Telegram group: ${approval.reason || 'telegram_group_approval_failed'}.`,
+    });
+  }
+  if (!record.consumedAt) {
+    await persistActionRecord(env, payload, {
+      ...record,
+      consumedAt: createdAt,
+      consumedGroupChatId: safeString(normalized.chat.chatId),
+      consumedGroupTitle: safeString(normalized.chat.title),
+    }, {
+      ttlSeconds: DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS,
+    });
+  }
+  const joined = await buildJoinResponse({
+    normalized,
+    command,
+    env,
+    sessionSlugOverride: resolved.session.sessionSlug,
+    createdAt,
+    waitUntil,
+  });
+  if (joined?.response?.text) {
+    joined.response.text = [
+      `Group approved for ${sessionLabel(resolved.session)}.`,
+      '',
+      joined.response.text,
+    ].join('\n');
+  }
+  joined.screen = 'telegram_group_approved';
+  joined.extra = {
+    ...(joined.extra || {}),
+    sessionSlug: resolved.session.sessionSlug,
+    groupChatId: normalized.chat.chatId,
+    approvalKey: approval.key,
+  };
+  return joined;
+}
+
 async function buildStartPayloadResponse({
   normalized,
   command,
@@ -7494,6 +8177,16 @@ async function buildStartPayloadResponse({
   createdAt,
   waitUntil = null,
 } = {}) {
+  const onboarding = parseAgentOnboardingStartParam(payload);
+  if (onboarding.ok) {
+    return buildAgentOnboardingStartResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: onboarding.sessionSlug,
+      createdAt,
+    });
+  }
   const parsed = parseOpaqueActionId(payload);
   if (!parsed.ok) {
     return buildHelpResponse({ normalized, command, env, createdAt, waitUntil });
@@ -7523,6 +8216,17 @@ async function buildStartPayloadResponse({
       createdAt,
     });
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP) {
+    return buildApproveTelegramGroupResponse({
+      normalized,
+      command,
+      env,
+      record,
+      payload: parsed.actionId,
+      createdAt,
+      waitUntil,
+    });
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {
     return buildAgentActionsResponse({
       normalized,
@@ -7543,6 +8247,15 @@ async function buildStartPayloadResponse({
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS) {
     return buildSettingsResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
+      createdAt,
+    });
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
+    return buildAgentTokenResponse({
       normalized,
       command,
       env,
@@ -7747,6 +8460,17 @@ async function buildCallbackResponse({
       createdAt,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_TELEGRAM_GROUP_APPROVAL_LINK) {
+    return attachCallbackQueryId(await buildTelegramGroupApprovalLinkResponse({
+      normalized,
+      command: 'callback:telegram_group_approval_link',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.TOGGLE_RESULTS_EXPOSURE) {
     return attachCallbackQueryId(await buildToggleResultsExposureResponse({
       normalized,
@@ -7836,6 +8560,16 @@ async function buildCallbackResponse({
       command: 'callback:my_account',
       env,
       createdAt,
+      method,
+      messageId,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_ACTIVITY) {
+    return attachCallbackQueryId(await buildActivityResponse({
+      normalized,
+      command: 'callback:agent_activity',
+      env,
+      sessionSlugOverride: sessionSlug,
       method,
       messageId,
     }), callbackQueryId);
@@ -7980,6 +8714,19 @@ export async function buildTelegramCommandResponse({
   if (parsed.command === COMMANDS.SESSIONS) {
     return buildSessionsResponse({ normalized, command: parsed.command, env, createdAt });
   }
+  if (parsed.command === COMMANDS.GROUP_ID) {
+    return buildGroupIdResponse({ normalized, command: parsed.command, env });
+  }
+  if (parsed.command === COMMANDS.GROUP_LINK) {
+    return buildTelegramGroupApprovalLinkResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      sessionSlugOverride: parsed.args[0] || '',
+      createdAt,
+      method: 'sendMessage',
+    });
+  }
   if (parsed.command === COMMANDS.QUESTIONS) {
     return buildQuestionsResponse({
       normalized,
@@ -8097,6 +8844,14 @@ export async function buildTelegramCommandResponse({
       command: parsed.command,
       env,
       createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.ACTIVITY) {
+    return buildActivityResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
     });
   }
   if ([COMMANDS.AGENT_TOKEN, COMMANDS.EXPORT_TOKEN].includes(parsed.command)) {

@@ -455,6 +455,7 @@ export async function persistTelegramLightweightGroupProposal({
   session = {},
   normalized = {},
   input = {},
+  metadata = null,
   createdAt = null,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || input.sessionSlug);
@@ -502,6 +503,9 @@ export async function persistTelegramLightweightGroupProposal({
     proposedBy: safeString(normalized.user?.telegramUserId) || null,
     createdAt: createdAt || new Date().toISOString(),
   };
+  if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+    record.actionMetadata = { ...metadata };
+  }
   assertNoSecretShape(record, 'Telegram lightweight group proposals must not serialize secrets.');
   await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record));
   return {

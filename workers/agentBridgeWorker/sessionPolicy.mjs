@@ -90,6 +90,20 @@ function normalizeLightweightGroups(session = {}) {
     }));
 }
 
+function normalizeTelegramGroupChatIds(...values) {
+  const out = [];
+  for (const value of values) {
+    const source = Array.isArray(value) ? value : safeString(value).split(/[\s,;|]+/);
+    for (const item of source) {
+      const raw = item && typeof item === 'object' && !Array.isArray(item)
+        ? safeString(item.chatId || item.groupChatId || item.telegramChatId || item.id)
+        : safeString(item);
+      if (raw && !out.includes(raw)) out.push(raw);
+    }
+  }
+  return out;
+}
+
 function normalizePositiveInteger(value, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number) || number <= 0) return fallback;
@@ -238,6 +252,31 @@ export function normalizeSessionPolicy(input = {}) {
       : (Array.isArray(input.telegramAuthoringGroupChatIds) ? input.telegramAuthoringGroupChatIds : []))
       .map(safeString)
       .filter(Boolean),
+    approvedTelegramGroupChatIds: normalizeTelegramGroupChatIds(
+      session.approvedTelegramGroupChatIds,
+      session.telegramApprovedGroupChatIds,
+      session.allowedTelegramGroupChatIds,
+      session.telegramAllowedGroupChatIds,
+      session.approvedTelegramChats,
+      session.telegramApprovedChats,
+      session.allowedTelegramChats,
+      session.telegramAllowedChats,
+      session.telegram?.approvedGroupChatIds,
+      session.telegram?.allowedGroupChatIds,
+      input.approvedTelegramGroupChatIds,
+      input.telegramApprovedGroupChatIds,
+      input.allowedTelegramGroupChatIds,
+      input.telegramAllowedGroupChatIds
+    ),
+    telegramGroupApprovalRequired: normalizeBool(
+      session.telegramGroupApprovalRequired ||
+      session.requireTelegramGroupApproval ||
+      session.telegramApprovedGroupsRequired ||
+      session.telegram?.groupApprovalRequired ||
+      session.telegram?.requireGroupApproval ||
+      input.telegramGroupApprovalRequired ||
+      input.requireTelegramGroupApproval
+    ),
     docLibraryEnabled: session.docLibraryEnabled === true,
     questions: Array.isArray(session.questions)
       ? session.questions.slice()
@@ -317,6 +356,40 @@ export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '
   if (!session) return { ok: false, reason: 'session_not_linked', sessionSlug: lookup };
   if (session.telegramBridgeEnabled !== true) return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: session.sessionSlug };
   return { ok: true, session, policy };
+}
+
+export function evaluateTelegramGroupSessionAccess(session = {}, {
+  chatId = '',
+  normalized = {},
+} = {}) {
+  const groupChatId = safeString(chatId || normalized.chat?.chatId || normalized.groupChatId);
+  const approved = normalizeTelegramGroupChatIds(session.approvedTelegramGroupChatIds);
+  const approvalRequired = session.telegramGroupApprovalRequired === true || approved.length > 0;
+  if (!approvalRequired) {
+    return {
+      ok: true,
+      reason: 'telegram_group_access_unrestricted',
+      groupChatId,
+      approvedTelegramGroupChatIds: [],
+      telegramGroupApprovalRequired: false,
+    };
+  }
+  if (groupChatId && approved.includes(groupChatId)) {
+    return {
+      ok: true,
+      reason: 'telegram_group_access_approved',
+      groupChatId,
+      approvedTelegramGroupChatIds: approved,
+      telegramGroupApprovalRequired: approvalRequired,
+    };
+  }
+  return {
+    ok: false,
+    reason: 'telegram_group_not_approved_for_session',
+    groupChatId,
+    approvedTelegramGroupChatIds: approved,
+    telegramGroupApprovalRequired: approvalRequired,
+  };
 }
 
 export function evaluateSbtJoinPolicy(session = {}, {

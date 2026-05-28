@@ -80,7 +80,7 @@ export function defaultTelegramAgentSettings(env = {}) {
   const settings = {
     draftStyle: normalizeDraftStyle(source.draftStyle),
     showUnansweredFirst: normalizeBoolean(source.showUnansweredFirst, true),
-    agentAutoApplyQuestionVotes: normalizeBoolean(source.agentAutoApplyQuestionVotes, true),
+    agentAutoApplyQuestionVotes: normalizeBoolean(source.agentAutoApplyQuestionVotes, false),
   };
   assertNoSecretShape(settings, 'Telegram agent settings defaults must not serialize secrets.');
   return settings;

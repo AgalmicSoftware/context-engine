@@ -15,6 +15,7 @@ import {
 } from './telegramQuestionProposals.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
+import { evaluateTelegramGroupSessionAccessForEnv } from './telegramGroupApprovals.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -24,6 +25,10 @@ import {
   persistTelegramLightweightGroupProposal,
 } from './telegramGroups.mjs';
 import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
+import {
+  AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX,
+  listTelegramAgentActivity,
+} from './telegramAgentActivity.mjs';
 import {
   loadTelegramQuestionQueueConfig,
   selectNextTelegramQuestion,
@@ -127,10 +132,10 @@ function agentTokenRefreshError(reason = 'agent_token_invalid') {
     ok: false,
     status: 401,
     reason,
-    message: 'This Context Engine agent token is expired, revoked, or no longer available. Ask the user to open the Context Engine Telegram bot, run /me, tap Create Agent Token, and paste the new token into the agent.',
+    message: 'This Context Engine agent token is expired, revoked, or no longer available. Ask the user to open the Context Engine Telegram bot, run /start, tap Onboard Agent, and paste the copied install info into the agent.',
     action: 'refresh_token_via_telegram',
-    telegramCommand: '/me',
-    telegramButton: 'Create Agent Token',
+    telegramCommand: '/start',
+    telegramButton: 'Onboard Agent',
   };
 }
 
@@ -209,6 +214,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/questions/next') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (pathname === '/telegram/agent/api/actions') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/question-votes/recommend') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.RECOMMEND_QUESTION_VOTES;
   }
@@ -283,6 +291,18 @@ async function resolveHandoffContext({
       return { ok: false, status: 403, reason: 'agent_token_session_mismatch', sessionSlug: resolved.session.sessionSlug };
     }
   }
+  if (normalized.chat?.isPrivate !== true) {
+    const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({ env, session: resolved.session, normalized });
+    if (!groupAccess.ok) {
+      return {
+        ok: false,
+        status: 403,
+        reason: groupAccess.reason,
+        sessionSlug: resolved.session.sessionSlug,
+        groupChatId: groupAccess.groupChatId,
+      };
+    }
+  }
   const permission = evaluateTelegramQuestionAuthoringPermission({
     env,
     normalized,
@@ -306,6 +326,7 @@ async function resolveHandoffContext({
     privateBinding,
     permission,
     delegation,
+    authMode: auth.authMode || '',
   };
 }
 
@@ -665,6 +686,46 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
   };
 }
 
+async function persistAgentQuestionVoteRecommendations({
+  env = {},
+  context = {},
+  input = {},
+  recommendations = [],
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'question_vote_recommendation_storage_unavailable' };
+  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
+  if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_recommendation_context_incomplete' };
+  const requestId = safeString(input.requestId || input.idempotencyKey) ||
+    buildOpaqueActionId(`agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`);
+  const record = {
+    type: 'telegram_agent_question_vote_recommendation',
+    version: 1,
+    requestId,
+    sessionSlug,
+    telegramUserId,
+    status: 'pending_review',
+    source: 'agent_handoff',
+    authMode: safeString(context.authMode),
+    recommendations: (Array.isArray(recommendations) ? recommendations : []).slice(0, 20).map((recommendation) => ({
+      questionId: safeString(recommendation.questionId),
+      prompt: safeString(recommendation.prompt).slice(0, 500),
+      suggestedVote: normalizeTelegramQuestionVote(recommendation.suggestedVote),
+      reason: safeString(recommendation.reason).slice(0, 800),
+      confidence: Number(recommendation.confidence || 0) || 0,
+    })),
+    createdAt,
+  };
+  assertNoSecretShape(record, 'Telegram agent question vote recommendation records must not serialize secrets.');
+  await kv.put(
+    `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`,
+    JSON.stringify(record)
+  );
+  return { ok: true, requestId, record };
+}
+
 const SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
 
 function sanitizeResearchMetadata(value, {
@@ -780,7 +841,9 @@ async function applyAgentQuestionVotes({
   const agentMetadata = normalizeAgentMetadata(input);
   const actionMetadata = sanitizeResearchMetadata({
     ...(input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata) ? input.metadata : {}),
-    source: firstValue(input.source, input.client, input.integration, input.metadata?.source),
+    source: 'agent_handoff',
+    authMode: safeString(context.authMode),
+    clientSource: firstValue(input.source, input.client, input.integration, input.metadata?.source),
     runId: firstValue(input.runId, input.requestRunId, input.metadata?.runId),
     requestId: firstValue(input.requestId, input.idempotencyKey, input.metadata?.requestId),
     preferenceTags: normalizePreferenceTagHints(input),
@@ -917,6 +980,15 @@ async function handleQuestionVoteRecommendationsRequest({
 } = {}) {
   const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
   const built = buildQuestionVoteRecommendations(questions, input, context);
+  const recommendationRecord = built.recommendations.length
+    ? await persistAgentQuestionVoteRecommendations({
+      env,
+      context,
+      input,
+      recommendations: built.recommendations,
+      createdAt: input.createdAt || new Date().toISOString(),
+    })
+    : { ok: false, reason: 'no_recommendations' };
   const settings = await loadTelegramAgentSettings({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -954,6 +1026,10 @@ async function handleQuestionVoteRecommendationsRequest({
     },
     relevance: built.relevance,
     recommendations: built.recommendations,
+    recommendationRecord: recommendationRecord.ok ? {
+      requestId: recommendationRecord.requestId,
+      status: recommendationRecord.record.status,
+    } : null,
     autoApply,
     approval: {
       endpoint: '/telegram/agent/api/question-votes/apply',
@@ -980,6 +1056,28 @@ async function handleQuestionVoteApplyRequest({
     recommendations,
   });
   return json(applied, { status: applied.ok ? 200 : 400 });
+}
+
+async function handleActionsRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
+  const items = await listTelegramAgentActivity({
+    env,
+    telegramUserId: context.normalized.user.telegramUserId,
+    sessionSlugs: sessionSlug ? [sessionSlug] : [],
+    includeContent: true,
+    limit: Number(input.limit || 50) || 50,
+  });
+  assertNoSecretShape(items, 'Telegram agent activity response must not serialize secrets.');
+  return json({
+    ok: true,
+    sessionSlug,
+    telegramUserId: context.normalized.user.telegramUserId,
+    actions: items,
+  });
 }
 
 function normalizePreferenceEntries(input = {}) {
@@ -1077,6 +1175,12 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       answerValue: JSON.stringify(draft.value),
       controlType: draft.controlType,
       submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+      metadata: {
+        source: 'agent_handoff',
+        authMode: safeString(context.authMode),
+        endpoint: '/telegram/agent/api/preferences',
+        reviewRequired: true,
+      },
       createdAt: input.createdAt || null,
     });
     if (!saved.ok) {
@@ -1118,6 +1222,11 @@ async function handlePoseRequest({
       options: input.options,
       tags: input.tags,
       sessionContext: input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
+      metadata: {
+        source: 'agent_handoff',
+        authMode: safeString(context.authMode),
+        endpoint: '/telegram/agent/api/questions/pose',
+      },
       createdAt: input.createdAt || null,
     });
     if (!saved.ok) return json({ ok: false, reason: saved.reason || 'question_save_failed' }, { status: 400 });
@@ -1200,6 +1309,11 @@ async function handleGroupProposalRequest({ env = {}, context = {}, input = {} }
     session: context.session,
     normalized: context.normalized,
     input,
+    metadata: {
+      source: 'agent_handoff',
+      authMode: safeString(context.authMode),
+      endpoint: '/telegram/agent/api/groups/propose',
+    },
     createdAt: input.createdAt || null,
   });
   return json(saved, { status: saved.ok ? 200 : 400 });
@@ -1262,6 +1376,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/question-votes/apply' && request.method === 'POST') {
     return handleQuestionVoteApplyRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/actions' && request.method === 'GET') {
+    return handleActionsRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });
