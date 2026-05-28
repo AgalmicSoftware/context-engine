@@ -62,6 +62,8 @@ const collectTreeNodes = (node, predicate, acc = []) => {
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return collectTreeNodes(rendered, predicate, acc);
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
@@ -72,6 +74,27 @@ const getNodeTypeName = (node) => {
   return String(type.displayName || type.name || '');
 };
 
+const RESOLVABLE_USER_PAGE_COMPONENTS = new Set([
+  'UserPageDeepScanStatusIndicator',
+  'UserPageDeepScanProgressPanel',
+  'UserPageHeader',
+  'UserPageQuestionSection',
+  'UserPageSbtSection',
+  'UserPageSurveySection',
+]);
+
+const resolvedComponentCache = new WeakMap();
+
+const renderResolvableComponent = (node) => {
+  const typeName = getNodeTypeName(node);
+  if (!RESOLVABLE_USER_PAGE_COMPONENTS.has(typeName)) return null;
+  if (typeof node?.type !== 'function') return null;
+  if (resolvedComponentCache.has(node)) return resolvedComponentCache.get(node);
+  const rendered = node.type(node.props || {});
+  resolvedComponentCache.set(node, rendered);
+  return rendered;
+};
+
 const treeHasText = (node, text) => {
   if (node == null) return false;
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
@@ -79,6 +102,8 @@ const treeHasText = (node, text) => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  const rendered = renderResolvableComponent(node);
+  if (rendered !== null) return treeHasText(rendered, text);
   return treeHasText(node?.props?.children, text);
 };
 
