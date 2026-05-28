@@ -177,17 +177,17 @@ import {
   faSpinner,
   faChevronDown,
   faChevronUp,
-  faSync,
 } from '@fortawesome/free-solid-svg-icons';
 
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import SBTPage from '../SBTs/SBTPage';
-import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
+import { Collapse } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
 import UserPageDeepScanProgressPanel, {
   type UserPageDeepScanProgressPanelOptions,
 } from './UserPageDeepScanProgressPanel';
+import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
 
@@ -4577,67 +4577,21 @@ class UserPage extends Component<any, any> {
           </div>
         )}
 
-        <Modal
+        <UserPageAnalysisModal
+          aiAnalysis={aiAnalysis}
+          analysisCacheStatusState={analysisCacheStatusState}
+          analysisDetails={analysisDetails}
+          analysisElapsedMs={analysisElapsedMs}
+          analysisError={analysisError}
+          analysisHistoricalFigure={analysisHistoricalFigure}
+          analysisHistoricalReasoning={analysisHistoricalReasoning}
+          analysisModalDisplayState={analysisModalDisplayState}
+          analysisName={analysisName}
+          analyzing={analyzing}
           isOpen={showAnalysisModal}
-          toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
-          className={styles.modalContent}
-        >
-          <ModalHeader
-            toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
-            className={styles.modalHeader}
-          >
-            {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
-            <div className={styles.modalTitleRow}>
-              {analysisName || 'User Analysis'}
-              <button
-                type="button"
-                className={styles.refreshIconButton}
-                onClick={() => this.analyzeUser(true)}
-                title="Refresh analysis"
-                disabled={analyzing}
-                aria-label="Refresh analysis"
-              >
-                <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
-              </button>
-            </div>
-            {analysisCacheStatusState.shouldRenderAnalysisCacheStatus && (
-              <div className={styles.analysisCacheStatus}>
-                Cached analysis from {analysisCacheStatusState.analysisCacheAge}
-              </div>
-            )}
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            {analysisModalDisplayState.shouldRenderAnalyzing && (
-              <div className={styles.analyzingContainer}>
-                <FontAwesomeIcon icon={faSpinner} spin />
-                <span>
-                  Generating insights… {(analysisElapsedMs / 1000).toFixed(1)}s
-                </span>
-              </div>
-            )}
-            {analysisModalDisplayState.shouldRenderError && (
-              <p className={styles.placeholderNote}>{analysisError}</p>
-            )}
-            {analysisModalDisplayState.shouldRenderAnalysisBody && (
-              <>
-                <p className={styles.placeholderNote}>{aiAnalysis}</p>
-                {analysisModalDisplayState.shouldRenderDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
-                {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
-                  <div className={styles.historicalAlignment}>
-                    <h4>Historical Alignment</h4>
-                    {analysisModalDisplayState.shouldRenderHistoricalFigure && (
-                      <p>{analysisHistoricalFigure}</p>
-                    )}
-                    {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
-                      <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-          </ModalBody>
-        </Modal>
+          onRefreshAnalysis={() => this.analyzeUser(true)}
+          onToggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
+        />
 
         <UserPageFullProfileModal
           aiAnalysis={aiAnalysis}
