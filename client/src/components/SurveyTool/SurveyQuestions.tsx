@@ -51,6 +51,7 @@ import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
@@ -10517,37 +10518,14 @@ export class SurveyQuestions extends Component {
 
 
   renderSurveyAnswers = (responses, isOwnResponse) => {
-    if (!this.state.questionPool || !Array.isArray(responses)) {
-      surveyLog.warn('renderSurveyAnswers: questionPool or responses not ready.', this.state.questionPool, responses);
-      return <div>Loading answers...</div>;
-    }
-
-    const questionMap = {};
-    this.state.questionPool.forEach(q => {
-       if (q && q.id) {
-           questionMap[q.id] = q;
-       } else {
-            surveyLog.warn("Invalid question object found in questionPool:", q);
-       }
-    });
-
     return (
-      <>
-        {responses.map((response, index) => {
-          if (!response || !response.questionID) {
-              surveyLog.warn("Invalid response object at index:", index, response);
-              return null;
-          }
-
-          const question = questionMap[response.questionID];
-          if (question) {
-            return this.renderQuestionAnswer(question, response, index, isOwnResponse);
-          } else {
-            surveyLog.warn(`Question not found in pool for response ID: ${response.questionID}`);
-             return null;
-          }
-        })}
-      </>
+      <SurveyQuestionsSurveyAnswersView
+        isOwnResponse={isOwnResponse}
+        onWarning={(...args) => surveyLog.warn(...args)}
+        questionPool={this.state.questionPool}
+        renderQuestionAnswer={this.renderQuestionAnswer}
+        responses={responses}
+      />
     );
   };
 

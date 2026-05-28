@@ -6,9 +6,7 @@ import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView
 describe('SurveyQuestionsSurveyAnswersView', () => {
   const onWarning = jest.fn();
   const renderQuestionAnswer = jest.fn((question) => (
-    <div key={question.id} data-testid={`answer-${question.id}`}>
-      {question.prompt}
-    </div>
+    <div key={question.id} data-testid={`answer-${question.id}`}>{question.prompt}</div>
   ));
 
   beforeEach(() => {
@@ -17,7 +15,12 @@ describe('SurveyQuestionsSurveyAnswersView', () => {
   });
 
   it('renders the loading fallback when questions or responses are not ready', () => {
-    render(<SurveyQuestionsSurveyAnswersView onWarning={onWarning} renderQuestionAnswer={renderQuestionAnswer} />);
+    render(
+      <SurveyQuestionsSurveyAnswersView
+        onWarning={onWarning}
+        renderQuestionAnswer={renderQuestionAnswer}
+      />
+    );
 
     expect(screen.getByText('Loading answers...')).toBeInTheDocument();
     expect(onWarning).toHaveBeenCalledWith(
@@ -39,7 +42,7 @@ describe('SurveyQuestionsSurveyAnswersView', () => {
         questionPool={[question]}
         renderQuestionAnswer={renderQuestionAnswer}
         responses={[response]}
-      />,
+      />
     );
 
     expect(screen.getByTestId('answer-q1')).toHaveTextContent('Question one');
@@ -58,7 +61,7 @@ describe('SurveyQuestionsSurveyAnswersView', () => {
           { questionID: '', answer: 'empty id' },
           { questionID: 'missing', answer: 'missing question' },
         ]}
-      />,
+      />
     );
 
     expect(onWarning).toHaveBeenCalledWith('Invalid question object found in questionPool:', null);
