@@ -376,9 +376,6 @@ import {
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
-  shouldHandleStartFresh,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
   shouldShowPileFullLoadingState,
   shouldShowSingleQuestionResponseLookupSpinner,
   stampResponsePayloadWithMeta,
@@ -539,6 +536,7 @@ import {
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsRouteViewDisplayState,
+  buildSurveyQuestionsSubmitFooterDisplayState,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
@@ -10683,7 +10681,6 @@ export class SurveyQuestions extends Component {
 
     // Submit button label block (centralized)
     const _pendingStats = this.getPendingStatsSnapshot();
-    const _isOwnEdit = !!(this.state.userHasResponse && this.state.isEditing);
     const _suffix = _pendingStats.total === 1 ? 'Response' : 'Responses';
 
     const submitButtonText = isSingleQuestionView
@@ -10692,24 +10689,34 @@ export class SurveyQuestions extends Component {
           suffix: _suffix,
           pendingStats: _pendingStats,
         });
-    const submittedStateActive = !!(this.state.submittedSinceLastEdit || this.state.submissionComplete);
-    const submittedIndicatorActive = shouldRenderSubmittedIndicator({
-      submittedStateActive,
-      isLoadingResponse: this.state.isLoadingResponse,
-    });
-
-    const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
-    const showSubmitAux =
-      !isSingleQuestionView && (
-        (_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
-        (singleQuestionSubmittedIndicatorActive && this.state.responseUrl)
-      );
-    const submitUploadStatusText =
+    const submitHasEncryptedAnswers =
       this.state.isSubmitting &&
-      this.state.currentStep === 1 &&
-      this.hasEncryptedAnswers()
-        ? 'Encrypting...'
-        : 'Uploading...';
+      this.state.currentStep === 1
+        ? this.hasEncryptedAnswers()
+        : false;
+    const submitHasMaskedCurrentQuestionPayload =
+      !this.state.isSubmitting &&
+      this.props.singleQuestionMode
+        ? this.hasMaskedCurrentQuestionPayload()
+        : false;
+    const submitFooterDisplayState = buildSurveyQuestionsSubmitFooterDisplayState({
+      currentStep: this.state.currentStep,
+      hasEncryptedAnswers: submitHasEncryptedAnswers,
+      hasMaskedCurrentQuestionPayload: submitHasMaskedCurrentQuestionPayload,
+      isDirty: this.state.isDirty,
+      isEditing: this.state.isEditing,
+      isLoadingResponse: this.state.isLoadingResponse,
+      isSingleQuestionView,
+      isSubmitting: this.state.isSubmitting,
+      pendingEditCount: _pendingStats.total,
+      responseUrl: this.state.responseUrl,
+      singleQuestionMode: this.props.singleQuestionMode,
+      startFresh: this.state.startFresh,
+      submissionComplete: this.state.submissionComplete,
+      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+      useHeaderSubmit: this.props.useHeaderSubmit,
+      userHasResponse: this.state.userHasResponse,
+    });
 
     const submitResponseButton = (
       <SurveyQuestionsSubmitFooter
@@ -10719,15 +10726,12 @@ export class SurveyQuestions extends Component {
         onRevertPendingChanges={this.handleRevertPendingChanges}
         pendingEditCount={_pendingStats.total}
         responseUrl={this.state.responseUrl}
-        showSubmitAux={showSubmitAux}
+        showSubmitAux={submitFooterDisplayState.showSubmitAux}
         submitButtonText={submitButtonText}
-        submitDisabled={
-          this.state.isSubmitting ||
-          (this.props.singleQuestionMode && this.hasMaskedCurrentQuestionPayload())
-        }
-        submittedIndicatorActive={submittedIndicatorActive}
+        submitDisabled={submitFooterDisplayState.submitDisabled}
+        submittedIndicatorActive={submitFooterDisplayState.submittedIndicatorActive}
         submissionError={this.state.submissionError}
-        uploadStatusText={submitUploadStatusText}
+        uploadStatusText={submitFooterDisplayState.uploadStatusText}
       />
     );
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
@@ -10757,19 +10761,10 @@ export class SurveyQuestions extends Component {
     const responseJson = jsonPanelDisplayState.showResponseJsonPanel
       ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
       : null;
-    const canEditQuestions = !this.state.userHasResponse || this.state.startFresh || this.state.isEditing;
-    const hasPendingEdits = !!this.state.isDirty || Number(_pendingStats.total || 0) > 0;
-    const genericShowInlineSubmit = shouldRenderInlineSubmitButton({
-      useHeaderSubmit: this.props.useHeaderSubmit,
-      canEditQuestions,
-      hasPendingEdits,
-      submittedStateActive,
-      isLoadingResponse: this.state.isLoadingResponse,
-    });
-    const showInlineSubmit = isSingleQuestionView
-      ? hasPendingEdits
-      : genericShowInlineSubmit;
-    const showTopInlineSubmit = showInlineSubmit && !isSingleQuestionView;
+    const canEditQuestions = submitFooterDisplayState.canEditQuestions;
+    const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
+    const showInlineSubmit = submitFooterDisplayState.showInlineSubmit;
+    const showTopInlineSubmit = submitFooterDisplayState.showTopInlineSubmit;
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: this.state.activeTagModalTag,
       isSingleQuestionView,
