@@ -39,12 +39,16 @@ broadcast
 coverage
 docs/codebase-*.md
 docs/assets/codebase-*
+docs/*PRD*.md
+docs/*prd*.md
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
 scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
+scripts/run-agent-bridge-worker-tests.js
+scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
 test/*.private.test.*
 artifacts
@@ -71,6 +75,8 @@ contextEngine-cc/TODO
 .e2e-cache
 docs/codebase-*.md
 docs/assets/codebase-*
+docs/*PRD*.md
+docs/*prd*.md
 test/*.private.test.*
 EOF
 }
@@ -105,6 +111,8 @@ broadcast
 coverage
 docs/codebase-*.md
 docs/assets/codebase-*
+docs/*PRD*.md
+docs/*prd*.md
 docs/agent-native*.md
 client/public/skill.md
 workers/agentBridgeWorker
@@ -113,6 +121,8 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
+scripts/run-agent-bridge-worker-tests.js
+scripts/vendor-cecc-ethers-bundle.js
 test/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md

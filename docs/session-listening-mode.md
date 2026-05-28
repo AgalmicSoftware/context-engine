@@ -60,8 +60,8 @@ hidden until transcript text exists and shows elapsed seconds while generation
 is running.
 
 The transcript summary/upload source path is disabled for this mode for now.
-Standalone questions do not currently have a document URL field; see the
-standalone-question document URL PRD for the planned source-reference path.
+Standalone questions do not currently have a document URL field; source
+references remain a planned follow-up for standalone question records.
 
 Answer suggestions remain reserved for the later Interview branch of the
 microphone feature.
