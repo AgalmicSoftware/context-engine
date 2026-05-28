@@ -52,6 +52,7 @@ type UserPageQuestionSectionProps = {
   questionsCreatedSectionToggleState: UserPageSectionToggleState;
   responderAddress?: SingleQuestionResponseProps['responderAddress'];
   sbtCacheRevision?: unknown;
+  surveysQuestionsToggle?: React.ReactNode;
 };
 
 const UserPageQuestionSection = ({
@@ -75,8 +76,10 @@ const UserPageQuestionSection = ({
   questionsCreatedSectionToggleState,
   responderAddress,
   sbtCacheRevision,
+  surveysQuestionsToggle = null,
 }: UserPageQuestionSectionProps): React.ReactElement => (
   <div className={styles.leftColumn}>
+    {surveysQuestionsToggle}
     <div className={styles.questionSection}>
       <h2
         onClick={onQuestionResponsesSectionToggle}

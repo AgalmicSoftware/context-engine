@@ -189,6 +189,7 @@ import UserPageDeepScanProgressPanel, {
 import UserPageAnalysisModal from './UserPageAnalysisModal';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
+import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
 
 // NEW IMPORT: for mini question display
@@ -4391,136 +4392,39 @@ class UserPage extends Component<any, any> {
             )}
 
             {selectedTab === 'questions' && (
-              <div className={styles.leftColumn}>
-                {surveysQuestionsToggle}
-                <div className={styles.questionSection}>
-                  <h2
-                    onClick={this.toggleQuestionResponsesSection}
-                    className={styles.sectionHeader}
-                  >
-                    {questionResponsesSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {questionResponsesSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
-                        aria-label="Show Surveys"
-                      >
-                        Survey
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Question Responses</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isQuestionLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          questionSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={questionResponsesSectionToggleState.isOpen}>
-                    {questionSectionDisplayState.hasQuestionResponses ? (
-                      questionResponseEntries.map((question, index: number) => {
-                        const userResp = detailedQuestionResponseMap[question.id];
-                        if (!userResp) return null;
-                        return (
-                          <div key={index} className={styles.questionWrapper}>
-                            <SingleQuestionResponse
-                              question={question}
-                              response={userResp}
-                              isOwnResponse={false}
-                              mode="mini"
-                              showImportance={true}
-                              compactEncryptedAnswerCta={true}
-                              stackCompactDecryptCta={true}
-                              onDecryptQuestion={this.handleDecryptQuestionAnswer}
-                              canDecryptOtherResponses={!!question?.canDecryptOtherResponses}
-                              responderAddress={propViewAddress}
-                              network={network}
-                              sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
-                              questionResponsesNonce={this.props.questionResponsesNonce}
-                              sbtCacheRevision={this.props.sbtCacheRevision}
-                            />
-                          </div>
-                        );
-                      })
-                    ) : questionSectionDisplayState.shouldRenderQuestionResponsesEmptyText ? (
-                      <p>{questionResponsesEmptyText}</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-
-                  <h2
-                    onClick={this.toggleQuestionsCreatedSection}
-                    className={styles.sectionHeaderWithMargin}
-                  >
-                    {questionsCreatedSectionToggleState.shouldRenderOpenIcon && (
-                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
-                    )}
-                    {questionsCreatedSectionToggleState.shouldRenderClosedIcon && (
-                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
-                    )}{' '}
-                    <span className={styles.sectionSwitcher}>
-                      <button
-                        type="button"
-                        className={styles.switchWordInactive}
-                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
-                        aria-label="Show Surveys"
-                      >
-                        Surveys
-                      </button>
-                      <span className={styles.switchDivider}>/</span>
-                      <span className={styles.switchWordActive}>Questions Created</span>
-                    </span>
-                    {/* Corner spinner (Green) for ANY loading activity */}
-                    {isQuestionLoadingAny && (
-                      this.renderDeepScanStatusIndicator(
-                          questionsCreatedSpinnerId,
-                          deepScanTooltipContent,
-                          deepScanProgressRows,
-                          deepScanTooltipTitle
-                        )
-                    )}
-                  </h2>
-                  <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
-                    {questionSectionDisplayState.hasCreatedQuestions ? (
-                      questionCreationEntries.map((question, index: number) => (
-                        <div key={index} className={createdQuestionWrapperClassName}>
-                          <SingleQuestionResponse
-                            question={question}
-                            response={null}
-                            isOwnResponse={false}
-                            mode="mini"
-                            showImportance={false}
-                            onDecryptQuestion={() => {}}
-                            /* NEW: non-interactive render for created questions */
-                            questionOnly={true}
-                            network={network}
-                            sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
-                            questionResponsesNonce={this.props.questionResponsesNonce}
-                            sbtCacheRevision={this.props.sbtCacheRevision}
-                          />
-                        </div>
-                      ))
-                    ) : questionSectionDisplayState.shouldRenderQuestionsCreatedEmptyText ? (
-                      <p>No questions created.</p>
-                    ) : (
-                      // Suppress white spinner; rely on green corner spinner
-                      null
-                    )}
-                  </Collapse>
-                </div>
-              </div>
+              <UserPageQuestionSection
+                activeSessionSlug={this.props.activeSessionSlug}
+                createdQuestionWrapperClassName={createdQuestionWrapperClassName}
+                detailedQuestionResponseMap={detailedQuestionResponseMap}
+                isQuestionLoadingAny={isQuestionLoadingAny}
+                network={network}
+                onDecryptQuestion={this.handleDecryptQuestionAnswer}
+                onQuestionResponsesSectionToggle={this.toggleQuestionResponsesSection}
+                onQuestionsCreatedSectionToggle={this.toggleQuestionsCreatedSection}
+                onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
+                questionCreationEntries={questionCreationEntries}
+                questionResponsesEmptyText={questionResponsesEmptyText}
+                questionResponsesLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
+                  questionSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                questionResponseEntries={questionResponseEntries}
+                questionResponsesSectionToggleState={questionResponsesSectionToggleState}
+                questionSectionDisplayState={questionSectionDisplayState}
+                questionsCreatedLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
+                  questionsCreatedSpinnerId,
+                  deepScanTooltipContent,
+                  deepScanProgressRows,
+                  deepScanTooltipTitle
+                ) : null}
+                questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
+                responderAddress={propViewAddress}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+                surveysQuestionsToggle={surveysQuestionsToggle}
+              />
             )}
 
             <UserPageSbtSection

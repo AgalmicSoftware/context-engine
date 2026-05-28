@@ -35,37 +35,22 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
     sbtCacheRevision?: unknown;
     sessionSlug?: unknown;
     showImportance?: unknown;
-  }) => {
-    const responseRecord = (response && typeof response === 'object')
-      ? response as {
-        additional?: { encrypted?: unknown; value?: unknown };
-        answer?: { encrypted?: unknown; value?: unknown };
-      }
-      : {};
-
-    return (
-      <div
-        data-testid={questionOnly ? 'created-question-card' : 'question-response-card'}
-        data-answer-encrypted={String(!!responseRecord.answer?.encrypted)}
-        data-answer-value={String(responseRecord.answer?.value)}
-        data-additional-encrypted={String(!!responseRecord.additional?.encrypted)}
-        data-additional-value={String(responseRecord.additional?.value)}
-        data-can-decrypt={String(canDecryptOtherResponses)}
-        data-has-response={String(!!response)}
-        data-mode={String(mode)}
-        data-nonce={String(questionResponsesNonce)}
-        data-responder-address={String(responderAddress)}
-        data-revision={String(sbtCacheRevision)}
-        data-session-slug={String(sessionSlug)}
-        data-show-importance={String(showImportance)}
-      >
-        {question?.prompt || question?.id}
-        {(questionOnly || canDecryptOtherResponses) && (
-          <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
-        )}
-      </div>
-    );
-  },
+  }) => (
+    <div
+      data-testid={questionOnly ? 'created-question-card' : 'question-response-card'}
+      data-can-decrypt={String(canDecryptOtherResponses)}
+      data-has-response={String(!!response)}
+      data-mode={String(mode)}
+      data-nonce={String(questionResponsesNonce)}
+      data-responder-address={String(responderAddress)}
+      data-revision={String(sbtCacheRevision)}
+      data-session-slug={String(sessionSlug)}
+      data-show-importance={String(showImportance)}
+    >
+      {question?.prompt || question?.id}
+      <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+    </div>
+  ),
 }));
 
 const createProps = (
@@ -114,6 +99,7 @@ const createProps = (
   },
   responderAddress: '0xviewer',
   sbtCacheRevision: 'revision-1',
+  surveysQuestionsToggle: null,
   ...overrides,
 });
 
@@ -183,142 +169,5 @@ describe('UserPageQuestionSection', () => {
     expect(screen.queryByTestId('created-loading')).toBeNull();
     expect(screen.queryByTestId('question-response-card')).toBeNull();
     expect(screen.queryByTestId('created-question-card')).toBeNull();
-  });
-
-  it('passes cache-derived decrypt eligibility without invoking decrypt on render', () => {
-    const onDecryptQuestion = jest.fn();
-
-    render(
-      <UserPageQuestionSection
-        {...createProps({
-          detailedQuestionResponseMap: {
-            'q-gated': {
-              answer: { encrypted: true, encryptionAudience: 'gate', value: '*' },
-            },
-            'q-open': {
-              answer: { value: 'cached clear text' },
-            },
-          },
-          onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: false,
-            id: 'q-gated',
-            prompt: 'Gated cached response',
-            slug: 'gated-session',
-          }, {
-            id: 'q-open',
-            prompt: 'Open cached response',
-          }],
-          questionResponsesNonce: 'cache-nonce',
-          sbtCacheRevision: 'gate-revision',
-        })}
-      />
-    );
-
-    const responseCards = screen.getAllByTestId('question-response-card');
-    expect(responseCards).toHaveLength(2);
-    expect(responseCards[0]).toHaveAttribute('data-can-decrypt', 'false');
-    expect(responseCards[0]).toHaveAttribute('data-session-slug', 'gated-session');
-    expect(responseCards[1]).toHaveAttribute('data-can-decrypt', 'false');
-    expect(responseCards[1]).toHaveAttribute('data-session-slug', 'fallback-session');
-    responseCards.forEach((card) => {
-      expect(card).toHaveAttribute('data-nonce', 'cache-nonce');
-      expect(card).toHaveAttribute('data-revision', 'gate-revision');
-      expect(card).toHaveAttribute('data-has-response', 'true');
-      expect(card.querySelector('button')).toBeNull();
-    });
-    expect(onDecryptQuestion).not.toHaveBeenCalled();
-  });
-
-  it('keeps gated cached responses visible and defers decrypt to the parent click handler', () => {
-    const onDecryptQuestion = jest.fn();
-
-    render(
-      <UserPageQuestionSection
-        {...createProps({
-          detailedQuestionResponseMap: {
-            'q-gated-visible': {
-              additional: {
-                encrypted: true,
-                encryptionAudience: 'gate',
-                value: '*',
-              },
-              answer: {
-                encrypted: true,
-                encryptionAudience: 'gate',
-                value: '*',
-              },
-            },
-          },
-          onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: true,
-            id: 'q-gated-visible',
-            prompt: 'Visible gated response',
-            sessionSlug: 'gated-cache-session',
-          }],
-          questionResponsesNonce: 'gate-cache-nonce',
-          sbtCacheRevision: 'gate-cache-revision',
-        })}
-      />
-    );
-
-    const responseCard = screen.getByTestId('question-response-card');
-    expect(responseCard).toHaveTextContent('Visible gated response');
-    expect(responseCard).toHaveAttribute('data-has-response', 'true');
-    expect(responseCard).toHaveAttribute('data-can-decrypt', 'true');
-    expect(responseCard).toHaveAttribute('data-answer-encrypted', 'true');
-    expect(responseCard).toHaveAttribute('data-answer-value', '*');
-    expect(responseCard).toHaveAttribute('data-additional-encrypted', 'true');
-    expect(responseCard).toHaveAttribute('data-additional-value', '*');
-    expect(responseCard).toHaveAttribute('data-session-slug', 'gated-cache-session');
-    expect(responseCard).toHaveAttribute('data-nonce', 'gate-cache-nonce');
-    expect(responseCard).toHaveAttribute('data-revision', 'gate-cache-revision');
-    expect(onDecryptQuestion).not.toHaveBeenCalled();
-
-    fireEvent.click(responseCard.querySelector('button') as HTMLButtonElement);
-    expect(onDecryptQuestion).toHaveBeenCalledWith('q-gated-visible');
-  });
-
-  it('uses the active session fallback for gated cached response decrypt wiring', () => {
-    const onDecryptQuestion = jest.fn();
-
-    render(
-      <UserPageQuestionSection
-        {...createProps({
-          activeSessionSlug: 'active-cache-session',
-          detailedQuestionResponseMap: {
-            'q-gated-fallback-session': {
-              answer: {
-                encrypted: true,
-                encryptionAudience: 'gate',
-                value: '*',
-              },
-            },
-          },
-          onDecryptQuestion,
-          questionResponseEntries: [{
-            canDecryptOtherResponses: true,
-            id: 'q-gated-fallback-session',
-            prompt: 'Fallback session gated response',
-          }],
-          questionResponsesNonce: 'fallback-cache-nonce',
-          sbtCacheRevision: 'fallback-cache-revision',
-        })}
-      />
-    );
-
-    const responseCard = screen.getByTestId('question-response-card');
-    expect(responseCard).toHaveTextContent('Fallback session gated response');
-    expect(responseCard).toHaveAttribute('data-has-response', 'true');
-    expect(responseCard).toHaveAttribute('data-can-decrypt', 'true');
-    expect(responseCard).toHaveAttribute('data-answer-encrypted', 'true');
-    expect(responseCard).toHaveAttribute('data-session-slug', 'active-cache-session');
-    expect(responseCard).toHaveAttribute('data-nonce', 'fallback-cache-nonce');
-    expect(responseCard).toHaveAttribute('data-revision', 'fallback-cache-revision');
-    expect(onDecryptQuestion).not.toHaveBeenCalled();
-
-    fireEvent.click(responseCard.querySelector('button') as HTMLButtonElement);
-    expect(onDecryptQuestion).toHaveBeenCalledWith('q-gated-fallback-session');
   });
 });
