@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -123,6 +123,7 @@ import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
 import SessionWizardRequirementsBanner, {
   SESSION_WIZARD_REQUIREMENT_LINKS,
 } from './SessionWizardRequirementsBanner';
+import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
 import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import SessionPublishSummary from './SessionPublishSummary';
 import {
@@ -4791,29 +4792,14 @@ const SessionWizard = ({
     }
   }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
 
-  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' && sessionIdDisplay ? (
-    <span className={styles.sessionIdBadge} title={sessionIdDisplay}>
-      {sessionIdDisplay.length > 14 ? sessionIdDisplay.slice(0, 14) + '…' : sessionIdDisplay}
-      <button
-        type="button"
-        className={styles.iconButton}
-        onClick={handleRegenerateSessionId}
-        title="Generate a new session ID"
-        aria-label="Generate a new session ID"
-      >
-        <FontAwesomeIcon icon={faRedoAlt} spin={isSessionIdRegenerating} />
-      </button>
-      <button type="button" className={styles.iconButton} onClick={handleCopySessionId} title="Copy session ID" aria-label="Copy session ID">
-        <FontAwesomeIcon icon={faCopy} />
-      </button>
-      {renderSessionWizardInfoTooltip({
-        id: 'gw-session-id',
-        content: 'On-chain session identifier. Use with /admin?sessionId=<uuid>&chainId=<id>.',
-        placement: 'bottom',
-        testId: 'ce-wizard-tooltip-gw-session-id',
-        ariaLabel: 'Session ID info',
-      })}
-    </span>
+  const sessionMetadataHeaderAccessory = wizardMode === 'advanced' ? (
+    <SessionWizardSessionIdBadge
+      isRegenerating={isSessionIdRegenerating}
+      onCopy={handleCopySessionId}
+      onRegenerate={handleRegenerateSessionId}
+      renderInfoTooltip={renderSessionWizardInfoTooltip}
+      sessionIdDisplay={sessionIdDisplay}
+    />
   ) : null;
 
   return (
