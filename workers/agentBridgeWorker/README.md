@@ -55,6 +55,20 @@ Freeform profile text, credentials, grants, keys, JWTs, gated content, and other
 private inputs must stay behind opaque refs collected in private chat or the
 Mini App.
 
+### Agent Skill Install
+
+Once this repo is public, an external Codex/OpenClaw-style agent can install
+the packaged CE Telegram handoff skill with:
+
+```bash
+CE_SKILL_REF="${CE_SKILL_REF:-main}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
+```
+
+Set `CE_SKILL_REF=release-staging` or another public branch/tag while testing
+before the skill lands on `main`. After install, the agent should use the
+`ce-telegram-agent-handoff` skill and ask the user to create a 28-day token
+from the CE bot `/me` screen.
+
 ## Telegram Screens
 
 Every `telegram_screen_state` carries launch metadata: a command, an opaque callback, or the `t.me/<bot>?start=<opaque-action-id>` deep link template.
@@ -80,7 +94,7 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `account_recovered` | `/recover_key` |
 | confirmation, submitted, draft, retry states | opaque callback actions |
 
-The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Attachments`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
+The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Groups`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
 `View Questions` reads the linked session through the bridge's worker-local
 materialized question index for now. Canonical `GET /api/agent/questions`
@@ -104,8 +118,10 @@ option/instruction text, and labels its return action `Other Questions`. Binary
 question buttons render `Agree` / `Disagree` on the first row and `Unsure`
 underneath.
 
-`/me` shows an abbreviated managed address as an inline chain-explorer link and
-renders known chains by name, for example `OP Sepolia Testnet (11155420)`.
+`/me` shows an abbreviated managed address as an inline chain-explorer link,
+renders known chains by name, for example `OP Sepolia Testnet (11155420)`, and
+offers a private `Create Agent Token` action when the user has a selectable
+Telegram session. The default user-scoped agent token lifespan is 28 days.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
@@ -118,9 +134,10 @@ Core Telegram commands:
   commands rather than welcome-screen buttons. If the user has not selected a
   private session yet, the Mini App launch opens the session picker first.
 - `/sessions`, `/questions`, `/q <number>`,
-  `/results`, `/results consensus`, `/results group`, `/attachments`, `/docs`,
-  `/me`, and `/account` keep their existing session/question/document/account
-  behavior. Plain `/results` explains the `consensus` and `group` views and
+  `/results`, `/results consensus`, `/results group`,
+  `/me`, `/account`, and `/agent_token` keep their existing
+  session/question/account behavior. Plain `/results` explains the `consensus`
+  and `group` views and
   renders buttons for both modes; mode-specific results attempt to upload a
   rendered PNG card with a compact white consensus view and participant graph
   for group results, using demo data until enough live overlap exists. The
@@ -209,11 +226,13 @@ The worker contract models R2 document bytes, D1 metadata/index status, and KV s
 Public summaries include titles, file types, visibility, and index status.
 Private or SBT-gated contents are never included in group-safe summaries.
 
-The attachment button copy is `Attachments`. `/attachments` is the preferred
-command; `/docs` remains an alias during bot-v1 smoke. Selected files
-are recorded as inputs for `Generate Questions` and as future `Use as Answer
-Context` candidates. Private or gated files should open through the Mini App
-once that surface is wired. Generating questions without selected files returns
+The attachment/document handlers remain implemented, but document buttons and
+registered bot commands are temporarily hidden while the Telegram-first UX is
+simplified. `/attachments` and `/docs` remain private compatibility commands
+for smoke testing. Selected files are recorded as inputs for `Generate
+Questions` and as future `Use as Answer Context` candidates. Private or gated
+files should open through the Mini App once that surface is re-enabled.
+Generating questions without selected files returns
 `Select or upload attachments before generating questions.`
 
 Storage profile selection belongs to session config, not Telegram.
@@ -621,6 +640,11 @@ Current v0 scope:
   `/export_allow` and `/export_revoke`. These managed grants are stored under
   `telegram:response-export-allowlist:v1:<sessionSlug>` in `AGENT_ACTION_KV`;
   they grant export only, not admin delegation.
+- Configured admins can manage sponsored/default question queues from Admin
+  Actions or with `/question_queue 1 3 4`. Queue config is stored under
+  `telegram:question-queue-config:v1:<sessionSlug>` in `AGENT_ACTION_KV`.
+  Agent next-question calls serve those question ids first when they match the
+  user's criteria, then fall back to preference-ranked active questions.
 - Worker login first honors per-session `workerLoginOrigin` /
   `sessionWorkerLoginOrigin` and `allowOrigins`, then tries
   `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, `LOCAL_AUTH_ORIGIN`, and
@@ -649,6 +673,7 @@ OpenClaw-style agents can call:
 ```text
 GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
 POST /telegram/agent/api/questions
+POST /telegram/agent/api/questions/next
 POST /telegram/agent/api/preferences
 POST /telegram/agent/api/questions/pose
 POST /telegram/agent/api/question-votes/recommend
@@ -663,6 +688,13 @@ question tags, prompt text, and attended-session hints. The default mode returns
 all questions ranked by relevance. Set `relevanceMode: "filter"` to return only
 questions with a positive relevance score. `questions/pose` accepts `tags` and
 `sessionContext` when an agent creates a new Telegram-only question.
+
+`POST /telegram/agent/api/questions/next` is the queue-friendly cadence route.
+It accepts `criteria` / `preferences`, optional `questionTypes`, `queueKey`,
+`advance`, and `resetQueue`. The worker serves admin-sponsored question ids
+first when they match the criteria, advances a per-user cursor in
+`AGENT_ACTION_KV`, and then falls back to the same preference-ranked active
+question list used by `/telegram/agent/api/questions`.
 
 Agents can also ask the worker for a meta-level importance view with
 `POST /telegram/agent/api/question-votes/recommend`. The response returns a

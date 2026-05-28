@@ -2,7 +2,7 @@ import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX = 'telegram:agent-delegation-token:v1:';
-export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS = 28 * 24 * 60 * 60;
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES = Object.freeze({
   READ_QUESTIONS: 'read_questions',
   DRAFT_ANSWERS: 'draft_answers',

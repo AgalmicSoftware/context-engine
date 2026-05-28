@@ -468,6 +468,7 @@ async function buildMiniAppAdminState({
       { action: 'export_all', label: 'Export data' },
       { action: 'export_access', label: 'Manage permissions' },
       { action: 'results_settings', label: 'Results settings' },
+      { action: 'question_queue', label: 'Question queue' },
       { action: 'export_allow', label: 'Add admin' },
       { action: 'export_revoke', label: 'Remove admin' },
     ],
@@ -5647,12 +5648,6 @@ function telegramMiniAppHtml() {
             </svg>
             <span>Sessions</span>
           </button>
-          <button class="iconButton documentsButton" id="showDocuments" type="button" aria-label="Documents" aria-expanded="false" title="Documents">
-            <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <path d="M7 3h7l4 4v14H7z"></path><path d="M14 3v5h5"></path><path d="M9 13h6"></path><path d="M9 17h6"></path>
-            </svg>
-            <span>Documents</span>
-          </button>
           <button class="iconButton groupsButton" id="showGroups" type="button" aria-label="Groups" aria-expanded="false" title="Groups">
             <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
               <path d="M7.5 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path><path d="M16.5 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path><path d="M3 20a4.5 4.5 0 0 1 9 0"></path><path d="M12 20a4.5 4.5 0 0 1 9 0"></path>
@@ -6213,6 +6208,7 @@ function telegramMiniAppHtml() {
       export_all: 'Export data',
       export_access: 'Manage permissions',
       results_settings: 'Results settings',
+      question_queue: 'Question queue',
       export_allow: 'Add admin',
       export_revoke: 'Remove admin',
     };
@@ -8147,6 +8143,7 @@ function telegramMiniAppHtml() {
         export_all: 'Use /export_all ' + sessionSlug + ' in the bot to export all responses.',
         export_access: 'Use /export_access ' + sessionSlug + ' in the bot to review export access.',
         results_settings: 'Open Admin Actions in the bot, then choose Results Settings for this session.',
+        question_queue: 'Use /question_queue 1 3 4 in the bot to set sponsored questions for this session.',
         export_allow: 'Use /export_allow 0x... ' + sessionSlug + ' in the bot to add an export admin.',
         export_revoke: 'Use /export_revoke 0x... ' + sessionSlug + ' in the bot to remove an export admin.',
       })[action.action] || ('Use the bot Admin Actions screen for ' + (action.label || action.action) + '.');
@@ -9419,11 +9416,14 @@ function telegramMiniAppHtml() {
       load();
     };
     function setPanelOpen(panel, button, open) {
+      if (!panel) return;
       panel.classList.toggle('open', open);
+      if (!button) return;
       button.classList.toggle('active', open);
       button.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
     function bindPanelClose(closeButton, panel, button) {
+      if (!closeButton || !panel) return;
       closeButton.onclick = () => setPanelOpen(panel, button, false);
     }
     function scrollPanelIntoView(panel) {
@@ -9442,14 +9442,16 @@ function telegramMiniAppHtml() {
       setToolMenuOpen(false);
       scrollPanelIntoView(el.sessionPicker);
     };
-    el.showDocuments.onclick = () => {
-      setPanelOpen(el.documentsPanel, el.showDocuments, true);
-      state.documentsSectionOpen = true;
-      renderDocuments();
-      setToolMenuOpen(false);
-      scrollPanelIntoView(el.documentsPanel);
-      if (!state.documentsData && state.documentsSessionSlug) loadDocuments();
-    };
+    if (el.showDocuments) {
+      el.showDocuments.onclick = () => {
+        setPanelOpen(el.documentsPanel, el.showDocuments, true);
+        state.documentsSectionOpen = true;
+        renderDocuments();
+        setToolMenuOpen(false);
+        scrollPanelIntoView(el.documentsPanel);
+        if (!state.documentsData && state.documentsSessionSlug) loadDocuments();
+      };
+    }
     el.showAdmin.onclick = () => {
       state.sessionsPanelOpen = false;
       renderSessionPicker();

@@ -25,6 +25,10 @@ import {
 } from './telegramGroups.mjs';
 import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
 import {
+  loadTelegramQuestionQueueConfig,
+  selectNextTelegramQuestion,
+} from './telegramQuestionQueue.mjs';
+import {
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
@@ -118,6 +122,18 @@ function suppliedAgentToken(request) {
   );
 }
 
+function agentTokenRefreshError(reason = 'agent_token_invalid') {
+  return {
+    ok: false,
+    status: 401,
+    reason,
+    message: 'This Context Engine agent token is expired, revoked, or no longer available. Ask the user to open the Context Engine Telegram bot, run /me, tap Create Agent Token, and paste the new token into the agent.',
+    action: 'refresh_token_via_telegram',
+    telegramCommand: '/me',
+    telegramButton: 'Create Agent Token',
+  };
+}
+
 async function authenticateAgentHandoff(request, env = {}) {
   const expected = expectedAgentToken(env);
   const supplied = suppliedAgentToken(request);
@@ -132,7 +148,7 @@ async function authenticateAgentHandoff(request, env = {}) {
     return { ok: true, authMode: 'telegram_agent_delegation_token', delegation: delegated.record };
   }
   if (safeString(supplied).startsWith('ceagt_')) {
-    return { ok: false, status: 401, reason: delegated.reason || 'agent_token_invalid' };
+    return agentTokenRefreshError(delegated.reason || 'agent_token_invalid');
   }
   if (!expected) {
     return { ok: false, status: 503, reason: 'agent_api_token_not_configured' };
@@ -176,12 +192,21 @@ function inputFromRequest(request, body = {}) {
     interests: body.interests || url.searchParams.get('interests'),
     sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
     relevanceMode: safeString(body.relevanceMode || url.searchParams.get('relevanceMode')),
+    questionTypes: body.questionTypes || body.questionType || url.searchParams.get('questionTypes') || url.searchParams.get('questionType'),
+    queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
+    advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
+    resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
+    includeSponsored: Object.hasOwn(body, 'includeSponsored') ? body.includeSponsored : url.searchParams.get('includeSponsored'),
+    sponsoredFirst: Object.hasOwn(body, 'sponsoredFirst') ? body.sponsoredFirst : url.searchParams.get('sponsoredFirst'),
   };
 }
 
 function delegationScopeForRequest(pathname = '', method = 'GET') {
   const methodName = safeString(method).toUpperCase();
   if (pathname === '/telegram/agent/api/questions') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/questions/next') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/question-votes/recommend') {
@@ -483,6 +508,40 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     relevance: ranked.relevance,
     questions: ranked.questions,
   });
+}
+
+async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const ranked = rankQuestionsByPreferences(questions, input, context);
+  const queueConfig = await loadTelegramQuestionQueueConfig({
+    env,
+    sessionSlug: context.session.sessionSlug,
+  });
+  const selected = await selectNextTelegramQuestion({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: context.normalized.user.telegramUserId,
+    questions: ranked.questions,
+    sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
+    input,
+    createdAt: input.createdAt || null,
+  });
+  return json({
+    ok: selected.ok,
+    sessionSlug: context.session.sessionSlug,
+    permissionMode: context.permission.mode,
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    relevance: ranked.relevance,
+    queueConfig: {
+      source: queueConfig.source || '',
+      sponsoredQuestionCount: queueConfig.sponsoredQuestionIds.length,
+    },
+    question: selected.question || null,
+    sponsored: selected.sponsored === true,
+    reason: selected.reason,
+    queue: selected.queue,
+  }, { status: selected.ok ? 200 : 404 });
 }
 
 function normalizeTelegramQuestionVote(value = '') {
@@ -1166,7 +1225,16 @@ export async function handleTelegramAgentHandoffRequest({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const auth = await authenticateAgentHandoff(request, env);
-  if (!auth.ok) return json({ ok: false, reason: auth.reason }, { status: auth.status });
+  if (!auth.ok) {
+    return json({
+      ok: false,
+      reason: auth.reason,
+      ...(auth.message ? { message: auth.message } : {}),
+      ...(auth.action ? { action: auth.action } : {}),
+      ...(auth.telegramCommand ? { telegramCommand: auth.telegramCommand } : {}),
+      ...(auth.telegramButton ? { telegramButton: auth.telegramButton } : {}),
+    }, { status: auth.status });
+  }
 
   const url = new URL(request.url);
   const body = await readRequestJson(request);
@@ -1185,6 +1253,9 @@ export async function handleTelegramAgentHandoffRequest({
 
   if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionsRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleNextQuestionRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/question-votes/recommend' && request.method === 'POST') {
     return handleQuestionVoteRecommendationsRequest({ env, context, input, waitUntil });
