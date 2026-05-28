@@ -3,10 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageActionsSection from './SbtPageActionsSection';
 
-const mintTxHash = '0x1111111111111111111111111111111111111111111111111111111111111111';
-const burnTxHash = '0x2222222222222222222222222222222222222222222222222222222222222222';
-const errorTxHash = '0x3333333333333333333333333333333333333333333333333333333333333333';
-
 const createProps = (
   overrides: Partial<React.ComponentProps<typeof SbtPageActionsSection>> = {}
 ) => ({
@@ -18,6 +14,8 @@ const createProps = (
   },
   burnButton: <button type="button">Burn Action</button>,
   burnLabel: 'Burn',
+  burnSuccessHref: 'https://explorer.example.test/burn',
+  burnSuccessText: '0xburn',
   burnedLowerLabel: 'burned',
   copyErrorButtonStyle: { marginLeft: '8px' },
   errorCopyIconState: {
@@ -25,24 +23,20 @@ const createProps = (
     shouldRenderDefaultIcon: true,
   },
   errorMessage: 'wallet rejected transaction',
-  getExplorerLink: (hash: unknown) => `https://explorer.example.test/tx/${String(hash || '')}`,
+  isOpen: true,
   mintButton: <button type="button">Mint Action</button>,
   mintLabel: 'Mint',
+  mintSuccessHref: 'https://explorer.example.test/mint',
+  mintSuccessText: '0xmint',
   mintedLowerLabel: 'minted',
   onCopyError: jest.fn(),
   onToggle: jest.fn(),
   sbtLabel: 'SBT',
   sectionHeaderClassName: 'section-header',
-  toggleState: {
-    isOpen: true,
-    shouldRenderClosedIcon: false,
-    shouldRenderOpenIcon: true,
-  },
-  transactionState: {
-    lastBurnTxHash: burnTxHash,
-    lastMintTxHash: mintTxHash,
-    transactionHash: errorTxHash,
-  },
+  shouldRenderClosedIcon: false,
+  shouldRenderOpenIcon: true,
+  transactionErrorHref: 'https://explorer.example.test/error',
+  transactionErrorText: '0xerror',
   ...overrides,
 });
 
@@ -64,7 +58,7 @@ describe('SbtPageActionsSection', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it('renders mint and burn success links from the transaction display state', () => {
+  it('renders mint and burn success links from explicit transaction props', () => {
     render(
       <SbtPageActionsSection
         {...createProps({
@@ -77,19 +71,15 @@ describe('SbtPageActionsSection', () => {
     );
 
     expect(screen.getByText(/SBT successfully minted!/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '0xmint' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${mintTxHash}`
+      'https://explorer.example.test/mint'
     );
-    expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: '0x1111...111111' })).toHaveAttribute('rel', 'noopener noreferrer');
     expect(screen.getByText(/SBT successfully burned!/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '0xburn' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${burnTxHash}`
+      'https://explorer.example.test/burn'
     );
-    expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: '0x2222...222222' })).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
   it('renders transaction error copy controls and optional transaction link', () => {
@@ -107,12 +97,10 @@ describe('SbtPageActionsSection', () => {
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Transaction Failed: wallet rejected transaction');
-    expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '0xerror' })).toHaveAttribute(
       'href',
-      `https://explorer.example.test/tx/${errorTxHash}`
+      'https://explorer.example.test/error'
     );
-    expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('link', { name: '0x3333...333333' })).toHaveAttribute('rel', 'noopener noreferrer');
 
     fireEvent.click(screen.getByRole('button', { name: 'Copy error message' }));
     expect(onCopyError).toHaveBeenCalledTimes(1);
@@ -122,11 +110,9 @@ describe('SbtPageActionsSection', () => {
     render(
       <SbtPageActionsSection
         {...createProps({
-          toggleState: {
-            isOpen: false,
-            shouldRenderClosedIcon: true,
-            shouldRenderOpenIcon: false,
-          },
+          isOpen: false,
+          shouldRenderClosedIcon: true,
+          shouldRenderOpenIcon: false,
         })}
       />
     );
