@@ -664,7 +664,13 @@ Current v0 scope:
   Actions or with `/question_queue 1 3 4`. Queue config is stored under
   `telegram:question-queue-config:v1:<sessionSlug>` in `AGENT_ACTION_KV`.
   Agent next-question calls serve those question ids first when they match the
-  user's criteria, then fall back to preference-ranked active questions.
+  user's criteria, then fall back to preference-ranked active questions. The
+  same queue is available to operator agents through
+  `GET /telegram/agent/api/question-queue` and
+  `POST /telegram/agent/api/question-queue`, but writes require the
+  shared service token and a Telegram account whose managed wallet is a
+  configured session admin; ordinary `ceagt_` user delegation tokens cannot
+  change admin queues.
 - Worker login first honors per-session `workerLoginOrigin` /
   `sessionWorkerLoginOrigin` and `allowOrigins`, then tries
   `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, `LOCAL_AUTH_ORIGIN`, and
@@ -694,6 +700,8 @@ OpenClaw-style agents can call:
 GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
 POST /telegram/agent/api/questions
 POST /telegram/agent/api/questions/next
+GET  /telegram/agent/api/question-queue
+POST /telegram/agent/api/question-queue
 GET  /telegram/agent/api/actions
 POST /telegram/agent/api/preferences
 POST /telegram/agent/api/questions/pose
@@ -716,6 +724,14 @@ It accepts `criteria` / `preferences`, optional `questionTypes`, `queueKey`,
 first when `sponsoredFirst` / `includeSponsored` allow them and they match the criteria, advances a per-user cursor in
 `AGENT_ACTION_KV`, and then falls back to the same preference-ranked active
 question list used by `/telegram/agent/api/questions`.
+
+`GET /telegram/agent/api/question-queue` returns the current sponsored queue
+and the answerable question candidates for a session. `POST` accepts
+`sponsoredQuestionIds` / `questionIds` (question IDs or 1-based candidate
+numbers) and persists the sponsored queue; use `{"clear": true}` or
+`{"operation": "clear"}` to empty it. This is an admin route: callers must use
+the shared service token and include `telegramUserId` for a configured session
+admin. User-scoped `ceagt_` tokens are intentionally rejected for this route.
 
 `GET /telegram/agent/api/actions` returns mutation-oriented activity for the
 resolved user: agent-created answer drafts, pending vote recommendations,
