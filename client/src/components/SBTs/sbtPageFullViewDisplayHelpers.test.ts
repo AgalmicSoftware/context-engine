@@ -4,6 +4,7 @@ import {
   resolveSbtPageCopyErrorButtonStyle,
   resolveSbtPageCopyIconState,
   resolveSbtPageFullViewShellState,
+  resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageItalicNoteStyle,
@@ -14,6 +15,55 @@ import {
 } from './sbtPageFullViewDisplayHelpers';
 
 describe('sbtPageFullViewDisplayHelpers', () => {
+  it('resolves identity panel display descriptors without handlers', () => {
+    expect(resolveSbtPageIdentityPanelDisplayState({
+      defaultImage: '/default.png',
+      fallbackState: {},
+      sbtInfo: {
+        name: 'Access Badge',
+        description: '',
+        image: 'https://example.test/badge.png',
+        descriptionLocked: true,
+      },
+      unnamedLabel: 'Unnamed Group',
+    })).toEqual({
+      descriptionText: '[encrypted]',
+      displayImageState: {
+        sourceKey: 'https://example.test/badge.png',
+        candidates: ['https://example.test/badge.png'],
+        activeIndex: 0,
+        src: 'https://example.test/badge.png',
+        canRetry: true,
+      },
+      imageAlt: 'Access Badge',
+      imageUrl: 'https://example.test/badge.png',
+      nameText: 'Access Badge',
+      showDescriptionLockIcon: true,
+    });
+
+    expect(resolveSbtPageIdentityPanelDisplayState({
+      defaultImage: '/default.png',
+      sbtInfo: {
+        description: 'Visible copy',
+        image: '',
+      },
+      unnamedLabel: 'Unnamed Group',
+    })).toEqual({
+      descriptionText: 'Visible copy',
+      displayImageState: {
+        sourceKey: '',
+        candidates: [],
+        activeIndex: 0,
+        src: '/default.png',
+        canRetry: false,
+      },
+      imageAlt: 'Unnamed Group',
+      imageUrl: '/default.png',
+      nameText: 'Unnamed Group',
+      showDescriptionLockIcon: false,
+    });
+  });
+
   it('resolves full SBT page shell display states', () => {
     expect(resolveSbtPageFullViewShellState({
       hasSbtAddress: false,

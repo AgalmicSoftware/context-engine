@@ -4916,14 +4916,14 @@ renderMintButton() {
                 descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
                 descriptionText={sbtDescriptionText}
                 explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
-                imageAlt={sbtNameText}
+                imageAlt={identityPanelDisplayState.imageAlt}
                 imageUrl={imageUrl}
-                nameText={sbtNameText}
+                nameText={identityPanelDisplayState.nameText}
                 onBookmark={this.bookmarkSBT}
                 onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
                 onImageError={imageErrorHandler}
                 onImageOpen={this.toggleFullImage}
-                showDescriptionLockIcon={isSbtFieldLocked(sbtInfo, 'description') && !String(sbtInfo?.description || '').trim()}
+                showDescriptionLockIcon={identityPanelDisplayState.showDescriptionLockIcon}
                 tokenUriHref={tokenUriHref}
               />
               <div className={styles.rightColumn}>
