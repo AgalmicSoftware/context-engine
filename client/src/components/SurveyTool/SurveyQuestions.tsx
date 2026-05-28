@@ -7893,11 +7893,9 @@ export class SurveyQuestions extends Component {
       (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
       { total: this.state.modifiedCount || 0 };
     const pendingEditCount = pendingStats.total;
-    const shouldResolveCompletedResponseRoute =
-      !!this.state.submissionComplete && Number(pendingEditCount || 0) <= 0;
-    const plan = buildSurveyQuestionsPrimarySubmitPlan({
+    const planBase = {
       account: this.props.account,
-      draftSlug: shouldResolveCompletedResponseRoute ? this._getEffectiveDraftSlug() : '',
+      draftSlug: '',
       isStandalone: this.props.isStandalone,
       isSubmitting: this.state.isSubmitting,
       pendingEditCount,
@@ -7907,7 +7905,14 @@ export class SurveyQuestions extends Component {
       submitGuardActive: this._submitGuard,
       submittedSinceLastEdit: this.state.submittedSinceLastEdit,
       surveyId: this.props.surveyId,
-    });
+    };
+    let plan = buildSurveyQuestionsPrimarySubmitPlan(planBase);
+    if (plan.action === 'navigate') {
+      plan = buildSurveyQuestionsPrimarySubmitPlan({
+        ...planBase,
+        draftSlug: this._getEffectiveDraftSlug(),
+      });
+    }
     if (plan.action === 'inert') return;
     if (plan.action === 'navigate') {
       window.history.pushState({}, '', plan.path);
