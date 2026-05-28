@@ -185,7 +185,7 @@ import {
 } from './sessionWizardWorkerDefaults';
 import {
   SESSION_STORAGE_BACKENDS,
-  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  buildSessionStorageProfileDisplayDescriptor,
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
@@ -2718,7 +2718,8 @@ const SessionWizard = ({
 
     if (path.length === 0 && key === 'storageProfile') {
       if (wizardMode !== 'advanced') return null;
-      const storageProfile = value && typeof value === 'object' ? value : {};
+      const storageProfile = normalizeSessionStorageProfileConfig(value);
+      const storageProfileDisplay = buildSessionStorageProfileDisplayDescriptor(storageProfile);
       const isCollapsed = metadataObjectCollapsed.storageProfile;
       const updateStorageBackend = (backend) => {
         updateDraftValue(
@@ -2761,83 +2762,51 @@ const SessionWizard = ({
                 role="radiogroup"
                 aria-label="Session storage profile"
               >
-                {[
-                  { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
-                  { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave' },
-                  { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
-                ].map((option) => {
-                  const selected = storageProfile.backend === option.backend;
-                  return (
-                    <Button
-                      key={option.backend}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
-                      onClick={() => updateStorageBackend(option.backend)}
-                    >
-                      {option.label}
-                    </Button>
-                  );
-                })}
+                {storageProfileDisplay.backendOptions.map((option) => (
+                  <Button
+                    key={option.backend}
+                    type="button"
+                    role="radio"
+                    aria-checked={option.selected}
+                    className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
+                    onClick={() => updateStorageBackend(option.backend)}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
               </div>
-              {storageProfile.backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE ? (
+              {storageProfileDisplay.backendHelperText &&
+              !storageProfileDisplay.showCloudflarePayloadAccessControls ? (
                 <div className={styles.helperText}>
-                  Lit-Arweave stores encrypted Arweave payloads for session documents and context.
+                  {storageProfileDisplay.backendHelperText}
                 </div>
               ) : null}
-              {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
+              {storageProfileDisplay.showCloudflarePayloadAccessControls ? (
                 <>
                   <div className={styles.helperText}>
-                    Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
+                    {storageProfileDisplay.backendHelperText}
                   </div>
                   <div
                     className={styles.inlineToggleRow}
                     role="radiogroup"
                     aria-label="Cloudflare payload access mode"
                   >
-                    {[
-                      {
-                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
-                        label: 'Public read',
-                      },
-                      {
-                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
-                        label: 'Worker SBT gate',
-                      },
-                      {
-                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
-                        label: 'Lit encrypted',
-                      },
-                    ].map((option) => {
-                      const selected = storageProfile.payloadAccessControl?.mode === option.mode;
-                      return (
-                        <Button
-                          key={option.mode}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
-                          onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
-                        >
-                          {option.label}
-                        </Button>
-                      );
-                    })}
+                    {storageProfileDisplay.cloudflarePayloadAccessOptions.map((option) => (
+                      <Button
+                        key={option.mode}
+                        type="button"
+                        role="radio"
+                        aria-checked={option.selected}
+                        className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
+                        onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
-                  {storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ? (
-                    <div className={styles.helperText}>
-                      Public-read mode stores canonical payloads in Cloudflare and serves reads through the session worker without wallet auth. Writes still require an authenticated session worker request.
-                    </div>
-                  ) : storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ? (
-                    <div className={styles.helperText}>
-                      Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes. Lit credentials are required; plaintext Cloudflare uploads are rejected until the Lit envelope path supplies payloadEncrypted data.
-                    </div>
-                  ) : (
-                    <div className={styles.helperText}>
-                      Worker SBT gate mode is worker-enforced access control, not end-to-end encryption. The session worker checks the requester&apos;s SBT on the configured chain/RPC before serving Cloudflare objects.
-                    </div>
-                  )}
+                  <div className={styles.helperText}>
+                    {storageProfileDisplay.cloudflarePayloadAccessHelperText}
+                  </div>
                 </>
               ) : null}
             </>
