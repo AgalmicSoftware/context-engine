@@ -665,12 +665,18 @@ Current v0 scope:
   `telegram:question-queue-config:v1:<sessionSlug>` in `AGENT_ACTION_KV`.
   Agent next-question calls serve those question ids first when they match the
   user's criteria, then fall back to preference-ranked active questions. The
-  same queue is available to operator agents through
+  same queue is available to operator agents through the raw service-token
+  route
   `GET /telegram/agent/api/question-queue` and
   `POST /telegram/agent/api/question-queue`, but writes require the
   shared service token and a Telegram account whose managed wallet is a
   configured session admin; ordinary `ceagt_` user delegation tokens cannot
-  change admin queues.
+  change admin queues through that raw route. Admin `ceagt_` tokens can use
+  `GET /telegram/agent/api/admin/status`,
+  `POST /telegram/agent/api/question-queue/plan`, and
+  `POST /telegram/agent/api/question-queue/apply` to resolve natural-language
+  sponsored-question references, draft new sponsored questions, and persist the
+  queue only after explicit admin approval.
 - Worker login first honors per-session `workerLoginOrigin` /
   `sessionWorkerLoginOrigin` and `allowOrigins`, then tries
   `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, `LOCAL_AUTH_ORIGIN`, and
@@ -700,8 +706,11 @@ OpenClaw-style agents can call:
 GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
 POST /telegram/agent/api/questions
 POST /telegram/agent/api/questions/next
+GET  /telegram/agent/api/admin/status
 GET  /telegram/agent/api/question-queue
 POST /telegram/agent/api/question-queue
+POST /telegram/agent/api/question-queue/plan
+POST /telegram/agent/api/question-queue/apply
 GET  /telegram/agent/api/actions
 POST /telegram/agent/api/preferences
 POST /telegram/agent/api/questions/pose
@@ -732,6 +741,19 @@ numbers) and persists the sponsored queue; use `{"clear": true}` or
 `{"operation": "clear"}` to empty it. This is an admin route: callers must use
 the shared service token and include `telegramUserId` for a configured session
 admin. User-scoped `ceagt_` tokens are intentionally rejected for this route.
+
+`GET /telegram/agent/api/admin/status` can be called with a user-scoped
+`ceagt_` token to check whether the token's managed wallet is a session admin.
+When `capabilities.canManageSponsoredQuestions` is true, agents may use
+`POST /telegram/agent/api/question-queue/plan` to resolve sponsored-question
+requests like "make the pizza question sponsored" or "create a question about
+organizer outcomes and make it sponsored." The plan route is read-only and
+returns resolved existing questions, draft questions, skipped references, and
+candidate questions. Agents must show that plan to the admin and call
+`POST /telegram/agent/api/question-queue/apply` only after explicit approval
+through `approved: true` or `approvalText`. Multiple existing references and
+multiple new questions are supported; apply appends by default and replaces the
+queue only when `replace: true` is supplied.
 
 `GET /telegram/agent/api/actions` returns mutation-oriented activity for the
 resolved user: agent-created answer drafts, pending vote recommendations,

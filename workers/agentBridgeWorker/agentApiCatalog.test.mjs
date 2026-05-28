@@ -15,6 +15,9 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   const accountCreate = getAgentApiCapability('agent.account.create');
   const nextQuestion = getAgentApiCapability('agent.telegram.questions.next');
   const queueAdmin = getAgentApiCapability('agent.telegram.question_queue.manage');
+  const adminStatus = getAgentApiCapability('agent.telegram.admin.status');
+  const queuePlan = getAgentApiCapability('agent.telegram.question_queue.plan');
+  const queueApply = getAgentApiCapability('agent.telegram.question_queue.apply');
 
   assert.equal(groupCapabilities.every((capability) => capability.groupSafe === true), true);
   assert.equal(groupCapabilities.some((capability) => capability.id === 'agent.actions.list'), true);
@@ -29,6 +32,15 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   assert.equal(queueAdmin.path, '/telegram/agent/api/question-queue');
   assert.deepEqual(queueAdmin.requiredFields, ['telegramUserId', 'sessionSlug']);
   assert.equal(queueAdmin.groupSafe, false);
+  assert.equal(adminStatus.path, '/telegram/agent/api/admin/status');
+  assert.deepEqual(adminStatus.requiredFields, ['sessionSlug']);
+  assert.equal(adminStatus.groupSafe, false);
+  assert.equal(queuePlan.path, '/telegram/agent/api/question-queue/plan');
+  assert.equal(queuePlan.requiredFields.includes('sessionSlug'), true);
+  assert.equal(queuePlan.groupSafe, false);
+  assert.equal(queueApply.path, '/telegram/agent/api/question-queue/apply');
+  assert.equal(queueApply.requiredFields.includes('approved or approvalText'), true);
+  assert.equal(queueApply.groupSafe, false);
 });
 
 test('canonical request envelopes include catalog metadata and required field gaps', () => {

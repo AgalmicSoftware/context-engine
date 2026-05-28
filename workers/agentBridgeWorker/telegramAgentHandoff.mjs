@@ -229,6 +229,15 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/actions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (pathname === '/telegram/agent/api/admin/status') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/question-queue/plan') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/question-queue/apply') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/question-votes/recommend') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.RECOMMEND_QUESTION_VOTES;
   }
@@ -595,6 +604,22 @@ function normalizeQuestionQueueRefs(value = []) {
     .slice(0, 50);
 }
 
+function normalizeQuestionQueueReferenceInputs(input = {}) {
+  return normalizeQuestionQueueRefs(
+    input.references ||
+    input.reference ||
+    input.queries ||
+    input.query ||
+    input.sponsoredQuestionRefs ||
+    input.questionRefs ||
+    input.sponsoredQuestionIds ||
+    input.questionIds ||
+    input.sponsoredQuestions ||
+    input.questionsToSponsor ||
+    input.ids
+  );
+}
+
 function questionQueueCandidates(questions = []) {
   return (Array.isArray(questions) ? questions : [])
     .filter((question) => question?.answerable === true)
@@ -614,6 +639,51 @@ function findQuestionQueueCandidate(questions = [], ref = '') {
     lower(question.id) === normalized ||
     lower(question.questionId).startsWith(normalized)
   )) || null;
+}
+
+function tokenizeQuestionQueueReference(value = '') {
+  const stop = new Set([
+    'a', 'an', 'and', 'are', 'as', 'be', 'by', 'for', 'from', 'is', 'it',
+    'make', 'mark', 'of', 'on', 'or', 'question', 'questions', 'sponsor',
+    'sponsored', 'that', 'the', 'this', 'to', 'with',
+  ]);
+  return lower(value)
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !stop.has(token))
+    .filter((token, index, values) => values.indexOf(token) === index)
+    .slice(0, 16);
+}
+
+function questionQueueCandidateSearchText(question = {}) {
+  return [
+    question.questionId,
+    question.prompt,
+    question.questionType,
+    Array.isArray(question.tags) ? question.tags.join(' ') : '',
+    Array.isArray(question.options) ? question.options.join(' ') : '',
+  ].map((value) => safeString(value).toLowerCase()).join(' ');
+}
+
+function scoreQuestionQueueCandidate(question = {}, ref = '') {
+  const tokens = tokenizeQuestionQueueReference(ref);
+  if (!tokens.length) return 0;
+  const haystack = questionQueueCandidateSearchText(question);
+  let score = 0;
+  tokens.forEach((token) => {
+    if (lower(question.questionId) === token) score += 100;
+    if (haystack.includes(token)) score += 10;
+    if ((Array.isArray(question.tags) ? question.tags : []).map(lower).includes(token)) score += 12;
+  });
+  return score;
+}
+
+function findQuestionQueueCandidateByText(questions = [], ref = '') {
+  const scored = questions
+    .map((question) => ({ question, score: scoreQuestionQueueCandidate(question, ref) }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score);
+  return scored[0]?.question || null;
 }
 
 function resolveQuestionQueueRefs(input = {}, questions = []) {
@@ -638,6 +708,77 @@ function resolveQuestionQueueRefs(input = {}, questions = []) {
   return { refs, ids, skipped };
 }
 
+function resolveNaturalQuestionQueueRefs(input = {}, questions = []) {
+  const refs = normalizeQuestionQueueReferenceInputs(input);
+  const instruction = safeString(input.instruction || input.promptRequest || input.request);
+  if (!refs.length && instruction && !/\b(create|draft|new|write|add)\b/i.test(instruction)) {
+    refs.push(instruction);
+  }
+  const ids = [];
+  const matches = [];
+  const skipped = [];
+  refs.forEach((ref) => {
+    const question = findQuestionQueueCandidate(questions, ref) || findQuestionQueueCandidateByText(questions, ref);
+    const questionId = safeString(question?.questionId);
+    if (!question || !questionId) {
+      skipped.push(ref);
+      return;
+    }
+    if (!ids.includes(questionId)) ids.push(questionId);
+    matches.push({
+      ref,
+      question: questionQueueCandidateSummary(question, questions.indexOf(question)),
+    });
+  });
+  return { refs, ids, matches, skipped };
+}
+
+function topicFromInstruction(value = '') {
+  const text = safeString(value).replace(/\s+/g, ' ');
+  if (!text) return '';
+  const quoted = text.match(/["“”']([^"“”']{4,160})["“”']/);
+  if (quoted?.[1]) return safeString(quoted[1]);
+  const about = text.match(/\babout\s+(.+?)(?:\s+(?:and|then)\s+(?:make|mark|sponsor)|$)/i);
+  if (about?.[1]) {
+    return safeString(about[1])
+      .replace(/\b(as|a)?\s*sponsored\s+question\b.*$/i, '')
+      .replace(/\b(make|mark)\s+it\s+sponsored\b.*$/i, '')
+      .replace(/[.?!]+$/g, '');
+  }
+  return '';
+}
+
+function normalizeQuestionDraftInputs(input = {}) {
+  const source = input.createQuestions || input.newQuestions || input.questionsToCreate || input.draftQuestions || [];
+  const entries = Array.isArray(source) ? source : (source ? [source] : []);
+  const questions = entries.map((entry) => {
+    if (typeof entry === 'string') return { prompt: entry };
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) return entry;
+    return null;
+  }).filter(Boolean);
+  const directPrompt = safeString(input.createQuestionPrompt || input.newQuestionPrompt);
+  if (directPrompt) questions.push({ prompt: directPrompt, questionType: input.questionType });
+  const instruction = safeString(input.instruction || input.promptRequest || input.request);
+  if (input.create === true && instruction) {
+    const topic = topicFromInstruction(instruction) || (!questions.length ? instruction : '');
+    if (topic) questions.push({ prompt: `Should this session prioritize ${topic}?`, questionType: input.questionType || 'binary' });
+  } else if (/\b(create|draft|new|write|add)\b/i.test(instruction) && /\bquestion\b/i.test(instruction)) {
+    const topic = topicFromInstruction(instruction);
+    if (topic) questions.push({ prompt: `Should this session prioritize ${topic}?`, questionType: input.questionType || 'binary' });
+  }
+  return questions
+    .map((entry) => ({
+      prompt: safeString(entry.prompt || entry.questionText || entry.text).replace(/\s+/g, ' ').slice(0, 1000),
+      questionType: safeString(entry.questionType || entry.type || input.questionType || 'binary') || 'binary',
+      options: Array.isArray(entry.options) ? entry.options.map(safeString).filter(Boolean).slice(0, 12) : [],
+      tags: normalizeQuestionTags(entry.tags || input.tags),
+      sessionContext: safeString(entry.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(input.session || {})),
+    }))
+    .filter((entry) => entry.prompt)
+    .filter((entry, index, values) => values.findIndex((candidate) => lower(candidate.prompt) === lower(entry.prompt)) === index)
+    .slice(0, 20);
+}
+
 function questionQueueCandidateSummary(question = {}, index = 0) {
   return {
     index: index + 1,
@@ -655,8 +796,34 @@ function isQuestionQueueClearRequested(input = {}) {
     ['true', '1', 'yes', 'on'].includes(clear);
 }
 
-async function requireQuestionQueueAdmin({ env = {}, context = {}, input = {} } = {}) {
-  if (context.authMode !== 'service_token') {
+async function loadAgentAdminStatus({ env = {}, context = {}, input = {} } = {}) {
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized: context.normalized,
+    session: context.session,
+    createdAt: input.createdAt || null,
+  });
+  return {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: context.normalized.user.telegramUserId,
+    accountAddress: manager.accountAddress || '',
+    admin: manager.ok === true,
+    reason: manager.ok ? 'admin_allowed' : manager.reason,
+    capabilities: {
+      canManageSponsoredQuestions: manager.ok === true,
+      canManageResponseExportAllowlist: manager.ok === true,
+    },
+  };
+}
+
+async function requireQuestionQueueAdmin({
+  env = {},
+  context = {},
+  input = {},
+  allowDelegatedAdmin = false,
+} = {}) {
+  if (context.authMode !== 'service_token' && !(allowDelegatedAdmin && context.authMode === 'telegram_agent_delegation_token')) {
     return { ok: false, status: 403, reason: 'question_queue_service_token_required' };
   }
   const manager = await canManageResponseExportAllowlist({
@@ -674,6 +841,186 @@ async function requireQuestionQueueAdmin({ env = {}, context = {}, input = {} } 
     };
   }
   return { ok: true, manager };
+}
+
+async function buildSponsoredQuestionPlan({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const admin = await requireQuestionQueueAdmin({
+    env,
+    context,
+    input,
+    allowDelegatedAdmin: true,
+  });
+  if (!admin.ok) return { ok: false, admin, status: admin.status || 403 };
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const candidates = questionQueueCandidates(questions);
+  const resolved = resolveNaturalQuestionQueueRefs(input, candidates);
+  const drafts = normalizeQuestionDraftInputs({ ...input, session: context.session });
+  const sponsoredQuestionIds = [...resolved.ids];
+  const queueConfig = await loadTelegramQuestionQueueConfig({
+    env,
+    sessionSlug: context.session.sessionSlug,
+  });
+  const existingSponsoredQuestionIds = Array.isArray(queueConfig.sponsoredQuestionIds)
+    ? queueConfig.sponsoredQuestionIds
+    : [];
+  return {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    permissionMode: context.permission.mode,
+    admin: {
+      accountAddress: admin.manager.accountAddress,
+      canManageSponsoredQuestions: true,
+    },
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    existingSponsoredQuestionIds,
+    mode: input.replace === true || lower(input.mode) === 'replace' ? 'replace' : 'append',
+    resolvedExistingQuestions: resolved.matches,
+    draftQuestions: drafts,
+    sponsoredQuestionIds,
+    skipped: resolved.skipped,
+    candidates: candidates.slice(0, 25).map(questionQueueCandidateSummary),
+    requiresConfirmation: true,
+    confirmation: {
+      endpoint: '/telegram/agent/api/question-queue/apply',
+      required: 'Show resolvedExistingQuestions and draftQuestions to the admin, then call apply only after explicit approval.',
+    },
+  };
+}
+
+function hasExplicitSponsoredQueueApproval(input = {}) {
+  if (input.approved === true || input.confirm === true || input.confirmed === true) return true;
+  const text = lower(input.approvalText || input.confirmationText || input.userApproval);
+  return /\b(approve|approved|confirm|confirmed|yes|go ahead|do it|ship it|make.+sponsored)\b/.test(text);
+}
+
+async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } = {}) {
+  const status = await loadAgentAdminStatus({ env, context, input });
+  return json(status);
+}
+
+async function handleQuestionQueuePlanRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const plan = await buildSponsoredQuestionPlan({ env, context, input, waitUntil });
+  if (!plan.ok) {
+    return json({
+      ok: false,
+      reason: plan.admin?.reason || 'question_queue_admin_required',
+      accountAddress: plan.admin?.accountAddress || '',
+    }, { status: plan.status || 403 });
+  }
+  return json(plan);
+}
+
+async function handleQuestionQueueApplyRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const plan = await buildSponsoredQuestionPlan({ env, context, input, waitUntil });
+  if (!plan.ok) {
+    return json({
+      ok: false,
+      reason: plan.admin?.reason || 'question_queue_admin_required',
+      accountAddress: plan.admin?.accountAddress || '',
+    }, { status: plan.status || 403 });
+  }
+  if (!hasExplicitSponsoredQueueApproval(input)) {
+    return json({
+      ...plan,
+      ok: false,
+      reason: 'sponsored_question_confirmation_required',
+    }, { status: 400 });
+  }
+  const createdQuestions = [];
+  const createdQuestionIds = [];
+  for (const draft of plan.draftQuestions) {
+    const saved = await persistTelegramProposedQuestion({
+      env,
+      normalized: context.normalized,
+      sessionSlug: context.session.sessionSlug,
+      prompt: draft.prompt,
+      questionType: draft.questionType,
+      options: draft.options,
+      tags: draft.tags,
+      sessionContext: draft.sessionContext || sessionContextFromPolicySession(context.session),
+      metadata: {
+        source: 'agent_handoff',
+        authMode: safeString(context.authMode),
+        endpoint: '/telegram/agent/api/question-queue/apply',
+        sponsoredQuestion: true,
+        approvalText: safeString(input.approvalText || input.confirmationText || input.userApproval).slice(0, 500),
+      },
+      createdAt: input.createdAt || null,
+    });
+    if (!saved.ok) {
+      plan.skipped.push({ prompt: draft.prompt, reason: saved.reason || 'question_create_failed' });
+      continue;
+    }
+    createdQuestionIds.push(saved.questionId);
+    createdQuestions.push({
+      questionId: saved.questionId,
+      prompt: saved.question?.prompt || draft.prompt,
+      questionType: saved.question?.questionType || draft.questionType,
+    });
+  }
+  const baseIds = plan.mode === 'replace' ? [] : plan.existingSponsoredQuestionIds;
+  const nextIds = [...baseIds, ...plan.sponsoredQuestionIds, ...createdQuestionIds]
+    .map(safeString)
+    .filter(Boolean)
+    .filter((id, index, values) => values.indexOf(id) === index)
+    .slice(0, 50);
+  if (!nextIds.length) {
+    return json({
+      ...plan,
+      ok: false,
+      reason: 'sponsored_question_targets_required',
+      createdQuestions,
+    }, { status: 400 });
+  }
+  const saved = await saveTelegramQuestionQueueConfig({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    sponsoredQuestionIds: nextIds,
+    updatedByTelegramUserId: context.normalized.user.telegramUserId,
+    updatedByAccountAddress: plan.admin.accountAddress,
+    createdAt: input.createdAt || null,
+  });
+  if (!saved.ok) {
+    return json({
+      ok: false,
+      reason: saved.reason || 'question_queue_save_failed',
+      sessionSlug: context.session.sessionSlug,
+    }, { status: 500 });
+  }
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    mode: plan.mode,
+    saved: true,
+    questionQueue: {
+      sponsoredQuestionIds: saved.config.sponsoredQuestionIds,
+      sponsoredQuestionCount: saved.config.sponsoredQuestionIds.length,
+      updatedAt: saved.config.updatedAt,
+    },
+    resolvedExistingQuestions: plan.resolvedExistingQuestions,
+    createdQuestions,
+    skipped: plan.skipped,
+    approval: {
+      approved: true,
+      approvalText: safeString(input.approvalText || input.confirmationText || input.userApproval).slice(0, 500),
+    },
+  });
 }
 
 async function handleQuestionQueueRequest({
@@ -1558,7 +1905,12 @@ export async function handleTelegramAgentHandoffRequest({
     }, { status: delegated.status || 403 });
   }
   const input = delegated.input;
-  const routeRequiresQuestionAuthoring = url.pathname !== '/telegram/agent/api/question-queue';
+  const routeRequiresQuestionAuthoring = ![
+    '/telegram/agent/api/admin/status',
+    '/telegram/agent/api/question-queue',
+    '/telegram/agent/api/question-queue/plan',
+    '/telegram/agent/api/question-queue/apply',
+  ].includes(url.pathname);
   const context = await resolveHandoffContext({
     env,
     input,
@@ -1570,8 +1922,17 @@ export async function handleTelegramAgentHandoffRequest({
   if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionsRequest({ env, context, input, waitUntil });
   }
+  if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleAdminStatusRequest({ env, context, input });
+  }
   if (url.pathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });
+  }
+  if (url.pathname === '/telegram/agent/api/question-queue/plan' && request.method === 'POST') {
+    return handleQuestionQueuePlanRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/question-queue/apply' && request.method === 'POST') {
+    return handleQuestionQueueApplyRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
     return handleNextQuestionRequest({ env, context, input, waitUntil });

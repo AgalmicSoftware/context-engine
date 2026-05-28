@@ -154,6 +154,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /refresh_token_via_telegram/);
   assert.match(source, /POST \/telegram\/agent\/api\/questions\/next/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue/);
+  assert.match(source, /GET \/telegram\/agent\/api\/admin\/status/);
+  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
+  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
   assert.match(source, /\/question_queue 1 3 4/);
   assert.match(source, /allowedProfileFields/);
   assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
@@ -656,6 +659,19 @@ test('Telegram agent service token can manage sponsored question queue as sessio
     env,
   });
   const next = await jsonBody(nextResponse);
+  const aliasResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        questions: ['1'],
+      },
+    }),
+    env,
+  });
+  const aliasBody = await jsonBody(aliasResponse);
 
   assert.equal(setResponse.status, 200);
   assert.equal(setBody.saved, true);
@@ -667,6 +683,8 @@ test('Telegram agent service token can manage sponsored question queue as sessio
   assert.equal(nextResponse.status, 200);
   assert.equal(next.question.questionId, 'q-freeform');
   assert.equal(next.sponsored, true);
+  assert.equal(aliasResponse.status, 200);
+  assert.deepEqual(aliasBody.questionQueue.sponsoredQuestionIds, ['q-binary']);
 });
 
 test('Telegram agent question queue management rejects non-admin service users', async () => {
@@ -689,6 +707,132 @@ test('Telegram agent question queue management rejects non-admin service users',
   assert.equal(response.status, 403);
   assert.equal(body.reason, 'response_export_admin_required');
   assert.match(body.accountAddress, /^0x[0-9a-fA-F]{40}$/);
+});
+
+test('Telegram admin ceagt token can plan and apply sponsored questions after approval', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+
+  const statusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/status?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const status = await jsonBody(statusResponse);
+  const planRequestBody = {
+    sessionSlug: 'alpha',
+    references: ['fund proposal'],
+    instruction: 'Create a question about edge city outcomes and make it sponsored.',
+    createQuestions: [{
+      prompt: 'Should Alpha prioritize participant follow-up after Agent Village?',
+      questionType: 'binary',
+    }],
+  };
+  const planResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/plan', {
+      method: 'POST',
+      token: issued.token,
+      body: planRequestBody,
+    }),
+    env,
+  });
+  const plan = await jsonBody(planResponse);
+  const unapprovedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/apply', {
+      method: 'POST',
+      token: issued.token,
+      body: planRequestBody,
+    }),
+    env,
+  });
+  const unapproved = await jsonBody(unapprovedResponse);
+  const applyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/apply', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        ...planRequestBody,
+        approvalText: 'Approved, make these sponsored questions.',
+      },
+    }),
+    env,
+  });
+  const applied = await jsonBody(applyResponse);
+  const nextResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/next?sessionSlug=alpha&queueKey=admin-ceagt-smoke&resetQueue=true', {
+      method: 'POST',
+      token: issued.token,
+    }),
+    env,
+  });
+  const next = await jsonBody(nextResponse);
+
+  assert.equal(statusResponse.status, 200);
+  assert.equal(status.admin, true);
+  assert.equal(status.capabilities.canManageSponsoredQuestions, true);
+  assert.equal(planResponse.status, 200);
+  assert.equal(plan.requiresConfirmation, true);
+  assert.equal(plan.resolvedExistingQuestions[0].question.questionId, 'q-binary');
+  assert.equal(plan.draftQuestions.length, 2);
+  assert.match(plan.draftQuestions[0].prompt, /participant follow-up/i);
+  assert.match(plan.draftQuestions[1].prompt, /edge city outcomes/i);
+  assert.equal(unapprovedResponse.status, 400);
+  assert.equal(unapproved.reason, 'sponsored_question_confirmation_required');
+  assert.equal(applyResponse.status, 200);
+  assert.equal(applied.questionQueue.sponsoredQuestionIds[0], 'q-binary');
+  assert.equal(applied.createdQuestions.length, 2);
+  assert.equal(applied.questionQueue.sponsoredQuestionIds.length, 3);
+  assert.equal(nextResponse.status, 200);
+  assert.equal(next.question.questionId, 'q-binary');
+  assert.equal(next.sponsored, true);
+});
+
+test('Telegram sponsored question planning rejects non-admin ceagt tokens', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = `0x${'ab'.repeat(20)}`;
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  const statusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/status?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const status = await jsonBody(statusResponse);
+  const planResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-queue/plan', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        references: ['funding'],
+      },
+    }),
+    env,
+  });
+  const plan = await jsonBody(planResponse);
+
+  assert.equal(statusResponse.status, 200);
+  assert.equal(status.admin, false);
+  assert.equal(status.capabilities.canManageSponsoredQuestions, false);
+  assert.equal(planResponse.status, 403);
+  assert.equal(plan.reason, 'response_export_admin_required');
 });
 
 test('Telegram agent can recommend and auto-apply question importance votes with research metadata', async () => {
