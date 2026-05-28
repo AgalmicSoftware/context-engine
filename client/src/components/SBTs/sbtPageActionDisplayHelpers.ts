@@ -46,6 +46,14 @@ type SbtPageBurnButtonState = {
   canOwnerBurn: boolean;
   shouldRenderBurnButton: boolean;
 };
+type SbtPageBurnActionBlockedReason =
+  | 'none'
+  | 'missing-sbt'
+  | 'missing-token'
+  | 'owner-burn-disabled';
+type SbtPageBurnActionPlan = SbtPageBurnButtonState & {
+  blockedReason: SbtPageBurnActionBlockedReason;
+};
 type ResolveSbtPageBurnStatusButtonStateArgs = {
   burningStatus?: unknown;
 };
@@ -247,6 +255,15 @@ type ShouldRenderSbtPageMintButtonArgs = {
   sbtInfo?: unknown;
   userHasSBT?: unknown;
 };
+type SbtPageMintActionBlockedReason =
+  | 'none'
+  | 'already-has-token'
+  | 'mint-ended'
+  | 'missing-sbt';
+type SbtPageMintActionPlan = {
+  blockedReason: SbtPageMintActionBlockedReason;
+  shouldRenderMintButton: boolean;
+};
 type SbtPageMiniBurnPermission = {
   canAdminBurn: boolean;
   canBurnMini: boolean;
@@ -388,6 +405,35 @@ export const resolveSbtPageBurnButtonState = ({
   return {
     canOwnerBurn,
     shouldRenderBurnButton: !!userHasSBT && canOwnerBurn,
+  };
+};
+
+export const resolveSbtPageBurnActionPlan = ({
+  account = '',
+  sbtInfo = null,
+  userHasSBT = false,
+}: ResolveSbtPageBurnButtonStateArgs = {}): SbtPageBurnActionPlan => {
+  if (!sbtInfo) {
+    return {
+      blockedReason: 'missing-sbt',
+      canOwnerBurn: false,
+      shouldRenderBurnButton: false,
+    };
+  }
+  const burnButtonState = resolveSbtPageBurnButtonState({
+    account,
+    sbtInfo,
+    userHasSBT,
+  });
+  if (burnButtonState.shouldRenderBurnButton) {
+    return {
+      ...burnButtonState,
+      blockedReason: 'none',
+    };
+  }
+  return {
+    ...burnButtonState,
+    blockedReason: userHasSBT ? 'owner-burn-disabled' : 'missing-token',
   };
 };
 
@@ -581,18 +627,49 @@ export const resolveSbtPageMiniTokenActionDisplayState = ({
   };
 };
 
+export const resolveSbtPageMintActionPlan = ({
+  burningStatus = '',
+  nowSeconds = 0,
+  sbtInfo = null,
+  userHasSBT = false,
+}: ShouldRenderSbtPageMintButtonArgs = {}): SbtPageMintActionPlan => {
+  if (userHasSBT && burningStatus !== 'success') {
+    return {
+      blockedReason: 'already-has-token',
+      shouldRenderMintButton: false,
+    };
+  }
+  if (!sbtInfo) {
+    return {
+      blockedReason: 'missing-sbt',
+      shouldRenderMintButton: false,
+    };
+  }
+  const mintingEndTime = (sbtInfo as { mintingEndTime?: unknown })?.mintingEndTime;
+  if (mintingEndTime !== 0 && Number(mintingEndTime) < Number(nowSeconds || 0)) {
+    return {
+      blockedReason: 'mint-ended',
+      shouldRenderMintButton: false,
+    };
+  }
+  return {
+    blockedReason: 'none',
+    shouldRenderMintButton: true,
+  };
+};
+
 export const shouldRenderSbtPageMintButton = ({
   burningStatus = '',
   nowSeconds = 0,
   sbtInfo = null,
   userHasSBT = false,
 }: ShouldRenderSbtPageMintButtonArgs = {}): boolean => {
-  if (userHasSBT && burningStatus !== 'success') return false;
-  if (!sbtInfo) return false;
-
-  const mintingEndTime = (sbtInfo as { mintingEndTime?: unknown })?.mintingEndTime;
-  if (mintingEndTime !== 0 && Number(mintingEndTime) < Number(nowSeconds || 0)) return false;
-  return true;
+  return resolveSbtPageMintActionPlan({
+    burningStatus,
+    nowSeconds,
+    sbtInfo,
+    userHasSBT,
+  }).shouldRenderMintButton;
 };
 
 export const resolveSbtPageAdminActionState = ({
