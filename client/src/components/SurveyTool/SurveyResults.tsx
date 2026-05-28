@@ -109,8 +109,9 @@ import {
 import {
   SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
-  getSurveyResultsExportTypeLabel as getExportTypeLabel,
-  type SurveyResultsExportOption,
+  buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsExportDownloadPlan,
+  buildSurveyResultsExportGenerationPlan,
 } from './surveyResultsExportDisplayHelpers.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
@@ -1770,6 +1771,488 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         },
       });
     }
+	  });
+	});
+
+	const knownQIDs = Object.keys(allQuestions);
+	const finalAggregator = unifyAggregatorWithAllQuestionIDs(
+	  aggregatorMap as Record<string, unknown[]>,
+	  knownQIDs
+	);
+	const totalQ = Object.keys(finalAggregator).length;
+  const totalResponseCount = countQuestionModeResponses(finalAggregator, allQuestions);
+
+// Compute a baseline "filtered" count (used when no filters are active)
+const initialFilteredCount = totalResponseCount;
+
+// 🛡️ Preserve currently-applied filters across refresh if a filter is active
+if (this.state.isFilterActive) {
+  this.setState(
+    buildSurveyResultsFilteredQuestionModeHydratedPatch({
+      aggregatorQuestionResponses: finalAggregator,
+      currentFilteredQuestionsCount: this.state.filteredQuestionsCount,
+      currentFilteredResponsesCount: this.state.filteredResponsesCount,
+      initialFilteredCount,
+      questionResponses: partialQR,
+      sbtFilteredAggregatorQuestionResponses: this.state.sbtFilteredAggregatorQuestionResponses,
+      totalQuestionsCount: totalQ,
+      totalResponsesCount: totalResponseCount,
+    }),
+    () => {
+      // ask the QuestionFilter to re-apply its pipeline on the fresh data
+      if (this.questionFilterRef && this.questionFilterRef.current) {
+        try {
+          this.questionFilterRef.current.handleApplyFilters(true);
+        } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
+      }
+    }
+  );
+} else {
+  // no active filters – reset filtered view to the full aggregator
+  this.setState(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
+    aggregatorQuestionResponses: finalAggregator,
+    filteredResponsesCount: initialFilteredCount,
+    questionResponses: partialQR,
+    totalQuestionsCount: totalQ,
+    totalResponsesCount: totalResponseCount,
+  }));
+}
+}
+
+
+generateResponsesCSV = (): string => {
+const { viewMode, surveyViewMode, sbtFilteredResponses, sbtFilteredAggregatorQuestionResponses } = this.state;
+let csvContent = '';
+let header = '';
+const csvRows: string[] = [];
+
+if (!this.hasEffectiveNetworkId()) {
+  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  return '';
+}
+const networkQuestions = this.getNetworkQuestionsForCurrentContext();
+
+const formatCell = (value: unknown): string => {
+  const cellValue = Array.isArray(value) ? value.join(', ') : value;
+  const stringValue = String(cellValue !== undefined && cellValue !== null ? cellValue : '');
+  return `"${stringValue.replace(/"/g, '""')}"`;
+};
+
+// -------- filename (prefix by mode) --------
+const tsName = new Date().toISOString().replace(/[:.]/g, '_');
+try {
+  const isSurveyIndividuals = (viewMode === 'survey' && surveyViewMode === 'individuals');
+  const prefix = isSurveyIndividuals ? 'contextEngine_surveyResponses' : 'contextEngine_questionResponses';
+
+  let cleanSession = '';
+  const sessionName = this.props.sessionName;
+  try {
+    if (typeof sessionName === 'string' && sessionName.trim().length > 0) {
+      cleanSession = sessionName.replace(/[^A-Za-z0-9_-]+/g, '');
+    } else if (sessionName !== undefined) {
+      surveyLog.error('[SurveyResults.generateResponsesCSV] sessionName provided but not a non-empty string:', sessionName);
+    }
+  } catch (orgErr) {
+    surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to sanitize sessionName:', orgErr);
+  }
+
+  const suggested = `${prefix}_${tsName}${cleanSession ? '_' + cleanSession : ''}.csv`;
+  this.csvFileName = suggested;
+  if (typeof this.setState === 'function') {
+    this.setState(buildSurveyResultsCsvFileNamePatch(suggested));
+  }
+} catch (err) {
+  surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set CSV filename:', err);
+  const fallback = `contextEngine_questionResponses_${tsName}.csv`;
+  this.csvFileName = fallback;
+  try {
+    if (typeof this.setState === 'function') {
+      this.setState(buildSurveyResultsCsvFileNamePatch(fallback));
+    }
+  } catch (innerErr) {
+    surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set fallback CSV filename:', innerErr);
+  }
+}
+
+if (viewMode === 'survey' && surveyViewMode === 'individuals') {
+  header = 'responderAddress,questionID,questionPrompt,type,options,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+
+  // De-dupe latest per (responder|questionID)
+  const latest = new Map<string, SurveyResultsCsvLatestEntry>();
+  const passthroughRows: string[] = [];
+
+  const filteredResponses = Array.isArray(sbtFilteredResponses)
+    ? sbtFilteredResponses as SurveyResultsCsvResponseEntry[]
+    : [];
+  filteredResponses.forEach((response) => {
+    const parsedResponse = this.parseResponse(response.response) as SurveyResultsSurveyResponsePayload | null;
+    if (parsedResponse && Array.isArray(parsedResponse.responses)) {
+      parsedResponse.responses.forEach((answer: SurveyResultsResponseRecord) => {
+        const qid = getResponseQuestionId(answer);
+        const responderAddress =
+          typeof response.responder === 'string'
+            ? response.responder
+            : (response.responder && toSurveyResultsRecord(response.responder).address) || response.responder || '';
+
+        const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
+        let optionsString = '';
+        if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
+          optionsString = questionData.options.join(';');
+        }
+
+        const ms = pickTimestampMs(answer, parsedResponse, response);
+        const tsOut = formatTsForCsv(ms);
+
+        const row = [
+          responderAddress,
+          qid,
+          getResponseQuestionPrompt(answer, questionData),
+          getResponseQuestionType(answer, questionData),
+          optionsString,
+          getConvictionValue(answer),
+          answer.answer?.value,
+          answer.answer?.hash,
+          answer.additional?.value,
+          answer.answer?.encrypted,
+          answer.additional?.encrypted,
+          answer.additional?.hash,
+          tsOut
+        ].map(formatCell).join(',');
+
+        if (!responderAddress || !qid) {
+          passthroughRows.push(row);
+          return;
+        }
+
+        const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
+        const prev = latest.get(key);
+        if (!prev || ms > prev.ms) {
+          latest.set(key, { ms, row });
+        }
+      });
+    }
+  });
+
+  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v) => v.row));
+} else {
+  // 'questions' mode or 'survey' -> 'aggregate' mode (question-centric)
+  header = 'questionID,questionPrompt,type,options,responderAddress,importance,answer,answerHash,additionalComments,answerEncrypted,additionalEncrypted,additionalHash,timestamp\n';
+
+  const dataToExport = toSurveyResultsRecord(sbtFilteredAggregatorQuestionResponses);
+  const latest = new Map<string, SurveyResultsCsvLatestEntry>();
+  const passthroughRows: string[] = [];
+
+  Object.entries(dataToExport).forEach(([questionIdFromBucket, responsesArray]) => {
+    const rows = Array.isArray(responsesArray) ? responsesArray as SurveyResultsCsvResponseEntry[] : [];
+    rows.forEach((respObj) => {
+      const parsed = this.parseResponse(respObj.response) as SurveyResultsResponseRecord | null;
+      if (!parsed) return;
+
+      let responderAddress = '';
+      if (typeof respObj.responder === 'string') {
+        responderAddress = respObj.responder;
+      } else if (respObj.responder && typeof toSurveyResultsRecord(respObj.responder).address === 'string') {
+        responderAddress = toSurveyResultsRecord(respObj.responder).address as string;
+      }
+
+      const qid = getResponseQuestionId(parsed) || String(questionIdFromBucket || '');
+      const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
+      let optionsString = '';
+      if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
+        optionsString = questionData.options.join(';');
+      }
+
+      const ms = pickTimestampMs(parsed, null, respObj);
+      const tsOut = formatTsForCsv(ms);
+
+      const row = [
+        qid,
+        getResponseQuestionPrompt(parsed, questionData),
+        getResponseQuestionType(parsed, questionData),
+        optionsString,
+        responderAddress,
+        getConvictionValue(parsed),
+        parsed.answer?.value,
+        parsed.answer?.hash,
+        parsed.additional?.value,
+        parsed.answer?.encrypted,
+        parsed.additional?.encrypted,
+        parsed.additional?.hash,
+        tsOut
+      ].map(formatCell).join(',');
+
+      if (!responderAddress || !qid) {
+        passthroughRows.push(row);
+        return;
+      }
+
+      const key = `${String(responderAddress).toLowerCase()}|${String(qid).toLowerCase()}`;
+      const prev = latest.get(key);
+      if (!prev || ms > prev.ms) {
+        latest.set(key, { ms, row });
+      }
+    });
+  });
+
+  csvRows.push(...passthroughRows, ...Array.from(latest.values()).map((v) => v.row));
+}
+
+csvContent = header + csvRows.join('\n');
+return csvContent;
+}
+
+generateResultsJSON = (): string => {
+const {
+  viewMode,
+  surveyViewMode,
+  surveyId,
+  surveyTitle,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount,
+  filteredResponsesCount,
+  filterState,
+  sbtFilteredResponses,
+  sbtFilteredAggregatorQuestionResponses,
+} = this.state;
+
+const filteredQuestions = this.getFilteredQuestionsForExport();
+
+return JSON.stringify(
+  {
+    exportedAt: new Date().toISOString(),
+    sessionSlug: this.getEffectiveSlug() || '',
+    viewMode,
+    surveyViewMode,
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    counts: {
+      totalQuestions: totalQuestionsCount,
+      filteredQuestions: filteredQuestionsCount,
+      totalResponses: totalResponsesCount,
+      filteredResponses: filteredResponsesCount,
+    },
+    filterState: filterState || {},
+    filteredQuestions,
+    filteredQuestionResponses: sbtFilteredAggregatorQuestionResponses || {},
+    filteredResponses: sbtFilteredResponses || [],
+  },
+  null,
+  2
+);
+}
+
+getFilteredQuestionIdsForExport = (): string[] => {
+const questionIds = new Set<string>();
+
+Object.keys(this.state.sbtFilteredAggregatorQuestionResponses || {}).forEach((qId) => {
+  const normalized = String(qId || '').trim().toLowerCase();
+  if (normalized) questionIds.add(normalized);
+});
+
+(this.state.sbtFilteredResponses || []).forEach((response: SurveyResultsSummaryResponseRow) => {
+  const parsedResponse = this.parseResponse(response?.response);
+  const responseRows = Array.isArray(parsedResponse?.responses) ? parsedResponse.responses : [];
+  responseRows.forEach((answer: SurveyResultsResponseRecord) => {
+    const normalized = getResponseQuestionId(answer);
+    if (normalized) questionIds.add(String(normalized).toLowerCase());
+  });
+});
+
+return Array.from(questionIds);
+}
+
+getFilteredQuestionsForExport = (): SurveyResultsQuestionExportRecord[] => {
+const networkQuestions = this.getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsRecord | undefined>;
+return this.getFilteredQuestionIdsForExport().map((qId) => {
+  const normalizedQuestionId = qId.toLowerCase();
+  const questionData = networkQuestions[normalizedQuestionId] || networkQuestions[qId] || {};
+
+  return {
+    id: questionData.id || qId,
+    prompt: questionData.prompt || '',
+    type: questionData.type || '',
+    tags: Array.isArray(questionData.tags) ? [...questionData.tags] : [],
+    options: Array.isArray(questionData.options) ? [...questionData.options] : [],
+  };
+});
+}
+
+generateQuestionsJSON = (): string => {
+const {
+  viewMode,
+  surveyViewMode,
+  surveyId,
+  surveyTitle,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount,
+  filteredResponsesCount,
+  filterState,
+} = this.state;
+
+return JSON.stringify(
+  {
+    exportedAt: new Date().toISOString(),
+    sessionSlug: this.getEffectiveSlug() || '',
+    viewMode,
+    surveyViewMode,
+    surveyId: surveyId || null,
+    surveyTitle: surveyTitle || '',
+    counts: {
+      totalQuestions: totalQuestionsCount,
+      filteredQuestions: filteredQuestionsCount,
+      totalResponses: totalResponsesCount,
+      filteredResponses: filteredResponsesCount,
+    },
+    filterState: filterState || {},
+    filteredQuestions: this.getFilteredQuestionsForExport(),
+  },
+  null,
+  2
+);
+}
+
+generateQuestionsCSV = (): string => {
+if (!this.hasEffectiveNetworkId()) {
+  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  return '';
+}
+
+const filteredQuestions = this.getFilteredQuestionsForExport();
+if (!filteredQuestions.length) {
+  this.setState(buildSurveyResultsAlertMessagePatch('No filtered questions to export.'));
+  return '';
+}
+
+const header = '"questionID","prompt","type","tags","options"\n';
+const csvRows = filteredQuestions.map((question) => {
+  const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
+  const options = Array.isArray(question?.options) ? question.options.join(';') : '';
+  return [
+    `"${String(question?.id || '').replace(/"/g, '""')}"`,
+    `"${String(question?.prompt || '').replace(/"/g, '""')}"`,
+    `"${String(question?.type || '').replace(/"/g, '""')}"`,
+    `"${String(tags).replace(/"/g, '""')}"`,
+    `"${String(options).replace(/"/g, '""')}"`,
+  ].join(',');
+});
+
+return header + csvRows.join('\n');
+}
+
+getExportBaseFileName = (exportType: unknown = this.state.exportType): string => {
+const { viewMode, surveyId } = this.state;
+const questionsOnly =
+  exportType === EXPORT_TYPES.CSV_QUESTIONS ||
+  exportType === EXPORT_TYPES.JSON_QUESTIONS;
+
+if (viewMode === 'survey') {
+  const surveyIdShort = surveyId
+    ? getShortenedSurveyID(surveyId, false, null, true)
+    : 'all';
+  return questionsOnly
+    ? `contextEngine_surveyQuestions_${surveyIdShort}`
+    : `contextEngine_surveyResults_${surveyIdShort}`;
+}
+
+return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
+}
+
+downloadCSV = (): void => {
+const { exportType } = this.state;
+const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
+let fileContent = '';
+const baseFileName = this.getExportBaseFileName(exportType);
+const generationPlan = buildSurveyResultsExportGenerationPlan({
+  baseFileName,
+  exportType,
+  timestamp,
+});
+
+if (generationPlan.status === 'invalid') {
+  this.setState(buildSurveyResultsAlertMessagePatch(generationPlan.alertMessage));
+  return;
+}
+
+switch (generationPlan.generatorKey) {
+  case 'questions-csv':
+    fileContent = this.generateQuestionsCSV();
+    break;
+  case 'questions-responses-csv':
+    fileContent = this.generateResponsesCSV();
+    break;
+  case 'questions-json':
+    fileContent = this.generateQuestionsJSON();
+    break;
+  case 'questions-responses-json':
+    fileContent = this.generateResultsJSON();
+    break;
+  default:
+    this.setState(buildSurveyResultsAlertMessagePatch('Invalid export type selected.'));
+    return;
+}
+
+const downloadPlan = buildSurveyResultsExportDownloadPlan({
+  fileContent,
+  generationPlan,
+});
+if (downloadPlan.status === 'empty') {
+  if (!this.state.alertMessage) {
+    this.setState(buildSurveyResultsAlertMessagePatch(downloadPlan.alertMessage));
+  }
+  return;
+}
+
+const blob = new Blob([downloadPlan.fileContent], { type: downloadPlan.mimeType });
+const url = window.URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.setAttribute('hidden', '');
+a.setAttribute('href', url);
+a.setAttribute('download', downloadPlan.filename);
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+};
+
+handleExportTypeChange = (type: unknown): void => {
+this.setState(buildSurveyResultsExportTypePatch(type));
+};
+
+handleQuestionFilter = (
+  filteredQuestionsOrCombined: unknown,
+  newFilterState: unknown
+): void => {
+  // ⛑️ Gate: don't clobber counts or bubble anything until the question cache is ready
+  if (!this.props.isQuestionCacheReady) return;
+
+  const isSurveyMode = this.state.viewMode === 'survey';
+  const isSurveyAggregate = isSurveyMode && this.state.surveyViewMode === 'aggregate';
+  const isSurveyIndividuals = isSurveyMode && this.state.surveyViewMode === 'individuals';
+
+  let filteredQuestions: SurveyResultsQuestionRecord[] = [];
+  let filteredResponsesByQuestion: SurveyResultsRecord | null = null;
+  if (Array.isArray(filteredQuestionsOrCombined)) {
+    filteredQuestions = filteredQuestionsOrCombined as SurveyResultsQuestionRecord[];
+  } else if (
+    filteredQuestionsOrCombined &&
+    typeof filteredQuestionsOrCombined === 'object' &&
+    Array.isArray((filteredQuestionsOrCombined as SurveyResultsQuestionFilterCombinedPayload).filteredQuestions)
+  ) {
+    const combinedPayload = filteredQuestionsOrCombined as SurveyResultsQuestionFilterCombinedPayload;
+    filteredQuestions = combinedPayload.filteredQuestions as SurveyResultsQuestionRecord[];
+    filteredResponsesByQuestion = toSurveyResultsRecord(combinedPayload.filteredResponsesByQuestion);
+  } else {
+    return;
+  }
+
+  const finalFilteredQCount = filteredQuestions.length;
+  if (this.props.onCountUpdate) {
+    this.props.onCountUpdate(finalFilteredQCount);
+  }
+
+  const statePatch: SurveyResultsRecord = {
+    filteredQuestionsCount: finalFilteredQCount,
   };
 
   const downloadHtmlReport = async (): Promise<void> => {
