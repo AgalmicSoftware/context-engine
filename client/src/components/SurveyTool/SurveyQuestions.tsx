@@ -514,6 +514,7 @@ import {
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsPrimarySubmitPlan,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitFooterDisplayState,
   buildSurveyQuestionPoolLoadState,
@@ -6673,31 +6674,34 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   );
 
   handlePrimarySubmitClick = () => {
-    if (this.state.isSubmitting || this._submitGuard) return;
+    const inFlightPlan = buildSurveyQuestionsPrimarySubmitPlan({
+      isSubmitting: this.state.isSubmitting,
+      submitGuardActive: this._submitGuard,
+    });
+    if (inFlightPlan.action === 'inert') return;
+
     const pendingStats =
       (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
       { total: this.state.modifiedCount || 0 };
-    const hasPendingEdits = Number(pendingStats.total || 0) > 0;
-    const submittedStateActive = !!(this.state.submittedSinceLastEdit || this.state.submissionComplete);
-    if (submittedStateActive && !this.state.submissionComplete && !hasPendingEdits) return;
-    if (this.state.submissionComplete && !hasPendingEdits) {
-      const accountLower = (this.props.account || '').toLowerCase();
-      if (!accountLower) return;
-      if (this.props.singleQuestionMode) {
-        const qLower = (this.props.questionID || '').toLowerCase();
-        if (!qLower) return;
-        const url = buildQuestionRoutePath(qLower, {
-          responderAddress: accountLower,
-          sessionSlug: this._getEffectiveDraftSlug(),
-        });
-        window.history.pushState({}, '', url);
-      } else if (!this.props.isStandalone) {
-        const sLower = (this.props.surveyId || '').toLowerCase();
-        if (!sLower) return;
-        const draftSlug = this._getEffectiveDraftSlug() || '';
-        const url = `/survey/${sLower}/${accountLower}${draftSlug ? `?session=${encodeURIComponent(draftSlug)}` : ''}`;
-        window.history.pushState({}, '', url);
-      }
+    const pendingEditCount = pendingStats.total;
+    const shouldResolveCompletedResponseRoute =
+      !!this.state.submissionComplete && Number(pendingEditCount || 0) <= 0;
+    const plan = buildSurveyQuestionsPrimarySubmitPlan({
+      account: this.props.account,
+      draftSlug: shouldResolveCompletedResponseRoute ? this._getEffectiveDraftSlug() : '',
+      isStandalone: this.props.isStandalone,
+      isSubmitting: this.state.isSubmitting,
+      pendingEditCount,
+      questionID: this.props.questionID,
+      singleQuestionMode: this.props.singleQuestionMode,
+      submissionComplete: this.state.submissionComplete,
+      submitGuardActive: this._submitGuard,
+      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+      surveyId: this.props.surveyId,
+    });
+    if (plan.action === 'inert') return;
+    if (plan.action === 'navigate') {
+      window.history.pushState({}, '', plan.path);
       return;
     }
     this._submitGuard = true;
