@@ -58,7 +58,6 @@ import {
   buildUserPageNicknameInputStatePatch,
   buildUserPageNicknameSaveStatePatch,
   buildUserPageNoSbtVisibleTelemetryState,
-  buildUserPageProfileEditVisibility,
   buildUserPageResponseDecryptSurveyBindings,
   buildUserPageResponseSectionDeriveSignature,
   buildUserPageRenderLoadingState,
@@ -138,7 +137,7 @@ import {
   resolveUserPageCopyIconDisplayState,
   resolveUserPageInlineEnteredIndicatorDisplayState,
   resolveUserPageFullProfileModalDisplayState,
-  resolveUserPageHeaderActionVisibility,
+  resolveUserPageHeaderPassiveDisplayState,
   resolveUserPageQuestionSectionDisplayState,
   resolveUserPageSbtDisplayState,
   resolveUserPageSurveySectionDisplayState,
@@ -3872,30 +3871,26 @@ class UserPage extends Component<any, any> {
       isDeepScanning,
     });
 
+    const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
+      account,
+      cachedNickname: cachedNicknameForThis,
+      explorerUrl,
+      isEditingNickname: this.state.isEditingNickname,
+      isEditingUsername: this.state.isEditingUsername,
+      isSimulated,
+      minimized,
+      pendingNickname: pendingForThis,
+      propViewAddress,
+      viewAddress: propViewAddress,
+    });
     const {
       hasNickForThis,
       isOwner,
       notOwnPage,
       showPen,
       showUsernamePen,
-    } = buildUserPageProfileEditVisibility({
-      account,
-      cachedNickname: cachedNicknameForThis,
-      isEditingNickname: this.state.isEditingNickname,
-      isEditingUsername: this.state.isEditingUsername,
-      minimized,
-      pendingNickname: pendingForThis,
-      viewAddress: propViewAddress,
-    });
-    const headerActionVisibility = resolveUserPageHeaderActionVisibility({
-      explorerUrl,
-      isEditingNickname: this.state.isEditingNickname,
-      isOwner,
-      isSimulated,
-      minimized,
-      notOwnPage,
-      propViewAddress,
-    });
+    } = headerPassiveDisplayState.profileEditVisibility;
+    const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
     const copyIconDisplayState = resolveUserPageCopyIconDisplayState({ copied });
     const bookmarkButtonDisplayState = resolveUserPageBookmarkButtonDisplayState({ bookmarked });
     const nicknameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
