@@ -10,9 +10,10 @@ Use this skill when acting as an OpenClaw-style agent for a Telegram user who is
 ## Preconditions
 
 - The CE worker base URL is known.
-- The worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured.
-- Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
-- Include `telegramUserId` on every call.
+- Use either a worker service token or a user-scoped agent token.
+- For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
+- For a user-scoped agent token, the user creates a token from the CE bot `/me` screen or `/agent_token`. The default expiry is 7 days. Send it as `Authorization: Bearer <token>`.
+- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
 
@@ -37,6 +38,52 @@ https://t.me/contextengineer_bot?start=sensemaking_trial
 ```
 
 After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account, bind the Telegram user to the selected Telegram-only session, and route the user into the private bot or Mini App flow. From then on, use this skill's API calls with the same `telegramUserId` and `sessionSlug`. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
+
+## Non-Telegram Agent Token Flow
+
+Use this path when the user's assistant is not running inside the CE Telegram bot but the user wants it to act against CE on their behalf.
+
+1. Ask the user to open the CE bot and run `/me`.
+2. The user clicks `Create Agent Token`, or runs `/agent_token`.
+3. The user copies the token into the trusted external agent. The default token expiry is 7 days.
+4. The external agent calls CE with `Authorization: Bearer <agent token>`.
+5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and token-bound session.
+
+Default token scope permits:
+
+- reading active questions
+- drafting answers for user review
+- recommending and applying question up/down votes
+- reading lightweight groups
+- proposing lightweight group categories or memberships for user approval
+- posing questions for the token-bound session
+
+Default token scope does not permit:
+
+- response export
+- admin actions
+- wallet/private-key export
+- raw response access
+- final answer submission unless a separate CE user-approved submit path is enabled
+
+Treat the token like a password. Do not paste it into shared chats, logs, issue trackers, prompts that may be retained by third parties, or public tools.
+
+Before using personal data, ask the user what may be used in this CE flow. Recommended consent fields:
+
+```json
+{
+  "allowedProfileFields": ["interests", "sessionsAttended", "roles"],
+  "allowedUses": ["rank_questions", "draft_answers", "recommend_votes", "suggest_groups"],
+  "forbiddenFields": ["private_notes", "age", "citizenship"],
+  "approvalMode": {
+    "answers": "draft_for_review",
+    "questionVotes": "auto_apply_if_enabled",
+    "groups": "suggest_for_review"
+  }
+}
+```
+
+Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
 
 ### Group Question Onboarding
 

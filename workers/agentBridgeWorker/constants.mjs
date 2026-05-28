@@ -96,6 +96,7 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   LINK_FULL_CE_ACCOUNT: 'link_full_ce_account',
   RETRY_SESSION_JOIN: 'retry_session_join',
   MY_ACCOUNT: 'my_account',
+  CREATE_AGENT_TOKEN: 'create_agent_token',
   VIEW_JOINED_SBTS: 'view_joined_sbts',
   EXPORT_ACCOUNT: 'export_account',
   RESTORE_ACCOUNT: 'restore_account',

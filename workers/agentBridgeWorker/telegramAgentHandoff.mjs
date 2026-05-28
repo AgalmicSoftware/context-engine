@@ -24,6 +24,11 @@ import {
   persistTelegramLightweightGroupProposal,
 } from './telegramGroups.mjs';
 import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
+import {
+  delegationTokenHasScope,
+  loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
+} from './telegramAgentDelegationTokens.mjs';
 
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
@@ -113,16 +118,26 @@ function suppliedAgentToken(request) {
   );
 }
 
-function authenticateAgentHandoff(request, env = {}) {
+async function authenticateAgentHandoff(request, env = {}) {
   const expected = expectedAgentToken(env);
+  const supplied = suppliedAgentToken(request);
+  if (!supplied) {
+    return { ok: false, status: 401, reason: 'agent_api_token_invalid' };
+  }
+  if (expected && supplied === expected) {
+    return { ok: true, authMode: 'service_token' };
+  }
+  const delegated = await loadTelegramAgentDelegationToken({ env, token: supplied });
+  if (delegated.ok) {
+    return { ok: true, authMode: 'telegram_agent_delegation_token', delegation: delegated.record };
+  }
+  if (safeString(supplied).startsWith('ceagt_')) {
+    return { ok: false, status: 401, reason: delegated.reason || 'agent_token_invalid' };
+  }
   if (!expected) {
     return { ok: false, status: 503, reason: 'agent_api_token_not_configured' };
   }
-  const supplied = suppliedAgentToken(request);
-  if (!supplied || supplied !== expected) {
-    return { ok: false, status: 401, reason: 'agent_api_token_invalid' };
-  }
-  return { ok: true };
+  return { ok: false, status: 401, reason: 'agent_api_token_invalid' };
 }
 
 function normalizeAgentTelegramContext(input = {}) {
@@ -164,9 +179,60 @@ function inputFromRequest(request, body = {}) {
   };
 }
 
+function delegationScopeForRequest(pathname = '', method = 'GET') {
+  const methodName = safeString(method).toUpperCase();
+  if (pathname === '/telegram/agent/api/questions') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/question-votes/recommend') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.RECOMMEND_QUESTION_VOTES;
+  }
+  if (pathname === '/telegram/agent/api/question-votes/apply') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.APPLY_QUESTION_VOTES;
+  }
+  if (pathname === '/telegram/agent/api/preferences') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
+  }
+  if (pathname === '/telegram/agent/api/questions/pose') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.POSE_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/groups' && methodName === 'GET') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS;
+  }
+  if (pathname === '/telegram/agent/api/groups/propose') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.PROPOSE_GROUPS;
+  }
+  return '';
+}
+
+function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = 'GET') {
+  if (auth.authMode !== 'telegram_agent_delegation_token') return { ok: true, input };
+  const delegation = auth.delegation || {};
+  const scope = delegationScopeForRequest(pathname, method);
+  if (!scope || !delegationTokenHasScope(delegation, scope)) {
+    return { ok: false, status: 403, reason: 'agent_token_scope_denied', requiredScope: scope || 'unsupported_route' };
+  }
+  const tokenSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
+  const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
+  if (requestedSessionSlug && tokenSessionSlug && requestedSessionSlug !== tokenSessionSlug) {
+    return { ok: false, status: 403, reason: 'agent_token_session_mismatch', sessionSlug: requestedSessionSlug };
+  }
+  return {
+    ok: true,
+    input: {
+      ...input,
+      telegramUserId: safeString(delegation.telegramUserId),
+      username: safeString(input.username || delegation.username),
+      sessionSlug: tokenSessionSlug || requestedSessionSlug,
+      groupChatId: safeString(input.groupChatId),
+    },
+  };
+}
+
 async function resolveHandoffContext({
   env = {},
   input = {},
+  auth = {},
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const normalized = normalizeAgentTelegramContext(input);
@@ -185,12 +251,22 @@ async function resolveHandoffContext({
   if (!resolved.ok) {
     return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
   }
+  const delegation = auth.authMode === 'telegram_agent_delegation_token' ? auth.delegation : null;
+  if (delegation) {
+    const delegatedSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
+    if (delegatedSessionSlug && delegatedSessionSlug !== resolved.session.sessionSlug) {
+      return { ok: false, status: 403, reason: 'agent_token_session_mismatch', sessionSlug: resolved.session.sessionSlug };
+    }
+  }
   const permission = evaluateTelegramQuestionAuthoringPermission({
     env,
     normalized,
     session: resolved.session,
     groupBinding,
-    privateBinding,
+    privateBinding: privateBinding || (delegation ? {
+      sessionSlug: resolved.session.sessionSlug,
+      source: 'telegram_agent_delegation_token',
+    } : null),
     requestedSessionSlug: resolved.session.sessionSlug,
   });
   if (!permission.ok) {
@@ -204,6 +280,7 @@ async function resolveHandoffContext({
     groupBinding,
     privateBinding,
     permission,
+    delegation,
   };
 }
 
@@ -1088,13 +1165,22 @@ export async function handleTelegramAgentHandoffRequest({
   waitUntil = null,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  const auth = authenticateAgentHandoff(request, env);
+  const auth = await authenticateAgentHandoff(request, env);
   if (!auth.ok) return json({ ok: false, reason: auth.reason }, { status: auth.status });
 
   const url = new URL(request.url);
   const body = await readRequestJson(request);
-  const input = inputFromRequest(request, body);
-  const context = await resolveHandoffContext({ env, input });
+  const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), url.pathname, request.method);
+  if (!delegated.ok) {
+    return json({
+      ok: false,
+      reason: delegated.reason,
+      requiredScope: delegated.requiredScope,
+      sessionSlug: delegated.sessionSlug || '',
+    }, { status: delegated.status || 403 });
+  }
+  const input = delegated.input;
+  const context = await resolveHandoffContext({ env, input, auth });
   if (!context.ok) return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
 
   if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {

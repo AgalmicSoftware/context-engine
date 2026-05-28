@@ -40,6 +40,10 @@ import {
 } from './sessionPolicy.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import {
+  createTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+} from './telegramAgentDelegationTokens.mjs';
+import {
   listTelegramProposedQuestionsForSession,
   mergeTelegramProposedQuestions,
   inferQuestionTags,
@@ -156,6 +160,8 @@ const COMMANDS = Object.freeze({
   DOCS: '/docs',
   ME: '/me',
   ACCOUNT: '/account',
+  AGENT_TOKEN: '/agent_token',
+  EXPORT_TOKEN: '/export_token',
 });
 
 const LEGACY_COMMAND_ALIASES = Object.freeze({
@@ -182,6 +188,8 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_docs': COMMANDS.DOCS,
   '/ce_me': COMMANDS.ME,
   '/ce_account': COMMANDS.ACCOUNT,
+  '/ce_agent_token': COMMANDS.AGENT_TOKEN,
+  '/ce_export_token': COMMANDS.EXPORT_TOKEN,
 });
 
 function safeString(value) {
@@ -6750,11 +6758,24 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     seed: `me|admin_actions|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   });
+  const agentTokenSession = normalized.chat.isPrivate
+    ? await resolveAgentTokenSession({ env, normalized, policy })
+    : null;
+  const agentTokenButton = agentTokenSession?.ok ? await makeCallbackButton({
+    env,
+    label: 'Create Agent Token',
+    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: agentTokenSession.session.sessionSlug },
+    seed: `me|agent_token|${agentTokenSession.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  }) : null;
   const rows = [[questionButton]];
   const copyAddress = ADDRESS_RE.test(account.accountAddress)
     ? copyTextButton('Copy Address', account.accountAddress)
     : null;
   if (copyAddress) rows.push([copyAddress]);
+  if (agentTokenButton) rows.push([agentTokenButton]);
   if (adminActionsButton) rows.push([adminActionsButton]);
   return reply({
     method,
@@ -6776,6 +6797,136 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     command,
     normalized,
     extra: { accountMode: state.accountMode },
+  });
+}
+
+async function resolveAgentTokenSession({
+  env = {},
+  normalized = {},
+  policy = {},
+  explicitSessionSlug = '',
+} = {}) {
+  const activeBinding = await readPrivateSessionBinding(env, normalized);
+  const visibleSessions = telegramVisibleSessions(policy, env);
+  const visibleSlugs = new Set(visibleSessions.map((session) => sanitizeSessionSlug(session.sessionSlug)));
+  const activeSlug = sanitizeSessionSlug(activeBinding?.sessionSlug);
+  const explicitSlug = sanitizeSessionSlug(explicitSessionSlug);
+  const defaultSlug = sanitizeSessionSlug(policy.defaultSessionSlug);
+  const candidateSlug = explicitSlug ||
+    activeSlug ||
+    (defaultSlug && visibleSlugs.has(defaultSlug) ? defaultSlug : '') ||
+    sanitizeSessionSlug(visibleSessions[0]?.sessionSlug);
+
+  if (!candidateSlug) return { ok: false, reason: 'agent_token_session_required' };
+  if (explicitSlug && explicitSlug !== activeSlug && !visibleSlugs.has(explicitSlug)) {
+    return { ok: false, reason: 'agent_token_session_not_selectable', sessionSlug: explicitSlug };
+  }
+
+  const resolved = resolveSessionInvocation(policy, candidateSlug);
+  if (!resolved.ok) return { ok: false, reason: resolved.reason || 'session_not_found', sessionSlug: candidateSlug };
+  const resolvedSlug = sanitizeSessionSlug(resolved.session.sessionSlug);
+  if (resolvedSlug !== activeSlug && !visibleSlugs.has(resolvedSlug)) {
+    return { ok: false, reason: 'agent_token_session_not_selectable', sessionSlug: resolvedSlug };
+  }
+  return { ok: true, session: resolved.session, policy: resolved.policy, activeBinding };
+}
+
+async function buildAgentTokenResponse({
+  normalized,
+  command = COMMANDS.AGENT_TOKEN,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  if (!normalized.chat?.isPrivate) {
+    return errorReply({
+      normalized,
+      command,
+      reason: 'agent_token_private_chat_required',
+      text: 'Agent tokens can only be created in private chat.',
+    });
+  }
+  const policy = await loadSessionPolicy(env);
+  const resolved = await resolveAgentTokenSession({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason || 'agent_token_session_not_selectable',
+      text: 'Could not create an agent token for that session. Join or select a Telegram-enabled session first.',
+    });
+  }
+  const account = await deriveManagedDemoAccount({
+    principal: normalizeTelegramPrincipal(normalized),
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
+    createdAt,
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+    username: normalized.user.username,
+    sessionSlug: resolved.session.sessionSlug,
+    accountAddress: account.accountAddress,
+    ttlSeconds: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+    createdAt,
+  });
+  if (!issued.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: issued.reason || 'agent_token_create_failed',
+      text: 'Could not create an agent token for this account.',
+    });
+  }
+  const copyToken = copyTextButton('Copy Agent Token', issued.token);
+  const accountButton = await makeCallbackButton({
+    env,
+    label: 'Back to Account',
+    action: TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+    seed: `agent_token|account|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  const rows = [];
+  if (copyToken) rows.push([copyToken]);
+  rows.push([accountButton]);
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'Agent token',
+      `Session: ${sessionLabel(resolved.session)}`,
+      `Expires: ${issued.record.expiresAt}`,
+      '',
+      'Paste this into a trusted agent. It can read questions, draft answers for review, recommend or apply question votes, suggest groups, and pose questions for this session.',
+      '',
+      'It cannot perform admin/export actions and does not expose your wallet key.',
+      '',
+      issued.token,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: rows,
+    },
+    screen: 'agent_token',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      expiresAt: issued.record.expiresAt,
+      tokenPrefix: issued.tokenPrefix,
+      scopes: issued.record.scopes,
+    },
   });
 }
 
@@ -7479,6 +7630,17 @@ async function buildCallbackResponse({
       messageId,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
+    return attachCallbackQueryId(await buildAgentTokenResponse({
+      normalized,
+      command: 'callback:create_agent_token',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
   if ([TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION, TELEGRAM_BRIDGE_ACTIONS.START_PRIVATE].includes(record.action)) {
     return attachCallbackQueryId(await buildJoinResponse({
       normalized,
@@ -7714,6 +7876,15 @@ export async function buildTelegramCommandResponse({
       normalized,
       command: parsed.command,
       env,
+      createdAt,
+    });
+  }
+  if ([COMMANDS.AGENT_TOKEN, COMMANDS.EXPORT_TOKEN].includes(parsed.command)) {
+    return buildAgentTokenResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      sessionSlugOverride: parsed.args[0] || '',
       createdAt,
     });
   }
