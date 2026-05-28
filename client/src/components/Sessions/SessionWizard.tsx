@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faExternalLinkAlt, faImage, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -94,7 +94,6 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import CETooltip from '../Shared/CETooltip';
 import {
   SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
   buildSessionWizardRegistrySessionFields,
@@ -118,6 +117,9 @@ import useSessionWizardWorkerDeploy from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardHeader from './SessionWizardHeader';
+import SessionWizardInfoTooltip, {
+  type SessionWizardTooltipRenderOptions,
+} from './SessionWizardInfoTooltip';
 import SessionWizardModals from './SessionWizardModals';
 import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
 import SessionWizardRequirementsBanner, {
@@ -480,14 +482,6 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
   lit?: UnknownRecord;
-};
-
-type TooltipRenderOptions = {
-  id?: string;
-  content?: React.ReactNode;
-  placement?: React.ComponentProps<typeof CETooltip>['placement'];
-  testId?: string;
-  ariaLabel?: string;
 };
 
 type SessionWizardProps = {
@@ -4329,52 +4323,24 @@ const SessionWizard = ({
     }));
   };
 
-  const renderSessionWizardTooltipContent = useCallback(({
-    id,
-    content,
-    placement = 'right',
-  }: TooltipRenderOptions = {}) => {
-    const tooltipText = toStr(content).trim();
-    if (!sessionWizardTooltipsEnabled || !id || !tooltipText) return null;
-    return (
-      <CETooltip
-        placement={placement as React.ComponentProps<typeof CETooltip>['placement']}
-        trigger="hover focus click"
-        target={id}
-        className={styles.tooltipBubble}
-        delay={0}
-        container="body"
-      >
-        {content}
-      </CETooltip>
-    );
-  }, [sessionWizardTooltipsEnabled]);
-
   const renderSessionWizardInfoTooltip = useCallback(({
     id,
     content,
     placement = 'right',
     testId = '',
     ariaLabel = 'Show more info',
-  }: TooltipRenderOptions = {}) => {
-    const tooltipText = toStr(content).trim();
-    if (!sessionWizardTooltipsEnabled || !id || !tooltipText) return null;
+  }: SessionWizardTooltipRenderOptions = {}) => {
     return (
-      <>
-        <span
-          id={id}
-          className={styles.tooltipTrigger}
-          data-testid={testId || undefined}
-          role="button"
-          tabIndex={0}
-          aria-label={ariaLabel}
-        >
-          <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} />
-        </span>
-        {renderSessionWizardTooltipContent({ id, content, placement })}
-      </>
+      <SessionWizardInfoTooltip
+        enabled={sessionWizardTooltipsEnabled}
+        id={id}
+        content={content}
+        placement={placement}
+        testId={testId}
+        ariaLabel={ariaLabel}
+      />
     );
-  }, [renderSessionWizardTooltipContent, sessionWizardTooltipsEnabled]);
+  }, [sessionWizardTooltipsEnabled]);
 
   const renderResourceInputs = (resourceKey: string) => {
     const fields = getResourceSecretFields(resourceKey);
