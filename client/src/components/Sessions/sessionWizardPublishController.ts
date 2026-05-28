@@ -2,6 +2,7 @@ import type { AnyRecord } from '../shellTypes';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
+  shouldDeployPendingSbts?: boolean;
   stepNumbers?: Record<string, number>;
 };
 
@@ -12,8 +13,16 @@ export type SessionWizardPublishDeployWorkerResult = {
   error?: string;
 };
 
+export type SessionWizardPublishDeployPendingSbtsArgs = {
+  workerUrlOverride: string;
+  signerAccountOverride: string;
+};
+
 export type SessionWizardPublishControllerPorts = {
   deployWorker: () => Promise<SessionWizardPublishDeployWorkerResult | null | undefined>;
+  deployPendingSbts?: (
+    args: SessionWizardPublishDeployPendingSbtsArgs
+  ) => Promise<unknown[] | null | undefined>;
 };
 
 export type SessionWizardPublishControllerCallbacks = {
@@ -23,11 +32,13 @@ export type SessionWizardPublishControllerCallbacks = {
 export type SessionWizardPublishControllerInput = {
   publishAllowed?: boolean;
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
+  signerAccountOverride?: string;
 };
 
 export type SessionWizardPublishControllerResult = {
   status: 'blocked' | 'completed';
   workerUrlOverride: string;
+  deployedPendingDrafts: unknown[];
 };
 
 const getPublishStepNumber = (
@@ -63,11 +74,13 @@ export const runSessionWizardPublishController = async ({
     return {
       status: 'blocked',
       workerUrlOverride: '',
+      deployedPendingDrafts: [],
     };
   }
 
   const { publishExecutionPlan } = input;
   let workerUrlOverride = '';
+  let deployedPendingDrafts: unknown[] = [];
 
   if (publishExecutionPlan.shouldAutoDeployWorker) {
     callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'deploy-worker'));
@@ -75,9 +88,21 @@ export const runSessionWizardPublishController = async ({
     workerUrlOverride = assertVerifiedWorkerDeploy(deployResult);
   }
 
+  if (publishExecutionPlan.shouldDeployPendingSbts) {
+    if (typeof ports.deployPendingSbts !== 'function') {
+      throw new Error('Pending SBT deploy port is required.');
+    }
+    callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'deploy-sbts'));
+    deployedPendingDrafts = await ports.deployPendingSbts({
+      workerUrlOverride,
+      signerAccountOverride: input.signerAccountOverride || '',
+    }) || [];
+  }
+
   return {
     status: 'completed',
     workerUrlOverride,
+    deployedPendingDrafts,
   };
 };
 
