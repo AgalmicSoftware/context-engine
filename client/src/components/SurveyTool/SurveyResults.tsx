@@ -147,6 +147,8 @@ import {
 import {
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsExportDownloadPlan,
+  buildSurveyResultsExportGenerationPlan,
 } from './surveyResultsExportDisplayHelpers.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
@@ -3252,59 +3254,53 @@ downloadCSV = (): void => {
 const { exportType } = this.state;
 const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
 let fileContent = '';
-let filename = '';
-let mimeType = 'text/plain;charset=utf-8;';
 const baseFileName = this.getExportBaseFileName(exportType);
+const generationPlan = buildSurveyResultsExportGenerationPlan({
+  baseFileName,
+  exportType,
+  timestamp,
+});
 
-switch (exportType) {
-  case EXPORT_TYPES.CSV_QUESTIONS:
+if (generationPlan.status === 'invalid') {
+  this.setState(buildSurveyResultsAlertMessagePatch(generationPlan.alertMessage));
+  return;
+}
+
+switch (generationPlan.generatorKey) {
+  case 'questions-csv':
     fileContent = this.generateQuestionsCSV();
-    filename = `${baseFileName}_${timestamp}.csv`;
-    mimeType = 'text/csv;charset=utf-8;';
     break;
-  case EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES:
+  case 'questions-responses-csv':
     fileContent = this.generateResponsesCSV();
-    filename = `${baseFileName}_${timestamp}.csv`;
-    mimeType = 'text/csv;charset=utf-8;';
     break;
-  case EXPORT_TYPES.JSON_QUESTIONS:
+  case 'questions-json':
     fileContent = this.generateQuestionsJSON();
-    filename = `${baseFileName}_${timestamp}.json`;
-    mimeType = 'application/json;charset=utf-8;';
     break;
-  case EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES:
+  case 'questions-responses-json':
     fileContent = this.generateResultsJSON();
-    filename = `${baseFileName}_${timestamp}.json`;
-    mimeType = 'application/json;charset=utf-8;';
     break;
   default:
     this.setState(buildSurveyResultsAlertMessagePatch('Invalid export type selected.'));
     return;
 }
 
-if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
+const downloadPlan = buildSurveyResultsExportDownloadPlan({
+  fileContent,
+  generationPlan,
+});
+if (downloadPlan.status === 'empty') {
   if (!this.state.alertMessage) {
-    this.setState({ alertMessage: 'No data available to download for this export type.' });
+    this.setState(buildSurveyResultsAlertMessagePatch(downloadPlan.alertMessage));
   }
   return;
 }
 
-if (
-  (exportType === EXPORT_TYPES.CSV_QUESTIONS || exportType === EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES) &&
-  fileContent.split('\n').length < 2
-) {
-  if (!this.state.alertMessage) {
-    this.setState(buildSurveyResultsAlertMessagePatch('No data available to download for this export type.'));
-  }
-  return;
-}
-
-const blob = new Blob([fileContent], { type: mimeType });
+const blob = new Blob([downloadPlan.fileContent], { type: downloadPlan.mimeType });
 const url = window.URL.createObjectURL(blob);
 const a = document.createElement('a');
 a.setAttribute('hidden', '');
 a.setAttribute('href', url);
-a.setAttribute('download', filename);
+a.setAttribute('download', downloadPlan.filename);
 document.body.appendChild(a);
 a.click();
 document.body.removeChild(a);
