@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -45,6 +45,7 @@ import {
   renderSbtPageHolderModal,
 } from './SBTPageModals';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
@@ -5013,74 +5014,31 @@ renderMintButton() {
                   shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
                   showScanProgress={showScanProgress}
                 />
-                <div className={styles.actionsSection}>
-                  <h2 className={sectionHeaderClassName} onClick={this.toggleActions}>
-                    ACTIONS{' '}
-                    {actionsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                    {actionsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                  </h2>
-                  {actionsSectionToggleState.isOpen && (
-                    <div className={styles.actions}>
-                      {this.renderMintButton()}
-                      {this.renderBurnButton()}
-                      {actionFeedbackState.showMintSuccess && (
-                        <div className={styles.mintProcess}>
-                          <p className={styles.mintSuccess}>
-                            {`${t('sbt')} successfully ${t('mintedLower')}!`}
-                            <br />
-                            {`${t('mint')} Tx Hash:`}{' '}
-                            <a
-                              href={this.getExplorerLink(lastMintTxHash)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {getShortenedTransactionHash(lastMintTxHash)}
-                            </a>
-                          </p>
-                        </div>
-                      )}
-                      {actionFeedbackState.showBurnSuccess && (
-                        <div className={styles.mintProcess}>
-                          <p className={styles.mintSuccess}>
-                            {`${t('sbt')} successfully ${t('burnedLower')}!`}
-                            <br />
-                            {`${t('burn')} Tx Hash:`}{' '}
-                            <a
-                              href={this.getExplorerLink(lastBurnTxHash)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {getShortenedTransactionHash(lastBurnTxHash)}
-                            </a>
-                          </p>
-                        </div>
-                      )}
-                      {actionFeedbackState.showTransactionError && (
-                        <Alert color="danger" className={styles.txErrorAlert} fade={false}>
-                          <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
-                          <button
-                            onClick={this.copyErrorToClipboard}
-                            aria-label="Copy error message"
-                            title="Copy error message"
-                            style={resolveSbtPageCopyErrorButtonStyle()}
-                          >
-                            {errorCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                            {errorCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                          </button>
-                          {actionFeedbackState.showErrorTransactionHash && (
-                            <>
-                              <br />
-                              Tx Hash:{' '}
-                              <a href={this.getExplorerLink(transactionHash)} target="_blank" rel="noopener noreferrer">
-                                {getShortenedTransactionHash(transactionHash)}
-                              </a>
-                            </>
-                          )}
-                        </Alert>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <SbtPageActionsSection
+                  actionFeedbackState={actionFeedbackState}
+                  burnButton={this.renderBurnButton()}
+                  burnLabel={t('burn')}
+                  burnSuccessHref={this.getExplorerLink(lastBurnTxHash)}
+                  burnSuccessText={getShortenedTransactionHash(lastBurnTxHash)}
+                  burnedLowerLabel={t('burnedLower')}
+                  copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
+                  errorCopyIconState={errorCopyIconState}
+                  errorMessage={this.state.error}
+                  isOpen={actionsSectionToggleState.isOpen}
+                  mintButton={this.renderMintButton()}
+                  mintLabel={t('mint')}
+                  mintSuccessHref={this.getExplorerLink(lastMintTxHash)}
+                  mintSuccessText={getShortenedTransactionHash(lastMintTxHash)}
+                  mintedLowerLabel={t('mintedLower')}
+                  onCopyError={this.copyErrorToClipboard}
+                  onToggle={this.toggleActions}
+                  sbtLabel={t('sbt')}
+                  sectionHeaderClassName={sectionHeaderClassName}
+                  shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
+                  shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
+                  transactionErrorHref={this.getExplorerLink(transactionHash)}
+                  transactionErrorText={getShortenedTransactionHash(transactionHash)}
+                />
                 {userIsSbtAdmin && (
                   <div className={styles.adminSection}>
                     <h2 className={sectionHeaderClassName} onClick={this.toggleAdminSection}>
