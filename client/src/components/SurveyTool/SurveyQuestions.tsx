@@ -46,6 +46,9 @@ import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuest
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
+import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
+import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
@@ -529,7 +532,8 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsFullLoadingProgressState,
-  buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsJsonForDisplayState,
+  buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionPoolLoadState,
@@ -7811,90 +7815,12 @@ export class SurveyQuestions extends Component {
     });
   };
 
-  processJsonToTree = (json, level = 0) => {
-    let output = [];
-    if (json === null || json === undefined) {
-      return output;
-    }
-
-    if (Array.isArray(json)) {
-      json.forEach((item, index) => {
-        if (item !== null && typeof item === 'object') {
-          output.push({ type: 'arrayItem', key: index, level });
-          output = [...output, ...this.processJsonToTree(item, level + 1)];
-        } else {
-          output.push({ type: 'arrayItemValue', key: index, value: item, level });
-        }
-      });
-    } else if (typeof json === 'object') {
-      Object.keys(json).forEach((key) => {
-        if (json[key] !== null && typeof json[key] === 'object') {
-          output.push({ type: 'objectKey', key, level });
-          output = [...output, ...this.processJsonToTree(json[key], level + 1)];
-        } else {
-          output.push({ type: 'objectKeyValue', key, value: json[key], level });
-        }
-      });
-    }
-    return output;
-  };
-
-  jsonTreeDisplay = (jsonInput) => {
-    let jsonObject;
-    if (jsonInput === null || jsonInput === undefined) {
-      jsonObject = {};
-    } else if (typeof jsonInput === 'string') {
-      try {
-        jsonObject = JSON.parse(jsonInput);
-      } catch (e) {
-        surveyLog.error("Invalid JSON string for display:", e, "Input:", jsonInput);
-        jsonObject = { error: "Invalid JSON input", original: jsonInput };
-      }
-    } else if (typeof jsonInput === 'object') {
-      jsonObject = jsonInput;
-    } else {
-      surveyLog.error("Invalid input for jsonTreeDisplay: Expected string or object, got", typeof jsonInput);
-      jsonObject = { error: "Invalid input type", original: String(jsonInput) };
-    }
-
-    if (!jsonObject) {
-      jsonObject = { error: "JSON became null after processing" };
-    }
-
-    const treeData = this.processJsonToTree(jsonObject);
-
-    if (treeData.length === 0) {
-      return (
-        <ul className={styles.tree}>
-          <li className={styles.treeItem}>{'{}'}</li>
-        </ul>
-      );
-    }
-
-    return (
-      <ul className={styles.tree}>
-        {treeData.map((node, index) => (
-          <li
-            key={index}
-            className={styles.treeItem}
-            style={{ marginLeft: `${node.level * 20}px` }}
-          >
-            <span className={styles.keyValueContainer}>
-              {node.type === 'arrayItemValue' && (
-                <span>[{node.key}]: {String(node.value)}</span>
-              )}
-              {node.type === 'objectKeyValue' && (
-                <span>{node.key}: {String(node.value)}</span>
-              )}
-              {node.type === 'arrayItem' && <span>[{node.key}]</span>}
-              {node.type === 'objectKey' && <span>{node.key}:</span>}
-              {node.type === 'value' && <span>{String(node.value)}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
+  jsonTreeDisplay = (jsonInput) => (
+    <SurveyQuestionsJsonTree
+      jsonInput={jsonInput}
+      onInvalidInput={(...args) => surveyLog.error(...args)}
+    />
+  );
 
   handlePrimarySubmitClick = () => {
     if (this.state.isSubmitting || this._submitGuard) return;
