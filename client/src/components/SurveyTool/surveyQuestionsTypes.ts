@@ -1,4 +1,5 @@
 import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes.js';
 import {
   buildQuestionScanProgressDisplay,
@@ -96,6 +97,12 @@ export type SurveyQuestionsSubmitFooterDisplayState = {
   genericShowInlineSubmit: boolean;
   showInlineSubmit: boolean;
   showTopInlineSubmit: boolean;
+};
+
+export type SurveyQuestionsPrimarySubmitPlan = {
+  action: 'inert' | 'navigate' | 'submit';
+  reason: string;
+  path: string;
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {
@@ -973,6 +980,87 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     genericShowInlineSubmit,
     showInlineSubmit,
     showTopInlineSubmit: showInlineSubmit && !isSingle,
+  };
+};
+
+export const buildSurveyQuestionsPrimarySubmitPlan = ({
+  account = '',
+  draftSlug = '',
+  isStandalone = false,
+  isSubmitting = false,
+  pendingEditCount = 0,
+  questionID = '',
+  singleQuestionMode = false,
+  submissionComplete = false,
+  submitGuardActive = false,
+  submittedSinceLastEdit = false,
+  surveyId = '',
+}: {
+  account?: unknown;
+  draftSlug?: unknown;
+  isStandalone?: unknown;
+  isSubmitting?: unknown;
+  pendingEditCount?: unknown;
+  questionID?: unknown;
+  singleQuestionMode?: unknown;
+  submissionComplete?: unknown;
+  submitGuardActive?: unknown;
+  submittedSinceLastEdit?: unknown;
+  surveyId?: unknown;
+} = {}): SurveyQuestionsPrimarySubmitPlan => {
+  if (isSubmitting) {
+    return { action: 'inert', reason: 'submitting', path: '' };
+  }
+  if (submitGuardActive) {
+    return { action: 'inert', reason: 'submit_guard', path: '' };
+  }
+
+  const pendingCount = Number(pendingEditCount || 0);
+  const hasPendingEdits = pendingCount > 0;
+  const completed = !!submissionComplete;
+  const submittedStateActive = !!(submittedSinceLastEdit || completed);
+  if (submittedStateActive && !completed && !hasPendingEdits) {
+    return { action: 'inert', reason: 'submitted_without_new_edits', path: '' };
+  }
+
+  if (completed && !hasPendingEdits) {
+    const accountLower = String(account || '').toLowerCase();
+    if (!accountLower) {
+      return { action: 'inert', reason: 'missing_account', path: '' };
+    }
+    if (singleQuestionMode) {
+      const questionIdLower = String(questionID || '').toLowerCase();
+      if (!questionIdLower) {
+        return { action: 'inert', reason: 'missing_question_id', path: '' };
+      }
+      return {
+        action: 'navigate',
+        reason: 'completed_single_question_response',
+        path: buildQuestionRoutePath(questionIdLower, {
+          responderAddress: accountLower,
+          sessionSlug: draftSlug,
+        }),
+      };
+    }
+    if (!isStandalone) {
+      const surveyIdLower = String(surveyId || '').toLowerCase();
+      if (!surveyIdLower) {
+        return { action: 'inert', reason: 'missing_survey_id', path: '' };
+      }
+      const normalizedDraftSlug = String(draftSlug || '');
+      return {
+        action: 'navigate',
+        reason: 'completed_survey_response',
+        path: `/survey/${surveyIdLower}/${accountLower}${normalizedDraftSlug ? `?session=${encodeURIComponent(normalizedDraftSlug)}` : ''}`,
+      };
+    }
+    return { action: 'inert', reason: 'completed_standalone_response', path: '' };
+  }
+
+  return {
+    action: 'submit',
+    reason: hasPendingEdits ? 'pending_edits' : 'submit_requested',
+    path: '',
   };
 };
 
