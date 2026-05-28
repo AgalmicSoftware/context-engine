@@ -1,7 +1,5 @@
 # Telegram Results Exposure Levels PRD
 
-Related PRD: [Telegram Public Session Equivalence](./telegram-public-session-equivalence-prd.md)
-
 ## Problem
 
 `telegram_only` sessions need a useful participant-facing results view without
@@ -43,7 +41,7 @@ where exposure can be more restrictive than the Telegram participant view.
 For now, implement the exposure contract in the Telegram Mini App results view
 and results API only. Do not add client-side CE changes for
 `/session/<telegram-only-slug>` yet. The normal CE client should continue to
-show the `Telegram-only session` notice described in the parity PRD.
+show a `Telegram-only session` notice for Telegram-only sessions.
 
 The Mini App may also offer a local `Demo data` toggle in the Results view and
 settings. That toggle should populate aggregate/group result panels and rendered

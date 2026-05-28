@@ -11,6 +11,7 @@ import {
 import {
   buildAgentBridgeDeployPlan,
   buildAgentBridgeWorkerUploadMetadata,
+  OPTIONAL_AGENT_BRIDGE_SECRET_NAMES,
   REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
   resolveAgentBridgeDeployConfigForLive,
   validateAgentBridgeDeployConfig,
@@ -26,11 +27,10 @@ const require = createRequire(import.meta.url);
 const TELEGRAM_BOT_COMMANDS = Object.freeze([
   { command: 'start', description: 'Open the Context Engine bot' },
   { command: 'sessions', description: 'List available sessions' },
-  { command: 'questions', description: 'View session questions' },
+  { command: 'questions', description: 'Questions' },
   { command: 'groups', description: 'Manage lightweight groups' },
   { command: 'add_question', description: 'Add a session question' },
-  { command: 'q', description: 'Pose a question by number' },
-  { command: 'results', description: 'View consensus or group results' },
+  { command: 'results', description: 'Results' },
   { command: 'attachments', description: 'View session files' },
   { command: 'docs', description: 'View session files' },
   { command: 'me', description: 'View your account' },
@@ -70,6 +70,13 @@ function unquoteEnvValue(value = '') {
     const first = trimmed[0];
     const last = trimmed[trimmed.length - 1];
     if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+      if (first === '"') {
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          // Fall through to plain quote trimming for non-JSON-compatible values.
+        }
+      }
       return trimmed.slice(1, -1);
     }
   }
@@ -561,9 +568,28 @@ export async function writeAgentBridgeWorkerSecrets({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const written = [];
-  for (const name of REQUIRED_AGENT_BRIDGE_SECRET_NAMES) {
-    const text = safeString(env[name]);
-    if (!text) return { ok: false, step: 'worker_secret_validate', status: 400, error: `${name} is missing.` };
+  const optionalSecretValues = {
+    AGENT_BRIDGE_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_OPENAI_API_KEY || env.OPENAI_API_KEY || env.E2E_OPENAI_KEY),
+  };
+  const secrets = [
+    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => ({
+      name,
+      text: safeString(env[name]),
+      required: true,
+    })),
+    ...OPTIONAL_AGENT_BRIDGE_SECRET_NAMES
+      .map((name) => ({
+        name,
+        text: optionalSecretValues[name] || safeString(env[name]),
+        required: false,
+      }))
+      .filter((secret) => secret.text),
+  ];
+  for (const { name, text, required } of secrets) {
+    if (!text) {
+      if (!required) continue;
+      return { ok: false, step: 'worker_secret_validate', status: 400, error: `${name} is missing.` };
+    }
     const response = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

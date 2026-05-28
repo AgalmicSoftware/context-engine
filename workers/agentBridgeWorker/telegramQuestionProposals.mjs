@@ -4,6 +4,47 @@ import { assertNoSecretShape } from './redaction.mjs';
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
 const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice']);
+const MAX_QUESTION_TAGS = 10;
+const MAX_QUESTION_TAG_LENGTH = 48;
+const TAG_STOP_WORDS = new Set([
+  'about',
+  'after',
+  'again',
+  'agree',
+  'answer',
+  'before',
+  'better',
+  'could',
+  'from',
+  'have',
+  'into',
+  'question',
+  'session',
+  'should',
+  'that',
+  'their',
+  'there',
+  'this',
+  'what',
+  'when',
+  'where',
+  'which',
+  'with',
+  'would',
+  'your',
+]);
+const TAG_RULES = Object.freeze([
+  ['ai', /\b(ai|artificial intelligence|llm|model|agent|agents|openclaw)\b/i],
+  ['governance', /\b(governance|vote|voting|policy|decision|proposal|consensus)\b/i],
+  ['food', /\b(food|pizza|meal|lunch|dinner|restaurant|snack|coffee)\b/i],
+  ['work', /\b(work|office|workplace|team|company|job)\b/i],
+  ['event', /\b(event|session|talk|workshop|conference|edge city|attended)\b/i],
+  ['risk', /\b(risk|safety|safe|unsafe|concern|harm|danger)\b/i],
+  ['preference', /\b(prefer|preference|favorite|favourite|like|choice|choose)\b/i],
+  ['community', /\b(community|group|tribe|participants|people|members)\b/i],
+  ['location', /\b(country|city|local|citizen|resident|live in|location)\b/i],
+  ['funding', /\b(fund|funding|invest|investor|budget|grant|money|capital)\b/i],
+]);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -43,6 +84,147 @@ function normalizePrompt(value = '') {
   return safeString(value).replace(/\s+/g, ' ').slice(0, 1000);
 }
 
+export function normalizeQuestionTag(value = '') {
+  return safeString(value)
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_QUESTION_TAG_LENGTH);
+}
+
+export function normalizeQuestionTags(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\n,;|#]+/);
+  const seen = new Set();
+  const tags = [];
+  source.forEach((entry) => {
+    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? firstString(entry.tag, entry.tagId, entry.id, entry.label, entry.name)
+      : entry;
+    const tag = normalizeQuestionTag(raw);
+    if (!tag || seen.has(tag)) return;
+    seen.add(tag);
+    tags.push(tag);
+  });
+  return tags.slice(0, MAX_QUESTION_TAGS);
+}
+
+function firstString(...values) {
+  return values.find((value) => safeString(value) !== '');
+}
+
+export function normalizeSessionContext(value = '') {
+  return safeString(value).replace(/\s+/g, ' ').slice(0, 1200);
+}
+
+export function sessionContextFromPolicySession(session = {}) {
+  const metadata = session?.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
+    ? session.metadata
+    : {};
+  return normalizeSessionContext(firstString(
+    session.sessionContext,
+    session.telegramSessionContext,
+    session.context,
+    session.description,
+    session.purpose,
+    session.topic,
+    metadata.sessionContext,
+    metadata.context,
+    metadata.description
+  ));
+}
+
+function addQuestionTags(target, tags = []) {
+  normalizeQuestionTags(tags).forEach((tag) => {
+    if (!target.includes(tag) && target.length < MAX_QUESTION_TAGS) target.push(tag);
+  });
+}
+
+function questionSourceTags(question = {}) {
+  const metadata = question?.metadata && typeof question.metadata === 'object' && !Array.isArray(question.metadata)
+    ? question.metadata
+    : {};
+  const payload = question?.payload && typeof question.payload === 'object' && !Array.isArray(question.payload)
+    ? question.payload
+    : {};
+  return [
+    question.tags,
+    question.questionTags,
+    question.promptTags,
+    question.topicTags,
+    metadata.tags,
+    metadata.questionTags,
+    payload.tags,
+    payload.questionTags,
+  ];
+}
+
+function sessionSourceTags(session = {}) {
+  const metadata = session?.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
+    ? session.metadata
+    : {};
+  return [
+    session.questionTags,
+    session.defaultQuestionTags,
+    session.telegramQuestionTags,
+    session.defaultTags,
+    session.tags,
+    metadata.questionTags,
+    metadata.defaultQuestionTags,
+    metadata.tags,
+  ];
+}
+
+function keywordTagsFromText(text = '') {
+  const raw = safeString(text);
+  const tags = [];
+  TAG_RULES.forEach(([tag, pattern]) => {
+    if (pattern.test(raw)) tags.push(tag);
+  });
+  raw
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 4 && !TAG_STOP_WORDS.has(token))
+    .slice(0, 16)
+    .forEach((token) => {
+      const tag = normalizeQuestionTag(token);
+      if (tag && !tags.includes(tag) && tags.length < 6) tags.push(tag);
+    });
+  return tags;
+}
+
+export function inferQuestionTags({
+  question = {},
+  prompt = '',
+  questionType = '',
+  options = [],
+  session = {},
+  explicitTags = [],
+  sessionContext = '',
+} = {}) {
+  const tags = [];
+  addQuestionTags(tags, explicitTags);
+  questionSourceTags(question).forEach((source) => addQuestionTags(tags, source));
+  sessionSourceTags(session).forEach((source) => addQuestionTags(tags, source));
+  const text = [
+    prompt,
+    question.prompt,
+    question.questionText,
+    question.title,
+    questionType,
+    Array.isArray(options) ? options.join(' ') : '',
+    sessionContext,
+    sessionContextFromPolicySession(session),
+    session.sessionName,
+    session.sessionSlug,
+  ].map(safeString).filter(Boolean).join(' ');
+  addQuestionTags(tags, keywordTagsFromText(text));
+  return tags.slice(0, MAX_QUESTION_TAGS);
+}
+
 function normalizeOptions(value = []) {
   return (Array.isArray(value) ? value : [])
     .map((option) => safeString(option).replace(/\s+/g, ' ').slice(0, 120))
@@ -78,6 +260,7 @@ function proposedRecordToQuestion(record = {}) {
   const prompt = normalizePrompt(record.prompt || record.questionText);
   if (!questionId || !prompt) return null;
   const questionType = normalizeQuestionType(record.questionType);
+  const tags = normalizeQuestionTags(record.tags);
   const question = {
     questionId,
     id: questionId,
@@ -93,6 +276,7 @@ function proposedRecordToQuestion(record = {}) {
   };
   const options = normalizeOptions(record.options);
   if (options.length) question.options = options;
+  if (tags.length) question.tags = tags;
   return question;
 }
 
@@ -103,12 +287,23 @@ export async function persistTelegramProposedQuestion({
   prompt = '',
   questionType = 'freeform',
   options = [],
+  tags = [],
+  sessionContext = '',
   createdAt = null,
   ttlSeconds = DEFAULT_PROPOSED_QUESTION_TTL_SECONDS,
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const promptText = normalizePrompt(prompt);
   const type = normalizeQuestionType(questionType);
+  const normalizedOptions = normalizeOptions(options);
+  const normalizedSessionContext = normalizeSessionContext(sessionContext);
+  const normalizedTags = inferQuestionTags({
+    prompt: promptText,
+    questionType: type,
+    options: normalizedOptions,
+    explicitTags: tags,
+    sessionContext: normalizedSessionContext,
+  });
   const prefix = proposedQuestionPrefix(slug);
   if (!slug) return { ok: false, reason: 'session_slug_missing' };
   if (!promptText) return { ok: false, reason: 'question_prompt_missing' };
@@ -130,7 +325,9 @@ export async function persistTelegramProposedQuestion({
     sessionSlug: slug,
     questionType: type,
     prompt: promptText,
-    options: normalizeOptions(options),
+    options: normalizedOptions,
+    tags: normalizedTags,
+    sessionContext: normalizedSessionContext || null,
     source: 'telegram_question_proposal',
     status: 'active',
     createdByTelegramUserId: telegramUserId || null,
@@ -193,7 +390,12 @@ export function mergeTelegramProposedQuestions(questions = [], proposedQuestions
 
 export const __test__telegramQuestionProposals = {
   PROPOSED_QUESTION_KV_PREFIX,
+  inferQuestionTags,
+  normalizeQuestionTag,
+  normalizeQuestionTags,
   normalizeQuestionType,
+  normalizeSessionContext,
   proposedQuestionPrefix,
   proposedRecordToQuestion,
+  sessionContextFromPolicySession,
 };

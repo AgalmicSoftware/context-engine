@@ -7,15 +7,26 @@ import {
   readGroupSessionBinding,
   readPrivateSessionBinding,
 } from './telegramCommands.mjs';
+import {
+  inferQuestionTags,
+  normalizeQuestionTags,
+  persistTelegramProposedQuestion,
+  sessionContextFromPolicySession,
+} from './telegramQuestionProposals.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
-import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
+import { buildOpaqueActionId } from './opaqueActions.mjs';
+import { assertNoSecretShape } from './redaction.mjs';
 import {
   loadTelegramLightweightGroups,
   persistTelegramChildSession,
   persistTelegramLightweightGroupProposal,
 } from './telegramGroups.mjs';
+import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
+
+const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
+const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 
 function safeString(value) {
   return String(value || '').trim();
@@ -51,6 +62,33 @@ function json(data, init = {}) {
 
 function firstValue(...values) {
   return values.find((value) => safeString(value) !== '');
+}
+
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => (
+      `${JSON.stringify(key)}:${stableJson(value[key])}`
+    )).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+function stableFingerprint(value = {}) {
+  const input = stableJson(value);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36).padStart(10, '0');
+}
+
+function kvKeySafePart(value = '') {
+  const text = safeString(value);
+  if (!text) return '';
+  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
+  return `${safe || 'ref'}_${stableFingerprint(text)}`;
 }
 
 function titleAnswer(value = '') {
@@ -119,6 +157,10 @@ function inputFromRequest(request, body = {}) {
     telegramUserId: safeString(body.telegramUserId || url.searchParams.get('telegramUserId')),
     groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
+    tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
+    interests: body.interests || url.searchParams.get('interests'),
+    sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
+    relevanceMode: safeString(body.relevanceMode || url.searchParams.get('relevanceMode')),
   };
 }
 
@@ -174,19 +216,34 @@ function questionIsUnavailable(question = {}) {
   return question.payloadUnavailable === true || lower(question.visibility) === 'payload_unavailable';
 }
 
-function publicAgentQuestion(question = {}) {
+function publicAgentQuestion(question = {}, {
+  session = {},
+} = {}) {
   const questionId = safeString(question.questionId || question.id);
   const locked = questionIsLocked(question);
   const unavailable = questionIsUnavailable(question);
   const prompt = locked || unavailable
     ? ''
     : safeString(question.questionText || question.prompt || question.title);
+  const questionType = safeString(question.questionType || question.type || 'freeform') || 'freeform';
+  const options = Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [];
+  const tags = locked || unavailable
+    ? []
+    : inferQuestionTags({
+      question,
+      prompt,
+      questionType,
+      options,
+      session,
+      sessionContext: sessionContextFromPolicySession(session),
+    });
   return {
     questionId,
     sessionSlug: sanitizeSessionSlug(question.sessionSlug),
-    questionType: safeString(question.questionType || question.type || 'freeform') || 'freeform',
+    questionType,
     prompt,
-    options: Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [],
+    options,
+    tags,
     answerable: Boolean(questionId && prompt && !locked && !unavailable),
     locked,
     payloadUnavailable: unavailable,
@@ -195,19 +252,598 @@ function publicAgentQuestion(question = {}) {
   };
 }
 
-async function handleQuestionsRequest({ env = {}, context = {}, waitUntil = null } = {}) {
+function normalizePreferenceTagHints(input = {}) {
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const profile = preferences.profile && typeof preferences.profile === 'object' && !Array.isArray(preferences.profile)
+    ? preferences.profile
+    : {};
+  const source = [
+    input.tags,
+    input.interests,
+    input.topics,
+    preferences.tags,
+    preferences.tagIds,
+    preferences.interests,
+    preferences.topics,
+    preferences.sessionTags,
+    profile.tags,
+    profile.interests,
+    profile.topics,
+  ].flatMap((value) => (Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/)));
+  return normalizeQuestionTags(source);
+}
+
+function normalizePreferenceSessionHints(input = {}) {
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const source = [
+    input.sessionsAttended,
+    input.attendedSessions,
+    input.sessionSlugs,
+    preferences.sessionsAttended,
+    preferences.attendedSessions,
+    preferences.sessionSlugs,
+  ].flatMap((value) => (Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/)));
+  const slugs = new Set();
+  const names = new Set();
+  source.forEach((entry) => {
+    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? firstValue(entry.sessionSlug, entry.slug, entry.id, entry.sessionName, entry.name, entry.title)
+      : entry;
+    const text = safeString(raw);
+    if (!text) return;
+    const slug = sanitizeSessionSlug(text);
+    if (slug) slugs.add(slug);
+    normalizeQuestionTags(text).forEach((tag) => names.add(tag));
+  });
+  return { slugs: [...slugs], tags: [...names] };
+}
+
+function questionRelevance(question = {}, {
+  tagHints = [],
+  sessionHints = { slugs: [], tags: [] },
+  session = {},
+} = {}) {
+  const qTags = normalizeQuestionTags(question.tags);
+  const tagSet = new Set(qTags);
+  const promptText = [
+    question.prompt,
+    question.questionType,
+    Array.isArray(question.options) ? question.options.join(' ') : '',
+    session.sessionName,
+    session.sessionSlug,
+    sessionContextFromPolicySession(session),
+  ].map((value) => safeString(value).toLowerCase()).join(' ');
+  const matchedTags = [];
+  let score = 0;
+  tagHints.forEach((tag) => {
+    if (tagSet.has(tag)) {
+      score += 20;
+      matchedTags.push(tag);
+    } else if (tag && promptText.includes(tag.replace(/-/g, ' '))) {
+      score += 6;
+      matchedTags.push(tag);
+    }
+  });
+  const matchedSessions = [];
+  const questionSlug = sanitizeSessionSlug(question.sessionSlug || session.sessionSlug);
+  sessionHints.slugs.forEach((slug) => {
+    if (slug && slug === questionSlug) {
+      score += 30;
+      matchedSessions.push(slug);
+    }
+  });
+  sessionHints.tags.forEach((tag) => {
+    if (tagSet.has(tag) || promptText.includes(tag.replace(/-/g, ' '))) {
+      score += 8;
+      if (!matchedTags.includes(tag)) matchedTags.push(tag);
+    }
+  });
+  return {
+    score,
+    matchedTags: [...new Set(matchedTags)],
+    matchedSessions: [...new Set(matchedSessions)],
+  };
+}
+
+function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
+  const tagHints = normalizePreferenceTagHints(input);
+  const sessionHints = normalizePreferenceSessionHints(input);
+  if (!tagHints.length && !sessionHints.slugs.length && !sessionHints.tags.length) {
+    return {
+      questions,
+      relevance: {
+        mode: 'none',
+        tags: [],
+        sessionsAttended: [],
+      },
+    };
+  }
+  const ranked = questions.map((question, index) => {
+    const relevance = questionRelevance(question, {
+      tagHints,
+      sessionHints,
+      session: context.session,
+    });
+    return { question: { ...question, relevance }, index, relevance };
+  });
+  const mode = lower(input.relevanceMode);
+  const filtered = ['filter', 'relevant_only', 'relevant-only'].includes(mode)
+    ? ranked.filter((entry) => entry.relevance.score > 0)
+    : ranked;
+  filtered.sort((left, right) => right.relevance.score - left.relevance.score || left.index - right.index);
+  return {
+    questions: filtered.map((entry) => entry.question),
+    relevance: {
+      mode: filtered.length === ranked.length ? 'rank' : 'filter',
+      tags: tagHints,
+      sessionsAttended: sessionHints.slugs,
+      sessionTags: sessionHints.tags,
+    },
+  };
+}
+
+async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil = null } = {}) {
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug, { waitUntil });
   const questions = (Array.isArray(loaded.questions) ? loaded.questions : [])
-    .map(publicAgentQuestion)
+    .map((question) => publicAgentQuestion(question, { session: context.session }))
     .filter((question) => question.questionId);
+  return { loaded, questions };
+}
+
+async function handleQuestionsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const ranked = rankQuestionsByPreferences(questions, input, context);
   return json({
     ok: true,
     sessionSlug: context.session.sessionSlug,
     permissionMode: context.permission.mode,
     questionSource: loaded.source || '',
     questionSourceReason: loaded.reason || '',
-    questions,
+    relevance: ranked.relevance,
+    questions: ranked.questions,
   });
+}
+
+function normalizeTelegramQuestionVote(value = '') {
+  const vote = lower(value);
+  return vote === 'up' || vote === 'down' ? vote : '';
+}
+
+function telegramQuestionVoteKey({
+  sessionSlug = '',
+  questionId = '',
+  telegramUserId = '',
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const qid = kvKeySafePart(questionId);
+  const user = kvKeySafePart(telegramUserId);
+  if (!slug || !qid || !user) return '';
+  return `${MINI_APP_QUESTION_VOTE_KV_PREFIX}${slug}:${qid}:${user}`;
+}
+
+function normalizeQuestionIdSet(value) {
+  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
+  return new Set(source.map(safeString).filter(Boolean));
+}
+
+function normalizeNegativePreferenceTagHints(input = {}) {
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const source = [
+    input.deprioritizeTags,
+    input.downvoteTags,
+    input.irrelevantTags,
+    input.avoidTags,
+    preferences.deprioritizeTags,
+    preferences.downvoteTags,
+    preferences.irrelevantTags,
+    preferences.avoidTags,
+    preferences.dislikedTags,
+  ].flatMap((value) => (Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/)));
+  return normalizeQuestionTags(source);
+}
+
+function recommendationLimit(input = {}) {
+  const value = Number(input.limit || input.topN || input.count || 10);
+  if (!Number.isFinite(value) || value <= 0) return 10;
+  return Math.max(1, Math.min(20, Math.floor(value)));
+}
+
+function buildQuestionVoteRecommendations(questions = [], input = {}, context = {}) {
+  const tagHints = normalizePreferenceTagHints(input);
+  const negativeTags = normalizeNegativePreferenceTagHints(input);
+  const sessionHints = normalizePreferenceSessionHints(input);
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const importantIds = normalizeQuestionIdSet(input.importantQuestionIds || preferences.importantQuestionIds);
+  const deprioritizeIds = normalizeQuestionIdSet(input.deprioritizeQuestionIds || preferences.deprioritizeQuestionIds);
+  const limit = recommendationLimit(input);
+  const hasTargeting = Boolean(
+    tagHints.length ||
+    negativeTags.length ||
+    sessionHints.slugs.length ||
+    sessionHints.tags.length ||
+    importantIds.size ||
+    deprioritizeIds.size
+  );
+  const entries = (Array.isArray(questions) ? questions : [])
+    .filter((question) => question.answerable === true)
+    .map((question, index) => {
+      const positive = questionRelevance(question, { tagHints, sessionHints, session: context.session });
+      const negative = questionRelevance(question, {
+        tagHints: negativeTags,
+        sessionHints: { slugs: [], tags: [] },
+        session: context.session,
+      });
+      let positiveScore = positive.score;
+      let negativeScore = negative.score;
+      if (importantIds.has(question.questionId)) positiveScore += 50;
+      if (deprioritizeIds.has(question.questionId)) negativeScore += 50;
+      const suggestedVote = negativeScore > positiveScore && negativeScore > 0 ? 'down' : 'up';
+      const rawScore = Math.max(positiveScore, negativeScore);
+      const fallbackScore = rawScore > 0 ? rawScore : Math.max(1, questions.length - index);
+      const confidence = Math.max(0.35, Math.min(0.95, 0.45 + (fallbackScore / 100)));
+      const matchedTags = suggestedVote === 'down' ? negative.matchedTags : positive.matchedTags;
+      const reason = matchedTags.length
+        ? `Matched ${suggestedVote === 'down' ? 'deprioritized' : 'relevant'} tags: ${matchedTags.join(', ')}.`
+        : 'No strong tag match; surfaced from the active question list for human review.';
+      return {
+        questionId: question.questionId,
+        questionType: question.questionType,
+        prompt: question.prompt,
+        tags: Array.isArray(question.tags) ? question.tags : [],
+        suggestedVote,
+        score: fallbackScore,
+        confidence: Number(confidence.toFixed(2)),
+        reason,
+        agentNote: `Suggested ${suggestedVote}vote: ${reason}`,
+        relevance: {
+          positiveScore,
+          negativeScore,
+          matchedTags,
+          matchedSessions: positive.matchedSessions,
+        },
+        index,
+      };
+    })
+    .filter((entry) => !hasTargeting || entry.score > Math.max(1, questions.length - entry.index));
+  entries.sort((left, right) => (
+    right.score - left.score ||
+    (left.suggestedVote === 'up' ? -1 : 1) ||
+    left.index - right.index
+  ));
+  return {
+    recommendations: entries.slice(0, limit).map(({ index, ...entry }) => entry),
+    relevance: {
+      tags: tagHints,
+      downvoteTags: negativeTags,
+      sessionsAttended: sessionHints.slugs,
+      sessionTags: sessionHints.tags,
+    },
+  };
+}
+
+const SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
+
+function sanitizeResearchMetadata(value, {
+  depth = 0,
+  maxString = 600,
+} = {}) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value.slice(0, maxString);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    if (depth >= 3) return [];
+    return value.slice(0, 20).map((entry) => sanitizeResearchMetadata(entry, { depth: depth + 1, maxString }));
+  }
+  if (typeof value !== 'object') return safeString(value).slice(0, maxString);
+  if (depth >= 3) return {};
+  const result = {};
+  Object.entries(value).slice(0, 30).forEach(([key, entry]) => {
+    const safeKey = safeString(key).replace(/[^a-zA-Z0-9_.:-]+/g, '_').slice(0, 80);
+    if (!safeKey || SECRETISH_METADATA_KEY_RE.test(safeKey)) return;
+    result[safeKey] = sanitizeResearchMetadata(entry, { depth: depth + 1, maxString });
+  });
+  return result;
+}
+
+function normalizeAgentMetadata(input = {}) {
+  const agent = input.agent && typeof input.agent === 'object' && !Array.isArray(input.agent)
+    ? input.agent
+    : (input.agentMetadata && typeof input.agentMetadata === 'object' && !Array.isArray(input.agentMetadata) ? input.agentMetadata : {});
+  return sanitizeResearchMetadata({
+    agentId: firstValue(input.agentId, agent.agentId, agent.id),
+    agentName: firstValue(input.agentName, agent.agentName, agent.name),
+    platform: firstValue(input.agentPlatform, agent.platform, agent.vendor),
+    model: firstValue(input.model, agent.model),
+    version: firstValue(input.agentVersion, agent.version),
+  });
+}
+
+function normalizeApprovalText(value = '') {
+  return safeString(sanitizeResearchMetadata(value, { maxString: 1500 }));
+}
+
+function explicitApprovalValue(value) {
+  if (value === true || value === false) return value;
+  const normalized = lower(value);
+  if (['approve', 'approved', 'accept', 'accepted', 'yes', 'use', 'used', 'true'].includes(normalized)) return true;
+  if (['reject', 'rejected', 'disapprove', 'decline', 'skip', 'no', 'false'].includes(normalized)) return false;
+  return null;
+}
+
+function approvalFromNaturalLanguage(approvalText = '', questionId = '') {
+  const text = lower(approvalText);
+  if (!text) return null;
+  const qid = lower(questionId);
+  if (qid && text.includes(qid)) {
+    const index = text.indexOf(qid);
+    const local = text.slice(Math.max(0, index - 48), Math.min(text.length, index + qid.length + 48));
+    if (/\b(reject|rejected|disapprove|decline|skip|do not|don't|no)\b/.test(local)) return false;
+    if (/\b(approve|approved|accept|accepted|yes|use|looks good)\b/.test(local)) return true;
+  }
+  if (/\b(approve all|accept all|use all|looks good|yes,? apply|apply all)\b/.test(text)) return true;
+  if (/\b(reject all|decline all|do not apply|don't apply|no,? do not)\b/.test(text)) return false;
+  return null;
+}
+
+function finalVoteFromNaturalLanguage(approvalText = '', questionId = '') {
+  const text = lower(approvalText);
+  const qid = lower(questionId);
+  if (!text || !qid || !text.includes(qid)) return '';
+  const index = text.indexOf(qid);
+  const local = text.slice(Math.max(0, index - 48), Math.min(text.length, index + qid.length + 48));
+  if (/\b(up|upvote|\+1)\b/.test(local)) return 'up';
+  if (/\b(down|downvote|-1)\b/.test(local)) return 'down';
+  return '';
+}
+
+async function applyAgentQuestionVotes({
+  env = {},
+  context = {},
+  input = {},
+  questions = [],
+  recommendations = [],
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') {
+    return { ok: false, reason: 'question_vote_storage_unavailable' };
+  }
+  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
+  if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_context_incomplete' };
+  const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  const autoApplyRequested = input.autoApply === true || lower(input.applyMode) === 'auto';
+  if (autoApplyRequested && settings.agentAutoApplyQuestionVotes === false) {
+    return {
+      ok: false,
+      reason: 'agent_question_vote_auto_apply_disabled',
+      settings: { agentAutoApplyQuestionVotes: false },
+    };
+  }
+
+  const questionById = new Map((Array.isArray(questions) ? questions : [])
+    .filter((question) => question.answerable === true)
+    .map((question) => [safeString(question.questionId), question]));
+  const recommendationById = new Map((Array.isArray(recommendations) ? recommendations : [])
+    .map((recommendation) => [safeString(recommendation.questionId), recommendation]));
+  const decisionInputs = Array.isArray(input.decisions)
+    ? input.decisions
+    : (Array.isArray(input.votes) ? input.votes : []);
+  const sourceDecisions = decisionInputs.length
+    ? decisionInputs
+    : (autoApplyRequested ? recommendations : []);
+  const approvalText = normalizeApprovalText(input.approvalText || input.humanApproval || input.userApproval || '');
+  const agentMetadata = normalizeAgentMetadata(input);
+  const actionMetadata = sanitizeResearchMetadata({
+    ...(input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata) ? input.metadata : {}),
+    source: firstValue(input.source, input.client, input.integration, input.metadata?.source),
+    runId: firstValue(input.runId, input.requestRunId, input.metadata?.runId),
+    requestId: firstValue(input.requestId, input.idempotencyKey, input.metadata?.requestId),
+    preferenceTags: normalizePreferenceTagHints(input),
+    downvoteTags: normalizeNegativePreferenceTagHints(input),
+  });
+  const appliedVotes = [];
+  const skipped = [];
+  const decisions = [];
+  for (const entry of sourceDecisions) {
+    const questionId = safeString(entry?.questionId || entry?.id);
+    const question = questionById.get(questionId);
+    if (!question) {
+      skipped.push({ questionId, reason: 'question_not_active_or_answerable' });
+      continue;
+    }
+    const recommendation = recommendationById.get(questionId) || {};
+    const suggestedVote = normalizeTelegramQuestionVote(entry?.suggestedVote || recommendation.suggestedVote);
+    const naturalVote = finalVoteFromNaturalLanguage(approvalText, questionId);
+    const finalVote = normalizeTelegramQuestionVote(entry?.finalVote || entry?.vote || naturalVote || suggestedVote);
+    if (!finalVote) {
+      skipped.push({ questionId, reason: 'vote_not_understood' });
+      continue;
+    }
+    const explicitApproval = explicitApprovalValue(entry?.approved ?? entry?.approval ?? entry?.decision ?? entry?.status);
+    const naturalApproval = approvalFromNaturalLanguage(approvalText, questionId);
+    const approved = autoApplyRequested ? true : (explicitApproval ?? naturalApproval ?? false);
+    const approvalStatus = autoApplyRequested
+      ? 'agent_auto_applied_pending_human_review'
+      : (approved ? 'human_approved' : 'human_rejected_or_missing');
+    const decision = {
+      questionId,
+      suggestedVote: suggestedVote || finalVote,
+      finalVote,
+      approved,
+      applied: approved,
+      overridden: approved && Boolean(suggestedVote) && finalVote !== suggestedVote,
+      approvalStatus,
+      agentNote: safeString(entry?.agentNote || recommendation.agentNote).slice(0, 800),
+      humanNote: safeString(entry?.humanNote || entry?.note).slice(0, 800),
+      reason: safeString(entry?.reason || recommendation.reason).slice(0, 800),
+      confidence: Number(entry?.confidence || recommendation.confidence || 0) || 0,
+    };
+    decisions.push(decision);
+    if (!approved) {
+      skipped.push({ questionId, reason: 'question_vote_not_approved' });
+      continue;
+    }
+    const voteKey = telegramQuestionVoteKey({ sessionSlug, questionId, telegramUserId });
+    if (!voteKey) {
+      skipped.push({ questionId, reason: 'question_vote_ref_incomplete' });
+      continue;
+    }
+    const previous = typeof kv.get === 'function'
+      ? safeJsonParse(await kv.get(voteKey).catch(() => null), null)
+      : null;
+    const voteRecord = {
+      type: 'telegram_mini_app_question_vote',
+      version: 1,
+      sessionSlug,
+      questionId,
+      telegramUserId,
+      vote: finalVote,
+      weight: 1,
+      votingMode: 'single',
+      source: 'agent_handoff',
+      agentMetadata,
+      agentNote: decision.agentNote,
+      agentSuggestedVote: decision.suggestedVote,
+      humanApproval: {
+        status: approvalStatus,
+        approved: autoApplyRequested ? false : approved,
+        humanReviewed: !autoApplyRequested,
+        overridden: decision.overridden,
+        approvalText,
+        humanNote: decision.humanNote,
+      },
+      actionMetadata,
+      quadraticVoting: {
+        enabled: false,
+        maxCredits: 1,
+        upgradePath: 'replace weight with credit-derived weight after credit allocation is enabled',
+      },
+      createdAt: safeString(previous?.createdAt) || createdAt,
+      updatedAt: createdAt,
+    };
+    assertNoSecretShape(voteRecord, 'Telegram agent question vote records must not serialize secrets.');
+    await kv.put(voteKey, JSON.stringify(voteRecord));
+    appliedVotes.push({ questionId, vote: finalVote, voteKey, approvalStatus });
+  }
+  const decisionFingerprint = stableFingerprint({
+    sessionSlug,
+    telegramUserId,
+    decisions,
+    approvalText,
+    actionMetadata,
+  });
+  const requestId = safeString(input.requestId || input.idempotencyKey) ||
+    buildOpaqueActionId(`agent_question_votes|${sessionSlug}|${telegramUserId}|${decisionFingerprint}|${createdAt}`);
+  const decisionRecordKey = `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`;
+  const decisionRecord = {
+    type: 'telegram_agent_question_vote_decision',
+    version: 1,
+    requestId,
+    sessionSlug,
+    telegramUserId,
+    autoApplyRequested,
+    autoApplyAllowed: settings.agentAutoApplyQuestionVotes !== false,
+    approvalText,
+    agentMetadata,
+    actionMetadata,
+    decisions,
+    appliedVotes,
+    skipped,
+    createdAt,
+  };
+  assertNoSecretShape(decisionRecord, 'Telegram agent question vote decision records must not serialize secrets.');
+  await kv.put(decisionRecordKey, JSON.stringify(decisionRecord));
+  return {
+    ok: true,
+    requestId,
+    decisionRecordKey,
+    settings: { agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes !== false },
+    appliedVotes,
+    skipped,
+    decisions,
+  };
+}
+
+async function handleQuestionVoteRecommendationsRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const built = buildQuestionVoteRecommendations(questions, input, context);
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: context.normalized.user.telegramUserId,
+  });
+  let autoApply = null;
+  if (input.autoApply === true || lower(input.applyMode) === 'auto') {
+    autoApply = settings.agentAutoApplyQuestionVotes === false
+      ? {
+        ok: false,
+        reason: 'agent_question_vote_auto_apply_disabled',
+        appliedVotes: [],
+      }
+      : await applyAgentQuestionVotes({
+        env,
+        context,
+        input: { ...input, autoApply: true },
+        questions,
+        recommendations: built.recommendations,
+      });
+  }
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    permissionMode: context.permission.mode,
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    metaQuestion: {
+      questionId: 'meta-question-importance',
+      prompt: 'Which active questions are most important for this user to prioritize?',
+      responseMode: 'approve_or_override_agent_question_votes',
+    },
+    settings: {
+      agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes !== false,
+    },
+    relevance: built.relevance,
+    recommendations: built.recommendations,
+    autoApply,
+    approval: {
+      endpoint: '/telegram/agent/api/question-votes/apply',
+      note: 'Send approved, rejected, or overridden vote decisions after human review. Natural-language approval text is stored with the decision record.',
+    },
+  });
+}
+
+async function handleQuestionVoteApplyRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const recommendations = Array.isArray(input.recommendations)
+    ? input.recommendations
+    : buildQuestionVoteRecommendations(questions, input, context).recommendations;
+  const applied = await applyAgentQuestionVotes({
+    env,
+    context,
+    input,
+    questions,
+    recommendations,
+  });
+  return json(applied, { status: applied.ok ? 200 : 400 });
 }
 
 function normalizePreferenceEntries(input = {}) {
@@ -344,6 +980,8 @@ async function handlePoseRequest({
       prompt,
       questionType: input.questionType || 'freeform',
       options: input.options,
+      tags: input.tags,
+      sessionContext: input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
       createdAt: input.createdAt || null,
     });
     if (!saved.ok) return json({ ok: false, reason: saved.reason || 'question_save_failed' }, { status: 400 });
@@ -459,8 +1097,14 @@ export async function handleTelegramAgentHandoffRequest({
   const context = await resolveHandoffContext({ env, input });
   if (!context.ok) return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
 
-  if (url.pathname === '/telegram/agent/api/questions' && request.method === 'GET') {
-    return handleQuestionsRequest({ env, context, waitUntil });
+  if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleQuestionsRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/question-votes/recommend' && request.method === 'POST') {
+    return handleQuestionVoteRecommendationsRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/question-votes/apply' && request.method === 'POST') {
+    return handleQuestionVoteApplyRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });
@@ -484,7 +1128,10 @@ export const __test__telegramAgentHandoff = {
   authenticateAgentHandoff,
   normalizeAgentTelegramContext,
   normalizeDraftForQuestion,
+  normalizePreferenceTagHints,
   normalizePreferenceEntries,
+  buildQuestionVoteRecommendations,
   publicAgentQuestion,
+  rankQuestionsByPreferences,
   safeJsonParse,
 };

@@ -66,11 +66,11 @@ export function evaluateTelegramQuestionAuthoringPermission({
   const privateSessionMatches = isPrivate && privateBinding?.sessionSlug && (
     !sessionSlug || lower(privateBinding.sessionSlug) === sessionSlug
   );
+  const privateBoundAuthoringDisabled = envFlagDisabled(env.AGENT_BRIDGE_AUTHORING_ALLOW_PRIVATE_BOUND_USERS);
   const telegramOnlyPrivateParticipant = isPrivate &&
     session.telegramOnly === true &&
     privateSessionMatches &&
-    !configuredGroups.size &&
-    !defaultGroupChatId;
+    !privateBoundAuthoringDisabled;
 
   if (!effectiveGroupChatId) {
     if (telegramOnlyPrivateParticipant) {
@@ -101,7 +101,7 @@ export function evaluateTelegramQuestionAuthoringPermission({
     return { ok: false, mode, reason: 'telegram_group_session_mismatch' };
   }
   if (isPrivate) {
-    if (envFlagDisabled(env.AGENT_BRIDGE_AUTHORING_ALLOW_PRIVATE_BOUND_USERS)) {
+    if (privateBoundAuthoringDisabled) {
       return { ok: false, mode, reason: 'private_bound_authoring_disabled' };
     }
     if (privateBinding?.sessionSlug && sessionSlug && lower(privateBinding.sessionSlug) !== sessionSlug) {

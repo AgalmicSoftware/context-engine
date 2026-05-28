@@ -178,6 +178,31 @@ export function normalizeSessionPolicy(input = {}) {
       session.metadata?.createdTimestamp ||
       session.telegram?.createdTimestamp
     ) || null,
+    sessionContext: safeString(
+      session.sessionContext ||
+      session.telegramSessionContext ||
+      session.context ||
+      session.description ||
+      session.purpose ||
+      session.topic ||
+      session.metadata?.sessionContext ||
+      session.metadata?.context ||
+      session.metadata?.description
+    ).replace(/\s+/g, ' ').slice(0, 1200) || null,
+    questionTags: (Array.isArray(session.questionTags)
+      ? session.questionTags
+      : (Array.isArray(session.defaultQuestionTags)
+        ? session.defaultQuestionTags
+        : (Array.isArray(session.telegramQuestionTags) ? session.telegramQuestionTags : [])))
+      .map(safeString)
+      .filter(Boolean)
+      .slice(0, 20),
+    tags: (Array.isArray(session.tags)
+      ? session.tags
+      : (Array.isArray(session.defaultTags) ? session.defaultTags : []))
+      .map(safeString)
+      .filter(Boolean)
+      .slice(0, 20),
     default: session.default === true,
     telegramBridgeEnabled: session.telegramBridgeEnabled !== false,
     telegramOnly: (

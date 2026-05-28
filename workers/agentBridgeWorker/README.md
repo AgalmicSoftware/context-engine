@@ -292,6 +292,7 @@ Required values:
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
+| Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
@@ -482,6 +483,8 @@ POST /telegram/mini-app/api/clear-drafts
 POST /telegram/mini-app/api/transcribe
 POST /telegram/mini-app/api/search
 POST /telegram/mini-app/api/settings
+POST /telegram/mini-app/api/questions/format
+POST /telegram/mini-app/api/questions/add
 ```
 
 The bot opens the Mini App with Telegram inline `web_app` buttons in private
@@ -531,12 +534,13 @@ Current v0 scope:
   Session question count text is intentionally a single answerable-question
   count rather than a split loaded/indexed diagnostic.
 - The filter panel includes unanswered-first ordering, question type filters
-  including freeform questions, and an AI-backed question search that ranks
-  matching loaded prompts through the session worker `/ai` route when sponsored
-  AI is available. It falls back to local semantic keyword matching when AI is
-  unavailable, auto-applies as the user types, and only shows `Clear` when
-  there is search text. The search field can also use the microphone icon;
-  transcribed search text is applied to the loaded-question filter immediately.
+  including freeform questions, generated question tag filters, and an AI-backed
+  question search that ranks matching loaded prompts/tags through the session
+  worker `/ai` route when sponsored AI is available. It falls back to local
+  semantic keyword matching when AI is unavailable, auto-applies as the user
+  types, and only shows `Clear` when there is search text. The search field can
+  also use the microphone icon; transcribed search text is applied to the
+  loaded-question filter immediately.
 - Additional comments include microphone/stop icon buttons. The Mini App first
   records with `MediaRecorder`, shows recording/transcription/error feedback in
   the comments textarea rather than duplicating it in the status bar, and sends
@@ -553,8 +557,13 @@ Current v0 scope:
   `DEFAULT_SESSION_SLUG` differs, the bridge retries worker auth without an
   explicit slug so the worker can use its configured tenant. Operators can also
   set per-session `workerSessionSlug` / `sessionWorkerSlug` in
-  `AGENT_BRIDGE_SESSION_POLICY_JSON`. Browser Web Speech remains a fallback for
-  webviews without `MediaRecorder`.
+  `AGENT_BRIDGE_SESSION_POLICY_JSON`. When `AGENT_BRIDGE_OPENAI_API_KEY`,
+  `AGENT_BRIDGE_OPENAI_KEY`, `OPENAI_API_KEY`, or `E2E_OPENAI_KEY` is available
+  on the Telegram bridge, the bridge appends it as a request-local session
+  worker `apiKey`; this avoids requiring every new Telegram-only session worker
+  to be separately seeded with `openaiKey` before transcription or AI question
+  generation can run. Browser Web Speech remains a fallback for webviews without
+  `MediaRecorder`.
 - Previously saved draft answers are returned by state as
   `draftAnswersByQuestionKey` and hydrate the matching question cards on load.
   The gear/settings panel also lists saved draft response labels and can clear
@@ -563,6 +572,16 @@ Current v0 scope:
   drafts only removes unsubmitted answers. The filter panel's
   `showUnansweredFirst` preference defaults to true and orders saved or
   submitted answered questions after unanswered questions on first load.
+- Telegram-only question authoring stores generated tags with each proposed
+  question. The Mini App Add Question panel has non-secret session-context and
+  comma-tag fields; dictation formatting sends those values to the session
+  worker `/ai` route so the returned prompt/options/tags fit the selected
+  session. Microphone-generated question drafts request automatic question-type
+  inference, so spoken requests can become binary, rating, multichoice, or
+  freeform questions and can populate multichoice options when the choices are
+  spoken. If AI is unavailable, the bridge still derives conservative type,
+  option, and tag metadata from the prompt, selected session metadata, and
+  session context.
 - The Mini App keeps polling state while no answerable questions are available
   and questions are still empty, the question source reports an error, or only
   payload-unavailable question rows are present. Mixed answerable/unavailable
@@ -617,6 +636,47 @@ Current v0 scope:
 - Payload-unavailable questions stay retryable/unanswered; true private or gated
   questions stay locked until the canonical private/gated decrypt path is
   available.
+
+### Telegram Agent Handoff Question Relevance
+
+The agent handoff skill is packaged with this worker at
+[`skills/ce-telegram-agent-handoff/SKILL.md`](skills/ce-telegram-agent-handoff/SKILL.md).
+The `.codex` copy is only a local discovery wrapper; this worker-packaged file
+is the source of truth for OpenClaw/Hermes-style agents.
+
+OpenClaw-style agents can call:
+
+```text
+GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
+POST /telegram/agent/api/questions
+POST /telegram/agent/api/preferences
+POST /telegram/agent/api/questions/pose
+POST /telegram/agent/api/question-votes/recommend
+POST /telegram/agent/api/question-votes/apply
+```
+
+`/telegram/agent/api/questions` returns public, answerable question metadata
+with normalized `tags`. `POST /telegram/agent/api/questions` accepts a
+`preferences` object containing `tags`, `interests`, `topics`,
+`sessionsAttended`, or `attendedSessions`; the worker infers relevance from
+question tags, prompt text, and attended-session hints. The default mode returns
+all questions ranked by relevance. Set `relevanceMode: "filter"` to return only
+questions with a positive relevance score. `questions/pose` accepts `tags` and
+`sessionContext` when an agent creates a new Telegram-only question.
+
+Agents can also ask the worker for a meta-level importance view with
+`POST /telegram/agent/api/question-votes/recommend`. The response returns a
+`metaQuestion`, suggested up/down question votes, confidence/reason fields, and
+an `agentNote` intended for user review. If the request includes
+`autoApply: true`, the worker applies those votes only when the current
+Telegram account/session Mini App setting `agentAutoApplyQuestionVotes` is
+enabled. That setting is account/session-scoped and defaults to enabled.
+`POST /telegram/agent/api/question-votes/apply` records human-approved,
+rejected, or overridden decisions from explicit fields or natural-language
+approval text. Applied votes use the same Cloudflare vote records read by the
+Mini App question popularity UI, and every agent-mediated vote stores
+non-secret `agentMetadata`, `actionMetadata`, the agent note, and whether the
+human accepted or overrode the suggestion.
 
 ## Deploy Helper Plan And Apply
 

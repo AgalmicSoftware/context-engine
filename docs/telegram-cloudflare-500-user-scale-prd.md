@@ -7,7 +7,6 @@ ingestion while preserving the current simple synchronous smoke path.
 
 Related PRDs:
 
-- [Public Session Equivalence](./telegram-public-session-equivalence-prd.md)
 - [Telegram Response Export Scope](./telegram-response-export-scope-prd.md)
 
 ## Problem

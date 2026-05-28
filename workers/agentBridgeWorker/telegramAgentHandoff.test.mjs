@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
+import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 
 class MemoryKv {
   constructor() {
@@ -56,11 +58,13 @@ function baseEnv(overrides = {}) {
         questionId: 'q-binary',
         questionType: 'binary',
         prompt: 'Should Alpha fund this proposal?',
+        tags: ['funding', 'governance'],
       },
       {
         questionId: 'q-freeform',
         questionType: 'freeform',
         prompt: 'What should Alpha decide next?',
+        tags: ['strategy'],
       },
     ]),
     AGENT_ACTION_KV: new MemoryKv(),
@@ -116,6 +120,17 @@ function agentRequest(path, {
 async function jsonBody(response) {
   return response.json();
 }
+
+test('Telegram agent handoff skill is packaged with the worker', () => {
+  const source = readFileSync(
+    new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(source, /^# CE Telegram Agent Handoff/m);
+  assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
+  assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
+});
 
 test('Telegram agent handoff requires the configured token', async () => {
   const env = baseEnv();
@@ -185,6 +200,198 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(drafted.reviewRequired, true);
   assert.equal(binaryDraft.answerLabel, 'Agree');
   assert.match(binaryDraft.answerValue, /Matches the stated priority/);
+});
+
+test('Telegram agent can rank or filter questions by preference-derived tags', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const rankedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        preferences: {
+          interests: ['funding'],
+        },
+      },
+    }),
+    env,
+  });
+  const ranked = await jsonBody(rankedResponse);
+
+  assert.equal(rankedResponse.status, 200);
+  assert.equal(ranked.relevance.mode, 'rank');
+  assert.deepEqual(ranked.relevance.tags, ['funding']);
+  assert.equal(ranked.questions[0].questionId, 'q-binary');
+  assert.equal(ranked.questions[0].tags.includes('funding'), true);
+  assert.equal(ranked.questions[0].relevance.score > 0, true);
+
+  const filteredResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        relevanceMode: 'filter',
+        preferences: {
+          tags: ['strategy'],
+        },
+      },
+    }),
+    env,
+  });
+  const filtered = await jsonBody(filteredResponse);
+
+  assert.equal(filteredResponse.status, 200);
+  assert.equal(filtered.relevance.mode, 'filter');
+  assert.deepEqual(filtered.questions.map((question) => question.questionId), ['q-freeform']);
+  assert.equal(filtered.questions[0].tags.includes('strategy'), true);
+});
+
+test('Telegram agent can recommend and auto-apply question importance votes with research metadata', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-votes/recommend', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        autoApply: true,
+        preferences: {
+          interests: ['funding'],
+        },
+        agent: {
+          id: 'hermes-1',
+          name: 'Hermes',
+          model: 'fixture-model',
+        },
+        metadata: {
+          runId: 'run-123',
+          source: 'openclaw',
+          apiKey: 'should-not-be-stored',
+        },
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const voteRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:mini-app-question-vote:v1:alpha:'))
+    .map(([, value]) => JSON.parse(value));
+  const decisionRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:agent-question-vote-decision:v1:alpha:'))
+    .map(([, value]) => JSON.parse(value));
+
+  assert.equal(response.status, 200);
+  assert.equal(body.metaQuestion.questionId, 'meta-question-importance');
+  assert.equal(body.settings.agentAutoApplyQuestionVotes, true);
+  assert.equal(body.recommendations[0].questionId, 'q-binary');
+  assert.equal(body.recommendations[0].suggestedVote, 'up');
+  assert.equal(body.autoApply.ok, true);
+  assert.equal(body.autoApply.appliedVotes.length, 1);
+  assert.equal(voteRecords.some((record) => (
+    record.questionId === 'q-binary' &&
+    record.vote === 'up' &&
+    record.source === 'agent_handoff' &&
+    record.agentMetadata.agentName === 'Hermes' &&
+    record.humanApproval.status === 'agent_auto_applied_pending_human_review' &&
+    record.humanApproval.humanReviewed === false
+  )), true);
+  assert.equal(decisionRecords.length, 1);
+  assert.equal(decisionRecords[0].actionMetadata.runId, 'run-123');
+  assert.equal(Object.hasOwn(decisionRecords[0].actionMetadata, 'apiKey'), false);
+});
+
+test('Telegram agent question vote apply records human overrides and respects auto-apply setting', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const applyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-votes/apply', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        approvalText: 'Approve q-binary as a downvote after review.',
+        recommendations: [{
+          questionId: 'q-binary',
+          suggestedVote: 'up',
+          reason: 'Matched funding.',
+          agentNote: 'Suggested upvote for funding relevance.',
+        }],
+        decisions: [{
+          questionId: 'q-binary',
+          suggestedVote: 'up',
+          finalVote: 'down',
+          approved: true,
+          humanNote: 'Not important for this user right now.',
+        }],
+      },
+    }),
+    env,
+  });
+  const applied = await jsonBody(applyResponse);
+  const voteRecord = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:mini-app-question-vote:v1:alpha:'))
+    .map(([, value]) => JSON.parse(value))
+    .find((record) => record.questionId === 'q-binary');
+
+  assert.equal(applyResponse.status, 200);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.appliedVotes[0].vote, 'down');
+  assert.equal(applied.decisions[0].overridden, true);
+  assert.equal(voteRecord.vote, 'down');
+  assert.equal(voteRecord.humanApproval.status, 'human_approved');
+  assert.equal(voteRecord.humanApproval.overridden, true);
+
+  const saved = await saveTelegramAgentSettingsPatch({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    patch: { agentAutoApplyQuestionVotes: false },
+    createdAt: '2026-05-08T12:05:00.000Z',
+  });
+  assert.equal(saved.ok, true);
+
+  const disabledResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/question-votes/recommend', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        autoApply: true,
+        preferences: { interests: ['funding'] },
+      },
+    }),
+    env,
+  });
+  const disabled = await jsonBody(disabledResponse);
+
+  assert.equal(disabledResponse.status, 200);
+  assert.equal(disabled.settings.agentAutoApplyQuestionVotes, false);
+  assert.equal(disabled.autoApply.ok, false);
+  assert.equal(disabled.autoApply.reason, 'agent_question_vote_auto_apply_disabled');
 });
 
 test('Telegram agent can create and dry-run pose a new group question', async () => {

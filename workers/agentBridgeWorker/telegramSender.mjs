@@ -312,4 +312,45 @@ export async function answerTelegramCallbackQuery({
   });
 }
 
+export async function sendTelegramChatAction({
+  botToken = '',
+  chatId = '',
+  action = 'typing',
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
+} = {}) {
+  return telegramBotApiRequest({
+    botToken,
+    method: 'sendChatAction',
+    payload: {
+      chat_id: safeString(chatId),
+      action: safeString(action) || 'typing',
+    },
+    fetchImpl,
+    timeoutMs,
+  });
+}
+
+export async function setTelegramMessageReaction({
+  botToken = '',
+  chatId = '',
+  messageId = '',
+  emoji = '👀',
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_TELEGRAM_API_TIMEOUT_MS,
+} = {}) {
+  return telegramBotApiRequest({
+    botToken,
+    method: 'setMessageReaction',
+    payload: {
+      chat_id: safeString(chatId),
+      message_id: Number(messageId),
+      reaction: [{ type: 'emoji', emoji: safeString(emoji) || '👀' }],
+      is_big: false,
+    },
+    fetchImpl,
+    timeoutMs,
+  });
+}
+
 export { buildTelegramApiUrl, redactTelegramErrorText };
