@@ -374,10 +374,42 @@ describe('SurveyQuestions controls', () => {
       submissionComplete: true,
     };
     subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject._getEffectiveDraftSlug = jest.fn(() => {
+      throw new Error('standalone completed submits should not resolve a route slug');
+    });
     subject.encryptAndUpload = jest.fn();
 
     subject.handlePrimarySubmitClick();
 
+    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps completed submissions without an account inert before resolving route slugs', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xSurveyABC',
+      account: '',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+    };
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
+    subject._getEffectiveDraftSlug = jest.fn(() => {
+      throw new Error('missing-account completed submits should not resolve a route slug');
+    });
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
     expect(subject.encryptAndUpload).not.toHaveBeenCalled();
     expect(pushStateSpy).not.toHaveBeenCalled();
   });
