@@ -173,17 +173,12 @@ import {
 } from './userPageHelpers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCopy,
-  faCheck,
   faExpand,
   faSpinner,
   faExternalLinkAlt,
-  faBookmark,
   faChevronDown,
   faChevronUp,
-  faExclamationTriangle,
   faSync,
-  faPen
 } from '@fortawesome/free-solid-svg-icons';
 
 
@@ -195,6 +190,7 @@ import CETooltip from '../Shared/CETooltip';
 import UserPageDeepScanProgressPanel, {
   type UserPageDeepScanProgressPanelOptions,
 } from './UserPageDeepScanProgressPanel';
+import UserPageHeader from './UserPageHeader';
 
 // NEW IMPORT: for mini question display
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -4038,215 +4034,41 @@ class UserPage extends Component<any, any> {
 
     return (
       <div className={rootClassName}>
-        <div className={styles.header}>
-          <div className={styles.addressAndActionsContainer}>
-            <div className={styles.userInfo}>
-              <div className={styles.avatarContainer}>
-                {/* Use background-image on the existing avatar div to avoid structural changes */}
-                <div
-                  className={styles.avatar}
-                  style={avatarDisplayState.avatarStyle}
-                  aria-label="User avatar"
-                  role="img"
-                ></div>
-              </div>
-              <h1 id={styles.userPageAddress}>
-                {addressDisplay}
-                {/* Nickname Pen (for others) */}
-                {showPen && (
-                  <button
-                    onClick={this.onPenClick}
-                    className={styles.copyButton}
-                    aria-label="Edit nickname"
-                    title="Edit nickname"
-                  >
-                    <FontAwesomeIcon icon={faPen} />
-                  </button>
-                )}
-                {/* Username Pen (for self) */}
-                {showUsernamePen && (
-                  <button
-                    onClick={this.onUsernamePenClick}
-                    className={styles.copyButton}
-                    aria-label="Set username"
-                    title="Set username"
-                  >
-                    <FontAwesomeIcon icon={faPen} />
-                  </button>
-                )}
-                {headerActionVisibility.showSimulatedBadge && (
-                  <span className={styles.simulatedBadge} id="simulatedUserTooltip">
-                    <FontAwesomeIcon icon={faExclamationTriangle} />
-                  </span>
-                )}
-                {headerActionVisibility.showSimulatedBadge && (
-                  <CETooltip placement="right" target="simulatedUserTooltip">
-                    This is a simulated user whose answers are generated based on documents.
-                  </CETooltip>
-                )}
-                {headerActionVisibility.showCopyAddressButton && (
-                  <button onClick={this.copyToClipboard} className={styles.copyButton}>
-                    <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
-                    <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
-                  </button>
-                )}
-                {headerActionVisibility.showExplorerLink && (
-                  <a
-                    href={explorerUrl || undefined}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.expandButton}
-                    aria-label="View address on explorer"
-                    title="View address on explorer"
-                  >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </a>
-                )}
-
-                {/* NEW: Bookmark Icon Logic */}
-                {headerActionVisibility.showBookmarkButton && (
-                  <button
-                    onClick={this.toggleBookmark}
-                    className={headerBookmarkClassName}
-                    style={bookmarkButtonDisplayState.iconStyle}
-                    aria-label={bookmarkButtonDisplayState.ariaLabel}
-                    title={bookmarkButtonDisplayState.title}
-                  >
-                    <FontAwesomeIcon icon={faBookmark} />
-                  </button>
-                )}
-              </h1>
-
-              {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
-              {headerActionVisibility.showBookmarksLink && (
-                <a
-                  href={buildPublicRoute('/bookmarks')}
-                  className={bookmarksLinkDisplayState.className}
-                  style={bookmarksLinkDisplayState.style}
-                >
-                  My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
-                </a>
-              )}
-
-              {/* RELOCATED: Inline nickname field — shown only when editing */}
-              {headerActionVisibility.showNicknameEditor && (
-                <div className={styles.usernameInline}>
-                  <input
-                    type="text"
-                    value={this.state.nicknameInput || ''}
-                    onChange={this.handleNicknameChange}
-                    onBlur={this.saveNickname}
-                    onKeyDown={this.handleNicknameKeyDown}
-                    placeholder="set nickname"
-                    aria-label="Set nickname"
-                    // BUG FIX: Removed el.select() from render cycle.
-                    // Focus/select is handled once in onPenClick.
-                    ref={(el: HTMLInputElement | null) => { if (el && this.state.isEditingNickname) { /* just render ref */ } }}
-                    autoFocus
-                  />
-                  {nicknameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
-                    <button
-                      type="button"
-                      className={styles.usernameCheck}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      title="Nickname entered"
-                      disabled
-                    >
-                      <FontAwesomeIcon icon={faCheck} />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* NEW: Inline username field (for self) — mirroring nickname logic */}
-              {isOwner && this.state.isEditingUsername && (
-                <div className={styles.usernameInline}>
-                  <input
-                    type="text"
-                    value={this.state.username}
-                    onChange={this.handleUsernameChange}
-                    onBlur={this.setUsername}
-                    onKeyDown={this.handleUsernameKeyDown}
-                    placeholder="set username"
-                    aria-label="Set username"
-                    autoFocus
-                  />
-                  {usernameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
-                    <button
-                      type="button"
-                      className={styles.usernameCheck}
-                      tabIndex={-1}
-                      aria-hidden="true"
-                      title="Username entered"
-                      disabled
-                    >
-                      <FontAwesomeIcon icon={faCheck} />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {!minimized && (
-              <div className={styles.headerActionsRight}>
-                {/* Nickname input moved to .userInfo above */}
-                {/* Username input moved to .userInfo above */}
-                {/* Bookmarks link moved to .userInfo above */}
-
-                {usernameErrorDisplayState.shouldRenderUsernameError && (
-                  <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
-                )}
-
-                {/* Compare (gated until all caches are ready) */}
-                <button
-                  onClick={this.toggleCollapse}
-                  className={styles.collapseButton}
-                  disabled={compareButtonDisplayState.disabled}
-                  title={compareButtonDisplayState.title}
-                >
-                  Compare{' '}
-                  {compareButtonDisplayState.shouldRenderCollapseOpenIcon && (
-                    <FontAwesomeIcon icon={faChevronUp} />
-                  )}
-                  {compareButtonDisplayState.shouldRenderCollapseClosedIcon && (
-                    <FontAwesomeIcon icon={faChevronDown} />
-                  )}
-                </button>
-
-                {/* Analyze (gated + shows spinner while running) */}
-                <button
-                  onClick={this.analyzeUser}
-                  className={styles.analyzeButton}
-                  disabled={analyzeButtonDisplayState.disabled}
-                  aria-busy={analyzeButtonDisplayState.ariaBusy}
-                  title={analyzeButtonDisplayState.title}
-                >
-                  {analyzeButtonDisplayState.shouldRenderAnalyzing ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin />&nbsp;{analyzeButtonDisplayState.label}
-                    </>
-                  ) : (
-                    analyzeButtonDisplayState.label
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* In minimized view, keep header actions WITHOUT nickname/username input */}
-            {minimized && (
-              <div className={styles.headerActionsRight}>
-                 {/* Empty for now, but keeping container for layout stability if needed */}
-                 {usernameErrorDisplayState.shouldRenderUsernameError && (
-                   <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
-                 )}
-              </div>
-            )}
-          </div>
-
-          {/* (Old) separate username bar removed; now integrated above */}
-
-        </div>
+        <UserPageHeader
+          addressDisplay={addressDisplay}
+          analyzeButtonDisplayState={analyzeButtonDisplayState}
+          avatarDisplayState={avatarDisplayState}
+          bookmarkButtonDisplayState={bookmarkButtonDisplayState}
+          bookmarksHref={buildPublicRoute('/bookmarks')}
+          bookmarksLinkDisplayState={bookmarksLinkDisplayState}
+          compareButtonDisplayState={compareButtonDisplayState}
+          copyIconDisplayState={copyIconDisplayState}
+          explorerUrl={explorerUrl}
+          headerActionVisibility={headerActionVisibility}
+          headerBookmarkClassName={headerBookmarkClassName}
+          isEditingUsername={this.state.isEditingUsername}
+          isOwner={isOwner}
+          minimized={minimized}
+          nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
+          nicknameInput={this.state.nicknameInput || ''}
+          onAnalyzeUser={this.analyzeUser}
+          onBookmark={this.toggleBookmark}
+          onCollapseToggle={this.toggleCollapse}
+          onCopyAddress={this.copyToClipboard}
+          onNicknameBlur={this.saveNickname}
+          onNicknameChange={this.handleNicknameChange}
+          onNicknameEdit={this.onPenClick}
+          onNicknameKeyDown={this.handleNicknameKeyDown}
+          onUsernameBlur={this.setUsername}
+          onUsernameChange={this.handleUsernameChange}
+          onUsernameEdit={this.onUsernamePenClick}
+          onUsernameKeyDown={this.handleUsernameKeyDown}
+          showPen={showPen}
+          showUsernamePen={showUsernamePen}
+          username={this.state.username}
+          usernameEnteredIndicatorDisplayState={usernameEnteredIndicatorDisplayState}
+          usernameErrorDisplayState={usernameErrorDisplayState}
+        />
 
         {/* Compare section collapses right under header */}
         {!minimized && (
