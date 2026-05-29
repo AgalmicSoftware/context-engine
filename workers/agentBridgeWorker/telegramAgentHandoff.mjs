@@ -20,6 +20,7 @@ import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import { validateTelegramMiniAppInitData } from './telegramMiniApp.mjs';
 import {
   inferQuestionTags,
+  normalizeQuestionReferences,
   normalizeQuestionTags,
   persistTelegramProposedQuestion,
   sessionContextFromPolicySession,
@@ -414,7 +415,7 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/preferences') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
-  if (pathname === '/telegram/agent/api/questions/pose') {
+  if (pathname === '/telegram/agent/api/questions/pose' || pathname === '/telegram/agent/api/questions/create') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.POSE_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/groups' && methodName === 'GET') {
@@ -777,6 +778,7 @@ function publicAgentQuestion(question = {}, {
     : safeString(question.questionText || question.prompt || question.title);
   const questionType = safeString(question.questionType || question.type || 'freeform') || 'freeform';
   const options = Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [];
+  const references = locked || unavailable ? [] : normalizeQuestionReferences(question.references);
   const tags = locked || unavailable
     ? []
     : inferQuestionTags({
@@ -799,6 +801,7 @@ function publicAgentQuestion(question = {}, {
     payloadUnavailable: unavailable,
     proposed: question.proposed === true,
     source: safeString(question.source),
+    references,
   };
 }
 
@@ -2558,6 +2561,125 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   });
 }
 
+function normalizeCreateQuestionBatch(input = {}) {
+  const questions = Array.isArray(input.questions)
+    ? input.questions
+    : (Array.isArray(input.questionDrafts) ? input.questionDrafts : []);
+  return questions.slice(0, 21).map((question) => (
+    question && typeof question === 'object' && !Array.isArray(question)
+      ? question
+      : { prompt: question }
+  ));
+}
+
+function normalizeSourceUrl(value = '') {
+  const text = safeString(value).slice(0, 2000);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function sourceTagForUrl(value = '') {
+  const url = normalizeSourceUrl(value);
+  if (!url) return '';
+  const hostname = safeString(new URL(url).hostname).replace(/^www\./i, '').toLowerCase();
+  return normalizeQuestionTags([`src:${hostname}`])[0] || '';
+}
+
+function referencesForCreatedQuestion(question = {}, batchSourceUrl = '') {
+  const explicit = normalizeQuestionReferences(question.references);
+  if (explicit.length) return explicit;
+  const sourceUrl = normalizeSourceUrl(question.sourceUrl || question.url || batchSourceUrl);
+  if (!sourceUrl) return [];
+  return normalizeQuestionReferences([{
+    type: 'url',
+    url: sourceUrl,
+    title: question.sourceTitle || question.title,
+  }]);
+}
+
+async function handleCreateQuestionsRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const batch = normalizeCreateQuestionBatch(input);
+  if (!batch.length) {
+    return json({ ok: false, reason: 'questions_create_batch_required' }, { status: 400 });
+  }
+  if (batch.length > 20) {
+    return json({ ok: false, reason: 'questions_create_batch_too_large', maxQuestions: 20 }, { status: 400 });
+  }
+  const batchSourceUrl = normalizeSourceUrl(input.sourceUrl || input.url || input.link);
+  if ((input.sourceUrl || input.url || input.link) && !batchSourceUrl) {
+    return json({ ok: false, reason: 'source_url_invalid' }, { status: 400 });
+  }
+  const created = [];
+  const skipped = [];
+  for (const question of batch) {
+    const prompt = safeString(question.prompt || question.questionText || question.text).replace(/\s+/g, ' ').slice(0, 1000);
+    if (!prompt) {
+      skipped.push({ prompt: '', reason: 'question_prompt_missing' });
+      continue;
+    }
+    const references = referencesForCreatedQuestion(question, batchSourceUrl);
+    const questionSourceUrl = references.find((reference) => reference.type === 'url')?.url || '';
+    const sourceTag = sourceTagForUrl(questionSourceUrl || batchSourceUrl);
+    const tags = normalizeQuestionTags([
+      ...(Array.isArray(question.tags) ? question.tags : normalizeQuestionTags(question.tags)),
+      ...(sourceTag ? [sourceTag] : []),
+    ]);
+    let saved = null;
+    try {
+      saved = await persistTelegramProposedQuestion({
+        env,
+        normalized: context.normalized,
+        sessionSlug: context.session.sessionSlug,
+        prompt,
+        questionType: question.questionType || question.type || 'binary',
+        options: question.options,
+        tags,
+        references,
+        sessionContext: question.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
+        metadata: {
+          source: 'agent_handoff',
+          authMode: safeString(context.authMode),
+          endpoint: '/telegram/agent/api/questions/create',
+          sourceUrl: questionSourceUrl || batchSourceUrl,
+        },
+        createdAt: input.createdAt || question.createdAt || null,
+      });
+    } catch (error) {
+      skipped.push({ prompt, reason: safeString(error?.message || error) || 'question_create_failed' });
+      continue;
+    }
+    if (!saved.ok) {
+      skipped.push({ prompt, reason: saved.reason || 'question_create_failed' });
+      continue;
+    }
+    created.push({
+      questionId: saved.questionId,
+      prompt: saved.record.prompt,
+      questionType: saved.record.questionType,
+      tags: saved.record.tags,
+      references: saved.record.references || [],
+    });
+  }
+  const payload = {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    created,
+    skipped,
+  };
+  assertNoSecretShape(payload, 'Telegram questions/create response must not serialize secrets.');
+  return json(payload);
+}
+
 async function handlePoseRequest({
   env = {},
   context = {},
@@ -2904,6 +3026,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/questions/create' && request.method === 'POST') {
+    return handleCreateQuestionsRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/questions/pose' && request.method === 'POST') {
     return handlePoseRequest({ env, context, input, fetchImpl });

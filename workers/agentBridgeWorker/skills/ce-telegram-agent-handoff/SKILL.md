@@ -362,6 +362,49 @@ With a `ceagt_` token, the worker scopes results to the token-bound Telegram use
 
 Use this endpoint before prompting the user so you can say what is already pending, what needs approval, and what the agent previously changed. Do not expose activity records in group chats unless the worker has already reduced them to counts.
 
+## Generate Questions From A URL
+
+When the user says "generate questions about <URL>" or similar, the agent
+fetches and summarizes the URL with its own tools. The worker does not fetch the
+URL. Draft about five candidate questions by default, show them to the user,
+and only create the approved questions.
+
+Before generating, pull the session's active tags and reuse existing tags where
+they fit:
+
+```http
+GET /telegram/agent/api/tags?sessionSlug=<slug>
+```
+
+After approval, create the questions as proposed questions:
+
+```http
+POST /telegram/agent/api/questions/create
+```
+
+Example body:
+
+```json
+{
+  "sessionSlug": "telegram-demo-4",
+  "sourceUrl": "https://example.org/source-note",
+  "questions": [
+    {
+      "prompt": "Should organizers publish a daily Agent Village recap?",
+      "questionType": "binary",
+      "tags": ["organizer-feedback"]
+    }
+  ]
+}
+```
+
+The worker validates and persists the approved questions, adds a host-derived
+`src:<host>` tag for navigation, and stores the URL as a structured
+`references` citation on each question. Created questions are proposed only; use
+the normal pose/surfacing flow later if the user wants them posted into a
+Telegram group. Never auto-create questions before the user approves the exact
+list.
+
 ## Read Aggregate Results
 
 Use this endpoint when the user asks what themes are emerging in the session or
@@ -768,5 +811,6 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   whether their installed skill is current.
 - Admin agents can read aggregate bridge metrics through
   `/telegram/agent/api/admin/metrics`.
-- Planned agent API coverage includes creating questions from
-  agent-summarized URLs and active-tag lookup for consistent tagging.
+- Agents can create approved batches of proposed questions from
+  agent-summarized URLs with durable `references` citations.
+- Planned agent API coverage includes active-tag lookup for consistent tagging.
