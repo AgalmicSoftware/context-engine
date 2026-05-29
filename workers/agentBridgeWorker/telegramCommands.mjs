@@ -143,6 +143,7 @@ const TELEGRAM_RESULTS_PAGE_SIZE = 3;
 const TELEGRAM_GENERATED_QUESTION_COUNT = 5;
 const TELEGRAM_GENERATED_QUESTION_MAX_COUNT = 20;
 const TELEGRAM_BUTTON_LABEL_MAX_BYTES = 64;
+const TELEGRAM_COPY_TEXT_MAX_BYTES = 256;
 const URL_QUESTION_SOURCE_MAX_CHARS = 24_000;
 const URL_QUESTION_SOURCE_MAX_BYTES = 1_000_000;
 const DEFAULT_LIVE_QUESTION_FALLBACK_TIMEOUT_MS = 2500;
@@ -421,7 +422,9 @@ function urlButton(label = '', url = '') {
 function copyTextButton(label = '', value = '') {
   const text = safeString(label);
   const copyText = safeString(value);
-  return text && copyText ? { text, copy_text: { text: copyText } } : null;
+  if (!text || !copyText) return null;
+  if (new TextEncoder().encode(copyText).length > TELEGRAM_COPY_TEXT_MAX_BYTES) return null;
+  return { text, copy_text: { text: copyText } };
 }
 
 function agentBridgePublicUrl(env = {}) {
@@ -442,25 +445,21 @@ function maskAgentToken(token = '') {
   return value.length > 11 ? `${value.slice(0, 6)}…${value.slice(-4)}` : `${value.slice(0, 6)}…`;
 }
 
-function buildAgentInstallInfo({
-  token = '',
-  sessionSlug = '',
-  workerUrl = '',
-  skillUrl = '',
-} = {}) {
-  return [
-    'Context Engine agent install info',
-    '',
-    `Worker: ${workerUrl}`,
-    `Skill: ${skillUrl}`,
-    `Session: ${sessionSlug}`,
-    '',
-    'Use this token as the Context Engine agent token:',
-    token,
-    '',
-    'Install/read the skill, then call the worker with Authorization: Bearer <token>.',
-    'Start by listing active questions, drafting responses for user review, and checking /telegram/agent/api/actions for pending suggestions.',
-  ].join('\n');
+function callbackMessageButtonTexts(message = {}) {
+  const keyboard = message?.reply_markup?.inline_keyboard;
+  if (!Array.isArray(keyboard)) return [];
+  return keyboard.flatMap((row) => (Array.isArray(row) ? row : []))
+    .map((button) => safeString(button?.text))
+    .filter(Boolean);
+}
+
+function callbackMessageLooksLikeAgentOnboarding(message = {}) {
+  const labels = callbackMessageButtonTexts(message);
+  return labels.some((label) => [
+    'Onboard Agent',
+    'Copy Agent Install Info',
+    'Copy Agent Token',
+  ].includes(label));
 }
 
 function telegramButtonLabel(value = '', fallback = 'Question') {
@@ -8468,7 +8467,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     : null;
   const agentTokenButton = agentTokenSession?.ok ? await makeCallbackButton({
     env,
-    label: 'Copy Agent Install Info',
+    label: 'Onboard Agent',
     action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
     lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     serverContextRef: { sessionSlug: agentTokenSession.session.sessionSlug },
@@ -8694,14 +8693,11 @@ async function buildAgentTokenResponse({
   }
   const workerUrl = agentBridgePublicUrl(env);
   const skillUrl = agentSkillUrl(env);
-  const installInfo = buildAgentInstallInfo({
-    token: issued.token,
-    sessionSlug: resolved.session.sessionSlug,
-    workerUrl,
-    skillUrl,
-  });
   const maskedToken = maskAgentToken(issued.token);
-  const copyToken = copyTextButton('Copy Agent Install Info', installInfo);
+  const copyToken = copyTextButton('Copy Agent Token', issued.token);
+  const copyWorkerUrl = copyTextButton('Copy Worker URL', workerUrl);
+  const copySkillUrl = copyTextButton('Copy Skill URL', skillUrl);
+  const copySessionSlug = copyTextButton('Copy Session Slug', resolved.session.sessionSlug);
   const accountButton = await makeCallbackButton({
     env,
     label: 'Back to Account',
@@ -8713,6 +8709,9 @@ async function buildAgentTokenResponse({
   });
   const rows = [];
   if (copyToken) rows.push([copyToken]);
+  if (copyWorkerUrl) rows.push([copyWorkerUrl]);
+  if (copySkillUrl) rows.push([copySkillUrl]);
+  if (copySessionSlug) rows.push([copySessionSlug]);
   rows.push([accountButton]);
   const bodyText = [
     'Agent install info',
@@ -8720,10 +8719,11 @@ async function buildAgentTokenResponse({
     `Token: ${maskedToken}`,
     `Expires: ${issued.record.expiresAt}`,
     '',
-    'Tap Copy Agent Install Info, then paste it into your trusted agent.',
+    'Tap Copy Agent Token, then paste it into your trusted agent when it asks for the Context Engine token.',
+    `Worker: ${workerUrl}`,
     `Skill: ${skillUrl}`,
     '',
-    'The copied text includes the full token and worker URL. The chat only shows the masked token.',
+    'The full token is only in the copy button payload. The chat shows the masked token.',
   ].join('\n');
   assertNoSecretShape({ bodyText }, 'Agent token response body must not expose secret-shaped values.');
   return reply({
@@ -9495,6 +9495,16 @@ async function buildCallbackResponse({
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
+    if (normalized.chat?.isPrivate && callbackMessageLooksLikeAgentOnboarding(message)) {
+      return attachCallbackQueryId(await buildAgentTokenResponse({
+        normalized,
+        command: 'callback:create_agent_token',
+        env,
+        method,
+        messageId,
+        createdAt,
+      }), callbackQueryId);
+    }
     return attachCallbackQueryId(errorReply({
       normalized,
       command: 'callback',
@@ -10227,6 +10237,17 @@ export async function dispatchTelegramCommandResponse({
       fetchImpl,
       timeoutMs,
     });
+    if (!sendResult?.ok) {
+      sendResult = await sendTelegramMessage({
+        botToken,
+        chatId: response.chatId,
+        text: response.text,
+        replyMarkup: response.replyMarkup,
+        parseMode: response.parseMode,
+        fetchImpl,
+        timeoutMs,
+      });
+    }
   } else if (response.method === 'sendPhoto' && response.photo) {
     const photoForTelegram = await materializeTelegramResultPhoto({
       env,
