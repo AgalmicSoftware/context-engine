@@ -104,7 +104,7 @@ continuing.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
-- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until May 30, 2026, then `ee-26-users`. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
+- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until `2026-05-30T00:00:00Z`, then `ee-26-users`. Operators can hide the test session after smoke testing with `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER`; agents should not rely on `ee-26-test` being visible. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
 
 Worked `ceagt_` token smoke test:
 

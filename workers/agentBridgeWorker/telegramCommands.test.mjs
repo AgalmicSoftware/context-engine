@@ -926,6 +926,70 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
   assert.equal(record.serverContextRef.sessionSlug, 'new-beta');
 });
 
+test('/sessions can use the Edge 2026 cutoff to hide the test session', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-29T01:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_NOW: '2026-05-30T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'ee-26-organizers',
+      defaultSessionSchedule: [
+        { sessionSlug: 'ee-26-organizers', until: '2026-05-30T00:00:00Z' },
+        { sessionSlug: 'ee-26-users', from: '2026-05-30T00:00:00Z' },
+      ],
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'ee-26-test',
+          sessionName: 'EE26 Test',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-29T00:00:00Z',
+        },
+        {
+          sessionSlug: 'ee-26-organizers',
+          sessionName: 'EE26 Organizers',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          createdAt: '2026-05-29T01:00:00Z',
+        },
+        {
+          sessionSlug: 'ee-26-users',
+          sessionName: 'EE26 Users',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          createdAt: '2026-05-29T02:00:00Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-30T00:00:01.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.equal(sessions.response.text.includes('EE26 Test'), false);
+  assert.match(sessions.response.text, /- ee-26-organizers \(EE26 Organizers\)/);
+  assert.match(sessions.response.text, /- ee-26-users \(EE26 Users\)/);
+  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'EE26 Organizers',
+    'EE26 Users',
+  ]);
+
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-30T00:00:02.000Z',
+  });
+  assert.equal(start.ok, true);
+  assert.match(start.response.text, /\/sessions - choose session/);
+});
+
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({

@@ -394,7 +394,14 @@ as a Cloudflare Worker plain-text var to hide older Telegram-only groups from
 `/start`, `/sessions`, and the Mini App picker. When that cutoff is active,
 policy entries need one of the normalized creation fields (`createdAt`,
 `sessionCreatedAt`, `groupCreatedAt`, `createdTimestamp`, or the timestamp
-aliases) or they are treated as older than the cutoff. Group session selection
+aliases) or they are treated as older than the cutoff. The Edge City 2026 demo
+policy should define `ee-26-test`, `ee-26-organizers`, and `ee-26-users` as
+Telegram-only sessions, with `defaultSessionSchedule` selecting
+`ee-26-organizers` until `2026-05-30T00:00:00Z` and `ee-26-users` from that
+instant onward. To remove `ee-26-test` after smoke testing, set
+`AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` to a timestamp after the test
+session's `createdAt` and before the public demo sessions' `createdAt`.
+Group session selection
 through
 `/sessions` or `/join <session>` persists the chat's selected session in
 `AGENT_ACTION_KV`, so later `/questions`, `/q <number>`, `/results`, and
