@@ -152,6 +152,7 @@ import {
   buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
 import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
+import { buildSurveyResultsQuestionSummaryDisplayPlan } from './surveyResultsQuestionSummaryStatusController';
 import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 import {
   runSurveyResultsBrowserDownload,
@@ -5081,7 +5082,10 @@ renderQuestionSummary = (
     networkQuestions = this.getNetworkQuestionsForCurrentContext();
   }
   const question = networkQuestions[lowerQId];
-  const questionPrompt = (question?.prompt || `Unknown question: ${questionId}`) as React.ReactNode;
+  const questionDisplay = buildSurveyResultsQuestionSummaryDisplayPlan({
+    question,
+    questionId,
+  });
   const displayResponses = (Array.isArray(responses) ? responses : []).map((row: SurveyResultsAggregateRow) => {
     const rowResponse = row?.response as SurveyResultsResponseRecord | null;
     const key = this.getLockedResponseKey({
@@ -5109,11 +5113,11 @@ return (
     bookmarkIconStyle={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
     domId={domId}
     isActive={!!isActive}
-    metadataMissing={!question}
+    metadataMissing={questionDisplay.metadataMissing}
     metadataMissingStyle={SURVEY_RESULTS_METADATA_MISSING_STYLE}
     onToggleBookmark={() => this.toggleQuestionBookmark(questionId)}
     onToggleSummary={() => this.toggleQuestionSummary(questionId)}
-    questionPrompt={questionPrompt}
+    questionPrompt={questionDisplay.questionPrompt as React.ReactNode}
     renderDefaultSummary={() => (
       <SingleQuestionResponse
         aggregatorResponseMode={true}
