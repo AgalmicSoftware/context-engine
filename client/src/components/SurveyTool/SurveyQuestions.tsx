@@ -477,6 +477,9 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import {
+  runSurveyQuestionsSubmitController,
+} from './surveyQuestionsSubmitController.js';
+import {
   buildActiveTagModalState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
@@ -6706,11 +6709,23 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
     if (plan.action === 'inert') return;
     if (plan.action === 'navigate') {
-      window.history.pushState({}, '', plan.path);
+      runSurveyQuestionsSubmitController({
+        plan,
+        ports: {
+          navigateToResponse: (path) => window.history.pushState({}, '', path),
+        },
+      });
       return;
     }
-    this._submitGuard = true;
-    this.encryptAndUpload();
+    runSurveyQuestionsSubmitController({
+      plan,
+      ports: {
+        dispatchSubmit: () => {
+          this._submitGuard = true;
+          this.encryptAndUpload();
+        },
+      },
+    });
   };
 
   getQuestionsJson = () => {
