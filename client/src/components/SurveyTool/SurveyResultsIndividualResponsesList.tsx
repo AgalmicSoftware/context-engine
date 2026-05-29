@@ -16,6 +16,7 @@ type SurveyResultsResponseListEntry = {
 
 type SurveyResultsIndividualResponsesListProps = {
   activeToggles?: Record<number, unknown>;
+  anonymizedResultsMode?: boolean;
   currentSurveyId?: string;
   effectiveSlug?: string;
   filterLoading?: boolean;
@@ -27,6 +28,7 @@ type SurveyResultsIndividualResponsesListProps = {
 
 const SurveyResultsIndividualResponsesList = ({
   activeToggles = {},
+  anonymizedResultsMode = false,
   currentSurveyId = '',
   effectiveSlug = '',
   filterLoading = false,
@@ -48,21 +50,29 @@ const SurveyResultsIndividualResponsesList = ({
               className={styleMap.responseHeader}
             >
               <span className={styleMap.responderAddress}>
-                <a
-                  href={`/u/${encodeURIComponent(response.responder)}`}
-                  className={styleMap.responderLink}
-                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
-                >
-                  {getShortenedAddress(response.responder, false)}
-                </a>
-                <a
-                  href={`/survey/${encodeURIComponent(currentSurveyId)}/${encodeURIComponent(response.responder)}${effectiveSlug ? `?session=${encodeURIComponent(effectiveSlug)}` : ''}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styleMap.externalLink}
-                >
-                  <FontAwesomeIcon icon={faExternalLinkAlt} />
-                </a>
+                {anonymizedResultsMode ? (
+                  <span className={styleMap.responderLink}>
+                    {getShortenedAddress(response.responder, false)}
+                  </span>
+                ) : (
+                  <>
+                    <a
+                      href={`/u/${encodeURIComponent(response.responder)}`}
+                      className={styleMap.responderLink}
+                      onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
+                    >
+                      {getShortenedAddress(response.responder, false)}
+                    </a>
+                    <a
+                      href={`/survey/${encodeURIComponent(currentSurveyId)}/${encodeURIComponent(response.responder)}${effectiveSlug ? `?session=${encodeURIComponent(effectiveSlug)}` : ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styleMap.externalLink}
+                    >
+                      <FontAwesomeIcon icon={faExternalLinkAlt} />
+                    </a>
+                  </>
+                )}
               </span>
               <FontAwesomeIcon
                 icon={openToggle ? faCaretUp : faCaretDown}

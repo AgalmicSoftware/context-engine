@@ -20,6 +20,7 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
+import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { buildPublicRoute, readSafeInternalReturnTo } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -37,6 +38,32 @@ type AtlasLayoutMode = 'orbital' | 'packed';
 type DebateVisualMode = 'circles' | 'atlas' | 'tree' | 'list';
 type VoteDirection = 'up' | 'down';
 type DemoModeProp = boolean | { tools?: unknown; [key: string]: unknown };
+const ETHEREUM_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/i;
+
+export const isAtlasAddressAuthor = (value: unknown): boolean => (
+  ETHEREUM_ADDRESS_RE.test(String(value || '').trim())
+);
+
+export const getAtlasAuthorAvatar = (username: string): string => {
+  const normalized = String(username || '').trim();
+  if (isAtlasAddressAuthor(normalized)) {
+    return generateBlockieDataUrl(normalized.toLowerCase(), 8, 4);
+  }
+  return getHistoricalFigureAvatarOrBlockie(normalized, {
+    preferBlockie: false,
+    fallbackSeed: normalized || 'atlas-comment-user',
+  });
+};
+
+export const getAtlasAuthorFallbackAvatar = (username: string): string => {
+  const normalized = String(username || '').trim();
+  if (isAtlasAddressAuthor(normalized)) {
+    return generateBlockieDataUrl(normalized.toLowerCase(), 8, 4);
+  }
+  return getHistoricalFigureBlockie(normalized, {
+    fallbackSeed: normalized || 'atlas-comment-user',
+  });
+};
 
 interface DebateVoteTotals {
   up?: number | string;
@@ -1873,18 +1900,11 @@ const Modal = ({
     setQuestionsOpen(false);
   }, [content?.id, hasDefaultArguments]);
 
-  const getUserAvatar = (username: string) => (
-    getHistoricalFigureAvatarOrBlockie(username, {
-      preferBlockie: false,
-      fallbackSeed: username || 'atlas-comment-user',
-    })
-  );
+  const getUserAvatar = (username: string) => getAtlasAuthorAvatar(username);
   const handleUserAvatarError = (event: React.SyntheticEvent<HTMLImageElement>, username: string) => {
     const target = event?.currentTarget;
     if (!target) return;
-    const fallbackSrc = getHistoricalFigureBlockie(username, {
-      fallbackSeed: username || 'atlas-comment-user',
-    });
+    const fallbackSrc = getAtlasAuthorFallbackAvatar(username);
     if (!fallbackSrc || target.src === fallbackSrc) return;
     target.src = fallbackSrc;
   };

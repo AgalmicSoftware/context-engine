@@ -313,6 +313,7 @@ export {
 const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
+const TELEGRAM_DEMO_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/i;
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
 type MainSiteBlockWindow = Record<string, unknown> & {
   fromBlock: number;
@@ -396,6 +397,17 @@ const SurveyPage = SurveyPageRaw as unknown as MainSiteRouteComponent;
 const SurveyTool = SurveyToolRaw as unknown as MainSiteRouteComponent;
 const TagPage = TagPageRaw as unknown as MainSiteRouteComponent;
 const UserPage = UserPageRaw as unknown as MainSiteRouteComponent;
+
+const isTelegramOnlySessionConfig = (cfg: MainSiteSessionConfigLike | null | undefined): boolean => {
+  if (!cfg || typeof cfg !== 'object') return false;
+  const mode = String(cfg.sessionMode || '').trim().toLowerCase();
+  return cfg.telegramOnly === true || mode === 'telegram_only';
+};
+
+const normalizeProfileAddress = (value: unknown): string => {
+  const normalized = String(value || '').trim();
+  return TELEGRAM_DEMO_ADDRESS_RE.test(normalized) ? normalized.toLowerCase() : '';
+};
 
 interface RouteRenderCtx {
   fullPath: string;
@@ -5380,13 +5392,20 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   };
 
   _renderUserProfileRoute = (ctx: RouteRenderCtx) => {
-    const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
+    const { fullPath, defaultSlug, defaultSessionCfg, defaultSessionNetwork } = ctx;
     const profilePath = fullPath;
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const profileSearchParams = new URLSearchParams(profileSearchStr);
 
     const viewAddress = profilePath.slice(1).replace("u/", "");
+    const normalizedViewAddress = normalizeProfileAddress(viewAddress);
+    const normalizedConnectedAddress = normalizeProfileAddress(this.props.account || this.props.address || '');
+    const isOwnProfile = !!normalizedViewAddress && normalizedViewAddress === normalizedConnectedAddress;
     const defaultTab = profileSearchParams.get('tab');
+
+    if (isTelegramOnlySessionConfig(defaultSessionCfg) && !isOwnProfile) {
+      return <NotFoundRoute path={fullPath} />;
+    }
 
     return (
       <Suspense fallback={<LazyFallback label="Loading Profile..." />}>

@@ -22,6 +22,7 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
+const mockUserPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
@@ -52,6 +53,19 @@ jest.mock('../MainContent/MainAreaTabs', () => () => null);
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
 jest.mock('../UserPage/SimUserPage', () => () => null);
+jest.mock('../UserPage/UserPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockUserPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-user-page',
+        'data-view-address': String(props.viewAddress || ''),
+      });
+    },
+  };
+});
 jest.mock('../Shared/LazyFallback', () => () => null);
 jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
@@ -814,6 +828,47 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-tag-page')).toHaveAttribute('data-path', '/tag/governance+ai');
     expect(screen.getByTestId('mock-tag-page')).toHaveAttribute('data-active-session-slug', 'edge');
     expect(screen.getByTestId('mock-tag-page')).toHaveAttribute('data-network-id', '84532');
+  });
+
+  it('blocks foreign user pages for telegram-only demo sessions', async () => {
+    const sessionConfig = buildSessionConfig({
+      slug: 'edge',
+      telegramOnly: true,
+      sessionMode: 'telegram_only',
+    });
+    const subject = createSubject({
+      path: '/u/0x00000000000000000000000000000000000000f0',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(mockUserPage).not.toHaveBeenCalled();
+  });
+
+  it('allows own user page for telegram-only demo sessions', async () => {
+    const ownAddress = '0x00000000000000000000000000000000000000f0';
+    const sessionConfig = buildSessionConfig({
+      slug: 'edge',
+      telegramOnly: true,
+      sessionMode: 'telegram_only',
+    });
+    const subject = createSubject({
+      path: `/u/${ownAddress}`,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    subject.props = {
+      ...subject.props,
+      account: ownAddress.toUpperCase(),
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-view-address', ownAddress);
+    expect(screen.queryByRole('heading', { name: /page not found/i })).not.toBeInTheDocument();
   });
 
   it('renders a clean 404 for unsupported routes without waiting for cache bootstrap', async () => {

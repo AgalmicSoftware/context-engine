@@ -540,6 +540,11 @@ const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
 const normalizeSurveyResultsAddress = (value: unknown): string => (
   String(value || '').trim().toLowerCase()
 );
+const isTelegramOnlySurveyResultsSessionConfig = (value: unknown): boolean => {
+  const cfg = toSurveyResultsRecord(value);
+  const mode = String(cfg.sessionMode || '').trim().toLowerCase();
+  return cfg.telegramOnly === true || mode === 'telegram_only';
+};
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
@@ -1316,6 +1321,15 @@ class SurveyResults extends Component<any, any> {
     const registry = toSurveyResultsRecord(sessionConfig.__registry);
     const adminAddress = normalizeSurveyResultsAddress(registry.adminAddress || sessionConfig.adminAddress);
     return !!adminAddress && adminAddress === accountLower;
+  }
+
+  isAnonymizedResultsMode() {
+    if (this.props.demoMode === true) return true;
+    const resolvedSession = this.getEffectiveSessionContext();
+    const sessionConfig = Object.keys(toSurveyResultsRecord(resolvedSession.sessionConfig)).length
+      ? toSurveyResultsRecord(resolvedSession.sessionConfig)
+      : toSurveyResultsRecord(this.props.sessionConfig);
+    return isTelegramOnlySurveyResultsSessionConfig(sessionConfig);
   }
 
   resolveBaseQuestionReadScopeContextFor({
@@ -4821,6 +4835,7 @@ return (
       {viewMode === 'survey' && surveyViewMode === 'individuals' && (
         <SurveyResultsIndividualResponsesList
           activeToggles={this.state.activeToggles}
+          anonymizedResultsMode={this.isAnonymizedResultsMode()}
           currentSurveyId={currentSurveyId}
           effectiveSlug={this.getEffectiveSlug()}
           filterLoading={filterLoading}

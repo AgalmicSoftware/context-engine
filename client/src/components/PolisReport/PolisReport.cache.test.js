@@ -811,6 +811,45 @@ describe('PolisReport demo data defaults', () => {
     expect(Math.abs(Number(statementCircle.getAttribute('cx') || 0))).toBeLessThanOrEqual(210);
   });
 
+  it('renders participant addresses as non-clickable in one-page demo mode', () => {
+    computePolisConversationMath.mockReturnValue({
+      stats: {
+        nParticipants: 1,
+        nComments: 1,
+        totalVotes: 1,
+        votesPerVoterAvg: 1,
+      },
+      participantCoords: [{ x: 0, y: 0, index: 0 }],
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0],
+      clusterCount: 1,
+      repQuestions: {},
+    });
+
+    const responder = '0x00000000000000000000000000000000000000f0';
+    render(
+      <PolisReport
+        {...baseReportProps}
+        onePageDemo={true}
+        questionResponses={{
+          q1: [{
+            responder,
+            questionId: 'q1',
+            response: JSON.stringify({
+              type: 'binary',
+              prompt: 'Demo prompt',
+              answer: { value: 'Agree', encrypted: false },
+            }),
+          }],
+        }}
+      />
+    );
+
+    expect(screen.getAllByText(responder).length).toBeGreaterThan(0);
+    expect(document.querySelector(`a[href="/u/${responder}"]`)).toBeNull();
+  });
+
   it('does not show the empty-state fallback when built-in demo data is available', () => {
     computePolisConversationMath.mockReturnValue({
       stats: {

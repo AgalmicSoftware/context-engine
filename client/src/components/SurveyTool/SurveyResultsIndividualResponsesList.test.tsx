@@ -66,6 +66,28 @@ describe('SurveyResultsIndividualResponsesList', () => {
     expect(onToggleResponse).toHaveBeenCalledWith(0);
   });
 
+  it('renders responder addresses without links in anonymized mode', () => {
+    const onToggleResponse = jest.fn();
+    render(
+      <SurveyResultsIndividualResponsesList
+        anonymizedResultsMode
+        currentSurveyId="survey-id"
+        effectiveSlug="alpha"
+        filterLoading={false}
+        onToggleResponse={onToggleResponse}
+        renderResponseBody={jest.fn()}
+        responses={[{ responder: '0xabc123/def456' }]}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(screen.getByText('0xabc...')).toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('0xabc...').closest('.responseHeader') as HTMLElement);
+    expect(onToggleResponse).toHaveBeenCalledWith(0);
+  });
+
   it('suppresses the empty copy while filters are loading', () => {
     render(
       <SurveyResultsIndividualResponsesList

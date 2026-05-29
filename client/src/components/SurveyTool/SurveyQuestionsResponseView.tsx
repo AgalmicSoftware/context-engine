@@ -5,6 +5,7 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 
 type SurveyQuestionsResponseViewProps = {
+  anonymizedResultsMode?: boolean;
   isLoadingResponse?: boolean;
   isOwnResponse?: unknown;
   noResponse?: boolean;
@@ -33,6 +34,7 @@ type SurveyQuestionsResponseViewProps = {
 };
 
 const SurveyQuestionsResponseView = ({
+  anonymizedResultsMode = false,
   isLoadingResponse = false,
   isOwnResponse,
   noResponse = false,
@@ -83,9 +85,15 @@ const SurveyQuestionsResponseView = ({
     <div className={responseViewClassName}>
       {viewedAddressRaw && (
         <h2 className={styles.viewAddressHeading}>
-          <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
-            {shortenedViewAddress}
-          </a>
+          {anonymizedResultsMode ? (
+            <span className={styles.viewAddressLink}>
+              {shortenedViewAddress}
+            </span>
+          ) : (
+            <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
+              {shortenedViewAddress}
+            </a>
+          )}
           <span className={styles.viewAddressHeadingSuffix}>Response:</span>
         </h2>
       )}

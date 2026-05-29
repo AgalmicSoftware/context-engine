@@ -6,6 +6,7 @@ import DebateMap, {
   AtlasView,
   buildHistoricalCaseBrief,
   buildHistoricalCompassPoints,
+  getAtlasAuthorAvatar,
   getCompactTreeNodeLabel,
   getPackedAtlasClickTarget,
   getPackedAtlasLabelFontSizePx,
@@ -21,6 +22,7 @@ import historicalFigureData from '../../variables/demo/historical_figures_tree_q
 import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getHistoricalFigureAvatarOrBlockie } from 'utilities/ui/historicalFigureAvatars.js';
+import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 
 jest.setTimeout(30000);
 
@@ -61,6 +63,9 @@ jest.mock('utilities/logging.js', () => ({
 jest.mock('utilities/ui/historicalFigureAvatars.js', () => ({
   getHistoricalFigureAvatarOrBlockie: jest.fn(() => 'avatar.png'),
 }));
+jest.mock('utilities/ui/blockieAvatars.js', () => ({
+  generateBlockieDataUrl: jest.fn(() => 'data:image/png;base64,address-blockie'),
+}));
 jest.mock('../../utilities/ui/notify.js', () => ({
   notify: {
     success: jest.fn(),
@@ -88,6 +93,7 @@ const getTreeSubtreeSpanAny = getTreeSubtreeSpan as any;
 const getTreeViewportFitHeightAny = getTreeViewportFitHeight as any;
 const getTreeViewportFitScaleAny = getTreeViewportFitScale as any;
 const mockedGetHistoricalFigureAvatarOrBlockie = getHistoricalFigureAvatarOrBlockie as jest.Mock;
+const mockedGenerateBlockieDataUrl = generateBlockieDataUrl as jest.Mock;
 const treeDataFixture = treeData as any[];
 const historicalFigureDataFixture = historicalFigureData as Record<string, any>;
 const loopholeHistoricalCasesFixture = loopholeHistoricalCases as any[];
@@ -253,6 +259,7 @@ describe('DebateMap', () => {
   afterEach(() => {
     mockNavigate.mockReset();
     mockedGetHistoricalFigureAvatarOrBlockie.mockClear();
+    mockedGenerateBlockieDataUrl.mockClear();
   });
 
   it('renders the standalone heading as Debate Map', () => {
@@ -850,6 +857,14 @@ describe('DebateMap', () => {
         })
       );
     });
+  });
+
+  it('uses blockie avatars for address authors', () => {
+    const address = '0x00000000000000000000000000000000000000f0';
+
+    expect(getAtlasAuthorAvatar(address)).toBe('data:image/png;base64,address-blockie');
+    expect(mockedGenerateBlockieDataUrl).toHaveBeenCalledWith(address.toLowerCase(), 8, 4);
+    expect(mockedGetHistoricalFigureAvatarOrBlockie).not.toHaveBeenCalled();
   });
 
   it('opens key arguments by default and keeps historical briefs collapsed on atlas node entry', async () => {

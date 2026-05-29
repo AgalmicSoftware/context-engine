@@ -85,6 +85,30 @@ describe('SurveyQuestionsResponseView', () => {
     expect(renderSurveyAnswers).not.toHaveBeenCalled();
   });
 
+  it('renders viewed addresses without profile links in anonymized mode', () => {
+    const question = { id: 'q1', prompt: 'Question?' };
+    const parsedViewAddressAnswers = { q1: 'viewed answer' };
+
+    render(
+      <SurveyQuestionsResponseView
+        anonymizedResultsMode
+        parsedViewAddressAnswers={parsedViewAddressAnswers}
+        questionPool={[question]}
+        questionPoolReady
+        renderQuestionAnswer={renderQuestionAnswer}
+        renderSurveyAnswers={renderSurveyAnswers}
+        shortenedViewAddress="0xabc...1234"
+        singleQuestionMode
+        viewedAddressLower="0xabc1234"
+        viewedAddressRaw="0xABC1234"
+      />
+    );
+
+    expect(screen.getByText('0xabc...1234')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '0xabc...1234' })).not.toBeInTheDocument();
+    expect(screen.getByText('Response:')).toBeInTheDocument();
+  });
+
   it('renders full-survey answers from own responses with the existing callback contract', () => {
     const responses = [{ questionID: 'q1', answer: 'yes' }];
 

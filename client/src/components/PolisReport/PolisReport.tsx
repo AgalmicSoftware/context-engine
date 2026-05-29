@@ -1252,6 +1252,7 @@ export default function PolisReport({
   const [allQuestions, setAllQuestions] = useState<string[]>([]);
   const [stats, setStats] = useState<PolisStats | null>(null);
   const [demoDisplayNames, setDemoDisplayNames] = useState<StringMap>({});
+  const anonymizedParticipantMode = !!(onePageDemo || demoMode);
 
   // Single SVD-based approach (statements + participants):
   const [participantCoords, setParticipantCoords] = useState<PolisPoint[]>([]);
@@ -2273,7 +2274,9 @@ export default function PolisReport({
             ? getPolisHistoricalParticipantAvatar(displayName, addr)
             : getBlockieFor(addr);
           const shortAddr = getShortenedAddress(addr, false) || addr;
-          const linkHref = displayName ? `/su/${displayName}` : (isEth ? `/u/${addr}` : '');
+          const linkHref = anonymizedParticipantMode
+            ? ''
+            : (displayName ? `/su/${displayName}` : (isEth ? `/u/${addr}` : ''));
           const label = displayName || addr;
           const shortLabel = displayName || shortAddr;
           return (
@@ -2889,7 +2892,7 @@ export default function PolisReport({
                 const addr = allResponders?.[d.index];
                 const isEth = typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/.test(addr);
                 const displayName = demoDisplayNames?.[addr];
-                const hasLink = isEth || !!displayName;
+                const hasLink = !isDemoLike && (isEth || !!displayName);
                 const linkHref = displayName ? `/su/${displayName}` : `/u/${addr}`;
                 const linkLabel = displayName || getShortenedAddress(addr, false);
                 const historicalAvatar = displayName
