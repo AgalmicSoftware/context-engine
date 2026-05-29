@@ -65,6 +65,25 @@ function normalizeDraftStyle(value = '') {
   return ['concise', 'balanced', 'detailed'].includes(draftStyle) ? draftStyle : 'balanced';
 }
 
+function parseQuestionBatchNumber(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const n = Math.floor(Number(value));
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeQuestionsPerBatch(value, fallback = 3) {
+  const n = parseQuestionBatchNumber(value);
+  if (n === null) return fallback;
+  return Math.min(10, Math.max(1, n));
+}
+
+function normalizeDigestFrequency(value = '') {
+  const frequency = lower(value);
+  return ['off', 'weekly', 'few_per_week', 'daily'].includes(frequency) ? frequency : 'weekly';
+}
+
 function normalizeStringList(value = []) {
   const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
   return source
@@ -126,6 +145,8 @@ export function defaultTelegramAgentSettings(env = {}) {
     draftDivergenceOptIn: normalizeBoolean(source.draftDivergenceOptIn, false),
     approvalMode: normalizeApprovalMode(source.approvalMode),
     dailyDigestOptIn: normalizeBoolean(source.dailyDigestOptIn, false),
+    questionsPerBatch: normalizeQuestionsPerBatch(source.questionsPerBatch, 3),
+    digestFrequency: normalizeDigestFrequency(source.digestFrequency),
     onboardingCompletedAt: normalizeIsoString(source.onboardingCompletedAt),
   };
   assertNoSecretShape(settings, 'Telegram agent settings defaults must not serialize secrets.');
@@ -180,6 +201,18 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
     if (normalized === null) return { ok: false, reason: 'daily_digest_opt_in_invalid' };
     patch.dailyDigestOptIn = normalized;
   }
+  if (Object.hasOwn(input, 'questionsPerBatch')) {
+    const parsed = parseQuestionBatchNumber(input.questionsPerBatch);
+    if (parsed === null) return { ok: false, reason: 'questions_per_batch_invalid' };
+    patch.questionsPerBatch = Math.min(10, Math.max(1, parsed));
+  }
+  if (Object.hasOwn(input, 'digestFrequency')) {
+    const digestFrequency = lower(input.digestFrequency);
+    if (!['off', 'weekly', 'few_per_week', 'daily'].includes(digestFrequency)) {
+      return { ok: false, reason: 'digest_frequency_invalid' };
+    }
+    patch.digestFrequency = digestFrequency;
+  }
   if (Object.hasOwn(input, 'onboardingCompletedAt')) {
     patch.onboardingCompletedAt = normalizeIsoString(input.onboardingCompletedAt);
   }
@@ -221,6 +254,8 @@ export async function loadTelegramAgentSettings({
     draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, defaults.draftDivergenceOptIn),
     approvalMode: normalizeApprovalMode(settings.approvalMode || defaults.approvalMode),
     dailyDigestOptIn: normalizeBoolean(settings.dailyDigestOptIn, defaults.dailyDigestOptIn),
+    questionsPerBatch: normalizeQuestionsPerBatch(settings.questionsPerBatch, defaults.questionsPerBatch),
+    digestFrequency: normalizeDigestFrequency(settings.digestFrequency || defaults.digestFrequency),
     onboardingCompletedAt: normalizeIsoString(settings.onboardingCompletedAt || defaults.onboardingCompletedAt),
   };
 }
@@ -266,6 +301,8 @@ export async function saveTelegramAgentSettingsPatch({
 export const __test__telegramAgentSettings = {
   TELEGRAM_AGENT_SETTINGS_KV_PREFIX,
   defaultTelegramAgentSettings,
+  normalizeDigestFrequency,
+  normalizeQuestionsPerBatch,
   normalizeTelegramAgentSettingsPatch,
   telegramAgentSettingsKey,
 };

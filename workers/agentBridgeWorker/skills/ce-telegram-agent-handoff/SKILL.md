@@ -606,6 +606,24 @@ CE does not schedule recurring Telegram prompts for the user. Keep reminder
 cadence in the OpenClaw or host-agent layer, where the agent can respect the
 user's requested frequency and quiet hours.
 
+Store the user's preferred volume and cadence through the same onboarding/settings
+flow used for `draftStyle`, `topicPreferences`, and digest consent. The worker
+stores these values but does not schedule delivery; the host agent must respect
+`questionsPerBatch` when choosing how many questions to fetch and
+`digestFrequency` when deciding digest cadence and quiet hours.
+
+```json
+{
+  "questionsPerBatch": 3,
+  "digestFrequency": "weekly"
+}
+```
+
+`questionsPerBatch` is clamped from 1 to 10. `digestFrequency` is one of `off`,
+`weekly`, `few_per_week`, or `daily`. `dailyDigestOptIn` remains the simple
+Edge daily digest consent flag; `digestFrequency` is the finer-grained cadence
+preference for the host agent.
+
 When the user has elected to see one question every so often, prefer the
 next-question queue endpoint:
 

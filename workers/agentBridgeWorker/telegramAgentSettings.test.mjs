@@ -1,0 +1,77 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  loadTelegramAgentSettings,
+  telegramAgentSettingsKey,
+  __test__telegramAgentSettings,
+} from './telegramAgentSettings.mjs';
+
+const {
+  defaultTelegramAgentSettings,
+  normalizeTelegramAgentSettingsPatch,
+} = __test__telegramAgentSettings;
+
+test('default Telegram agent settings include question cadence preferences', () => {
+  const defaults = defaultTelegramAgentSettings({});
+  assert.equal(defaults.questionsPerBatch, 3);
+  assert.equal(defaults.digestFrequency, 'weekly');
+});
+
+test('settings patch accepts and clamps questionsPerBatch', () => {
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ questionsPerBatch: 7 }), {
+    ok: true,
+    patch: { questionsPerBatch: 7 },
+    publicSummary: { questionsPerBatch: 7 },
+  });
+  assert.equal(normalizeTelegramAgentSettingsPatch({ questionsPerBatch: 99 }).patch.questionsPerBatch, 10);
+  assert.equal(normalizeTelegramAgentSettingsPatch({ questionsPerBatch: 0 }).patch.questionsPerBatch, 1);
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ questionsPerBatch: 'abc' }), {
+    ok: false,
+    reason: 'questions_per_batch_invalid',
+  });
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ questionsPerBatch: false }), {
+    ok: false,
+    reason: 'questions_per_batch_invalid',
+  });
+});
+
+test('settings patch validates digestFrequency', () => {
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ digestFrequency: 'daily' }), {
+    ok: true,
+    patch: { digestFrequency: 'daily' },
+    publicSummary: { digestFrequency: 'daily' },
+  });
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ digestFrequency: 'hourly' }), {
+    ok: false,
+    reason: 'digest_frequency_invalid',
+  });
+});
+
+test('loadTelegramAgentSettings returns stored question cadence preferences', async () => {
+  const sessionSlug = 'ee-26-organizers';
+  const telegramUserId = '42';
+  const key = telegramAgentSettingsKey({ sessionSlug, telegramUserId });
+  const stored = {
+    type: 'telegram_agent_settings',
+    version: 1,
+    sessionSlug,
+    telegramUserId,
+    settings: {
+      questionsPerBatch: 6,
+      digestFrequency: 'few_per_week',
+    },
+  };
+  const env = {
+    AGENT_ACTION_KV: {
+      async get(requestedKey) {
+        assert.equal(requestedKey, key);
+        return JSON.stringify(stored);
+      },
+    },
+  };
+
+  const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  assert.equal(settings.questionsPerBatch, 6);
+  assert.equal(settings.digestFrequency, 'few_per_week');
+});
