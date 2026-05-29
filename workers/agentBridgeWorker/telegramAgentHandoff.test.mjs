@@ -3127,6 +3127,57 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal((await jsonBody(oversizedResponse)).reason, 'questions_create_batch_too_large');
 });
 
+test('Telegram agent preserves explicit question tags without session tag inference', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Agent Village Research',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        sessionContext: 'Agent Village governance funding safety research with organizers.',
+      }],
+    }),
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/create', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        questions: [{
+          prompt: 'Should safety reviewers intervene immediately?',
+          questionType: 'binary',
+          tags: ['ethics', 'safety', 'methodology'],
+        }],
+      },
+    }),
+    env,
+  });
+  const created = await jsonBody(response);
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
+    env,
+  });
+  const listed = await jsonBody(questionsResponse);
+  const question = listed.questions.find((entry) => entry.questionId === created.created[0].questionId);
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(created.created[0].tags, ['ethics', 'safety', 'methodology']);
+  assert.deepEqual(question.tags, ['ethics', 'safety', 'methodology']);
+});
+
 test('Telegram agent geo backlinks handle bytes32 question ids without secret false positives', async () => {
   const questionId = `0x${'a'.repeat(64)}`;
   const env = baseEnv({

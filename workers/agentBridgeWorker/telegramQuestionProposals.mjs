@@ -416,16 +416,18 @@ export async function persistTelegramProposedQuestion({
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
-  const normalizedTags = inferQuestionTags({
-    prompt: promptText,
-    questionType: type,
-    options: normalizedOptions,
-    explicitTags: [
-      ...geoTagsFromRefs(normalizedGeoRefs),
-      ...(Array.isArray(tags) ? tags : normalizeQuestionTags(tags)),
-    ],
-    sessionContext: normalizedSessionContext,
-  });
+  const explicitTagList = normalizeQuestionTags([
+    ...geoTagsFromRefs(normalizedGeoRefs),
+    ...(Array.isArray(tags) ? tags : normalizeQuestionTags(tags)),
+  ]);
+  const normalizedTags = explicitTagList.length
+    ? explicitTagList
+    : inferQuestionTags({
+      prompt: promptText,
+      questionType: type,
+      options: normalizedOptions,
+      sessionContext: normalizedSessionContext,
+    });
   const prefix = proposedQuestionPrefix(slug);
   if (!slug) return { ok: false, reason: 'session_slug_missing' };
   if (!promptText) return { ok: false, reason: 'question_prompt_missing' };

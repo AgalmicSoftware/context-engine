@@ -995,15 +995,16 @@ async function miniQuestionFromRecord({
   const questionType = safeString(card.questionType || group.questionType || 'freeform');
   const prompt = locked || payloadUnavailable ? '' : safeString(card.questionText || group.questionText || 'Untitled question');
   const options = locked || payloadUnavailable ? [] : (Array.isArray(card.answerLabels) ? card.answerLabels : []);
+  const explicitTags = locked || payloadUnavailable ? [] : normalizeQuestionTags(question.tags);
   const tags = locked || payloadUnavailable
     ? []
-    : inferQuestionTags({
+    : (explicitTags.length ? explicitTags : inferQuestionTags({
       question,
       prompt,
       questionType,
       options,
       session,
-    });
+    }));
   const lockMessage = payloadUnavailable
     ? 'Question payload is not available yet. The app will keep retrying.'
     : encrypted
@@ -4492,14 +4493,16 @@ async function handleAddQuestionRequest({
   const options = questionType === 'multichoice' ? normalizeMiniAppQuestionOptions(body.options || body.choices) : [];
   const metadataSession = miniAppPolicySessionForContext(context);
   const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
-  const tags = inferQuestionTags({
-    prompt,
-    questionType,
-    options,
-    session: metadataSession,
-    explicitTags: body.tags,
-    sessionContext,
-  });
+  const explicitTags = normalizeQuestionTags(body.tags);
+  const tags = explicitTags.length
+    ? explicitTags
+    : inferQuestionTags({
+      prompt,
+      questionType,
+      options,
+      session: metadataSession,
+      sessionContext,
+    });
   if (!prompt) return json({ ok: false, error: 'question_prompt_required' }, { status: 400 });
   if (questionType === 'multichoice' && options.length < 2) {
     return json({ ok: false, error: 'multichoice_options_required' }, { status: 400 });

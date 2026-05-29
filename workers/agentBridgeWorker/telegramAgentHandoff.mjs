@@ -1075,16 +1075,17 @@ function publicAgentQuestion(question = {}, {
   const geoRefs = locked || unavailable
     ? []
     : normalizeQuestionGeoRefs(question.geoRefs || question.geoIds || question.geoId);
+  const explicitTags = locked || unavailable ? [] : normalizeQuestionTags(question.tags);
   const tags = locked || unavailable
     ? []
-    : inferQuestionTags({
+    : (explicitTags.length ? explicitTags : inferQuestionTags({
       question,
       prompt,
       questionType,
       options,
       session,
       sessionContext: sessionContextFromPolicySession(session),
-    });
+    }));
   return {
     questionId,
     sessionSlug: sanitizeSessionSlug(question.sessionSlug),

@@ -3198,12 +3198,10 @@ test('Mini App add question endpoint persists Telegram-only proposed questions',
   assert.equal(body.ok, true);
   assert.equal(body.question.questionType, 'multichoice');
   assert.deepEqual(body.question.options, ['Pizza', 'Salad', 'Tacos']);
-  assert.equal(body.question.tags.includes('food-preference'), true);
-  assert.equal(body.question.tags.includes('edge-city'), true);
+  assert.deepEqual(body.question.tags, ['food-preference', 'edge-city']);
   const added = state.questions.find((question) => question.prompt === 'What should lunch be?');
   assert.equal(Boolean(added), true);
-  assert.equal(added.tags.includes('food-preference'), true);
-  assert.equal(added.tags.includes('edge-city'), true);
+  assert.deepEqual(added.tags, ['food-preference', 'edge-city']);
 });
 
 test('Mini App add question formatter uses session worker AI to shape dictation by question type', async () => {
