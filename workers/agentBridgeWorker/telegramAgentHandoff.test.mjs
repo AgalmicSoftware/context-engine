@@ -178,6 +178,30 @@ async function jsonBody(response) {
   return response.json();
 }
 
+async function putSubmittedResult(env, {
+  key = '',
+  sessionSlug = 'alpha',
+  telegramUserId = '42',
+  questionId = 'q-binary',
+  label = 'Agree',
+  value = '',
+  comments = '',
+  createdAt = '2026-05-08T12:00:00.000Z',
+} = {}) {
+  await env.AGENT_ACTION_KV.put(key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`, JSON.stringify({
+    status: 'direct_submitted',
+    sessionSlug,
+    telegramUserId,
+    questionId,
+    answer: {
+      label,
+      value: value || String(label).toLowerCase(),
+      comments,
+    },
+    createdAt,
+  }));
+}
+
 async function managedAccountAddressForTelegramUser(env, telegramUserId = '42') {
   const account = await deriveTelegramResponseExportAccount({
     env,
@@ -1278,6 +1302,171 @@ test('Telegram agent can read and render topic-map results without raw response 
   const imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
   assert.equal(imageResponse.status, 200);
   assert.equal(imageResponse.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(imageBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test('Telegram agent results exposes consensus and difference as aggregate-only JSON', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
+      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+    ]),
+  });
+
+  for (const view of ['consensus', 'difference']) {
+    const response = await handleTelegramAgentHandoffRequest({
+      request: agentRequest(`/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=${view}&demo=1`),
+      env,
+    });
+    const body = await jsonBody(response);
+    const serialized = JSON.stringify(body);
+
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.view, view);
+    assert.ok(Array.isArray(body.questions));
+    assert.ok(body.questions.length > 0);
+    assert.equal(serialized.includes('telegramUserId'), false);
+    assert.equal(serialized.includes('aliases'), false);
+    assert.equal(serialized.includes('qualitativeResponses'), false);
+    assert.equal(serialized.includes('raw private answer'), false);
+  }
+});
+
+test('Telegram agent groups JSON strips aliases and raw qualitative responses', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
+      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+    ]),
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=groups&demo=1'),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.view, 'groups');
+  assert.ok(Array.isArray(body.groups));
+  assert.ok(body.groups.length > 0);
+  assert.equal(typeof body.groupCount, 'number');
+  assert.equal(typeof body.suppressedGroupCount, 'number');
+  for (const group of body.groups) {
+    assert.equal(Object.hasOwn(group, 'aliases'), false);
+    assert.equal(Object.hasOwn(group, 'qualitativeResponses'), false);
+  }
+});
+
+test('Telegram agent groups suppress live groups below minGroupSize', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 3 },
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-one', questionType: 'binary', prompt: 'Should Alpha publish recaps?', tags: ['results'] },
+      { questionId: 'q-two', questionType: 'binary', prompt: 'Should Alpha ask more questions?', tags: ['results'] },
+    ]),
+  });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:1', telegramUserId: '42', questionId: 'q-one', label: 'Agree', comments: 'raw private answer one', createdAt: '2026-05-08T12:00:01.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:2', telegramUserId: '43', questionId: 'q-one', label: 'Agree', comments: 'raw private answer two', createdAt: '2026-05-08T12:00:02.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:3', telegramUserId: '42', questionId: 'q-two', label: 'Disagree', createdAt: '2026-05-08T12:00:03.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:4', telegramUserId: '43', questionId: 'q-two', label: 'Disagree', createdAt: '2026-05-08T12:00:04.000Z' });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=groups'),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.minGroupSize, 3);
+  assert.equal(body.groupCount, 0);
+  assert.ok(body.suppressedGroupCount >= 1);
+  assert.equal(JSON.stringify(body).includes('raw private answer'), false);
+});
+
+test('Telegram agent result views enforce exposure gates and supported view list', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        resultsExposure: {
+          aggregateResultsEnabled: false,
+          anonymizedGroupsEnabled: false,
+        },
+      }],
+    }),
+  });
+
+  const consensus = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=consensus'),
+    env,
+  });
+  assert.equal(consensus.status, 403);
+  assert.equal((await jsonBody(consensus)).reason, 'level_3_aggregate_results_admin_disabled');
+
+  const groups = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=groups'),
+    env,
+  });
+  assert.equal(groups.status, 403);
+  assert.equal((await jsonBody(groups)).reason, 'anonymized_groups_admin_disabled');
+
+  const unknown = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=geo-map'),
+    env,
+  });
+  const unknownBody = await jsonBody(unknown);
+  assert.equal(unknown.status, 400);
+  assert.equal(unknownBody.reason, 'unsupported_results_view');
+  assert.deepEqual(unknownBody.supportedViews, ['topic-map', 'consensus', 'difference', 'groups']);
+
+  const unsupportedImage = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results-image?sessionSlug=alpha&telegramUserId=42&view=difference'),
+    env,
+  });
+  const unsupportedImageBody = await jsonBody(unsupportedImage);
+  assert.equal(unsupportedImage.status, 400);
+  assert.equal(unsupportedImageBody.reason, 'unsupported_results_view');
+  assert.deepEqual(unsupportedImageBody.supportedViews, ['topic-map', 'consensus', 'groups']);
+});
+
+test('Telegram agent can render group results image with demo data', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
+      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+    ]),
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results-image?sessionSlug=alpha&telegramUserId=42&view=group&demo=1'),
+    env,
+  });
+  const imageBytes = new Uint8Array(await response.arrayBuffer());
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'image/png');
   assert.deepEqual(Array.from(imageBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 });
 

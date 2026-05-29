@@ -4,8 +4,10 @@ import {
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
 import {
+  buildParticipantGraph,
   buildTelegramCommandResponse,
   clearAdminDefaultSessionOverride,
+  consensusQuestionsForResults,
   loadQuestionsForSession,
   loadSessionPolicy,
   loadSubmittedResultRecords,
@@ -17,6 +19,7 @@ import {
   readGroupSessionBinding,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
+  summarizeQuestionResults,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -2994,6 +2997,155 @@ function aggregateResultsEnabledForAgent(session = {}) {
   return exposure.aggregateResultsEnabled !== false;
 }
 
+function anonymizedGroupsEnabledForAgent(session = {}) {
+  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+    ? session.resultsExposure
+    : {};
+  return exposure.anonymizedGroupsEnabled !== false;
+}
+
+function agentResultsMinGroupSize(session = {}) {
+  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+    ? session.resultsExposure
+    : {};
+  const n = Math.floor(Number(exposure.minGroupSize));
+  return Number.isFinite(n) && n >= 1 ? n : 2;
+}
+
+function normalizeAgentResultsView(value = '') {
+  const view = lower(value || 'topic-map');
+  if (['topic-map', 'topic', 'topic_map'].includes(view)) return 'topic-map';
+  if (['group', 'groups'].includes(view)) return 'groups';
+  if (view === 'consensus') return 'consensus';
+  if (view === 'difference') return 'difference';
+  return view;
+}
+
+const AGENT_RESULTS_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'difference', 'groups'];
+const AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'groups'];
+
+function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
+  const source = Array.isArray(groups) ? groups : [];
+  const kept = source.filter((group) => Number(group?.size) >= minGroupSize);
+  const safe = kept.map((group) => ({
+    groupId: safeString(group.groupId),
+    label: safeString(group.label),
+    theme: safeString(group.theme),
+    size: Number(group.size || 0),
+    averageScore: Number(group.averageScore || 0),
+    topStatements: Array.isArray(group.topStatements)
+      ? group.topStatements.map((statement) => ({
+        label: safeString(statement.label),
+        prompt: safeString(statement.prompt),
+        cluster: statement.cluster && typeof statement.cluster === 'object' && !Array.isArray(statement.cluster)
+          ? statement.cluster
+          : {},
+        overall: statement.overall && typeof statement.overall === 'object' && !Array.isArray(statement.overall)
+          ? statement.overall
+          : {},
+        differenceScore: Number(statement.differenceScore || 0),
+      }))
+      : [],
+  }));
+  return {
+    groups: safe,
+    suppressedGroupCount: source.length - kept.length,
+  };
+}
+
+function demoAgentResultsQuestions(questions = []) {
+  const source = Array.isArray(questions) && questions.length ? questions : [
+    { questionId: 'demo-q-1', questionType: 'binary', prompt: 'Should onboarding optimize for one-click agent setup?' },
+    { questionId: 'demo-q-2', questionType: 'binary', prompt: 'Should admins sponsor organizer-priority questions first?' },
+    { questionId: 'demo-q-3', questionType: 'binary', prompt: 'Should topic maps hide raw response text by default?' },
+    { questionId: 'demo-q-4', questionType: 'binary', prompt: 'Should agents draft answers from natural language context?' },
+  ];
+  return source.slice(0, 6).map((question, index) => ({
+    ...question,
+    questionId: safeString(question.questionId || question.id) || `demo-q-${index + 1}`,
+    questionType: safeString(question.questionType || question.type || question.controlType) || 'binary',
+    prompt: safeString(question.prompt || question.text || question.question) || `Demo question ${index + 1}`,
+  }));
+}
+
+function demoAgentResultsRecords(questions = []) {
+  const labels = [
+    ['Agree', 'Agree', 'Unsure', 'Disagree'],
+    ['Agree', 'Unsure', 'Disagree', 'Disagree'],
+    ['Unsure', 'Agree', 'Agree', 'Disagree'],
+    ['Disagree', 'Disagree', 'Unsure', 'Agree'],
+  ];
+  return demoAgentResultsQuestions(questions).flatMap((question, questionIndex) => (
+    Array.from({ length: 4 }, (_, participantIndex) => {
+      const label = labels[questionIndex % labels.length][participantIndex % 4];
+      return {
+        telegramUserId: `demo-user-${participantIndex + 1}`,
+        questionId: question.questionId,
+        label,
+        value: lower(label),
+        questionType: question.questionType,
+        createdAt: `demo-results-${questionIndex + 1}-${participantIndex + 1}`,
+      };
+    })
+  ));
+}
+
+async function loadAgentResultsDataset({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
+  const loaded = await loadQuestionsForSession(env, sessionSlug);
+  const questions = Array.isArray(loaded.questions) ? loaded.questions : [];
+  const demo = agentBoolean(input.demo);
+  const sourceQuestions = demo ? demoAgentResultsQuestions(questions) : questions;
+  const sourceRecords = demo ? demoAgentResultsRecords(sourceQuestions) : await loadSubmittedResultRecords(env, sessionSlug);
+  return {
+    sessionSlug,
+    questions,
+    sourceQuestions,
+    sourceRecords,
+    demo,
+  };
+}
+
+function aggregateQuestionRows(records = [], questions = [], view = 'consensus') {
+  const consensusQuestions = consensusQuestionsForResults(questions);
+  const consensusQuestionIds = new Set(consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean));
+  const consensusRecords = records.filter((record) => consensusQuestionIds.has(safeString(record.questionId)));
+  const rows = summarizeQuestionResults(consensusRecords, consensusQuestions).map((summary) => {
+    const counts = summary.counts.map(([label, count]) => ({ label, count }));
+    const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
+    const agreementScore = summary.total > 0 ? maxCount / summary.total : 0;
+    return {
+      questionId: safeString(summary.questionId),
+      prompt: safeString(summary.prompt),
+      total: Number(summary.total || 0),
+      participants: Number(summary.participants || 0),
+      counts,
+      agreementScore: Number(agreementScore.toFixed(3)),
+      differenceScore: Number(Number(summary.differenceScore || 0).toFixed(3)),
+      hasDifference: summary.hasDifference === true,
+    };
+  }).filter((row) => row.total > 0);
+  return rows.sort((left, right) => (
+    view === 'difference'
+      ? right.differenceScore - left.differenceScore || right.total - left.total || left.prompt.localeCompare(right.prompt)
+      : right.agreementScore - left.agreementScore || right.total - left.total || left.prompt.localeCompare(right.prompt)
+  ));
+}
+
+function beeswarmRowsFromAgentQuestionRows(rows = []) {
+  return rows.slice(0, 3).map((row, index) => ({
+    label: `Q${index + 1}`,
+    prompt: row.prompt,
+    answers: row.counts.flatMap((item) => (
+      new Array(Math.max(0, Number(item.count || 0))).fill(item.label)
+    )),
+  }));
+}
+
 async function buildAgentTopicMap({
   env = {},
   context = {},
@@ -3041,25 +3193,75 @@ async function handleResultsRequest({
   context = {},
   input = {},
 } = {}) {
-  const view = lower(input.view || 'topic-map');
-  if (!['topic-map', 'topic', 'topic_map'].includes(view)) {
-    return json({ ok: false, reason: 'unsupported_results_view', supportedViews: ['topic-map'] }, { status: 400 });
+  const view = normalizeAgentResultsView(input.view || 'topic-map');
+  if (!AGENT_RESULTS_SUPPORTED_VIEWS.includes(view)) {
+    const body = { ok: false, reason: 'unsupported_results_view', supportedViews: AGENT_RESULTS_SUPPORTED_VIEWS };
+    assertNoSecretShape(body, 'Telegram agent results unsupported-view response must not serialize secrets.');
+    return json(body, { status: 400 });
   }
-  if (!agentBoolean(input.demo) && !aggregateResultsEnabledForAgent(context.session)) {
-    return json({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  const demo = agentBoolean(input.demo);
+  if (view === 'topic-map') {
+    if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
+      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
+      return json(body, { status: 403 });
+    }
+    const built = await buildAgentTopicMap({ env, context, input });
+    const body = {
+      ok: true,
+      sessionSlug: built.sessionSlug,
+      view: 'topic-map',
+      demo: built.demo,
+      counts: built.topicMap.counts,
+      available: built.topicMap.availability.available,
+      unavailableReason: built.topicMap.availability.available ? '' : built.topicMap.availability.reason,
+      topicMap: built.topicMap,
+    };
+    assertNoSecretShape(body, 'Telegram agent results response must not serialize secrets.');
+    return json(body, { status: 200 });
   }
-  const built = await buildAgentTopicMap({ env, context, input });
+  if (['consensus', 'difference'].includes(view)) {
+    if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
+      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
+      return json(body, { status: 403 });
+    }
+    const loaded = await loadAgentResultsDataset({ env, context, input });
+    const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, view);
+    const body = {
+      ok: true,
+      sessionSlug: loaded.sessionSlug,
+      view,
+      demo: loaded.demo,
+      questionCount: rows.length,
+      responseCount: loaded.sourceRecords.length,
+      questions: rows,
+    };
+    assertNoSecretShape(body, 'Telegram agent aggregate results response must not serialize secrets.');
+    return json(body, { status: 200 });
+  }
+  if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
+    const body = { ok: false, reason: 'anonymized_groups_admin_disabled' };
+    assertNoSecretShape(body, 'Telegram agent groups gate response must not serialize secrets.');
+    return json(body, { status: 403 });
+  }
+  const loaded = await loadAgentResultsDataset({ env, context, input });
+  const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
+  const minGroupSize = agentResultsMinGroupSize(context.session);
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize);
   const body = {
     ok: true,
-    sessionSlug: built.sessionSlug,
-    view: 'topic-map',
-    demo: built.demo,
-    counts: built.topicMap.counts,
-    available: built.topicMap.availability.available,
-    unavailableReason: built.topicMap.availability.available ? '' : built.topicMap.availability.reason,
-    topicMap: built.topicMap,
+    sessionSlug: loaded.sessionSlug,
+    view: 'groups',
+    demo: loaded.demo,
+    minGroupSize,
+    groupCount: anonymized.groups.length,
+    suppressedGroupCount: anonymized.suppressedGroupCount,
+    participantCount: graph.participantCount,
+    questionCount: graph.questionCount,
+    groups: anonymized.groups,
   };
-  assertNoSecretShape(body, 'Telegram agent results response must not serialize secrets.');
+  assertNoSecretShape(body, 'Telegram agent anonymized groups response must not serialize secrets.');
   return json(body, { status: 200 });
 }
 
@@ -3068,28 +3270,107 @@ async function handleResultsImageRequest({
   context = {},
   input = {},
 } = {}) {
-  const view = lower(input.view || 'topic-map');
-  if (!['topic-map', 'topic', 'topic_map'].includes(view)) {
-    return json({ ok: false, reason: 'unsupported_results_view', supportedViews: ['topic-map'] }, { status: 400 });
+  const view = normalizeAgentResultsView(input.view || 'topic-map');
+  if (!AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS.includes(view)) {
+    const body = { ok: false, reason: 'unsupported_results_view', supportedViews: AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS };
+    assertNoSecretShape(body, 'Telegram agent results-image unsupported-view response must not serialize secrets.');
+    return json(body, { status: 400 });
   }
-  if (!agentBoolean(input.demo) && !aggregateResultsEnabledForAgent(context.session)) {
-    return json({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  const demo = agentBoolean(input.demo);
+  if (view === 'topic-map') {
+    if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
+      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      assertNoSecretShape(body, 'Telegram agent results-image gate response must not serialize secrets.');
+      return json(body, { status: 403 });
+    }
+    const built = await buildAgentTopicMap({ env, context, input });
+    if (!built.topicMap.availability.available && !built.demo) {
+      const body = {
+        ok: false,
+        reason: built.topicMap.availability.reason || 'topic_map_not_enough_data',
+        sessionSlug: built.sessionSlug,
+        view: 'topic-map',
+      };
+      assertNoSecretShape(body, 'Telegram agent topic-map image unavailable response must not serialize secrets.');
+      return json(body, { status: 409 });
+    }
+    const image = buildResultsImage({
+      mode: 'topic-map',
+      sessionTitle: context.session.sessionName || context.session.sessionSlug,
+      responseCount: built.sourceRecords.length,
+      demo: built.demo,
+      topicMap: built.topicMap,
+    });
+    return new Response(image.bytes, {
+      status: 200,
+      headers: {
+        'content-type': image.contentType,
+        'cache-control': 'no-store',
+        'content-disposition': `inline; filename="${image.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+      },
+    });
   }
-  const built = await buildAgentTopicMap({ env, context, input });
-  if (!built.topicMap.availability.available && !built.demo) {
-    return json({
+  if (view === 'consensus') {
+    if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
+      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      assertNoSecretShape(body, 'Telegram agent consensus image gate response must not serialize secrets.');
+      return json(body, { status: 403 });
+    }
+    const loaded = await loadAgentResultsDataset({ env, context, input });
+    const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, 'consensus');
+    if (!loaded.demo && (!loaded.sourceRecords.length || !rows.length)) {
+      const body = {
+        ok: false,
+        reason: 'not_enough_data_for_view',
+        sessionSlug: loaded.sessionSlug,
+        view: 'consensus',
+      };
+      assertNoSecretShape(body, 'Telegram agent consensus image unavailable response must not serialize secrets.');
+      return json(body, { status: 409 });
+    }
+    const image = buildResultsImage({
+      mode: 'consensus',
+      sessionTitle: context.session.sessionName || context.session.sessionSlug,
+      responseCount: loaded.sourceRecords.length,
+      demo: loaded.demo,
+      beeswarmRows: beeswarmRowsFromAgentQuestionRows(rows),
+    });
+    return new Response(image.bytes, {
+      status: 200,
+      headers: {
+        'content-type': image.contentType,
+        'cache-control': 'no-store',
+        'content-disposition': `inline; filename="${image.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+      },
+    });
+  }
+  if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
+    const body = { ok: false, reason: 'anonymized_groups_admin_disabled' };
+    assertNoSecretShape(body, 'Telegram agent groups image gate response must not serialize secrets.');
+    return json(body, { status: 403 });
+  }
+  const loaded = await loadAgentResultsDataset({ env, context, input });
+  const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
+  const minGroupSize = agentResultsMinGroupSize(context.session);
+  const keptGroupIds = new Set(anonymizeAgentGroups(graph.groups, minGroupSize).groups.map((group) => group.groupId));
+  const keptGroups = graph.groups.filter((group) => keptGroupIds.has(group.groupId));
+  if (!loaded.demo && (!loaded.sourceRecords.length || !keptGroups.length)) {
+    const body = {
       ok: false,
-      reason: built.topicMap.availability.reason || 'topic_map_not_enough_data',
-      sessionSlug: built.sessionSlug,
-      view: 'topic-map',
-    }, { status: 409 });
+      reason: 'not_enough_data_for_view',
+      sessionSlug: loaded.sessionSlug,
+      view: 'groups',
+    };
+    assertNoSecretShape(body, 'Telegram agent groups image unavailable response must not serialize secrets.');
+    return json(body, { status: 409 });
   }
   const image = buildResultsImage({
-    mode: 'topic-map',
+    mode: 'group',
     sessionTitle: context.session.sessionName || context.session.sessionSlug,
-    responseCount: built.sourceRecords.length,
-    demo: built.demo,
-    topicMap: built.topicMap,
+    responseCount: loaded.sourceRecords.length,
+    demo: loaded.demo,
+    participants: graph.participants,
+    groups: keptGroups,
   });
   return new Response(image.bytes, {
     status: 200,

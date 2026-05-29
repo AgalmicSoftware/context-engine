@@ -604,7 +604,12 @@ asks for the CE results view:
 
 ```http
 GET /telegram/agent/api/results?sessionSlug=<slug>&view=topic-map
+GET /telegram/agent/api/results?sessionSlug=<slug>&view=consensus
+GET /telegram/agent/api/results?sessionSlug=<slug>&view=difference
+GET /telegram/agent/api/results?sessionSlug=<slug>&view=groups
 GET /telegram/agent/api/results-image?sessionSlug=<slug>&view=topic-map
+GET /telegram/agent/api/results-image?sessionSlug=<slug>&view=consensus
+GET /telegram/agent/api/results-image?sessionSlug=<slug>&view=group
 ```
 
 The JSON endpoint returns an aggregate `topicMap` data contract with `topics`,
@@ -612,6 +617,43 @@ circle positions, per-topic question counts, response counts, and question
 bubbles. It does not return raw response records, Telegram user ids, wallet
 addresses, or individual answer text. The image endpoint returns a PNG rendering
 of that same topic map for agents that can send or display images.
+
+`consensus` and `difference` return aggregate-only question rows: prompt, vote
+counts, participant count, total responses, agreement score, and difference
+score. They never include Telegram user ids, wallet addresses, aliases, or raw
+answer text.
+
+`groups` returns k-anonymized opinion groups only when the session's results
+exposure allows `anonymized_groups`. Each group has:
+
+```json
+{
+  "groupId": "group-1",
+  "label": "Group 1",
+  "theme": "higher agreement",
+  "size": 4,
+  "averageScore": 0.42,
+  "topStatements": [
+    {
+      "label": "Q1",
+      "prompt": "Should organizers publish a daily recap?",
+      "cluster": { "agree": 3, "disagree": 0, "unsure": 1, "responded": 4 },
+      "overall": { "agree": 5, "disagree": 3, "unsure": 2, "responded": 10 },
+      "differenceScore": 0.38
+    }
+  ]
+}
+```
+
+The groups JSON deliberately omits per-participant aliases and all raw response
+text. Groups smaller than the session `minGroupSize` are suppressed and counted
+as `suppressedGroupCount`. Do not try to re-identify or infer individuals.
+
+For group analysis, first send or show the group graph image, then offer to
+analyze each group. Do the per-group narrative analysis from the anonymized
+`topStatements`; CE does not send raw participant text for this. Admin toggles:
+`aggregate_results` gates topic-map, consensus, and difference; `anonymized_groups`
+gates group views; `minGroupSize` sets the suppression threshold.
 
 The interactive client report uses the worker result-view cache for generated
 report analysis plus the demo circles and breakdown views. The cache key is the
