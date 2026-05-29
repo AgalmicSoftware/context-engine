@@ -65,6 +65,43 @@
   width: 100%;
 }
 
+.telegramBucketSection {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin: 12px auto 18px;
+  max-width: 860px;
+}
+
+.telegramBucketCard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 132px;
+  max-width: 210px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--ce-radius-8);
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.telegramBucketLabel {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.telegramBucketValue {
+  color: var(--ce-color-white);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .featuredSectionSpinner {
   position: absolute;
   top: 0;

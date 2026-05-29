@@ -121,6 +121,7 @@ type SBTsPageProps = UnknownRecord & {
   ensureLightSbtDiscovery?: unknown;
   ensureLightSbtUniverse?: unknown;
   refreshSessionUniverseRegistryCache?: unknown;
+  telegramBuckets?: unknown;
 };
 type SBTsPageState = {
   showSBTsList: boolean;
@@ -132,6 +133,38 @@ const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, u
 const SBTPageComponent = SBTPage as React.ComponentType<Record<string, unknown>>;
 
 const sbtLog = createLogger('sbt');
+
+const normalizeTelegramBucketCards = (groups: unknown = null) => {
+  const source = groups && typeof groups === 'object' && !Array.isArray(groups)
+    ? groups as Record<string, any>
+    : {};
+  const categories = Array.isArray(source.categories) ? source.categories : [];
+  const selections = source.selections && typeof source.selections === 'object' && !Array.isArray(source.selections)
+    ? source.selections as Record<string, unknown>
+    : {};
+  return categories.flatMap((category: any) => {
+    const categoryId = String(category?.categoryId || '').trim();
+    if (!categoryId) return [];
+    const selected = Array.isArray(selections[categoryId])
+      ? selections[categoryId] as unknown[]
+      : [];
+    const optionLabels = selected
+      .map((optionId) => {
+        const normalizedOptionId = String(optionId || '').trim();
+        const option = Array.isArray(category?.options)
+          ? category.options.find((entry: any) => String(entry?.optionId || '').trim() === normalizedOptionId)
+          : null;
+        return String(option?.label || normalizedOptionId).trim();
+      })
+      .filter(Boolean);
+    if (!optionLabels.length) return [];
+    return [{
+      categoryId,
+      label: String(category?.label || categoryId).trim(),
+      value: optionLabels.join(', '),
+    }];
+  });
+};
 
 const getDisplaySessionConfig = (slugIn: unknown = ''): SBTSessionConfigLike | null => (
   resolveDisplaySessionConfig({
@@ -558,12 +591,28 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showCreateGroupBeforeFeatured = effectiveShowCreateGroup && showCreateGroupAboveFeatured;
     const showCreateGroupAfterFeatured = effectiveShowCreateGroup && !showCreateGroupBeforeFeatured;
     const showMiniSbtAddress = isCryptoMode();
+    const telegramBucketCards = normalizeTelegramBucketCards(this.props.telegramBuckets);
+    const showTelegramBuckets = this.props.miniaturized === true && telegramBucketCards.length > 0;
 
     return (
       <div>
         {/* Render manual Featured/Create section (Bottom Appearance) for both Miniaturized AND Standard modes */}
         <div>
             {showCreateGroupBeforeFeatured && renderCreateGroupPanel()}
+            {showTelegramBuckets && (
+              <div className={styles.telegramBucketSection} data-testid="ce-session-telegram-buckets">
+                {telegramBucketCards.map((bucket) => (
+                  <div
+                    key={bucket.categoryId}
+                    className={styles.telegramBucketCard}
+                    data-testid={`ce-session-telegram-bucket-${bucket.categoryId}`}
+                  >
+                    <span className={styles.telegramBucketLabel}>{bucket.label}</span>
+                    <span className={styles.telegramBucketValue}>{bucket.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* <h2 className={styles.featuredTitle}>Featured</h2> */}
             {showFeaturedColdStartSpinner ? (
               <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingIcon} />

@@ -511,6 +511,7 @@ class OnePageSession extends Component<any, any> {
           sessionSlug: login.sessionSlug || sessionSlug,
           workerUrl: login.workerUrl,
           exp: login.exp,
+          buckets: login.buckets || null,
         },
       });
       removeTelegramLoginInputFromUrl();
@@ -2734,6 +2735,7 @@ class OnePageSession extends Component<any, any> {
                     showCreateGroupExternal={this.state.showEmbeddedCreateGroup}
                     onCreateGroupToggleExternal={this.toggleEmbeddedCreateGroup}
                     preferCacheBackedFeaturedCards={true}
+                    telegramBuckets={telegramClientAuth.buckets || null}
                     refreshSbtData={this.props.refreshSbtData}
                     /* per-demo passthroughs */
                     sessionSlug={slug}

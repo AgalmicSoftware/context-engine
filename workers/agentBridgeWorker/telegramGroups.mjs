@@ -3,10 +3,11 @@ import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs'
 
 export const TELEGRAM_LIGHTWEIGHT_GROUPS_KV_PREFIX = 'telegram:lightweight-groups:';
 export const TELEGRAM_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX = 'telegram:lightweight-group-membership:';
+export const TELEGRAM_BUCKET_MEMBERSHIP_KV_PREFIX = 'telegram:bucket-membership:v1:';
 export const TELEGRAM_LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposal:';
 export const TELEGRAM_CHILD_SESSION_KV_PREFIX = 'telegram:child-session:';
 
-const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
+export const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
   {
     categoryId: 'age_bucket',
     label: 'Age',
@@ -59,6 +60,64 @@ const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
       { optionId: 'artist_designer', label: 'Artist / designer' },
       { optionId: 'community_host', label: 'Community host' },
       { optionId: 'other', label: 'Other' },
+    ],
+  },
+  {
+    categoryId: 'events_attended',
+    label: 'Events attended',
+    description: 'Optional Edge event attendance context for aggregate comparisons.',
+    selectionMode: 'multi',
+    options: [
+      { optionId: 'opening_weekend', label: 'Opening weekend' },
+      { optionId: 'ai_governance', label: 'AI governance' },
+      { optionId: 'frontier_tech', label: 'Frontier tech' },
+      { optionId: 'community_programming', label: 'Community programming' },
+      { optionId: 'demo_day', label: 'Demo day' },
+      { optionId: 'other', label: 'Other' },
+    ],
+  },
+  {
+    categoryId: 'time_in_crypto',
+    label: 'Time in crypto',
+    description: 'Optional tenure bucket for aggregate comparisons.',
+    selectionMode: 'single',
+    options: [
+      { optionId: 'new_this_year', label: 'New this year' },
+      { optionId: 'one_to_three_years', label: '1-3 years' },
+      { optionId: 'three_to_seven_years', label: '3-7 years' },
+      { optionId: 'seven_plus_years', label: '7+ years' },
+      { optionId: 'not_crypto_focused', label: 'Not crypto-focused' },
+      { optionId: 'prefer_not_to_say', label: 'Prefer not to say' },
+    ],
+  },
+  {
+    categoryId: 'primary_focus',
+    label: 'Primary focus',
+    description: 'Optional work focus for aggregate comparisons.',
+    selectionMode: 'single',
+    options: [
+      { optionId: 'research', label: 'Research' },
+      { optionId: 'governance', label: 'Governance' },
+      { optionId: 'infra', label: 'Infrastructure' },
+      { optionId: 'social', label: 'Social' },
+      { optionId: 'art', label: 'Art' },
+      { optionId: 'other', label: 'Other' },
+    ],
+  },
+  {
+    categoryId: 'region',
+    label: 'Region',
+    description: 'Optional continent-level region, less identifying than country.',
+    selectionMode: 'single',
+    options: [
+      { optionId: 'africa', label: 'Africa' },
+      { optionId: 'asia', label: 'Asia' },
+      { optionId: 'europe', label: 'Europe' },
+      { optionId: 'latin_america', label: 'Latin America' },
+      { optionId: 'middle_east', label: 'Middle East' },
+      { optionId: 'north_america', label: 'North America' },
+      { optionId: 'oceania', label: 'Oceania' },
+      { optionId: 'prefer_not_to_say', label: 'Prefer not to say' },
     ],
   },
 ]);
@@ -123,6 +182,17 @@ function membershipKey({ sessionSlug = '', telegramUserId = '' } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const userId = safeString(telegramUserId);
   return slug && userId ? `${TELEGRAM_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX}${slug}:${userId}` : '';
+}
+
+function normalizeAddress(value = '') {
+  const text = lower(value);
+  return /^0x[0-9a-f]{40}$/.test(text) ? text : '';
+}
+
+function bucketMembershipKey({ sessionSlug = '', accountAddress = '' } = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const address = normalizeAddress(accountAddress);
+  return slug && address ? `${TELEGRAM_BUCKET_MEMBERSHIP_KV_PREFIX}${slug}:${address}` : '';
 }
 
 function proposalPrefix(sessionSlug = '') {
@@ -251,6 +321,19 @@ async function readMembership(env = {}, {
   return parsed;
 }
 
+export async function readTelegramBucketMembership(env = {}, {
+  sessionSlug = '',
+  accountAddress = '',
+} = {}) {
+  const key = bucketMembershipKey({ sessionSlug, accountAddress });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') return null;
+  const parsed = safeJsonParse(await kv.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram KV bucket memberships must not serialize secrets.');
+  return parsed;
+}
+
 export function normalizeTelegramGroupSelections(selections = {}, categories = []) {
   const categoryById = new Map((Array.isArray(categories) ? categories : []).map((category) => [category.categoryId, category]));
   const source = Array.isArray(selections)
@@ -350,6 +433,7 @@ export async function loadTelegramLightweightGroups({
   env = {},
   session = {},
   telegramUserId = '',
+  accountAddress = '',
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
   const policyGroups = normalizeTelegramGroupCategories(
@@ -361,7 +445,9 @@ export async function loadTelegramLightweightGroups({
     policyGroups,
     custom.categories
   );
-  const membership = await readMembership(env, { sessionSlug, telegramUserId });
+  const telegramMembership = await readMembership(env, { sessionSlug, telegramUserId });
+  const bucketMembership = telegramMembership ? null : await readTelegramBucketMembership(env, { sessionSlug, accountAddress });
+  const membership = telegramMembership || bucketMembership;
   const selections = normalizeTelegramGroupSelections(membership?.selections || {}, categories);
   const details = normalizeTelegramGroupDetails(membership?.details || {}, categories, selections);
   const proposals = await loadGroupProposals(env, { sessionSlug, telegramUserId });
@@ -372,6 +458,7 @@ export async function loadTelegramLightweightGroups({
     selections,
     details,
     proposals,
+    membershipSource: telegramMembership ? 'telegram_user' : (bucketMembership ? 'managed_wallet' : null),
     updatedAt: safeString(membership?.updatedAt) || null,
   };
 }
@@ -419,6 +506,7 @@ export async function saveTelegramLightweightGroupMembership({
   env = {},
   session = {},
   telegramUserId = '',
+  accountAddress = '',
   selections = {},
   details = {},
   createdAt = null,
@@ -428,8 +516,9 @@ export async function saveTelegramLightweightGroupMembership({
   const normalizedSelections = normalizeTelegramGroupSelections(selections, groups.categories);
   const normalizedDetails = normalizeTelegramGroupDetails(details, groups.categories, normalizedSelections);
   const key = membershipKey({ sessionSlug, telegramUserId });
+  const bucketKey = bucketMembershipKey({ sessionSlug, accountAddress });
   const kv = env?.AGENT_ACTION_KV;
-  if (!key || !kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  if ((!key && !bucketKey) || !kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
   const record = {
     version: 1,
     sessionSlug,
@@ -439,13 +528,29 @@ export async function saveTelegramLightweightGroupMembership({
     updatedAt: createdAt || new Date().toISOString(),
   };
   assertNoSecretShape(record, 'Telegram lightweight group memberships must not serialize secrets.');
-  await kv.put(key, JSON.stringify(record));
+  if (key) {
+    await kv.put(key, JSON.stringify(record));
+  }
+  if (bucketKey) {
+    const bucketRecord = {
+      version: 1,
+      type: 'telegram_kv_bucket_membership',
+      sessionSlug,
+      accountAddress: normalizeAddress(accountAddress),
+      selections: normalizedSelections,
+      details: normalizedDetails,
+      updatedAt: record.updatedAt,
+    };
+    assertNoSecretShape(bucketRecord, 'Telegram KV bucket memberships must not serialize secrets.');
+    await kv.put(bucketKey, JSON.stringify(bucketRecord));
+  }
   return {
     ok: true,
     groups: {
       ...groups,
       selections: normalizedSelections,
       details: normalizedDetails,
+      membershipSource: key ? 'telegram_user' : 'managed_wallet',
       updatedAt: record.updatedAt,
     },
   };

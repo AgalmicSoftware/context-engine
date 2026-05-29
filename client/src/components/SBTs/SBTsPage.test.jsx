@@ -489,6 +489,48 @@ describe('SBTsPage auto-feature flag', () => {
     expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
   });
 
+  it('renders Telegram KV buckets in the embedded group slot', () => {
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="telegram"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account="0x00000000000000000000000000000000000000aa"
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="edge"
+        sessionName="Edge"
+        sessionInfo="Edge session"
+        hideMiniActionRow={true}
+        miniaturized={true}
+        telegramBuckets={{
+          categories: [
+            {
+              categoryId: 'primary_focus',
+              label: 'Primary focus',
+              options: [{ optionId: 'governance', label: 'Governance' }],
+            },
+            {
+              categoryId: 'region',
+              label: 'Region',
+              options: [{ optionId: 'north_america', label: 'North America' }],
+            },
+          ],
+          selections: {
+            primary_focus: ['governance'],
+            region: ['north_america'],
+          },
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('ce-session-telegram-buckets')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-telegram-bucket-primary_focus')).toHaveTextContent('Governance');
+    expect(screen.getByTestId('ce-session-telegram-bucket-region')).toHaveTextContent('North America');
+  });
+
   it('uses terminology-aware back button text on the create route', () => {
     window.history.replaceState({}, '', `${sbtsListPath()}/new`);
 

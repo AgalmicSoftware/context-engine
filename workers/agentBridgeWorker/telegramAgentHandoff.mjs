@@ -3186,6 +3186,12 @@ async function handleClientLoginExchangeRequest({
       skipped: login.skipped === true,
     }, { status: login.skipped ? 400 : 502 });
   }
+  const groups = await loadTelegramLightweightGroups({
+    env,
+    session: context.session,
+    telegramUserId: safeString(delegated.record.telegramUserId),
+    accountAddress: login.accountAddress,
+  });
   const payload = {
     ok: true,
     tokenType: 'session_worker_jwt',
@@ -3195,6 +3201,7 @@ async function handleClientLoginExchangeRequest({
     workerToken: login.token,
     exp: login.exp,
     expiresAt: login.exp ? new Date(Number(login.exp) * 1000).toISOString() : '',
+    buckets: groups,
   };
   const { workerToken: _workerToken, ...secretFree } = payload;
   assertNoSecretShape(secretFree, 'Telegram client-login exchange metadata must not serialize bearer tokens.');

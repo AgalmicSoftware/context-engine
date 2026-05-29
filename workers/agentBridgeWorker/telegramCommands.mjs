@@ -4246,10 +4246,18 @@ async function buildSetGroupSelectionResponse({
     else selected.add(option.optionId);
     selections[category.categoryId] = Array.from(selected);
   }
+  const account = await deriveManagedDemoAccount({
+    principal: normalized,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    createdAt,
+  });
   const saved = await saveTelegramLightweightGroupMembership({
     env,
     session: resolved.session,
     telegramUserId: normalized.user.telegramUserId,
+    accountAddress: account.accountAddress,
     selections,
     details: groups.details || {},
     createdAt,

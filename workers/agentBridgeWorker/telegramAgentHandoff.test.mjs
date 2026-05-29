@@ -561,6 +561,8 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   assert.equal(body.sessionSlug, 'alpha');
   assert.equal(body.accountAddress, accountAddress);
   assert.equal(body.workerUrl, 'https://session-worker.example');
+  assert.equal(body.buckets.sessionSlug, 'alpha');
+  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'primary_focus'), true);
   assert.equal(JSON.stringify(body).includes(issued.token), false);
   assert.deepEqual(fetchCalls.map((call) => call.url), [
     'https://session-worker.example/auth/nonce',

@@ -3785,11 +3785,20 @@ async function handleGroupsRequest({
   if (context.session?.telegramOnly !== true) {
     return json({ ok: false, error: 'telegram_only_session_required' }, { status: 403 });
   }
+  const principal = normalizeTelegramPrincipal(context.auth.user || {});
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
   if (request.method === 'POST') {
     const saved = await saveTelegramLightweightGroupMembership({
       env,
       session: context.session,
       telegramUserId: context.auth.user?.telegramUserId,
+      accountAddress: account.accountAddress,
       selections: body.selections || {},
       details: body.details || {},
       createdAt,
@@ -3801,6 +3810,7 @@ async function handleGroupsRequest({
     env,
     session: context.session,
     telegramUserId: context.auth.user?.telegramUserId,
+    accountAddress: account.accountAddress,
   });
   return json({ ok: true, groups });
 }
