@@ -5522,7 +5522,7 @@ function telegramMiniAppHtml() {
     .distributionBar {
       display: grid;
       grid-template-columns: var(--agree, 0fr) var(--unsure, 0fr) var(--disagree, 0fr);
-      min-height: 8px;
+      min-height: 16px;
       border-radius: 999px;
       overflow: hidden;
       background: rgba(255, 255, 255, 0.1);
@@ -5531,6 +5531,19 @@ function telegramMiniAppHtml() {
     .distributionBar span:nth-child(1) { background: #12b569; }
     .distributionBar span:nth-child(2) { background: #f5b500; }
     .distributionBar span:nth-child(3) { background: #ff443d; }
+    .distributionRow {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+    }
+    .distributionTotal {
+      min-width: 1.5rem;
+      text-align: right;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+    }
     .resultGroup {
       display: grid;
       gap: 6px;
@@ -6339,16 +6352,6 @@ function telegramMiniAppHtml() {
             </div>
           </section>
           <div class="resultColumns">
-            <section class="resultSection collapsed" id="consensusSection" aria-label="Most consensus questions">
-              <button class="collapsibleHeader" id="toggleConsensusSection" type="button" aria-expanded="false">
-                <span>Most consensus</span>
-                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
-              </button>
-              <div class="collapsibleBody">
-                <div class="resultList" id="consensusResults"></div>
-                <button class="secondary moreResultsButton" id="moreConsensusResults" type="button">More</button>
-              </div>
-            </section>
             <section class="resultSection collapsed" id="divisiveSection" aria-label="Most difference questions">
               <button class="collapsibleHeader" id="toggleDivisiveSection" type="button" aria-expanded="false">
                 <span>Most difference</span>
@@ -6357,6 +6360,16 @@ function telegramMiniAppHtml() {
               <div class="collapsibleBody">
                 <div class="resultList" id="divisiveResults"></div>
                 <button class="secondary moreResultsButton" id="moreDivisiveResults" type="button">More</button>
+              </div>
+            </section>
+            <section class="resultSection collapsed" id="consensusSection" aria-label="Most consensus questions">
+              <button class="collapsibleHeader" id="toggleConsensusSection" type="button" aria-expanded="false">
+                <span>Most consensus</span>
+                <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+              </button>
+              <div class="collapsibleBody">
+                <div class="resultList" id="consensusResults"></div>
+                <button class="secondary moreResultsButton" id="moreConsensusResults" type="button">More</button>
               </div>
             </section>
           </div>
@@ -6602,7 +6615,7 @@ function telegramMiniAppHtml() {
       resultSectionsOpen: {
         filters: false,
         consensus: false,
-        divisive: false,
+        divisive: true,
         groups: false,
         topicMap: false,
         groupAnalysis: false,
@@ -8416,7 +8429,14 @@ function telegramMiniAppHtml() {
         distribution.style.setProperty('--disagree', String(Math.max(0.001, Number(counts.Disagree || counts.disagree || 0) / total)) + 'fr');
         distribution.setAttribute('aria-label', row.countsText || (Number(row.total || 0) + ' responses'));
         distribution.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
-        item.append(prompt, distribution);
+        const distributionRow = document.createElement('div');
+        distributionRow.className = 'distributionRow';
+        const totalLabel = document.createElement('span');
+        totalLabel.className = 'distributionTotal';
+        totalLabel.textContent = String(Number(row.total || 0));
+        totalLabel.setAttribute('aria-label', Number(row.total || 0) + ' total responses');
+        distributionRow.append(distribution, totalLabel);
+        item.append(prompt, distributionRow);
         mount.appendChild(item);
       });
       if (moreButton) {

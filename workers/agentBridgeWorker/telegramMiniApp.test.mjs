@@ -345,6 +345,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="resultImagePreview"'), false);
   assert.match(html, /id="toggleConsensusSection"/);
   assert.match(html, /id="toggleDivisiveSection"/);
+  assert.match(html, /id="divisiveSection"[\s\S]*id="consensusSection"/);
+  assert.match(html, /resultSectionsOpen: \{[\s\S]*consensus: false,[\s\S]*divisive: true,/);
   assert.match(html, /id="toggleResultGroupsSection"/);
   assert.match(html, /id="toggleGroupAnalysisSection"/);
   assert.match(html, /id="resultGroupsSection"[\s\S]*id="groupAnalysisSection"/);
@@ -359,6 +361,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultGroups"/);
   assert.match(html, /Analyze ' \+ group\.label/);
   assert.match(html, /\.distributionBar/);
+  assert.match(html, /min-height: 16px;/);
+  assert.match(html, /\.distributionRow/);
+  assert.match(html, /totalLabel\.textContent = String\(Number\(row\.total \|\| 0\)\);/);
   assert.match(html, /\/telegram\/mini-app\/api\/results/);
   assert.match(html, /function renderResults\(\)/);
   assert.match(html, /function analyzeResultGroup\(groupId\)/);
