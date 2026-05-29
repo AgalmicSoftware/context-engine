@@ -611,6 +611,83 @@ test('Telegram client login rejects preview-user and session-mismatched tokens',
   assert.equal((await jsonBody(mismatchResponse)).reason, 'agent_token_session_mismatch');
 });
 
+test('Telegram result-view cache stores and returns data-version scoped analysis', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  assert.equal(issued.ok, true);
+
+  const missResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1', {
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        origin: 'https://client.example',
+      },
+    }),
+    env,
+  });
+  const miss = await jsonBody(missResponse);
+  assert.equal(missResponse.status, 200);
+  assert.equal(miss.cached, false);
+  assert.equal(miss.cacheLayer, 'miss');
+  assert.equal(missResponse.headers.get('access-control-allow-origin'), 'https://client.example');
+
+  const saveResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        viewType: 'polis_clusters',
+        dataVersionKey: 'v1',
+        value: {
+          clusters: {
+            0: {
+              name: 'Builders',
+              short: 'Builders want more prototypes.',
+              long: 'Builders want more prototypes and fewer panels.',
+            },
+          },
+        },
+      }),
+    }),
+    env,
+  });
+  const saved = await jsonBody(saveResponse);
+  assert.equal(saveResponse.status, 200);
+  assert.equal(saved.cacheLayer, 'stored');
+  assert.equal(saved.value.clusters[0].name, 'Builders');
+  assert.equal(JSON.stringify(saved).includes(issued.token), false);
+
+  const hitResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1', {
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        origin: 'https://client.example',
+      },
+    }),
+    env,
+  });
+  const hit = await jsonBody(hitResponse);
+  assert.equal(hitResponse.status, 200);
+  assert.equal(hit.cached, true);
+  assert.equal(hit.cacheLayer, 'kv');
+  assert.equal(hit.value.clusters[0].long, 'Builders want more prototypes and fewer panels.');
+});
+
 test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user and session', async () => {
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const issued = await createTelegramAgentDelegationToken({

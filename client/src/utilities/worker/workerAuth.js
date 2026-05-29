@@ -372,6 +372,8 @@ const readTelegramWorkerLogin = ({ slug, workerUrl } = {}) => {
 };
 
 const writeTelegramWorkerLogin = ({
+  agentBridgeUrl,
+  agentToken,
   workerUrl,
   sessionSlug,
   address,
@@ -380,16 +382,40 @@ const writeTelegramWorkerLogin = ({
   const normalizedSlug = normalizeSessionSlug(sessionSlug);
   const normalizedAddress = normalizeAddress(address);
   const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
+  const normalizedBridgeUrl = normalizeAgentBridgeUrl(agentBridgeUrl);
+  const copiedAgentToken = extractTelegramSessionToken(agentToken);
   if (!normalizedSlug || !normalizedAddress || !normalizedWorkerUrl) return;
   try {
     localStorage.setItem(buildTelegramWorkerLoginKey({ slug: normalizedSlug }), JSON.stringify({
       v: 1,
       sessionSlug: normalizedSlug,
       workerUrl: normalizedWorkerUrl,
+      agentBridgeUrl: normalizedBridgeUrl,
+      agentToken: copiedAgentToken,
       address: normalizedAddress,
       updatedAt: Date.now(),
     }));
   } catch (_) {}
+};
+
+export const getTelegramAgentBridgeCredentials = ({ slug, agentBridgeUrl } = {}) => {
+  if (typeof window === 'undefined') return null;
+  const normalizedSlug = normalizeSessionSlug(slug);
+  if (!normalizedSlug) return null;
+  let login = null;
+  try {
+    login = JSON.parse(localStorage.getItem(buildTelegramWorkerLoginKey({ slug: normalizedSlug })) || 'null');
+  } catch {
+    login = null;
+  }
+  const token = extractTelegramSessionToken(login?.agentToken);
+  const bridgeUrl = normalizeAgentBridgeUrl(agentBridgeUrl || login?.agentBridgeUrl);
+  if (!token || !bridgeUrl) return null;
+  return {
+    token,
+    agentBridgeUrl: bridgeUrl,
+    sessionSlug: normalizedSlug,
+  };
 };
 
 const clearTelegramWorkerLogin = ({ slug } = {}) => {
@@ -464,6 +490,8 @@ export const exchangeTelegramSessionToken = async ({
     address,
   }));
   writeTelegramWorkerLogin({
+    agentBridgeUrl: bridgeUrl,
+    agentToken: copiedToken,
     workerUrl,
     sessionSlug: effectiveSlug,
     address,
@@ -1407,6 +1435,7 @@ export const workerAuthUtils = {
   buildSignedAdminActionAuth,
   extractTelegramSessionToken,
   exchangeTelegramSessionToken,
+  getTelegramAgentBridgeCredentials,
   getWorkerSessionToken,
   getWorkerAuthHeaders,
   clearWorkerSessionToken,

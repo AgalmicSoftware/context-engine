@@ -16,10 +16,11 @@ import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
-import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { fetchWorkerWithAuth, getTelegramAgentBridgeCredentials } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { resolveSessionConfigAliases } from '../session/sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
+import { CE_TELEGRAM_AGENT_BRIDGE_URL } from '../../variables/appConfig.js';
 
 
 
@@ -1410,8 +1411,13 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
     let long = '';
     let raw = '';
     const aiCallOpts = opts && typeof opts === 'object'
-      ? { ...opts, taskType: opts.taskType || 'summarize' }
-      : { taskType: 'summarize' };
+      ? {
+        ...opts,
+        model: opts.model || 'gpt-5.5',
+        reasoning_effort: opts.reasoning_effort || opts.reasoningEffort || 'high',
+        taskType: opts.taskType || 'summarize',
+      }
+      : { model: 'gpt-5.5', reasoning_effort: 'high', taskType: 'summarize' };
 
     try {
       raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: true });
@@ -1456,6 +1462,98 @@ export async function analyzeClusterOpinions(clusterData, allClustersData = null
     };
   }
 }
+
+const normalizeResultViewCacheType = (value = '') => {
+  const normalized = String(value || 'polis_clusters')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48);
+  return normalized || 'polis_clusters';
+};
+
+const resultViewCacheCredentialContext = ({ sessionSlug, agentBridgeUrl } = {}) => {
+  const slug = String(sessionSlug || '').trim();
+  const bridge = String(agentBridgeUrl || CE_TELEGRAM_AGENT_BRIDGE_URL || '').trim();
+  if (!slug) return null;
+  return getTelegramAgentBridgeCredentials({
+    slug,
+    agentBridgeUrl: bridge || undefined,
+  });
+};
+
+export const getCachedGeneratedResultView = async ({
+  sessionSlug,
+  dataVersionKey,
+  viewType = 'polis_clusters',
+  agentBridgeUrl = CE_TELEGRAM_AGENT_BRIDGE_URL,
+  fetchImpl = fetch,
+} = {}) => {
+  const dataKey = String(dataVersionKey || '').trim();
+  const credentials = resultViewCacheCredentialContext({ sessionSlug, agentBridgeUrl });
+  if (!dataKey || !credentials?.token || !credentials?.agentBridgeUrl) {
+    return { ok: false, skipped: true, reason: 'telegram_result_cache_credentials_missing' };
+  }
+  const url = new URL(`${credentials.agentBridgeUrl}/telegram/agent/api/result-view-cache`);
+  url.searchParams.set('sessionSlug', credentials.sessionSlug || sessionSlug);
+  url.searchParams.set('viewType', normalizeResultViewCacheType(viewType));
+  url.searchParams.set('dataVersionKey', dataKey);
+  const response = await fetchImpl(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${credentials.token}`,
+    },
+    cache: 'no-store',
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      skipped: false,
+      reason: body?.reason || `result_view_cache_get_failed_${response.status}`,
+    };
+  }
+  return body;
+};
+
+export const putCachedGeneratedResultView = async ({
+  sessionSlug,
+  dataVersionKey,
+  viewType = 'polis_clusters',
+  value = {},
+  agentBridgeUrl = CE_TELEGRAM_AGENT_BRIDGE_URL,
+  fetchImpl = fetch,
+} = {}) => {
+  const dataKey = String(dataVersionKey || '').trim();
+  const credentials = resultViewCacheCredentialContext({ sessionSlug, agentBridgeUrl });
+  if (!dataKey || !credentials?.token || !credentials?.agentBridgeUrl) {
+    return { ok: false, skipped: true, reason: 'telegram_result_cache_credentials_missing' };
+  }
+  const response = await fetchImpl(`${credentials.agentBridgeUrl}/telegram/agent/api/result-view-cache`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${credentials.token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sessionSlug: credentials.sessionSlug || sessionSlug,
+      viewType: normalizeResultViewCacheType(viewType),
+      dataVersionKey: dataKey,
+      value,
+    }),
+    cache: 'no-store',
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      skipped: false,
+      reason: body?.reason || `result_view_cache_put_failed_${response.status}`,
+    };
+  }
+  return body;
+};
 
 /**
  * Analyze a single user's visible profile data (SBTs + answers).

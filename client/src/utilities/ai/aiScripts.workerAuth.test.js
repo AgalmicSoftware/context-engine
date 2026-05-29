@@ -1,7 +1,17 @@
-import { analyzeClusterOpinions, analyzePhotoForQuestionGeneration, callAI, rankQuestionsAI, runCompareToolkit, transcribeAudio } from './aiScripts.js';
+import {
+  analyzeClusterOpinions,
+  analyzePhotoForQuestionGeneration,
+  callAI,
+  getCachedGeneratedResultView,
+  putCachedGeneratedResultView,
+  rankQuestionsAI,
+  runCompareToolkit,
+  transcribeAudio,
+} from './aiScripts.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { getTelegramAgentBridgeCredentials } from '../worker/workerAuth.js';
 
 jest.mock('./aiSettings.js', () => ({
   getEffectiveAiConfig: jest.fn(),
@@ -14,6 +24,11 @@ jest.mock('../worker/corsProxy.js', () => ({
 
 jest.mock('../worker/workerAuth.js', () => ({
   fetchWorkerWithAuth: jest.fn(),
+  getTelegramAgentBridgeCredentials: jest.fn(),
+}));
+
+jest.mock('../../variables/appConfig.js', () => ({
+  CE_TELEGRAM_AGENT_BRIDGE_URL: '',
 }));
 
 jest.mock('../logging.js', () => ({
@@ -144,6 +159,87 @@ describe('aiScripts worker auth options', () => {
     expect(body.max_output_tokens).toBe(321);
     expect(body.max_completion_tokens).toBeUndefined();
     expect(body.max_tokens).toBeUndefined();
+  });
+
+  it('uses high-effort gpt-5.5 defaults for cluster analysis', async () => {
+    getEffectiveAiConfig.mockResolvedValue({
+      provider: 'openai',
+      model: 'gpt-5.5',
+      apiKeySource: 'worker',
+    });
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      json: async () => ({ completion: JSON.stringify({ name: 'Builders', short: 'Short', long: 'Long' }) }),
+    });
+
+    const result = await analyzeClusterOpinions({
+      clusterIndex: 0,
+      clusterSize: 2,
+      totalClusters: 1,
+      topStatements: [],
+    }, null, { sessionSlug: 'edge' });
+
+    expect(result.name).toBe('Builders');
+    const requestInit = fetchWorkerWithAuth.mock.calls[0]?.[1] || {};
+    const body = JSON.parse(String(requestInit.body || '{}'));
+    expect(body.model).toBe('gpt-5.5');
+    expect(body.reasoning_effort).toBe('high');
+  });
+
+  it('reads and writes generated result views through the Telegram agent cache', async () => {
+    const token = `ceagt_${'C'.repeat(32)}`;
+    getTelegramAgentBridgeCredentials.mockReturnValue({
+      token,
+      agentBridgeUrl: 'https://bridge.example',
+      sessionSlug: 'edge',
+    });
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          cached: true,
+          value: { clusters: { 0: { name: 'Builders', short: 'Short', long: 'Long' } } },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, cacheLayer: 'stored' }),
+      });
+
+    const hit = await getCachedGeneratedResultView({
+      sessionSlug: 'edge',
+      dataVersionKey: 'v1',
+      viewType: 'polis_clusters',
+      fetchImpl,
+    });
+    expect(hit.cached).toBe(true);
+    expect(getTelegramAgentBridgeCredentials).toHaveBeenCalledWith({
+      slug: 'edge',
+      agentBridgeUrl: undefined,
+    });
+    expect(fetchImpl.mock.calls[0][0]).toBe(
+      'https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=edge&viewType=polis_clusters&dataVersionKey=v1'
+    );
+    expect(fetchImpl.mock.calls[0][1].headers.Authorization).toBe(`Bearer ${token}`);
+
+    const saved = await putCachedGeneratedResultView({
+      sessionSlug: 'edge',
+      dataVersionKey: 'v1',
+      value: { clusters: { 0: { name: 'Builders', short: 'Short', long: 'Long' } } },
+      fetchImpl,
+    });
+    expect(saved.cacheLayer).toBe('stored');
+    expect(fetchImpl.mock.calls[1][0]).toBe('https://bridge.example/telegram/agent/api/result-view-cache');
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body)).toEqual(expect.objectContaining({
+      sessionSlug: 'edge',
+      viewType: 'polis_clusters',
+      dataVersionKey: 'v1',
+    }));
   });
 
   it('fails closed for photo analysis when the configured provider/model is not vision-capable', async () => {

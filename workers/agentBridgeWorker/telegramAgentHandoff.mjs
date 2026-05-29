@@ -85,6 +85,9 @@ const LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposa
 const ADMIN_METRICS_CACHE_KV_PREFIX = 'telegram:admin-metrics-cache:v1:';
 const ADMIN_METRICS_CACHE_TTL_SECONDS = 60;
 const ADMIN_METRICS_SUBMIT_ENTRY_LIMIT = 100000;
+const RESULT_VIEW_CACHE_KV_PREFIX = 'telegram:result-view-cache:v1:';
+const RESULT_VIEW_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const RESULT_VIEW_VALUE_MAX_CHARS = 8000;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -236,6 +239,33 @@ function clientLoginCorsHeaders(request, env = {}) {
     'access-control-max-age': '600',
     vary: 'Origin',
   };
+}
+
+function resultViewCacheCorsHeaders(request, env = {}) {
+  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
+  if (!origin) return {};
+  const allowed = clientLoginAllowedOrigins(env);
+  if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
+    return null;
+  }
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type, x-ce-agent-token, x-context-engine-agent-token',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
+
+function jsonResultViewCache(request, env, data, init = {}) {
+  const cors = resultViewCacheCorsHeaders(request, env);
+  return json(data, {
+    ...init,
+    headers: {
+      ...(cors || {}),
+      ...(init.headers || {}),
+    },
+  });
 }
 
 function jsonClientLogin(request, env, data, init = {}) {
@@ -418,6 +448,18 @@ function inputFromRequest(request, body = {}) {
     operation: safeString(body.operation || url.searchParams.get('operation')),
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
     view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
+    viewType: safeString(body.viewType || body.type || url.searchParams.get('viewType') || url.searchParams.get('type')),
+    dataVersionKey: safeString(
+      body.dataVersionKey ||
+      body.dataKey ||
+      body.cacheKey ||
+      url.searchParams.get('dataVersionKey') ||
+      url.searchParams.get('dataKey') ||
+      url.searchParams.get('cacheKey')
+    ),
+    value: Object.hasOwn(body, 'value') ? body.value : undefined,
+    result: Object.hasOwn(body, 'result') ? body.result : undefined,
+    cache: Object.hasOwn(body, 'cache') ? body.cache : undefined,
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
     questionId: safeString(body.questionId || url.searchParams.get('questionId')),
     geoId: safeString(body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId')),
@@ -443,6 +485,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/results-image') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/result-view-cache') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/geo-backlink') {
@@ -1465,6 +1510,163 @@ async function saveAdminMetricsCache(env = {}, cacheKey = '', payload = {}) {
   if (!cacheKey || !kv || typeof kv.put !== 'function') return;
   assertNoSecretShape(payload, 'Telegram admin metrics cache payload must not serialize secrets.');
   await kv.put(cacheKey, JSON.stringify(payload), { expirationTtl: ADMIN_METRICS_CACHE_TTL_SECONDS });
+}
+
+function normalizeResultViewType(value = '') {
+  const normalized = safeString(value || 'polis_clusters')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 48);
+  return normalized || 'polis_clusters';
+}
+
+function resultViewCacheKey(sessionSlug = '', viewType = '', dataVersionKey = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const type = normalizeResultViewType(viewType);
+  const fingerprint = stableFingerprint(`${slug}|${type}|${safeString(dataVersionKey)}`);
+  return `${RESULT_VIEW_CACHE_KV_PREFIX}${slug}:${type}:${fingerprint}`;
+}
+
+function normalizeResultViewAnalysisValue(value = {}) {
+  const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const clustersInput = input.clusters && typeof input.clusters === 'object' && !Array.isArray(input.clusters)
+    ? input.clusters
+    : input;
+  const clusters = {};
+  for (const [clusterKey, clusterValue] of Object.entries(clustersInput || {})) {
+    const key = safeString(clusterKey).replace(/[^0-9A-Za-z_-]+/g, '').slice(0, 24);
+    if (!key || !clusterValue || typeof clusterValue !== 'object' || Array.isArray(clusterValue)) continue;
+    clusters[key] = {
+      name: safeString(clusterValue.name).slice(0, 160),
+      short: safeString(clusterValue.short).slice(0, RESULT_VIEW_VALUE_MAX_CHARS),
+      long: safeString(clusterValue.long).slice(0, RESULT_VIEW_VALUE_MAX_CHARS),
+    };
+  }
+  return { clusters };
+}
+
+async function loadResultViewCache(env = {}, {
+  sessionSlug = '',
+  viewType = '',
+  dataVersionKey = '',
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function') return null;
+  const key = resultViewCacheKey(sessionSlug, viewType, dataVersionKey);
+  const cached = safeJsonParse(await kv.get(key).catch(() => null), null);
+  if (!cached || typeof cached !== 'object' || Array.isArray(cached) || cached.ok !== true) return null;
+  assertNoSecretShape(cached, 'Cached Telegram result view must not serialize secrets.');
+  return {
+    ...cached,
+    cached: true,
+    cacheLayer: 'kv',
+  };
+}
+
+async function saveResultViewCache(env = {}, {
+  sessionSlug = '',
+  viewType = '',
+  dataVersionKey = '',
+  value = {},
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return null;
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const type = normalizeResultViewType(viewType);
+  const dataKey = safeString(dataVersionKey).slice(0, 512);
+  const payload = {
+    ok: true,
+    type: 'telegram_result_view_cache',
+    sessionSlug: slug,
+    viewType: type,
+    dataVersionKey: dataKey,
+    generatedAt: new Date().toISOString(),
+    model: 'gpt-5.5',
+    reasoning_effort: 'high',
+    value: normalizeResultViewAnalysisValue(value),
+  };
+  assertNoSecretShape(payload, 'Telegram result view cache payload must not serialize secrets.');
+  await kv.put(resultViewCacheKey(slug, type, dataKey), JSON.stringify(payload), {
+    expirationTtl: RESULT_VIEW_CACHE_TTL_SECONDS,
+  });
+  return payload;
+}
+
+async function handleResultViewCacheRequest({ env = {}, context = {}, input = {}, request = null } = {}) {
+  const method = safeString(request?.method || 'GET').toUpperCase();
+  const sessionSlug = context.session.sessionSlug;
+  const viewType = normalizeResultViewType(input.viewType || input.type || 'polis_clusters');
+  const dataVersionKey = safeString(input.dataVersionKey || input.dataKey || input.cacheKey).slice(0, 512);
+  if (!dataVersionKey) {
+    return jsonResultViewCache(request, env, { ok: false, reason: 'data_version_key_required' }, { status: 400 });
+  }
+  if (method === 'GET') {
+    const cached = await loadResultViewCache(env, { sessionSlug, viewType, dataVersionKey });
+    if (cached) return jsonResultViewCache(request, env, cached);
+    return jsonResultViewCache(request, env, {
+      ok: true,
+      cached: false,
+      cacheLayer: 'miss',
+      sessionSlug,
+      viewType,
+      dataVersionKey,
+    });
+  }
+  if (method !== 'POST') {
+    return jsonResultViewCache(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const saved = await saveResultViewCache(env, {
+    sessionSlug,
+    viewType,
+    dataVersionKey,
+    value: input.value || input.result || input.cache || {},
+  });
+  return jsonResultViewCache(request, env, {
+    ...saved,
+    cached: false,
+    cacheLayer: 'stored',
+  });
+}
+
+async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
+  const cors = resultViewCacheCorsHeaders(request, env);
+  if (cors === null) {
+    return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
+  }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors || {} });
+  }
+  const url = new URL(request.url);
+  const body = await readRequestJson(request);
+  const auth = await authenticateAgentHandoff(request, env);
+  if (!auth.ok) {
+    return jsonResultViewCache(request, env, { ok: false, reason: auth.reason }, { status: auth.status || 401 });
+  }
+  const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), url.pathname, request.method);
+  if (!delegated.ok) {
+    return jsonResultViewCache(request, env, {
+      ok: false,
+      reason: delegated.reason,
+      requiredScope: delegated.requiredScope,
+      sessionSlug: delegated.sessionSlug || '',
+    }, { status: delegated.status || 403 });
+  }
+  const input = delegated.input;
+  const context = await resolveHandoffContext({
+    env,
+    input,
+    auth,
+    requireQuestionAuthoring: false,
+  });
+  if (!context.ok) {
+    return jsonResultViewCache(request, env, {
+      ok: false,
+      reason: context.reason,
+      sessionSlug: context.sessionSlug || '',
+    }, { status: context.status || 400 });
+  }
+  return handleResultViewCacheRequest({ env, context, input, request });
 }
 
 async function buildAdminMetricsSnapshot({
@@ -3220,6 +3422,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/client-login/exchange') {
     return handleClientLoginExchangeRequest({ request, env, fetchImpl });
+  }
+  if (url.pathname === '/telegram/agent/api/result-view-cache') {
+    return handleResultViewCacheHttpRequest({ request, env });
   }
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
     const payload = skillVersionPayload(env);

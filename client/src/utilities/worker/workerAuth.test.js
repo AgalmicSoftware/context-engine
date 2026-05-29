@@ -6,6 +6,7 @@ import {
   exchangeTelegramSessionToken,
   extractTelegramSessionToken,
   fetchWorkerWithAuth,
+  getTelegramAgentBridgeCredentials,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   normalizeWorkerUrl,
@@ -311,8 +312,15 @@ describe('workerAuth Telegram token login', () => {
     ))).toEqual(expect.objectContaining({
       sessionSlug: 'edge',
       workerUrl: 'https://session-worker.example',
+      agentBridgeUrl: 'https://bridge.example',
+      agentToken: token,
       address: TEST_ADDRESS,
     }));
+    expect(getTelegramAgentBridgeCredentials({ slug: 'edge' })).toEqual({
+      token,
+      agentBridgeUrl: 'https://bridge.example',
+      sessionSlug: 'edge',
+    });
 
     const mockStore = require('../../store.js').default;
     mockStore.getState.mockReturnValue({

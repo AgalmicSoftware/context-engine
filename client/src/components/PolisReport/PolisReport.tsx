@@ -36,7 +36,11 @@ import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getChainById } from '../../variables/chains.js';
 import styles from './PolisReport.module.scss';
 import { QRCodeSVG } from 'qrcode.react';
-import { analyzeClusterOpinions } from '../../utilities/ai/aiScripts.js';
+import {
+  analyzeClusterOpinions,
+  getCachedGeneratedResultView,
+  putCachedGeneratedResultView,
+} from '../../utilities/ai/aiScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -212,6 +216,7 @@ type AnalyzeClusterOpinionsFn = (
   allClustersData: UnknownRecord,
   options: { sessionSlug: string }
 ) => Promise<Partial<PolisClusterAnalysisResult>>;
+type GeneratedResultCacheFn = (options: UnknownRecord) => Promise<UnknownRecord>;
 
 type D3LinearScale = {
   domain(values: [number, number]): {
@@ -247,6 +252,8 @@ const d3Report = d3 as unknown as D3ReportApi;
 const doUMAPTyped = doUMAP as unknown as DoUMAPFn;
 const clusterUMAPPointsKmeansTyped = clusterUMAPPointsKmeans as unknown as ClusterPointsFn;
 const analyzeClusterOpinionsTyped = analyzeClusterOpinions as unknown as AnalyzeClusterOpinionsFn;
+const getCachedGeneratedResultViewTyped = getCachedGeneratedResultView as unknown as GeneratedResultCacheFn;
+const putCachedGeneratedResultViewTyped = putCachedGeneratedResultView as unknown as GeneratedResultCacheFn;
 const asRecord = (value: unknown): UnknownRecord => (
   value && typeof value === 'object' ? value as UnknownRecord : {}
 );
@@ -2409,6 +2416,11 @@ export default function PolisReport({
     return { clusterIndex, clusterSize, totalClusters, topStatements };
   };
 
+  const readRemoteAnalysisClusters = (payload: UnknownRecord = {}) => {
+    const value = asRecord(payload.value);
+    return asRecord(value.clusters);
+  };
+
   /***************************************************************
    * NEW: Analyze clusters (parallel AI calls + caching)
    * (UPDATED to pass previous names and enforce uniqueness)
@@ -2421,17 +2433,48 @@ export default function PolisReport({
       const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
       if (uniqueClusters.length === 0) return;
 
-      const cacheForKey = analysisCacheByKey[key] || {};
-      const errorsForKey = analysisErrorsByKey[key] || {};
-      const hasAllClusters = uniqueClusters.every((c) => cacheForKey[c]);
-      const hasErrors = uniqueClusters.some((c) => errorsForKey[c]);
+      let cacheForKey = analysisCacheByKey[key] || {};
+      let errorsForKey = analysisErrorsByKey[key] || {};
+      let hasAllClusters = uniqueClusters.every((c) => cacheForKey[c]);
+      let hasErrors = uniqueClusters.some((c) => errorsForKey[c]);
       if (hasAllClusters && !hasErrors) {
         // Already have cached results for this k – nothing to re-fetch
         return;
       }
 
+      const remoteCached = await getCachedGeneratedResultViewTyped({
+        sessionSlug: activeReportSlug,
+        dataVersionKey: key,
+        viewType: 'polis_clusters',
+      }).catch(() => null);
+      const remoteClusters = remoteCached?.ok === true && remoteCached?.cached === true
+        ? readRemoteAnalysisClusters(remoteCached)
+        : {};
+      if (Object.keys(remoteClusters).length > 0) {
+        cacheForKey = { ...remoteClusters, ...cacheForKey };
+        setAnalysisCacheByKey((prev) => ({
+          ...prev,
+          [key]: {
+            ...remoteClusters,
+            ...(prev[key] || {}),
+          },
+        }));
+        errorsForKey = analysisErrorsByKey[key] || {};
+        hasAllClusters = uniqueClusters.every((c) => cacheForKey[c]);
+        hasErrors = uniqueClusters.some((c) => errorsForKey[c]);
+        if (hasAllClusters && !hasErrors) return;
+      }
+
       const clustersToAnalyze = uniqueClusters.filter((c) => !cacheForKey[c] || errorsForKey[c]);
       if (clustersToAnalyze.length === 0) return;
+
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.confirm === 'function' &&
+        !window.confirm('Generating this result view can take about a minute. Continue?')
+      ) {
+        return;
+      }
 
       // Reset start times; we'll set each cluster's start at call time
       analysisStartTimesRef.current = {};
@@ -2449,6 +2492,7 @@ export default function PolisReport({
 
       // Track names we’ve already accepted to guarantee uniqueness
       const usedNames: string[] = [];
+      let nextCacheForKey = { ...cacheForKey };
       uniqueClusters.forEach((c) => {
         const cachedName = cacheForKey[c]?.name;
         if (cachedName) {
@@ -2492,15 +2536,21 @@ export default function PolisReport({
           }
           usedNames.push(proposed);
 
+          const clusterAnalysis = {
+            short: String(aiRes.short || ''),
+            long: String(aiRes.long || ''),
+            name: proposed,
+          };
+          nextCacheForKey = {
+            ...nextCacheForKey,
+            [clusterKey]: clusterAnalysis,
+          };
+
 	          setAnalysisCacheByKey((prev) => ({
 	            ...prev,
 	            [key]: {
 	              ...(prev[key] || {}),
-	              [clusterKey]: {
-                  short: String(aiRes.short || ''),
-                  long: String(aiRes.long || ''),
-                  name: proposed,
-                }
+	              [clusterKey]: clusterAnalysis
 	            }
 	          }));
 	        } catch (err: unknown) {
@@ -2512,6 +2562,14 @@ export default function PolisReport({
 	            }
 	          }));
 	        }
+      }
+      if (uniqueClusters.every((c) => nextCacheForKey[c])) {
+        await putCachedGeneratedResultViewTyped({
+          sessionSlug: activeReportSlug,
+          dataVersionKey: key,
+          viewType: 'polis_clusters',
+          value: { clusters: nextCacheForKey },
+        }).catch(() => null);
       }
     } catch (e) {
       surveyLog.error('Analyze clusters failed:', e);
