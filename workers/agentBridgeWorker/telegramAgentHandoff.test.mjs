@@ -755,6 +755,9 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.telegramUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'alpha');
+  assert.equal(binding.followDefault, true);
 });
 
 test('Mini App onboarding endpoint rejects disallowed origins and invalid initData', async () => {

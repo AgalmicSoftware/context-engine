@@ -4128,13 +4128,14 @@ async function handleMiniAppOnboardRequest({
     await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
   }
   if (sessionSlug) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
     await persistTelegramUserSessionBinding({
       env,
       normalized,
       session: resolved.session,
       createdAt,
       source: 'mini_app_agent_onboarding',
-      followDefault: false,
+      followDefault,
     });
   }
   const issued = await createTelegramAgentDelegationToken({

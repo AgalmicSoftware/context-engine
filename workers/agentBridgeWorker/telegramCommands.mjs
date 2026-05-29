@@ -8864,12 +8864,13 @@ async function buildAgentTokenResponse({
     });
   }
   if (sanitizeSessionSlug(sessionSlugOverride)) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
     await persistPrivateSessionBinding({
       env,
       normalized,
       session: resolved.session,
       createdAt,
-      followDefault: false,
+      followDefault,
     });
   }
   const issued = await createTelegramAgentDelegationToken({

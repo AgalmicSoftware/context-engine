@@ -4918,6 +4918,49 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
   assert.doesNotMatch(result.response.text, /Session: Alpha Session/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'alpha');
+  assert.equal(binding.followDefault, true);
+});
+
+test('/start agent_onboarding non-default slug pins the session', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__beta'),
+    env,
+    now,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'agent_token');
+  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
+  assert.equal(binding.sessionSlug, 'beta');
+  assert.equal(binding.followDefault, false);
 });
 
 test('/agent_token refuses explicit sessions that are not selectable for the Telegram account', async () => {
