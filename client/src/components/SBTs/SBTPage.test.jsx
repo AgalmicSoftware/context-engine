@@ -6,6 +6,7 @@ import {
   cacheScripts,
   render,
   createSubject,
+  findElementInTree,
   treeIncludesText,
   createReadCachePayload,
   setupSBTPageTestLifecycle,
@@ -136,6 +137,28 @@ describe('SBTPage session routing and holder loading', () => {
     expect(secondAddresses).not.toBe(firstAddresses);
     expect(sessionConfigSpy).toHaveBeenCalledTimes(2);
     expect(sessionConfigSpy).toHaveBeenCalledWith('rxc');
+  });
+
+  it('routes owner burn button clicks through the parent burn handler', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      sbtInfo: {
+        burnAuth: 1,
+      },
+      userHasSBT: true,
+    };
+    subject.handleBurn = jest.fn();
+
+    const tree = subject.renderBurnButton();
+    const burnButton = findElementInTree(tree, (node) => node?.type === 'button');
+
+    expect(burnButton).not.toBeNull();
+    burnButton.props.onClick({ preventDefault: jest.fn() });
+    expect(subject.handleBurn).toHaveBeenCalledTimes(1);
   });
 
   it('keeps holders modal refresh log-driven and shows approximate counts without ownerOf fan-out', async () => {

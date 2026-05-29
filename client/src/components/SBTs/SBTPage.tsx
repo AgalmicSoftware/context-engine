@@ -51,6 +51,9 @@ import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
+  runSbtPageBurnActionController,
+} from './sbtPageActionController';
+import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
   applySbtPageHistorySummaryFallback,
@@ -4057,7 +4060,7 @@ renderMintButton() {
     const { sbtInfo, userHasSBT, burningStatus } = this.state;
     if (!sbtInfo) return null;
 
-    const { shouldRenderBurnButton } = resolveSbtPageBurnActionPlan({
+    const burnActionPlan = resolveSbtPageBurnActionPlan({
       account: this.props.account,
       sbtInfo,
       userHasSBT,
@@ -4078,14 +4081,21 @@ renderMintButton() {
       variantClassName: styles.burnButton,
     });
 
-    if (!shouldRenderBurnButton) {
+    if (!burnActionPlan.shouldRenderBurnButton) {
       return null;
     }
 
     return (
       <div>
         <button
-          onClick={this.handleBurn}
+          onClick={(event) => runSbtPageBurnActionController({
+            disabled: burnStatusButtonState.disabled,
+            event,
+            plan: burnActionPlan,
+            ports: {
+              dispatchBurn: this.handleBurn,
+            },
+          })}
           disabled={burnStatusButtonState.disabled}
           className={burnActionButtonClassName}
         >
