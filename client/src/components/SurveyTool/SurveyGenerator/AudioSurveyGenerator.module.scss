@@ -932,15 +932,16 @@ $input-border: tokens.$ce-input-border;
     align-items: center;
     gap: 6px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.05);
-    color: var(--ce-color-white);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
     border-radius: var(--ce-radius-6);
     padding: 6px 10px;
     font-weight: 700;
     cursor: pointer;
     transition: box-shadow 0.12s ease;
     &:hover {
-      background: rgba(255, 255, 255, 0.1);
+      background: transparent;
+      color: rgba(255, 255, 255, 0.72);
     }
   }
 

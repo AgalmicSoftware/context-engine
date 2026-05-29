@@ -11,6 +11,7 @@ import {
   faPlus,
   faMinus,
   faCaretDown,
+  faBars,
   faRobot,
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
@@ -44,6 +45,7 @@ type PileNavControlsProps = {
 };
 
 type PileActionControlsProps = {
+  collapseActionsIntoMenu?: boolean;
   isFilterActive: boolean;
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
@@ -183,11 +185,38 @@ export const buildPileFooterClassName = (
   pileTopRailVisible: unknown
 ) => `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
 
+export const buildPileActionsClassName = (
+  styleMap: Record<string, string>,
+  collapseActionsIntoMenu: unknown
+) => [
+  styleMap.pileActions,
+  collapseActionsIntoMenu ? styleMap.pileActionsMenuEligible : '',
+].filter(Boolean).join(' ');
+
 export const buildPileSubmitButtonClassName = (
   styleMap: Record<string, string>,
   hasPendingPileChanges: unknown,
   shouldHidePileSubmitButton: unknown
 ) => `${styleMap.pileSubmitButton}${hasPendingPileChanges ? ` ${styleMap.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styleMap.pileSubmitButtonInactive}` : ''}`;
+
+export const shouldCollapsePileActionsIntoMenu = ({
+  pileTopRailVisible,
+  showSubmitButton,
+  hasPendingPileChanges,
+  isSubmitting,
+  shouldHidePileSubmitButton,
+}: {
+  pileTopRailVisible: unknown;
+  showSubmitButton: unknown;
+  hasPendingPileChanges: unknown;
+  isSubmitting: unknown;
+  shouldHidePileSubmitButton: unknown;
+}): boolean => (
+  !!pileTopRailVisible &&
+  !!showSubmitButton &&
+  (!!hasPendingPileChanges || !!isSubmitting) &&
+  !shouldHidePileSubmitButton
+);
 
 export const resolvePileCardStatusClassName = (
   styleMap: Record<string, string>,
@@ -271,6 +300,7 @@ const renderPileNavControls = ({
 );
 
 const renderPileActionControls = ({
+  collapseActionsIntoMenu = false,
   isFilterActive,
   toggleFilterModal,
   showCreate,
@@ -284,46 +314,58 @@ const renderPileActionControls = ({
   const filterIconStyle = resolvePileFilterIconStyle(isFilterActive);
 
   return (
-    <div className={styles.pileActions}>
+    <div className={buildPileActionsClassName(styles, collapseActionsIntoMenu)}>
       <button
-        onClick={toggleFilterModal}
-        className={buildPileFilterButtonClassName(styles, isFilterActive)}
-        style={filterButtonStyle}
-        title="Filter Questions"
-        data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
+        type="button"
+        className={`${styles.actionButton} ${styles.pileActionMenuToggle}`}
+        title="Question actions"
+        aria-label="Question actions"
+        aria-haspopup="menu"
       >
-        <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
+        <FontAwesomeIcon icon={faBars} />
       </button>
 
-      <button
-        onClick={toggleCreate}
-        className={styles.actionButton}
-        title={showCreate ? 'Close Create Interface' : 'Create New Question'}
-        data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
-      >
-        <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
-      </button>
-
-      <button
-        onClick={toggleListeningPanel}
-        className={`${styles.actionButton} ${showListeningPanel ? styles.actionButtonActive : ''}`}
-        title={showListeningPanel ? 'Close listening' : 'Open listening'}
-        aria-pressed={showListeningPanel}
-        data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
-      >
-        <FontAwesomeIcon icon={faMicrophone} />
-      </button>
-
-      {onViewAllClick && (
+      <div className={styles.pileActionButtonGroup}>
         <button
-          onClick={handleViewAllFromPile}
-          className={styles.actionButton}
-          title="View All Questions"
-          data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
+          onClick={toggleFilterModal}
+          className={buildPileFilterButtonClassName(styles, isFilterActive)}
+          style={filterButtonStyle}
+          title="Filter Questions"
+          data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
         >
-          <FontAwesomeIcon icon={faCaretDown} />
+          <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
         </button>
-      )}
+
+        <button
+          onClick={toggleCreate}
+          className={styles.actionButton}
+          title={showCreate ? 'Close Create Interface' : 'Create New Question'}
+          data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
+        >
+          <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
+        </button>
+
+        <button
+          onClick={toggleListeningPanel}
+          className={`${styles.actionButton} ${showListeningPanel ? styles.actionButtonActive : ''}`}
+          title={showListeningPanel ? 'Close listening' : 'Open listening'}
+          aria-pressed={showListeningPanel}
+          data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+        >
+          <FontAwesomeIcon icon={faMicrophone} />
+        </button>
+
+        {onViewAllClick && (
+          <button
+            onClick={handleViewAllFromPile}
+            className={styles.actionButton}
+            title="View All Questions"
+            data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
+          >
+            <FontAwesomeIcon icon={faCaretDown} />
+          </button>
+        )}
+      </div>
     </div>
   );
 };
@@ -628,6 +670,13 @@ export const renderPileInteractionSurface = ({
     {!showHologramAssistant && (
       <div className={styles.pileControls}>
         {renderPileActionControls({
+          collapseActionsIntoMenu: shouldCollapsePileActionsIntoMenu({
+            pileTopRailVisible,
+            showSubmitButton,
+            hasPendingPileChanges,
+            isSubmitting,
+            shouldHidePileSubmitButton,
+          }),
           isFilterActive,
           toggleFilterModal,
           showCreate,
