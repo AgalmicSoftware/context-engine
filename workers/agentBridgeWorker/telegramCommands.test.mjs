@@ -4602,9 +4602,9 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'my_account');
   assert.match(result.response.text, /Account/);
-  assert.match(result.response.text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
-  assert.match(result.response.text, /Chain: OP Sepolia Testnet \(11155420\)/);
-  assert.equal(result.response.parseMode, 'HTML');
+  assert.match(result.response.text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/i);
+  assert.doesNotMatch(result.response.text, /Chain:/);
+  assert.equal(result.response.parseMode, '');
   const addressButton = flattenButtons(result.response.replyMarkup)
     .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
   assert.equal(addressButton, undefined);

@@ -1258,9 +1258,9 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(byCommand['/attachments'].text, /Attachments for alpha:/);
   assert.match(byCommand['/docs'].text, /Attachments for alpha:/);
   assert.match(byCommand['/me'].text, /Account/);
-  assert.match(byCommand['/me'].text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
-  assert.match(byCommand['/me'].text, /Chain: OP Sepolia Testnet \(11155420\)/);
-  assert.equal(byCommand['/me'].parse_mode, 'HTML');
+  assert.match(byCommand['/me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/i);
+  assert.doesNotMatch(byCommand['/me'].text, /Chain:/);
+  assert.equal(byCommand['/me'].parse_mode, undefined);
 
   for (const command of ['/join alpha', '/sessions', '/questions', '/q 1', '/attachments', '/docs']) {
     assertGroupSafeText(byCommand[command].text);

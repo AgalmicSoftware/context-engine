@@ -8441,11 +8441,8 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     joinedSbts: [],
     createdAt,
   });
-  const explorerUrl = addressExplorerUrl(account.accountAddress, env.DEFAULT_CHAIN_ID || '11155420');
   const addressLabel = shortAddress(account.accountAddress);
-  const addressDisplay = explorerUrl
-    ? `<a href="${escapeTelegramHtml(explorerUrl)}">${escapeTelegramHtml(addressLabel)}</a>`
-    : escapeTelegramHtml(addressLabel);
+  const addressDisplay = escapeTelegramHtml(addressLabel);
   const questionButton = await makeCallbackButton({
     env,
     label: 'View Questions',
@@ -8498,7 +8495,6 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     text: [
       'Account',
       `Address: ${addressDisplay}`,
-      `Chain: ${chainDisplayName(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
       '',
       'Use /questions.',
@@ -8506,7 +8502,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     replyMarkup: {
       inline_keyboard: rows,
     },
-    parseMode: explorerUrl ? 'HTML' : '',
+    parseMode: '',
     screen: state.screen,
     command,
     normalized,
