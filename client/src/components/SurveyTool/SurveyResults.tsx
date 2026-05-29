@@ -396,8 +396,8 @@ const HTML_REPORT_EXPORT_FORMATS: readonly { description: string; label: string;
     value: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   },
   {
-    description: 'One-page PDF capture using the same selected sections and print-oriented layout.',
-    label: 'Single-page PDF',
+    description: 'Multi-page PDF report',
+    label: 'PDF report',
     value: SESSION_RESULTS_EXPORT_FORMAT_PDF,
   },
 ]);
