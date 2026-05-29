@@ -12,6 +12,7 @@ import {
   getPhotoAnalysisToggleBySourceId,
   getPhotoAnalysisBodyBySourceId,
   toggleCheckbox,
+  setInputValue,
   setAudioInputValue,
   addAdditionalPhoto,
   renderSubject,
@@ -25,7 +26,7 @@ import {
 describe('AudioSurveyGenerator input and question generation', () => {
   setupAudioSurveyGeneratorTestLifecycle();
 
-  it('toggles transcript mode placeholder text', () => {
+  it('shows transcript mode only when text input exists and toggles placeholder text', () => {
     act(() => {
       root.render(
         <AudioSurveyGenerator
@@ -60,6 +61,26 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(container.querySelector('[data-testid="transcript-mode-toggle"]')).toBeNull();
     expect(textarea.placeholder).toBe('Speak or type text here...');
     expect(textarea.getAttribute('data-enable-downloads')).toBe('false');
+  });
+
+  it('shows transcript mode when a URL source is typed', () => {
+    act(() => {
+      root.render(
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
+      );
+    });
+
+    expect(container.querySelector('[data-testid="transcript-mode-toggle"]')).toBeNull();
+
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/source');
+
+    expect(container.querySelector('[data-testid="transcript-mode-toggle"]')).not.toBeNull();
   });
 
   it('shows transcript mode when a URL source is typed', () => {

@@ -651,7 +651,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByTestId('polis-report')).toBeInTheDocument();
   });
 
-  it('keeps selected results mode button glow inside the scroller gutter', () => {
+  it('keeps selected results mode button glow inside a contained scroller gutter', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const tabletResultsBlock = extractMediaBlock(
       scss,
@@ -661,7 +661,9 @@ describe('OnePageSession results routing', () => {
 
     expect(scss).toMatch(/\.resultsModeActionsScroller\s*{[\s\S]*?padding-block:\s*6px;[\s\S]*?margin-block:\s*-6px;/);
     expect(tabletResultsBlock).toContain('.resultsModeActionsScroller');
-    expect(tabletResultsBlock).toContain('overflow: visible;');
+    expect(tabletResultsBlock).toContain('max-width: 100%;');
+    expect(tabletResultsBlock).toContain('overflow-x: auto;');
+    expect(tabletResultsBlock).toContain('overflow-y: hidden;');
     expect(tabletResultsBlock).toContain('padding: 6px 10px;');
   });
 

@@ -4010,8 +4010,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: auto;
     max-width: none;
     min-height: 0;
-    margin-right: 12px;
-    gap: 16px;
+    margin-right: 8px;
+    gap: 12px;
   }
 
   .pileFooter .pileSubmitButton {
@@ -4075,8 +4075,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     padding: 0;
   }
 
-  .pileHologramToggle {
-    top: 14px;
+  .pileActionButtonGroup {
+    flex-direction: row;
+    gap: 16px;
+  }
+
+  .pileNav {
+    flex-direction: row;
+    gap: 12px;
+    order: 2;
+    margin-left: auto;
+    padding: 6px 16px;
+    border-radius: 50px;
+    min-width: auto;
   }
 
   .pileFooter {
