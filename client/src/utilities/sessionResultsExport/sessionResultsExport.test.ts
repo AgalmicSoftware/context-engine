@@ -3,6 +3,7 @@ import {
   buildSessionResultsHtmlReportFilename,
   buildSessionResultsPdfReportFilename,
   downloadBrowserFile,
+  downloadSessionResultsPdfReport,
   escapeHtml,
   renderSessionResultsHtmlReport,
   serializeJsonForHtmlScript,
@@ -372,5 +373,51 @@ describe('sessionResultsExport utilities', () => {
     appendChildSpy.mockRestore();
     createElementSpy.mockRestore();
     clickSpy.mockRestore();
+  });
+
+  it('paginates PDF exports instead of shrinking long reports onto one page', async () => {
+    const canvas = {
+      height: 2000,
+      toDataURL: jest.fn(() => 'data:image/jpeg;base64,report'),
+      width: 500,
+    } as unknown as HTMLCanvasElement;
+    const html2canvas = jest.fn(async () => canvas);
+    const addImage = jest.fn();
+    const addPage = jest.fn();
+    const save = jest.fn();
+    const JsPdf = jest.fn().mockImplementation(() => ({
+      addImage,
+      addPage,
+      internal: {
+        pageSize: {
+          getHeight: () => 842,
+          getWidth: () => 595,
+        },
+      },
+      save,
+    }));
+
+    await downloadSessionResultsPdfReport({
+      filename: 'report.pdf',
+      html: '<!doctype html><html><body><main>Long report</main></body></html>',
+      html2canvasLoader: async () => ({ default: html2canvas }),
+      jsPdfLoader: async () => ({ jsPDF: JsPdf }),
+    });
+
+    expect(html2canvas).toHaveBeenCalledTimes(1);
+    expect(canvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.82);
+    expect(addImage).toHaveBeenCalledTimes(3);
+    expect(addPage).toHaveBeenCalledTimes(2);
+    expect(addImage.mock.calls.map((call) => call[3])).toEqual([0, -842, -1684]);
+    expect(addImage.mock.calls[0]).toEqual(expect.arrayContaining([
+      'data:image/jpeg;base64,report',
+      'JPEG',
+      0,
+      0,
+      595,
+      2380,
+    ]));
+    expect(save).toHaveBeenCalledWith('report.pdf');
+    expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
   });
 });

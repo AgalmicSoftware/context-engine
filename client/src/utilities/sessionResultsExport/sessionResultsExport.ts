@@ -3,7 +3,7 @@ export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
 export const SESSION_RESULTS_HTML_PRIVACY_REDACTED = 'redacted';
 export const SESSION_RESULTS_EXPORT_FORMAT_VIEWER = 'viewer';
 export const SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML = 'single-html';
-export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'single-page-pdf';
+export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'pdf-report';
 
 const DEFAULT_UNAVAILABLE_REASON = 'No hydrated data was available for this section when the export was created.';
 const DEFAULT_REDACTIONS = [
@@ -167,6 +167,7 @@ export type SessionResultsHtmlReportRenderOptions = {
 };
 
 type JsPdfConstructor = new (...args: unknown[]) => {
+  addPage: () => void;
   addImage: (...args: unknown[]) => void;
   internal: {
     pageSize: {
@@ -878,12 +879,26 @@ export const downloadSessionResultsPdfReport = async ({
     const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const fitScale = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-    const imgWidth = canvas.width * fitScale;
-    const imgHeight = canvas.height * fitScale;
-    const x = (pageWidth - imgWidth) / 2;
-    const y = (pageHeight - imgHeight) / 2;
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.86), 'JPEG', x, y, imgWidth, imgHeight, undefined, 'FAST');
+    if (!canvas.width || !canvas.height) {
+      throw new Error('PDF export capture did not produce a usable canvas.');
+    }
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.82);
+    const imgWidth = pageWidth;
+    const imgHeight = (canvas.height * pageWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      pdf.addPage();
+      position = heightLeft - imgHeight;
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pageHeight;
+    }
+
     pdf.save(filename);
   } finally {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);

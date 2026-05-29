@@ -598,8 +598,8 @@ const HTML_REPORT_EXPORT_FORMATS: readonly { description: string; label: string;
     value: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   },
   {
-    description: 'Print-oriented PDF preview',
-    label: 'Single-page PDF',
+    description: 'Multi-page PDF report',
+    label: 'PDF report',
     value: SESSION_RESULTS_EXPORT_FORMAT_PDF,
   },
 ]);
