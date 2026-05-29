@@ -4628,19 +4628,27 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /^Agent install info/m);
-  assert.match(result.response.text, /Expires: 2026-06-05T12:00:00.000Z/);
-  const copyToken = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token');
-  const token = copyToken?.copy_text?.text || '';
+  assert.equal(result.response.text, [
+    'Agent Install Info',
+    '',
+    'Press Copy Agent Info and paste to your agent',
+    '',
+    'Context Engine will ask you questions and create a privacy-preserving map of opinions',
+  ].join('\n'));
+  const copyInfoButton = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info');
+  const copyInfo = copyInfoButton?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.equal(new TextEncoder().encode(token).length <= 256, true);
+  assert.match(copyInfo, /token=ceagt_[A-Za-z0-9_-]+/);
+  assert.match(copyInfo, /worker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /skill=https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
-  assert.match(result.response.text, /ceagt_…[A-Za-z0-9_-]{4}/);
-  assert.match(result.response.text, /Copy Agent Token/);
-  assert.match(result.response.text, /Worker: https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(result.response.text, /Skill: https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026/);
-  assert.match(result.response.text, /chat shows the masked token/i);
+  assert.doesNotMatch(result.response.text, /Worker:/);
+  assert.doesNotMatch(result.response.text, /Skill:/);
+  assert.doesNotMatch(result.response.text, /Token:/);
+  assert.doesNotMatch(result.response.text, /Expires:/);
 
   const loaded = await loadTelegramAgentDelegationToken({ env, token, now });
   assert.equal(loaded.ok, true);
@@ -4682,15 +4690,15 @@ test('private Onboard Agent callback renders the copy install screen on first ta
     now,
   });
   const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token')?.copy_text?.text || '';
-  const token = copyInfo;
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.ok(onboard.callback_data);
   assert.equal(onboard.url, undefined);
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-first-tap');
-  assert.match(result.response.text, /Tap Copy Agent Token, then paste it into your trusted agent/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
 });
@@ -4721,13 +4729,14 @@ test('expired private Onboard Agent callback mints a fresh copy token screen', a
     now,
   });
   const copyToken = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token')?.copy_text?.text || '';
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyToken.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-expired-tap');
-  assert.match(copyToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.equal(result.response.text.includes(copyToken), false);
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
 });
 
 test('/start Onboard Agent deep-link mints private install info without exposing tokens in group', async () => {
@@ -4761,13 +4770,13 @@ test('/start Onboard Agent deep-link mints private install info without exposing
     now,
   });
   const copyInfo = flattenButtons(privateStart.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token')?.copy_text?.text || '';
-  const token = copyInfo;
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(privateStart.screen, 'agent_token');
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(privateStart.response.text.includes(token), false);
-  assert.match(privateStart.response.text, /Worker: https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /worker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
 });
 
 test('/start agent_onboarding slug deep-link opens the private copy install screen directly', async () => {
@@ -4779,13 +4788,13 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
     now,
   });
   const copyInfo = flattenButtons(result.response.replyMarkup)
-    .find((button) => button.text === 'Copy Agent Token')?.copy_text?.text || '';
-  const token = copyInfo;
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /Tap Copy Agent Token, then paste it into your trusted agent/);
-  assert.match(result.response.text, /Session: Alpha Session/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent/);
+  assert.doesNotMatch(result.response.text, /Session: Alpha Session/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
 });

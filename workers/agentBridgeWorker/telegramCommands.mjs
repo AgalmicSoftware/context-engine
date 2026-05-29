@@ -439,10 +439,28 @@ function agentSkillUrl(env = {}) {
   );
 }
 
-function maskAgentToken(token = '') {
-  const value = safeString(token);
-  if (!value) return '';
-  return value.length > 11 ? `${value.slice(0, 6)}…${value.slice(-4)}` : `${value.slice(0, 6)}…`;
+function compactGithubRawUrl(url = '') {
+  const value = safeString(url);
+  const rawPrefix = 'https://raw.githubusercontent.com/';
+  if (!value.startsWith(rawPrefix)) return value;
+  const parts = value.slice(rawPrefix.length).split('/').filter(Boolean);
+  if (parts.length < 4) return value;
+  const [owner, repo, branch, ...pathParts] = parts;
+  return `https://github.com/${owner}/${repo}/raw/${branch}/${pathParts.join('/')}`;
+}
+
+function buildAgentInstallCopyInfo({
+  token = '',
+  workerUrl = '',
+  skillUrl = '',
+} = {}) {
+  const compactSkillUrl = compactGithubRawUrl(skillUrl);
+  const candidates = [
+    `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
+  ];
+  return candidates.find((value) => new TextEncoder().encode(value).length <= TELEGRAM_COPY_TEXT_MAX_BYTES) || '';
 }
 
 function callbackMessageButtonTexts(message = {}) {
@@ -458,6 +476,7 @@ function callbackMessageLooksLikeAgentOnboarding(message = {}) {
   return labels.some((label) => [
     'Onboard Agent',
     'Copy Agent Install Info',
+    'Copy Agent Info',
     'Copy Agent Token',
   ].includes(label));
 }
@@ -8689,11 +8708,12 @@ async function buildAgentTokenResponse({
   }
   const workerUrl = agentBridgePublicUrl(env);
   const skillUrl = agentSkillUrl(env);
-  const maskedToken = maskAgentToken(issued.token);
-  const copyToken = copyTextButton('Copy Agent Token', issued.token);
-  const copyWorkerUrl = copyTextButton('Copy Worker URL', workerUrl);
-  const copySkillUrl = copyTextButton('Copy Skill URL', skillUrl);
-  const copySessionSlug = copyTextButton('Copy Session Slug', resolved.session.sessionSlug);
+  const copyInfo = buildAgentInstallCopyInfo({
+    token: issued.token,
+    workerUrl,
+    skillUrl,
+  });
+  const copyInfoButton = copyTextButton('Copy Agent Info', copyInfo);
   const accountButton = await makeCallbackButton({
     env,
     label: 'Back to Account',
@@ -8704,22 +8724,14 @@ async function buildAgentTokenResponse({
     createdAt,
   });
   const rows = [];
-  if (copyToken) rows.push([copyToken]);
-  if (copyWorkerUrl) rows.push([copyWorkerUrl]);
-  if (copySkillUrl) rows.push([copySkillUrl]);
-  if (copySessionSlug) rows.push([copySessionSlug]);
+  if (copyInfoButton) rows.push([copyInfoButton]);
   rows.push([accountButton]);
   const bodyText = [
-    'Agent install info',
-    `Session: ${sessionLabel(resolved.session)}`,
-    `Token: ${maskedToken}`,
-    `Expires: ${issued.record.expiresAt}`,
+    'Agent Install Info',
     '',
-    'Tap Copy Agent Token, then paste it into your trusted agent when it asks for the Context Engine token.',
-    `Worker: ${workerUrl}`,
-    `Skill: ${skillUrl}`,
+    'Press Copy Agent Info and paste to your agent',
     '',
-    'The full token is only in the copy button payload. The chat shows the masked token.',
+    'Context Engine will ask you questions and create a privacy-preserving map of opinions',
   ].join('\n');
   assertNoSecretShape({ bodyText }, 'Agent token response body must not expose secret-shaped values.');
   return reply({

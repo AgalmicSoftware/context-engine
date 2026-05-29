@@ -85,10 +85,10 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 ```
 
 After the user taps `Start`, Telegram should land directly on the private
-`Copy Agent Install Info` screen. Ask the user to tap `Copy Agent Install Info`
-and paste the copied install info back into Claude Code. Do not call the CE
-worker until the pasted install info provides a `Worker`, `Session`, and
-`ceagt_...` token.
+`Agent Install Info` screen. Ask the user to tap `Copy Agent Info` and paste
+the copied install info back into Claude Code. Do not call the CE worker until
+the pasted install info provides a `worker=...`, `skill=...`, and `ceagt_...`
+token.
 
 ## Staying Up To Date
 
@@ -214,7 +214,7 @@ launches, and client links. Do not invent a new CE endpoint for it.
 Use this path when the user's assistant is not running inside the CE Telegram bot but the user wants it to act against CE on their behalf.
 
 1. Ask the user to open the CE bot and run `/start`.
-2. The user taps `Onboard Agent`, then `Copy Agent Install Info`. `/me` also links to account details and activity after onboarding.
+2. The user taps `Onboard Agent`, then `Copy Agent Info`. `/me` also links to account details and activity after onboarding.
 3. The user copies the install info into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
 5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and token-bound session.
