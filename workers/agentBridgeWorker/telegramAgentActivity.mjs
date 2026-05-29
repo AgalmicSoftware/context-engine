@@ -57,6 +57,114 @@ async function listKvRecordsByPrefix(env = {}, prefix = '', {
   return records;
 }
 
+export async function listKvKeyMetadataByPrefix(env = {}, prefix = '', {
+  limit = 200,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!prefix || !kv || typeof kv.list !== 'function') return [];
+  const entries = [];
+  const maxRecords = Math.max(1, Math.min(1000, Number(limit) || 200));
+  let cursor = undefined;
+  do {
+    const page = await kv.list({
+      prefix,
+      limit: maxRecords,
+      ...(cursor ? { cursor } : {}),
+    }).catch(() => null);
+    const keys = Array.isArray(page?.keys) ? page.keys : [];
+    for (const entry of keys) {
+      const key = safeString(entry?.name || entry);
+      if (!key) continue;
+      entries.push({
+        key,
+        metadata: entry && typeof entry === 'object' && !Array.isArray(entry)
+          ? (entry.metadata || null)
+          : null,
+      });
+      if (entries.length >= maxRecords) return entries;
+    }
+    cursor = page?.list_complete === false ? safeString(page.cursor) : '';
+  } while (cursor);
+  return entries;
+}
+
+async function readKvRecord(env = {}, key = '') {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') return null;
+  const record = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record && typeof record === 'object' && !Array.isArray(record)
+    ? { ...record, key }
+    : null;
+}
+
+export function buildTelegramAgentActivityMetadata({
+  type = '',
+  status = '',
+  createdAt = '',
+  pendingAction = '',
+  sessionSlug = '',
+  questionId = '',
+  telegramUserId = '',
+  targetTelegramUserId = '',
+} = {}) {
+  const metadata = {
+    v: 1,
+    t: safeString(type),
+    s: safeString(status),
+    c: safeString(createdAt),
+    p: safeString(pendingAction),
+    sg: sanitizeSessionSlug(sessionSlug),
+    questionId: safeString(questionId),
+  };
+  const userId = safeString(telegramUserId);
+  const targetUserId = safeString(targetTelegramUserId);
+  if (userId) metadata.u = userId;
+  if (targetUserId) metadata.tu = targetUserId;
+  assertNoSecretShape(metadata, 'Telegram agent activity metadata must not serialize secrets.');
+  return metadata;
+}
+
+function recordFromActivityMetadata(metadata = {}, key = '') {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata) || Number(metadata.v) !== 1) return null;
+  const type = safeString(metadata.t);
+  const common = {
+    key,
+    sessionSlug: sanitizeSessionSlug(metadata.sg),
+    questionId: safeString(metadata.questionId || metadata.q),
+    status: safeString(metadata.s),
+    createdAt: safeString(metadata.c),
+    selectedAt: safeString(metadata.c),
+    telegramUserId: safeString(metadata.u),
+  };
+  if (!common.sessionSlug || !type) return null;
+  if (type === 'answer_draft') {
+    return {
+      ...common,
+      answerLabel: '',
+      answerValue: '',
+      controlType: '',
+    };
+  }
+  if (type === 'proposed_question') {
+    return {
+      ...common,
+      createdByTelegramUserId: safeString(metadata.u),
+      prompt: '',
+      questionType: '',
+      tags: [],
+    };
+  }
+  if (type === 'group_proposal') {
+    return {
+      ...common,
+      proposedBy: safeString(metadata.u),
+      targetTelegramUserId: safeString(metadata.tu),
+      message: '',
+    };
+  }
+  return null;
+}
+
 function createdAtOf(item = {}) {
   return safeString(item.createdAt || item.updatedAt || item.selectedAt || item.approvedAt);
 }
@@ -131,16 +239,17 @@ function decisionItems(record = {}, options = {}) {
 }
 
 function proposedQuestionItem(record = {}, options = {}) {
+  const prompt = safeString(record.prompt);
   return publicItem({
     type: 'proposed_question',
     sessionSlug: sanitizeSessionSlug(record.sessionSlug),
     questionId: safeString(record.questionId),
     createdAt: safeString(record.createdAt),
     status: safeString(record.status || 'active'),
-    summary: `Question proposed: ${safeString(record.prompt).slice(0, 140)}`,
+    summary: prompt ? `Question proposed: ${prompt.slice(0, 140)}` : 'Question proposed for review',
     pendingAction: '',
     content: {
-      prompt: safeString(record.prompt),
+      prompt,
       questionType: safeString(record.questionType),
       tags: Array.isArray(record.tags) ? record.tags.map(safeString).filter(Boolean) : [],
     },
@@ -163,6 +272,28 @@ function groupProposalItem(record = {}, options = {}) {
   }, options);
 }
 
+async function listMetadataBackedRecords(env = {}, prefix = '', {
+  includeContent = false,
+  limit = 200,
+  filter = () => true,
+} = {}) {
+  if (includeContent) {
+    return (await listKvRecordsByPrefix(env, prefix, { limit })).filter(filter);
+  }
+  const entries = await listKvKeyMetadataByPrefix(env, prefix, { limit });
+  const records = [];
+  for (const entry of entries) {
+    const metadataRecord = recordFromActivityMetadata(entry.metadata, entry.key);
+    if (metadataRecord && filter(metadataRecord)) {
+      records.push(metadataRecord);
+      continue;
+    }
+    const record = await readKvRecord(env, entry.key);
+    if (record && filter(record)) records.push(record);
+  }
+  return records;
+}
+
 export async function listTelegramAgentActivity({
   env = {},
   telegramUserId = '',
@@ -179,9 +310,12 @@ export async function listTelegramAgentActivity({
   const options = { includeContent };
   const items = [];
 
-  const drafts = await listKvRecordsByPrefix(env, `${ANSWER_DRAFT_KV_PREFIX}${userId}:`, { limit: 300 });
+  const drafts = await listMetadataBackedRecords(env, `${ANSWER_DRAFT_KV_PREFIX}${userId}:`, {
+    includeContent,
+    limit: 300,
+    filter: (record) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record.sessionSlug)),
+  });
   drafts
-    .filter((record) => !slugSet.size || slugSet.has(sanitizeSessionSlug(record.sessionSlug)))
     .forEach((record) => items.push(draftItem(record, options)));
 
   for (const slug of slugs) {
@@ -195,14 +329,20 @@ export async function listTelegramAgentActivity({
       .filter((record) => safeString(record.telegramUserId) === userId)
       .forEach((record) => items.push(...decisionItems(record, options)));
 
-    const proposed = await listKvRecordsByPrefix(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, { limit: 1000 });
+    const proposed = await listMetadataBackedRecords(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, {
+      includeContent,
+      limit: 1000,
+      filter: (record) => safeString(record.createdByTelegramUserId) === userId,
+    });
     proposed
-      .filter((record) => safeString(record.createdByTelegramUserId) === userId)
       .forEach((record) => items.push(proposedQuestionItem(record, options)));
 
-    const groupProposals = await listKvRecordsByPrefix(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, { limit: 1000 });
+    const groupProposals = await listMetadataBackedRecords(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, {
+      includeContent,
+      limit: 1000,
+      filter: (record) => [record.proposedBy, record.targetTelegramUserId].map(safeString).includes(userId),
+    });
     groupProposals
-      .filter((record) => [record.proposedBy, record.targetTelegramUserId].map(safeString).includes(userId))
       .forEach((record) => items.push(groupProposalItem(record, options)));
   }
 

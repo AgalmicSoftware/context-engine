@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
-import { listTelegramAgentActivity } from './telegramAgentActivity.mjs';
+import {
+  buildTelegramAgentActivityMetadata,
+  listTelegramAgentActivity,
+} from './telegramAgentActivity.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import {
@@ -17,13 +20,21 @@ import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mj
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.metadata = new Map();
+    this.getCalls = 0;
   }
 
-  async put(key, value) {
+  async put(key, value, options = {}) {
     this.store.set(key, value);
+    if (options && typeof options === 'object' && Object.hasOwn(options, 'metadata')) {
+      this.metadata.set(key, options.metadata);
+    } else {
+      this.metadata.delete(key);
+    }
   }
 
   async get(key) {
+    this.getCalls += 1;
     return this.store.get(key) || null;
   }
 
@@ -39,10 +50,17 @@ class MemoryKv {
     const page = keys.slice(start, start + limit);
     const next = start + page.length;
     return {
-      keys: page.map((name) => ({ name })),
+      keys: page.map((name) => ({
+        name,
+        ...(this.metadata.has(name) ? { metadata: this.metadata.get(name) } : {}),
+      })),
       list_complete: next >= keys.length,
       cursor: next >= keys.length ? undefined : String(next),
     };
+  }
+
+  resetGetCalls() {
+    this.getCalls = 0;
   }
 }
 
@@ -508,6 +526,131 @@ test('Telegram agent activity vote scans use user-scoped prefixes past shared li
   assert.equal(JSON.stringify(decisions).includes('q-other-'), false);
 });
 
+test('Telegram agent activity uses KV metadata for non-content one-to-one records with fallback', async () => {
+  const env = telegramOnlyEnv();
+  const metadataRecords = [
+    {
+      key: 'telegram:answer-draft:42:alpha:q-binary',
+      value: {
+        status: 'draft_saved',
+        telegramUserId: '42',
+        sessionSlug: 'alpha',
+        questionId: 'q-binary',
+        answerLabel: 'Agree',
+        answerValue: 'Agree',
+        controlType: 'binary',
+        selectedAt: '2026-12-01T12:01:00.000Z',
+      },
+      metadata: buildTelegramAgentActivityMetadata({
+        type: 'answer_draft',
+        status: 'draft_saved',
+        createdAt: '2026-12-01T12:01:00.000Z',
+        pendingAction: 'review_draft',
+        sessionSlug: 'alpha',
+        questionId: 'q-binary',
+        telegramUserId: '42',
+      }),
+    },
+    {
+      key: 'telegram:proposed-question:alpha:q-agent',
+      value: {
+        status: 'active',
+        createdByTelegramUserId: '42',
+        sessionSlug: 'alpha',
+        questionId: 'q-agent',
+        prompt: 'Should the agent village publish a daily recap?',
+        questionType: 'binary',
+        tags: ['recap'],
+        createdAt: '2026-12-01T12:02:00.000Z',
+      },
+      metadata: buildTelegramAgentActivityMetadata({
+        type: 'proposed_question',
+        status: 'active',
+        createdAt: '2026-12-01T12:02:00.000Z',
+        sessionSlug: 'alpha',
+        questionId: 'q-agent',
+        telegramUserId: '42',
+      }),
+    },
+    {
+      key: 'telegram:lightweight-group-proposal:alpha:g-agent',
+      value: {
+        status: 'pending_user_decision',
+        proposedBy: '42',
+        targetTelegramUserId: '',
+        sessionSlug: 'alpha',
+        proposalId: 'g-agent',
+        categoryId: 'role',
+        optionIds: ['organizer'],
+        message: 'Review the organizer group.',
+        createdAt: '2026-12-01T12:03:00.000Z',
+      },
+      metadata: buildTelegramAgentActivityMetadata({
+        type: 'group_proposal',
+        status: 'pending_user_decision',
+        createdAt: '2026-12-01T12:03:00.000Z',
+        pendingAction: 'review_group_proposal',
+        sessionSlug: 'alpha',
+        telegramUserId: '42',
+      }),
+    },
+  ];
+  for (const record of metadataRecords) {
+    await env.AGENT_ACTION_KV.put(record.key, JSON.stringify(record.value), { metadata: record.metadata });
+  }
+
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const metadataItems = await listTelegramAgentActivity({
+    env,
+    telegramUserId: '42',
+    sessionSlugs: ['alpha'],
+    includeContent: false,
+    limit: 10,
+  });
+
+  assert.equal(env.AGENT_ACTION_KV.getCalls, 0);
+  assert.deepEqual(metadataItems.map((item) => item.type).sort(), [
+    'answer_draft',
+    'group_proposal',
+    'proposed_question',
+  ]);
+  assert.equal(JSON.stringify(metadataItems).includes('daily recap'), false);
+  assert.equal(metadataItems.every((item) => !Object.hasOwn(item, 'content')), true);
+
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-legacy', JSON.stringify({
+    status: 'active',
+    createdByTelegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-legacy',
+    prompt: 'Should legacy questions still render?',
+    questionType: 'binary',
+    tags: ['legacy'],
+    createdAt: '2026-12-01T12:04:00.000Z',
+  }));
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const fallbackItems = await listTelegramAgentActivity({
+    env,
+    telegramUserId: '42',
+    sessionSlugs: ['alpha'],
+    includeContent: false,
+    limit: 10,
+  });
+  assert.equal(env.AGENT_ACTION_KV.getCalls, 1);
+  assert.equal(fallbackItems.some((item) => item.summary.includes('legacy questions still render')), true);
+
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const contentItems = await listTelegramAgentActivity({
+    env,
+    telegramUserId: '42',
+    sessionSlugs: ['alpha'],
+    includeContent: true,
+    limit: 10,
+  });
+  assert.equal(env.AGENT_ACTION_KV.getCalls >= 4, true);
+  assert.equal(contentItems.some((item) => item.content?.prompt?.includes('daily recap')), true);
+  assert.equal(contentItems.some((item) => item.content?.answerLabel === 'Agree'), true);
+});
+
 test('Telegram agent can read active questions and draft preferences after group join', async () => {
   const env = baseEnv();
   await buildTelegramCommandResponse({
@@ -563,6 +706,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(binaryDraft.answerLabel, 'Agree');
   assert.match(binaryDraft.answerValue, /Matches the stated priority/);
   assert.equal(binaryDraft.source, 'agent_handoff');
+  assert.equal(env.AGENT_ACTION_KV.metadata.get('telegram:answer-draft:42:alpha:q-binary')?.t, 'answer_draft');
   assert.equal(binaryDraft.actionMetadata.authMode, 'service_token');
   await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
     status: 'draft_saved',
@@ -1441,6 +1585,11 @@ test('Telegram agent can create and dry-run pose a new group question', async ()
   assert.equal(body.posed, true);
   assert.equal(body.sent, false);
   assert.equal(questions.questions.some((question) => question.prompt === 'What question should the group answer next?'), true);
+  assert.equal(Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(([key, metadata]) => (
+    key.startsWith('telegram:proposed-question:alpha:') &&
+    metadata.t === 'proposed_question' &&
+    metadata.u === '42'
+  )), true);
 });
 
 test('Telegram agent can propose Cloudflare-only groups for user approval', async () => {
@@ -1476,6 +1625,11 @@ test('Telegram agent can propose Cloudflare-only groups for user approval', asyn
   assert.equal(proposed.ok, true);
   assert.equal(proposed.requiresUserApproval, true);
   assert.equal(proposed.category.categoryId, 'ai_tribe');
+  assert.equal(Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(([key, metadata]) => (
+    key.startsWith('telegram:lightweight-group-proposal:alpha:') &&
+    metadata.t === 'group_proposal' &&
+    metadata.u === '42'
+  )), true);
 
   const groupsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/groups?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
