@@ -244,6 +244,11 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.loadMoreQuestions/);
   assert.match(html, /function loadMoreQuestions\(\)/);
   assert.match(html, /stateUrl\.searchParams\.set\('questionLimit', String\(state\.questionLimit\)\);/);
+  assert.match(html, /const FAST_INITIAL_QUESTION_LIMIT = 5;/);
+  assert.match(html, /questionLimit: FAST_INITIAL_QUESTION_LIMIT,/);
+  assert.match(html, /function shouldAutoExpandQuestions\(data\)/);
+  assert.match(html, /setTimeout\(\(\) => load\(\), 0\);/);
+  assert.match(html, /state\.questionLimit = FAST_INITIAL_QUESTION_LIMIT;/);
   assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
   assert.match(html, /\.card\[data-active="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\), var\(--question-card-shadow\);/);
   assert.match(html, /\.card\[data-highlight="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--settings-accent\), var\(--question-card-shadow\);/);
@@ -983,6 +988,23 @@ test('Mini App question state defaults to 50 questions and supports loading more
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions),
   };
+
+  const fastInitial = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=5`),
+    env,
+  });
+  assert.equal(fastInitial.ok, true);
+  assert.equal(fastInitial.pageSize, 50);
+  assert.equal(fastInitial.questionCount, 55);
+  assert.equal(fastInitial.loadedQuestionCount, 5);
+  assert.equal(fastInitial.loadedQuestionLimit, 5);
+  assert.equal(fastInitial.hasMoreQuestions, true);
+  assert.equal(fastInitial.questions.length, 5);
+  const fastActionCount = Array.from(kv.store.values())
+    .map((value) => JSON.parse(value))
+    .filter((record) => record?.miniAppQuestionAction === true)
+    .length;
+  assert.equal(fastActionCount, 5);
 
   const initial = await __test__telegramMiniApp.buildMiniAppState({
     request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`),

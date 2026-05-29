@@ -118,6 +118,7 @@ import {
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 50;
+const DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT = 5;
 const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
@@ -270,13 +271,16 @@ function miniAppQuestionLimitFromRequest(url, pageSize = DEFAULT_MINI_APP_PAGE_S
   return Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Math.floor(parsed)));
 }
 
-function pagedMiniAppQuestions(questions = [], limit = DEFAULT_MINI_APP_PAGE_SIZE) {
-  const source = Array.isArray(questions) ? questions : [];
+function pagedMiniAppQuestionEntries(entries = [], limit = DEFAULT_MINI_APP_PAGE_SIZE, launchQuestionId = '') {
+  const source = Array.isArray(entries) ? entries : [];
   const boundedLimit = Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Number(limit) || DEFAULT_MINI_APP_PAGE_SIZE));
   const page = source.slice(0, boundedLimit);
-  const launchQuestion = source.find((question) => question?.activeFromLaunch === true);
-  if (launchQuestion && !page.some((question) => question?.questionKey === launchQuestion.questionKey)) {
-    return [launchQuestion, ...page].slice(0, boundedLimit);
+  const launchId = lower(launchQuestionId);
+  const launchEntry = launchId
+    ? source.find((entry) => lower(readQuestionId(entry?.question)) === launchId)
+    : null;
+  if (launchEntry && !page.some((entry) => lower(readQuestionId(entry?.question)) === launchId)) {
+    return [launchEntry, ...page].slice(0, boundedLimit);
   }
   return page;
 }
@@ -1655,40 +1659,52 @@ async function buildMiniAppState({
     loaded: await loadQuestionsForSession(env, slug, { waitUntil }),
   })));
   let questionIndex = 0;
-  const questionGroups = await Promise.all(loadedEntries.map(async ({ sessionSlug: slug, session, loaded }) => {
+  const sourceQuestionEntries = loadedEntries.flatMap(({ sessionSlug: slug, session, loaded }) => {
     const sourceQuestions = Array.isArray(loaded.questions) ? loaded.questions : [];
-    return Promise.all(sourceQuestions.map((question) => miniQuestionFromRecord({
-      env,
+    return sourceQuestions.map((question) => ({
       sessionSlug: slug,
       session,
       question,
       index: questionIndex++,
-      launchQuestionId,
-      createdAt,
-    })));
-  }));
-  const loadedQuestions = questionGroups.flat();
-  const loadedQuestionsById = new Map();
-  loadedQuestions.forEach((question) => {
-    if (question?.questionId) loadedQuestionsById.set(lower(question.questionId), question);
+    }));
+  });
+  const sourceQuestionEntriesById = new Map();
+  sourceQuestionEntries.forEach((entry) => {
+    const qid = readQuestionId(entry.question);
+    if (qid) sourceQuestionEntriesById.set(lower(qid), entry);
   });
   const skippedLaunchQuestionIds = new Set(launchSeries.skippedQuestionIds.map(lower));
-  const seriesSourceQuestions = launchSeries.enabled
+  const seriesSourceEntries = launchSeries.enabled
     ? launchSeries.questionIds
-      .map((questionId) => loadedQuestionsById.get(lower(questionId)))
+      .map((questionId) => sourceQuestionEntriesById.get(lower(questionId)))
       .filter(Boolean)
     : [];
-  const allQuestions = seriesSourceQuestions.length
-    ? seriesSourceQuestions.filter((question) => !skippedLaunchQuestionIds.has(lower(question.questionId)))
-    : loadedQuestions;
-  const questions = pagedMiniAppQuestions(allQuestions, requestedQuestionLimit);
-  const availableQuestionCount = allQuestions.filter((question) => question?.canAnswer).length;
-  const unavailableQuestionCount = allQuestions.filter((question) => question?.payloadUnavailable === true).length;
-  const lockedQuestionCount = allQuestions.filter((question) => question?.locked === true).length;
+  const allQuestionEntries = seriesSourceEntries.length
+    ? seriesSourceEntries.filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+    : sourceQuestionEntries;
+  const questionEntries = seriesSourceEntries.length
+    ? allQuestionEntries
+    : pagedMiniAppQuestionEntries(allQuestionEntries, requestedQuestionLimit, launchQuestionId);
+  const questions = await Promise.all(questionEntries.map(({ sessionSlug: slug, session, question, index }) => miniQuestionFromRecord({
+    env,
+    sessionSlug: slug,
+    session,
+    question,
+    index,
+    launchQuestionId,
+    createdAt,
+  })));
+  const questionsById = new Map();
+  questions.forEach((question) => {
+    if (question?.questionId) questionsById.set(lower(question.questionId), question);
+  });
+  const availableQuestionCount = questions.filter((question) => question?.canAnswer).length;
+  const unavailableQuestionCount = questions.filter((question) => question?.payloadUnavailable === true).length;
+  const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
   const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
     sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
-  ), 0) || allQuestions.length;
-  const activeQuestionKey = (seriesSourceQuestions.length
+  ), 0) || allQuestionEntries.length;
+  const activeQuestionKey = (seriesSourceEntries.length
     ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
     : '') ||
     questions.find((question) => question.activeFromLaunch)?.questionKey ||
@@ -1753,9 +1769,9 @@ async function buildMiniAppState({
   const sourceOk = loadedEntries.every((entry) => entry.loaded.ok !== false);
   const sourceReasons = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.reason)).filter(Boolean))];
   const sourceNames = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.source)).filter(Boolean))];
-  const questionSeriesKeys = seriesSourceQuestions
-    .filter((question) => !skippedLaunchQuestionIds.has(lower(question.questionId)))
-    .map((question) => question.questionKey)
+  const questionSeriesKeys = seriesSourceEntries
+    .filter((entry) => !skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+    .map((entry) => questionsById.get(lower(readQuestionId(entry.question)))?.questionKey)
     .filter(Boolean);
   const questionSeriesActiveIndex = Math.max(0, questionSeriesKeys.indexOf(activeQuestionKey));
   return {
@@ -1781,22 +1797,22 @@ async function buildMiniAppState({
     draftAnswersByQuestionKey: savedDraftState.draftAnswersByQuestionKey,
     prefilledDraftAnswersByQuestionKey,
     questionSeries: {
-      enabled: Boolean(seriesSourceQuestions.length),
-      questionCount: seriesSourceQuestions.length,
+      enabled: Boolean(seriesSourceEntries.length),
+      questionCount: seriesSourceEntries.length,
       questionKeys: questionSeriesKeys,
       activeIndex: questionSeriesActiveIndex,
       currentQuestionKey: activeQuestionKey,
-      skippedQuestionKeys: seriesSourceQuestions
-        .filter((question) => skippedLaunchQuestionIds.has(lower(question.questionId)))
-        .map((question) => question.questionKey)
+      skippedQuestionKeys: seriesSourceEntries
+        .filter((entry) => skippedLaunchQuestionIds.has(lower(readQuestionId(entry.question))))
+        .map((entry) => questionsById.get(lower(readQuestionId(entry.question)))?.questionKey)
         .filter(Boolean),
       skippedQuestionCount: skippedLaunchQuestionIds.size,
     },
     activeQuestionKey,
-    questionCount: allQuestions.length,
+    questionCount: allQuestionEntries.length,
     loadedQuestionCount: questions.length,
     loadedQuestionLimit: requestedQuestionLimit,
-    hasMoreQuestions: allQuestions.length > questions.length,
+    hasMoreQuestions: allQuestionEntries.length > questions.length,
     availableQuestionCount,
     unavailableQuestionCount,
     lockedQuestionCount,
@@ -6885,6 +6901,7 @@ function telegramMiniAppHtml() {
     const POPULAR_QUESTION_LIMIT_MIN = 2;
     const POPULAR_QUESTION_LIMIT_MAX = 50;
     const POPULAR_QUESTION_LIMIT_STEP = 2;
+    const FAST_INITIAL_QUESTION_LIMIT = ${DEFAULT_MINI_APP_FAST_INITIAL_QUESTION_LIMIT};
     const QUESTION_TAG_LIMIT = 10;
     const QUESTION_TAG_FILTER_COLLAPSED_LIMIT = 5;
     const state = {
@@ -6980,7 +6997,7 @@ function telegramMiniAppHtml() {
       seriesActiveIndex: 0,
       seriesSkippedKeys: new Set(),
       sessionsPanelOpen: false,
-      questionLimit: 0,
+      questionLimit: FAST_INITIAL_QUESTION_LIMIT,
       loadedOnce: false,
     };
     const el = {
@@ -10991,6 +11008,7 @@ function telegramMiniAppHtml() {
         clearQuestionRetry();
         return;
       }
+      const wasLoadedOnce = state.loadedOnce;
       state.data = body;
       const loadedLimit = Number(body.loadedQuestionLimit || body.loadedQuestionCount || body.pageSize || 0);
       if (loadedLimit > 0) state.questionLimit = loadedLimit;
@@ -11048,6 +11066,10 @@ function telegramMiniAppHtml() {
       }
       render();
       state.loadedOnce = true;
+      if (!wasLoadedOnce && shouldAutoExpandQuestions(body)) {
+        state.questionLimit = Number(body.pageSize || 50) || 50;
+        setTimeout(() => load(), 0);
+      }
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
     function loadMoreQuestions() {
@@ -11055,6 +11077,11 @@ function telegramMiniAppHtml() {
       const increment = Number(state.data?.pageSize || 50) || 50;
       state.questionLimit = current + increment;
       load();
+    }
+    function shouldAutoExpandQuestions(data) {
+      const loaded = Number(data?.loadedQuestionLimit || data?.loadedQuestionCount || 0) || 0;
+      const pageSize = Number(data?.pageSize || 50) || 50;
+      return data?.hasMoreQuestions === true && loaded > 0 && loaded < pageSize;
     }
     el.continueSessions.onclick = () => {
       if (!state.selectedSessionSlugs.size) return;
@@ -11068,7 +11095,7 @@ function telegramMiniAppHtml() {
       state.expandedQuestionKeys = new Set();
       state.highlightedQuestionKey = '';
       state.highlightScrollDone = false;
-      state.questionLimit = 0;
+      state.questionLimit = FAST_INITIAL_QUESTION_LIMIT;
       state.sessionsPanelOpen = false;
       load();
     };
