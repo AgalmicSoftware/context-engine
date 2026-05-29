@@ -13,12 +13,12 @@ export type SbtPageActionEventLike = {
 };
 
 export type SbtPageMintActionControllerPorts = {
-  dispatchMint?: (...args: unknown[]) => unknown;
+  dispatchMint?: CallableFunction;
   openMintTransaction?: () => unknown;
 };
 
 export type SbtPageBurnActionControllerPorts = {
-  dispatchBurn?: () => unknown;
+  dispatchBurn?: CallableFunction;
 };
 
 export type RunSbtPageMintActionControllerArgs = {
