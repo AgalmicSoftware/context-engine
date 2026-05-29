@@ -31,6 +31,8 @@ in practical terms:
 - CE can show the user pending drafts, vote suggestions, proposed questions, and
   previous agent actions so the user can understand and override the agent's
   choices.
+- CE can read aggregate session results, including a topic-map circles view of
+  answered question themes, without exposing raw response records.
 - CE can help admins sponsor important questions. Admin agents should first plan
   the sponsored-question change, show the exact questions to the admin, and only
   apply it after explicit confirmation.
@@ -83,7 +85,8 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 4. Ask the user which personal data may be used for this CE flow. Keep the consent choices in your agent memory for this user.
 5. Draft responses with `POST <Worker>/telegram/agent/api/preferences`; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 6. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
-7. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
+7. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
+8. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
 
@@ -122,6 +125,7 @@ Default token scope permits:
 - reading active questions
 - drafting answers for user review
 - recommending and applying question up/down votes
+- reading aggregate result views such as the topic map
 - reading lightweight groups
 - proposing lightweight group categories or memberships for user approval
 - posing questions for the token-bound session
@@ -291,6 +295,26 @@ With a `ceagt_` token, the worker scopes results to the token-bound Telegram use
 ```
 
 Use this endpoint before prompting the user so you can say what is already pending, what needs approval, and what the agent previously changed. Do not expose activity records in group chats unless the worker has already reduced them to counts.
+
+## Read Aggregate Results
+
+Use this endpoint when the user asks what themes are emerging in the session or
+asks for the CE results view:
+
+```http
+GET /telegram/agent/api/results?sessionSlug=<slug>&view=topic-map
+GET /telegram/agent/api/results-image?sessionSlug=<slug>&view=topic-map
+```
+
+The JSON endpoint returns an aggregate `topicMap` data contract with `topics`,
+circle positions, per-topic question counts, response counts, and question
+bubbles. It does not return raw response records, Telegram user ids, wallet
+addresses, or individual answer text. The image endpoint returns a PNG rendering
+of that same topic map for agents that can send or display images.
+
+If the response has `available: false`, do not invent a map. Explain the
+`unavailableReason` and ask the user to gather more answered questions. For demos
+or previews, pass `demo=1` to either endpoint.
 
 ## Question Cadence
 
