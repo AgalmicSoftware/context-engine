@@ -273,6 +273,66 @@ describe('SurveyQuestions controls', () => {
     expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
   });
 
+  it('submits completed responses with pending edits instead of routing to the completed response', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xSurveyABC',
+      account: '0xABC',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+      modifiedCount: 2,
+    };
+    subject.getPendingEditStats = jest.fn(() => ({ total: 2 }));
+    subject._getEffectiveDraftSlug = jest.fn(() => {
+      throw new Error('pending completed submits should not resolve a response route');
+    });
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
+    expect(subject._submitGuard).toBe(true);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('uses modifiedCount fallback to keep completed pending edits on the submit path', () => {
+    const pushStateSpy = jest.spyOn(window.history, 'pushState').mockImplementation(() => {});
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xSurveyABC',
+      account: '0xABC',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+      modifiedCount: 2,
+    };
+    subject.getPendingEditStats = undefined;
+    subject._getEffectiveDraftSlug = jest.fn(() => {
+      throw new Error('fallback pending edits should not resolve a response route');
+    });
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._getEffectiveDraftSlug).not.toHaveBeenCalled();
+    expect(subject._submitGuard).toBe(true);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(pushStateSpy).not.toHaveBeenCalled();
+  });
+
   it('keeps in-flight primary submit inert before reading pending stats or routes', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
