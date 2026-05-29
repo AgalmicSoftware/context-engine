@@ -272,7 +272,7 @@ test('worker preview update exercises command builder without Telegram network c
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -321,7 +321,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: bytes32QuestionId, questionType: 'rating', prompt: 'How strong is the signal?' },
@@ -749,7 +749,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-first', questionType: 'rating', prompt: 'How strong is the first signal?' },
@@ -906,7 +906,7 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
-      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-rating', questionType: 'rating', prompt: 'How strong is the signal?' },
@@ -1137,6 +1137,7 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
           sessionName: 'Alpha Session',
           default: true,
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
@@ -1144,6 +1145,7 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },

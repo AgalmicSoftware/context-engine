@@ -97,6 +97,7 @@ export async function evaluateTelegramGroupSessionAccessForEnv({
       groupChatId,
       approvedTelegramGroupChatIds: staticAccess.approvedTelegramGroupChatIds || [],
       telegramGroupApprovalRequired: staticAccess.telegramGroupApprovalRequired === true,
+      telegramGroupOpenAccess: staticAccess.telegramGroupOpenAccess === true,
       approval,
     };
   }

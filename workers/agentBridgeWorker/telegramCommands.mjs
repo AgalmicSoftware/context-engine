@@ -3188,9 +3188,55 @@ function sessionVisibleInTelegram(session = {}, {
   return session.telegramBridgeEnabled === true && session.telegramOnly === true;
 }
 
-async function sessionAllowedInCurrentTelegramChat(session = {}, normalized = {}, env = {}) {
+async function sessionAllowedInCurrentTelegramChat(session = {}, normalized = {}, env = {}, {
+  autoApproveAdmin = false,
+} = {}) {
   if (!normalized?.chat || normalized.chat.isPrivate) return true;
-  return (await evaluateTelegramGroupSessionAccessForEnv({ env, session, normalized })).ok;
+  const access = await evaluateTelegramGroupSessionAccessForEnv({ env, session, normalized });
+  if (access.ok) return true;
+  if (!autoApproveAdmin) return false;
+  const approval = await maybeAutoApproveTelegramGroupSession({
+    env,
+    normalized,
+    session,
+    access,
+  });
+  return approval?.ok === true;
+}
+
+async function maybeAutoApproveTelegramGroupSession({
+  env = {},
+  normalized = {},
+  session = {},
+  access = {},
+  createdAt = null,
+} = {}) {
+  if (!normalized?.chat || normalized.chat.isPrivate) return null;
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session,
+    createdAt,
+  });
+  if (!manager.ok) return null;
+  const saved = await persistTelegramGroupApproval({
+    env,
+    session,
+    normalized,
+    approvedByTelegramUserId: normalized.user?.telegramUserId,
+    approvedByAccountAddress: manager.accountAddress,
+    approvalTokenId: 'admin_launch',
+    createdAt: createdAt || nowIso(),
+  });
+  if (!saved.ok) return null;
+  normalized.telegramGroupAutoApprovalNotice = `Group auto-approved for ${sessionLabel(session)} by admin.`;
+  return {
+    ok: true,
+    access,
+    manager,
+    approval: saved.record,
+    notice: normalized.telegramGroupAutoApprovalNotice,
+  };
 }
 
 function telegramVisibleSessions(policy = {}, env = {}) {
@@ -3253,10 +3299,19 @@ async function ensureTelegramGroupSessionAccess({
   session = {},
   method = 'sendMessage',
   messageId = '',
+  createdAt = null,
 } = {}) {
   if (normalized.chat?.isPrivate) return null;
   const access = await evaluateTelegramGroupSessionAccessForEnv({ env, session, normalized });
   if (access.ok) return null;
+  const approval = await maybeAutoApproveTelegramGroupSession({
+    env,
+    normalized,
+    session,
+    access,
+    createdAt,
+  });
+  if (approval?.ok) return null;
   return telegramGroupAccessErrorReply({ normalized, command, session, access, method, messageId });
 }
 
@@ -3769,6 +3824,7 @@ async function buildJoinResponse({
     normalized,
     command,
     session: resolved.session,
+    createdAt,
   });
   if (groupAccessError) return groupAccessError;
 
@@ -3845,9 +3901,10 @@ async function buildJoinResponse({
   return reply({
     chatId: normalized.chat.chatId,
     text: [
+      normalized.telegramGroupAutoApprovalNotice || '',
       state.text,
       questionAvailabilityLine(questionPrefetch),
-    ].join('\n'),
+    ].filter(Boolean).join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
     command,

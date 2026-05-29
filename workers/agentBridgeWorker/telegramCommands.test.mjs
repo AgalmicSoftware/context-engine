@@ -65,6 +65,7 @@ function baseEnv(overrides = {}) {
         sessionName: 'Alpha Session',
         default: true,
         telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
         docLibraryEnabled: true,
       }],
@@ -118,6 +119,7 @@ function agentTokenEnv(overrides = {}) {
         default: true,
         telegramBridgeEnabled: true,
         telegramOnly: true,
+        telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
       }],
     }),
@@ -480,7 +482,7 @@ test('/sessions reads the current telegram_only policy list', async () => {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'old-alpha',
-      sessions: [{ sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      sessions: [{ sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true }],
     }),
     AGENT_ACTION_KV: new MemoryKv(),
   };
@@ -493,8 +495,8 @@ test('/sessions reads the current telegram_only policy list', async () => {
   env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
     defaultSessionSlug: 'old-alpha',
     sessions: [
-      { sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true },
-      { sessionSlug: 'new-beta', sessionName: 'New Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      { sessionSlug: 'old-alpha', sessionName: 'Old Alpha', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
+      { sessionSlug: 'new-beta', sessionName: 'New Beta', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
     ],
   });
   const fresh = await buildTelegramCommandResponse({
@@ -586,6 +588,67 @@ test('Telegram group allowlist filters and blocks group session binding', async 
   assert.match(staleStart.response.text, /\/sessions - choose session/);
 });
 
+test('Telegram group access is closed by default until an admin or open-access policy allows it', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const closedPolicy = {
+    defaultSessionSlug: 'alpha',
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      telegramBridgeEnabled: true,
+      telegramOnly: true,
+    }],
+  };
+  const deniedEnv = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify(closedPolicy),
+  });
+  const adminAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const adminEnv = baseEnv({
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify(closedPolicy),
+  });
+  const openEnv = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+      }],
+    }),
+  });
+
+  const denied = await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env: deniedEnv,
+    now,
+  });
+  const adminJoin = await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env: adminEnv,
+    now,
+  });
+  const adminApproval = JSON.parse(await adminEnv.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'));
+  const openJoin = await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env: openEnv,
+    now,
+  });
+
+  assert.equal(denied.screen, 'telegram_group_access_denied');
+  assert.match(denied.response.text, /not approved for Alpha Session/);
+  assert.equal(await deniedEnv.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
+  assert.equal(adminJoin.screen, 'group_session_card');
+  assert.match(adminJoin.response.text, /Group auto-approved for Alpha Session by admin/);
+  assert.equal(adminApproval.approvalTokenId, 'admin_launch');
+  assert.equal(adminApproval.approvedByTelegramUserId, '42');
+  assert.equal(adminApproval.approvedByAccountAddress, adminAddress.toLowerCase());
+  assert.equal(openJoin.screen, 'group_session_card');
+  assert.equal(await openEnv.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
+});
+
 test('admin-generated group approval link approves the first Telegram group that uses it', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
@@ -654,6 +717,7 @@ test('/sessions paginates tall Telegram session lists', async () => {
         sessionName: slug,
         telegramBridgeEnabled: true,
         telegramOnly: true,
+        telegramGroupOpenAccess: true,
       })),
     }),
     AGENT_ACTION_KV: new MemoryKv(),
@@ -700,13 +764,13 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
         {
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
-          telegramBridgeEnabled: true, telegramOnly: true,
+          telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: false,
         },
         {
@@ -752,6 +816,7 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
           sessionName: 'New Beta',
           telegramBridgeEnabled: true,
           telegramOnly: true,
+          telegramGroupOpenAccess: true,
           createdAt: '2026-05-20T00:00:00.000Z',
         },
         {
@@ -1272,6 +1337,7 @@ test('/results group analysis callback uses session worker AI for the selected p
         sessionName: 'Alpha Session',
         default: true,
         telegramBridgeEnabled: true, telegramOnly: true,
+        telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
         sponsoredAiAllowed: true,
         sessionWorkerUrl: 'https://session-worker.example',
@@ -1494,12 +1560,14 @@ test('/results uses the joined Telegram-enabled session without requiring SBT jo
           sessionSlug: 'alpha',
           sessionName: 'Alpha Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'beta',
           sessionName: 'Beta Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: false,
           requiredSbtGroups: [{ groupId: 'beta-sbt', name: 'Beta SBT', joinMode: 'public' }],
         },
@@ -1936,12 +2004,14 @@ test('/start admin actions target the latest submitted session before the regist
           sessionSlug: 'test-session',
           sessionName: 'Registry First Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           sessionWorkerUrl: 'https://session.example',
         },
         {
           sessionSlug: 'telegram-demo-2',
           sessionName: 'Telegram Demo 2',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           sessionWorkerUrl: 'https://session.example',
           storageProfile: { backend: 'cloudflare' },
         },
@@ -2235,6 +2305,7 @@ test('/questions reads telegram_only preloaded policy questions without chain in
           sessionName: 'Telegram Native',
           telegramOnly: true,
           telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           questions: [{
             questionId: 'q-native-1',
@@ -2324,6 +2395,7 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
           sessionName: 'Telegram Cloudflare',
           telegramOnly: true,
           telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
           sessionWorkerUrl: 'https://session.example',
           workerSessionSlug: 'telegram-cloudflare',
           questionSource: 'cloudflare_storage',
@@ -2364,6 +2436,7 @@ test('/questions live_or_fixture does not show fixture questions when live loadi
           sessionName: 'Telegram Demo 3',
           default: true,
           telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         }],
       }),
@@ -2420,6 +2493,7 @@ test('group session binding makes later question and doc commands use the joined
           sessionName: 'Alpha Session',
           default: true,
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
@@ -2427,6 +2501,7 @@ test('group session binding makes later question and doc commands use the joined
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
           docLibraryEnabled: true,
         },
@@ -2501,12 +2576,14 @@ test('private session join makes later question commands use the selected sessio
           sessionName: 'Alpha Session',
           default: true,
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
       ],
@@ -2563,12 +2640,14 @@ test('private session join schedules question prefetch without blocking the join
           sessionName: 'Alpha Session',
           default: true,
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
       ],
@@ -2620,6 +2699,7 @@ test('group session join schedules question prefetch without blocking the join r
         sessionName: 'Demo Session',
         default: true,
         telegramBridgeEnabled: true, telegramOnly: true,
+        telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
       }],
     }),
@@ -2672,6 +2752,7 @@ test('private session join schedules faucet funding when session policy allows i
         sessionName: 'Alpha Session',
         default: true,
         telegramBridgeEnabled: true, telegramOnly: true,
+        telegramGroupOpenAccess: true,
         managedAccountSubmitAllowed: true,
         sponsoredFaucetAllowed: true,
         sessionWorkerUrl: 'https://session.example',
@@ -2765,12 +2846,14 @@ test('/sessions callback switches the group session used by later question comma
           sessionName: 'Alpha Session',
           default: true,
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
         {
           sessionSlug: 'demo',
           sessionName: 'Demo Session',
           telegramBridgeEnabled: true, telegramOnly: true,
+          telegramGroupOpenAccess: true,
           managedAccountSubmitAllowed: true,
         },
       ],
@@ -3940,6 +4023,7 @@ test('/start auto-joins a single Telegram-only session and keeps the welcome scr
       default: true,
       telegramBridgeEnabled: true,
       telegramOnly: true,
+      telegramGroupOpenAccess: true,
       managedAccountSubmitAllowed: true,
     }],
   };
@@ -3999,8 +4083,8 @@ test('/start keeps session selection visible when multiple Telegram-only session
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
       sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true },
-        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
+        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true, telegramGroupOpenAccess: true },
       ],
     }),
   });

@@ -268,6 +268,14 @@ export function normalizeSessionPolicy(input = {}) {
       input.allowedTelegramGroupChatIds,
       input.telegramAllowedGroupChatIds
     ),
+    telegramGroupOpenAccess: normalizeBool(
+      session.telegramGroupOpenAccess ||
+      session.telegramOpenGroupAccess ||
+      session.telegram?.groupOpenAccess ||
+      session.telegram?.openGroupAccess ||
+      input.telegramGroupOpenAccess ||
+      input.telegramOpenGroupAccess
+    ),
     telegramGroupApprovalRequired: normalizeBool(
       session.telegramGroupApprovalRequired ||
       session.requireTelegramGroupApproval ||
@@ -364,14 +372,16 @@ export function evaluateTelegramGroupSessionAccess(session = {}, {
 } = {}) {
   const groupChatId = safeString(chatId || normalized.chat?.chatId || normalized.groupChatId);
   const approved = normalizeTelegramGroupChatIds(session.approvedTelegramGroupChatIds);
-  const approvalRequired = session.telegramGroupApprovalRequired === true || approved.length > 0;
-  if (!approvalRequired) {
+  const openAccess = session.telegramGroupOpenAccess === true;
+  const approvalRequired = !openAccess || session.telegramGroupApprovalRequired === true || approved.length > 0;
+  if (openAccess) {
     return {
       ok: true,
       reason: 'telegram_group_access_unrestricted',
       groupChatId,
       approvedTelegramGroupChatIds: [],
       telegramGroupApprovalRequired: false,
+      telegramGroupOpenAccess: true,
     };
   }
   if (groupChatId && approved.includes(groupChatId)) {
@@ -381,6 +391,7 @@ export function evaluateTelegramGroupSessionAccess(session = {}, {
       groupChatId,
       approvedTelegramGroupChatIds: approved,
       telegramGroupApprovalRequired: approvalRequired,
+      telegramGroupOpenAccess: openAccess,
     };
   }
   return {
@@ -389,6 +400,7 @@ export function evaluateTelegramGroupSessionAccess(session = {}, {
     groupChatId,
     approvedTelegramGroupChatIds: approved,
     telegramGroupApprovalRequired: approvalRequired,
+    telegramGroupOpenAccess: openAccess,
   };
 }
 
