@@ -417,7 +417,10 @@ stores an expiring Mini App launch record, and returns `link`, usually in the
 link to the user. The Mini App opens the ordered series, pre-fills each draft
 without marking it as submitted, lets the user edit manually, use microphone
 dictation/transcription in the WebView, submit, or skip to the next question.
-The CE worker does not silently submit these answers.
+If WebView audio is unreliable, the user can send a native Telegram voice
+message in the private DM after opening a Mini App question link; the bot
+transcribes it through the session worker and appends it to the latest Mini App
+draft for review. The CE worker does not silently submit these answers.
 
 ## Review Activity
 
@@ -553,6 +556,11 @@ circle positions, per-topic question counts, response counts, and question
 bubbles. It does not return raw response records, Telegram user ids, wallet
 addresses, or individual answer text. The image endpoint returns a PNG rendering
 of that same topic map for agents that can send or display images.
+
+The interactive client report uses the worker result-view cache for generated
+report analysis plus the demo circles and breakdown views. The cache key is the
+session plus the client data-version key, so existing viewers reuse the cached
+view and materially new questions or responses create a new cache entry.
 
 ### Interactive Client Report
 

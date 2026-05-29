@@ -209,6 +209,20 @@ describe('aiScripts worker auth options', () => {
         ok: true,
         status: 200,
         json: async () => ({ ok: true, cacheLayer: 'stored' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          cached: false,
+          cacheLayer: 'miss',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, cacheLayer: 'stored' }),
       });
 
     const hit = await getCachedGeneratedResultView({
@@ -239,6 +253,32 @@ describe('aiScripts worker auth options', () => {
       sessionSlug: 'edge',
       viewType: 'polis_clusters',
       dataVersionKey: 'v1',
+    }));
+
+    const circlesMiss = await getCachedGeneratedResultView({
+      sessionSlug: 'edge',
+      dataVersionKey: 'v-circles',
+      viewType: 'circles',
+      fetchImpl,
+    });
+    expect(circlesMiss.cacheLayer).toBe('miss');
+    expect(fetchImpl.mock.calls[2][0]).toBe(
+      'https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=edge&viewType=circles&dataVersionKey=v-circles'
+    );
+
+    const breakdownSaved = await putCachedGeneratedResultView({
+      sessionSlug: 'edge',
+      dataVersionKey: 'v-breakdown',
+      viewType: 'breakdown',
+      value: { summary: { totalResponsesCount: 12 } },
+      fetchImpl,
+    });
+    expect(breakdownSaved.cacheLayer).toBe('stored');
+    expect(JSON.parse(fetchImpl.mock.calls[3][1].body)).toEqual(expect.objectContaining({
+      sessionSlug: 'edge',
+      viewType: 'breakdown',
+      dataVersionKey: 'v-breakdown',
+      value: { summary: { totalResponsesCount: 12 } },
     }));
   });
 

@@ -70,6 +70,10 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import LazyFallback from '../Shared/LazyFallback';
 import {
+  getCachedGeneratedResultView,
+  putCachedGeneratedResultView,
+} from '../../utilities/ai/aiScripts.js';
+import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
   resolveSurveyResultsSessionContext,
@@ -186,6 +190,62 @@ const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
 type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
+
+export const normalizeSurveyResultsDemoCacheViewType = (viewKey: unknown = ''): string => {
+  const normalized = String(viewKey || '').trim().toLowerCase();
+  if (normalized === 'atlas' || normalized === 'circles') return 'circles';
+  if (normalized === 'breakdown') return 'breakdown';
+  return '';
+};
+
+export const buildSurveyResultsDemoResultDataKey = ({
+  sessionSlug = '',
+  viewType = '',
+  questionResponsesNonce = 0,
+  totalQuestionsCount = 0,
+  totalResponsesCount = 0,
+  filteredQuestionsCount = 0,
+  filteredResponsesCount = 0,
+  cachedQuestionsCount = 0,
+  cachedSurveyResponsesCount = 0,
+}: SurveyResultsRecord = {}): string => {
+  const slug = String(normalizeSessionSlug(sessionSlug) || 'demo').toLowerCase();
+  const type = normalizeSurveyResultsDemoCacheViewType(viewType);
+  return [
+    slug,
+    type || 'demo_view',
+    Number(questionResponsesNonce || 0) || 0,
+    Number(totalQuestionsCount || 0) || 0,
+    Number(totalResponsesCount || 0) || 0,
+    Number(filteredQuestionsCount || 0) || 0,
+    Number(filteredResponsesCount || 0) || 0,
+    Number(cachedQuestionsCount || 0) || 0,
+    Number(cachedSurveyResponsesCount || 0) || 0,
+  ].join(':');
+};
+
+export const buildSurveyResultsDemoResultCacheValue = ({
+  sessionSlug = '',
+  viewType = '',
+  dataVersionKey = '',
+  generatedAt = '',
+  totalQuestionsCount = 0,
+  totalResponsesCount = 0,
+  filteredQuestionsCount = 0,
+  filteredResponsesCount = 0,
+}: SurveyResultsRecord = {}): SurveyResultsRecord => ({
+  kind: 'survey_results_demo_view',
+  sessionSlug: String(normalizeSessionSlug(sessionSlug) || 'demo').toLowerCase(),
+  viewType: normalizeSurveyResultsDemoCacheViewType(viewType),
+  dataVersionKey: String(dataVersionKey || '').slice(0, 256),
+  generatedAt: String(generatedAt || new Date().toISOString()),
+  summary: {
+    totalQuestionsCount: Number(totalQuestionsCount || 0) || 0,
+    totalResponsesCount: Number(totalResponsesCount || 0) || 0,
+    filteredQuestionsCount: Number(filteredQuestionsCount || 0) || 0,
+    filteredResponsesCount: Number(filteredResponsesCount || 0) || 0,
+  },
+});
 const DebateMapForSurveyResults = DebateMap as React.ComponentType<SurveyResultsRecord>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
 type SurveyResultsScopeContextInput = {
@@ -1058,6 +1118,7 @@ class SurveyResults extends Component<any, any> {
   _lastNotifiedFilterStateSignature: string | null;
   _pendingFilterLoadingValue: unknown;
   _bookmarkFeedbackTimer: ReturnType<typeof setTimeout> | null;
+  _demoResultViewCacheRequests: Set<string>;
   _stableFallbackQuestions: SurveyResultsFallbackQuestionBuckets | null = null;
   csvFileName: string = '';
 
@@ -1086,6 +1147,7 @@ class SurveyResults extends Component<any, any> {
     this._syncLoadingStartedAt = null;
     this._scrollMutationObserver = null;
     this._scrollToQuestionRetryTimer = null;
+    this._demoResultViewCacheRequests = new Set();
 
     this.state = {
       responses: [],
@@ -1812,6 +1874,24 @@ class SurveyResults extends Component<any, any> {
       this._syncLoadingStartedAt = Date.now();
     }
 
+    if (
+      this.props.isOpen &&
+      this.getIsDemoQuestionResultsContext() &&
+      normalizeSurveyResultsDemoCacheViewType(this.state.demoResultsViewMode) &&
+      (
+        prevState.demoResultsViewMode !== this.state.demoResultsViewMode ||
+        prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
+        prevState.totalQuestionsCount !== this.state.totalQuestionsCount ||
+        prevState.totalResponsesCount !== this.state.totalResponsesCount ||
+        prevState.filteredQuestionsCount !== this.state.filteredQuestionsCount ||
+        prevState.filteredResponsesCount !== this.state.filteredResponsesCount ||
+        prevState.cachedQuestionsCount !== this.state.cachedQuestionsCount ||
+        prevState.cachedSurveyResponsesCount !== this.state.cachedSurveyResponsesCount
+      )
+    ) {
+      this.ensureDemoResultViewCache(this.state.demoResultsViewMode);
+    }
+
     // Sync local filteredQuestionsCount from props
     if (
       this.props.filteredQuestionsCount !== prevProps.filteredQuestionsCount &&
@@ -2083,7 +2163,58 @@ class SurveyResults extends Component<any, any> {
     this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsDemoViewSelectPatch({
       nextView,
       prevState,
-    }));
+    }), () => {
+      this.ensureDemoResultViewCache(nextView);
+    });
+  };
+
+  getDemoResultViewDataKey = (viewType: unknown = ''): string => buildSurveyResultsDemoResultDataKey({
+    sessionSlug: this.getEffectiveSlug(),
+    viewType,
+    questionResponsesNonce: this.props.questionResponsesNonce,
+    totalQuestionsCount: this.state.totalQuestionsCount,
+    totalResponsesCount: this.state.totalResponsesCount,
+    filteredQuestionsCount: this.state.filteredQuestionsCount,
+    filteredResponsesCount: this.state.filteredResponsesCount,
+    cachedQuestionsCount: this.state.cachedQuestionsCount,
+    cachedSurveyResponsesCount: this.state.cachedSurveyResponsesCount,
+  });
+
+  buildDemoResultViewCacheValue = (viewType: unknown = '', dataVersionKey: unknown = ''): SurveyResultsRecord =>
+    buildSurveyResultsDemoResultCacheValue({
+      sessionSlug: this.getEffectiveSlug(),
+      viewType,
+      dataVersionKey,
+      totalQuestionsCount: this.state.totalQuestionsCount,
+      totalResponsesCount: this.state.totalResponsesCount,
+      filteredQuestionsCount: this.state.filteredQuestionsCount,
+      filteredResponsesCount: this.state.filteredResponsesCount,
+    });
+
+  ensureDemoResultViewCache = (viewKey: unknown = ''): void => {
+    const viewType = normalizeSurveyResultsDemoCacheViewType(viewKey);
+    if (!viewType || !this.getIsDemoQuestionResultsContext()) return;
+    const sessionSlug = this.getEffectiveSlug();
+    const dataVersionKey = this.getDemoResultViewDataKey(viewType);
+    const requestKey = `${sessionSlug}:${viewType}:${dataVersionKey}`;
+    if (this._demoResultViewCacheRequests.has(requestKey)) return;
+    this._demoResultViewCacheRequests.add(requestKey);
+    const value = this.buildDemoResultViewCacheValue(viewType, dataVersionKey);
+    getCachedGeneratedResultView({
+      sessionSlug,
+      dataVersionKey,
+      viewType,
+    }).then((cached: SurveyResultsRecord) => {
+      if (cached?.ok === true && cached?.cached === true) return cached;
+      return putCachedGeneratedResultView({
+        sessionSlug,
+        dataVersionKey,
+        viewType,
+        value,
+      });
+    }).catch((error: unknown) => {
+      surveyLog.warn('SurveyResults: demo result view cache unavailable', error);
+    });
   };
 
   handleDemoAtlasOpen = (nodeId: unknown = ''): void => {

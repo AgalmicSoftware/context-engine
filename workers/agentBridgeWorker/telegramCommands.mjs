@@ -109,6 +109,7 @@ import {
   sendTelegramMessage,
   sendTelegramPhoto,
   setTelegramMessageReaction,
+  telegramBotApiRequest,
 } from './telegramSender.mjs';
 
 const ACTION_KV_PREFIX = 'telegram:action:';
@@ -121,12 +122,17 @@ const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const QUESTION_GENERATION_BATCH_KV_PREFIX = 'telegram:question-generation-batch:v1:';
+const MINI_APP_LATEST_LAUNCH_KV_PREFIX = 'telegram:mini-app-latest-launch:v1:';
+const DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:dm-voice-transcribe-rate:v1:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const QUESTION_GENERATION_BATCH_TTL_SECONDS = 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
+const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
+const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
+const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
@@ -2150,6 +2156,55 @@ async function readActionRecord(env = {}, actionId = '') {
   return parsed;
 }
 
+function latestMiniAppLaunchUserKeyPart(telegramUserId = '') {
+  return safeString(telegramUserId).replace(/[^0-9A-Za-z_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+}
+
+function latestMiniAppLaunchKey(telegramUserId = '') {
+  const user = latestMiniAppLaunchUserKeyPart(telegramUserId);
+  return user ? `${MINI_APP_LATEST_LAUNCH_KV_PREFIX}${user}` : '';
+}
+
+async function persistLatestMiniAppLaunchPointer({
+  env = {},
+  telegramUserId = '',
+  sessionSlug = '',
+  launch = '',
+  questionIds = [],
+  createdAt = null,
+  ttlSeconds = DEFAULT_ACTION_TTL_SECONDS,
+} = {}) {
+  const key = latestMiniAppLaunchKey(telegramUserId);
+  const launchId = safeString(launch);
+  if (!key || !launchId || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const record = {
+    type: 'telegram_mini_app_latest_launch',
+    version: 1,
+    telegramUserId: safeString(telegramUserId),
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    launch: launchId,
+    questionIds: Array.isArray(questionIds) ? questionIds.map(safeString).filter(Boolean).slice(0, 50) : [],
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram Mini App latest-launch pointers must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+    expirationTtl: ttlSeconds,
+  });
+  return { ok: true, key };
+}
+
+async function readLatestMiniAppLaunchPointer(env = {}, telegramUserId = '') {
+  const key = latestMiniAppLaunchKey(telegramUserId);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram Mini App latest-launch pointers must not serialize secrets.');
+  const launch = safeString(parsed.launch);
+  return launch ? { ...parsed, launch } : null;
+}
+
 function groupSessionBindingKey(normalized = {}) {
   const chatId = safeString(normalized.chat?.chatId);
   return chatId ? `${GROUP_SESSION_KV_PREFIX}${chatId}` : '';
@@ -2848,6 +2903,255 @@ function miniAppUrlForLaunch(env = {}, launch = '') {
   const payload = safeString(launch);
   if (payload) url.searchParams.set('launch', payload);
   return url.toString();
+}
+
+function positiveIntegerEnv(value = '', fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function dmVoiceTranscribeMaxBytes(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_MAX_BYTES || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_MAX_BYTES,
+    DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES
+  );
+}
+
+function dmVoiceTranscribeRateLimit(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_LIMIT,
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT
+  );
+}
+
+function dmVoiceTranscribeRateWindowSeconds(env = {}) {
+  return positiveIntegerEnv(
+    env.AGENT_BRIDGE_TRANSCRIBE_RATE_WINDOW_SECONDS || env.AGENT_BRIDGE_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS,
+    DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS
+  );
+}
+
+function dmVoiceTranscribeRateKey({
+  telegramUserId = '',
+  sessionSlug = '',
+  createdAt = null,
+  windowSeconds = DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS,
+} = {}) {
+  const userId = latestMiniAppLaunchUserKeyPart(telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug || 'unknown');
+  const nowMs = createdAt ? Date.parse(createdAt) : Date.now();
+  const safeWindowSeconds = Math.max(1, Number(windowSeconds) || DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS);
+  const bucket = Math.floor((Number.isFinite(nowMs) ? nowMs : Date.now()) / (safeWindowSeconds * 1000));
+  return userId && slug ? `${DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX}${slug}:${userId}:${bucket}` : '';
+}
+
+async function checkDmVoiceTranscribeRateLimit({
+  env = {},
+  telegramUserId = '',
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
+    return { ok: false, status: 503, reason: 'transcribe_rate_limit_storage_unavailable' };
+  }
+  const limit = dmVoiceTranscribeRateLimit(env);
+  const windowSeconds = dmVoiceTranscribeRateWindowSeconds(env);
+  const key = dmVoiceTranscribeRateKey({ telegramUserId, sessionSlug, createdAt, windowSeconds });
+  if (!key) return { ok: false, status: 400, reason: 'transcribe_rate_limit_key_invalid' };
+  const current = safeJsonParse(await kv.get(key).catch(() => null), null);
+  const count = Math.max(0, Number(current?.count || 0) || 0);
+  if (count >= limit) {
+    return { ok: false, status: 429, reason: 'transcribe_rate_limited', retryAfterSeconds: windowSeconds };
+  }
+  const record = {
+    version: 1,
+    count: count + 1,
+    limit,
+    windowSeconds,
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram DM voice transcribe rate records must not serialize secrets.');
+  await kv.put(key, JSON.stringify(record), { expirationTtl: windowSeconds + 60 });
+  return { ok: true, count: count + 1, limit, windowSeconds };
+}
+
+function telegramVoiceFileId(normalized = {}) {
+  const message = normalized.raw?.message || {};
+  return safeString(message.voice?.file_id || message.audio?.file_id);
+}
+
+function telegramFileDownloadUrl(botToken = '', filePath = '') {
+  const token = safeString(botToken);
+  const path = safeString(filePath)
+    .split('/')
+    .map((part) => encodeURIComponent(part))
+    .join('/');
+  return token && path ? `https://api.telegram.org/file/bot${token}/${path}` : '';
+}
+
+async function downloadTelegramVoiceFile({
+  env = {},
+  fileId = '',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const botToken = safeString(env.TELEGRAM_BOT_TOKEN);
+  const voiceFileId = safeString(fileId);
+  if (!botToken || !voiceFileId) return { ok: false, reason: 'telegram_voice_file_missing' };
+  if (typeof fetchImpl !== 'function') return { ok: false, reason: 'fetch_unavailable' };
+
+  const meta = await telegramBotApiRequest({
+    botToken,
+    method: 'getFile',
+    payload: { file_id: voiceFileId },
+    fetchImpl,
+    timeoutMs: telegramApiTimeoutMs(env),
+  });
+  if (!meta.ok) return { ok: false, reason: meta.error || 'telegram_get_file_failed', status: meta.status || 502 };
+  const filePath = safeString(meta.result?.file_path);
+  const fileUrl = telegramFileDownloadUrl(botToken, filePath);
+  if (!fileUrl) return { ok: false, reason: 'telegram_file_path_missing' };
+
+  let response;
+  try {
+    response = await fetchImpl(fileUrl, { method: 'GET' });
+  } catch {
+    return { ok: false, reason: 'telegram_file_download_failed', status: 502 };
+  }
+  if (!response?.ok) return { ok: false, reason: 'telegram_file_download_failed', status: response?.status || 502 };
+  const bytes = await response.arrayBuffer().catch(() => null);
+  const size = bytes?.byteLength || 0;
+  if (!size) return { ok: false, reason: 'telegram_voice_file_empty', status: 400 };
+  if (size > dmVoiceTranscribeMaxBytes(env)) return { ok: false, reason: 'telegram_voice_file_too_large', status: 413 };
+  const filename = safeString(filePath.split('/').pop()) || 'telegram-voice.ogg';
+  const mimeType = filename.toLowerCase().endsWith('.mp3') ? 'audio/mpeg' : 'audio/ogg';
+  return {
+    ok: true,
+    file: new Blob([bytes], { type: mimeType }),
+    filename,
+  };
+}
+
+function selectMiniAppVoiceDraftQuestionId(record = {}) {
+  const ref = record.serverContextRef || {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? ref.questionSeries
+    : {};
+  const skipped = new Set(
+    (Array.isArray(series.skippedQuestionIds) ? series.skippedQuestionIds : [])
+      .map((questionIdRef) => lower(questionIdRef))
+      .filter(Boolean)
+  );
+  const ids = (Array.isArray(series.questionIds) ? series.questionIds : [])
+    .map(safeString)
+    .filter(Boolean);
+  return ids.find((questionIdRef) => !skipped.has(lower(questionIdRef))) || safeString(ref.questionId);
+}
+
+function appendMiniAppVoiceDraft(record = {}, questionIdRef = '', transcript = '', createdAt = null) {
+  const questionRef = safeString(questionIdRef);
+  const text = safeString(transcript).slice(0, 4000);
+  if (!questionRef || !text) return { ok: false, reason: 'voice_transcript_missing' };
+  const ref = record.serverContextRef && typeof record.serverContextRef === 'object' && !Array.isArray(record.serverContextRef)
+    ? { ...record.serverContextRef }
+    : {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? { ...ref.questionSeries }
+    : { questionIds: [questionRef], skippedQuestionIds: [], draftAnswersByQuestionId: {} };
+  const drafts = series.draftAnswersByQuestionId && typeof series.draftAnswersByQuestionId === 'object' && !Array.isArray(series.draftAnswersByQuestionId)
+    ? { ...series.draftAnswersByQuestionId }
+    : {};
+  const existing = drafts[questionRef] && typeof drafts[questionRef] === 'object' && !Array.isArray(drafts[questionRef])
+    ? { ...drafts[questionRef] }
+    : {};
+  const existingText = safeString(existing.text || existing.answer || '');
+  const nextText = existingText ? `${existingText}\n\n${text}` : text;
+  drafts[questionRef] = {
+    ...existing,
+    text: nextText.slice(0, 4000),
+    updatedFromTelegramVoiceAt: createdAt || nowIso(),
+  };
+  series.draftAnswersByQuestionId = drafts;
+  ref.questionSeries = series;
+  ref.questionId = safeString(ref.questionId) || questionRef;
+  const updated = {
+    ...record,
+    serverContextRef: ref,
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(updated, 'Telegram Mini App launch records must not serialize secrets.');
+  return { ok: true, record: updated };
+}
+
+async function transcribeTelegramVoiceForMiniAppDraft({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  fileId = '',
+  createdAt = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sanitizeSessionSlug(sessionSlug));
+  if (!resolved.ok) return { ok: false, reason: resolved.reason || 'session_not_available', status: 403 };
+  const eligibility = evaluateSponsoredResourceEligibility(resolved.session, {
+    resource: 'ai',
+    requestedRisk: 'submit',
+    riskCeiling: policy.riskCeiling,
+  });
+  if (!eligibility.ok) return { ok: false, reason: eligibility.reason || 'session_ai_not_allowed', status: 403 };
+  const workerUrl = resolveSessionWorkerUrl(env, resolved.session);
+  if (!workerUrl) return { ok: false, reason: 'session_worker_url_missing', status: 503 };
+
+  const principal = normalizeTelegramPrincipal(normalized);
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
+  const sessionAuth = await authenticateSessionWorker({
+    env,
+    session: resolved.session,
+    account,
+    principal,
+    workerUrl,
+    fetchImpl,
+    now: createdAt ? new Date(createdAt) : new Date(),
+  }).catch((error) => ({ ok: false, reason: safeString(error?.message || error) || 'worker_auth_failed' }));
+  if (!sessionAuth.ok || !sessionAuth.token) {
+    return { ok: false, reason: sessionAuth.reason || 'worker_auth_failed', status: 503 };
+  }
+
+  const downloaded = await downloadTelegramVoiceFile({ env, fileId, fetchImpl });
+  if (!downloaded.ok) return downloaded;
+
+  const form = new FormData();
+  const model = safeString(env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
+  form.append('file', downloaded.file, downloaded.filename);
+  form.append('model', model);
+  const apiKey = bridgeOpenAiApiKey(env);
+  if (apiKey) form.append('apiKey', apiKey);
+
+  const response = await fetchImpl(`${sessionAuth.workerUrl}/transcribe`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${sessionAuth.token}`,
+    },
+    body: form,
+  });
+  if (!response?.ok) {
+    return {
+      ok: false,
+      reason: 'transcription_failed',
+      upstreamStatus: response?.status || 502,
+      status: response?.status || 502,
+    };
+  }
+  const body = await response.json().catch(() => ({}));
+  const text = safeString(body?.text);
+  return text ? { ok: true, text } : { ok: false, reason: 'transcript_empty', status: 502 };
 }
 
 async function makeMiniAppButton({
@@ -8456,6 +8760,150 @@ function buildMiniAppStartResponse({
   });
 }
 
+async function buildMiniAppVoiceDraftFallbackResponse({
+  normalized,
+  command = 'voice',
+  env = {},
+  createdAt = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (!normalized.chat?.isPrivate) {
+    return reply({
+      chatId: normalized.chat?.chatId,
+      text: 'Voice draft updates work in a private chat with the bot. Open the Mini App link or DM the bot first.',
+      screen: 'mini_app_voice_private_required',
+      command,
+      normalized,
+    });
+  }
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const fileId = telegramVoiceFileId(normalized);
+  if (!telegramUserId || !fileId) {
+    return errorReply({
+      normalized,
+      command,
+      reason: 'telegram_voice_missing',
+      text: 'I could not read that voice message. Please try again from your private chat.',
+    });
+  }
+  const pointer = await readLatestMiniAppLaunchPointer(env, telegramUserId);
+  if (!pointer?.launch) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Open a CE Mini App question link first, then send a Telegram voice message here.',
+        '',
+        'I will transcribe it and add it to the current draft for review.',
+      ].join('\n'),
+      screen: 'mini_app_voice_no_launch',
+      command,
+      normalized,
+      extra: { voiceDraftFallback: true, launchFound: false },
+    });
+  }
+  const record = await readActionRecord(env, pointer.launch);
+  if (
+    !record ||
+    record.miniAppLaunch !== true ||
+    record.action !== TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE ||
+    record.lane !== TELEGRAM_CHAT_LANES.MINI_APP
+  ) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: 'That Mini App question link has expired. Ask the agent for a fresh question link and send the voice note again.',
+      screen: 'mini_app_voice_launch_expired',
+      command,
+      normalized,
+      extra: { voiceDraftFallback: true, launchFound: true, launchExpired: true },
+    });
+  }
+  const sessionSlug = sanitizeSessionSlug(pointer.sessionSlug || record.serverContextRef?.sessionSlug);
+  const questionIdRef = selectMiniAppVoiceDraftQuestionId(record);
+  if (!sessionSlug || !questionIdRef) {
+    return errorReply({
+      normalized,
+      command,
+      reason: 'mini_app_voice_context_missing',
+      text: 'That Mini App question link is missing its session or question. Ask the agent for a fresh link.',
+    });
+  }
+  const rateLimit = await checkDmVoiceTranscribeRateLimit({
+    env,
+    telegramUserId,
+    sessionSlug,
+    createdAt,
+  });
+  if (!rateLimit.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: rateLimit.reason || 'transcribe_rate_limited',
+      text: 'Voice transcription is temporarily rate limited. Please wait a bit, or edit the draft directly in the Mini App.',
+    });
+  }
+  const transcript = await transcribeTelegramVoiceForMiniAppDraft({
+    env,
+    normalized,
+    sessionSlug,
+    fileId,
+    createdAt,
+    fetchImpl,
+  });
+  if (!transcript.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: transcript.reason || 'transcription_failed',
+      text: 'I could not transcribe that voice note. Please try again, or edit the draft directly in the Mini App.',
+    });
+  }
+  const updated = appendMiniAppVoiceDraft(record, questionIdRef, transcript.text, createdAt);
+  if (!updated.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: updated.reason || 'mini_app_voice_draft_update_failed',
+      text: 'I could not update the Mini App draft. Please edit it directly in the Mini App.',
+    });
+  }
+  const stored = await persistActionRecord(env, pointer.launch, updated.record);
+  if (!stored.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: stored.reason || 'action_record_unavailable',
+      text: 'I transcribed the note, but could not save it back to the Mini App draft.',
+    });
+  }
+  const url = miniAppUrlForLaunch(env, pointer.launch);
+  const preview = safeString(transcript.text).slice(0, 240);
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      'Updated the Mini App draft from your voice note.',
+      '',
+      preview ? `Transcript: ${preview}` : '',
+      '',
+      'Open the Mini App to review and send the answer.',
+    ].filter((line) => line !== '').join('\n'),
+    replyMarkup: url ? {
+      inline_keyboard: [[{
+        text: 'Review Draft',
+        web_app: { url },
+      }]],
+    } : null,
+    screen: 'mini_app_voice_draft_fallback',
+    command,
+    normalized,
+    extra: {
+      voiceDraftFallback: true,
+      sessionSlug,
+      questionId: questionIdRef,
+      launch: pointer.launch,
+    },
+  });
+}
+
 async function buildApproveTelegramGroupResponse({
   normalized,
   command,
@@ -9014,6 +9462,7 @@ async function buildCallbackResponse({
 export async function buildTelegramCommandResponse({
   update = {},
   env = {},
+  fetchImpl = globalThis.fetch,
   now = null,
   waitUntil = null,
 } = {}) {
@@ -9030,6 +9479,15 @@ export async function buildTelegramCommandResponse({
   const createdAt = nowIso(now);
   if (normalized.kind === 'callback') {
     return buildCallbackResponse({ normalized, env, createdAt, waitUntil });
+  }
+  if (telegramVoiceFileId(normalized)) {
+    return buildMiniAppVoiceDraftFallbackResponse({
+      normalized,
+      command: 'voice',
+      env,
+      createdAt,
+      fetchImpl,
+    });
   }
 
   const parsed = parseTelegramCommandText(normalized.text, {
@@ -9523,7 +9981,7 @@ export async function handleTelegramWebhookUpdate({
       timeoutMs: telegramApiTimeoutMs(env),
     })
     : null;
-  const commandResponse = await buildTelegramCommandResponse({ update, env, now, waitUntil });
+  const commandResponse = await buildTelegramCommandResponse({ update, env, fetchImpl, now, waitUntil });
   if (!commandResponse.ok && !commandResponse.response) {
     return commandResponse;
   }
@@ -9617,15 +10075,18 @@ export {
   loadSubmittedResultRecords,
   loadSessionPolicy,
   loadQuestionsForSession,
+  latestMiniAppLaunchKey,
   parseAgentOnboardingStartParam,
   parseTelegramCommandText,
   persistActionRecord,
   persistAnswerDraft,
+  persistLatestMiniAppLaunchPointer,
   persistTelegramUserSessionBinding,
   questionId,
   readActionRecord,
   readAnswerDraft,
   readGroupSessionBinding,
+  readLatestMiniAppLaunchPointer,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
   shortQuestionId,

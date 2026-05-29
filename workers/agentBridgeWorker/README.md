@@ -134,6 +134,13 @@ private copy payload, never in message body text.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
+Mini App question links can carry a prefilled editable draft and an ordered
+question series. If the Mini App microphone path is unavailable, the user can
+send a native Telegram voice message in the private bot DM after opening the
+link; the worker transcribes it through the configured session worker and
+applies it to that user's latest Mini App draft under the same rate-limit
+settings used for Mini App transcription.
+
 ## Bot Commands
 
 Core Telegram commands:
@@ -156,7 +163,10 @@ Core Telegram commands:
   analysis buttons that use
   the selected session worker's sponsored AI route when available. Topic maps
   render only after enough answered questions exist, unless the caller requests
-  demo preview data.
+  demo preview data. The interactive client report can reuse worker-cached
+  generated result views for report analysis plus demo circles and breakdown
+  snapshots; cache keys include the session and client data-version key so new
+  question/response data creates a fresh entry.
 - `/export_all [session]` is private-chat only and sends a zip archive of
   Cloudflare-backed response payloads for the selected session. The caller's
   managed Telegram ETH address must be allowlisted with

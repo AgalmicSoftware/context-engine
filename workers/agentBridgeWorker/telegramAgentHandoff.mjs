@@ -12,6 +12,7 @@ import {
   parseAgentOnboardingStartParam,
   persistActionRecord,
   persistAnswerDraft,
+  persistLatestMiniAppLaunchPointer,
   readGroupSessionBinding,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
@@ -90,6 +91,10 @@ const ADMIN_METRICS_SUBMIT_ENTRY_LIMIT = 100000;
 const RESULT_VIEW_CACHE_KV_PREFIX = 'telegram:result-view-cache:v1:';
 const RESULT_VIEW_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const RESULT_VIEW_VALUE_MAX_CHARS = 8000;
+const RESULT_VIEW_GENERIC_MAX_ARRAY_ITEMS = 200;
+const RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS = 200;
+const RESULT_VIEW_GENERIC_MAX_DEPTH = 6;
+const RESULT_VIEW_CACHE_MAX_BYTES = 512 * 1024;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -1576,7 +1581,38 @@ function resultViewCacheKey(sessionSlug = '', viewType = '', dataVersionKey = ''
   return `${RESULT_VIEW_CACHE_KV_PREFIX}${slug}:${type}:${fingerprint}`;
 }
 
-function normalizeResultViewAnalysisValue(value = {}) {
+function normalizeGenericResultViewValue(value = {}, depth = 0) {
+  if (value == null) return null;
+  if (typeof value === 'string') return safeString(value).slice(0, RESULT_VIEW_VALUE_MAX_CHARS);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value;
+  if (depth >= RESULT_VIEW_GENERIC_MAX_DEPTH) return null;
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, RESULT_VIEW_GENERIC_MAX_ARRAY_ITEMS)
+      .map((entry) => normalizeGenericResultViewValue(entry, depth + 1))
+      .filter((entry) => entry !== undefined);
+  }
+  if (typeof value === 'object') {
+    const out = {};
+    Object.entries(value)
+      .slice(0, RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS)
+      .forEach(([key, entry]) => {
+        const safeKey = safeString(key).replace(/[^0-9A-Za-z_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+        if (!safeKey) return;
+        const normalized = normalizeGenericResultViewValue(entry, depth + 1);
+        if (normalized !== undefined) out[safeKey] = normalized;
+      });
+    return out;
+  }
+  return null;
+}
+
+function normalizeResultViewAnalysisValue(value = {}, viewType = 'polis_clusters') {
+  const type = normalizeResultViewType(viewType);
+  if (type !== 'polis_clusters') {
+    return normalizeGenericResultViewValue(value);
+  }
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const clustersInput = input.clusters && typeof input.clusters === 'object' && !Array.isArray(input.clusters)
     ? input.clusters
@@ -1632,10 +1668,14 @@ async function saveResultViewCache(env = {}, {
     generatedAt: new Date().toISOString(),
     model: 'gpt-5.5',
     reasoning_effort: 'high',
-    value: normalizeResultViewAnalysisValue(value),
+    value: normalizeResultViewAnalysisValue(value, type),
   };
   assertNoSecretShape(payload, 'Telegram result view cache payload must not serialize secrets.');
-  await kv.put(resultViewCacheKey(slug, type, dataKey), JSON.stringify(payload), {
+  const serialized = JSON.stringify(payload);
+  if (new TextEncoder().encode(serialized).byteLength > RESULT_VIEW_CACHE_MAX_BYTES) {
+    return { ok: false, reason: 'result_view_cache_value_too_large' };
+  }
+  await kv.put(resultViewCacheKey(slug, type, dataKey), serialized, {
     expirationTtl: RESULT_VIEW_CACHE_TTL_SECONDS,
   });
   return payload;
@@ -1670,6 +1710,12 @@ async function handleResultViewCacheRequest({ env = {}, context = {}, input = {}
     dataVersionKey,
     value: input.value || input.result || input.cache || {},
   });
+  if (saved?.ok === false) {
+    return jsonResultViewCache(request, env, saved, { status: 413 });
+  }
+  if (!saved) {
+    return jsonResultViewCache(request, env, { ok: false, reason: 'result_view_cache_unavailable' }, { status: 503 });
+  }
   return jsonResultViewCache(request, env, {
     ...saved,
     cached: false,
@@ -2806,6 +2852,14 @@ async function handleMiniAppLaunchRequest({
   assertNoSecretShape(record, 'Telegram Mini App launch records must not serialize secrets.');
   const stored = await persistActionRecord(env, callback.callbackData, record);
   if (!stored.ok) return json({ ok: false, reason: stored.reason || 'action_record_unavailable' }, { status: 503 });
+  await persistLatestMiniAppLaunchPointer({
+    env,
+    telegramUserId: context.normalized?.user?.telegramUserId,
+    sessionSlug: context.session.sessionSlug,
+    launch: callback.callbackData,
+    questionIds: resolved.ids,
+    createdAt: new Date().toISOString(),
+  }).catch(() => null);
   const link = directLinkMiniAppUrl(env, callback.callbackData);
   return json({
     ok: true,

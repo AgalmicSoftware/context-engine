@@ -178,6 +178,26 @@ function privateMessageFrom(text, {
   };
 }
 
+function privateVoiceMessage({
+  telegramUserId = '42',
+  username = 'participant',
+  fileId = 'voice-file-1',
+} = {}) {
+  return {
+    update_id: 7003,
+    message: {
+      message_id: 13,
+      voice: {
+        file_id: fileId,
+        duration: 4,
+        mime_type: 'audio/ogg',
+      },
+      chat: { id: Number(telegramUserId), type: 'private' },
+      from: { id: Number(telegramUserId), username },
+    },
+  };
+}
+
 async function withTimeout(promise, ms = 100, message = 'operation timed out') {
   let timeout = null;
   try {
@@ -991,6 +1011,139 @@ test('/sessions can use the Edge 2026 cutoff to hide the test session', async ()
   });
   assert.equal(start.ok, true);
   assert.match(start.response.text, /\/sessions - choose session/);
+});
+
+test('private voice message updates the latest Mini App launch draft', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_MINI_APP_URL: 'https://bridge.example/telegram/mini-app',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
+    AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_TRANSCRIBE_RATE_LIMIT: '1',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredAiAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  });
+  const launch = 'cecb_voice_draft';
+  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    callbackData: launch,
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionId: 'q-readiness',
+      questionSeries: {
+        questionIds: ['q-readiness'],
+        skippedQuestionIds: [],
+        draftAnswersByQuestionId: {
+          'q-readiness': { text: 'Existing draft' },
+        },
+      },
+    },
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:mini-app-latest-launch:v1:42', JSON.stringify({
+    type: 'telegram_mini_app_latest_launch',
+    version: 1,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    launch,
+    questionIds: ['q-readiness'],
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = String(url);
+    calls.push({ url: target, init });
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-voice' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/getFile')) {
+      const body = JSON.parse(init.body);
+      assert.equal(body.file_id, 'voice-file-1');
+      return new Response(JSON.stringify({
+        ok: true,
+        result: { file_path: 'voice/file_1.ogg' },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.includes('/file/bot123456:test-token/voice/file_1.ogg')) {
+      return new Response(new Uint8Array([1, 2, 3]), {
+        status: 200,
+        headers: { 'content-type': 'audio/ogg' },
+      });
+    }
+    if (target.endsWith('/transcribe')) {
+      assert.equal(init.headers.Authorization, 'Bearer worker-token');
+      assert.equal(init.body.get('model'), 'whisper-1');
+      assert.equal(init.body.get('apiKey'), 'sk-bridge-openai');
+      assert.equal(init.body.get('file').name, 'file_1.ogg');
+      return new Response(JSON.stringify({ text: 'spoken update' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ error: `unexpected ${target}` }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const result = await buildTelegramCommandResponse({
+    update: privateVoiceMessage(),
+    env,
+    fetchImpl,
+    now: '2026-05-29T12:05:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'mini_app_voice_draft_fallback');
+  assert.match(result.response.text, /Updated the Mini App draft/);
+  assert.equal(flattenButtons(result.response.replyMarkup)[0].text, 'Review Draft');
+  const stored = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(
+    stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-readiness'].text,
+    'Existing draft\n\nspoken update'
+  );
+  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), [
+    '/auth/nonce',
+    '/auth/login',
+    '/bot123456:test-token/getFile',
+    '/file/bot123456:test-token/voice/file_1.ogg',
+    '/transcribe',
+  ]);
+
+  const second = await buildTelegramCommandResponse({
+    update: privateVoiceMessage({ fileId: 'voice-file-2' }),
+    env,
+    fetchImpl,
+    now: '2026-05-29T12:06:00.000Z',
+  });
+  assert.equal(second.ok, false);
+  assert.equal(second.reason, 'transcribe_rate_limited');
+  assert.match(second.response.text, /temporarily rate limited/);
+  assert.equal(calls.length, 5);
 });
 
 test('/questions and callback dispatch list questions without leaking locked prompts', async () => {

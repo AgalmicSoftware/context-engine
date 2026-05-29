@@ -17,9 +17,12 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
   buildSurveyResultsAggregatorPanelClassName,
+  buildSurveyResultsDemoResultCacheValue,
+  buildSurveyResultsDemoResultDataKey,
   buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
+  normalizeSurveyResultsDemoCacheViewType,
   resolveSurveyResultsSyncDetailsStyle,
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
@@ -538,6 +541,43 @@ describe('SurveyResults sync status display', () => {
 });
 
 describe('SurveyResults demo results views', () => {
+  it('builds stable worker-cache keys for demo circles and breakdown views', () => {
+    expect(normalizeSurveyResultsDemoCacheViewType('atlas')).toBe('circles');
+    expect(normalizeSurveyResultsDemoCacheViewType('breakdown')).toBe('breakdown');
+    expect(normalizeSurveyResultsDemoCacheViewType('riskMatrix')).toBe('');
+
+    const key = buildSurveyResultsDemoResultDataKey({
+      sessionSlug: 'Demo',
+      viewType: 'atlas',
+      questionResponsesNonce: 7,
+      totalQuestionsCount: 12,
+      totalResponsesCount: 34,
+      filteredQuestionsCount: 10,
+      filteredResponsesCount: 30,
+      cachedQuestionsCount: 12,
+      cachedSurveyResponsesCount: 0,
+    });
+    expect(key).toBe('demo:circles:7:12:34:10:30:12:0');
+
+    expect(buildSurveyResultsDemoResultCacheValue({
+      sessionSlug: 'Demo',
+      viewType: 'breakdown',
+      dataVersionKey: key,
+      generatedAt: '2026-05-29T12:00:00.000Z',
+      totalQuestionsCount: 12,
+      totalResponsesCount: 34,
+    })).toEqual(expect.objectContaining({
+      kind: 'survey_results_demo_view',
+      sessionSlug: 'demo',
+      viewType: 'breakdown',
+      dataVersionKey: key,
+      summary: expect.objectContaining({
+        totalQuestionsCount: 12,
+        totalResponsesCount: 34,
+      }),
+    }));
+  });
+
   it('shows the demo results switcher only for demo question results', () => {
     const nonDemoSubject = createSubject({
       isOpen: true,

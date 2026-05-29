@@ -712,6 +712,68 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   assert.equal(hit.cached, true);
   assert.equal(hit.cacheLayer, 'kv');
   assert.equal(hit.value.clusters[0].long, 'Builders want more prototypes and fewer panels.');
+
+  const circlesSaveResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        viewType: 'circles',
+        dataVersionKey: 'v1-circles',
+        value: {
+          summary: { nodes: 12, responses: 48 },
+          representativeNodes: [{ id: 'n1', label: 'Protocol design', score: 0.84 }],
+        },
+      }),
+    }),
+    env,
+  });
+  const circlesSaved = await jsonBody(circlesSaveResponse);
+  assert.equal(circlesSaveResponse.status, 200);
+  assert.equal(circlesSaved.value.summary.nodes, 12);
+  assert.equal(circlesSaved.value.representativeNodes[0].label, 'Protocol design');
+
+  const circlesHitResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=circles&dataVersionKey=v1-circles', {
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        origin: 'https://client.example',
+      },
+    }),
+    env,
+  });
+  const circlesHit = await jsonBody(circlesHitResponse);
+  assert.equal(circlesHitResponse.status, 200);
+  assert.equal(circlesHit.cached, true);
+  assert.equal(circlesHit.value.summary.responses, 48);
+
+  const oversizedResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        viewType: 'breakdown',
+        dataVersionKey: 'v1-oversized',
+        value: {
+          rows: Array.from({ length: 200 }, () => 'x'.repeat(8000)),
+        },
+      }),
+    }),
+    env,
+  });
+  const oversized = await jsonBody(oversizedResponse);
+  assert.equal(oversizedResponse.status, 413);
+  assert.equal(oversized.reason, 'result_view_cache_value_too_large');
 });
 
 test('Telegram agent can mint a Mini App question-series launch link', async () => {
@@ -772,6 +834,11 @@ test('Telegram agent can mint a Mini App question-series launch link', async () 
   assert.deepEqual(stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-freeform'], {
     text: 'Drafted answer for review',
   });
+  const latest = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:mini-app-latest-launch:v1:42'));
+  assert.equal(latest.launch, body.launch);
+  assert.equal(latest.sessionSlug, 'alpha');
+  assert.deepEqual(latest.questionIds, ['q-freeform', 'q-binary']);
+  assert.equal(JSON.stringify(latest).includes(issued.token), false);
   assert.equal(JSON.stringify(stored).includes(issued.token), false);
 
   const deniedResponse = await handleTelegramAgentHandoffRequest({
