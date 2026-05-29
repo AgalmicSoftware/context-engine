@@ -3612,7 +3612,7 @@ async function handleClientLoginExchangeRequest({
     session: context.session,
     account,
     principal: context.normalized,
-    workerUrl: safeString(body.workerUrl || url.searchParams.get('workerUrl')),
+    workerUrl: '',
     fetchImpl,
   });
   if (!login.ok) {

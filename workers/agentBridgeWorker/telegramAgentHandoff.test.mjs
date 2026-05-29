@@ -596,6 +596,69 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   ]);
 });
 
+test('Telegram client login ignores caller-supplied workerUrl', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+  });
+  const accountAddress = await managedAccountAddressForTelegramUser(env, '42');
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const target = String(url);
+    fetchCalls.push({ url: target, init });
+    if (target.startsWith('https://attacker.example')) {
+      throw new Error('caller-supplied workerUrl must not be fetched');
+    }
+    if (target.endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (target.endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/client-login/exchange?workerUrl=https%3A%2F%2Fattacker.example', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        token: issued.token,
+        workerUrl: 'https://attacker.example',
+      }),
+    }),
+    env,
+    fetchImpl,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.workerUrl, 'https://session-worker.example');
+  assert.deepEqual(fetchCalls.map((call) => call.url), [
+    'https://session-worker.example/auth/nonce',
+    'https://session-worker.example/auth/login',
+  ]);
+});
+
 test('Telegram client login rejects preview-user and session-mismatched tokens', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
