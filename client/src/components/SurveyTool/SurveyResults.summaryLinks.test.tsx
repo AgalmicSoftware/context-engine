@@ -501,6 +501,42 @@ describe('SurveyResults filter summary counts', () => {
   });
 });
 
+describe('SurveyResults sync status display', () => {
+  it('wires sync-status display plans into the modal header progress panel', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      syncDetailsOpen: true,
+      networkLatestBlock: 100,
+      questionLocalBlock: 80,
+      responseLocalBlock: 100,
+      questionResultsHydrated: true,
+      questionResponses: {},
+      aggregatorQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+    };
+
+    const tree = subject.render();
+    const headerNode = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsModalHeader
+    );
+    const markup = renderToStaticMarkup(headerNode?.props?.syncStatusNode);
+
+    expect(markup).toContain('Syncing...');
+    expect(markup).toContain('Remaining Blocks: 20 (Current: 80 / Latest: 100)');
+    expect(markup).toContain('In Sync (Current: 100 / Latest: 100)');
+    expect(markup).toContain('Refresh Now');
+  });
+});
+
 describe('SurveyResults demo results views', () => {
   it('shows the demo results switcher only for demo question results', () => {
     const nonDemoSubject = createSubject({

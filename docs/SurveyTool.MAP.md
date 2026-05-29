@@ -17,9 +17,10 @@
   - `SurveyQuestionsSurveyAnswersView.tsx`: **56 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
-  - `SurveyResults.tsx`: **5,038 lines**
+  - `SurveyResults.tsx`: **4,898 lines**
   - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyResultsModalHeader.tsx`: **137 lines**
+  - `SurveyResultsPanels.tsx`: **208 lines**
   - `SurveyResultsQuestionListCard.tsx`: **56 lines**
   - `SurveyResultsExportControls.tsx`: **85 lines**
   - `surveyResultsExportController.ts`: **125 lines**
@@ -29,10 +30,11 @@
   - `SurveyResultsSurveyViewModeToggle.tsx`: **43 lines**
   - `SurveyResultsStatusMessages.tsx`: **42 lines**
   - `surveyResultsFilterStatusController.ts`: **98 lines**
+  - `surveyResultsSyncStatusController.ts`: **174 lines**
   - `surveyResultsSummaryModels.ts`: **205 lines**
   - `SurveyPileViewMode.tsx`: **2,787 lines**
   - `surveyQuestionsJsonDerivation.ts`: **131 lines**
-- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections extracted while keeping submit, decrypt, cache, route, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, and filter/status display-plan helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, and export payload generation in the parent.
+- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections extracted while keeping submit, decrypt, cache, route, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, filter/status display-plan, and sync-status display-plan helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, polling/timers, manual refresh, network block reads, and export payload generation in the parent.
 
 ## Current Runtime Hierarchy
 
@@ -53,8 +55,10 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
      -> SurveyResults.tsx  [survey/question results runtime]
         -> SurveyResultsModalHeader.tsx  [modal title, links, bookmark, sync/header presentation]
+        -> SurveyResultsPanels.tsx  [sync-status and filter-summary panel rendering helpers]
         -> SurveyResultsStatusMessages.tsx  [alert/loading status presentation]
         -> surveyResultsFilterStatusController.ts  [filter/status display plans]
+        -> surveyResultsSyncStatusController.ts  [sync-status progress display plans]
         -> SurveyResultsSurveyViewModeToggle.tsx  [survey individual/aggregate toggle presentation]
         -> SurveyResultsQuestionListCard.tsx  [question table card shell]
         -> SurveyResultsQuestionTable.tsx  [question result table presentation]
@@ -84,8 +88,9 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
-| `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export payload generation, route/session state, and result mutation behavior while delegating export orchestration to `surveyResultsExportController.ts` and filter/status display planning to `surveyResultsFilterStatusController.ts` |
+| `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export payload generation, route/session state, polling/timers, manual refresh, network block reads, and result mutation behavior while delegating export orchestration to `surveyResultsExportController.ts`, filter/status display planning to `surveyResultsFilterStatusController.ts`, and sync-status progress display planning to `surveyResultsSyncStatusController.ts` |
 | `SurveyResultsModalHeader.tsx` | Results modal header presentation | Renders title, survey ID/document links, bookmark, demo-view controls, locked-response toggle slot, and sync-status slot from explicit props |
+| `SurveyResultsPanels.tsx` | Results panel presentation helpers | Renders sync-status progress panel and filter summary UI from explicit props while leaving display plans in controller helpers and handlers/state in `SurveyResults` |
 | `SurveyResultsStatusMessages.tsx` | Results status presentation | Renders alert and filter-loading states from explicit props while leaving alert/filter state in `SurveyResults` and display selection in `surveyResultsFilterStatusController.ts` |
 | `SurveyResultsSurveyViewModeToggle.tsx` | Survey view-mode toggle presentation | Renders individual/aggregate switch labels and ARIA state from explicit props while leaving mode state and keyboard/click handlers in `SurveyResults` |
 | `SurveyResultsQuestionListCard.tsx` | Question table card shell | Renders the collapsible View & Sort Questions card from explicit props while leaving table derivation, toggles, and scroll behavior in `SurveyResults` |
@@ -93,6 +98,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyResultsExportControls.tsx` | Export controls presentation | Renders export area collapse, type dropdown, and download button from explicit props while leaving export type state in `SurveyResults` and export execution in `surveyResultsExportController.ts` |
 | `surveyResultsExportController.ts` | Results export orchestration | Runs export generation/download plans, invokes injected content generators and browser download ports, and maps invalid/empty export alerts without owning export payload generation, route, cache, fetch, or decrypt behavior |
 | `surveyResultsFilterStatusController.ts` | Results filter/status display planning | Builds pure alert/loading and filtered-count display plans without owning filter state mutation, SBT/question filtering, cache, fetch, decrypt, route, or export behavior |
+| `surveyResultsSyncStatusController.ts` | Results sync-status display planning | Builds pure sync label/progress/color/spinner/quick-refresh visibility plans without owning polling, timers, manual refresh, cache, network block reads, fetch, decrypt, route, or export behavior |
 | `SurveyResultsQuestionSummaryCard.tsx` | Question summary card shell | Renders summary headers, metadata fallback, bookmark action, and selected summary body slots while leaving decrypt overrides and response rendering in `SurveyResults` |
 | `SurveyResultsIndividualResponsesList.tsx` | Individual response list presentation | Renders individual responder cards, links, toggles, and empty states while leaving response body/decrypt rendering in `SurveyResults` |
 | `SurveyResultsQuestionSummariesList.tsx` | Question summary list presentation | Renders aggregate/question summary list entries and no-results fallback from explicit props while leaving summary rendering in `SurveyResults` |
