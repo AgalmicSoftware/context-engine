@@ -80,6 +80,30 @@ export type SessionWizardPublishCompletionControllerResult = {
   publishedPendingSbtLinks: unknown[];
 };
 
+export type SessionWizardRegisterTxEntry = AnyRecord;
+
+export type SessionWizardRegisterTxsUpdater =
+  | SessionWizardRegisterTxEntry[]
+  | ((prev: SessionWizardRegisterTxEntry[]) => SessionWizardRegisterTxEntry[]);
+
+export type SessionWizardRegisterStepControllerInput = {
+  registerArgs: AnyRecord;
+};
+
+export type SessionWizardRegisterStepControllerPorts = {
+  registerSessionOnChain: (args: AnyRecord) => Promise<AnyRecord | null | undefined>;
+};
+
+export type SessionWizardRegisterStepControllerCallbacks = {
+  setRegisterTxs: (value: SessionWizardRegisterTxsUpdater) => void;
+  setStatus: (status: string) => void;
+};
+
+export type SessionWizardRegisterStepControllerResult = {
+  status: 'completed';
+  registerResult: AnyRecord | null;
+};
+
 const getPublishStepNumber = (
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike,
   stepKey: string
@@ -146,6 +170,39 @@ export const runSessionWizardPublishController = async ({
     status: 'completed',
     workerUrlOverride,
     deployedPendingDrafts,
+  };
+};
+
+export const runSessionWizardRegisterStepController = async ({
+  input,
+  ports,
+  callbacks,
+}: {
+  input: SessionWizardRegisterStepControllerInput;
+  ports: SessionWizardRegisterStepControllerPorts;
+  callbacks: SessionWizardRegisterStepControllerCallbacks;
+}): Promise<SessionWizardRegisterStepControllerResult> => {
+  callbacks.setRegisterTxs([]);
+  callbacks.setStatus('Registering session on-chain…');
+
+  const registerResult = await ports.registerSessionOnChain({
+    ...input.registerArgs,
+    onTxHash: (entry: SessionWizardRegisterTxEntry) => {
+      callbacks.setRegisterTxs((prev) => [
+        ...(Array.isArray(prev) ? prev : []),
+        entry,
+      ]);
+    },
+  }) || null;
+
+  if (Array.isArray(registerResult?.txs) && registerResult.txs.length) {
+    callbacks.setRegisterTxs(registerResult.txs);
+  }
+  callbacks.setStatus('Session registered on-chain.');
+
+  return {
+    status: 'completed',
+    registerResult,
   };
 };
 
