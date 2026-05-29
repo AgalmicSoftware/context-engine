@@ -17,10 +17,10 @@
   - `SurveyQuestionsSurveyAnswersView.tsx`: **56 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
-  - `SurveyResults.tsx`: **4,898 lines**
+  - `SurveyResults.tsx`: **4,899 lines**
   - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyResultsModalHeader.tsx`: **137 lines**
-  - `SurveyResultsPanels.tsx`: **208 lines**
+  - `SurveyResultsPanels.tsx`: **210 lines**
   - `SurveyResultsQuestionListCard.tsx`: **56 lines**
   - `SurveyResultsExportControls.tsx`: **85 lines**
   - `surveyResultsExportController.ts`: **125 lines**
