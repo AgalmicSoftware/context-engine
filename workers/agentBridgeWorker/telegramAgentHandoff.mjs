@@ -2617,20 +2617,28 @@ function normalizeDigestLimit(value = null) {
   return Math.max(1, Math.min(5, Number.isFinite(parsed) ? Math.floor(parsed) : 3));
 }
 
-function selectDigestQuestions(questions = [], sponsoredQuestionIds = [], limit = 3) {
+function selectDigestQuestions({
+  questions = [],
+  rankedQuestions = [],
+  sponsoredQuestionIds = [],
+  limit = 3,
+} = {}) {
   const sponsoredIds = normalizeQuestionQueueRefs(sponsoredQuestionIds);
   const answerable = (Array.isArray(questions) ? questions : [])
     .filter((question) => question?.answerable === true);
+  const rankedAnswerable = (Array.isArray(rankedQuestions) ? rankedQuestions : [])
+    .filter((question) => question?.answerable === true);
   const byId = new Map(answerable.map((question) => [safeString(question.questionId || question.id), question]));
+  const rankedById = new Map(rankedAnswerable.map((question) => [safeString(question.questionId || question.id), question]));
   const selected = [];
   const seen = new Set();
   sponsoredIds.forEach((questionId) => {
     const question = byId.get(questionId);
     if (!question || seen.has(questionId)) return;
-    selected.push({ ...question, sponsored: true, digestReason: 'admin_sponsored' });
+    selected.push({ ...(rankedById.get(questionId) || question), sponsored: true, digestReason: 'admin_sponsored' });
     seen.add(questionId);
   });
-  answerable.forEach((question) => {
+  rankedAnswerable.forEach((question) => {
     const questionId = safeString(question.questionId || question.id);
     if (!questionId || seen.has(questionId)) return;
     selected.push({ ...question, sponsored: false, digestReason: 'preference_ranked' });
@@ -2665,11 +2673,12 @@ async function handleDigestRequest({
   const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
   const ranked = rankQuestionsByPreferences(questions, input, context);
   const queueConfig = await loadTelegramQuestionQueueConfig({ env, sessionSlug });
-  const digestQuestions = selectDigestQuestions(
-    ranked.questions,
-    queueConfig.sponsoredQuestionIds,
+  const digestQuestions = selectDigestQuestions({
+    questions,
+    rankedQuestions: ranked.questions,
+    sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
     limit
-  );
+  });
   const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
   const activityItems = await listTelegramAgentActivity({
     env,

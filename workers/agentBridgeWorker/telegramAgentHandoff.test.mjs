@@ -917,7 +917,7 @@ test('Telegram agent digest returns sponsored-first ranked questions and redacte
   }));
 
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/digest?sessionSlug=alpha&limit=2&geoIds=edge-town-hall', {
+    request: agentRequest('/telegram/agent/api/digest?sessionSlug=alpha&limit=2&geoIds=edge-town-hall&relevanceMode=filter', {
       token: issued.token,
     }),
     env,
@@ -934,6 +934,8 @@ test('Telegram agent digest returns sponsored-first ranked questions and redacte
   assert.equal(body.questions[0].digestReason, 'admin_sponsored');
   assert.equal(body.questions[1].digestReason, 'preference_ranked');
   assert.deepEqual(body.questions[1].geoRefs, [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }]);
+  assert.deepEqual(body.relevance.geoIds, ['edge-town-hall']);
+  assert.equal(body.relevance.mode, 'filter');
   assert.equal(body.pending.answerDraftCount, 1);
   assert.equal(body.pending.voteRecommendationCount, 1);
   assert.equal(body.pendingAnswerDrafts.length, 1);
