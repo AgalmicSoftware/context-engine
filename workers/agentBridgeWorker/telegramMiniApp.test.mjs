@@ -186,8 +186,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(toolMenu.includes('<span>Add question</span>'), false);
   assert.equal(toolMenu.includes('<span>Filter</span>'), false);
   assert.match(toolMenu, /<span>Settings<\/span>/);
+  assert.match(toolMenu, /id="demoDataResults"[^>]*aria-label="Demo data"[\s\S]*<span>Demo data<\/span>/);
   assert.match(html, /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/);
   assert.match(html, /\.toolMenu \.iconButton \{[\s\S]*min-height: 64px;[\s\S]*font-size: 14px;[\s\S]*line-height: 1\.15;/);
+  assert.match(html, /\.toolMenu \.menuCheckbox input \{[\s\S]*accent-color: var\(--results-accent\);/);
   assert.match(html, /function setToolMenuOpen\(open\)/);
   assert.match(html, /function bindPanelClose\(closeButton, panel, button\)/);
   assert.match(html, /state\.sessionsPanelOpen/);
@@ -306,7 +308,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultsTitleSession"/);
   assert.match(html, /\.resultsTitleSession \{[\s\S]*opacity: 0\.5;/);
   assert.match(html, /class="resultsTitleRow"[\s\S]*id="showResultFilters"[^>]*aria-label="Filter results"/);
-  assert.match(html, /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*state\.resultSectionsOpen\.filters = !state\.resultSectionsOpen\.filters;[\s\S]*scrollPanelIntoView\(el\.resultFilters\);/);
+  assert.match(html, /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*const open = state\.resultSectionsOpen\.filters !== true;[\s\S]*state\.resultSectionsOpen\.filters = open;[\s\S]*if \(open\) scrollPanelIntoView\(el\.resultFilters\);/);
   assert.equal(html.includes("state.resultsData.sessionName + ' | ' +"), false);
   assert.match(html, /el\.resultsSummary\.textContent = state\.resultsData\.responseCount \+ ' responses \| ' \+/);
   assert.equal(html.includes('id="refreshResults"'), false);
@@ -316,6 +318,13 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultFilters"[^>]*aria-label="Result filters"/);
   assert.match(html, /id="toggleResultFilters"/);
   assert.match(html, /class="resultFilterHeader"[\s\S]*id="toggleResultFilters"[\s\S]*id="clearResultFilters"/);
+  const resultsBodyStart = html.indexOf('<div class="resultsPanelBody" id="resultsPanelBody">');
+  const resultFiltersStart = html.indexOf('<section class="resultFilters', resultsBodyStart);
+  const resultsBodyLead = resultsBodyStart >= 0 && resultFiltersStart > resultsBodyStart
+    ? html.slice(resultsBodyStart, resultFiltersStart)
+    : '';
+  assert.equal(resultsBodyLead.includes('Demo data'), false);
+  assert.equal(resultsBodyLead.includes('demoDataResults'), false);
   assert.match(html, /id="resultFilterOptions"/);
   assert.equal(html.includes('id="applyResultFilters"'), false);
   assert.match(html, /autoApplyResultFilters/);
@@ -351,7 +360,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="toggleGroupAnalysisSection"/);
   assert.match(html, /id="resultGroupsSection"[\s\S]*id="groupAnalysisSection"/);
   assert.match(html, /function renderResultGroups\(groups\)[\s\S]*el\.resultClusterControls\.innerHTML = '';[\s\S]*el\.resultGroupChart\.innerHTML = '';[\s\S]*el\.groupAnalysisSection\.hidden = true;/);
-  assert.match(html, /if \(!groups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultClusterControls\(\);[\s\S]*renderResultGroupChart\(groups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;/);
+  assert.match(html, /const participantCount = Number\(state\.resultsData\?\.participantCount \|\| state\.resultsData\?\.counts\?\.uniqueParticipants \|\| 0\) \|\| 0;/);
+  assert.match(html, /if \(participantCount >= 2\) renderResultClusterControls\(\);[\s\S]*if \(!groups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(groups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;/);
   assert.match(html, /resultsCache: new Map\(\)/);
   assert.match(html, /function loadResults\(\{ force = false \} = \{\}\) \{[\s\S]*const cacheKey = currentResultsCacheKey\(\);[\s\S]*state\.resultsCache\.set\(cacheKey, nextData\);/);
   assert.match(html, /function setResultsDemoData\(value\) \{[\s\S]*restoreCachedResults\(\);[\s\S]*loadResults\(\{ force: true \}\);/);
@@ -360,6 +370,13 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="divisiveResults"/);
   assert.match(html, /id="resultGroups"/);
   assert.match(html, /Analyze ' \+ group\.label/);
+  assert.match(html, /Analyzing ' \+ group\.label \+ '\.\.\. ' \+ elapsedSeconds \+ 's elapsed'/);
+  assert.match(html, /function resultClusterOptionCounts\(\)[\s\S]*Math\.min\(5, Math\.floor\(participantCount \|\| 0\)\)/);
+  assert.match(html, /Array\.from\(\{ length: maxCount - 1 \}, \(_, index\) => index \+ 2\)/);
+  assert.match(html, /className = 'resultRow groupAnalysisResult'/);
+  assert.match(html, /font-size: 14px;/);
+  assert.match(html, /function startGroupAnalysisProgressTimer\(\)/);
+  assert.match(html, /state\.resultSectionsOpen\.groups = true;[\s\S]*state\.resultSectionsOpen\.groupAnalysis = true;[\s\S]*renderResults\(\);[\s\S]*scrollPanelIntoView\(el\.groupAnalysisSection\);/);
   assert.match(html, /\.distributionBar/);
   assert.match(html, /min-height: 16px;/);
   assert.match(html, /\.distributionRow/);
@@ -2706,7 +2723,7 @@ test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo togg
   assert.equal(html.includes('id="renderGroupImage"'), false);
   assert.equal(html.includes('fetch(imageUrl.pathname + imageUrl.search'), false);
   assert.match(html, /id="demoDataResults"/);
-  assert.match(html, /id="demoDataResultsInline"/);
+  assert.equal(html.includes('id="demoDataResultsInline"'), false);
   assert.match(html, /Demo data/);
   assert.match(html, /expandedQuestionKeys: new Set\(\)/);
   assert.match(html, /highlightedQuestionKey/);
