@@ -382,6 +382,19 @@ Supported answer shapes:
 - `freeform`: `text` is the answer body.
 - `multichoice`: `values` is an array of selected option labels.
 
+### Writing Good Additional Comments
+
+`comments` is optional, but valuable when it adds a genuine, specific contribution. Add one when the user has:
+
+- A meta-comment on the question itself, such as leading framing, conflated ideas, or an undefined key term.
+- A premise challenge, such as "this assumes X, but in my context X does not hold because ...".
+- Nuance or a conditional, such as agreeing for new users but disagreeing for power users.
+- A missing option or false binary that changes how the answer should be interpreted.
+- Ambiguity that materially changes the response.
+- A concrete data point, counterexample, or lived-experience detail that explains the stance.
+
+Avoid restating the chosen answer, generic praise or filler, comments longer than about 1-3 sentences, and private or identifying details the user has not authorized.
+
 Draft the preferences:
 
 ```http
