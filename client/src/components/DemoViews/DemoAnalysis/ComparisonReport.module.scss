@@ -7,11 +7,63 @@
   position: relative;
 }
 
+.reportCollapseHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ce-color-dark);
+  text-align: left;
+  cursor: pointer;
+
+  &:hover .mainReportTitle,
+  &:focus-visible .mainReportTitle {
+    color: #0f5ec7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #0f5ec7;
+    outline-offset: 4px;
+    border-radius: var(--ce-radius-6);
+  }
+}
+
+.reportCollapseCopy {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.reportSummaryText {
+  color: #5f6f82;
+  font-size: 0.98rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.reportCollapseIcon {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+  color: #34495e;
+}
+
+.reportCollapseBody {
+  display: grid;
+  gap: 0;
+}
+
 .mainReportTitle {
   text-align: left;
   color: var(--ce-color-dark);
-  margin: 0 0 1rem;
+  margin: 0;
+  font-size: 1.3rem;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .legendContainer {
@@ -414,6 +466,7 @@
   }
 }
 
-.reportButtonReset {
-  all: unset;
+.reportAnalysisContent {
+  display: grid;
+  gap: 0.45rem;
 }

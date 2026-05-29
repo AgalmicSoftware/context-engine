@@ -220,6 +220,12 @@ The report section should include:
 - Representative questions/comments when available.
 - Consensus/divisive question tables when available.
 - A link or anchor back to embedded JSON details.
+- For AI-generated non-demo sessions, a `breakdown.dimensions` list that
+  drives comparison/filter controls from dataset-relevant SBTs, gates, groups,
+  tags, or other non-address cohort labels. Do not hardcode the demo-only
+  `Era`, `Region`, `Country`, `Gender`, `Affiliation`, or `Atlas Category`
+  selectors unless those exact dimensions are present in the generated
+  artifact.
 
 The first implementation may render a simplified static report from the same
 data used by `PolisReport`; it does not need to pixel-match the live component

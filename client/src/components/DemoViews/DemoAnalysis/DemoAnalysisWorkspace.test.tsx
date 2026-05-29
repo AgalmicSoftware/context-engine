@@ -65,9 +65,11 @@ describe('DemoAnalysisWorkspace', () => {
     const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\) !important;/);
-    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/);
+    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\);/);
+    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*transparent !important;/);
     expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
+    expect(scss).toMatch(/\.selectedQuestionTension\s*{[\s\S]*color:\s*#364252;/);
     expect(scss).not.toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#f8fbff;/);
   });
 
@@ -128,8 +130,8 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
     expect(suggestionQuestionText).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
-    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/personas/i);
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/modeled responses/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).not.toHaveTextContent(/personas\s*·/i);
     expect(screen.getByTestId('demo-analysis-report-summary').textContent).toMatch(/:/);
     expect(screen.getByTestId('demo-analysis-suggestion-0')).toHaveAttribute('aria-pressed', 'true');
   });
@@ -188,9 +190,16 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     const banner = screen.getByTestId('demo-analysis-question-banner');
-    expect(within(banner).getByText('Custom Grounding')).toBeInTheDocument();
-    expect(within(banner).getByText('Tweets')).toBeInTheDocument();
-    expect(within(banner).getByText(/Key tension:/i)).toBeInTheDocument();
+    const customGroundingTag = within(banner).getByRole('button', { name: 'Custom Grounding' });
+    const tweetsTag = within(banner).getByRole('button', { name: 'Tweets' });
+
+    expect(screen.getByTestId('demo-analysis-selected-question-tension')).toHaveTextContent(/Key tension:/i);
+    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'false');
+    expect(tweetsTag).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(customGroundingTag);
+
+    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {
@@ -231,7 +240,7 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
   });
 
-  it('exposes modeled respondent profiles in the drilldown modal instead of hiding synthetic rows', async () => {
+  it('does not expose the temporary drilldown details modal', async () => {
     render(<DemoAnalysisWorkspace />);
 
     fireEvent.click(await screen.findByTestId('demo-analysis-suggestion-0'));
@@ -240,12 +249,8 @@ describe('DemoAnalysisWorkspace', () => {
       expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
-
-    expect(screen.getByTestId('demo-analysis-drilldown-modal')).toBeInTheDocument();
-    expect(screen.getByText('Modeled respondent mix')).toBeInTheDocument();
-    expect(screen.getByText('Historical persona baseline')).toBeInTheDocument();
-    expect(screen.getByText('Consensus echo')).toBeInTheDocument();
-    expect(screen.getByText('Bridge builder')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('demo-analysis-drilldown-modal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Modeled respondent mix')).not.toBeInTheDocument();
   });
 });

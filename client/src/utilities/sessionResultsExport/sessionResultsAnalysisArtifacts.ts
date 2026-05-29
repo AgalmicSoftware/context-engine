@@ -8,6 +8,16 @@ export const SESSION_RESULTS_ANALYSIS_MINIMUMS = Object.freeze({
 });
 
 const ETH_ADDRESS_TEXT_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
+const REDACTED_ADDRESS_PLACEHOLDER = '[redacted-address]';
+const SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS = [
+  /^address$/i,
+  /^wallet$/i,
+  /^walletAddress$/i,
+  /^participantAddress$/i,
+  /^participantAddresses$/i,
+  /^responder$/i,
+  /^responderAddress$/i,
+];
 
 export type SessionResultsAnalysisQuestionInput = {
   id: string;
@@ -49,10 +59,25 @@ export type SessionResultsAnalysisAiPayload = {
   };
   questions: SessionResultsAnalysisQuestionInput[];
   responses: SessionResultsAnalysisAiResponse[];
+  segmentDimensions: SessionResultsAnalysisSegmentDimension[];
   session: {
     name: string;
     slug: string;
   };
+};
+
+export type SessionResultsAnalysisSegmentValue = {
+  count?: number;
+  id: string;
+  label: string;
+  source?: string;
+};
+
+export type SessionResultsAnalysisSegmentDimension = {
+  id: string;
+  label: string;
+  source?: string;
+  values: SessionResultsAnalysisSegmentValue[];
 };
 
 export type SessionResultsAnalysisPayloadBuildResult = {
@@ -80,6 +105,7 @@ export type SessionResultsGeneratedAnalysisArtifact = {
     };
     breakdown: {
       available: boolean;
+      dimensions: unknown[];
       groups: unknown[];
       reason?: string;
       summary: Record<string, unknown>;
@@ -118,7 +144,7 @@ const normalizeText = (value: unknown): string => (
 );
 
 const normalizeAiText = (value: unknown): string => (
-  normalizeText(value).replace(ETH_ADDRESS_TEXT_PATTERN, '[redacted-address]')
+  normalizeText(value).replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER)
 );
 
 const toPlainRecord = (value: unknown): Record<string, unknown> => (
@@ -132,6 +158,83 @@ const toArray = (value: unknown): unknown[] => (
 );
 
 const buildSyntheticId = (index: number): string => `participant_${String(index + 1).padStart(3, '0')}`;
+
+const slugifyAnalysisId = (value: unknown, fallback = 'item'): string => {
+  const slug = normalizeAiText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 72);
+  return slug || fallback;
+};
+
+const isSafeAnalysisLabel = (value: unknown): boolean => {
+  const label = normalizeAiText(value);
+  return !!label && !label.includes(REDACTED_ADDRESS_PLACEHOLDER);
+};
+
+const normalizeSegmentValue = (
+  value: unknown,
+  dimensionId: string
+): SessionResultsAnalysisSegmentValue | null => {
+  const record = toPlainRecord(value);
+  const label = normalizeAiText(record.label ?? record.value ?? '');
+  if (!isSafeAnalysisLabel(label)) return null;
+  const count = Number(record.count);
+  const rawId = record.id ?? record.valueId;
+  return {
+    id: slugifyAnalysisId(isSafeAnalysisLabel(rawId) ? rawId : `${dimensionId}_${label}`, 'value'),
+    label,
+    ...(Number.isFinite(count) && count > 0 ? { count: Math.floor(count) } : {}),
+    ...(isSafeAnalysisLabel(record.source) ? { source: normalizeAiText(record.source) } : {}),
+  };
+};
+
+const normalizeSegmentDimension = (
+  value: unknown
+): SessionResultsAnalysisSegmentDimension | null => {
+  const record = toPlainRecord(value);
+  const label = normalizeAiText(record.label ?? record.dimensionLabel ?? record.dimension ?? '');
+  if (!isSafeAnalysisLabel(label)) return null;
+
+  const rawId = record.id ?? record.dimensionId;
+  const id = slugifyAnalysisId(isSafeAnalysisLabel(rawId) ? rawId : label, 'dimension');
+  const values = toArray(record.values)
+    .map((entry) => normalizeSegmentValue(entry, id))
+    .filter(Boolean) as SessionResultsAnalysisSegmentValue[];
+  if (values.length === 0) return null;
+
+  return {
+    id,
+    label,
+    values,
+    ...(isSafeAnalysisLabel(record.source) ? { source: normalizeAiText(record.source) } : {}),
+  };
+};
+
+const normalizeAnalysisSegmentDimensions = (
+  value: unknown
+): SessionResultsAnalysisSegmentDimension[] => (
+  toArray(value)
+    .map(normalizeSegmentDimension)
+    .filter(Boolean) as SessionResultsAnalysisSegmentDimension[]
+);
+
+const shouldDropAnalysisOutputKey = (key: string): boolean => (
+  SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS.some((pattern) => pattern.test(key))
+);
+
+const sanitizeGeneratedAnalysisValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(sanitizeGeneratedAnalysisValue);
+  if (typeof value === 'string') return normalizeAiText(value);
+  if (!value || typeof value !== 'object') return value;
+
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, entryValue]) => {
+    if (shouldDropAnalysisOutputKey(key)) return acc;
+    acc[key] = sanitizeGeneratedAnalysisValue(entryValue);
+    return acc;
+  }, {});
+};
 
 export const shortenSessionResultsAddress = (value: unknown): string => {
   const address = toSafeString(value).trim();
@@ -186,10 +289,12 @@ export const buildSessionResultsAnalysisInputSignature = (
 export const buildSessionResultsAnalysisAiPayload = ({
   questions = [],
   responses = [],
+  segmentDimensions = [],
   session = {},
 }: {
   questions?: SessionResultsAnalysisQuestionInput[];
   responses?: SessionResultsAnalysisResponseInput[];
+  segmentDimensions?: unknown[];
   session?: Partial<SessionResultsAnalysisAiPayload['session']>;
 } = {}): SessionResultsAnalysisPayloadBuildResult => {
   const participantIds = new Map<string, SessionResultsAnalysisParticipant>();
@@ -228,6 +333,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
       questionType: normalizeAiText(response?.questionType),
     };
   }).filter(Boolean) as SessionResultsAnalysisAiResponse[];
+  const normalizedSegmentDimensions = normalizeAnalysisSegmentDimensions(segmentDimensions);
 
   return {
     aiPayload: {
@@ -238,6 +344,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
       },
       questions: normalizedQuestions,
       responses: normalizedResponses,
+      segmentDimensions: normalizedSegmentDimensions,
       session: {
         name: normalizeAiText(session?.name),
         slug: normalizeAiText(session?.slug),
@@ -280,6 +387,9 @@ Return only valid JSON. Do not include markdown fences.
 
 Privacy rules:
 - The input uses synthetic participant IDs only. Never invent or request wallet addresses.
+- If segmentDimensions is non-empty, use those dataset-specific dimensions for Breakdown comparison/filter controls. They may represent SBTs, gates, groups, tags, or other non-address cohort labels.
+- Do not use demo-only dimensions such as Era, Region, Country, Gender, Affiliation, or Atlas Category unless those exact dimensions are present in segmentDimensions.
+- Never put wallet addresses or contract addresses in generated segment labels, ids, summaries, or participant references.
 - You may reason from raw answer text, but your summaries must paraphrase instead of quoting identifiable freeform responses.
 - Keep participant references as synthetic IDs such as participant_001.
 
@@ -287,6 +397,7 @@ Generate this JSON shape:
 {
   "breakdown": {
     "summary": { "overview": "short neutral synthesis" },
+    "dimensions": [{ "id": "sbt_groups", "label": "SBT / Groups", "source": "sbt", "values": [{ "id": "builders", "label": "Builders", "count": 3 }] }],
     "groups": [{ "id": "group_1", "label": "theme", "summary": "paraphrased summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }]
   },
   "argumentMap": {
@@ -328,7 +439,7 @@ const parseJsonObject = (raw: unknown): Record<string, unknown> => {
 };
 
 const sectionArray = (record: Record<string, unknown>, key: string): unknown[] => (
-  toArray(record[key])
+  toArray(record[key]).map(sanitizeGeneratedAnalysisValue)
 );
 
 const normalizeSectionRecord = (value: unknown): Record<string, unknown> => (
@@ -360,12 +471,15 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
     : generatedAtDate.toISOString();
 
   const groups = sectionArray(breakdown, 'groups');
+  const dimensions = sectionArray(breakdown, 'dimensions');
   const debates = sectionArray(argumentMap, 'debates');
   const categories = sectionArray(riskMatrix, 'categories');
   const comments = sectionArray(riskMatrix, 'comments');
   const scenarioLinks = sectionArray(riskMatrix, 'scenarioLinks');
   const nodes = sectionArray(atlas, 'nodes');
   const edges = sectionArray(atlas, 'edges');
+  const breakdownSummary = toPlainRecord(sanitizeGeneratedAnalysisValue(breakdown.summary));
+  const riskMatrixHeatmap = toPlainRecord(sanitizeGeneratedAnalysisValue(riskMatrix.heatmap));
 
   return {
     generatedAt: normalizedGeneratedAt,
@@ -386,10 +500,11 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
         ...(nodes.length || edges.length ? {} : { reason: 'AI generation did not return atlas nodes.' }),
       },
       breakdown: {
-        available: groups.length > 0 || Object.keys(toPlainRecord(breakdown.summary)).length > 0,
+        available: dimensions.length > 0 || groups.length > 0 || Object.keys(breakdownSummary).length > 0,
+        dimensions,
         groups,
-        summary: toPlainRecord(breakdown.summary),
-        ...(groups.length || Object.keys(toPlainRecord(breakdown.summary)).length ? {} : {
+        summary: breakdownSummary,
+        ...(dimensions.length || groups.length || Object.keys(breakdownSummary).length ? {} : {
           reason: 'AI generation did not return breakdown groups.',
         }),
       },
@@ -397,7 +512,7 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
         available: categories.length > 0 || comments.length > 0,
         categories,
         comments,
-        heatmap: toPlainRecord(riskMatrix.heatmap),
+        heatmap: riskMatrixHeatmap,
         scenarioLinks,
         ...(categories.length || comments.length ? {} : { reason: 'AI generation did not return risk matrix data.' }),
       },
