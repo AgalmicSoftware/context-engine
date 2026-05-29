@@ -161,6 +161,34 @@ describe('SBTPage session routing and holder loading', () => {
     expect(subject.handleBurn).toHaveBeenCalledTimes(1);
   });
 
+  it('routes open mint button clicks through the parent mint handler with force refresh', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: {
+        hasPasswordMint: false,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.handleMint = jest.fn();
+
+    const tree = subject.renderMintButton();
+    const mintButton = findElementInTree(tree, (node) => node?.type === 'button');
+
+    expect(mintButton).not.toBeNull();
+    mintButton.props.onClick({ preventDefault: jest.fn() });
+    expect(subject.handleMint).toHaveBeenCalledTimes(1);
+    expect(subject.handleMint).toHaveBeenCalledWith(true);
+  });
+
   it('keeps holders modal refresh log-driven and shows approximate counts without ownerOf fan-out', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const sbtLower = sbtAddress.toLowerCase();
