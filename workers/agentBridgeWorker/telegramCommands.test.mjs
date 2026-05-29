@@ -19,6 +19,7 @@ import {
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
@@ -1180,7 +1181,7 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const env = baseEnv({ AGENT_ACTION_KV: kv });
   const written = await writeAgentSkillUpdateFlag({
     env,
-    latestVersion: '2026-05-30 (v4)',
+    latestVersion: '2026-05-30 (v5)',
     note: 'Refresh before answering.',
     accountAddress: `0x${'cd'.repeat(20)}`,
     createdAt: '2026-05-30T00:00:00.000Z',
@@ -1189,9 +1190,9 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
   const cleared = await clearAgentSkillUpdateFlag(env);
 
-  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v4)' });
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v5)' });
   assert.equal(read.updateAvailable, true);
-  assert.equal(read.latestVersion, '2026-05-30 (v4)');
+  assert.equal(read.latestVersion, '2026-05-30 (v5)');
   assert.equal(read.note, 'Refresh before answering.');
   assert.equal(read.updatedBy, '0xcdcd...cdcd');
   assert.equal(putCall.options?.expirationTtl, undefined);
@@ -2710,11 +2711,11 @@ test('/start and /me show admin actions only to the configured export admin', as
   const policyAfterToggle = await loadSessionPolicy(allowedEnv);
   const alphaAfterToggle = policyAfterToggle.linkedSessions.find((session) => session.sessionSlug === 'alpha');
 
-  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
+  assert.deepEqual(flattenButtons(allowedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'Admin Actions'), true);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_all'), false);
   assert.equal(flattenButtons(allowedMe.response.replyMarkup).some((button) => button.text === 'export_access'), false);
-  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(flattenButtons(deniedStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(adminView.screen, 'admin_actions');
   assert.deepEqual(flattenButtons(adminView.response.replyMarkup).map((button) => button.text), [
     'Export Responses',
@@ -2896,7 +2897,7 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About', 'Admin Actions']);
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
   assert.equal(guestGrantAttempt.screen, 'response_export_access_updated');
@@ -4734,12 +4735,50 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.telegramUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  assert.equal(pointer.tokenHash, loaded.tokenHash);
+  assert.equal(pointer.tokenHash.length, 64);
+  assert.equal(JSON.stringify(pointer).includes(token), false);
   assert.equal(loaded.record.ttlSeconds, TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), true);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), true);
   const storedRecords = Array.from(env.AGENT_ACTION_KV.store.values()).join('\n');
   assert.equal(storedRecords.includes(token), false);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('/agent_token re-onboard revokes the prior token pointer', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  assert.equal(firstLoaded.ok, true);
+
+  const second = await buildTelegramCommandResponse({
+    update: privateMessage('/agent_token'),
+    env,
+    now,
+  });
+  const secondCopy = flattenButtons(second.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const secondToken = secondCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  assert.equal(secondToken && secondToken !== firstToken, true);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(oldLoaded.reason, 'agent_token_not_found');
+  assert.equal(secondLoaded.ok, true);
+  assert.equal(pointer.tokenHash, secondLoaded.tokenHash);
+  assert.notEqual(pointer.tokenHash, firstLoaded.tokenHash);
 });
 
 test('private Onboard Agent callback renders the copy install screen on first tap', async () => {
@@ -4923,7 +4962,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
   const buttonLabels = flattenButtons(result.response.replyMarkup).map((button) => button.text);
-  assert.deepEqual(buttonLabels, ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(buttonLabels, ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(result.response.text.includes('/results [ consensus | group ]'), false);
   assert.equal(result.response.text.split('\n').includes('/results'), true);
   assert.equal(result.response.text.includes('/q <number>'), false);
@@ -4948,6 +4987,37 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(record.action, 'view_questions');
   assert.equal(record.serverContextRef.sessionPicker, true);
   assert.equal(record.serverContextRef.sessionSlug, undefined);
+});
+
+test('/start About button explains Context Engine and links the OSS repo', async () => {
+  const env = baseEnv();
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const about = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'About');
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9204,
+      callback_query: {
+        id: 'about-tap',
+        data: about.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 80,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.screen, 'about_context_engine');
+  assert.match(result.response.text, /privacy-preserving opinion maps/);
+  const repo = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Open OSS Repo');
+  assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine');
 });
 
 test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {
@@ -4984,6 +5054,7 @@ test('/start auto-joins a single Telegram-only session and keeps the welcome scr
   const privateBinding = JSON.parse(await privateEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(privateBinding.sessionSlug, 'alpha');
   assert.equal(privateBinding.source, 'private_chat');
+  assert.equal(privateBinding.followDefault, true);
   const privateMiniApp = flattenButtons(privateStart.response.replyMarkup).find((button) => button.text === 'Mini App');
   const privateLaunch = new URL(privateMiniApp.web_app.url).searchParams.get('launch');
   const privateRecord = JSON.parse(await privateEnv.AGENT_ACTION_KV.get(`telegram:action:${privateLaunch}`));
@@ -5004,9 +5075,11 @@ test('/start auto-joins a single Telegram-only session and keeps the welcome scr
   assert.equal(groupStart.response.text.includes('/sessions'), false);
   const groupBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:group-session:-100123'));
   assert.equal(groupBinding.sessionSlug, 'alpha');
+  assert.equal(groupBinding.followDefault, true);
   const groupUserBinding = JSON.parse(await groupEnv.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(groupUserBinding.sessionSlug, 'alpha');
   assert.equal(groupUserBinding.source, 'single_session_start');
+  assert.equal(groupUserBinding.followDefault, true);
   const groupMiniApp = flattenButtons(groupStart.response.replyMarkup).find((button) => button.text === 'Mini App');
   const groupLaunch = new URL(groupMiniApp.url).searchParams.get('start');
   const groupRecord = JSON.parse(await groupEnv.AGENT_ACTION_KV.get(`telegram:action:${groupLaunch}`));
@@ -5053,7 +5126,7 @@ test('group /start includes a Mini App deep link to the session picker', async (
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'setup_welcome');
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'About']);
   assert.equal(result.response.text.includes('/sessions'), false);
   assert.equal(result.response.text.includes('/groups'), false);
   assert.equal(result.response.text.includes('/add_question'), false);

@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v4)
+**Skill version:** 2026-05-30 (v5)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
@@ -112,10 +112,10 @@ raw GitHub URL, then re-read the changelog before continuing.
 - Use either a worker service token or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
 - For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
-- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
+- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
-- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until `2026-05-30T00:00:00Z`, then `ee-26-users`. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on `ee-26-test` always being listed. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
+- Current Edge 2026 demo sessions may include the default `Research Questions (Demo)` session for organizers plus participant sessions. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on older sessions always being listed. A `ceagt_` token follows the user's selected session. To switch sessions, send `sessionSlug=<existing-slug>` on a worker call; CE validates the slug and pins it for later omitted-slug calls.
 
 Worked `ceagt_` token smoke test:
 
@@ -129,9 +129,9 @@ curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api
 Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
 
 1. Ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
-2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, `Session`, and the `ceagt_...` token.
-3. Call `GET <Worker>/telegram/agent/api/onboarding?sessionSlug=<Session>` with `Authorization: Bearer <token>`. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
-4. Call `GET <Worker>/telegram/agent/api/questions?sessionSlug=<Session>` with `Authorization: Bearer <token>`.
+2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session` field; that is expected.
+3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
+4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Draft responses, show the proposed answers, and ask for confirmation.
 7. Save confirmed drafts with `POST <Worker>/telegram/agent/api/preferences`; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
@@ -173,7 +173,7 @@ https://t.me/contextengineer_bot?start=agent_onboarding
 https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 ```
 
-After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account, bind the Telegram user to the selected Telegram-only session, and render a private masked token screen with a copy button for full install info. From then on, use this skill's API calls with the token-bound `sessionSlug`. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
+After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account and render a private masked token screen with a copy button for full install info. Generic onboarding follows the live worker default session. Session-specific onboarding pins the named session. From then on, use this skill's API calls with the copied token; omit `sessionSlug` for the user's current/default session, or include an existing `sessionSlug` to switch and pin the user. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
 
 ## Prepopulated Deep Links On First Invocation
 
@@ -188,7 +188,7 @@ menu of deep-link sets.
 3. Fetch active questions with the existing tag-filtered question reads and the
    geo-linked question flow. Respect `questionsPerBatch` from the user's
    settings, defaulting to 3.
-4. Build one Mini App `startapp` link or private token-bound client link per
+4. Build one Mini App `startapp` link or private token-authenticated client link per
    topic cluster using the link builders already described in "Mini App
    Question Links" and "Interactive Client Report".
 5. Present the links as a short menu the user can choose from.
@@ -217,7 +217,7 @@ Use this path when the user's assistant is not running inside the CE Telegram bo
 2. The user taps `Onboard Agent`, then `Copy Agent Info`. `/me` also links to account details and activity after onboarding.
 3. The user copies the install info into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
-5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and token-bound session.
+5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and current session. To switch, pass `sessionSlug=<existing-slug>` once; omitted-slug calls stay on that pinned session until the user changes it again.
 
 Default token scope permits:
 
@@ -227,7 +227,7 @@ Default token scope permits:
 - reading aggregate result views such as the topic map
 - reading lightweight groups
 - proposing lightweight group categories or memberships for user approval
-- posing questions for the token-bound session
+- posing questions for the current or explicitly selected session
 
 Default token scope does not permit:
 
@@ -255,7 +255,8 @@ Content-Type: application/json
 
 With `ceagt_...` tokens:
 
-- include `sessionSlug` in the query string or JSON body;
+- omit `sessionSlug` to use the user's selected session or the current worker default;
+- include `sessionSlug` in the query string or JSON body only when the user wants to switch to a specific existing session;
 - omit `telegramUserId` by default, because the worker infers it from the token;
 - do not send the token as a URL query parameter, request body field, prompt
   transcript, log line, or shared note;
@@ -280,17 +281,20 @@ Before using personal data, ask the user what may be used in this CE flow. The
 worker exposes a first-run onboarding endpoint for this:
 
 ```http
-GET /telegram/agent/api/onboarding?sessionSlug=<Session>
+GET /telegram/agent/api/onboarding
 POST /telegram/agent/api/onboarding
 ```
 
 `GET` returns the fixed first-run consent questions and any saved answers. `POST`
-persists the answers for the token-bound Telegram user and session. Defaults
+persists the answers for the token's Telegram user and current session. Defaults
 are privacy-preserving: all consent is off until the user explicitly answers.
 Ask the user what topics they want CE to prioritize, such as AI futures, Edge
-City, governance, infra, social, art, or sessions they attended. Persist those
-as `topicPreferences` in the onboarding POST body. The current questions map to
-these settings:
+City, governance, infra, social, art, or sessions they attended. Treat this as
+opt-in: if the user says yes to preference tailoring, the agent may read the
+authorized parts of the user's Edge profile and activity to choose questions.
+If they do not opt in, use only the current conversation and public session
+context. Persist approved topics as `topicPreferences` in the onboarding POST
+body. The current questions map to these settings:
 
 ```json
 {
@@ -305,6 +309,16 @@ these settings:
     "answers": "draft_for_review",
     "questionVotes": "auto_apply_if_enabled",
     "groups": "suggest_for_review"
+  },
+  "groups": {
+    "selections": {
+      "events_attended": ["week_1", "attended_previous_edge_events"],
+      "region": ["north_america"],
+      "contribution_role": ["organizer"]
+    },
+    "details": {
+      "contribution_role": { "other": "community research" }
+    }
   }
 }
 ```
@@ -324,7 +338,15 @@ send agent-drafted answers to the worker as durable research records. A Mini
 App launch may still carry an editable prefill draft for review, but that is a
 short-lived launch artifact rather than a draft-divergence research record.
 
-Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
+When the user answers yes to demographic or attendance linking and provides
+explicit bucket choices, include those choices under `groups.selections` in the
+onboarding POST. Positive consent writes aggregate bucket memberships such as
+attendance, age bucket, region, AI tribe, or role. Explain plainly: these
+buckets are associated with their answers for aggregate research and filtering,
+not published under their name. Do not infer or submit demographic group
+membership from private user data unless the user has explicitly allowed that
+field and that use. Prefer suggesting groups and linking the user to the Mini
+App Groups panel for approval.
 
 ### Group Question Onboarding
 
@@ -474,7 +496,7 @@ POST /telegram/agent/api/mini-app-launch
 }
 ```
 
-The worker resolves the question references against the token-bound session,
+The worker resolves the question references against the current or explicitly selected session,
 stores an expiring Mini App launch record, and returns `link`, usually in the
 `https://t.me/<bot>/<mini-app-short-name>?startapp=<payload>` form. Send that
 link to the user. The Mini App opens the ordered series, pre-fills each draft
@@ -493,7 +515,7 @@ Use this endpoint as the agent's read surface for previous mutations and pending
 GET /telegram/agent/api/actions?sessionSlug=<slug>
 ```
 
-With a `ceagt_` token, the worker scopes results to the token-bound Telegram user and session. The response includes only mutation-oriented records: answer drafts, pending vote recommendations, applied vote decisions, proposed questions, and group suggestions. It does not include pure read calls. Items have this shape:
+With a `ceagt_` token, the worker scopes results to the token's Telegram user and the current or explicitly selected session. The response includes only mutation-oriented records: answer drafts, pending vote recommendations, applied vote decisions, proposed questions, and group suggestions. It does not include pure read calls. Items have this shape:
 
 ```json
 {
@@ -549,8 +571,11 @@ The worker validates and persists the approved questions, adds a host-derived
 `src:<host>` tag for navigation, and stores the URL as a structured
 `references` citation on each question. Created questions are proposed only; use
 the normal pose/surfacing flow later if the user wants them posted into a
-Telegram group. Never auto-create questions before the user approves the exact
-list.
+Telegram group. The create endpoint accepts batches up to 20 questions. If an
+organizer gives you 50 tagged questions, send three create calls such as
+20 + 20 + 10. They will be stored as proposed off-chain Cloudflare questions
+for the session and should appear in the Mini App and `/questions`. Never
+auto-create questions before the user approves the exact list.
 
 ## Geo Digest And Geo-Linked Questions
 
@@ -672,7 +697,7 @@ view and materially new questions or responses create a new cache entry.
 When the user wants the full interactive report, create a private client link
 instead of asking them to connect a wallet. Use the public CE client origin
 (`https://contextengine.xyz` unless the operator gives you a different client
-URL), the copied worker URL, the token-bound session slug, and the user's
+URL), the copied worker URL, the current session slug, and the user's
 copied `ceagt_...` token:
 
 ```text
@@ -783,7 +808,7 @@ session. User-scoped admin tokens should use the normal in-group admin approval
 flow instead of minting group approval links directly.
 
 For a user-scoped `ceagt_` token, first check whether the user is an admin for
-the token-bound session:
+the current or explicitly selected session:
 
 ```http
 GET /telegram/agent/api/admin/status?sessionSlug=ee-26-organizers
@@ -811,7 +836,7 @@ SessionRegistry read and is not a count of worker-created sessions; and
 the submit-record TTL window. The worker reads submit status from KV list
 metadata for current records, with a legacy body-read fallback for older records.
 Env-level root admins receive global totals and a per-session breakdown; session
-admins receive only their token-bound or target session.
+admins receive only their current or target session.
 
 ```http
 POST /telegram/agent/api/question-queue/plan
@@ -1097,6 +1122,13 @@ enabled. The digest flag is stored for Phase 2 and should not be treated as an
 active delivery subscription yet.
 
 ## Changelog
+
+### 2026-05-30 (v5)
+
+- User-scoped `ceagt_` tokens now follow the user's selected/default session instead of being locked to one session; sending an existing `sessionSlug` switches and pins the user.
+- Agent onboarding docs now cover opt-in topic preferences, consent-gated aggregate bucket membership writes, and the quick preference flow.
+- Documented the 20-question create batch limit and the 20 + 20 + 10 pattern for 50 organizer questions.
+- Added the public-release edge allow rule expectation for publishing the Telegram worker and skill on the `edge-2026` branch.
 
 ### 2026-05-30 (v4)
 

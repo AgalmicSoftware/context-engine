@@ -17,6 +17,7 @@ import {
   persistActionRecord,
   persistAnswerDraft,
   persistLatestMiniAppLaunchPointer,
+  persistTelegramUserSessionBinding,
   readGroupSessionBinding,
   readAgentSkillUpdateFlag,
   readPrivateSessionBinding,
@@ -51,6 +52,7 @@ import {
   loadTelegramLightweightGroups,
   persistTelegramChildSession,
   persistTelegramLightweightGroupProposal,
+  saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
 import {
   loadTelegramAgentSettings,
@@ -71,9 +73,12 @@ import {
   createTelegramAgentDelegationToken,
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
+  readTelegramAgentDelegationTokenUserPointer,
+  revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
+  writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
 import {
   SUBMIT_REQUEST_KV_PREFIX,
@@ -87,7 +92,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v4)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v5)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -624,6 +629,67 @@ function normalizeOnboardingTopicPreferences(input = {}, settings = {}) {
   return normalizeQuestionTags(source).slice(0, 30);
 }
 
+function plainObject(value = {}) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
+  const groups = plainObject(input.groups);
+  const rawSelections = plainObject(
+    input.groupSelections ||
+    input.bucketSelections ||
+    input.demographicBuckets ||
+    groups.selections
+  );
+  const rawDetails = plainObject(
+    input.groupDetails ||
+    input.bucketDetails ||
+    input.demographicDetails ||
+    groups.details
+  );
+  const allowedCategories = new Set();
+  if (answers.demographic_link_opt_in === true || answers.demographics_research === true) {
+    ['age_bucket', 'country_relationship', 'region', 'ai_tribe', 'contribution_role'].forEach((id) => allowedCategories.add(id));
+  }
+  if (answers.attendance_context_opt_in === true) {
+    allowedCategories.add('events_attended');
+  }
+  const selections = {};
+  for (const [categoryId, value] of Object.entries(rawSelections)) {
+    const category = safeString(categoryId);
+    if (!allowedCategories.has(category)) continue;
+    const values = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
+    const normalized = values
+      .map((entry) => safeString(entry).toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80))
+      .filter(Boolean)
+      .slice(0, 12);
+    if (normalized.length) selections[category] = [...new Set(normalized)];
+  }
+  const details = {};
+  for (const [categoryId, value] of Object.entries(rawDetails)) {
+    const category = safeString(categoryId);
+    if (!allowedCategories.has(category)) continue;
+    if (Array.isArray(value)) {
+      details[category] = value.map(safeString).filter(Boolean).slice(0, 8);
+    } else if (value && typeof value === 'object') {
+      details[category] = Object.fromEntries(
+        Object.entries(value)
+          .map(([key, entry]) => [safeString(key).slice(0, 64), safeString(entry).slice(0, 160)])
+          .filter(([key, entry]) => key && entry)
+          .slice(0, 12)
+      );
+    } else {
+      const detail = safeString(value).slice(0, 160);
+      if (detail) details[category] = detail;
+    }
+  }
+  return { selections, details };
+}
+
+function hasOnboardingGroupMembership(input = {}) {
+  return Object.keys(input.selections || {}).length > 0 || Object.keys(input.details || {}).length > 0;
+}
+
 function normalizeOnboardingAnswers(input = {}, settings = {}) {
   const source = input.answers && typeof input.answers === 'object' && !Array.isArray(input.answers)
     ? input.answers
@@ -717,6 +783,12 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
 function normalizeAddress(value = '') {
   const text = safeString(value).toLowerCase();
   return /^0x[0-9a-f]{40}$/.test(text) ? text : '';
+}
+
+function bindingSessionSlug(binding = {}, policy = {}) {
+  if (!binding || typeof binding !== 'object') return '';
+  if (binding.followDefault === true) return sanitizeSessionSlug(policy.defaultSessionSlug);
+  return sanitizeSessionSlug(binding.sessionSlug);
 }
 
 function parseAddressList(value = '') {
@@ -869,18 +941,14 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
   if (!scope || !delegationTokenHasScope(delegation, scope)) {
     return { ok: false, status: 403, reason: 'agent_token_scope_denied', requiredScope: scope || 'unsupported_route' };
   }
-  const tokenSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
   const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
-  if (requestedSessionSlug && tokenSessionSlug && requestedSessionSlug !== tokenSessionSlug) {
-    return { ok: false, status: 403, reason: 'agent_token_session_mismatch', sessionSlug: requestedSessionSlug };
-  }
   return {
     ok: true,
     input: {
       ...input,
       telegramUserId: safeString(delegation.telegramUserId),
       username: safeString(input.username || delegation.username),
-      sessionSlug: tokenSessionSlug || requestedSessionSlug,
+      sessionSlug: requestedSessionSlug,
       groupChatId: safeString(input.groupChatId),
     },
   };
@@ -899,24 +967,48 @@ async function resolveHandoffContext({
     return { ok: false, status: 400, reason: 'telegram_user_required' };
   }
   const groupBinding = ignoreSessionBinding ? null : await readGroupSessionBinding(env, normalized);
-  const privateBinding = ignoreSessionBinding ? null : await readPrivateSessionBinding(env, normalized);
+  let privateBinding = ignoreSessionBinding ? null : await readPrivateSessionBinding(env, normalized);
+  const delegation = auth.authMode === 'telegram_agent_delegation_token' ? auth.delegation : null;
+  const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
+  const groupBindingSlug = delegation ? '' : bindingSessionSlug(groupBinding, policy);
+  const privateBindingSlug = bindingSessionSlug(privateBinding, policy);
   const sessionSlug = sanitizeSessionSlug(
-    input.sessionSlug ||
-    groupBinding?.sessionSlug ||
-    privateBinding?.sessionSlug ||
+    requestedSessionSlug ||
+    groupBindingSlug ||
+    privateBindingSlug ||
     policy.defaultSessionSlug
   );
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
   }
-  const delegation = auth.authMode === 'telegram_agent_delegation_token' ? auth.delegation : null;
-  if (delegation) {
-    const delegatedSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
-    if (delegatedSessionSlug && delegatedSessionSlug !== resolved.session.sessionSlug) {
-      return { ok: false, status: 403, reason: 'agent_token_session_mismatch', sessionSlug: resolved.session.sessionSlug };
+  if (delegation && requestedSessionSlug && !ignoreSessionBinding) {
+    const existingPinnedSlug = privateBinding?.followDefault === true ? '' : sanitizeSessionSlug(privateBinding?.sessionSlug);
+    if (existingPinnedSlug !== resolved.session.sessionSlug) {
+      const saved = await persistTelegramUserSessionBinding({
+        env,
+        normalized,
+        session: resolved.session,
+        createdAt: input.createdAt || null,
+        source: 'telegram_agent_delegation_token',
+        followDefault: false,
+      });
+      if (saved.ok) {
+        privateBinding = {
+          ...(privateBinding || {}),
+          sessionSlug: resolved.session.sessionSlug,
+          source: 'telegram_agent_delegation_token',
+          followDefault: false,
+        };
+      }
     }
   }
+  const effectiveGroupBinding = groupBinding?.followDefault === true
+    ? { ...groupBinding, sessionSlug: resolved.session.sessionSlug }
+    : groupBinding;
+  const effectivePrivateBinding = privateBinding?.followDefault === true
+    ? { ...privateBinding, sessionSlug: resolved.session.sessionSlug }
+    : privateBinding;
   if (normalized.chat?.isPrivate !== true) {
     const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({ env, session: resolved.session, normalized });
     if (!groupAccess.ok) {
@@ -935,8 +1027,8 @@ async function resolveHandoffContext({
       env,
       normalized,
       session: resolved.session,
-      groupBinding,
-      privateBinding: privateBinding || (delegation ? {
+      groupBinding: effectiveGroupBinding,
+      privateBinding: effectivePrivateBinding || (delegation ? {
         sessionSlug: resolved.session.sessionSlug,
         source: 'telegram_agent_delegation_token',
       } : null),
@@ -951,8 +1043,8 @@ async function resolveHandoffContext({
     policy,
     session: resolved.session,
     normalized,
-    groupBinding,
-    privateBinding,
+    groupBinding: effectiveGroupBinding,
+    privateBinding: effectivePrivateBinding,
     permission,
     delegation,
     authMode: auth.authMode || '',
@@ -1759,8 +1851,23 @@ async function handleOnboardingRequest({
   const answers = normalizeOnboardingAnswers(body, current);
   const patch = {
     ...settingsPatchFromOnboardingAnswers(answers, completedAt),
-    topicPreferences: normalizeOnboardingTopicPreferences(body, current),
+    topicPreferences: answers.preference_tailoring === true
+      ? normalizeOnboardingTopicPreferences(body, current)
+      : [],
   };
+  const groupMembership = normalizeOnboardingGroupMembershipInput(body, answers);
+  let savedGroups = null;
+  if (hasOnboardingGroupMembership(groupMembership)) {
+    savedGroups = await saveTelegramLightweightGroupMembership({
+      env,
+      session: context.session,
+      telegramUserId,
+      accountAddress: context.delegation?.accountAddress || body.accountAddress || '',
+      selections: groupMembership.selections,
+      details: groupMembership.details,
+      createdAt: completedAt,
+    });
+  }
   const saved = await saveTelegramAgentSettingsPatch({
     env,
     sessionSlug,
@@ -1774,7 +1881,12 @@ async function handleOnboardingRequest({
       reason: saved.reason || 'onboarding_settings_save_failed',
     }, { status: 400 });
   }
-  return json(publicOnboardingState({ sessionSlug, settings: saved.settings }));
+  const payload = {
+    ...publicOnboardingState({ sessionSlug, settings: saved.settings }),
+    ...(savedGroups?.ok ? { groups: savedGroups.groups } : {}),
+  };
+  assertNoSecretShape(payload, 'Telegram agent onboarding save response must not serialize secrets.');
+  return json(payload);
 }
 
 async function loadAdminMetricsCache(env = {}, cacheKey = '') {
@@ -4011,6 +4123,20 @@ async function handleMiniAppOnboardRequest({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
+  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({ env, telegramUserId });
+  if (previousPointer.tokenHash) {
+    await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
+  }
+  if (sessionSlug) {
+    await persistTelegramUserSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      source: 'mini_app_agent_onboarding',
+      followDefault: false,
+    });
+  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId,
@@ -4024,6 +4150,19 @@ async function handleMiniAppOnboardRequest({
     return jsonMiniAppOnboard(request, env, {
       ok: false,
       reason: issued.reason || 'agent_token_create_failed',
+    }, { status: 500 });
+  }
+  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId,
+    tokenHash: issued.tokenHash,
+    issuedAt: issued.record?.issuedAt || createdAt,
+    createdAt,
+  });
+  if (!pointer.ok) {
+    return jsonMiniAppOnboard(request, env, {
+      ok: false,
+      reason: pointer.reason || 'agent_token_pointer_write_failed',
     }, { status: 500 });
   }
   const response = {
@@ -4078,34 +4217,25 @@ async function handleClientLoginExchangeRequest({
       message: 'Open the Context Engine Telegram bot, tap Onboard Agent, and paste the copied install token again.',
     }, { status: 401 });
   }
-  const tokenSessionSlug = sanitizeSessionSlug(delegated.record.sessionSlug);
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || url.searchParams.get('sessionSlug'));
-  if (requestedSessionSlug && tokenSessionSlug && requestedSessionSlug !== tokenSessionSlug) {
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: 'agent_token_session_mismatch',
-      sessionSlug: requestedSessionSlug,
-    }, { status: 403 });
-  }
   const context = await resolveHandoffContext({
     env,
     input: {
       telegramUserId: safeString(delegated.record.telegramUserId),
       username: safeString(delegated.record.username),
-      sessionSlug: requestedSessionSlug || tokenSessionSlug,
+      sessionSlug: requestedSessionSlug,
     },
     auth: {
       authMode: 'telegram_agent_delegation_token',
       delegation: delegated.record,
     },
     requireQuestionAuthoring: false,
-    ignoreSessionBinding: true,
   });
   if (!context.ok) {
     return jsonClientLogin(request, env, {
       ok: false,
       reason: context.reason,
-      sessionSlug: context.sessionSlug || requestedSessionSlug || tokenSessionSlug,
+      sessionSlug: context.sessionSlug || requestedSessionSlug || '',
     }, { status: context.status || 400 });
   }
   const account = delegated.record.accountAddress

@@ -3,12 +3,27 @@
 # Shared strip patterns for public release workflows.
 # Keep release-export and public-history sync scripts aligned by sourcing this file.
 
+ce_public_release_include_telegram() {
+  case "${CE_PUBLIC_RELEASE_INCLUDE_TELEGRAM:-}" in
+    1|true|TRUE|yes|YES|on|ON)
+      return 0
+      ;;
+  esac
+
+  case "${CE_PUBLIC_RELEASE_TARGET_BRANCH:-}" in
+    edge-2026|*/edge-2026)
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
 docs/agent-native*.md
 client/public/skill.md
-workers/agentBridgeWorker
 TODO
 local-private-version
 CLAUDE.md
@@ -60,6 +75,9 @@ whitepaper/IdeasMap.md
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 EOF
+  if ! ce_public_release_include_telegram; then
+    printf '%s\n' 'workers/agentBridgeWorker'
+  fi
 }
 
 ce_public_release_manifest_exclude_patterns() {
@@ -115,7 +133,6 @@ docs/*PRD*.md
 docs/*prd*.md
 docs/agent-native*.md
 client/public/skill.md
-workers/agentBridgeWorker
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
@@ -127,4 +144,7 @@ test/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF
+  if ! ce_public_release_include_telegram; then
+    printf '%s\n' 'workers/agentBridgeWorker'
+  fi
 }

@@ -43,7 +43,10 @@ import {
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import {
   createTelegramAgentDelegationToken,
+  readTelegramAgentDelegationTokenUserPointer,
+  revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+  writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
 import {
   listTelegramProposedQuestionsForSession,
@@ -137,6 +140,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
 const TELEGRAM_RESULTS_PAGE_SIZE = 3;
@@ -2350,6 +2354,7 @@ async function persistGroupSessionBinding({
   normalized = {},
   session = {},
   createdAt = null,
+  followDefault = false,
 } = {}) {
   if (normalized.chat?.isPrivate) return { ok: false, reason: 'private_chat' };
   const key = groupSessionBindingKey(normalized);
@@ -2361,6 +2366,7 @@ async function persistGroupSessionBinding({
     chatId: safeString(normalized.chat?.chatId),
     sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
     sessionName: sessionLabel(session),
+    followDefault: followDefault === true,
     linkedAt: createdAt || nowIso(),
   };
   if (!record.sessionSlug) return { ok: false, reason: 'session_slug_missing' };
@@ -2393,6 +2399,7 @@ async function persistTelegramUserSessionBinding({
   session = {},
   createdAt = null,
   source = 'private_chat',
+  followDefault = false,
 } = {}) {
   const key = privateSessionBindingKey(normalized);
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
@@ -2403,6 +2410,7 @@ async function persistTelegramUserSessionBinding({
     telegramUserId: safeString(normalized.user?.telegramUserId),
     sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
     sessionName: sessionLabel(session),
+    followDefault: followDefault === true,
     selectedAt: createdAt || nowIso(),
     source: safeString(source) || 'private_chat',
   };
@@ -2423,6 +2431,7 @@ async function persistPrivateSessionBinding({
   normalized = {},
   session = {},
   createdAt = null,
+  followDefault = false,
 } = {}) {
   if (!normalized.chat?.isPrivate) return { ok: false, reason: 'not_private_chat' };
   return persistTelegramUserSessionBinding({
@@ -2431,6 +2440,7 @@ async function persistPrivateSessionBinding({
     session,
     createdAt,
     source: 'private_chat',
+    followDefault,
   });
 }
 
@@ -2443,6 +2453,12 @@ async function readPrivateSessionBinding(env = {}, normalized = {}) {
   assertNoSecretShape(parsed, 'Telegram private session bindings must not serialize secrets.');
   const sessionSlug = sanitizeSessionSlug(parsed.sessionSlug);
   return sessionSlug ? { ...parsed, sessionSlug } : null;
+}
+
+function bindingSessionSlug(binding = {}, policy = {}) {
+  if (!binding || typeof binding !== 'object') return '';
+  if (binding.followDefault === true) return sanitizeSessionSlug(policy.defaultSessionSlug);
+  return sanitizeSessionSlug(binding.sessionSlug);
 }
 
 function answerDraftKey({
@@ -2783,9 +2799,11 @@ async function resolveCommandSessionSlug({
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return explicit;
   const privateBinding = await readPrivateSessionBinding(env, normalized);
-  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
+  const privateSlug = bindingSessionSlug(privateBinding, policy);
+  if (privateSlug) return privateSlug;
   const binding = await readGroupSessionBinding(env, normalized);
-  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
+  const groupSlug = bindingSessionSlug(binding, policy);
+  return sanitizeSessionSlug(groupSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
 async function resolveResponseExportSessionSlug({
@@ -2798,7 +2816,8 @@ async function resolveResponseExportSessionSlug({
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return explicit;
   const privateBinding = await readPrivateSessionBinding(env, normalized);
-  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
+  const privateSlug = bindingSessionSlug(privateBinding, policy);
+  if (privateSlug) return privateSlug;
   const latestSubmittedSession = sanitizeSessionSlug(await findLatestResponseExportSessionSlugForTelegramUser({
     env,
     normalized,
@@ -2806,7 +2825,8 @@ async function resolveResponseExportSessionSlug({
   }));
   if (latestSubmittedSession) return latestSubmittedSession;
   const binding = await readGroupSessionBinding(env, normalized);
-  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
+  const groupSlug = bindingSessionSlug(binding, policy);
+  return sanitizeSessionSlug(groupSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
 async function makeCallbackButton({
@@ -3620,6 +3640,42 @@ function formatHelpText({
   return lines.join('\n');
 }
 
+async function buildAboutResponse({
+  normalized,
+  command = 'callback:about_context_engine',
+  env,
+  createdAt,
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  const rows = [[{
+    text: 'Open OSS Repo',
+    url: CONTEXT_ENGINE_OSS_URL,
+  }]];
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    seed: `about|start|${normalized.chat?.chatId || ''}|${normalized.user?.telegramUserId || ''}|${normalized.updateId || ''}`,
+    createdAt,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'About Context Engine',
+      '',
+      'Context Engine helps communities ask questions, draft responses, and create privacy-preserving opinion maps.',
+      '',
+      `Open source: ${CONTEXT_ENGINE_OSS_URL}`,
+    ].join('\n'),
+    replyMarkup: { inline_keyboard: rows },
+    screen: 'about_context_engine',
+    command,
+    normalized,
+  });
+}
+
 function timestampMs(value = '') {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -3943,13 +3999,16 @@ async function buildHelpResponse({
     ? await readPrivateSessionBinding(env, normalized)
     : await readGroupSessionBinding(env, normalized);
   if (activeBinding?.sessionSlug && !normalized.chat.isPrivate) {
-    const activeResolved = resolveSessionInvocation(policy, activeBinding.sessionSlug);
+    const activeResolved = resolveSessionInvocation(policy, bindingSessionSlug(activeBinding, policy));
     if (activeResolved.ok && !(await sessionAllowedInCurrentTelegramChat(activeResolved.session, normalized, env))) {
       activeBinding = null;
     }
   }
   let autoJoinedSession = null;
-  if (visibleSessions.length === 1 && activeBinding?.sessionSlug !== visibleSessions[0].sessionSlug) {
+  const visibleSession = visibleSessions[0] || {};
+  const followDefaultOnSingleSession = sanitizeSessionSlug(visibleSession.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+  const activeSessionSlug = bindingSessionSlug(activeBinding, policy);
+  if (visibleSessions.length === 1 && activeSessionSlug !== visibleSession.sessionSlug) {
     autoJoinedSession = visibleSessions[0];
     if (normalized.chat.isPrivate) {
       const saved = await persistPrivateSessionBinding({
@@ -3957,8 +4016,9 @@ async function buildHelpResponse({
         normalized,
         session: autoJoinedSession,
         createdAt,
+        followDefault: followDefaultOnSingleSession,
       });
-      if (saved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+      if (saved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug, followDefault: followDefaultOnSingleSession };
     } else {
       const [groupSaved, userSaved] = await Promise.all([
         persistGroupSessionBinding({
@@ -3966,6 +4026,7 @@ async function buildHelpResponse({
           normalized,
           session: autoJoinedSession,
           createdAt,
+          followDefault: followDefaultOnSingleSession,
         }),
         persistTelegramUserSessionBinding({
           env,
@@ -3973,9 +4034,10 @@ async function buildHelpResponse({
           session: autoJoinedSession,
           createdAt,
           source: 'single_session_start',
+          followDefault: followDefaultOnSingleSession,
         }),
       ]);
-      if (groupSaved.ok || userSaved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug };
+      if (groupSaved.ok || userSaved.ok) activeBinding = { sessionSlug: autoJoinedSession.sessionSlug, followDefault: followDefaultOnSingleSession };
     }
     scheduleQuestionPrefetchForJoinedSession({
       env,
@@ -3983,18 +4045,19 @@ async function buildHelpResponse({
       waitUntil,
     });
   }
-  const resolvedActiveSession = activeBinding?.sessionSlug
-    ? resolveSessionInvocation(policy, activeBinding.sessionSlug)
+  const resolvedActiveSessionSlug = bindingSessionSlug(activeBinding, policy);
+  const resolvedActiveSession = resolvedActiveSessionSlug
+    ? resolveSessionInvocation(policy, resolvedActiveSessionSlug)
     : { ok: false };
   const activeSession = resolvedActiveSession.ok ? resolvedActiveSession.session : autoJoinedSession;
   const miniAppButton = await makeMiniAppButton({
     env,
     label: 'Open Mini App',
     action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-    serverContextRef: activeBinding?.sessionSlug
-      ? { sessionSlug: activeBinding.sessionSlug }
+    serverContextRef: resolvedActiveSessionSlug
+      ? { sessionSlug: resolvedActiveSessionSlug }
       : { sessionPicker: true },
-    seed: `help|mini_app|${activeBinding?.sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    seed: `help|mini_app|${resolvedActiveSessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
     privateChat: normalized.chat.isPrivate,
     botUsername: env.TELEGRAM_BOT_USERNAME,
@@ -4007,22 +4070,31 @@ async function buildHelpResponse({
   const agentOnboardingButton = await makeAgentOnboardingButton({
     env,
     normalized,
-    sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+    sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '',
     createdAt,
   });
   if (agentOnboardingButton) keyboard.push([agentOnboardingButton]);
   if (!normalized.chat.isPrivate) {
     const agentOnboardingMiniAppButton = makeAgentOnboardingMiniAppButton({
       env,
-      sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+      sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '',
     });
     if (agentOnboardingMiniAppButton) keyboard.push([agentOnboardingMiniAppButton]);
   }
+  keyboard.push([await makeCallbackButton({
+    env,
+    label: 'About',
+    action: TELEGRAM_BRIDGE_ACTIONS.ABOUT_CONTEXT_ENGINE,
+    lane: normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: { sessionSlug: activeSession?.sessionSlug || resolvedActiveSessionSlug || '' },
+    seed: `help|about|${activeSession?.sessionSlug || resolvedActiveSessionSlug || 'default'}|${normalized.chat.chatId}|${normalized.updateId}`,
+    createdAt,
+  })]);
   const adminActionsButton = await makeAdminActionsButton({
     env,
     normalized,
     policy,
-    sessionSlug: activeBinding?.sessionSlug || '',
+    sessionSlug: resolvedActiveSessionSlug || '',
     createdAt,
   });
   if (adminActionsButton) keyboard.push([adminActionsButton]);
@@ -8615,7 +8687,7 @@ async function resolveActivitySessions({
     : await readGroupSessionBinding(env, normalized);
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return visibleSlugs.includes(explicit) ? [explicit] : [];
-  const bound = sanitizeSessionSlug(binding?.sessionSlug);
+  const bound = bindingSessionSlug(binding, policy);
   if (bound && visibleSlugs.includes(bound)) return [bound];
   return normalized.chat?.isPrivate ? visibleSlugs : visibleSlugs.slice(0, 1);
 }
@@ -8713,7 +8785,7 @@ async function resolveAgentTokenSession({
   const activeBinding = await readPrivateSessionBinding(env, normalized);
   const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
   const visibleSlugs = new Set(visibleSessions.map((session) => sanitizeSessionSlug(session.sessionSlug)));
-  const activeSlug = sanitizeSessionSlug(activeBinding?.sessionSlug);
+  const activeSlug = bindingSessionSlug(activeBinding, policy);
   const explicitSlug = sanitizeSessionSlug(explicitSessionSlug);
   const defaultSlug = sanitizeSessionSlug(policy.defaultSessionSlug);
   const candidateSlug = explicitSlug ||
@@ -8774,6 +8846,25 @@ async function buildAgentTokenResponse({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
+  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+  });
+  if (previousPointer.tokenHash) {
+    await revokeTelegramAgentDelegationTokenHash({
+      env,
+      tokenHash: previousPointer.tokenHash,
+    });
+  }
+  if (sanitizeSessionSlug(sessionSlugOverride)) {
+    await persistPrivateSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      followDefault: false,
+    });
+  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: normalized.user.telegramUserId,
@@ -8789,6 +8880,21 @@ async function buildAgentTokenResponse({
       command,
       reason: issued.reason || 'agent_token_create_failed',
       text: 'Could not create an agent token for this account.',
+    });
+  }
+  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: normalized.user.telegramUserId,
+    tokenHash: issued.tokenHash,
+    issuedAt: issued.record?.issuedAt || createdAt,
+    createdAt,
+  });
+  if (!pointer.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: pointer.reason || 'agent_token_pointer_write_failed',
+      text: 'Could not save the agent token pointer for this account.',
     });
   }
   const workerUrl = agentBridgePublicUrl(env);
@@ -9620,6 +9726,16 @@ async function buildCallbackResponse({
       env,
       createdAt,
       waitUntil,
+      method,
+      messageId,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.ABOUT_CONTEXT_ENGINE) {
+    return attachCallbackQueryId(await buildAboutResponse({
+      normalized,
+      command: 'callback:about_context_engine',
+      env,
+      createdAt,
       method,
       messageId,
     }), callbackQueryId);

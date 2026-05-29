@@ -47,9 +47,6 @@ PRIVATE_BRANCH_GUARD_INSTALLER="$SCRIPT_DIR/install-private-branch-guard.sh"
 source "$SCRIPT_DIR/lib/public-release-strip-patterns.sh"
 
 STRIP_PATTERNS=()
-while IFS= read -r pattern; do
-  STRIP_PATTERNS+=("$pattern")
-done < <(ce_public_release_strip_patterns)
 
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
@@ -321,6 +318,11 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+export CE_PUBLIC_RELEASE_TARGET_BRANCH="${CE_PUBLIC_RELEASE_TARGET_BRANCH:-$TARGET_BRANCH}"
+while IFS= read -r pattern; do
+  STRIP_PATTERNS+=("$pattern")
+done < <(ce_public_release_strip_patterns)
 
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fail "Repository root is not a git repository: $REPO_ROOT" 1

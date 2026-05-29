@@ -54,6 +54,7 @@ export const RISK_RANK = Object.freeze({
 export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   VIEW_QUESTIONS: 'view_questions',
   VIEW_RESULTS: 'view_results',
+  ABOUT_CONTEXT_ENGINE: 'about_context_engine',
   VIEW_ADMIN_ACTIONS: 'view_admin_actions',
   VIEW_RESULTS_SETTINGS: 'view_results_settings',
   VIEW_QUESTION_QUEUE_SETTINGS: 'view_question_queue_settings',

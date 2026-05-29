@@ -16,13 +16,14 @@ function writeFile(rootDir, relativePath, contents) {
   fs.writeFileSync(absolutePath, contents);
 }
 
-function runPrepareScript(rootDir, outputDir) {
+function runPrepareScript(rootDir, outputDir, env = {}) {
   return spawnSync('bash', [path.join(rootDir, 'scripts', 'prepare-public-release.sh'), '--force', outputDir], {
     cwd: rootDir,
     encoding: 'utf8',
     env: {
       ...process.env,
       TMPDIR: TEST_TMP_ROOT,
+      ...env,
     },
   });
 }
@@ -155,6 +156,34 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
     assert.doesNotMatch(manifestText, /\.private\.test/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('prepare-public-release can include Telegram worker for edge release', () => {
+  fs.mkdirSync(TEST_TMP_ROOT, { recursive: true });
+  const tempRoot = fs.mkdtempSync(path.join(TEST_TMP_ROOT, 'ce-prepare-public-release-'));
+  const sourceDir = path.join(tempRoot, 'source');
+  const outputDir = path.join(tempRoot, 'release-public');
+
+  try {
+    writeFile(sourceDir, path.join('scripts', 'prepare-public-release.sh'), fs.readFileSync(SCRIPT_SOURCE_PATH, 'utf8'));
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
+      fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+    );
+    fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
+
+    writeFile(sourceDir, 'public.txt', 'keep\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public telegram bridge worker\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'skills', 'ce-telegram-agent-handoff', 'SKILL.md'), 'public skill\n');
+
+    const result = runPrepareScript(sourceDir, outputDir, { CE_PUBLIC_RELEASE_INCLUDE_TELEGRAM: '1' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.readFileSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js'), 'utf8'), 'public telegram bridge worker\n');
+    assert.equal(fs.readFileSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'skills', 'ce-telegram-agent-handoff', 'SKILL.md'), 'utf8'), 'public skill\n');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

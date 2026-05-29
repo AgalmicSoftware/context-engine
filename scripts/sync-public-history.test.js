@@ -190,6 +190,17 @@ test('sync-public-history dry run reports replayed and skipped commits without c
   });
 });
 
+test('sync-public-history keeps Telegram worker for edge-2026 branch', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const result = runSyncScript(sourceDir, ['--dry-run', 'edge-2026']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Would replay: 3/);
+    assert.match(result.stdout, /Would skip: 1/);
+    assert.match(result.stderr, /DRY RUN replay .*Private agent-only commit/);
+  });
+});
+
 test('sync-public-history accepts an explicit source branch', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', 'dev-public-sync', 'dev']);
