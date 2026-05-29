@@ -1417,8 +1417,47 @@ test('/results without arguments explains available result views', async () => {
   assert.match(result.response.text, /Selected session: alpha/);
   assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
   assert.match(result.response.text, /Group: shows participant answer patterns/);
-  assert.match(result.response.text, /\/results \[ consensus \| group \]/);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group']);
+  assert.match(result.response.text, /Topic map: circles view/);
+  assert.match(result.response.text, /\/results \[ consensus \| group \| topic \]/);
+  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group', 'Topic Map']);
+});
+
+test('/results topic returns a topic-map image when enough answered questions exist', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
+      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+    ]),
+  });
+  let counter = 0;
+  async function putResponse(questionId, telegramUserId, label) {
+    counter += 1;
+    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId,
+      questionId,
+      answer: { label, value: label.toLowerCase() },
+      createdAt: `2026-05-08T12:02:0${counter}.000Z`,
+    }));
+  }
+  await putResponse('q-onboarding', '1', 'Agree');
+  await putResponse('q-onboarding', '2', 'Agree');
+  await putResponse('q-privacy', '1', 'Disagree');
+  await putResponse('q-privacy', '2', 'Agree');
+
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/results topic'),
+    env,
+    now: '2026-05-08T12:03:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'results_topic_map');
+  assert.equal(result.response.method, 'sendPhoto');
+  assert.equal(result.response.photo.filename, 'context-engine-topic-map-results.png');
+  assert.match(result.response.text, /^Topic map/);
+  assert.match(result.response.text, /2 topics from 2 answered questions/);
 });
 
 test('/results consensus demo rows are limited to binary questions', async () => {
@@ -2029,11 +2068,11 @@ test('configured export admin can grant and revoke another Telegram managed wall
 
   assert.equal(grant.screen, 'response_export_access_updated');
   assert.equal(grant.added, true);
-  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent']);
+  assert.deepEqual(flattenButtons(guestStart.response.replyMarkup).map((button) => button.text), ['Mini App', 'Onboard Agent', 'Admin Actions']);
   assert.equal(guestExport.screen, 'response_export');
   assert.equal(guestExport.response.method, 'sendDocument');
-  assert.equal(guestGrantAttempt.screen, 'response_export_access_denied');
-  assert.match(guestGrantAttempt.response.text, /response_export_admin_required/);
+  assert.equal(guestGrantAttempt.screen, 'response_export_access_updated');
+  assert.equal(guestGrantAttempt.added, true);
   assert.equal(guestAfterRootDisabled.screen, 'response_export_denied');
   assert.match(guestAfterRootDisabled.response.text, /response_export_allowlist_empty/);
   assert.equal(revoke.screen, 'response_export_access_updated');
