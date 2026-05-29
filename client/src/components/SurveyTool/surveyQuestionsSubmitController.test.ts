@@ -91,6 +91,30 @@ describe('surveyQuestionsSubmitController', () => {
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
+  it('keeps navigate plans unhandled and side-effect free when the navigation port is absent', () => {
+    const ports = {
+      activateSubmitGuard: jest.fn(),
+      dispatchSubmit: jest.fn(),
+    };
+    const plan: SurveyQuestionsPrimarySubmitPlan = {
+      action: 'navigate',
+      path: '/survey/0xsurvey/0xabc?session=edge%20session',
+      reason: 'completed_survey_response',
+    };
+
+    const result = runSurveyQuestionsSubmitController({ plan, ports });
+
+    expect(result).toEqual({
+      action: 'navigate',
+      path: plan.path,
+      plan,
+      reason: 'completed_survey_response',
+      status: 'unhandled',
+    });
+    expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+  });
+
   it('activates the submit guard before dispatching submit plans', () => {
     const events: string[] = [];
     const ports = createPorts();
@@ -279,6 +303,14 @@ describe('surveyQuestionsSubmitController', () => {
       fallbackTotal: 5,
       fallbackEncrypted: 2,
     })).toEqual({ total: 5, encrypted: 2 });
+  });
+
+  it('falls back to parent pending stats when the stats port returns no data', () => {
+    expect(resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: () => null,
+      fallbackTotal: 4,
+      fallbackEncrypted: 1,
+    })).toEqual({ total: 4, encrypted: 1 });
   });
 
   it('uses injected pending stats when available', () => {
