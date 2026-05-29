@@ -5166,7 +5166,7 @@ test('/start About button explains Context Engine and links the OSS repo', async
   assert.equal(result.screen, 'about_context_engine');
   assert.match(result.response.text, /privacy-preserving opinion maps/);
   const repo = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Open OSS Repo');
-  assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine');
+  assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine/tree/edge-2026');
 });
 
 test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {

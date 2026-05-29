@@ -5797,6 +5797,9 @@ function telegramMiniAppHtml() {
       padding: 10px;
       background: rgba(255, 255, 255, 0.05);
     }
+    .resultFilters[hidden] {
+      display: none !important;
+    }
     .resultFilterHeader {
       display: flex;
       align-items: center;
@@ -6947,7 +6950,7 @@ function telegramMiniAppHtml() {
     const QUESTION_RETRY_DELAY_MS = 4000;
     const DRAFT_AUTOSAVE_DELAY_MS = 700;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
-    const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results';
+    const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
     };

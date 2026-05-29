@@ -341,6 +341,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="closeResults"[^>]*aria-label="Close results"/);
   assert.equal(html.includes('id="resultViewLevels"'), false);
   assert.match(html, /id="resultFilters"[^>]*aria-label="Result filters"[^>]*hidden/);
+  assert.match(html, /\.resultFilters\[hidden\] \{[\s\S]*display: none !important;/);
   assert.match(html, /id="toggleResultFilters"/);
   assert.match(html, /<span>Filter Results<\/span>/);
   assert.match(html, /class="resultFilterHeader"[\s\S]*id="toggleResultFilters"[\s\S]*id="clearResultFilters"/);
@@ -353,6 +354,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(resultsBodyLead.includes('demoDataResults'), false);
   assert.match(html, /id="resultFilterOptions"/);
   assert.equal(html.includes('id="applyResultFilters"'), false);
+  assert.match(html, /const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';/);
   assert.match(html, /autoApplyResultFilters/);
   assert.match(html, /if \(key === 'filters'\) section\.hidden = !open;/);
   assert.equal(html.includes('id="toggleResultsPanelBody"'), false);
