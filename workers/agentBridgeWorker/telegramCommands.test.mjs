@@ -4055,6 +4055,26 @@ test('/start Onboard Agent deep-link mints private install info without exposing
   assert.match(copyInfo, /Context Engine agent install info/);
 });
 
+test('/start agent_onboarding slug deep-link opens the private copy install screen directly', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const copyInfo = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'agent_token');
+  assert.match(result.response.text, /Tap Copy Agent Install Info, then paste it into your trusted agent/);
+  assert.match(copyInfo, /Session: alpha/);
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
+});
+
 test('/agent_token refuses explicit sessions that are not selectable for the Telegram account', async () => {
   const env = agentTokenEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({

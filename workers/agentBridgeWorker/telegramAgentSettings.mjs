@@ -65,6 +65,35 @@ function normalizeDraftStyle(value = '') {
   return ['concise', 'balanced', 'detailed'].includes(draftStyle) ? draftStyle : 'balanced';
 }
 
+function normalizeStringList(value = []) {
+  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
+  return source
+    .map((entry) => lower(entry).replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64))
+    .filter(Boolean)
+    .filter((entry, index, values) => values.indexOf(entry) === index);
+}
+
+function normalizeApprovalMode(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const normalized = {};
+  ['answers', 'questionVotes', 'groups'].forEach((key) => {
+    const mode = lower(source[key]).replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+    if (mode) normalized[key] = mode;
+  });
+  return {
+    answers: normalized.answers || 'draft_for_review',
+    questionVotes: normalized.questionVotes || 'suggest_for_review',
+    groups: normalized.groups || 'suggest_for_review',
+  };
+}
+
+function normalizeIsoString(value = '') {
+  const text = safeString(value);
+  if (!text) return '';
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : '';
+}
+
 export function telegramAgentSettingsKey({
   sessionSlug = '',
   telegramUserId = '',
@@ -81,6 +110,11 @@ export function defaultTelegramAgentSettings(env = {}) {
     draftStyle: normalizeDraftStyle(source.draftStyle),
     showUnansweredFirst: normalizeBoolean(source.showUnansweredFirst, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(source.agentAutoApplyQuestionVotes, false),
+    allowedProfileFields: normalizeStringList(source.allowedProfileFields),
+    allowedUses: normalizeStringList(source.allowedUses),
+    approvalMode: normalizeApprovalMode(source.approvalMode),
+    dailyDigestOptIn: normalizeBoolean(source.dailyDigestOptIn, false),
+    onboardingCompletedAt: normalizeIsoString(source.onboardingCompletedAt),
   };
   assertNoSecretShape(settings, 'Telegram agent settings defaults must not serialize secrets.');
   return settings;
@@ -106,6 +140,23 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
     const normalized = normalizeBoolean(input.agentAutoApplyQuestionVotes, null);
     if (normalized === null) return { ok: false, reason: 'agent_auto_apply_question_votes_invalid' };
     patch.agentAutoApplyQuestionVotes = normalized;
+  }
+  if (Object.hasOwn(input, 'allowedProfileFields')) {
+    patch.allowedProfileFields = normalizeStringList(input.allowedProfileFields);
+  }
+  if (Object.hasOwn(input, 'allowedUses')) {
+    patch.allowedUses = normalizeStringList(input.allowedUses);
+  }
+  if (Object.hasOwn(input, 'approvalMode')) {
+    patch.approvalMode = normalizeApprovalMode(input.approvalMode);
+  }
+  if (Object.hasOwn(input, 'dailyDigestOptIn')) {
+    const normalized = normalizeBoolean(input.dailyDigestOptIn, null);
+    if (normalized === null) return { ok: false, reason: 'daily_digest_opt_in_invalid' };
+    patch.dailyDigestOptIn = normalized;
+  }
+  if (Object.hasOwn(input, 'onboardingCompletedAt')) {
+    patch.onboardingCompletedAt = normalizeIsoString(input.onboardingCompletedAt);
   }
   if (!Object.keys(patch).length) {
     return { ok: false, reason: 'settings_patch_required' };
@@ -138,6 +189,11 @@ export async function loadTelegramAgentSettings({
       settings.agentAutoApplyQuestionVotes,
       defaults.agentAutoApplyQuestionVotes
     ),
+    allowedProfileFields: normalizeStringList(settings.allowedProfileFields || defaults.allowedProfileFields),
+    allowedUses: normalizeStringList(settings.allowedUses || defaults.allowedUses),
+    approvalMode: normalizeApprovalMode(settings.approvalMode || defaults.approvalMode),
+    dailyDigestOptIn: normalizeBoolean(settings.dailyDigestOptIn, defaults.dailyDigestOptIn),
+    onboardingCompletedAt: normalizeIsoString(settings.onboardingCompletedAt || defaults.onboardingCompletedAt),
   };
 }
 
