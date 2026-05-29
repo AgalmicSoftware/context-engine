@@ -92,6 +92,22 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 
 The preferred low-friction path is a CE bot deep link. A group-question response remains available when the user should enter through a Telegram group that already has CE bot buttons.
 
+### Direct Link Mini App Onboarding
+
+When a group message shows `Onboard Agent (Mini App)`, tapping it opens a
+private per-tapper Telegram Mini App page. That page must send Telegram's raw
+`window.Telegram.WebApp.initData` to:
+
+```http
+POST /telegram/agent/api/miniapp/onboard
+```
+
+The worker validates the Telegram initData server-side and returns that user's
+own `ceagt_...` token, worker URL, session slug, expiry, and skill name. The
+token is never written into the shared group message. The DM deep-link
+`Onboard Agent` path remains available as the fallback when the Direct Link Mini
+App short name is not configured.
+
 ### Sensemaking Trial Deep Link
 
 Use the deployment's CE bot start link when the user wants to opt in to the sensemaking trial. The link should open the Context Engine Telegram bot and start the bot flow with `/start`.

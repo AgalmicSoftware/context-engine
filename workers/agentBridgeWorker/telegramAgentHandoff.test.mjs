@@ -1,10 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHmac } from 'node:crypto';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
-import { createTelegramAgentDelegationToken } from './telegramAgentDelegationTokens.mjs';
+import {
+  createTelegramAgentDelegationToken,
+  loadTelegramAgentDelegationToken,
+} from './telegramAgentDelegationTokens.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 
 class MemoryKv {
@@ -117,6 +121,20 @@ function agentRequest(path, {
     },
     body: body ? JSON.stringify(body) : null,
   });
+}
+
+function signInitData(fields = {}, botToken = '') {
+  const dataCheckString = Object.entries(fields)
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+      leftKey === rightKey
+        ? String(leftValue).localeCompare(String(rightValue))
+        : leftKey.localeCompare(rightKey)
+    ))
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+  const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const hash = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  return new URLSearchParams({ ...fields, hash }).toString();
 }
 
 async function jsonBody(response) {
@@ -282,6 +300,80 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(missingTokenResponse.status, 401);
   assert.equal(missingTokenBody.reason, 'agent_token_not_found');
   assert.equal(missingTokenBody.action, 'refresh_token_via_telegram');
+});
+
+test('Mini App onboarding endpoint validates Telegram initData and mints a scoped user token', async () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
+  });
+  const initData = signInitData({
+    auth_date: String(nowSeconds),
+    query_id: 'mini-onboard-query',
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, env.TELEGRAM_BOT_TOKEN);
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://mini.example',
+      },
+      body: JSON.stringify({
+        initData,
+        startParam: 'onboard__alpha',
+      }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://mini.example');
+  assert.equal(body.ok, true);
+  assert.equal(body.worker, 'https://bridge.example');
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.skill, 'ce-telegram-agent-handoff');
+  assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.record.telegramUserId, '42');
+  assert.equal(loaded.record.sessionSlug, 'alpha');
+});
+
+test('Mini App onboarding endpoint rejects disallowed origins and invalid initData', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
+  });
+  const originResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://evil.example',
+      },
+      body: JSON.stringify({ initData: 'bad' }),
+    }),
+    env,
+  });
+  assert.equal(originResponse.status, 403);
+  assert.equal((await jsonBody(originResponse)).reason, 'origin_not_allowed');
+
+  const invalidResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://mini.example',
+      },
+      body: JSON.stringify({ initData: 'bad' }),
+    }),
+    env,
+  });
+  assert.equal(invalidResponse.status, 401);
+  assert.equal((await jsonBody(invalidResponse)).reason, 'miniapp_initdata_invalid');
 });
 
 test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user and session', async () => {

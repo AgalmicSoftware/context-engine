@@ -1,15 +1,22 @@
-import { TELEGRAM_CHAT_LANES } from './constants.mjs';
+import {
+  AGENT_BRIDGE_EVENT_TYPES,
+  TELEGRAM_CHAT_LANES,
+} from './constants.mjs';
 import {
   buildTelegramCommandResponse,
   loadQuestionsForSession,
   loadSessionPolicy,
   loadSubmittedResultRecords,
+  parseAgentOnboardingStartParam,
   persistAnswerDraft,
   readGroupSessionBinding,
   readPrivateSessionBinding,
+  resolveAgentTokenSession,
 } from './telegramCommands.mjs';
+import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { buildResultsImage } from './resultImage.mjs';
 import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
+import { validateTelegramMiniAppInitData } from './telegramMiniApp.mjs';
 import {
   inferQuestionTags,
   normalizeQuestionTags,
@@ -39,11 +46,14 @@ import {
 } from './telegramQuestionQueue.mjs';
 import { canManageResponseExportAllowlist } from './telegramResponseExport.mjs';
 import {
+  createTelegramAgentDelegationToken,
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
 
+const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 
@@ -77,6 +87,63 @@ function json(data, init = {}) {
       ...(init.headers || {}),
     },
   });
+}
+
+function agentBridgePublicUrl(env = {}) {
+  return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+}
+
+function miniAppOnboardAllowedOrigins(env = {}) {
+  return safeString(env.AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS)
+    .split(',')
+    .map((entry) => safeString(entry).replace(/\/+$/, ''))
+    .filter(Boolean);
+}
+
+function miniAppOnboardCorsHeaders(request, env = {}) {
+  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
+  if (!origin) return {};
+  const allowed = miniAppOnboardAllowedOrigins(env);
+  if (!allowed.includes(origin) && !allowed.includes('*')) return null;
+  return {
+    'access-control-allow-origin': allowed.includes('*') ? origin : origin,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, x-telegram-init-data, telegram-web-app-init-data, x-ce-telegram-init-data',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
+
+function jsonMiniAppOnboard(request, env, data, init = {}) {
+  const cors = miniAppOnboardCorsHeaders(request, env);
+  return json(data, {
+    ...init,
+    headers: {
+      ...(cors || {}),
+      ...(init.headers || {}),
+    },
+  });
+}
+
+async function readMiniAppOnboardInput(request) {
+  const url = new URL(request.url);
+  const body = request.method === 'POST'
+    ? await request.json().catch(() => ({}))
+    : {};
+  return {
+    ...body,
+    initData: safeString(
+      body.initData ||
+      body.telegramInitData ||
+      url.searchParams.get('initData') ||
+      url.searchParams.get('telegramInitData') ||
+      request.headers.get('X-Telegram-Init-Data') ||
+      request.headers.get('Telegram-Web-App-Init-Data') ||
+      request.headers.get('X-Ce-Telegram-Init-Data')
+    ),
+    startParam: safeString(body.startParam || body.startapp || body.startApp || url.searchParams.get('startParam') || url.searchParams.get('startapp')),
+    sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
+  };
 }
 
 function firstValue(...values) {
@@ -2005,12 +2072,122 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
   return json(saved, { status: saved.ok ? 200 : 400 });
 }
 
+async function handleMiniAppOnboardRequest({
+  request,
+  env = {},
+  createdAt = null,
+} = {}) {
+  const cors = miniAppOnboardCorsHeaders(request, env);
+  if (cors === null) {
+    return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
+  }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors || {} });
+  }
+  if (!['GET', 'POST'].includes(request.method)) {
+    return jsonMiniAppOnboard(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+
+  const input = await readMiniAppOnboardInput(request);
+  const ttlSeconds = Number(env.AGENT_BRIDGE_MINIAPP_INITDATA_TTL_SECONDS || 3600);
+  const validationEnv = {
+    ...env,
+    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: Number.isFinite(ttlSeconds) && ttlSeconds > 0
+      ? String(Math.floor(ttlSeconds))
+      : '3600',
+  };
+  const validated = await validateTelegramMiniAppInitData(input.initData, validationEnv);
+  if (!validated.ok) {
+    const reason = validated.reason === 'telegram_init_data_expired'
+      ? 'miniapp_initdata_expired'
+      : 'miniapp_initdata_invalid';
+    return jsonMiniAppOnboard(request, env, { ok: false, reason }, { status: 401 });
+  }
+  const telegramUserId = safeString(validated.user?.telegramUserId);
+  if (!telegramUserId) {
+    return jsonMiniAppOnboard(request, env, { ok: false, reason: 'miniapp_user_missing' }, { status: 401 });
+  }
+
+  const parsedStart = parseAgentOnboardingStartParam(input.startParam);
+  const sessionSlug = parsedStart.ok ? parsedStart.sessionSlug : sanitizeSessionSlug(input.sessionSlug);
+  const policy = await loadSessionPolicy(env);
+  const normalized = {
+    type: 'telegram_mock_update',
+    updateId: `miniapp-onboard-${Date.now()}`,
+    kind: 'mini_app_agent_onboarding',
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    user: {
+      telegramUserId,
+      username: safeString(validated.user?.username),
+      languageCode: safeString(validated.user?.languageCode),
+    },
+    chat: {
+      chatId: telegramUserId,
+      chatType: 'private',
+      type: 'private',
+      isPrivate: true,
+    },
+  };
+  const resolved = await resolveAgentTokenSession({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlug,
+  });
+  if (!resolved.ok) {
+    return jsonMiniAppOnboard(request, env, {
+      ok: false,
+      reason: resolved.reason || 'session_not_found',
+      sessionSlug: resolved.sessionSlug || sessionSlug || '',
+    }, { status: 404 });
+  }
+
+  const account = await deriveManagedDemoAccount({
+    principal: normalized,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
+    createdAt,
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId,
+    username: safeString(validated.user?.username),
+    sessionSlug: resolved.session.sessionSlug,
+    accountAddress: account.accountAddress,
+    ttlSeconds: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+    createdAt,
+  });
+  if (!issued.ok) {
+    return jsonMiniAppOnboard(request, env, {
+      ok: false,
+      reason: issued.reason || 'agent_token_create_failed',
+    }, { status: 500 });
+  }
+  const response = {
+    ok: true,
+    token: issued.token,
+    worker: agentBridgePublicUrl(env),
+    sessionSlug: resolved.session.sessionSlug,
+    expiresAt: issued.record.expiresAt,
+    skill: 'ce-telegram-agent-handoff',
+  };
+  const { token: _token, ...secretFree } = response;
+  assertNoSecretShape(secretFree, 'Mini App onboarding token response metadata must not serialize secrets.');
+  return jsonMiniAppOnboard(request, env, response);
+}
+
 export async function handleTelegramAgentHandoffRequest({
   request,
   env = {},
   waitUntil = null,
   fetchImpl = globalThis.fetch,
 } = {}) {
+  const url = new URL(request.url);
+  if (url.pathname === '/telegram/agent/api/miniapp/onboard') {
+    return handleMiniAppOnboardRequest({ request, env });
+  }
+
   const auth = await authenticateAgentHandoff(request, env);
   if (!auth.ok) {
     return json({
@@ -2023,7 +2200,6 @@ export async function handleTelegramAgentHandoffRequest({
     }, { status: auth.status });
   }
 
-  const url = new URL(request.url);
   const body = await readRequestJson(request);
   const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), url.pathname, request.method);
   if (!delegated.ok) {
