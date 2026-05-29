@@ -3959,6 +3959,48 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 
+test('private Onboard Agent callback renders the copy install screen on first tap', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv();
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now,
+  });
+  const onboard = flattenButtons(start.response.replyMarkup)
+    .find((button) => button.text === 'Onboard Agent');
+
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9201,
+      callback_query: {
+        id: 'onboard-first-tap',
+        data: onboard.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 77,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const copyInfo = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Install Info')?.copy_text?.text || '';
+  const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+
+  assert.ok(onboard.callback_data);
+  assert.equal(onboard.url, undefined);
+  assert.equal(result.screen, 'agent_token');
+  assert.equal(result.response.method, 'editMessageText');
+  assert.equal(result.callbackQueryId, 'onboard-first-tap');
+  assert.match(result.response.text, /Tap Copy Agent Install Info, then paste it into your trusted agent/);
+  assert.match(copyInfo, /Context Engine agent install info/);
+  assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(result.response.text.includes(token), false);
+});
+
 test('/start Onboard Agent deep-link mints private install info without exposing tokens in group', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const env = agentTokenEnv({
