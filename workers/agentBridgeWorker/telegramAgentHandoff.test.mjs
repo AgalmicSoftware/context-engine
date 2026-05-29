@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
+import { listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import {
@@ -430,6 +431,52 @@ test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user
   assert.equal(serialized.includes('Wrong user draft'), false);
   assert.equal(serialized.includes('Wrong session draft'), false);
   assert.equal(serialized.includes(issued.token), false);
+});
+
+test('Telegram agent activity vote scans use user-scoped prefixes past shared list caps', async () => {
+  const env = telegramOnlyEnv();
+  for (let index = 0; index < 320; index += 1) {
+    await env.AGENT_ACTION_KV.put(`telegram:agent-question-vote-decision:v1:alpha:42:req-${String(index).padStart(3, '0')}`, JSON.stringify({
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      requestId: `other-${index}`,
+      createdAt: `2026-12-01T10:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      decisions: [{
+        questionId: `q-other-${index}`,
+        suggestedVote: 'up',
+        finalVote: 'up',
+        applied: true,
+      }],
+    }));
+  }
+  for (let index = 0; index < 80; index += 1) {
+    await env.AGENT_ACTION_KV.put(`telegram:agent-question-vote-decision:v1:alpha:99:req-${String(index).padStart(3, '0')}`, JSON.stringify({
+      sessionSlug: 'alpha',
+      telegramUserId: '99',
+      requestId: `own-${index}`,
+      createdAt: `2026-12-01T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      decisions: [{
+        questionId: `q-own-${index}`,
+        suggestedVote: 'down',
+        finalVote: 'down',
+        applied: true,
+      }],
+    }));
+  }
+
+  const items = await listTelegramAgentActivity({
+    env,
+    telegramUserId: '99',
+    sessionSlugs: ['alpha'],
+    includeContent: true,
+    limit: 100,
+  });
+  const decisions = items.filter((item) => item.type === 'question_vote_decision');
+
+  assert.equal(decisions.length, 80);
+  assert.equal(decisions.every((item) => item.sessionSlug === 'alpha'), true);
+  assert.equal(decisions.every((item) => item.questionId.startsWith('q-own-')), true);
+  assert.equal(JSON.stringify(decisions).includes('q-other-'), false);
 });
 
 test('Telegram agent can read active questions and draft preferences after group join', async () => {

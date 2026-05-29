@@ -185,22 +185,22 @@ export async function listTelegramAgentActivity({
     .forEach((record) => items.push(draftItem(record, options)));
 
   for (const slug of slugs) {
-    const recommendations = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${slug}:`, { limit: 300 });
+    const recommendations = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${slug}:${userId}:`, { limit: 300 });
     recommendations
       .filter((record) => safeString(record.telegramUserId) === userId)
       .forEach((record) => items.push(...recommendationItems(record, options)));
 
-    const decisions = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${slug}:`, { limit: 300 });
+    const decisions = await listKvRecordsByPrefix(env, `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${slug}:${userId}:`, { limit: 300 });
     decisions
       .filter((record) => safeString(record.telegramUserId) === userId)
       .forEach((record) => items.push(...decisionItems(record, options)));
 
-    const proposed = await listKvRecordsByPrefix(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, { limit: 300 });
+    const proposed = await listKvRecordsByPrefix(env, `${PROPOSED_QUESTION_KV_PREFIX}${slug}:`, { limit: 1000 });
     proposed
       .filter((record) => safeString(record.createdByTelegramUserId) === userId)
       .forEach((record) => items.push(proposedQuestionItem(record, options)));
 
-    const groupProposals = await listKvRecordsByPrefix(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, { limit: 300 });
+    const groupProposals = await listKvRecordsByPrefix(env, `${LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX}${slug}:`, { limit: 1000 });
     groupProposals
       .filter((record) => [record.proposedBy, record.targetTelegramUserId].map(safeString).includes(userId))
       .forEach((record) => items.push(groupProposalItem(record, options)));
