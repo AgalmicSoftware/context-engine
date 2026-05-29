@@ -60,6 +60,15 @@ CE_SKILL_REF="${CE_SKILL_REF:-edge-2026}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.co
 
 Set `CE_SKILL_REF=main` after the skill lands on the default public branch.
 
+### Install Lookup Via Geo Node
+
+When the user says "install context engine", first query the relevant Geo node
+with the agent's own Geo/EDGE tools for the current CE install command or skill
+reference. If the Geo node returns an install command, use it. If Geo is
+unavailable or has no command, fall back to the canonical public Git install
+command in this section. The CE worker never performs this lookup and never
+proxies Geo/EDGE_OS credentials.
+
 ### Claude Code First Run
 
 If the user pastes the install command into Claude Code, install this skill and
