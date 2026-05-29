@@ -11,6 +11,7 @@ export const TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES = Object.freeze({
   READ_GROUPS: 'read_groups',
   PROPOSE_GROUPS: 'propose_groups',
   POSE_QUESTIONS: 'pose_questions',
+  MANAGE_GROUP_APPROVALS: 'manage_group_approvals',
 });
 export const TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES = Object.freeze([
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,

@@ -150,6 +150,7 @@ Default token scope does not permit:
 
 - response export
 - broad admin actions such as response export allowlist management
+- Telegram group approval link management
 - wallet/private-key export
 - raw response access
 - final answer submission unless a separate CE user-approved submit path is enabled
@@ -382,6 +383,26 @@ session admin, and send either `sponsoredQuestionIds` / `questionIds` or
 `{"clear": true}`. Ordinary user-scoped `ceagt_` tokens cannot call this route.
 Question refs may be exact IDs or 1-based candidate numbers from the `GET`
 response.
+
+Session admins can also ask the worker to mint a one-use Telegram group approval
+link:
+
+```http
+POST /telegram/agent/api/group-approval-link
+Content-Type: application/json
+Authorization: Bearer <service token or scoped admin ceagt_ token>
+
+{
+  "telegramUserId": "123456789",
+  "sessionSlug": "telegram-demo-4"
+}
+```
+
+The caller must pass CE's session-admin gate. A normal `ceagt_` token does not
+include the `manage_group_approvals` scope by default; use the worker service
+token or an explicitly scoped admin token. The response contains a `url` to send
+to the Telegram group owner. The first group that opens it becomes approved for
+that session.
 
 For a user-scoped `ceagt_` token, first check whether the user is an admin for
 the token-bound session:

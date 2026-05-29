@@ -7,6 +7,7 @@ import {
   loadQuestionsForSession,
   loadSessionPolicy,
   loadSubmittedResultRecords,
+  mintTelegramGroupApprovalLink,
   parseAgentOnboardingStartParam,
   persistAnswerDraft,
   readGroupSessionBinding,
@@ -315,6 +316,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   }
   if (pathname === '/telegram/agent/api/question-queue/apply') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/group-approval-link') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS;
   }
   if (pathname === '/telegram/agent/api/question-votes/recommend') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.RECOMMEND_QUESTION_VOTES;
@@ -1184,6 +1188,48 @@ async function handleQuestionQueueRequest({
     skipped,
     candidates: candidateSummaries,
   });
+}
+
+async function handleGroupApprovalLinkRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const admin = await requireQuestionQueueAdmin({
+    env,
+    context,
+    input,
+    allowDelegatedAdmin: true,
+  });
+  if (!admin.ok) {
+    return json({
+      ok: false,
+      reason: 'group_approval_admin_required',
+      accountAddress: admin.accountAddress || '',
+    }, { status: admin.status || 403 });
+  }
+  const minted = await mintTelegramGroupApprovalLink({
+    env,
+    session: context.session,
+    approvedByTelegramUserId: context.normalized.user.telegramUserId,
+    approvedByAccountAddress: admin.manager.accountAddress,
+    createdAt: input.createdAt || null,
+  });
+  if (!minted.url) {
+    return json({
+      ok: false,
+      reason: 'telegram_bot_username_missing',
+      sessionSlug: context.session.sessionSlug,
+    }, { status: 500 });
+  }
+  const response = {
+    ok: true,
+    url: minted.url,
+    expiresAt: minted.expiresAt,
+    sessionSlug: context.session.sessionSlug,
+  };
+  assertNoSecretShape(response, 'Telegram group approval link response must not serialize secrets.');
+  return json(response);
 }
 
 function normalizeTelegramQuestionVote(value = '') {
@@ -2216,6 +2262,7 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
     '/telegram/agent/api/question-queue/apply',
+    '/telegram/agent/api/group-approval-link',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
   ].includes(url.pathname);
@@ -2241,6 +2288,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/question-queue/apply' && request.method === 'POST') {
     return handleQuestionQueueApplyRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/group-approval-link' && request.method === 'POST') {
+    return handleGroupApprovalLinkRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
     return handleNextQuestionRequest({ env, context, input, waitUntil });
