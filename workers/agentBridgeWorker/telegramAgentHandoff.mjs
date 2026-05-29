@@ -3016,6 +3016,18 @@ export async function handleTelegramAgentHandoffRequest({
   });
   if (!context.ok) {
     if (url.pathname === '/telegram/agent/api/tags' && context.status === 404) {
+      const fallbackContext = await resolveHandoffContext({
+        env,
+        input: { ...input, sessionSlug: '' },
+        auth,
+        requireQuestionAuthoring: false,
+      });
+      if (fallbackContext.ok) {
+        return handleTagsRequest({ env, context: fallbackContext, waitUntil });
+      }
+      if (fallbackContext.status !== 404) {
+        return json({ ok: false, reason: fallbackContext.reason, sessionSlug: fallbackContext.sessionSlug || '' }, { status: fallbackContext.status });
+      }
       return emptyTagsResponse(context.sessionSlug || input.sessionSlug);
     }
     return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });

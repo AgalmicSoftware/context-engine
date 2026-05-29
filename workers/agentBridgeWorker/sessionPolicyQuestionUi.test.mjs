@@ -66,6 +66,35 @@ test('session policy resolves defaults and invocation by slug or name', () => {
   assert.deepEqual(workerSlugSession.allowOrigins, ['http://localhost:3000', 'https://contextengine.xyz']);
 });
 
+test('session policy can switch the default Telegram demo session by date', () => {
+  const base = {
+    defaultSessionSlug: 'ee-26-organizers',
+    defaultSessionSchedule: [{
+      from: '2026-05-30T00:00:00-07:00',
+      sessionSlug: 'ee-26-users',
+    }],
+    sessions: [
+      { sessionSlug: 'ee-26-test', sessionName: 'EE 26 Test', telegramBridgeEnabled: true, telegramOnly: true },
+      { sessionSlug: 'ee-26-organizers', sessionName: 'EE 26 Organizers', telegramBridgeEnabled: true, telegramOnly: true },
+      { sessionSlug: 'ee-26-users', sessionName: 'EE 26 Users', telegramBridgeEnabled: true, telegramOnly: true },
+    ],
+  };
+  const beforeMay30 = normalizeSessionPolicy(base, { now: '2026-05-29T12:00:00-07:00' });
+  const onMay30 = normalizeSessionPolicy(base, { now: '2026-05-30T12:00:00-07:00' });
+
+  assert.equal(beforeMay30.defaultSessionSlug, 'ee-26-organizers');
+  assert.equal(resolveSessionInvocation(beforeMay30, '').session.sessionSlug, 'ee-26-organizers');
+  assert.equal(onMay30.defaultSessionSlug, 'ee-26-users');
+  assert.equal(resolveSessionInvocation(onMay30, '').session.sessionSlug, 'ee-26-users');
+  assert.equal(onMay30.configuredDefaultSessionSlug, 'ee-26-organizers');
+
+  const invalidSchedule = normalizeSessionPolicy({
+    ...base,
+    defaultSessionSchedule: [{ from: 'not-a-date', sessionSlug: 'ee-26-users' }],
+  }, { now: '2026-05-30T12:00:00-07:00' });
+  assert.equal(invalidSchedule.defaultSessionSlug, 'ee-26-organizers');
+});
+
 test('Telegram group session access is closed by default unless explicitly open or approved', () => {
   const policy = normalizeSessionPolicy({
     defaultSessionSlug: 'alpha',

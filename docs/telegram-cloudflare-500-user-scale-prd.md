@@ -86,6 +86,25 @@ This mode keeps blockchain/Arweave out of the hot participant path. Future
 parity work can add an asynchronous export/anchor lane without changing
 Telegram response UX.
 
+Event deployments can schedule the bridge default session in
+`AGENT_BRIDGE_SESSION_POLICY_JSON` without code changes. Keep
+`defaultSessionSlug` on the initial default, then add `defaultSessionSchedule`
+entries that take effect at a timestamp:
+
+```json
+{
+  "defaultSessionSlug": "ee-26-organizers",
+  "defaultSessionSchedule": [
+    { "from": "2026-05-30T00:00:00-07:00", "sessionSlug": "ee-26-users" }
+  ]
+}
+```
+
+For the Edge Esmeralda 2026 demo, the intended session set is
+`ee-26-test`, `ee-26-organizers`, and `ee-26-users`; the test session can be
+kept out of participant lists by moving the Telegram session created-after
+cutoff after its creation time once smoke testing is complete.
+
 ### Smoke Mode
 
 Smoke mode is the current simple deployment:

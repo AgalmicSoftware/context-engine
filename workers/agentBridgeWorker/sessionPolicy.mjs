@@ -110,6 +110,71 @@ function normalizePositiveInteger(value, fallback) {
   return Math.floor(number);
 }
 
+function timestampMs(value = '') {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value > 0 && value < 10_000_000_000 ? Math.floor(value * 1000) : Math.floor(value);
+  }
+  const text = safeString(value);
+  if (!text) return null;
+  if (/^\d+$/.test(text)) {
+    const number = Number(text);
+    if (!Number.isFinite(number) || number <= 0) return null;
+    return number < 10_000_000_000 ? Math.floor(number * 1000) : Math.floor(number);
+  }
+  const parsed = Date.parse(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDefaultSessionSchedule(input = {}) {
+  const source = Array.isArray(input.defaultSessionSchedule)
+    ? input.defaultSessionSchedule
+    : (
+      Array.isArray(input.defaultSessionTimeline)
+        ? input.defaultSessionTimeline
+        : (Array.isArray(input.telegramDefaultSessionSchedule) ? input.telegramDefaultSessionSchedule : [])
+    );
+  return source
+    .filter(plainObject)
+    .map((entry) => {
+      const sessionSlug = safeString(entry.sessionSlug || entry.slug || entry.defaultSessionSlug).toLowerCase();
+      if (!SESSION_SLUG_RE.test(sessionSlug)) return null;
+      return {
+        sessionSlug,
+        from: safeString(entry.from || entry.effectiveAt || entry.startsAt || entry.startAt || entry.after) || null,
+        until: safeString(entry.until || entry.expiresAt || entry.endsAt || entry.endAt || entry.before) || null,
+      };
+    })
+    .filter(Boolean);
+}
+
+function selectDefaultSessionSlug({
+  baseDefaultSessionSlug = '',
+  schedule = [],
+  now = null,
+} = {}) {
+  const base = safeString(baseDefaultSessionSlug).toLowerCase();
+  const nowMs = timestampMs(now) ?? Date.now();
+  const candidates = schedule
+    .map((entry, index) => {
+      const hasFrom = safeString(entry.from) !== '';
+      const hasUntil = safeString(entry.until) !== '';
+      const fromMs = timestampMs(entry.from);
+      const untilMs = timestampMs(entry.until);
+      if ((hasFrom && !Number.isFinite(fromMs)) || (hasUntil && !Number.isFinite(untilMs))) {
+        return null;
+      }
+      const starts = !Number.isFinite(fromMs) || nowMs >= fromMs;
+      const notEnded = !Number.isFinite(untilMs) || nowMs < untilMs;
+      if (!starts || !notEnded) return null;
+      return { ...entry, index, fromMs: Number.isFinite(fromMs) ? fromMs : Number.NEGATIVE_INFINITY };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.fromMs - left.fromMs || right.index - left.index);
+  return candidates[0]?.sessionSlug || base;
+}
+
 function normalizeResultsExposurePolicy(session = {}) {
   const source = plainObject(session.resultsExposure)
     ? session.resultsExposure
@@ -163,7 +228,9 @@ function isRequiredSbtJoined(group = {}, joinedLookup = new Set()) {
     .some((value) => joinedLookup.has(value));
 }
 
-export function normalizeSessionPolicy(input = {}) {
+export function normalizeSessionPolicy(input = {}, {
+  now = null,
+} = {}) {
   const sessions = Array.isArray(input.sessions)
     ? input.sessions
     : (Array.isArray(input.linkedSessions) ? input.linkedSessions : []);
@@ -350,10 +417,18 @@ export function normalizeSessionPolicy(input = {}) {
     ) || null,
     chainId: safeString(session.chainId || input.chainId || input.defaultChainId) || null,
   })).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
+  const baseDefaultSessionSlug = safeString(input.defaultSessionSlug || linkedSessions.find((session) => session.default)?.sessionSlug || linkedSessions[0]?.sessionSlug).toLowerCase();
+  const defaultSessionSchedule = normalizeDefaultSessionSchedule(input);
   return {
     type: 'agent_bridge_session_policy',
     linkedSessions,
-    defaultSessionSlug: safeString(input.defaultSessionSlug || linkedSessions.find((session) => session.default)?.sessionSlug || linkedSessions[0]?.sessionSlug).toLowerCase(),
+    defaultSessionSlug: selectDefaultSessionSlug({
+      baseDefaultSessionSlug,
+      schedule: defaultSessionSchedule,
+      now: now || input.policyNow || input.now,
+    }),
+    configuredDefaultSessionSlug: baseDefaultSessionSlug,
+    defaultSessionSchedule,
     riskCeiling: normalizeRisk(input.riskCeiling || RISK_CEILINGS.READ),
     allowQuestionGeneration: input.allowQuestionGeneration === true,
     allowAddQuestion: input.allowAddQuestion === true,

@@ -562,9 +562,10 @@ async function applyResultsExposureOverrides(env = {}, policy = {}) {
 async function loadSessionPolicy(env = {}, {
   forceRefresh = false,
 } = {}) {
+  const policyNow = env.AGENT_BRIDGE_SESSION_POLICY_NOW || env.AGENT_BRIDGE_NOW || null;
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
-    return applyResultsExposureOverrides(env, normalizeSessionPolicy(configured));
+    return applyResultsExposureOverrides(env, normalizeSessionPolicy(configured, { now: policyNow }));
   }
   const registry = await listRegistrySessionsForBridge({ env, forceRefresh }).catch((error) => ({
     ok: false,
@@ -583,7 +584,7 @@ async function loadSessionPolicy(env = {}, {
       allowQuestionGeneration: true,
       allowGenerateQuestion: true,
       sessions: registry.sessions,
-    }));
+    }, { now: policyNow }));
   }
   const defaultSessionSlug = sanitizeSessionSlug(
     env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
@@ -607,7 +608,7 @@ async function loadSessionPolicy(env = {}, {
       sbtJoinModes: ['public', 'password'],
       docLibraryEnabled: true,
     }],
-  }));
+  }, { now: policyNow }));
 }
 
 function loadDemoQuestions(env = {}) {
