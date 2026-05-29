@@ -350,6 +350,76 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(missingTokenBody.action, 'refresh_token_via_telegram');
 });
 
+test('Telegram agent onboarding returns consent questions and persists first-run answers', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+
+  const firstResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/onboarding?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const first = await jsonBody(firstResponse);
+  assert.equal(firstResponse.status, 200);
+  assert.equal(first.completed, false);
+  assert.equal(first.questions.length, 5);
+  assert.equal(first.answers.preference_tailoring, false);
+  assert.equal(first.settings.agentAutoApplyQuestionVotes, false);
+  assert.equal(first.settings.dailyDigestOptIn, false);
+
+  const saveResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/onboarding', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        createdAt: '2026-05-08T12:05:00.000Z',
+        answers: {
+          preference_tailoring: true,
+          demographics_research: false,
+          draft_responses: true,
+          auto_apply_question_votes: true,
+          edge_daily_digest: true,
+        },
+      },
+    }),
+    env,
+  });
+  const saved = await jsonBody(saveResponse);
+  assert.equal(saveResponse.status, 200);
+  assert.equal(saved.completed, true);
+  assert.equal(saved.completedAt, '2026-05-08T12:05:00.000Z');
+  assert.equal(saved.answers.preference_tailoring, true);
+  assert.equal(saved.answers.draft_responses, true);
+  assert.equal(saved.answers.auto_apply_question_votes, true);
+  assert.equal(saved.settings.allowedProfileFields.includes('interests'), true);
+  assert.equal(saved.settings.allowedUses.includes('rank_questions'), true);
+  assert.equal(saved.settings.allowedUses.includes('draft_answers'), true);
+  assert.equal(saved.settings.agentAutoApplyQuestionVotes, true);
+  assert.equal(saved.settings.dailyDigestOptIn, true);
+
+  const secondResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/onboarding?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const second = await jsonBody(secondResponse);
+  assert.equal(secondResponse.status, 200);
+  assert.equal(second.completed, true);
+  assert.equal(second.answers.preference_tailoring, true);
+  assert.equal(second.answers.edge_daily_digest, true);
+  assert.equal(JSON.stringify(second).includes(issued.token), false);
+});
+
 test('Mini App onboarding endpoint validates Telegram initData and mints a scoped user token', async () => {
   const nowSeconds = Math.floor(Date.now() / 1000);
   const env = telegramOnlyEnv({

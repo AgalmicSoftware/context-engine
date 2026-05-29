@@ -38,7 +38,10 @@ import {
   persistTelegramChildSession,
   persistTelegramLightweightGroupProposal,
 } from './telegramGroups.mjs';
-import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
+import {
+  loadTelegramAgentSettings,
+  saveTelegramAgentSettingsPatch,
+} from './telegramAgentSettings.mjs';
 import {
   AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX,
   listTelegramAgentActivity,
@@ -62,6 +65,28 @@ const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftwa
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-28 (v2)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
+const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
+  {
+    id: 'preference_tailoring',
+    prompt: 'Can your agent pass preference info to CE to tailor which questions you see?',
+  },
+  {
+    id: 'demographics_research',
+    prompt: 'Can your agent share non-identifying demographics for research only, never published in connection to you?',
+  },
+  {
+    id: 'draft_responses',
+    prompt: 'Can your agent draft question responses for you based on your activity and user file?',
+  },
+  {
+    id: 'auto_apply_question_votes',
+    prompt: 'Can your agent upvote questions it thinks you will find relevant?',
+  },
+  {
+    id: 'edge_daily_digest',
+    prompt: 'Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?',
+  },
+]);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -69,6 +94,15 @@ function safeString(value) {
 
 function lower(value) {
   return safeString(value).toLowerCase();
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === true || value === false) return value;
+  const normalized = lower(value);
+  if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
 }
 
 function sanitizeSessionSlug(value = '') {
@@ -336,6 +370,11 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/admin/status') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (pathname === '/telegram/agent/api/onboarding') {
+    return methodName === 'POST'
+      ? TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS
+      : TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/question-queue/plan') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
@@ -367,6 +406,93 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.PROPOSE_GROUPS;
   }
   return '';
+}
+
+function onboardingAnswersFromSettings(settings = {}) {
+  const uses = new Set(Array.isArray(settings.allowedUses) ? settings.allowedUses : []);
+  const profileFields = new Set(Array.isArray(settings.allowedProfileFields) ? settings.allowedProfileFields : []);
+  return {
+    preference_tailoring: uses.has('rank_questions') ||
+      profileFields.has('interests') ||
+      profileFields.has('sessions_attended') ||
+      profileFields.has('roles'),
+    demographics_research: uses.has('research_demographics') ||
+      profileFields.has('non_identifying_demographics'),
+    draft_responses: uses.has('draft_answers'),
+    auto_apply_question_votes: settings.agentAutoApplyQuestionVotes === true,
+    edge_daily_digest: settings.dailyDigestOptIn === true,
+  };
+}
+
+function normalizeOnboardingAnswers(input = {}, settings = {}) {
+  const source = input.answers && typeof input.answers === 'object' && !Array.isArray(input.answers)
+    ? input.answers
+    : input;
+  const previous = onboardingAnswersFromSettings(settings);
+  return TELEGRAM_AGENT_ONBOARDING_QUESTIONS.reduce((answers, question) => {
+    answers[question.id] = normalizeBoolean(
+      Object.hasOwn(source, question.id) ? source[question.id] : undefined,
+      previous[question.id] === true ? true : false
+    );
+    return answers;
+  }, {});
+}
+
+function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
+  const allowedProfileFields = [];
+  const allowedUses = [];
+  if (answers.preference_tailoring === true) {
+    allowedProfileFields.push('interests', 'sessions_attended', 'roles');
+    allowedUses.push('rank_questions');
+  }
+  if (answers.demographics_research === true) {
+    allowedProfileFields.push('non_identifying_demographics');
+    allowedUses.push('research_demographics');
+  }
+  if (answers.draft_responses === true) {
+    allowedUses.push('draft_answers');
+  }
+  if (answers.auto_apply_question_votes === true) {
+    allowedUses.push('recommend_votes');
+  }
+  return {
+    allowedProfileFields,
+    allowedUses,
+    approvalMode: {
+      answers: answers.draft_responses === true ? 'draft_for_review' : 'manual_review',
+      questionVotes: answers.auto_apply_question_votes === true ? 'auto_apply' : 'suggest_for_review',
+      groups: 'suggest_for_review',
+    },
+    agentAutoApplyQuestionVotes: answers.auto_apply_question_votes === true,
+    dailyDigestOptIn: answers.edge_daily_digest === true,
+    onboardingCompletedAt: completedAt,
+  };
+}
+
+function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
+  const answers = onboardingAnswersFromSettings(settings);
+  const questions = TELEGRAM_AGENT_ONBOARDING_QUESTIONS.map((question, index) => ({
+    ...question,
+    order: index + 1,
+    answer: answers[question.id] === true,
+  }));
+  const payload = {
+    ok: true,
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    completed: Boolean(safeString(settings.onboardingCompletedAt)),
+    completedAt: safeString(settings.onboardingCompletedAt),
+    questions,
+    answers,
+    settings: {
+      allowedProfileFields: Array.isArray(settings.allowedProfileFields) ? settings.allowedProfileFields : [],
+      allowedUses: Array.isArray(settings.allowedUses) ? settings.allowedUses : [],
+      approvalMode: settings.approvalMode || {},
+      agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes === true,
+      dailyDigestOptIn: settings.dailyDigestOptIn === true,
+    },
+  };
+  assertNoSecretShape(payload, 'Telegram agent onboarding state must not serialize secrets.');
+  return payload;
 }
 
 function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = 'GET') {
@@ -1012,6 +1138,38 @@ function hasExplicitSponsoredQueueApproval(input = {}) {
 async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } = {}) {
   const status = await loadAgentAdminStatus({ env, context, input });
   return json(status);
+}
+
+async function handleOnboardingRequest({
+  env = {},
+  context = {},
+  input = {},
+  body = {},
+  method = 'GET',
+} = {}) {
+  const sessionSlug = context.session.sessionSlug;
+  const telegramUserId = context.normalized.user.telegramUserId;
+  const current = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  if (safeString(method).toUpperCase() !== 'POST') {
+    return json(publicOnboardingState({ sessionSlug, settings: current }));
+  }
+  const completedAt = safeString(input.completedAt || input.createdAt) || new Date().toISOString();
+  const answers = normalizeOnboardingAnswers(body, current);
+  const patch = settingsPatchFromOnboardingAnswers(answers, completedAt);
+  const saved = await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug,
+    telegramUserId,
+    patch,
+    createdAt: completedAt,
+  });
+  if (!saved.ok) {
+    return json({
+      ok: false,
+      reason: saved.reason || 'onboarding_settings_save_failed',
+    }, { status: 400 });
+  }
+  return json(publicOnboardingState({ sessionSlug, settings: saved.settings }));
 }
 
 async function handleQuestionQueuePlanRequest({
@@ -2345,6 +2503,7 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/question-queue/apply',
     '/telegram/agent/api/group-approval-link',
     '/telegram/agent/api/group-approval-revoke',
+    '/telegram/agent/api/onboarding',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
   ].includes(url.pathname);
@@ -2361,6 +2520,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleOnboardingRequest({ env, context, input, body, method: request.method });
   }
   if (url.pathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });
