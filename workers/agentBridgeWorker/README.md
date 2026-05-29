@@ -143,18 +143,20 @@ Core Telegram commands:
   commands rather than welcome-screen buttons. If the user has not selected a
   private session yet, the Mini App launch opens the session picker first.
 - `/sessions`, `/questions`, `/q <number>`,
-  `/results`, `/results consensus`, `/results group`,
+  `/results`, `/results consensus`, `/results group`, `/results topic`,
   `/me`, `/account`, and `/agent_token` keep their existing
   session/question/account behavior. Plain `/results` explains the `consensus`
-  and `group` views and
-  renders buttons for both modes; mode-specific results attempt to upload a
-  rendered PNG card with a compact white consensus view and participant graph
-  for group results, using demo data until enough live overlap exists. The
+  `group`, and `topic map` views and
+  renders buttons for those modes; mode-specific results attempt to upload a
+  rendered PNG card with a compact white consensus view, participant graph
+  for group results, or aggregate topic-map circles. The
   consensus view pages through the top three differentiating questions at a
   time and renders client-style agree/unsure/disagree distribution bars. The
   participant graph connects same-group participant dots and exposes per-group
   analysis buttons that use
-  the selected session worker's sponsored AI route when available.
+  the selected session worker's sponsored AI route when available. Topic maps
+  render only after enough answered questions exist, unless the caller requests
+  demo preview data.
 - `/export_all [session]` is private-chat only and sends a zip archive of
   Cloudflare-backed response payloads for the selected session. The caller's
   managed Telegram ETH address must be allowlisted with
@@ -173,8 +175,10 @@ Core Telegram commands:
   `/export_revoke 0xAddress [session]` are private-chat only admin commands for
   response export access. Only addresses configured in the Worker env or session
   policy are root export admins; admins can add or remove additional exporters
-  in Worker KV without redeploying. Added exporters can run `/export_all` but
-  cannot add other exporters.
+  in Worker KV without redeploying. For the Telegram-only demo lane, added
+  addresses also unlock the Mini App admin panel so organizers can delegate
+  exports, results settings, sponsored-question queues, and group invite-link
+  creation without editing Worker env.
 - `/actions`, `/settings`, and `/join <session>` remain accepted for backward
   compatibility, but `/start` and the registered Telegram command menu no
   longer advertise them. Session selection is through `/sessions`.
@@ -359,7 +363,7 @@ The live webhook route is `/telegram/webhook`. It rejects requests unless
 the configured webhook secret token. It parses real Telegram `message` and
 `callback_query` updates, handles `/start`, `/actions`, `/agent`,
 hidden `/create_agent` compatibility commands, `/settings`, `/join <session>`, `/sessions`,
-`/questions`, `/pose_question`, `/q`, `/results`, `/results consensus`, `/results group`,
+`/questions`, `/pose_question`, `/q`, `/results`, `/results consensus`, `/results group`, `/results topic`,
 `/attachments` or alias `/docs`, and `/me`, answers callback queries to clear Telegram's
 inline-button loading state, and sends replies through an injected Telegram Bot
 API adapter. In live Cloudflare requests, Telegram sends are scheduled with
@@ -524,6 +528,14 @@ POST /telegram/mini-app/api/search
 POST /telegram/mini-app/api/settings
 POST /telegram/mini-app/api/questions/format
 POST /telegram/mini-app/api/questions/add
+GET  /telegram/mini-app/api/admin/access
+POST /telegram/mini-app/api/admin/access
+GET  /telegram/mini-app/api/admin/results-settings
+POST /telegram/mini-app/api/admin/results-settings
+GET  /telegram/mini-app/api/admin/question-queue
+POST /telegram/mini-app/api/admin/question-queue
+GET  /telegram/mini-app/api/admin/export
+POST /telegram/mini-app/api/admin/group-link
 ```
 
 The bot opens the Mini App with Telegram inline `web_app` buttons in private
@@ -630,6 +642,13 @@ Current v0 scope:
   Worker-local `telegram:agent-request:*` record and a planned canonical
   `/api/agent/settings/update-request` envelope. It does not execute the live
   settings backend yet.
+- Admin actions are available inside the Mini App for managed Telegram accounts
+  with configured or delegated export/admin access. The admin panel can download
+  the response export zip, add or remove delegated admin addresses, update
+  results exposure settings, set the sponsored question queue, and generate a
+  one-use add-bot-to-group link. The permissions panel also shows equivalent bot
+  commands such as `/export_allow 0x... <session>` and `/export_revoke 0x...
+  <session>` for operators who prefer the bot.
 - `submit=true` attempts direct on-chain submit by default when the session has
   a worker URL and Surveys address, and session policy allows managed Telegram
   demo submit. The worker authenticates the managed account to the session
@@ -712,6 +731,8 @@ POST /telegram/agent/api/question-queue
 POST /telegram/agent/api/question-queue/plan
 POST /telegram/agent/api/question-queue/apply
 GET  /telegram/agent/api/actions
+GET  /telegram/agent/api/results
+GET  /telegram/agent/api/results-image
 POST /telegram/agent/api/preferences
 POST /telegram/agent/api/questions/pose
 POST /telegram/agent/api/question-votes/recommend
@@ -761,6 +782,17 @@ applied vote decisions, proposed questions, and group proposals. With a
 `ceagt_` token, the worker scopes the response to that token's Telegram user and
 session. The bot mirrors the same data through `/activity`: full details in
 private chat and counts only in groups.
+
+`GET /telegram/agent/api/results?view=topic-map` returns the aggregate
+topic-map data contract used by the Mini App: topic circles, question bubbles,
+counts, and cache status. It does not include raw response records, Telegram
+user ids, wallet addresses, or individual answer text. The worker caches one
+aggregate topic-map payload per session/filter variant in `AGENT_ACTION_KV` and
+refreshes it only when question membership changes or enough new responses land
+to materially change the map. `GET /telegram/agent/api/results-image?view=topic-map`
+returns a PNG rendering of the same map. If there is not enough live data, the
+JSON endpoint reports `available: false` and the image endpoint returns `409`;
+pass `demo=1` for preview output.
 
 Agents can also ask the worker for a meta-level importance view with
 `POST /telegram/agent/api/question-votes/recommend`. The response returns a
@@ -910,7 +942,7 @@ IDs.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
 9. Smoke Telegram private chat `/start`, `/actions`,
    `/settings`, group `/join <session>`, `/sessions`, `/questions`,
-   `/q <number>`, `/results consensus`, `/results group`, `/attachments`, and
+   `/q <number>`, `/results consensus`, `/results group`, `/results topic`, `/attachments`, and
    private `/me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
