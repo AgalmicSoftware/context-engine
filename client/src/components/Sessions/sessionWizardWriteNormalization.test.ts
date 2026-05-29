@@ -1,5 +1,3 @@
-/* eslint-disable import/first */
-
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
@@ -317,6 +315,36 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile.telegramOwned).toBe(false);
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
+  });
+
+  test('telegram-only mode is published as explicit non-secret session metadata', () => {
+    const metadata = sanitizeSessionWizardMetadataPayload({
+      slug: 'telegram-native',
+      sessionName: 'Telegram Native',
+      telegramOnly: true,
+      storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
+    }, {
+      fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
+    });
+
+    expect(metadata.telegramOnly).toBe(true);
+    expect(metadata.sessionMode).toBe('telegram_only');
+    expect(metadata.telegramBridgeEnabled).toBe(true);
+    expect(metadata.telegram).toEqual({ mode: 'telegram_only', only: true });
+
+    const workerPayload = buildSessionWizardWorkerConfigPayload({
+      slug: 'telegram-native',
+      draft: {
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        telegramOnly: true,
+        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
+      },
+      deployPayload: {},
+    });
+
+    expect(workerPayload.telegramOnly).toBe(true);
+    expect(workerPayload.sessionMode).toBe('telegram_only');
+    expect(workerPayload.telegramBridgeEnabled).toBe(true);
   });
 
 });

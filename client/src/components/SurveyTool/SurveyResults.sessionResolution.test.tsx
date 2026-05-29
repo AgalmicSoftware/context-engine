@@ -31,6 +31,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -192,6 +194,32 @@ describe('SurveyResults session resolution', () => {
     jest.restoreAllMocks();
   });
 
+  it('does not rewrite route-owned results URLs on unmount', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/session/edge/questions/results');
+      const subject = createSubject({
+        activeSessionSlug: 'edge',
+        isOpen: true,
+        preventUrlChange: true,
+        sessionSlug: 'edge',
+        viewMode: 'questions',
+      });
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+      };
+
+      subject.componentWillUnmount();
+
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/session/edge/questions/results');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('removes the old SurveyResults session selector chrome while keeping header spacing intact', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
@@ -303,7 +331,7 @@ describe('SurveyResults session resolution', () => {
     expect(entriesSpy).toHaveBeenCalledTimes(3);
   });
 
-  it('fans out question reads across list scope on /session routes', () => {
+  it('keeps /session route question reads scoped to one session', () => {
     const scope = resolveSurveyResultsQuestionReadScope({
       pathname: '/session/edge/questions/results',
       search: '',
@@ -314,8 +342,8 @@ describe('SurveyResults session resolution', () => {
     });
 
     expect(scope.baseSlug).toBe('edge');
-    expect(scope.questionReadSlugs).toEqual(['edge', 'alpha']);
-    expect(scope.storageKeyPrefix).toBe('dg:filters:__scope__:alpha|edge');
+    expect(scope.questionReadSlugs).toEqual(['edge']);
+    expect(scope.storageKeyPrefix).toBe('dg:filters:edge');
   });
 
   it('keeps explicit query session pins scoped to one session in question results', () => {
@@ -572,7 +600,7 @@ describe('SurveyResults session resolution', () => {
     expect(subject.state.questionResultsHydrated).toBe(true);
   });
 
-  it('aggregates question-mode reads across list scope on /session routes', async () => {
+  it('keeps question-mode reads scoped to the /session route slug', async () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
     try {
@@ -644,24 +672,22 @@ describe('SurveyResults session resolution', () => {
 
       await subject.fetchQuestionModeResponses();
 
-      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1', 'q2', 'q3']);
-      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['q1', 'q2', 'q3']);
-      expect(subject.state.totalQuestionsCount).toBe(3);
-      expect(subject.state.totalResponsesCount).toBe(3);
+      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1']);
+      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['q1']);
+      expect(subject.state.totalQuestionsCount).toBe(1);
+      expect(subject.state.totalResponsesCount).toBe(1);
       expect(subject.getNetworkQuestionsForCurrentContext()).toMatchObject({
         q1: expect.objectContaining({ sessionSlug: 'edge', prompt: 'Edge 1' }),
-        q2: expect.objectContaining({ sessionSlug: 'alpha', prompt: 'Alpha 2' }),
-        q3: expect.objectContaining({ sessionSlug: 'beta', prompt: 'Beta 3' }),
       });
       expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
   });
 
-  it('passes the list-scope results filter storage bucket on aggregated /session question results', () => {
+  it('uses the route slug filter storage bucket on /session question results', () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
     try {
@@ -714,25 +740,25 @@ describe('SurveyResults session resolution', () => {
         viewMode: 'questions',
         showQuestionFilter: true,
         questionResponses: {
-          q2: {
-            '0xalpha': { answer: { value: 'alpha', encrypted: false } },
+          q1: {
+            '0xedge': { answer: { value: 'edge', encrypted: false } },
           },
         },
         aggregatorQuestionResponses: {
-          q2: [
+          q1: [
             {
-              responder: '0xalpha',
-              questionId: 'q2',
-              response: { answer: { value: 'alpha', encrypted: false } },
+              responder: '0xedge',
+              questionId: 'q1',
+              response: { answer: { value: 'edge', encrypted: false } },
             },
           ],
         },
         sbtFilteredAggregatorQuestionResponses: {
-          q2: [
+          q1: [
             {
-              responder: '0xalpha',
-              questionId: 'q2',
-              response: { answer: { value: 'alpha', encrypted: false } },
+              responder: '0xedge',
+              questionId: 'q1',
+              response: { answer: { value: 'edge', encrypted: false } },
             },
           ],
         },
@@ -748,14 +774,80 @@ describe('SurveyResults session resolution', () => {
           node?.props?.onFilter === subject.handleQuestionFilter
       );
 
-      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:__scope__:alpha|beta|edge');
+      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:edge');
       expect(questionFilterNode?.props?.questions).toEqual([
         expect.objectContaining({
-          id: 'q2',
-          prompt: 'Alpha 2',
-          sessionSlug: 'alpha',
+          id: 'q1',
+          prompt: 'Edge 1',
+          sessionSlug: 'edge',
         }),
       ]);
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('excludes response-discovered pending placeholders from /session question results', async () => {
+    const priorUrl = window.location.href;
+    const leakedResponder = '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526';
+    window.history.replaceState({}, '', '/session/telegram-demo-2');
+    try {
+      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['telegram-demo-2', 'demo']);
+      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+        if (namespace === 'bookmarksCache') return { surveys: [], questions: [] };
+        if (namespace !== 'questionsCache') return {};
+        if (slug !== 'telegram-demo-2') return {};
+        return {
+          '84532': {
+            questions: {
+              qLocal: { id: 'qLocal', prompt: 'Local question', type: 'binary' },
+              qPending: {
+                id: 'qPending',
+                prompt: '[encrypted]',
+                type: 'binary',
+                __ceQuestionMetadataPending: true,
+              },
+              qDemoExplicit: {
+                id: 'qDemoExplicit',
+                prompt: 'Demo question',
+                type: 'binary',
+                sessionSlug: 'demo',
+                sessionSlugExplicit: true,
+              },
+            },
+            questionResponses: {
+              qLocal: {
+                '0xlocal': { type: 'binary', answer: { value: 'Agree', encrypted: false } },
+              },
+              qPending: {
+                [leakedResponder]: { type: 'binary', answer: { value: 'Disagree', encrypted: false } },
+              },
+              qDemoExplicit: {
+                [leakedResponder]: { type: 'binary', answer: { value: 'Agree', encrypted: false } },
+              },
+            },
+          },
+        };
+      });
+
+      const subject = createSubject({
+        activeSessionSlug: 'telegram-demo-2',
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+      });
+      attachStateHarness(subject);
+      subject.questionFilterRef = { current: { handleApplyFilters: jest.fn() } };
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+      };
+
+      await subject.fetchQuestionModeResponses();
+
+      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['qlocal']);
+      expect(Object.keys(subject.state.questionResponses).sort()).toEqual(['qlocal']);
+      expect(JSON.stringify(subject.state.aggregatorQuestionResponses).toLowerCase()).not.toContain(leakedResponder);
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
@@ -935,23 +1027,24 @@ describe('SurveyResults session resolution', () => {
     };
 
     const tree = subject.render();
-    const controls = findElement(
+    const headerNode = findElement(
       tree,
-      (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderControls')
+      (node) => node?.type === SurveyResultsModalHeader
     );
     const cornerActions = findElement(
       tree,
       (node) => typeof node?.props?.className === 'string' && node.props.className.includes('modalHeaderCornerActions')
     );
     const syncStatus = findElement(
-      controls,
+      headerNode?.props?.syncStatusNode,
       (child) => typeof child?.props?.className === 'string' && child.props.className.includes('syncStatusContainer')
     );
     const selectorInControls = findElement(
-      controls,
+      headerNode?.props?.syncStatusNode,
       (child) => child?.props?.['data-testid'] === 'ce-surveyresults-session-selector'
     );
 
+    expect(headerNode).toBeTruthy();
     expect(syncStatus).toBeTruthy();
     expect(selectorInControls).toBeNull();
     expect(cornerActions).toBeNull();
@@ -977,10 +1070,17 @@ describe('SurveyResults session resolution', () => {
         bookmarkedQuestionIDs: [],
       };
 
-      return collectTreeNodes(
-        subject.render(),
-        (node) => node?.type === 'a' && typeof node?.props?.href === 'string' && node.props.href.startsWith('/survey/')
-      ).map((node) => node.props.href);
+      const tree = subject.render();
+      const headerNode = findElement(tree, (node) => node?.type === SurveyResultsModalHeader);
+      const responseListNode = findElement(tree, (node) => node?.type === SurveyResultsIndividualResponsesList);
+      const markup = [
+        headerNode ? renderToStaticMarkup(<SurveyResultsModalHeader {...headerNode.props} />) : '',
+        responseListNode ? renderToStaticMarkup(<SurveyResultsIndividualResponsesList {...responseListNode.props} />) : '',
+      ].join('');
+
+      return Array.from(markup.matchAll(/href="([^"]+)"/g))
+        .map((match) => match[1])
+        .filter((href) => href.startsWith('/survey/'));
     };
 
     const debateLinks = collectSurveyLinks('DEBATE');

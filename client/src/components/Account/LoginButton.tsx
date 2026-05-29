@@ -36,17 +36,17 @@ class LoginButton extends Component<LoginButtonProps> {
         const isBusy = !!this.props.loginInProgress;
 
         return (
-        <div id={styles.navConnectContainer}>
+        <div className={styles.navConnectContainer}>
           <Button
             color="none"
             onClick={this.openLoginModal}
-            id={styles.navConnectButton}
+            className={styles.navConnectButton}
             disabled={isBusy}
           >
-            <h1 id={styles.loginPromptText}>
-              {isBusy ? <FontAwesomeIcon id={styles.loginIcon} icon={faSpinner} pulse /> : ' LOG IN '}
+            <h1 className={styles.loginPromptText}>
+              {isBusy ? <FontAwesomeIcon className={styles.loginIcon} icon={faSpinner} pulse /> : ' LOG IN '}
             </h1>
-            <h1 id={styles.loginIcons}>
+            <h1 className={styles.loginIcons}>
               {!isBusy && (
                 <>
                 </>

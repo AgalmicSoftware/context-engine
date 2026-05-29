@@ -3,7 +3,6 @@
  */
 
 import React from 'react';
-import PropTypes from 'prop-types';
 import styles from './MainSite.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -148,8 +147,3 @@ export const SessionLoadingSkeleton = ({
     </div>
   </div>
 );
-
-SessionLoadingSkeleton.propTypes = {
-  statusTitle: PropTypes.string,
-  statusDetail: PropTypes.string,
-};

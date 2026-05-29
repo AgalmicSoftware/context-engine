@@ -12,15 +12,29 @@ import {
   normalizeGateMode,
   resolveSponsoredGateStateForResource,
 } from '../web3/sponsoredAccess.js';
+import type { SponsoredGate } from '../web3/sponsoredAccessState.js';
 import { createLogger } from '../logging.js';
 import { toStr } from '../shared/primitives.js';
 
-type LitGate = any;
+type UnknownRecord = Record<string, unknown>;
+type LitGate = UnknownRecord & {
+  type?: unknown;
+  label?: unknown;
+  name?: unknown;
+  title?: unknown;
+  gateId?: unknown;
+  id?: unknown;
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+  chainId?: unknown;
+  litChain?: unknown;
+  chain?: unknown;
+};
 
 type LitRecipient = {
-  accessControlConditions: any;
+  accessControlConditions: unknown;
   chain: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type GatePolicyGate = {
@@ -46,7 +60,7 @@ type GatePolicyAccumulator = {
 };
 
 type GatePolicyArgs = {
-  cfg?: any;
+  cfg?: UnknownRecord;
   fallbackChainId?: number | string | null;
 };
 
@@ -59,7 +73,7 @@ type UploadTargets = {
   questions?: boolean;
   questionTags?: boolean;
   docUrls?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type UploadGatePolicyArgs = GatePolicyArgs & {
@@ -93,11 +107,11 @@ const buildRecipientDedupeKey = (recipient: LitRecipient): string => JSON.string
   accessControlConditions: recipient.accessControlConditions || null,
 });
 
-const buildGateDedupeKey = (gate: any): string => JSON.stringify({
+const buildGateDedupeKey = (gate: LitGate): string => JSON.stringify({
   chainId: Number(gate?.chainId || 0) || null,
   litChain: toStr(gate?.litChain || gate?.chain || '').trim().toLowerCase(),
-  mode: normalizeGateMode(gate),
-  sbtAddresses: getGateSbtAddresses(gate).map((addr) => addr.toLowerCase()).sort(),
+  mode: normalizeGateMode(gate as SponsoredGate),
+  sbtAddresses: getGateSbtAddresses(gate as SponsoredGate).map((addr) => addr.toLowerCase()).sort(),
 });
 
 export const createLitRecipientFromGate = ({
@@ -119,7 +133,8 @@ export const createLitRecipientFromGate = ({
     return null;
   }
 
-  const sbtAddresses = getGateSbtAddresses(gate);
+  const sponsoredGate = gate as SponsoredGate;
+  const sbtAddresses = getGateSbtAddresses(sponsoredGate);
   if (!sbtAddresses.length) return null;
 
   const gateChainId = Number(gate?.chainId || fallbackChainId || 0) || fallbackChainId || null;
@@ -127,7 +142,7 @@ export const createLitRecipientFromGate = ({
     chainId: gateChainId,
     litChain: gate?.litChain || gate?.chain,
   });
-  const mode = normalizeGateMode(gate) || 'any';
+  const mode = normalizeGateMode(sponsoredGate) || 'any';
   const accessControlConditions = buildSbtAccessControlConditions({
     sbtAddresses,
     chainId: gateChainId,

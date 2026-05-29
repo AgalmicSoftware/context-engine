@@ -15,17 +15,36 @@ type SurveyResultsSyncStatusPanelArgs = {
   onToggleSyncDetails: () => void;
   onManualRefresh: () => void;
   viewMode: string;
+  showQuickRefresh?: boolean;
   showQuestionSpinner: boolean;
   questionProgress: number;
   questionColor: string;
-  questionBarText: React.ReactNode;
+  questionBarText: string;
+  showQuestionRemainingSpinner?: boolean;
   showResponseSpinner: boolean;
   responseProgress: number;
   responseColor: string;
-  responseBarText: React.ReactNode;
+  responseBarText: string;
+  showResponseRemainingSpinner?: boolean;
   miniBarSpinnerStyle: React.CSSProperties;
   miniProgressStyle: React.CSSProperties;
+  remainingSpinnerStyle: React.CSSProperties;
 };
+
+const renderSurveyResultsSyncBarText = (
+  barText: string,
+  showRemainingSpinner: boolean,
+  remainingSpinnerStyle: React.CSSProperties
+): React.ReactNode => (
+  showRemainingSpinner ? (
+    <>
+      {barText}{' '}
+      <FontAwesomeIcon icon={faSpinner} spin style={remainingSpinnerStyle} />
+    </>
+  ) : (
+    barText
+  )
+);
 
 export const renderSurveyResultsSyncStatusPanel = ({
   isSynced,
@@ -37,16 +56,20 @@ export const renderSurveyResultsSyncStatusPanel = ({
   onToggleSyncDetails,
   onManualRefresh,
   viewMode,
+  showQuickRefresh = !isSynced,
   showQuestionSpinner,
   questionProgress,
   questionColor,
   questionBarText,
+  showQuestionRemainingSpinner = false,
   showResponseSpinner,
   responseProgress,
   responseColor,
   responseBarText,
+  showResponseRemainingSpinner = false,
   miniBarSpinnerStyle,
   miniProgressStyle,
+  remainingSpinnerStyle,
 }: SurveyResultsSyncStatusPanelArgs) => (
   <div className={styles.syncStatusContainer}>
     <button
@@ -66,7 +89,7 @@ export const renderSurveyResultsSyncStatusPanel = ({
         {showLongSyncNotice}
       </span>
     </button>
-    {!isSynced && (
+    {showQuickRefresh && (
       <button
         type="button"
         className={styles.syncStatus__quickRefresh}
@@ -98,7 +121,13 @@ export const renderSurveyResultsSyncStatusPanel = ({
                   style={miniProgressStyle}
                   className={styles.miniProgress}
                 />
-                <div className={styles.miniBarFraction}>{questionBarText}</div>
+                <div className={styles.miniBarFraction}>
+                  {renderSurveyResultsSyncBarText(
+                    questionBarText,
+                    showQuestionRemainingSpinner,
+                    remainingSpinnerStyle
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -119,7 +148,13 @@ export const renderSurveyResultsSyncStatusPanel = ({
                 style={miniProgressStyle}
                 className={styles.miniProgress}
               />
-              <div className={styles.miniBarFraction}>{responseBarText}</div>
+              <div className={styles.miniBarFraction}>
+                {renderSurveyResultsSyncBarText(
+                  responseBarText,
+                  showResponseRemainingSpinner,
+                  remainingSpinnerStyle
+                )}
+              </div>
             </>
           )}
         </div>
@@ -139,10 +174,9 @@ export const renderSurveyResultsSyncStatusPanel = ({
 type SurveyResultsFilterSummaryArgs = {
   displayedTotalQuestionsCount: number;
   displayedTotalResponsesCount: number;
-  normalizedFilteredQuestionsCount: number;
-  normalizedFilteredResponsesCount: number;
-  filterLoading: boolean;
-  areSummaryCountsHydrated: boolean;
+  normalizedFilteredQuestionsCount: React.ReactNode;
+  normalizedFilteredResponsesCount: React.ReactNode;
+  showFilteredCountSpinner: boolean;
 };
 
 export const renderSurveyResultsFilterSummary = ({
@@ -150,14 +184,13 @@ export const renderSurveyResultsFilterSummary = ({
   displayedTotalResponsesCount,
   normalizedFilteredQuestionsCount,
   normalizedFilteredResponsesCount,
-  filterLoading,
-  areSummaryCountsHydrated,
+  showFilteredCountSpinner,
 }: SurveyResultsFilterSummaryArgs) => (
   <div className={styles.filterSummaryBox}>
     <p className={styles.filterSummaryText}>
       Questions: <strong>{displayedTotalQuestionsCount}</strong> ‎  Filtered:{' '}
       <strong>
-        {filterLoading || !areSummaryCountsHydrated ? (
+        {showFilteredCountSpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
           normalizedFilteredQuestionsCount
@@ -166,7 +199,7 @@ export const renderSurveyResultsFilterSummary = ({
       <br />
       Responses: <strong>{displayedTotalResponsesCount}</strong> ‎  Filtered:{' '}
       <strong>
-        {filterLoading || !areSummaryCountsHydrated ? (
+        {showFilteredCountSpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
           normalizedFilteredResponsesCount

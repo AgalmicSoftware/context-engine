@@ -1,4 +1,12 @@
-type GateDetailRecord = Record<string, any>;
+type GateDetailRecord = Record<string, unknown>;
+type GateDetailSbt = {
+  address?: unknown;
+  label?: unknown;
+};
+
+const isGateDetailRecord = (value: unknown): value is GateDetailRecord => (
+  !!value && typeof value === 'object'
+);
 
 type BuildLockedQuestionGateDetailsArgs = {
   hiddenMaskedQuestionIds?: unknown;
@@ -83,14 +91,14 @@ export const collectGateSbtAddressesForHydrationFromSources = ({
     addresses.add(getAddress(raw));
   };
   const addGateAddresses = (gate: unknown): void => {
-    const gateRecord = (gate && typeof gate === 'object') ? gate as GateDetailRecord : {};
+    const gateRecord = isGateDetailRecord(gate) ? gate : {};
     [
       ...(Array.isArray(gateRecord.sbtAddresses) ? gateRecord.sbtAddresses : []),
       gateRecord.sbtAddress,
     ].forEach(addAddress);
   };
 
-  const policyRecord = (policy && typeof policy === 'object') ? policy as GateDetailRecord : {};
+  const policyRecord = isGateDetailRecord(policy) ? policy : {};
   const gates = Array.isArray(policyRecord?.gates) ? policyRecord.gates : [];
   gates.forEach(addGateAddresses);
 
@@ -128,14 +136,14 @@ export const buildLockedQuestionGateDetailsFromPool = ({
   const detailsByKey = new Map<string, LockedQuestionGateDetailDraft>();
 
   (Array.isArray(pool) ? pool : []).forEach((question) => {
-    const questionRecord = (question && typeof question === 'object') ? question as GateDetailRecord : {};
+    const questionRecord = isGateDetailRecord(question) ? question : {};
     const questionId = String(questionRecord?.id || '').trim().toLowerCase();
     if (!hiddenIds.has(questionId)) return;
     const gates = getQuestionEncryptionGates(questionRecord);
     const questionSessionSlug = normalizeSessionSlug(questionRecord?.sessionSlug || normalizedSlug);
 
     gates.forEach((gate, gateIndex) => {
-      const gateRecord = (gate && typeof gate === 'object') ? gate : {};
+      const gateRecord = isGateDetailRecord(gate) ? gate : {};
       const sbtAddresses = collectUniqueGateSbtAddresses(gateRecord);
       const configuredLabel = normalizeGateLabelText(
         resolveConfiguredGateLabel({
@@ -204,10 +212,13 @@ export const buildLockedGateRequirementSentence = (
   const labels = Array.from(new Set(
     (Array.isArray(lockedGateDetails) ? lockedGateDetails : [])
       .flatMap((gate) => {
-        const record = (gate && typeof gate === 'object') ? gate as GateDetailRecord : {};
+        const record = isGateDetailRecord(gate) ? gate : {};
         return Array.isArray(record?.sbts) ? record.sbts : [];
       })
-      .map((sbt) => String(sbt?.label || sbt?.address || '').trim())
+      .map((sbt) => {
+        const record = isGateDetailRecord(sbt) ? sbt as GateDetailSbt : {};
+        return String(record.label || record.address || '').trim();
+      })
       .filter(Boolean)
   ));
   if (!labels.length) return '';

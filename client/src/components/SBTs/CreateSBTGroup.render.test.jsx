@@ -50,7 +50,7 @@ describe('CreateSBTGroup render and image authoring', () => {
 
     render(instance.render());
 
-    const panel = document.getElementById(styles.createGroupExpanded);
+    const panel = document.querySelector(`.${styles.createGroupExpanded}`);
     expect(panel).toBeInTheDocument();
     expect(panel).toHaveStyle('--ce-create-group-surface-bg: #11182c');
     expect(screen.getByRole('heading', { name: 'Add to Session' })).toBeInTheDocument();
@@ -319,6 +319,7 @@ describe('CreateSBTGroup render and image authoring', () => {
   });
 
   it('keeps the existing uploaded image when a pasted clipboard image blob is too large', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -369,6 +370,7 @@ describe('CreateSBTGroup render and image authoring', () => {
         'blob:existing-sbt-preview'
       );
       expect(screen.getByText('Image too large (>10MB)')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Image too large (>10MB)');
       expect(instance.state.sbtMinted).toBe(true);
       expect(instance.state.sbtAddress).toBe('0x9999999999999999999999999999999999999999');
       expect(instance.state.currentStep).toBe(4);
@@ -383,10 +385,12 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 
   it('keeps the existing uploaded image when a pasted image URL fails validation', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -431,6 +435,11 @@ describe('CreateSBTGroup render and image authoring', () => {
         'blob:existing-sbt-preview'
       );
       expect(screen.getByText('Invalid image type')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Failed to fetch pasted image via worker:',
+        expect.any(Error)
+      );
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
@@ -438,6 +447,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 
@@ -549,15 +559,15 @@ describe('CreateSBTGroup render and image authoring', () => {
     const scssPath = path.join(__dirname, 'CreateSBTGroup.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(/#createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/);
+    expect(scss).toMatch(/\.createGroupExpanded\s*{[\s\S]*?container-type:\s*inline-size;[\s\S]*?container-name:\s*create-sbt-panel;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tokenInfoTopGrid,[\s\S]*?grid-template-columns:\s*1fr;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*flex-start;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.imageUploadHeader\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
     expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.tagsInlineRow\s*{[\s\S]*?flex-direction:\s*row;[\s\S]*?align-items:\s*center;/);
-    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
-    expect(scss).not.toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*#addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
-    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?#addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
+    expect(scss).toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).not.toMatch(/@mixin\s+tokenInfoNarrowLayout\s*{[\s\S]*?\.fieldLockRow,\s*\.imageUploadHeader,\s*\.tagsInlineRow,\s*\.addDocUrlSection\s*{[\s\S]*?flex-direction:\s*column;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.inlineFieldLockControl\s*{[\s\S]*?order:\s*2;/);
+    expect(scss).toMatch(/@media\s*\(max-width:\s*600px\)\s*{[\s\S]*?\.addDocUrlSection\s*{[\s\S]*?>\s*\.addDocUrlActionButton\s*{[\s\S]*?order:\s*3;[\s\S]*?width:\s*100%;/);
     expect(scss).toMatch(/@container\s+create-sbt-panel\s*\(max-width:\s*820px\)\s*{\s*@include\s+tokenInfoNarrowLayout;/);
   });
 

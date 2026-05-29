@@ -1,4 +1,4 @@
-jest.mock('utilities/logging.js', () => ({
+jest.mock('utilities/logging', () => ({
   __esModule: true,
   createLogger: () => ({
     log: jest.fn(),
@@ -8,7 +8,7 @@ jest.mock('utilities/logging.js', () => ({
     debug: jest.fn(),
     isEnabled: jest.fn(() => false),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('../web3/contractScripts.js', () => {
   const defaultExport = {
@@ -39,7 +39,7 @@ jest.mock('../web3/contractScripts.js', () => {
   };
 });
 
-jest.mock('../../components/MainSite/mainSiteUtils.js', () => ({
+jest.mock('../../components/MainSite/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -66,9 +66,9 @@ jest.mock('../../components/MainSite/mainSiteUtils.js', () => ({
     );
   }),
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
-}), { virtual: true });
+}));
 
-jest.mock('../../components/MainSite/progressHelpers.js', () => ({
+jest.mock('../../components/MainSite/progressHelpers', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(({
     baseFrom = 0,
@@ -92,7 +92,7 @@ jest.mock('../../components/MainSite/progressHelpers.js', () => ({
   SBT_PROGRESS_FINAL_TAIL_BLOCKS: 3,
   SBT_PROGRESS_MIN_INTERVAL_MS: 250,
   shouldCommitThrottledProgress: jest.fn(() => true),
-}), { virtual: true });
+}));
 
 const { createSessionSbtCacheController } = require('./sessionSbtCacheController.js');
 const contractScriptsModule = require('../web3/contractScripts.js');
@@ -102,11 +102,11 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../../components/MainSite/mainSiteUtils.js');
+} = require('../../components/MainSite/mainSiteUtils');
 const {
   mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,
-} = require('../../components/MainSite/progressHelpers.js');
+} = require('../../components/MainSite/progressHelpers');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 

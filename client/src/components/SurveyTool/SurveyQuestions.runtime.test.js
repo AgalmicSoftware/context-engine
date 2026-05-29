@@ -825,6 +825,258 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.submissionComplete).toBe(false);
   });
 
+  it('uses parent pending-count fallback before primary submit dispatch', () => {
+    const events = [];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+    });
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: true,
+      modifiedCount: 2,
+    };
+    subject.getPendingEditStats = undefined;
+    subject.encryptAndUpload = jest.fn(() => {
+      events.push(`encrypt:${subject._submitGuard ? 'guarded' : 'unguarded'}`);
+    });
+
+    subject.handlePrimarySubmitClick();
+
+    expect(events).toEqual(['encrypt:guarded']);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(subject._submitGuard).toBe(true);
+  });
+
+  it('builds Lit encryption options from recipients and wallet provider hooks', () => {
+    const saveKey = jest.fn();
+    const getKey = jest.fn();
+    const resourceAbilityRequests = [{ resource: 'session://edge', ability: 'decrypt' }];
+    const recipients = [{
+      accessControlConditions: [{ contractAddress: '0x1111111111111111111111111111111111111111' }],
+      chain: 'optimismSepolia',
+    }];
+    const subject = new SurveyQuestions({
+      provider: { kind: 'mock-wallet-provider' },
+      litHooks: {
+        saveKey,
+        getKey,
+        litNetwork: 'datil-dev',
+        connectTimeout: 1234,
+        resourceAbilityRequests,
+      },
+    });
+
+    const options = subject.buildLitEncryptionOptionsForRecipients(recipients);
+
+    expect(options).toEqual(expect.objectContaining({
+      saveKey,
+      getKey,
+      accessControlConditions: recipients[0].accessControlConditions,
+      chain: 'optimismSepolia',
+      recipients,
+      litNetwork: 'datil-dev',
+      connectTimeout: 1234,
+      providerLike: subject.props.provider,
+      resourceAbilityRequests,
+    }));
+  });
+
+  it('runs submit success cache write and refresh callbacks through submitted slug boundaries', async () => {
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    const finalSlice = {
+      answers: { q1: { value: 'yes', encrypted: false } },
+      additionalComments: { q1: { value: '', encrypted: false } },
+      importance: {},
+      conviction: {},
+    };
+    const receipt = {
+      blockNumber: 44,
+      transactionHash: `0x${'4'.repeat(64)}`,
+      __ceQuestionResponses: [{
+        questionID: 'q1',
+        answer: { value: 'yes', encrypted: false },
+      }],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responses: [{ questionID: 'q1' }],
+      },
+      __ceSurveyId: '0xsurvey',
+      __ceSubmissionGroupKey: 'submitted-edge',
+    };
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      refreshQuestionResponses,
+      refreshSurveyResponsesByID,
+    });
+    const callbackRuns = [];
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveSessionChainId = jest.fn(() => 84532);
+    subject.getAnsweredQuestionsCount = jest.fn(() => 1);
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue(receipt);
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
+      questionCacheWritten: false,
+      surveyCacheWritten: false,
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      surveyID: '0xsurvey',
+      responses: [{ questionID: 'q1', answer: { value: 'yes' } }],
+    }));
+    subject.invalidateDiffCaches = jest.fn();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function'
+        ? updater(subject.state, subject.props)
+        : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') {
+        callbackRuns.push(Promise.resolve(callback()));
+      }
+      return patch;
+    });
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [finalSlice],
+      editBaseline: {
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      },
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      modifiedCount: 1,
+      encryptedModifiedCount: 0,
+      hasEncryptedChanges: false,
+    };
+
+    await subject.encryptAndUpload();
+    await Promise.all(callbackRuns);
+
+    expect(subject.submitSurveyResponse).toHaveBeenCalledWith(
+      finalSlice,
+      expect.any(Set),
+      expect.objectContaining({
+        account: '0xabc',
+        effectiveDraftSlug: 'edge',
+        surveyId: '0xsurvey',
+      })
+    );
+    expect(subject.clearDraftFor).toHaveBeenCalledWith('q1');
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith({
+      receipt,
+      questionResponses: receipt.__ceQuestionResponses,
+      surveyResponse: receipt.__ceSurveyResponse,
+      surveyId: receipt.__ceSurveyId,
+      submissionSlug: 'submitted-edge',
+    }, expect.objectContaining({
+      account: '0xabc',
+      effectiveDraftSlug: 'edge',
+    }));
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'submitted-edge',
+      responder: '0xabc',
+    });
+    expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
+    expect(subject.state.responseUrl).toBe('/survey/0xsurvey/0xabc?session=submitted-edge');
+    expect(subject._submitGuard).toBe(false);
+  });
+
+  it('runs submit failure status cleanup through the parent wiring', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveSessionChainId = jest.fn(() => 84532);
+    subject.getAnsweredQuestionsCount = jest.fn(() => 1);
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockRejectedValue(new Error('Receipt reverted'));
+    subject.clearDraftFor = jest.fn();
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function'
+        ? updater(subject.state, subject.props)
+        : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: true,
+      submittedSinceLastEdit: true,
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+    };
+    subject._submitGuard = true;
+
+    await subject.encryptAndUpload();
+
+    expect(subject.submitSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(subject.clearDraftFor).not.toHaveBeenCalled();
+    expect(subject.writeSubmittedResponsesToLocalCaches).not.toHaveBeenCalled();
+    expect(subject._submitGuard).toBe(false);
+    expect(subject._activeSubmitAttemptSeq).toBe(0);
+    expect(subject.state).toEqual(expect.objectContaining({
+      isSubmitting: false,
+      submitProgress: 0,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      submissionError: 'Receipt reverted',
+    }));
+  });
+
   it('skips auto-decrypt requeue for unchanged masked payloads after a failed attempt', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

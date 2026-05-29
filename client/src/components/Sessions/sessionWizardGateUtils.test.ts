@@ -43,7 +43,9 @@ describe('sessionWizardGateUtils', () => {
       [{ address: '0xdef' }, { address: '0xabc' }]
     )).toBe(true);
 
-    const value: any = { ai: { models: { fast: { provider: 'openai' } } } };
+    const value: { ai: { models: Record<string, { provider: string }> } } = {
+      ai: { models: { fast: { provider: 'openai' } } },
+    };
     expect(getValueAtPath(value, ['ai', 'models', 'fast', 'provider'])).toBe('openai');
     setValueAtPath(value, ['ai', 'models', 'thinking', 'provider'], 'anthropic');
     expect(value.ai.models.thinking.provider).toBe('anthropic');

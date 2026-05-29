@@ -248,6 +248,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           resolveAnonymousRateIdentity: deps?.resolveAnonymousRateIdentity,
           checkRateLimit: deps?.checkRateLimit,
           dispatchAnonymousRoute: deps?.dispatchAnonymousRoute,
+          storageRoute: deps?.storageRoute,
           readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
           evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
           getSessionSecrets: deps?.getSessionSecrets,

@@ -56,6 +56,22 @@ type UseWhisperResult = {
   getLastRecordingBlob?: () => LastRecording | null | undefined;
 };
 
+type UseWhisperOptions = {
+  apiKey?: string;
+  silenceDetection?: boolean;
+  timeSlice?: number;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig | null;
+  context?: unknown;
+  workerUrl?: string;
+  onTranscriptionUpdate?: (transcript: string) => void;
+  onTranscriptionComplete?: (finalText: string) => void;
+  onError?: (err: unknown) => void;
+  onRecordingStop?: () => void;
+};
+
+type UseWhisperHook = (options?: UseWhisperOptions) => UseWhisperResult;
+
 type AudioInputProps = {
   placeholder?: string;
   updateFunction?: (text: string) => void;
@@ -87,6 +103,8 @@ type AudioInputProps = {
 type PlaceholderStyle = React.CSSProperties & {
   '--placeholder-opacity'?: string;
 };
+
+const useWhisperHook = useWhisper as UseWhisperHook;
 
 const describeError = (err: unknown) => (err instanceof Error ? err.message : err);
 
@@ -254,7 +272,7 @@ const AudioInput = ({
     mediaStreamRef,
     lastRecordingBlobRef,
     getLastRecordingBlob
-  } = (useWhisper as any)({
+  } = useWhisperHook({
     apiKey: '',
     silenceDetection: false,
     timeSlice: 0,
@@ -410,7 +428,7 @@ const AudioInput = ({
         : Date.now();
     if (now - lastDrawRef.current < 33) {
       if (animationRef.current !== null) {
-        animationRef.current = requestAnimationFrame(drawWaveform);
+        animationRef.current = window.requestAnimationFrame(drawWaveform);
       }
       return;
     }
@@ -452,7 +470,7 @@ const AudioInput = ({
 
     // Only continue the loop if we still own the handle
     if (animationRef.current !== null) {
-      animationRef.current = requestAnimationFrame(drawWaveform);
+      animationRef.current = window.requestAnimationFrame(drawWaveform);
     }
   }, []);
 
@@ -464,7 +482,7 @@ const AudioInput = ({
         (typeof document.visibilityState === 'string' && document.visibilityState !== 'visible');
       if (hidden) {
         if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
+          window.cancelAnimationFrame(animationRef.current);
           animationRef.current = null;
         }
         return;
@@ -479,7 +497,7 @@ const AudioInput = ({
 
       if (shouldAnimate && !animationRef.current) {
         lastDrawRef.current = 0;
-        animationRef.current = requestAnimationFrame(drawWaveform);
+        animationRef.current = window.requestAnimationFrame(drawWaveform);
       }
     };
     document.addEventListener('visibilitychange', onVis);
@@ -557,14 +575,14 @@ const AudioInput = ({
       // If we are actively recording, nodes are now ready, and no RAF is running yet,
       // start the animation loop immediately so the waveform appears right away.
       if (
-        isRecordingRef.current &&
-        !isPausedRef.current &&
+        (isRecordingRef.current || isRecording) &&
+        !(isPausedRef.current || isPaused) &&
         analyserRef.current &&
         canvasRef.current &&
         !animationRef.current
       ) {
         lastDrawRef.current = 0;
-        animationRef.current = requestAnimationFrame(drawWaveform);
+        animationRef.current = window.requestAnimationFrame(drawWaveform);
       }
       return !!(analyserRef.current && sourceNodeRef.current);
     } catch (e) {
@@ -574,7 +592,7 @@ const AudioInput = ({
       }
       return false;
     }
-  }, [audioContextRef, mediaStreamRef, sizeCanvasToWrap, drawWaveform]);
+  }, [audioContextRef, mediaStreamRef, sizeCanvasToWrap, drawWaveform, isRecording, isPaused]);
 
   // Waveform lifecycle - attach/detach nodes for the entire session (paused or not)
   useEffect(() => {
@@ -606,7 +624,7 @@ const AudioInput = ({
         resizeListenerAttachedRef.current = false;
       }
       if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+        window.cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
       try {
@@ -636,12 +654,12 @@ const AudioInput = ({
       if (!animationRef.current) {
         // reset throttle timestamp at (re)start to avoid burst
         lastDrawRef.current = 0;
-        animationRef.current = requestAnimationFrame(drawWaveform);
+        animationRef.current = window.requestAnimationFrame(drawWaveform);
       }
     } else {
       // Pause/resume/stop: stop RAF but keep last frame on the canvas
       if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+        window.cancelAnimationFrame(animationRef.current);
         animationRef.current = null;
       }
     }

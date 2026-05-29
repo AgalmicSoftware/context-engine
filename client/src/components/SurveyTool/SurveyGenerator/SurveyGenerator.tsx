@@ -1599,6 +1599,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   );
   const effectiveSurveyTitle = hasUploadedFileSources ? toStr(surveyTitle).trim() : '';
   const hasTypedUrlSource = toStr(additionalUrlInput).trim().length > 0;
+  const hasTranscriptModeInput = toStr(pastedText).trim().length > 0 || hasTypedUrlSource;
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0 || hasTypedUrlSource;
   const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
     ? docSaveSessionLabel
@@ -1611,6 +1612,15 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   useEffect(() => {
     if (isExplorerViewMode) setShowDemoCorpusView(demoSurfaceEnabled);
   }, [isExplorerViewMode, demoSurfaceEnabled]);
+
+  useEffect(() => {
+    if (!hasTranscriptModeInput && transcriptMode) {
+      setTranscriptMode(false);
+      setAudioFile(null);
+      setSummaryMd('');
+      setSummaryCollapsed(true);
+    }
+  }, [hasTranscriptModeInput, transcriptMode]);
 
   const renderExplorerViewMode = () => (
     <div className={styles.viewModeShell} data-testid={E2E_TESTIDS.DATABASE_VIEW_PANEL}>
@@ -1763,18 +1773,20 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               </button>
             </div>
 
-            <div
-              className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
-              onClick={handleTranscriptModeToggle}
-              title="Enable Transcript Mode (Summary + Arweave Upload)"
-              data-testid="transcript-mode-toggle"
-            >
-              <FontAwesomeIcon
-                icon={transcriptMode ? faCheckSquare : faSquare}
-                className={styles.checkboxIcon}
-              />
-              <span>Transcript</span>
-            </div>
+            {hasTranscriptModeInput && (
+              <div
+                className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
+                onClick={handleTranscriptModeToggle}
+                title="Enable Transcript Mode (Summary + Arweave Upload)"
+                data-testid="transcript-mode-toggle"
+              >
+                <FontAwesomeIcon
+                  icon={transcriptMode ? faCheckSquare : faSquare}
+                  className={styles.checkboxIcon}
+                />
+                <span>Transcript</span>
+              </div>
+            )}
 
             {transcriptMode && (
               <div

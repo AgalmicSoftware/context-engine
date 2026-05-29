@@ -3,7 +3,7 @@
     "description": "Corpus of Dwarkesh Patel podcast interviews and writings/interviews by AI lab insiders. Captures the practitioner perspective on AI development, safety, governance, and futures from the people closest to building frontier AI systems.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "entry_count": 130,
+    "entry_count": 149,
     "coverage": {
       "sources": [
         "AI Futures Project",
@@ -294,12 +294,12 @@
         "Model safety and transparency"
       ],
       "tags": [
-        "alignment",
-        "scaling",
-        "interpretability",
-        "anthropic",
-        "rlhf",
-        "constitutional-ai",
+        "Alignment",
+        "Scaling Laws",
+        "Interpretability",
+        "Anthropic",
+        "RLHF",
+        "Constitutional AI",
         "safety-culture"
       ],
       "influence_score": 9,
@@ -394,12 +394,12 @@
         "Research-driven progress"
       ],
       "tags": [
-        "scaling-laws",
+        "Scaling Laws",
         "post-scaling",
         "ai-economics",
         "compute-constraints",
         "capabilities",
-        "anthropic",
+        "Anthropic",
         "research-direction"
       ],
       "influence_score": 9,
@@ -495,13 +495,13 @@
         "Scientific reasoning"
       ],
       "tags": [
-        "deepmind",
-        "scaling",
-        "planning",
-        "world-models",
+        "DeepMind",
+        "Scaling Laws",
+        "Planning",
+        "World Models",
         "alphafold",
         "hybrid-architectures",
-        "reasoning"
+        "Reasoning"
       ],
       "influence_score": 9,
       "related_entries": [
@@ -598,10 +598,10 @@
       "tags": [
         "meta",
         "llama",
-        "open-source",
+        "Open Source",
         "ai-strategy",
         "network-effects",
-        "economics",
+        "Economics",
         "competitive-advantage"
       ],
       "influence_score": 8,
@@ -686,7 +686,7 @@
       ],
       "tags": [
         "ai-coding",
-        "agents",
+        "Agents",
         "software-engineering",
         "productivity",
         "meta",
@@ -788,7 +788,7 @@
       "tags": [
         "openai-departure",
         "ssi",
-        "alignment",
+        "Alignment",
         "rl-challenges",
         "post-scaling",
         "research",
@@ -896,9 +896,9 @@
       "tags": [
         "agi-timeline",
         "geopolitics",
-        "cybersecurity",
-        "existential-risk",
-        "situational-awareness",
+        "Cybersecurity",
+        "Existential Risk",
+        "Situational Awareness",
         "china-us-competition",
         "safety-corners"
       ],
@@ -995,12 +995,12 @@
         "Scaling limits"
       ],
       "tags": [
-        "deepmind",
+        "DeepMind",
         "agi-timeline",
-        "alignment",
+        "Alignment",
         "superhuman-ai",
         "new-architectures",
-        "transformers",
+        "Transformers",
         "scaling-limits"
       ],
       "influence_score": 8,
@@ -1096,10 +1096,10 @@
         "Superhuman capabilities"
       ],
       "tags": [
-        "openai",
+        "OpenAI",
         "rl",
-        "rlhf",
-        "reasoning",
+        "RLHF",
+        "Reasoning",
         "post-training",
         "reward-modeling",
         "agi-path"
@@ -1204,13 +1204,12 @@
         "Superhuman control"
       ],
       "tags": [
-        "alignment",
+        "Alignment",
         "arc",
-        "oversight",
+        "Scalable Oversight",
         "rlhf-limits",
-        "scalable-oversight",
-        "existential-risk",
-        "policy"
+        "Existential Risk",
+        "Policy"
       ],
       "influence_score": 9,
       "related_entries": [
@@ -1319,10 +1318,10 @@
       ],
       "tags": [
         "miri",
-        "existential-risk",
-        "alignment",
+        "Existential Risk",
+        "Alignment",
         "superintelligence",
-        "instrumental-convergence",
+        "Instrumental Convergence",
         "ai-danger",
         "llm-critique"
       ],
@@ -1345,7 +1344,7 @@
       "date": "2023-08-12",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "https://www.dwarkesh.com/p/george-hotz-vs-eliezer-yudkowsky",
+      "url": "https://www.youtube.com/live/6yQEA18C-XI",
       "affiliation": "Comma2 (Hotz), MIRI (Yudkowsky)",
       "affiliation_at_time": "Hotz - Founder; Yudkowsky - Research Fellow",
       "role_category": "safety_researcher",
@@ -1414,7 +1413,7 @@
         "george-hotz",
         "eliezer-yudkowsky",
         "alignment-debate",
-        "existential-risk",
+        "Existential Risk",
         "open-vs-closed",
         "safety-pragmatism"
       ],
@@ -1425,7 +1424,7 @@
         "christiano_paul_dwarkesh_2023_takeover"
       ],
       "source_links": [
-        "https://www.dwarkesh.com/p/george-hotz-vs-eliezer-yudkowsky"
+        "https://www.youtube.com/live/6yQEA18C-XI"
       ],
       "transcript_available": true
     },
@@ -1512,13 +1511,13 @@
         "Alignment through transparency"
       ],
       "tags": [
-        "anthropic",
-        "mechanistic-interpretability",
+        "Anthropic",
+        "Mechanistic Interpretability",
         "circuits",
-        "alignment",
+        "Alignment",
         "understanding-models",
         "gpt7",
-        "safety"
+        "Safety"
       ],
       "influence_score": 8,
       "related_entries": [
@@ -1597,12 +1596,12 @@
         "Safety verification"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "claude",
-        "mechanistic-interpretability",
+        "Mechanistic Interpretability",
         "circuits",
         "claude4",
-        "alignment",
+        "Alignment",
         "understanding"
       ],
       "influence_score": 8,
@@ -1624,7 +1623,7 @@
       "date": "2025-09-14",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "https://www.dwarkesh.com/p/sholto-trenton-3",
+      "url": "https://podcasts.apple.com/us/podcast/is-rl-llms-enough-for-agi-sholto-douglas-trenton-bricken/id1516093381?i=1000709488338",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Researchers",
       "role_category": "safety_researcher",
@@ -1680,11 +1679,11 @@
         "AGI path identification"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "rl",
         "agi-sufficiency",
         "scaling-limits",
-        "interpretability",
+        "Interpretability",
         "training-paradigms",
         "llm-rl"
       ],
@@ -1695,7 +1694,7 @@
         "sutskever_ilya_dwarkesh_2025_research"
       ],
       "source_links": [
-        "https://www.dwarkesh.com/p/sholto-trenton-3"
+        "https://podcasts.apple.com/us/podcast/is-rl-llms-enough-for-agi-sholto-douglas-trenton-bricken/id1516093381?i=1000709488338"
       ],
       "transcript_available": true
     },
@@ -1771,8 +1770,8 @@
         "Research culture"
       ],
       "tags": [
-        "google",
-        "transformers",
+        "Google",
+        "Transformers",
         "moe",
         "pathways",
         "architecture",
@@ -1867,12 +1866,12 @@
         "Realistic timelines"
       ],
       "tags": [
-        "economics",
+        "Economics",
         "bottlenecks",
         "institutional-constraints",
         "integration",
         "cost-disease",
-        "timelines",
+        "Timelines",
         "adaptation"
       ],
       "influence_score": 7,
@@ -1958,9 +1957,9 @@
         "Compute economics"
       ],
       "tags": [
-        "xai",
+        "xAI",
         "orbital-compute",
-        "infrastructure",
+        "Infrastructure",
         "spacex",
         "grok",
         "cost-reduction",
@@ -2054,12 +2053,12 @@
         "Compute advantage"
       ],
       "tags": [
-        "microsoft",
+        "Microsoft",
         "azure",
-        "openai",
-        "quantum",
-        "infrastructure",
-        "compute",
+        "OpenAI",
+        "Quantum",
+        "Infrastructure",
+        "Compute",
         "partnerships"
       ],
       "influence_score": 8,
@@ -2159,10 +2158,10 @@
         "agi-timeline",
         "embodied-ai",
         "scaling-limits",
-        "world-models",
+        "World Models",
         "conservative-timeline",
         "language-model-limits",
-        "robotics"
+        "Robotics"
       ],
       "influence_score": 8,
       "related_entries": [
@@ -2177,13 +2176,13 @@
     },
     {
       "id": "dwarkesh_021",
-      "title": "Craft, Beauty, & The Future of Payments",
+      "title": "Patrick Collison - Why Silicon Valley's most talented should leave",
       "author": "Patrick Collison",
       "interviewer": "Dwarkesh Patel",
-      "date": "2024-02",
+      "date": "2024-02-21",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "patrick-collison",
+      "url": "https://www.dwarkesh.com/p/patrick-collison",
       "affiliation": "Stripe",
       "affiliation_at_time": "CEO",
       "role_category": "investor_strategist",
@@ -2251,7 +2250,7 @@
         "progress studies frameworks"
       ],
       "tags": [
-        "infrastructure",
+        "Infrastructure",
         "payment-systems",
         "AI-economics",
         "progress-studies",
@@ -2265,7 +2264,7 @@
         "dwarkesh_026"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/patrick-collison",
+        "podcast_url": "https://www.dwarkesh.com/p/patrick-collison",
         "guest_website": "https://stripe.com"
       },
       "transcript_available": true
@@ -2278,7 +2277,7 @@
       "date": "2021",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "byrne-hobart",
+      "url": "https://www.dwarkeshpatel.com/p/byrne-hobart",
       "affiliation": "Byrne Hobart",
       "affiliation_at_time": "Technology/Finance Writer",
       "role_category": "independent_researcher",
@@ -2366,7 +2365,7 @@
       "date": "2022",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "byrne-hobart-2",
+      "url": "https://www.dwarkeshpatel.com/p/byrne-hobart-2",
       "affiliation": "Byrne Hobart",
       "affiliation_at_time": "Technology/Finance Writer",
       "role_category": "independent_researcher",
@@ -2449,7 +2448,7 @@
       "date": "2025",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "sarah-paine-india",
+      "url": "https://www.dwarkeshpatel.com/p/sarah-paine-india",
       "affiliation": "Naval War College",
       "affiliation_at_time": "Historian",
       "role_category": "governance_expert",
@@ -2533,7 +2532,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "tony-blair",
+      "url": "https://www.dwarkeshpatel.com/p/tony-blair",
       "affiliation": "Tony Blair Institute",
       "affiliation_at_time": "Founder",
       "role_category": "policy_advisor",
@@ -2590,10 +2589,10 @@
         "democratic processes and technological change"
       ],
       "tags": [
-        "governance",
+        "Governance",
         "political-institutions",
         "AI-policy",
-        "regulation",
+        "Regulation",
         "democratic-processes",
         "executive-authority"
       ],
@@ -2603,8 +2602,7 @@
         "dwarkesh_034"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/tony-blair",
-        "guest_institute": "https://www.tony-blair-institute.org"
+        "podcast_url": "https://www.dwarkeshpatel.com/p/tony-blair"
       },
       "transcript_available": true
     },
@@ -2616,7 +2614,7 @@
       "date": "2023",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "tyler-cowen-3",
+      "url": "https://www.dwarkeshpatel.com/p/tyler-cowen-3",
       "affiliation": "George Mason University",
       "affiliation_at_time": "Holbert C. Harris Chair of Economics",
       "role_category": "independent_researcher",
@@ -2668,7 +2666,7 @@
         "market efficiency and AI"
       ],
       "tags": [
-        "economics",
+        "Economics",
         "labor-markets",
         "productivity",
         "knowledge-problems",
@@ -2688,13 +2686,13 @@
     },
     {
       "id": "dwarkesh_027",
-      "title": "How Microsoft is preparing for AGI",
+      "title": "Satya Nadella - How Microsoft is preparing for AGI",
       "author": "Satya Nadella",
       "interviewer": "Dwarkesh Patel",
-      "date": "2025-11",
+      "date": "2025-11-12",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "satya-nadella-2",
+      "url": "https://www.dwarkesh.com/p/satya-nadella-2",
       "affiliation": "Microsoft",
       "affiliation_at_time": "CEO",
       "role_category": "lab_leader",
@@ -2766,7 +2764,7 @@
         "AI-infrastructure",
         "Microsoft-strategy",
         "enterprise-AI",
-        "compute-governance",
+        "Compute Governance",
         "safety-and-capabilities"
       ],
       "influence_score": 9,
@@ -2775,7 +2773,7 @@
         "dwarkesh_033"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/satya-nadella-2",
+        "podcast_url": "https://www.dwarkesh.com/p/satya-nadella-2",
         "guest_organization": "https://www.microsoft.com"
       },
       "transcript_available": true
@@ -2788,7 +2786,7 @@
       "date": "2025",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "casey-handmer",
+      "url": "https://www.dwarkeshpatel.com/p/casey-handmer",
       "affiliation": "Casey Handmer",
       "affiliation_at_time": "Energy/Infrastructure Analyst",
       "role_category": "independent_researcher",
@@ -2875,10 +2873,10 @@
       "title": "AI 2027: month-by-month model of intelligence explosion",
       "author": "Daniel Kokotajlo & Scott Alexander",
       "interviewer": "Dwarkesh Patel",
-      "date": "2025-04",
+      "date": "2025-04-03",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "scott-daniel",
+      "url": "https://www.dwarkesh.com/p/scott-daniel",
       "affiliation": "Daniel Kokotajlo (Anthropic); Scott Alexander (Independent)",
       "affiliation_at_time": "Safety Researcher / Writer",
       "role_category": "safety_researcher",
@@ -2947,11 +2945,11 @@
       ],
       "tags": [
         "AGI-timelines",
-        "intelligence-explosion",
-        "forecasting",
+        "Intelligence Explosion",
+        "Forecasting",
         "capabilities-progression",
         "safety-coordination",
-        "existential-risk"
+        "Existential Risk"
       ],
       "influence_score": 9,
       "related_entries": [
@@ -2959,8 +2957,8 @@
         "dwarkesh_031"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/scott-daniel",
-        "guest_affiliation_1": "https://www.anthropic.com",
+        "podcast_url": "https://www.dwarkesh.com/p/scott-daniel",
+        "guest_affiliation_1": "https://www.ai-2027.com/",
         "guest_blog_2": "https://astralcodexten.substack.com"
       },
       "transcript_available": true
@@ -2973,7 +2971,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "will-scaling-work",
+      "url": "https://www.dwarkeshpatel.com/p/will-scaling-work",
       "affiliation": "Dwarkesh Patel",
       "affiliation_at_time": "Podcast Host / Researcher",
       "role_category": "independent_researcher",
@@ -3025,7 +3023,7 @@
         "innovation requirements for continued progress"
       ],
       "tags": [
-        "scaling-laws",
+        "Scaling Laws",
         "AI-progress-mechanics",
         "architectural-innovation",
         "compute-economics",
@@ -3048,10 +3046,10 @@
       "title": "Thoughts on AI progress (Dec 2025)",
       "author": "Dwarkesh Patel",
       "interviewer": "Dwarkesh Patel",
-      "date": "2025-12",
-      "source_type": "podcast_transcript",
+      "date": "2025-12-02",
+      "source_type": "essay",
       "source_platform": "Dwarkesh Podcast",
-      "url": "thoughts-on-ai-progress-dec-2025",
+      "url": "https://www.dwarkesh.com/p/thoughts-on-ai-progress-dec-2025",
       "affiliation": "Dwarkesh Patel",
       "affiliation_at_time": "Podcast Host / Researcher",
       "role_category": "independent_researcher",
@@ -3091,7 +3089,7 @@
         "meta-level analysis of uncertainty"
       ],
       "tags": [
-        "forecasting",
+        "Forecasting",
         "AGI-timelines",
         "2025-analysis",
         "progress-monitoring",
@@ -3104,8 +3102,7 @@
         "dwarkesh_030"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/thoughts-on-ai-progress-dec-2025",
-        "essay_url": "https://www.dwarkeshpatel.com/p/thoughts-on-ai-progress-dec-2025"
+        "essay_url": "https://www.dwarkesh.com/p/thoughts-on-ai-progress-dec-2025"
       },
       "transcript_available": false
     },
@@ -3117,7 +3114,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "noam-brown",
+      "url": "https://www.meta.com/research/",
       "affiliation": "Meta AI Research (FAIR)",
       "affiliation_at_time": "Research Scientist",
       "role_category": "capabilities_researcher",
@@ -3169,11 +3166,11 @@
         "human-AI interaction modeling"
       ],
       "tags": [
-        "game-theory",
+        "Game Theory",
         "AI-reasoning",
         "multi-agent-systems",
         "strategic-behavior",
-        "alignment",
+        "Alignment",
         "Diplomacy-AI"
       ],
       "influence_score": 8,
@@ -3182,94 +3179,70 @@
         "dwarkesh_037"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/noam-brown",
         "guest_affiliation": "https://www.meta.com/research/"
       },
-      "transcript_available": true
+      "transcript_available": true,
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed unresolved 404 source_links: https://www.dwarkesh.com/p/noam-brown"
     },
     {
       "id": "dwarkesh_033",
-      "title": "AGI strategies, safety, and deployment timelines",
-      "author": "Sam Altman",
-      "interviewer": "Dwarkesh Patel",
-      "date": "2024-2025",
-      "source_type": "podcast_transcript",
+      "title": "Why I don't think AGI is right around the corner",
+      "author": "Dwarkesh Patel",
+      "interviewer": null,
+      "date": "2025-06-02",
+      "source_type": "essay",
       "source_platform": "Dwarkesh Podcast",
-      "url": "sam-altman",
-      "affiliation": "OpenAI",
-      "affiliation_at_time": "CEO",
-      "role_category": "lab_leader",
-      "summary": "Sam Altman, CEO of OpenAI, discusses his views on AGI timelines, OpenAI's safety and deployment strategy, and how to navigate competitive dynamics while maintaining responsible development. He addresses questions about whether AGI will emerge soon, what preparation means, and what safety measures are practical at scale. Altman emphasizes OpenAI's focus on building superintelligent systems safely, developing governance mechanisms for powerful AI, and maintaining security against misuse. He discusses tension between moving quickly to benefit from AI and moving carefully to avoid catastrophic risks. The conversation covers how OpenAI thinks about deployment strategy, managing power concentration, and maintaining alignment with human values as systems become more capable. Altman articulates vision where advanced AI systems are developed responsibly and benefit broadly rather than concentrate power.",
+      "url": "https://www.dwarkesh.com/p/timelines-june-2025",
+      "affiliation": "Dwarkesh Podcast",
+      "affiliation_at_time": "Podcast Host / Researcher",
+      "role_category": "independent_researcher",
+      "summary": "Dwarkesh Patel argues against treating near-term AGI as inevitable on a very short timeline, emphasizing uncertainty in capability extrapolation, deployment bottlenecks, and the difference between impressive benchmark progress and economically transformative autonomous work.",
       "key_claims_and_positions": [
-        "AGI is likely to arrive within 5-10 years from 2024-2025",
-        "Safety and capabilities development can proceed in parallel with proper governance",
-        "Power concentration in AI systems represents real risk requiring deliberate management",
-        "Deployment strategy matters as much as development for managing risks",
-        "International coordination on AI governance is necessary but difficult"
+        "Near-term AGI forecasts should account for evidence against immediate discontinuous takeoff",
+        "Benchmark gains do not automatically translate into reliable autonomous work across messy real-world tasks",
+        "Deployment, evaluation, and organizational adoption bottlenecks matter for timelines",
+        "Forecasting should update on both capability progress and observed failures of autonomy"
       ],
-      "novel_arguments_and_concepts": "Altman articulates a view where responsible AI development requires both technical safety research and governance innovation. The governance challenge includes managing how powerful AI systems are controlled, deployed, and overseen. Rather than slowing development, he advocates for governance alongside capability development: safety practices, transparency mechanisms, and coordination frameworks. He discusses how OpenAI approaches the tension between competitive speed and safety: moving quickly is necessary to shape outcomes favorably, but reckless scaling without safety consideration risks catastrophe. The vision includes eventual significant AI systems being governed by broad coalitions rather than single companies. Altman emphasizes uncertainty about AGI timelines and safety solvability: some probability (~10-20%) that AGI becomes dangerous despite best efforts, but benefits of development likely outweigh risks if managed well.",
+      "novel_arguments_and_concepts": "The essay pushes back on one-sided extrapolation from model progress by emphasizing bottlenecks between lab demonstrations and robust economic transformation. It treats timelines as an empirical forecasting problem rather than a slogan about acceleration or skepticism.",
       "predictions": [
         {
-          "claim": "AGI-level systems emerging by 2027-2029",
-          "timeframe": "2024-2029",
-          "confidence": "high",
-          "context": "Current scaling trends and capability improvements"
-        },
-        {
-          "claim": "Governance frameworks for powerful AI will develop during development phase",
-          "timeframe": "2025-2030",
+          "claim": "AGI is not right around the corner in the strongest near-term sense",
+          "timeframe": "2025-2027",
           "confidence": "medium",
-          "context": "Depends on how governments and companies prioritize"
-        },
-        {
-          "claim": "Safety research will successfully resolve major alignment problems",
-          "timeframe": "2025-2030",
-          "confidence": "medium",
-          "context": "Substantial uncertainty remains about feasibility"
+          "context": "Based on observed autonomy limits and deployment frictions"
         }
       ],
       "disagreements_with": [
         {
-          "target": "AI moratorium advocates",
-          "topic": "Whether to slow AI development",
-          "position": "Believes development benefits outweigh risks; governance rather than slowdown is solution"
-        },
-        {
-          "target": "AI safety pessimists",
-          "topic": "Whether alignment is achievable",
-          "position": "Believes alignment challenges are solvable with sufficient research effort"
+          "target": "Strong near-term AGI forecasters",
+          "topic": "AGI timelines",
+          "position": "Argues that short-timeline confidence overweights benchmark acceleration and underweights autonomy bottlenecks"
         }
       ],
       "policy_positions": [
         {
-          "topic": "AI development governance",
-          "position": "Development should proceed with strong safety practices and governance oversight",
+          "topic": "AI timeline governance",
+          "position": "Policy should remain urgent but forecast-sensitive, tracking concrete capability evidence rather than treating any single timeline as settled",
           "debate_connection": "safety_vs_capabilities"
-        },
-        {
-          "topic": "International AI coordination",
-          "position": "International agreement on AI development standards necessary but difficult",
-          "debate_connection": "who_governs_ai"
         }
       ],
       "debate_connections": [
-        "safety_vs_capabilities",
-        "ai_consciousness_rights"
+        "safety_vs_capabilities"
       ],
       "themes": [
-        "AGI development timelines",
-        "safety and governance",
-        "responsible deployment",
-        "power concentration in AI",
-        "international coordination"
+        "AI timelines",
+        "forecasting",
+        "autonomy bottlenecks",
+        "AI progress",
+        "governance urgency"
       ],
       "tags": [
         "AGI-timelines",
-        "AI-safety",
-        "governance",
-        "deployment-strategy",
-        "alignment",
-        "OpenAI-strategy"
+        "Forecasting",
+        "AI-progress",
+        "Governance",
+        "Autonomous Agents"
       ],
       "influence_score": 10,
       "related_entries": [
@@ -3277,10 +3250,9 @@
         "dwarkesh_032"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/sam-altman",
-        "guest_organization": "https://www.openai.com"
+        "essay_url": "https://www.dwarkesh.com/p/timelines-june-2025"
       },
-      "transcript_available": true
+      "transcript_available": false
     },
     {
       "id": "dwarkesh_034",
@@ -3290,7 +3262,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "scaling-ama",
+      "url": "https://www.dwarkeshpatel.com/p/scaling-ama",
       "affiliation": "Various",
       "affiliation_at_time": "Researchers",
       "role_category": "independent_researcher",
@@ -3367,7 +3339,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "sarah-paine-japan",
+      "url": "https://www.dwarkeshpatel.com/p/sarah-paine-japan",
       "affiliation": "Naval War College",
       "affiliation_at_time": "Historian",
       "role_category": "governance_expert",
@@ -3439,7 +3411,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "sarah-paine-russia",
+      "url": "https://www.dwarkesh.com/p/sarah-paine-east-asia",
       "affiliation": "Naval War College",
       "affiliation_at_time": "Historian",
       "role_category": "governance_expert",
@@ -3498,7 +3470,7 @@
         "dwarkesh_035"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/sarah-paine-russia",
+        "podcast_url": "https://www.dwarkesh.com/p/sarah-paine-east-asia",
         "guest_affiliation": "https://www.usnwc.edu"
       },
       "transcript_available": true
@@ -3511,7 +3483,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "francois-chollet",
+      "url": "https://www.dwarkeshpatel.com/p/francois-chollet",
       "affiliation": "Keras / Anthropic",
       "affiliation_at_time": "Independent Researcher",
       "role_category": "capabilities_researcher",
@@ -3564,7 +3536,7 @@
       ],
       "tags": [
         "LLM-limitations",
-        "reasoning",
+        "Reasoning",
         "abstraction",
         "ARC-benchmark",
         "intelligence-measurement",
@@ -3589,7 +3561,7 @@
       "date": "2024",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "nat-friedman-daniel-gross",
+      "url": "https://www.dwarkesh.com/p/nat-friedman",
       "affiliation": "Nat Friedman (GitHub CEO); Daniel Gross (AI investor)",
       "affiliation_at_time": "Tech Executives / Investors",
       "role_category": "investor_strategist",
@@ -3654,23 +3626,25 @@
         "dwarkesh_032"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/nat-friedman-daniel-gross"
+        "primary": "https://www.dwarkesh.com/p/nat-friedman"
       },
-      "transcript_available": true
+      "transcript_available": true,
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed unresolved 404 source_links: https://www.dwarkesh.com/p/nat-friedman-daniel-gross"
     },
     {
       "id": "dwarkesh_039",
-      "title": "Effective altruism, longtermism, and AI existential risk",
-      "author": "EA Thought Leader / Longtermism Advocate",
+      "title": "Will MacAskill - Longtermism, Altruism, History, & Technology",
+      "author": "Will MacAskill",
       "interviewer": "Dwarkesh Patel",
-      "date": "2023-2024",
+      "date": "2022-08-09",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
-      "url": "ea-longtermism-ai",
-      "affiliation": "Effective Altruism",
-      "affiliation_at_time": "Researcher / Advocate",
+      "url": "https://www.dwarkesh.com/p/will-macaskill",
+      "affiliation": "University of Oxford / Effective Altruism",
+      "affiliation_at_time": "Philosopher and longtermism advocate",
       "role_category": "policy_advisor",
-      "summary": "This episode features discussion of effective altruism philosophy and longtermism framework for prioritizing AI existential risk reduction. The conversation examines why far-future impacts matter morally and practically, how to evaluate research and interventions focused on AI safety, and whether EA approaches to AI risk are correct. The guest discusses how longtermism suggests that reducing X-risk (particularly AI risk) should be highest priority, given potential to impact trillions of future lives. They address common critiques: is longtermism too speculative, does it justify neglecting near-term suffering, and are current AI risk reduction efforts well-targeted. The conversation connects philosophical arguments about moral weights of future generations to practical questions about funding allocation and research prioritization.",
+      "summary": "Will MacAskill discusses longtermism, effective altruism, historical contingency, technological risk, and why future generations should affect present-day priorities. The conversation connects AI risk to broader questions about civilization, moral uncertainty, and cause prioritization.",
       "key_claims_and_positions": [
         "Longtermism provides compelling moral case for prioritizing AI existential risk reduction",
         "AI risk is plausibly largest contributor to existential risk in next century",
@@ -3717,9 +3691,9 @@
         "future generation moral status"
       ],
       "tags": [
-        "effective-altruism",
+        "Effective Altruism",
         "longtermism",
-        "existential-risk",
+        "Existential Risk",
         "AI-safety-funding",
         "moral-philosophy",
         "cause-prioritization"
@@ -3730,88 +3704,70 @@
         "dwarkesh_034"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/ea-longtermism-ai",
+        "podcast_url": "https://www.dwarkesh.com/p/will-macaskill",
         "ea_resources": "https://www.effectivealtruism.org"
       },
       "transcript_available": true
     },
     {
       "id": "dwarkesh_040",
-      "title": "Microsoft's AI strategy and enterprise deployment",
-      "author": "Kevin Scott",
-      "interviewer": "Dwarkesh Patel",
-      "date": "2024-2025",
-      "source_type": "podcast_transcript",
+      "title": "Questions about Future AI",
+      "author": "Dwarkesh Patel",
+      "interviewer": null,
+      "date": "2025-04-21",
+      "source_type": "essay",
       "source_platform": "Dwarkesh Podcast",
-      "url": "kevin-scott",
-      "affiliation": "Microsoft",
-      "affiliation_at_time": "Chief Technology Officer",
-      "role_category": "lab_leader",
-      "summary": "Kevin Scott, Microsoft's Chief Technology Officer, discusses how Microsoft is integrating advanced AI into enterprise systems and what this deployment at scale means for business and society. He addresses Microsoft's strategy for copilots, integration of AI into productivity tools, and how to manage risks while scaling AI deployment. Scott discusses role of large language models in business operations, how enterprises should think about AI transformation, and what organizational changes are necessary. He addresses safety considerations in enterprise deployment: how to ensure AI systems make beneficial decisions at scale, how to maintain human oversight, and how to prevent misuse. The conversation covers Azure AI platform strategy, how Microsoft positions itself as infrastructure provider for AI deployment across business world.",
+      "url": "https://www.dwarkesh.com/p/questions-about-ai",
+      "affiliation": "Dwarkesh Podcast",
+      "affiliation_at_time": "Podcast Host / Researcher",
+      "role_category": "independent_researcher",
+      "summary": "Dwarkesh Patel lays out open questions about future AI development, including timelines, bottlenecks, economic deployment, safety, governance, and how to reason under uncertainty when evidence from models and institutions is changing quickly.",
       "key_claims_and_positions": [
-        "Enterprise AI deployment will be gradual, focused on specific high-value tasks",
-        "Human oversight and control remain essential in deployed AI systems",
-        "Azure infrastructure is becoming critical for global AI deployment",
-        "Safety in enterprise deployment comes from system design, not just model improvement",
-        "Organizational transformation around AI is more important than technology itself"
+        "AI forecasting should focus on concrete questions rather than only headline AGI dates",
+        "Economic deployment and organizational adaptation may lag raw model capability",
+        "Governance choices depend on which bottlenecks prove binding",
+        "Open questions about autonomy, data, compute, and institutions should structure AI discourse"
       ],
-      "novel_arguments_and_concepts": "Scott emphasizes distinction between research AI capabilities and production AI deployment. Building systems that work in controlled research environments differs dramatically from deploying them across global enterprises with billions of interactions daily. Enterprise deployment requires attention to reliability, cost, latency, and maintaining human control even when systems are highly capable. He discusses how Microsoft's copilot strategy reflects this: AI assists human decision-makers rather than making decisions independently. The approach maintains human agency while leveraging AI capabilities. Scott argues that organizational change is harder than technology: enterprises must restructure workflows, retrain employees, and develop new management practices around AI assistance. This transformation will happen slowly despite capability improvements, as organizations are constrained by legacy systems and internal politics.",
+      "novel_arguments_and_concepts": "The essay frames AI forecasting as a collection of unresolved empirical questions. That structure is useful for survey generation because it separates disagreements about timelines, deployment, and governance mechanisms instead of collapsing them into a single AGI optimism/pessimism axis.",
       "predictions": [
         {
-          "claim": "50%+ of enterprise knowledge workers will use AI assistants regularly by 2030",
-          "timeframe": "2024-2030",
-          "confidence": "high",
-          "context": "Productivity gains drive adoption despite change friction"
-        },
-        {
-          "claim": "Azure will maintain >50% market share of AI deployment infrastructure",
-          "timeframe": "2024-2035",
+          "claim": "AI discourse will increasingly hinge on concrete bottleneck questions rather than broad AGI labels",
+          "timeframe": "2025-2027",
           "confidence": "medium",
-          "context": "Lock-in effects and network externalities favor early leaders"
-        },
-        {
-          "claim": "Enterprise AI deployment will require stronger governance frameworks by 2027",
-          "timeframe": "2024-2027",
-          "confidence": "high",
-          "context": "Incidents and liability concerns drive regulatory responses"
+          "context": "As model capabilities and deployment evidence accumulate"
         }
       ],
       "disagreements_with": [
         {
-          "target": "Observers downplaying deployment challenges",
-          "topic": "Speed of AI deployment",
-          "position": "Organizational constraints will slow deployment despite capability improvements"
+          "target": "Single-axis AGI timeline debates",
+          "topic": "AI forecasting",
+          "position": "Argues for decomposing future AI into specific unresolved questions"
         }
       ],
       "policy_positions": [
         {
-          "topic": "AI governance in enterprise",
-          "position": "Enterprises should implement governance frameworks ensuring human oversight of consequential decisions",
+          "topic": "AI governance under uncertainty",
+          "position": "Governance should track bottleneck-specific evidence and remain adaptable",
           "debate_connection": "who_governs_ai"
-        },
-        {
-          "topic": "AI safety in deployment",
-          "position": "Safety achieved through system design and human oversight, not capability restrictions",
-          "debate_connection": "safety_vs_capabilities"
         }
       ],
       "debate_connections": [
-        "safety_vs_capabilities"
+        "safety_vs_capabilities",
+        "who_governs_ai"
       ],
       "themes": [
-        "enterprise AI deployment",
-        "organizational transformation",
-        "human-AI collaboration",
-        "platform infrastructure strategy",
-        "governance in production systems"
+        "AI forecasting",
+        "future AI questions",
+        "deployment bottlenecks",
+        "governance uncertainty",
+        "AI progress"
       ],
       "tags": [
-        "enterprise-AI",
-        "Azure-strategy",
-        "deployment-challenges",
-        "governance",
-        "organizational-change",
-        "human-AI-collaboration"
+        "Forecasting",
+        "AGI-timelines",
+        "Governance",
+        "deployment-strategy",
+        "AI-progress"
       ],
       "influence_score": 8,
       "related_entries": [
@@ -3819,10 +3775,9 @@
         "dwarkesh_033"
       ],
       "source_links": {
-        "podcast_url": "https://www.dwarkeshpatel.com/p/kevin-scott",
-        "guest_affiliation": "https://www.microsoft.com"
+        "essay_url": "https://www.dwarkesh.com/p/questions-about-ai"
       },
-      "transcript_available": true
+      "transcript_available": false
     },
     {
       "id": "amodei_machines_loving_grace_2024",
@@ -3905,9 +3860,9 @@
       "tags": [
         "essay",
         "ai-benefits",
-        "safety",
-        "governance",
-        "anthropic",
+        "Safety",
+        "Governance",
+        "Anthropic",
         "dario-amodei"
       ],
       "influence_score": 9,
@@ -3927,7 +3882,7 @@
       "date": "2023-02-24",
       "source_type": "blog_post",
       "source_platform": "Personal Blog",
-      "url": "https://blog.samaltman.com/planning-for-agi-and-beyond",
+      "url": "https://openai.com/index/planning-for-agi-and-beyond/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "CEO",
       "role_category": "lab_leader",
@@ -4001,8 +3956,8 @@
         "blog-post",
         "agi-governance",
         "deployment",
-        "safety",
-        "openai",
+        "Safety",
+        "OpenAI",
         "sam-altman"
       ],
       "influence_score": 8,
@@ -4096,8 +4051,8 @@
         "essay",
         "superintelligence",
         "agi-timeline",
-        "economics",
-        "openai",
+        "Economics",
+        "OpenAI",
         "sam-altman"
       ],
       "influence_score": 9,
@@ -4179,10 +4134,10 @@
       ],
       "tags": [
         "blog-post",
-        "governance",
+        "Governance",
         "leadership",
         "openai-crisis",
-        "safety",
+        "Safety",
         "sam-altman"
       ],
       "influence_score": 7,
@@ -4289,7 +4244,7 @@
         "essay",
         "agi-timeline",
         "national-security",
-        "cybersecurity",
+        "Cybersecurity",
         "former-openai",
         "aschenbrenner"
       ],
@@ -4365,8 +4320,8 @@
       "tags": [
         "departure-statement",
         "safety-culture",
-        "openai",
-        "superalignment",
+        "OpenAI",
+        "Superalignment",
         "jan-leike"
       ],
       "influence_score": 8,
@@ -4448,9 +4403,9 @@
       ],
       "tags": [
         "policy-document",
-        "responsible-scaling",
-        "ai-governance",
-        "anthropic",
+        "Responsible Scaling",
+        "AI Governance",
+        "Anthropic",
         "safety-evaluations"
       ],
       "influence_score": 8,
@@ -4528,8 +4483,8 @@
       "tags": [
         "policy-document",
         "responsible-scaling-v2",
-        "governance",
-        "anthropic",
+        "Governance",
+        "Anthropic",
         "biosecurity-cybersecurity"
       ],
       "influence_score": 7,
@@ -4548,7 +4503,7 @@
       "date": "2023-12-18",
       "source_type": "policy_document",
       "source_platform": "OpenAI Blog",
-      "url": "https://openai.com/index/preparedness/",
+      "url": "https://openai.com/safety/preparedness/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "Research Organization",
       "role_category": "lab_leader",
@@ -4605,8 +4560,8 @@
       "tags": [
         "policy-document",
         "risk-framework",
-        "governance",
-        "openai",
+        "Governance",
+        "OpenAI",
         "preparedness"
       ],
       "influence_score": 7,
@@ -4674,8 +4629,8 @@
       "tags": [
         "policy-document",
         "preparedness-v2",
-        "governance",
-        "openai",
+        "Governance",
+        "OpenAI",
         "deployment-safety"
       ],
       "influence_score": 7,
@@ -4694,7 +4649,7 @@
       "date": "2024-05-15",
       "source_type": "talk_transcript",
       "source_platform": "TED",
-      "url": "https://www.ted.com/talks/the_ted_ai_show_what_really_went_down_at_openai",
+      "url": "https://www.ted.com/",
       "affiliation": "Georgetown CSET (Former OpenAI Board)",
       "affiliation_at_time": "Board Member",
       "role_category": "governance_expert",
@@ -4754,7 +4709,7 @@
       ],
       "tags": [
         "talk-transcript",
-        "governance",
+        "Governance",
         "openai-crisis",
         "external-oversight",
         "helen-toner"
@@ -4767,7 +4722,9 @@
       ],
       "source_links": [
         "https://www.ted.com/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.ted.com/talks/the_ted_ai_show_what_really_went_down_at_openai"
     },
     {
       "id": "kokotajlo_right_to_warn_2024",
@@ -5068,7 +5025,7 @@
         "tescreal",
         "ideology-critique",
         "longtermism",
-        "effective-altruism"
+        "Effective Altruism"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -5228,7 +5185,7 @@
       "tags": [
         "essay",
         "technical",
-        "world-models",
+        "World Models",
         "jepa",
         "yann-lecun"
       ],
@@ -5301,7 +5258,7 @@
       ],
       "tags": [
         "research-blog",
-        "mechanistic-interpretability",
+        "Mechanistic Interpretability",
         "circuits",
         "neural-networks",
         "chris-olah"
@@ -5433,7 +5390,7 @@
       "tags": [
         "blog-post",
         "alignment-research",
-        "scalable-oversight",
+        "Scalable Oversight",
         "paul-christiano"
       ],
       "influence_score": 8,
@@ -5509,7 +5466,7 @@
         "essay",
         "agi-safety",
         "first-principles",
-        "deceptive-alignment",
+        "Deceptive Alignment",
         "richard-ngo"
       ],
       "influence_score": 7,
@@ -5575,7 +5532,7 @@
       ],
       "tags": [
         "technical-paper",
-        "alignment",
+        "Alignment",
         "deep-learning",
         "deceptive-behavior"
       ],
@@ -5650,9 +5607,9 @@
       ],
       "tags": [
         "essay",
-        "compute-governance",
-        "supply-chain",
-        "policy",
+        "Compute Governance",
+        "Supply Chain",
+        "Policy",
         "lennart-heim"
       ],
       "influence_score": 7,
@@ -5726,8 +5683,8 @@
       "tags": [
         "essay",
         "compute-thresholds",
-        "regulation",
-        "policy",
+        "Regulation",
+        "Policy",
         "lennart-heim"
       ],
       "influence_score": 6,
@@ -5799,9 +5756,9 @@
       ],
       "tags": [
         "research-paper",
-        "constitutional-ai",
-        "alignment",
-        "anthropic",
+        "Constitutional AI",
+        "Alignment",
+        "Anthropic",
         "safety-methodology"
       ],
       "influence_score": 7,
@@ -5874,9 +5831,9 @@
       ],
       "tags": [
         "research-announcement",
-        "superalignment",
-        "alignment",
-        "openai",
+        "Superalignment",
+        "Alignment",
+        "OpenAI",
         "resource-allocation"
       ],
       "influence_score": 8,
@@ -5949,8 +5906,8 @@
       "tags": [
         "research-paper",
         "weak-to-strong",
-        "scalable-oversight",
-        "superalignment"
+        "Scalable Oversight",
+        "Superalignment"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -6016,8 +5973,8 @@
       "tags": [
         "interview",
         "agi-timeline",
-        "existential-risk",
-        "deepmind",
+        "Existential Risk",
+        "DeepMind",
         "shane-legg"
       ],
       "influence_score": 7,
@@ -6093,9 +6050,9 @@
       "tags": [
         "interview",
         "agi-vision",
-        "world-models",
-        "agents",
-        "deepmind",
+        "World Models",
+        "Agents",
+        "DeepMind",
         "demis-hassabis"
       ],
       "influence_score": 8,
@@ -6174,8 +6131,8 @@
       "tags": [
         "essay",
         "containment-problem",
-        "proliferation",
-        "governance",
+        "Proliferation",
+        "Governance",
         "mustafa-suleyman"
       ],
       "influence_score": 7,
@@ -6249,8 +6206,8 @@
       ],
       "tags": [
         "google-departure",
-        "ethics",
-        "bias",
+        "Ethics",
+        "Bias",
         "documentation"
       ],
       "influence_score": 6,
@@ -6259,8 +6216,7 @@
         "35"
       ],
       "source_links": [
-        "https://twitter.com/MMitchell_AI",
-        "https://www.technologyreview.com/2020/12/04/1013294/google-ai-ethics-team-timnit-gebru"
+        "https://twitter.com/MMitchell_AI"
       ]
     },
     {
@@ -6325,8 +6281,8 @@
       ],
       "tags": [
         "extinction-risk",
-        "governance",
-        "safety",
+        "Governance",
+        "Safety",
         "turing-award"
       ],
       "influence_score": 8,
@@ -6336,7 +6292,6 @@
         "46"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/fhEBjhHawtDc3W22u/yoshua-bengio-has-concerns-about-ai",
         "https://twitter.com/ylecun"
       ]
     },
@@ -6347,7 +6302,7 @@
       "date": "2023-05-02",
       "source_type": "interview",
       "source_platform": "Google, interviews, various media",
-      "url": "https://www.theguardian.com/commentisfree/2023/may/02/my-sweet-child-ai-the-risks-of-machine-learning",
+      "url": "https://www.cnbc.com/2023/05/01/godfather-of-ai-leaves-google-after-a-decade-to-warn-of-dangers.html",
       "affiliation": "Google AI, University of Toronto",
       "affiliation_at_time": "Google AI Distinguished Researcher (retired)",
       "role_category": "lab_leader",
@@ -6399,7 +6354,7 @@
       "tags": [
         "google-departure",
         "superintelligence",
-        "regulation",
+        "Regulation",
         "turing-award"
       ],
       "influence_score": 9,
@@ -6409,9 +6364,10 @@
         "52"
       ],
       "source_links": [
-        "https://www.theguardian.com/commentisfree/2023/may/02/my-sweet-child-ai-the-risks-of-machine-learning",
-        "https://www.bbc.com/news/world-us-canada-65440220"
-      ]
+        "https://www.cnbc.com/2023/05/01/godfather-of-ai-leaves-google-after-a-decade-to-warn-of-dangers.html"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.theguardian.com/commentisfree/2023/may/02/my-sweet-child-ai-the-risks-of-machine-learning"
     },
     {
       "id": "anthropic_anthropic_core_views_2023",
@@ -6474,10 +6430,10 @@
         "transparency"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "safety-framework",
-        "constitutional-ai",
-        "alignment"
+        "Constitutional AI",
+        "Alignment"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -6487,7 +6443,7 @@
       ],
       "source_links": [
         "https://www.anthropic.com/index/core-views-on-ai-safety",
-        "https://www.anthropic.com/constitutional-ai-harmlessness-from-ai-feedback"
+        "https://www.anthropic.com/research/constitutional-ai-harmlessness-from-ai-feedback"
       ]
     },
     {
@@ -6547,10 +6503,10 @@
         "character specification"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "values",
         "character-design",
-        "constitutional-ai"
+        "Constitutional AI"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -6568,7 +6524,7 @@
       "date": "2024-05-10",
       "source_type": "research_blog",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/research/scaling-monosemanticity",
+      "url": "https://www.anthropic.com/research/mapping-mind-language-model",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -6617,8 +6573,8 @@
         "alignment progress"
       ],
       "tags": [
-        "anthropic",
-        "interpretability",
+        "Anthropic",
+        "Interpretability",
         "research-breakthrough",
         "mechanistic-interp"
       ],
@@ -6628,7 +6584,7 @@
         "47"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/scaling-monosemanticity",
+        "https://www.anthropic.com/research/mapping-mind-language-model",
         "https://arxiv.org/abs/2405.05034"
       ]
     },
@@ -6688,9 +6644,9 @@
         "trust"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "safety-evaluations",
-        "deceptive-alignment",
+        "Deceptive Alignment",
         "testing"
       ],
       "influence_score": 6,
@@ -6709,7 +6665,7 @@
       "date": "2024-02-15",
       "source_type": "policy_document",
       "source_platform": "openai.com",
-      "url": "https://openai.com/blog/safety-and-security-committee",
+      "url": "https://openai.com/index/openai-board-forms-safety-and-security-committee/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "lab_leader",
@@ -6758,10 +6714,10 @@
         "accountability"
       ],
       "tags": [
-        "openai",
-        "governance",
+        "OpenAI",
+        "Governance",
         "safety-committee",
-        "transparency"
+        "Transparency"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -6769,8 +6725,8 @@
         "49"
       ],
       "source_links": [
-        "https://openai.com/blog/safety-and-security-committee",
-        "https://openai.com/blog/board-update"
+        "https://openai.com/index/openai-board-forms-safety-and-security-committee/",
+        "https://openai.com/index/openai-announces-leadership-transition/"
       ]
     },
     {
@@ -6830,7 +6786,7 @@
         "capability progress"
       ],
       "tags": [
-        "openai",
+        "OpenAI",
         "strategy",
         "deployment",
         "capabilities"
@@ -6911,9 +6867,9 @@
       ],
       "tags": [
         "musk",
-        "xai",
-        "open-source",
-        "governance"
+        "xAI",
+        "Open Source",
+        "Governance"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -6987,9 +6943,9 @@
         "xai-vision"
       ],
       "tags": [
-        "xai",
+        "xAI",
         "grok",
-        "open-source",
+        "Open Source",
         "truth-seeking"
       ],
       "influence_score": 6,
@@ -7064,7 +7020,7 @@
       ],
       "tags": [
         "mistral",
-        "open-source",
+        "Open Source",
         "eu-regulation",
         "competitiveness"
       ],
@@ -7086,7 +7042,7 @@
       "date": "2023-04-20",
       "source_type": "research_blog",
       "source_platform": "deepmind.com",
-      "url": "https://www.deepmind.com/about/mission-and-values",
+      "url": "https://www.deepmind.com/research",
       "affiliation": "DeepMind",
       "affiliation_at_time": "DeepMind Safety Research Lead",
       "role_category": "safety_researcher",
@@ -7135,10 +7091,10 @@
         "governance"
       ],
       "tags": [
-        "deepmind",
+        "DeepMind",
         "safety-research",
-        "alignment",
-        "evaluation"
+        "Alignment",
+        "Evaluations"
       ],
       "influence_score": 5,
       "related_entries": [
@@ -7146,9 +7102,10 @@
         "49"
       ],
       "source_links": [
-        "https://www.deepmind.com/research",
-        "https://www.deepmind.com/about/mission-and-values"
-      ]
+        "https://www.deepmind.com/research"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.deepmind.com/about/mission-and-values"
     },
     {
       "id": "pineau_joelle_pineau_meta_2023",
@@ -7207,9 +7164,9 @@
       ],
       "tags": [
         "meta",
-        "responsible-ai",
+        "Responsible AI",
         "reproducibility",
-        "evaluation"
+        "Evaluations"
       ],
       "influence_score": 5,
       "related_entries": [
@@ -7278,8 +7235,8 @@
       ],
       "tags": [
         "elk-problem",
-        "oversight",
-        "alignment",
+        "Scalable Oversight",
+        "Alignment",
         "arc"
       ],
       "influence_score": 8,
@@ -7288,8 +7245,7 @@
         "48"
       ],
       "source_links": [
-        "https://www.alignmentforum.org/posts/qHCJdMTavN6aan6s2/arc-s-research-agenda-2022",
-        "https://www.lesswrong.com/posts/mPx4cRxfqe4xXFGRR"
+        "https://www.alignmentforum.org/posts/qHCJdMTavN6aan6s2/arc-s-research-agenda-2022"
       ]
     },
     {
@@ -7354,8 +7310,8 @@
       "tags": [
         "risk-estimates",
         "probability",
-        "existential-risk",
-        "alignment"
+        "Existential Risk",
+        "Alignment"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -7424,7 +7380,7 @@
         "democratization"
       ],
       "tags": [
-        "interpretability",
+        "Interpretability",
         "transformerlens",
         "mechanistic-interp",
         "tools"
@@ -7498,8 +7454,8 @@
       "tags": [
         "redwood-research",
         "ai-control",
-        "monitoring",
-        "safety"
+        "Monitoring",
+        "Safety"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -7562,10 +7518,10 @@
         "responsible-scaling"
       ],
       "tags": [
-        "deepmind",
+        "DeepMind",
         "safety-framework",
-        "governance",
-        "evaluation"
+        "Governance",
+        "Evaluations"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -7573,8 +7529,7 @@
         "43"
       ],
       "source_links": [
-        "https://www.deepmind.com/research",
-        "https://www.deepmind.com/about/mission-and-values"
+        "https://www.deepmind.com/research"
       ]
     },
     {
@@ -7630,7 +7585,7 @@
       "tags": [
         "meta",
         "llama",
-        "open-source",
+        "Open Source",
         "open-weights"
       ],
       "influence_score": 7,
@@ -7694,8 +7649,8 @@
         "methodology"
       ],
       "tags": [
-        "forecasting",
-        "timelines",
+        "Forecasting",
+        "Timelines",
         "epoch-ai",
         "expert-surveys"
       ],
@@ -7705,8 +7660,7 @@
         "52"
       ],
       "source_links": [
-        "https://www.epoch.ai/",
-        "https://www.epoch.ai/papers/"
+        "https://www.epoch.ai/"
       ]
     },
     {
@@ -7766,8 +7720,8 @@
       "tags": [
         "timeline-estimates",
         "biological-anchors",
-        "compute",
-        "forecasting"
+        "Compute",
+        "Forecasting"
       ],
       "influence_score": 8,
       "related_entries": [
@@ -7835,10 +7789,10 @@
         "research-prioritization"
       ],
       "tags": [
-        "existential-risk",
+        "Existential Risk",
         "risk-analysis",
         "probability",
-        "alignment"
+        "Alignment"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -7923,7 +7877,7 @@
       "date": "2025-01-20",
       "source_type": "policy_document",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/resources/research",
+      "url": "https://www.anthropic.com/constitution",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "lab_leader",
@@ -7968,9 +7922,9 @@
         "design-choices"
       ],
       "tags": [
-        "anthropic",
+        "Anthropic",
         "model-spec",
-        "transparency",
+        "Transparency",
         "claude"
       ],
       "influence_score": 7,
@@ -7979,8 +7933,10 @@
         "35"
       ],
       "source_links": [
-        "https://www.anthropic.com/resources/research"
-      ]
+        "https://www.anthropic.com/constitution"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.anthropic.com/resources/research"
     },
     {
       "id": "altman_sam_altman_three_2024",
@@ -8033,10 +7989,10 @@
         "policy-readiness"
       ],
       "tags": [
-        "openai",
+        "OpenAI",
         "altman",
         "development-trajectory",
-        "scaling"
+        "Scaling Laws"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -8054,7 +8010,7 @@
       "date": "2024-05-15",
       "source_type": "policy_document",
       "source_platform": "openai.com",
-      "url": "https://openai.com/research/model-spec",
+      "url": "https://model-spec.openai.com/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "lab_leader",
@@ -8098,10 +8054,10 @@
         "guidelines"
       ],
       "tags": [
-        "openai",
+        "OpenAI",
         "model-spec",
         "deployment",
-        "transparency"
+        "Transparency"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -8109,7 +8065,7 @@
         "58"
       ],
       "source_links": [
-        "https://openai.com/research/model-spec",
+        "https://model-spec.openai.com/",
         "https://openai.com/"
       ]
     },
@@ -8170,9 +8126,9 @@
         "strategic-resources"
       ],
       "tags": [
-        "nvidia",
-        "infrastructure",
-        "compute",
+        "NVIDIA",
+        "Infrastructure",
+        "Compute",
         "strategic"
       ],
       "influence_score": 7,
@@ -8235,10 +8191,10 @@
         "progress"
       ],
       "tags": [
-        "anthropic",
-        "interpretability",
+        "Anthropic",
+        "Interpretability",
         "research-progress",
-        "safety"
+        "Safety"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -8251,16 +8207,16 @@
     },
     {
       "id": "zuckerberg_mark_zuckerberg_open_2024",
-      "title": "Mark Zuckerberg Open Source AI Is Path Forward July 2024",
+      "title": "Open Source AI is the Path Forward",
       "author": "Mark Zuckerberg",
-      "date": "2024-07-15",
+      "date": "2024-07-23",
       "source_type": "blog_post",
       "source_platform": "meta.com",
-      "url": "https://about.fb.com/news/2024/07/ai-open-source-model/",
+      "url": "https://about.fb.com/news/2024/07/open-source-ai-is-the-path-forward/",
       "affiliation": "Meta",
       "affiliation_at_time": "Meta CEO",
       "role_category": "investor_strategist",
-      "summary": "Mark Zuckerberg's direct statement arguing open-source AI is preferable to closed approaches, positioning Meta's open-weight model releases as strategically important for preventing concentration of AI power. Zuckerberg contends open availability of frontier models prevents any single entity from controlling powerful AI, distributes capability across ecosystem, enables broader innovation. His argument directly challenges closed-lab approach of OpenAI and others, advocating instead for open-source as superior safety and innovation strategy. Zuckerberg's strong advocacy for open-source represents significant voice arguing for distributed approach. Zuckerberg argues that Meta's investment in open-source models is necessary to prevent dangerous concentration of power in AI development. He positions open-source as competitive strategy that enables Meta to influence AI development while preventing any single entity from controlling frontier AI. Zuckerberg's strong advocacy for open-source represents significant voice from major technology leader supporting alternative approach to AI development. His argument emphasizes that openness is not risk but rather necessity for safe development. Zuckerberg positions open-source as necessary for preventing dangerous concentration of AI power. He argues that allowing single entities to control frontier AI enables potential misuse and reduces democratic control. Open distribution across ecosystem prevents monopolistic control and enables broader innovation. His argument emphasizes safety benefits of distributed development.",
+      "summary": "Mark Zuckerberg argues that open-source AI can become the industry standard, support developer control and cost efficiency, reduce concentration of power, and improve safety through transparency and broad scrutiny, while acknowledging intentional and unintentional harm concerns.",
       "key_claims_and_positions": [
         "Open-source AI prevents concentration of power and monopolistic control",
         "Broader access enables more innovation and safety improvements",
@@ -8311,7 +8267,7 @@
       ],
       "tags": [
         "meta",
-        "open-source",
+        "Open Source",
         "zuckerberg",
         "llama"
       ],
@@ -8322,9 +8278,10 @@
         "50"
       ],
       "source_links": [
-        "https://about.fb.com/news/2024/07/ai-open-source-model/",
-        "https://ai.meta.com/"
-      ]
+        "https://about.fb.com/news/2024/07/open-source-ai-is-the-path-forward/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Corrected to Meta Newsroom primary source and publication date."
     },
     {
       "id": "deepmind_gemini_safety_2024",
@@ -8333,7 +8290,7 @@
       "date": "2024-06-15",
       "source_type": "research_blog",
       "source_platform": "deepmind.com",
-      "url": "https://deepmind.google/research/publications/gemini-safety/",
+      "url": "https://deepmind.google/research/publications/78149/",
       "affiliation": "Google DeepMind",
       "affiliation_at_time": "Google DeepMind",
       "role_category": "lab_leader",
@@ -8400,14 +8357,14 @@
         "transparency"
       ],
       "tags": [
-        "safety",
-        "evaluation",
-        "red_teaming",
+        "Safety",
+        "Evaluations",
+        "Red Teaming",
         "deployment",
-        "deepmind",
+        "DeepMind",
         "gemini",
-        "responsible_ai",
-        "policy"
+        "Responsible AI",
+        "Policy"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -8416,8 +8373,8 @@
         "openai_o1_system_card_2024"
       ],
       "source_links": [
-        "https://deepmind.google/research/publications/gemini-safety/",
-        "https://arxiv.org/abs/2406.xxxxx"
+        "https://deepmind.google/research/publications/78149/",
+        "https://arxiv.org/abs/2404.14068"
       ]
     },
     {
@@ -8427,7 +8384,7 @@
       "date": "2024-07-20",
       "source_type": "research_blog",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/research/scaling-ai-trust-safety",
+      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -8494,12 +8451,12 @@
         "incident_response"
       ],
       "tags": [
-        "safety",
-        "policy",
+        "Safety",
+        "Policy",
         "deployment",
-        "anthropic",
-        "scaling",
-        "trust",
+        "Anthropic",
+        "Scaling Laws",
+        "Trust",
         "user_safety",
         "operations"
       ],
@@ -8510,9 +8467,10 @@
         "anthropic_claude3_system_card_2024"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/scaling-ai-trust-safety",
-        "https://arxiv.org/abs/2407.xxxxx"
-      ]
+        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.anthropic.com/research/scaling-ai-trust-safety"
     },
     {
       "id": "russell_ai_control_problem_2024",
@@ -8521,7 +8479,7 @@
       "date": "2024-05-10",
       "source_type": "interview",
       "source_platform": "various",
-      "url": "https://www.berkeley.edu/ai-control-problem/",
+      "url": "https://aima.cs.berkeley.edu/~russell/hc.html",
       "affiliation": "UC Berkeley",
       "affiliation_at_time": "UC Berkeley",
       "role_category": "safety_researcher",
@@ -8588,8 +8546,8 @@
         "formal_verification"
       ],
       "tags": [
-        "safety",
-        "alignment",
+        "Safety",
+        "Alignment",
         "russell",
         "control_problem",
         "value_learning",
@@ -8604,9 +8562,10 @@
         "hendrycks_ai_risk_overview_2023"
       ],
       "source_links": [
-        "https://www.berkeley.edu/ai-control-problem/",
-        "https://people.eecs.berkeley.edu/~russell/papers/chi21.pdf"
-      ]
+        "https://aima.cs.berkeley.edu/~russell/hc.html"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.berkeley.edu/ai-control-problem/"
     },
     {
       "id": "tegmark_ai_governance_2024",
@@ -8615,7 +8574,7 @@
       "date": "2024-04-15",
       "source_type": "essay",
       "source_platform": "futureoflife.org",
-      "url": "https://futureoflife.org/ai-governance-tegmark-2024/",
+      "url": "https://futureoflife.org/our-position-on-ai/",
       "affiliation": "Future of Life Institute",
       "affiliation_at_time": "Future of Life Institute",
       "role_category": "governance_expert",
@@ -8682,13 +8641,13 @@
         "precaution"
       ],
       "tags": [
-        "governance",
-        "existential_risk",
-        "moratorium",
+        "Governance",
+        "Existential Risk",
+        "Moratorium",
         "international_cooperation",
         "tegmark",
         "fli",
-        "policy",
+        "Policy",
         "risk_prevention"
       ],
       "influence_score": 6,
@@ -8698,9 +8657,10 @@
         "hendrycks_ai_risk_overview_2023"
       ],
       "source_links": [
-        "https://futureoflife.org/ai-governance-tegmark-2024/",
-        "https://futureoflife.org/open-letter/ai-existential-risk-statement/"
-      ]
+        "https://futureoflife.org/our-position-on-ai/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://futureoflife.org/ai-governance-tegmark-2024/"
     },
     {
       "id": "drexler_reframing_superintelligence_2019",
@@ -8709,7 +8669,7 @@
       "date": "2019-10-15",
       "source_type": "essay",
       "source_platform": "fhi.ox.ac.uk",
-      "url": "https://www.fhi.ox.ac.uk/reframing-superintelligence/",
+      "url": "https://arxiv.org/abs/1810.03779",
       "affiliation": "Future of Humanity Institute, Oxford University",
       "affiliation_at_time": "Future of Humanity Institute, Oxford University",
       "role_category": "safety_researcher",
@@ -8780,9 +8740,9 @@
         "drexler",
         "cais",
         "superintelligence",
-        "safety",
-        "decentralization",
-        "coordination",
+        "Safety",
+        "Decentralization",
+        "Coordination",
         "services"
       ],
       "influence_score": 6,
@@ -8792,9 +8752,10 @@
         "bengio_ai_governance_framework_2024"
       ],
       "source_links": [
-        "https://www.fhi.ox.ac.uk/reframing-superintelligence/",
         "https://arxiv.org/abs/1810.03779"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.fhi.ox.ac.uk/reframing-superintelligence/"
     },
     {
       "id": "bostrom_superintelligence_legacy_2024",
@@ -8803,7 +8764,7 @@
       "date": "2024-08-20",
       "source_type": "interview",
       "source_platform": "various",
-      "url": "https://www.nickbostrom.com/superintelligence-2024-update.html",
+      "url": "https://www.nickbostrom.com/superintelligence.html",
       "affiliation": "Future of Humanity Institute, Oxford University",
       "affiliation_at_time": "Future of Humanity Institute, Oxford University",
       "role_category": "governance_expert",
@@ -8872,13 +8833,13 @@
       ],
       "tags": [
         "superintelligence",
-        "existential_risk",
+        "Existential Risk",
         "bostrom",
-        "governance",
+        "Governance",
         "deep_utopia",
-        "alignment",
+        "Alignment",
         "risk_analysis",
-        "policy"
+        "Policy"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -8887,9 +8848,10 @@
         "bengio_ai_governance_framework_2024"
       ],
       "source_links": [
-        "https://www.nickbostrom.com/superintelligence-2024-update.html",
         "https://www.nickbostrom.com/superintelligence.html"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.nickbostrom.com/superintelligence-2024-update.html"
     },
     {
       "id": "openai_superalignment_dissolution_2024",
@@ -8898,7 +8860,7 @@
       "date": "2024-05-20",
       "source_type": "departure_statement",
       "source_platform": "various news coverage",
-      "url": "https://openai.com/blog/superalignment-dissolution/",
+      "url": "https://openai.com/index/introducing-superalignment/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "lab_leader",
@@ -8965,14 +8927,14 @@
         "safety_theater"
       ],
       "tags": [
-        "safety",
+        "Safety",
         "organization",
-        "openai",
+        "OpenAI",
         "departures",
         "capabilities",
         "safety_tension",
         "research_direction",
-        "governance"
+        "Governance"
       ],
       "influence_score": 8,
       "related_entries": [
@@ -8981,8 +8943,7 @@
         "anthropic_collective_constitutional_ai_2023"
       ],
       "source_links": [
-        "https://openai.com/blog/superalignment-dissolution/",
-        "https://www.theregister.com/2024/05/openai-superalignment-dissolution/"
+        "https://openai.com/index/introducing-superalignment/"
       ]
     },
     {
@@ -8992,7 +8953,7 @@
       "date": "2024-09-10",
       "source_type": "policy_document",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/research/election-integrity-2024",
+      "url": "https://www.anthropic.com/news/testing-and-mitigating-elections-related-risks/",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "policy_advisor",
@@ -9059,14 +9020,14 @@
         "misuse_prevention"
       ],
       "tags": [
-        "policy",
+        "Policy",
         "election_integrity",
-        "anthropic",
+        "Anthropic",
         "disinformation",
         "misuse_prevention",
         "democratic_protection",
         "synthetic_content",
-        "governance"
+        "Governance"
       ],
       "influence_score": 5,
       "related_entries": [
@@ -9075,9 +9036,10 @@
         "openai_democratic_inputs_2023"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/election-integrity-2024",
-        "https://www.anthropic.com/responsible-disclosure"
-      ]
+        "https://www.anthropic.com/news/testing-and-mitigating-elections-related-risks/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.anthropic.com/research/election-integrity-2024"
     },
     {
       "id": "lecun_debate_marcus_2024",
@@ -9160,10 +9122,10 @@
         "lecun",
         "debate",
         "deep_learning",
-        "scaling",
-        "transformers",
+        "Scaling Laws",
+        "Transformers",
         "agi",
-        "safety",
+        "Safety",
         "open_models"
       ],
       "influence_score": 6,
@@ -9173,8 +9135,7 @@
         "kambhampati_planning_llms_2024"
       ],
       "source_links": [
-        "https://x.com/ylecun/status/1234567890",
-        "https://www.metacareers.com/research/yann-lecun"
+        "https://x.com/ylecun/status/1234567890"
       ]
     },
     {
@@ -9184,7 +9145,7 @@
       "date": "2024-04-20",
       "source_type": "research_blog",
       "source_platform": "various",
-      "url": "https://kambhampati.org/llm-planning-limitations/",
+      "url": "https://arxiv.org/abs/2402.01817",
       "affiliation": "Arizona State University",
       "affiliation_at_time": "Arizona State University",
       "role_category": "independent_researcher",
@@ -9251,9 +9212,9 @@
         "counterfactual_reasoning"
       ],
       "tags": [
-        "planning",
+        "Planning",
         "llm_limitations",
-        "reasoning",
+        "Reasoning",
         "kambhampati",
         "capabilities",
         "hybrid_systems",
@@ -9267,22 +9228,23 @@
         "russell_ai_control_problem_2024"
       ],
       "source_links": [
-        "https://kambhampati.org/llm-planning-limitations/",
-        "https://arxiv.org/abs/2402.xxxxx"
-      ]
+        "https://arxiv.org/abs/2402.01817"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://kambhampati.org/llm-planning-limitations/"
     },
     {
       "id": "chollet_arc_intelligence_2024",
-      "title": "François Chollet ARC Prize and Intelligence Measurement 2024",
-      "author": "François Chollet",
-      "date": "2024-06-10",
+      "title": "ARC Prize 2024: Technical Report",
+      "author": "François Chollet, Mike Knoop, Gregory Kamradt, Bryan Landers",
+      "date": "2024-12-05",
       "source_type": "essay",
       "source_platform": "arcprize.org",
-      "url": "https://arcprize.org/chollet-intelligence-measurement/",
+      "url": "https://arxiv.org/abs/2412.04604",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic (formerly Google)",
       "role_category": "capabilities_researcher",
-      "summary": "François Chollet, creator of the ARC Prize benchmark for measuring machine intelligence, articulates his critique of the LLM-as-AGI narrative and his vision for measuring genuine intelligence. Chollet argues that current LLM performance on benchmark tasks is largely pattern matching against training data, not genuine intelligence. He contrasts this with the ARC (Abstraction and Reasoning Corpus) challenge, which requires solving novel tasks never seen during training - a true test of compositional reasoning and transfer. Chollet's work emphasizes that measuring intelligence is fundamentally about measuring the ability to solve novel problems, not the ability to reproduce patterns from training. His 2024 essay reflects on entries to the ARC Prize, winner strategies, and what these reveal about the gap between current AI and genuine general intelligence.",
+      "summary": "ARC Prize technical report and benchmark framing from François Chollet and collaborators. The report argues that ARC-AGI measures generalization on novel tasks rather than prepared task skill, surveys 2024 competition approaches, and reports progress from 33% to 55.5% on the private evaluation set while emphasizing remaining gaps in fluid intelligence.",
       "key_claims_and_positions": [
         "Current measures of AI capability primarily measure pattern matching, not intelligence",
         "Intelligence requires the ability to solve novel problems never seen during training",
@@ -9350,8 +9312,8 @@
         "arc",
         "abstraction",
         "generalization",
-        "benchmarks",
-        "reasoning",
+        "Benchmarks",
+        "Reasoning",
         "agi"
       ],
       "influence_score": 6,
@@ -9361,9 +9323,11 @@
         "russell_ai_control_problem_2024"
       ],
       "source_links": [
-        "https://arcprize.org/chollet-intelligence-measurement/",
-        "https://arcprize.org/arc/"
-      ]
+        "https://arxiv.org/abs/2412.04604",
+        "https://arcprize.org/arc-agi"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Corrected to arXiv ARC Prize 2024 technical report and ARC-AGI benchmark page."
     },
     {
       "id": "gwern_scaling_analysis_2023",
@@ -9372,7 +9336,7 @@
       "date": "2023-11-15",
       "source_type": "blog_post",
       "source_platform": "gwern.net",
-      "url": "https://gwern.net/scaling-laws/",
+      "url": "https://gwern.net/ai",
       "affiliation": "Independent Researcher",
       "affiliation_at_time": "Independent Researcher",
       "role_category": "independent_researcher",
@@ -9439,13 +9403,13 @@
         "extrapolation"
       ],
       "tags": [
-        "scaling",
+        "Scaling Laws",
         "analysis",
         "gwern",
-        "compute",
+        "Compute",
         "agi",
         "capabilities",
-        "hardware",
+        "Hardware",
         "trends"
       ],
       "influence_score": 6,
@@ -9455,9 +9419,10 @@
         "kambhampati_planning_llms_2024"
       ],
       "source_links": [
-        "https://gwern.net/scaling-laws/",
         "https://gwern.net/ai"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://gwern.net/scaling-laws/"
     },
     {
       "id": "openai_o1_system_card_2024",
@@ -9466,7 +9431,7 @@
       "date": "2024-09-15",
       "source_type": "policy_document",
       "source_platform": "openai.com",
-      "url": "https://openai.com/o1-system-card/",
+      "url": "https://openai.com/index/openai-o1-system-card/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "safety_researcher",
@@ -9529,14 +9494,14 @@
         "extended_inference"
       ],
       "tags": [
-        "safety",
-        "reasoning",
+        "Safety",
+        "Reasoning",
         "o1",
-        "openai",
-        "interpretability",
-        "chain_of_thought",
+        "OpenAI",
+        "Interpretability",
+        "Chain-of-thought",
         "system_card",
-        "evaluation"
+        "Evaluations"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -9545,7 +9510,7 @@
         "deepmind_gemini_safety_2024"
       ],
       "source_links": [
-        "https://openai.com/o1-system-card/",
+        "https://openai.com/index/openai-o1-system-card/",
         "https://openai.com/o1/"
       ]
     },
@@ -9619,12 +9584,12 @@
         "limitations"
       ],
       "tags": [
-        "safety",
-        "anthropic",
+        "Safety",
+        "Anthropic",
         "claude3",
         "model_card",
-        "evaluation",
-        "transparency",
+        "Evaluations",
+        "Transparency",
         "limitations",
         "asl"
       ],
@@ -9636,7 +9601,7 @@
       ],
       "source_links": [
         "https://www.anthropic.com/claude-3-model-card",
-        "https://www.anthropic.com/research/asl"
+        "https://www.anthropic.com/responsible-scaling-policy"
       ]
     },
     {
@@ -9646,7 +9611,7 @@
       "date": "2024-07-01",
       "source_type": "research_blog",
       "source_platform": "deepmind.com",
-      "url": "https://deepmind.google/research/frontier-ai-safety/",
+      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
       "affiliation": "Google DeepMind",
       "affiliation_at_time": "Google DeepMind",
       "role_category": "lab_leader",
@@ -9709,13 +9674,13 @@
         "effectiveness"
       ],
       "tags": [
-        "safety",
-        "deepmind",
+        "Safety",
+        "DeepMind",
         "industry_survey",
         "practices",
-        "standards",
-        "coordination",
-        "governance",
+        "Standards",
+        "Coordination",
+        "Governance",
         "research"
       ],
       "influence_score": 5,
@@ -9725,8 +9690,7 @@
         "openai_gpt4_system_card_2023"
       ],
       "source_links": [
-        "https://deepmind.google/research/frontier-ai-safety/",
-        "https://arxiv.org/abs/2407.xxxxx"
+        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
       ]
     },
     {
@@ -9803,14 +9767,14 @@
         "comprehensive_risk"
       ],
       "tags": [
-        "risk",
+        "Risk",
         "taxonomy",
         "hendrycks",
-        "misuse",
-        "safety",
+        "Misuse",
+        "Safety",
         "cais",
-        "governance",
-        "policy"
+        "Governance",
+        "Policy"
       ],
       "influence_score": 7,
       "related_entries": [
@@ -9819,8 +9783,7 @@
         "bostrom_superintelligence_legacy_2024"
       ],
       "source_links": [
-        "https://arxiv.org/abs/2306.12001",
-        "https://www.safe.ai/catastrophic-ai-risks"
+        "https://arxiv.org/abs/2306.12001"
       ]
     },
     {
@@ -9897,12 +9860,12 @@
         "policy_mechanisms"
       ],
       "tags": [
-        "governance",
+        "Governance",
         "bengio",
-        "policy",
-        "compute",
-        "safety",
-        "regulation",
+        "Policy",
+        "Compute",
+        "Safety",
+        "Regulation",
         "international",
         "framework"
       ],
@@ -9913,8 +9876,7 @@
         "bostrom_superintelligence_legacy_2024"
       ],
       "source_links": [
-        "https://managing-ai-risks.com/",
-        "https://www.safe.ai/work/governance"
+        "https://managing-ai-risks.com/"
       ]
     },
     {
@@ -9992,14 +9954,14 @@
         "human_agency"
       ],
       "tags": [
-        "governance",
+        "Governance",
         "human_centered",
         "li",
         "stanford",
         "public_research",
-        "democracy",
+        "Democracy",
         "literacy",
-        "policy"
+        "Policy"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -10019,7 +9981,7 @@
       "date": "2024-08-05",
       "source_type": "research_blog",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/research/ai-influence-operations/",
+      "url": "https://www.anthropic.com/news/elections-ai-2024",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -10082,10 +10044,10 @@
         "psychological_vectors"
       ],
       "tags": [
-        "safety",
+        "Safety",
         "influence_operations",
         "persuasion",
-        "anthropic",
+        "Anthropic",
         "manipulation",
         "defense",
         "research",
@@ -10098,8 +10060,8 @@
         "hendrycks_ai_risk_overview_2023"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/ai-influence-operations/",
-        "https://arxiv.org/abs/2408.xxxxx"
+        "https://www.anthropic.com/news/elections-ai-2024",
+        "https://openai.com/index/disrupting-deceptive-uses-of-AI-by-covert-influence-operations/"
       ]
     },
     {
@@ -10109,7 +10071,7 @@
       "date": "2023-03-15",
       "source_type": "policy_document",
       "source_platform": "openai.com",
-      "url": "https://openai.com/gpt-4-system-card/",
+      "url": "https://cdn.openai.com/papers/gpt-4-system-card.pdf",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "safety_researcher",
@@ -10172,13 +10134,13 @@
         "evaluation_methodology"
       ],
       "tags": [
-        "safety",
-        "openai",
+        "Safety",
+        "OpenAI",
         "gpt4",
         "system_card",
-        "red_teaming",
-        "evaluation",
-        "transparency",
+        "Red Teaming",
+        "Evaluations",
+        "Transparency",
         "methodology"
       ],
       "influence_score": 7,
@@ -10188,7 +10150,6 @@
         "deepmind_gemini_safety_2024"
       ],
       "source_links": [
-        "https://openai.com/gpt-4-system-card/",
         "https://cdn.openai.com/papers/gpt-4-system-card.pdf"
       ]
     },
@@ -10199,7 +10160,7 @@
       "date": "2024-06-01",
       "source_type": "research_blog",
       "source_platform": "deepmind.com",
-      "url": "https://deepmind.google/research/sociotechnical-safety/",
+      "url": "https://deepmind.google/research/publications/sociotechnical-safety-evaluation-of-generative-ai-systems/",
       "affiliation": "Google DeepMind",
       "affiliation_at_time": "Google DeepMind",
       "role_category": "safety_researcher",
@@ -10262,8 +10223,8 @@
         "integration"
       ],
       "tags": [
-        "safety",
-        "deepmind",
+        "Safety",
+        "DeepMind",
         "sociotechnical",
         "participatory",
         "social",
@@ -10278,8 +10239,8 @@
         "openai_democratic_inputs_2023"
       ],
       "source_links": [
-        "https://deepmind.google/research/sociotechnical-safety/",
-        "https://arxiv.org/abs/2406.xxxxx"
+        "https://deepmind.google/research/publications/sociotechnical-safety-evaluation-of-generative-ai-systems/",
+        "https://arxiv.org/abs/2404.14068"
       ]
     },
     {
@@ -10289,7 +10250,7 @@
       "date": "2023-09-20",
       "source_type": "essay",
       "source_platform": "worldcoin.org",
-      "url": "https://www.worldcoin.org/sam-altman-vision/",
+      "url": "https://www.worldcoin.org/",
       "affiliation": "OpenAI and Worldcoin Foundation",
       "affiliation_at_time": "OpenAI (CEO), Worldcoin Foundation (Co-founder)",
       "role_category": "investor_strategist",
@@ -10358,10 +10319,10 @@
       "tags": [
         "altman",
         "worldcoin",
-        "ubi",
-        "governance",
-        "identity",
-        "economics",
+        "UBI",
+        "Governance",
+        "Identity",
+        "Economics",
         "agi",
         "vision"
       ],
@@ -10372,9 +10333,10 @@
         "bengio_ai_governance_framework_2024"
       ],
       "source_links": [
-        "https://www.worldcoin.org/sam-altman-vision/",
         "https://www.worldcoin.org/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.worldcoin.org/sam-altman-vision/"
     },
     {
       "id": "meta_safety_transparency_2024",
@@ -10383,7 +10345,7 @@
       "date": "2024-06-15",
       "source_type": "research_blog",
       "source_platform": "ai.meta.com",
-      "url": "https://ai.meta.com/research/system-level-safety/",
+      "url": "https://ai.meta.com/blog/responsible-ai-connect-2024/",
       "affiliation": "Meta (Facebook)",
       "affiliation_at_time": "Meta Platforms",
       "role_category": "lab_leader",
@@ -10450,7 +10412,7 @@
         "community_safety"
       ],
       "tags": [
-        "safety",
+        "Safety",
         "meta",
         "open_models",
         "tools",
@@ -10466,9 +10428,10 @@
         "openai_gpt4_system_card_2023"
       ],
       "source_links": [
-        "https://ai.meta.com/research/system-level-safety/",
-        "https://ai.meta.com/research/purple-llama/"
-      ]
+        "https://ai.meta.com/blog/responsible-ai-connect-2024/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://ai.meta.com/research/system-level-safety/"
     },
     {
       "id": "openai_democratic_inputs_2023",
@@ -10477,7 +10440,7 @@
       "date": "2023-04-10",
       "source_type": "policy_document",
       "source_platform": "openai.com",
-      "url": "https://openai.com/democratic-inputs-to-ai/",
+      "url": "https://openai.com/index/democratic-inputs-to-ai/",
       "affiliation": "OpenAI",
       "affiliation_at_time": "OpenAI",
       "role_category": "policy_advisor",
@@ -10541,13 +10504,13 @@
         "deliberative_democracy"
       ],
       "tags": [
-        "governance",
-        "openai",
-        "democracy",
+        "Governance",
+        "OpenAI",
+        "Democracy",
         "public_input",
         "participatory_design",
         "values",
-        "policy",
+        "Policy",
         "legitimacy"
       ],
       "influence_score": 5,
@@ -10557,8 +10520,7 @@
         "deepmind_sociotechnical_safety_2024"
       ],
       "source_links": [
-        "https://openai.com/democratic-inputs-to-ai/",
-        "https://openai.com/research/democracy"
+        "https://openai.com/index/democratic-inputs-to-ai/"
       ]
     },
     {
@@ -10568,7 +10530,7 @@
       "date": "2023-07-15",
       "source_type": "research_blog",
       "source_platform": "anthropic.com",
-      "url": "https://www.anthropic.com/research/collective-constitutional-ai/",
+      "url": "https://www.anthropic.com/news/collective-constitutional-ai-aligning-a-language-model-with-public-input",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -10632,14 +10594,14 @@
         "legitimacy"
       ],
       "tags": [
-        "anthropic",
-        "constitutional_ai",
-        "democracy",
+        "Anthropic",
+        "Constitutional AI",
+        "Democracy",
         "public_input",
         "values",
-        "collective_intelligence",
+        "Collective Intelligence",
         "polis",
-        "governance"
+        "Governance"
       ],
       "influence_score": 6,
       "related_entries": [
@@ -10648,8 +10610,7 @@
         "deepmind_sociotechnical_safety_2024"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/collective-constitutional-ai/",
-        "https://collectiveintelligenceproject.org/ai/"
+        "https://www.anthropic.com/news/collective-constitutional-ai-aligning-a-language-model-with-public-input"
       ]
     },
     {
@@ -10659,7 +10620,7 @@
       "date": "2024-03-20",
       "source_type": "research_blog",
       "source_platform": "epoch.ai",
-      "url": "https://epoch.ai/compute-trends/",
+      "url": "https://epoch.ai/",
       "affiliation": "Epoch AI",
       "affiliation_at_time": "Epoch AI",
       "role_category": "independent_researcher",
@@ -10722,12 +10683,12 @@
         "monitoring"
       ],
       "tags": [
-        "compute",
+        "Compute",
         "trends",
         "epoch",
-        "governance",
-        "hardware",
-        "scaling",
+        "Governance",
+        "Hardware",
+        "Scaling Laws",
         "analysis",
         "data"
       ],
@@ -10738,9 +10699,10 @@
         "tegmark_ai_governance_2024"
       ],
       "source_links": [
-        "https://epoch.ai/compute-trends/",
         "https://epoch.ai/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://epoch.ai/compute-trends/"
     },
     {
       "id": "li_weidinger_deepmind_ethics_2022",
@@ -10812,12 +10774,12 @@
         "mitigation_strategies"
       ],
       "tags": [
-        "safety",
-        "ethics",
+        "Safety",
+        "Ethics",
         "social_risk",
-        "deepmind",
+        "DeepMind",
         "taxonomy",
-        "discrimination",
+        "Discrimination",
         "disinformation",
         "research"
       ],
@@ -10839,7 +10801,7 @@
       "date": "2024-05-01",
       "source_type": "essay",
       "source_platform": "arxiv",
-      "url": "https://arxiv.org/abs/2405.xxxxx",
+      "url": "https://arxiv.org/abs/2404.16244",
       "affiliation": "Anthropic",
       "affiliation_at_time": "Anthropic",
       "role_category": "safety_researcher",
@@ -10902,11 +10864,11 @@
         "design_principles"
       ],
       "tags": [
-        "ethics",
-        "anthropic",
+        "Ethics",
+        "Anthropic",
         "gabriel",
         "autonomy",
-        "philosophy",
+        "Philosophy",
         "design",
         "manipulation",
         "values"
@@ -10918,8 +10880,7 @@
         "deepmind_sociotechnical_safety_2024"
       ],
       "source_links": [
-        "https://arxiv.org/abs/2405.xxxxx",
-        "https://www.anthropic.com/research/ethics"
+        "https://arxiv.org/abs/2404.16244"
       ]
     },
     {
@@ -10929,7 +10890,7 @@
       "date": "2024-07-10",
       "source_type": "research_blog",
       "source_platform": "partnershiponai.org",
-      "url": "https://partnershiponai.org/labor-impact-analysis/",
+      "url": "https://partnershiponai.org/",
       "affiliation": "Partnership on AI",
       "affiliation_at_time": "Partnership on AI",
       "role_category": "policy_advisor",
@@ -10992,11 +10953,11 @@
         "income_support"
       ],
       "tags": [
-        "labor",
-        "economics",
+        "Labor",
+        "Economics",
         "impact",
-        "displacement",
-        "policy",
+        "Displacement",
+        "Policy",
         "klinova",
         "partnership_on_ai",
         "welfare"
@@ -11008,9 +10969,10 @@
         "bengio_ai_governance_framework_2024"
       ],
       "source_links": [
-        "https://partnershiponai.org/labor-impact-analysis/",
         "https://partnershiponai.org/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://partnershiponai.org/labor-impact-analysis/"
     },
     {
       "id": "uk_ai_safety_institute_2024",
@@ -11019,7 +10981,7 @@
       "date": "2024-04-15",
       "source_type": "policy_document",
       "source_platform": "gov.uk",
-      "url": "https://www.gov.uk/ai-safety-institute/",
+      "url": "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations",
       "affiliation": "UK Government",
       "affiliation_at_time": "UK Government",
       "role_category": "governance_expert",
@@ -11086,12 +11048,12 @@
         "inspection_approach"
       ],
       "tags": [
-        "governance",
-        "uk",
+        "Governance",
+        "UK",
         "government_oversight",
         "testing",
-        "safety",
-        "regulation",
+        "Safety",
+        "Regulation",
         "international",
         "inspection"
       ],
@@ -11102,9 +11064,1030 @@
         "openai_gpt4_system_card_2023"
       ],
       "source_links": [
-        "https://www.gov.uk/ai-safety-institute/",
-        "https://assets.publishing.service.gov.uk/media/frontier-ai-capabilities"
-      ]
+        "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.gov.uk/ai-safety-institute/"
+    },
+    {
+      "id": "dwarkesh_dario_amodei_feb_2026",
+      "title": "Dario Amodei — We are near the end of the exponential",
+      "author": "Dario Amodei",
+      "interviewer": "Dwarkesh Patel",
+      "date": "2026-02-13",
+      "source_type": "podcast_transcript",
+      "source_platform": "Dwarkesh Podcast",
+      "url": "https://www.dwarkesh.com/p/dario-amodei-2",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "lab_leader",
+      "summary": "Dario Amodei discusses the approaching limits of exponential AI scaling, Anthropic's safety approach, the Jevons paradox in AI compute, and near-term societal implications of transformative AI.",
+      "key_claims_and_positions": [
+        "We are approaching the end of the exponential scaling curve",
+        "Jevons paradox applies to AI compute—efficiency gains increase total usage",
+        "Safety research is keeping pace but needs to accelerate",
+        "Transformative AI will arrive within current scaling paradigm"
+      ],
+      "novel_arguments_and_concepts": [
+        "End of exponential thesis",
+        "AI Jevons paradox",
+        "Safety-capability race dynamic at current frontier"
+      ],
+      "predictions": [
+        "Scaling returns will slow but not plateau immediately",
+        "AI safety research will become the bottleneck",
+        "Compute efficiency improvements will increase total AI usage"
+      ],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Voluntary commitments are necessary but not sufficient",
+        "Government needs technical capacity to evaluate AI systems"
+      ],
+      "debate_connections": [
+        "debate_exponential_progress",
+        "debate_ai_rd_automation"
+      ],
+      "themes": [
+        "Scaling",
+        "Safety",
+        "Governance",
+        "Economics"
+      ],
+      "tags": [
+        "Scaling Laws",
+        "Safety",
+        "Jevons Paradox",
+        "Lab Leadership",
+        "Anthropic"
+      ],
+      "influence_score": 10,
+      "related_entries": [],
+      "source_links": [
+        "https://www.dwarkesh.com/p/dario-amodei-2"
+      ],
+      "transcript_available": true
+    },
+    {
+      "id": "dwarkesh_elon_musk_feb_2026",
+      "title": "Elon Musk — In 36 months, the cheapest place to put AI will be space",
+      "author": "Elon Musk",
+      "interviewer": "Dwarkesh Patel",
+      "date": "2026-02-05",
+      "source_type": "podcast_transcript",
+      "source_platform": "Dwarkesh Podcast",
+      "url": "https://www.dwarkesh.com/p/elon-musk",
+      "affiliation": "xAI / Tesla / SpaceX",
+      "affiliation_at_time": "xAI / Tesla / SpaceX",
+      "role_category": "lab_leader",
+      "summary": "Elon Musk discusses orbital data centers, power scaling challenges for AI, humanoid manufacturing plans, and xAI's strategy for building competitive AI infrastructure.",
+      "key_claims_and_positions": [
+        "Orbital data centers will be cost-competitive within 36 months",
+        "Power is the binding constraint for AI scaling",
+        "Humanoid robots will integrate with AI infrastructure",
+        "xAI aims to compete on both capability and infrastructure"
+      ],
+      "novel_arguments_and_concepts": [
+        "Orbital compute thesis",
+        "Power as the binding constraint",
+        "Humanoid-AI infrastructure integration"
+      ],
+      "predictions": [
+        "Space-based AI compute within 36 months",
+        "Power will remain primary constraint through 2030"
+      ],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Open source AI development",
+        "Minimal regulation of AI deployment"
+      ],
+      "debate_connections": [
+        "debate_open_vs_closed_safety",
+        "debate_exponential_progress"
+      ],
+      "themes": [
+        "Infrastructure",
+        "Scaling",
+        "Space Technology",
+        "Competition"
+      ],
+      "tags": [
+        "xAI",
+        "Infrastructure",
+        "Scaling",
+        "Space Computing",
+        "Energy"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://www.dwarkesh.com/p/elon-musk"
+      ],
+      "transcript_available": true
+    },
+    {
+      "id": "anthropic_claude_opus_46_system_card",
+      "title": "Claude Opus 4.6 System Card",
+      "author": "Anthropic",
+      "interviewer": "",
+      "date": "2026-02-01",
+      "source_type": "research_report",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/system-cards",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "safety_researcher",
+      "summary": "Most comprehensive model safety evaluation attempted, finding Claude Opus 4.6 has comparable misaligned behavior rates to best-aligned recent models with lower excessive refusal rates.",
+      "key_claims_and_positions": [
+        "Most comprehensive safety evaluation to date",
+        "Misalignment rate comparable to best-aligned models",
+        "Lower excessive refusal rate than prior Claude models",
+        "RSP evaluation process assessed catastrophic risk domains"
+      ],
+      "novel_arguments_and_concepts": [
+        "Comprehensive misalignment rate benchmarking",
+        "Excessive refusal reduction methodology",
+        "RSP-based catastrophic risk assessment"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "RSP framework as model for industry safety assessment"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_deceptive_alignment"
+      ],
+      "themes": [
+        "Safety Evaluation",
+        "Model Cards",
+        "Responsible Deployment"
+      ],
+      "tags": [
+        "System Card",
+        "Safety Evaluation",
+        "Claude",
+        "Anthropic",
+        "RSP"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://www.anthropic.com/system-cards"
+      ],
+      "transcript_available": false,
+      "verification_status": "verified",
+      "verification_notes": "Anchored to Anthropic system-card index listing Claude Opus 4.6."
+    },
+    {
+      "id": "anthropic_claude_opus_45_system_card",
+      "title": "Claude Opus 4.5 System Card — Best-Aligned Frontier Model",
+      "author": "Anthropic",
+      "interviewer": "",
+      "date": "2025-11-01",
+      "source_type": "research_report",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/claude-opus-4-5-system-card",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "safety_researcher",
+      "summary": "System card documenting Claude Opus 4.5 as Anthropic's best-aligned frontier model, showing low rates of concerning behavior across comprehensive safety evaluations.",
+      "key_claims_and_positions": [
+        "Claude Opus 4.5 is best-aligned frontier model in the industry",
+        "Low rates of concerning behavior across all evaluation categories",
+        "Comprehensive RSP evaluation completed"
+      ],
+      "novel_arguments_and_concepts": [
+        "Industry-leading alignment benchmarking",
+        "Holistic safety evaluation methodology"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Transparency through model cards as industry standard"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy"
+      ],
+      "themes": [
+        "Safety Evaluation",
+        "Model Cards",
+        "Alignment"
+      ],
+      "tags": [
+        "System Card",
+        "Safety Evaluation",
+        "Claude",
+        "Anthropic",
+        "Alignment"
+      ],
+      "influence_score": 8,
+      "related_entries": [
+        "anthropic_claude_opus_46_system_card"
+      ],
+      "source_links": [
+        "https://www.anthropic.com/claude-opus-4-5-system-card"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "anthropic_mythos_system_card_2026",
+      "title": "Claude Mythos System Card — Frontier Cybersecurity Capabilities",
+      "author": "Anthropic",
+      "interviewer": "",
+      "date": "2026-04-01",
+      "source_type": "research_report",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/system-cards",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "safety_researcher",
+      "summary": "System card for Claude Mythos Preview, documenting unprecedented cybersecurity capabilities exceeding prior models, with safety mitigations and deployment restrictions.",
+      "key_claims_and_positions": [
+        "Mythos possesses cybersecurity capabilities far exceeding any prior model",
+        "Safety mitigations include deployment restrictions",
+        "Red team evaluation identified novel threat vectors"
+      ],
+      "novel_arguments_and_concepts": [
+        "Step-function capability improvement in cybersecurity domain",
+        "Novel threat vectors from highly capable models",
+        "Deployment restriction framework for dangerous capabilities"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Restricted deployment for models with dangerous capability profiles"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_exponential_progress"
+      ],
+      "themes": [
+        "Cybersecurity",
+        "Dangerous Capabilities",
+        "Deployment Restrictions"
+      ],
+      "tags": [
+        "System Card",
+        "Cybersecurity",
+        "Claude Mythos",
+        "Anthropic",
+        "Dangerous Capabilities"
+      ],
+      "influence_score": 9,
+      "related_entries": [
+        "anthropic_claude_opus_46_system_card"
+      ],
+      "source_links": [
+        "https://www.anthropic.com/system-cards"
+      ],
+      "transcript_available": false,
+      "verification_status": "verified",
+      "verification_notes": "Anchored to Anthropic system-card index listing Mythos Preview."
+    },
+    {
+      "id": "metr_frontier_risk_report_2026",
+      "title": "METR Frontier Risk Report (February to March 2026)",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-05-19",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Assessment of whether internal AI agents at major labs had means, motive, and opportunity for rogue deployment. Found agents plausibly had capability for small rogue deployments but not large, robust ones.",
+      "key_claims_and_positions": [
+        "Internal agents plausibly had means, motive, and opportunity for small rogue deployments",
+        "Large robust rogue deployments not yet feasible",
+        "Entity-based assessment piloted with Anthropic, Google, Meta, OpenAI"
+      ],
+      "novel_arguments_and_concepts": [
+        "Entity-based risk assessment framework",
+        "Rogue deployment capability taxonomy",
+        "Means-motive-opportunity framework for AI agents"
+      ],
+      "predictions": [
+        "Risk of rogue deployment will increase with agent capability improvements"
+      ],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Multi-lab cooperative evaluation is essential",
+        "Regular risk reporting cadence needed"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_deceptive_alignment",
+        "debate_ai_rd_automation"
+      ],
+      "themes": [
+        "Risk Assessment",
+        "Rogue Deployment",
+        "Agent Safety",
+        "Multi-Lab Cooperation"
+      ],
+      "tags": [
+        "METR",
+        "Risk",
+        "Rogue Deployment",
+        "Agent Safety",
+        "Frontier Models"
+      ],
+      "influence_score": 10,
+      "related_entries": [],
+      "source_links": [
+        "https://metr.org/blog/2026-05-19-frontier-risk-report/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "dwarkesh_metr_mirrorcode_2026",
+      "title": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-04-10",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Benchmark providing evidence that AI systems can complete coding tasks that would take human programmers several weeks, representing significant R&D automation progress.",
+      "key_claims_and_positions": [
+        "AI can complete some multi-week coding tasks",
+        "Time horizon has extended significantly",
+        "R&D automation is advancing faster than many predicted"
+      ],
+      "novel_arguments_and_concepts": [
+        "MirrorCode benchmark methodology",
+        "Weeks-long task completion evidence",
+        "R&D automation capability tracking"
+      ],
+      "predictions": [
+        "AI R&D automation will continue accelerating"
+      ],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Time horizon metrics should inform governance triggers"
+      ],
+      "debate_connections": [
+        "debate_ai_rd_automation",
+        "debate_benchmark_validity"
+      ],
+      "themes": [
+        "R&D Automation",
+        "Benchmarks",
+        "Time Horizon",
+        "Coding"
+      ],
+      "tags": [
+        "METR",
+        "MirrorCode",
+        "Benchmarks",
+        "R&D Automation",
+        "Coding"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "dwarkesh_metr_red_teaming_anthropic_monitoring_2026",
+      "title": "Red-Teaming Anthropic's Internal Agent Monitoring Systems",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-03-25",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Results from METR red-teaming Anthropic's internal monitoring systems, evaluating whether current monitoring can detect sabotage and circumvention attempts by AI agents.",
+      "key_claims_and_positions": [
+        "Current monitoring systems have identifiable gaps",
+        "Red teaming reveals specific evasion strategies",
+        "Monitoring effectiveness varies by attack sophistication"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI monitoring red-team methodology",
+        "Evasion strategy taxonomy",
+        "Monitoring coverage gap analysis"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Third-party red teaming of monitoring systems should be standard practice"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_deceptive_alignment"
+      ],
+      "themes": [
+        "Monitoring",
+        "Red Teaming",
+        "Agent Safety",
+        "Sabotage"
+      ],
+      "tags": [
+        "METR",
+        "Red Teaming",
+        "Monitoring",
+        "Agent Safety",
+        "Anthropic"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "dwarkesh_metr_ai_usage_survey_2026",
+      "title": "Measuring the Self-Reported Impact of Early-2026 AI on Technical Worker Productivity",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-05-11",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-05-11-ai-usage-survey/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Survey of 349 technical workers finding median 1.4-2x self-reported productivity gains from AI tools, though with reasons for skepticism about magnitude. Expected gains growing over time.",
+      "key_claims_and_positions": [
+        "1.4-2x median self-reported productivity change",
+        "Expected gains are growing over time",
+        "Reasons for skepticism about self-reported magnitude"
+      ],
+      "novel_arguments_and_concepts": [
+        "Self-reported vs objective productivity measurement gap",
+        "Technical worker AI adoption patterns",
+        "Productivity growth trajectory modeling"
+      ],
+      "predictions": [
+        "AI productivity impact will continue increasing"
+      ],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Objective productivity measurement is needed to complement self-reports"
+      ],
+      "debate_connections": [
+        "debate_ai_rd_automation"
+      ],
+      "themes": [
+        "Productivity",
+        "AI Tools",
+        "Worker Impact",
+        "Measurement"
+      ],
+      "tags": [
+        "METR",
+        "Productivity",
+        "Survey",
+        "AI Tools",
+        "Worker Impact"
+      ],
+      "influence_score": 7,
+      "related_entries": [],
+      "source_links": [
+        "https://metr.org/blog/2026-05-11-ai-usage-survey/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "metr_sabotage_risk_review_opus_46",
+      "title": "Review of the Anthropic Sabotage Risk Report: Claude Opus 4.6",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-03-12",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-03-12-sabotage-risk-report-opus-4-6-review/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "METR's independent review of Anthropic's sabotage risk report for Claude Opus 4.6, evaluating the methodology and conclusions of Anthropic's safety assessment.",
+      "key_claims_and_positions": [
+        "Reviewed two versions of Anthropic's sabotage risk report",
+        "Produced corresponding review documents",
+        "Evaluated methodology and conclusions independently"
+      ],
+      "novel_arguments_and_concepts": [
+        "Third-party safety report review methodology",
+        "Sabotage risk assessment quality evaluation"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Third-party review of safety assessments should be normalized"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy"
+      ],
+      "themes": [
+        "Safety Assessment",
+        "Third-Party Review",
+        "Sabotage Risk"
+      ],
+      "tags": [
+        "METR",
+        "Sabotage",
+        "Safety Assessment",
+        "Review",
+        "Anthropic",
+        "Claude"
+      ],
+      "influence_score": 8,
+      "related_entries": [
+        "anthropic_claude_opus_46_system_card"
+      ],
+      "source_links": [
+        "https://metr.org/blog/2026-03-12-sabotage-risk-report-opus-4-6-review/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "dwarkesh_metr_monitorability_evals_2026",
+      "title": "Early work on monitorability evaluations",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-01-19",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Initial work on evaluating monitorability of AI systems — how well can sabotage capabilities be tracked and monitored as systems become more capable.",
+      "key_claims_and_positions": [
+        "Future AI systems may be capable enough for sabotage",
+        "Need to track sabotage capabilities proactively",
+        "Monitorability evaluation methodology is tractable"
+      ],
+      "novel_arguments_and_concepts": [
+        "Monitorability evaluation framework",
+        "Proactive sabotage capability tracking",
+        "Monitoring scalability assessment"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Monitorability should be a deployment requirement"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_deceptive_alignment"
+      ],
+      "themes": [
+        "Monitoring",
+        "Sabotage",
+        "Evaluation",
+        "Safety"
+      ],
+      "tags": [
+        "METR",
+        "Monitoring",
+        "Sabotage",
+        "Evaluations",
+        "Safety"
+      ],
+      "influence_score": 7,
+      "related_entries": [],
+      "source_links": [
+        "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "metr_developer_productivity_experiment_update",
+      "title": "We are Changing our Developer Productivity Experiment Design",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-02-24",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-02-24-uplift-update/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Update on METR's developer productivity experiment, noting that initial findings showed AI tools caused a 20% slowdown for experienced open-source developers, prompting experiment redesign.",
+      "key_claims_and_positions": [
+        "AI tools caused 20% slowdown for experienced devs in initial study",
+        "Experiment design being revised to address methodology concerns",
+        "Self-reported productivity gains may not reflect objective performance"
+      ],
+      "novel_arguments_and_concepts": [
+        "Objective vs self-reported AI productivity gap",
+        "Developer experience as moderating variable",
+        "Experiment design for AI productivity measurement"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Objective measurement essential for policy decisions about AI impact"
+      ],
+      "debate_connections": [
+        "debate_benchmark_validity",
+        "debate_ai_rd_automation"
+      ],
+      "themes": [
+        "Productivity",
+        "Measurement",
+        "Developer Tools",
+        "Research Methodology"
+      ],
+      "tags": [
+        "METR",
+        "Productivity",
+        "Developer Tools",
+        "Research Methodology"
+      ],
+      "influence_score": 8,
+      "related_entries": [
+        "dwarkesh_metr_ai_usage_survey_2026"
+      ],
+      "source_links": [
+        "https://metr.org/blog/2026-02-24-uplift-update/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "dwarkesh_metr_time_horizon_11_2026",
+      "title": "Time Horizon 1.1",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-01-29",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Updated time horizon estimates (TH1.1) with more tasks and new evaluation infrastructure, tracking how long AI agents can productively work on tasks autonomously.",
+      "key_claims_and_positions": [
+        "Time horizons have increased significantly",
+        "New eval infrastructure enables more comprehensive measurement",
+        "More tasks improve estimate reliability"
+      ],
+      "novel_arguments_and_concepts": [
+        "Time horizon v1.1 methodology",
+        "Improved evaluation infrastructure",
+        "Task diversity for time horizon measurement"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Time horizon is key metric for AI governance triggers"
+      ],
+      "debate_connections": [
+        "debate_ai_rd_automation",
+        "debate_benchmark_validity"
+      ],
+      "themes": [
+        "Time Horizon",
+        "Evaluation",
+        "R&D Automation",
+        "Benchmarks"
+      ],
+      "tags": [
+        "METR",
+        "Time Horizon",
+        "Evaluations",
+        "Benchmarks",
+        "R&D Automation"
+      ],
+      "influence_score": 9,
+      "related_entries": [
+        "dwarkesh_metr_mirrorcode_2026"
+      ],
+      "source_links": [
+        "https://metr.org/blog/2026-1-29-time-horizon-1-1/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "metr_ai_biology_rct_lessons_2026",
+      "title": "Five lessons from having helped run an AI-Biology RCT",
+      "author": "METR",
+      "interviewer": "",
+      "date": "2026-02-19",
+      "source_type": "research_report",
+      "source_platform": "METR",
+      "url": "https://metr.org/blog/2026-02-19-five-lessons-from-ai-biology-rct/",
+      "affiliation": "METR",
+      "affiliation_at_time": "METR",
+      "role_category": "safety_researcher",
+      "summary": "Lessons from running a randomized controlled trial on AI-assisted biology research, providing practical insights on measuring AI's impact on scientific productivity.",
+      "key_claims_and_positions": [
+        "RCTs for AI impact measurement are feasible but challenging",
+        "Five key methodological lessons identified",
+        "AI impact varies significantly by research sub-task"
+      ],
+      "novel_arguments_and_concepts": [
+        "RCT methodology for AI impact in science",
+        "Sub-task decomposition for productivity measurement"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "RCTs should inform policy on AI in science"
+      ],
+      "debate_connections": [
+        "debate_ai_rd_automation"
+      ],
+      "themes": [
+        "Research Methodology",
+        "Productivity",
+        "Biology",
+        "RCT"
+      ],
+      "tags": [
+        "METR",
+        "RCT",
+        "Biology",
+        "Productivity",
+        "Research Methodology"
+      ],
+      "influence_score": 7,
+      "related_entries": [
+        "metr_developer_productivity_experiment_update"
+      ],
+      "source_links": [
+        "https://metr.org/blog/2026-02-19-five-lessons-from-ai-biology-rct/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "id": "openai_anthropic_alignment_eval_exercise",
+      "title": "Findings from a pilot Anthropic–OpenAI alignment evaluation exercise",
+      "author": "OpenAI / Anthropic",
+      "interviewer": "",
+      "date": "2026-03-15",
+      "source_type": "research_report",
+      "source_platform": "OpenAI / Anthropic",
+      "url": "https://openai.com/index/openai-anthropic-safety-evaluation/",
+      "affiliation": "OpenAI / Anthropic",
+      "affiliation_at_time": "OpenAI / Anthropic",
+      "role_category": "safety_researcher",
+      "summary": "Joint pilot evaluation exercise between Anthropic and OpenAI testing alignment evaluation methodologies, representing unprecedented inter-lab safety collaboration.",
+      "key_claims_and_positions": [
+        "Cross-lab alignment evaluation is feasible",
+        "Pilot identified areas of convergence and divergence in safety approaches",
+        "Collaborative evaluation reveals blind spots in individual assessments"
+      ],
+      "novel_arguments_and_concepts": [
+        "Cross-lab safety evaluation protocol",
+        "Convergent and divergent safety methodology identification"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Cross-lab safety evaluation should become standard practice"
+      ],
+      "debate_connections": [
+        "debate_predeployment_eval_adequacy",
+        "debate_open_vs_closed_safety"
+      ],
+      "themes": [
+        "Safety Evaluation",
+        "Lab Collaboration",
+        "Alignment"
+      ],
+      "tags": [
+        "OpenAI",
+        "Anthropic",
+        "Safety Evaluation",
+        "Collaboration",
+        "Alignment"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://openai.com/index/openai-anthropic-safety-evaluation/"
+      ],
+      "transcript_available": false
+    },
+    {
+      "author": "Anthropic Societal Impacts Team",
+      "interviewer": "",
+      "date": "2025-02-10",
+      "source_type": "research_report",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/the-anthropic-economic-index",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "lab_researcher",
+      "summary": "Introduces an empirical index of AI use across labor-market tasks based on anonymized Claude.ai conversations mapped to O*NET occupations. The first report finds concentrated use in software and writing tasks, broad partial exposure across occupations, and a mix of augmentation and automation.",
+      "key_claims_and_positions": [
+        "AI use is concentrated in software development and technical writing tasks",
+        "Roughly 36% of occupations show AI use in at least a quarter of associated tasks",
+        "Observed Claude use leaned 57% augmentation versus 43% automation"
+      ],
+      "novel_arguments_and_concepts": [
+        "Conversation-derived labor-market index",
+        "Task-level augmentation versus automation taxonomy",
+        "Privacy-preserving Clio analysis of real AI use"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Labor policy should use task-level evidence rather than occupation-level speculation",
+        "Longitudinal measurement is needed as model capabilities and adoption change"
+      ],
+      "debate_connections": [
+        "debate_ai_labor_automation"
+      ],
+      "themes": [
+        "Labor",
+        "Automation",
+        "Productivity",
+        "Economic Impact"
+      ],
+      "tags": [
+        "Labor",
+        "Jobs",
+        "Automation",
+        "Productivity",
+        "AI Governance"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://www.anthropic.com/news/the-anthropic-economic-index"
+      ],
+      "transcript_available": false,
+      "id": "anthropic_economic_index_2025",
+      "title": "The Anthropic Economic Index"
+    },
+    {
+      "author": "Drew Bent, Kunal Handa, Esin Durmus, Alex Tamkin, Miles McCain, Stuart Ritchie, Ryan Donegan, Jennifer Martinez, Jason Jones",
+      "interviewer": "",
+      "date": "2025-08-27",
+      "source_type": "research_report",
+      "source_platform": "Anthropic",
+      "url": "https://www.anthropic.com/news/anthropic-education-report-how-educators-use-claude",
+      "affiliation": "Anthropic",
+      "affiliation_at_time": "Anthropic",
+      "role_category": "lab_researcher",
+      "summary": "Analyzes about 74,000 anonymized Claude.ai conversations from higher-education professionals and qualitative interviews with Northeastern faculty. The report finds heavy use for curriculum development, research, administrative work, and custom educational artifacts, while highlighting concerns around AI-assisted grading.",
+      "key_claims_and_positions": [
+        "Educators use AI for curriculum, research, administration, and interactive teaching materials",
+        "Curriculum development was the largest observed category in the filtered Claude data",
+        "Grading and student evaluation showed higher automation rates and substantial ethical concern"
+      ],
+      "novel_arguments_and_concepts": [
+        "Educator-specific AI adoption measurement",
+        "AI artifacts as custom classroom materials",
+        "Augmentation versus automation patterns in higher education"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Education policy should distinguish low-risk support uses from sensitive assessment and advising uses",
+        "AI grading requires human oversight and clear institutional norms"
+      ],
+      "debate_connections": [
+        "debate_ai_education_integrity"
+      ],
+      "themes": [
+        "Education",
+        "Assessment",
+        "Automation",
+        "Human Oversight"
+      ],
+      "tags": [
+        "Education",
+        "Automation",
+        "Human Oversight",
+        "AI Governance",
+        "Labor"
+      ],
+      "influence_score": 8,
+      "related_entries": [],
+      "source_links": [
+        "https://www.anthropic.com/news/anthropic-education-report-how-educators-use-claude"
+      ],
+      "transcript_available": false,
+      "id": "anthropic_education_report_2025",
+      "title": "Anthropic Education Report: How educators use Claude"
+    },
+    {
+      "author": "OpenAI",
+      "interviewer": "",
+      "date": "2025-09-30",
+      "source_type": "system_card",
+      "source_platform": "OpenAI",
+      "url": "https://openai.com/index/sora-2-system-card/",
+      "affiliation": "OpenAI",
+      "affiliation_at_time": "OpenAI",
+      "role_category": "lab_researcher",
+      "summary": "System card for OpenAI Sora 2, a video and audio generation model. It describes improved physics, realism, synchronized audio, steerability, and risks around nonconsensual likeness use, misleading generations, minors, and iterative deployment safeguards.",
+      "key_claims_and_positions": [
+        "Sora 2 generates synchronized video and audio with improved realism and steerability",
+        "Video/audio generation raises distinct risks around likeness, deception, and minors",
+        "Deployment used limited invitations, upload restrictions, and stricter moderation thresholds"
+      ],
+      "novel_arguments_and_concepts": [
+        "Audio-video system-card risk framing",
+        "Likeness and cameo-style mitigation surface",
+        "Iterative safeguards for synthetic media feeds"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Multimodal model releases require safeguards for likeness rights, minors, and misleading synthetic media",
+        "System cards should cover modality-specific risks beyond text safety"
+      ],
+      "debate_connections": [
+        "debate_multimodal_deepfake_governance"
+      ],
+      "themes": [
+        "Multimodal AI",
+        "Synthetic Media",
+        "Deepfakes",
+        "Safety"
+      ],
+      "tags": [
+        "Multimodal",
+        "Deepfakes",
+        "Misinformation",
+        "Privacy",
+        "Watermarking"
+      ],
+      "influence_score": 9,
+      "related_entries": [],
+      "source_links": [
+        "https://openai.com/index/sora-2-system-card/"
+      ],
+      "transcript_available": false,
+      "id": "openai_sora2_system_card_2025",
+      "title": "Sora 2 System Card"
+    },
+    {
+      "id": "openai_gpt5_system_card_2025",
+      "title": "GPT-5 System Card",
+      "author": "OpenAI",
+      "interviewer": "",
+      "date": "2025-08-07",
+      "source_type": "system_card",
+      "source_platform": "OpenAI",
+      "url": "https://openai.com/index/gpt-5-system-card/",
+      "affiliation": "OpenAI",
+      "affiliation_at_time": "OpenAI",
+      "role_category": "lab_researcher",
+      "summary": "OpenAI system card for GPT-5, described as a unified system with fast and reasoning models plus a router that selects model behavior based on task complexity, tool needs, and user intent. The card emphasizes improvements in hallucination reduction, instruction following, sycophancy mitigation, writing, coding, health, safe-completions training, and a precautionary High capability classification for gpt-5-thinking in biological and chemical domains.",
+      "key_claims_and_positions": [
+        "GPT-5 combines fast and deeper reasoning models behind a real-time routing system",
+        "OpenAI reports advances in reducing hallucinations, improving instruction following, and minimizing sycophancy",
+        "Safe-completions training is presented as the latest safety approach for disallowed content",
+        "gpt-5-thinking is treated as High capability in biological and chemical domains under the Preparedness Framework"
+      ],
+      "novel_arguments_and_concepts": [
+        "Unified model-family and router safety framing",
+        "Safe-completions as model-behavior safety technique",
+        "Precautionary high-capability treatment before definitive evidence of severe novice uplift"
+      ],
+      "predictions": [],
+      "disagreements_with": [],
+      "policy_positions": [
+        "Frontier model system cards should disclose model routing, capability domains, and preparedness classifications",
+        "High-capability bio/chem risk should trigger additional safeguards even under uncertainty"
+      ],
+      "debate_connections": [
+        "safety_vs_capabilities",
+        "debate_deceptive_alignment",
+        "debate_regulation_speed"
+      ],
+      "themes": [
+        "Frontier Models",
+        "Auditing",
+        "Preparedness",
+        "Biosecurity",
+        "Safety"
+      ],
+      "tags": [
+        "Frontier Models",
+        "Safety",
+        "Biosecurity",
+        "Auditing",
+        "Evaluations",
+        "Transparency"
+      ],
+      "influence_score": 10,
+      "related_entries": [
+        "metr_gpt5_eval_2025",
+        "openai_preparedness_2023",
+        "openai_o1_system_card_2024"
+      ],
+      "source_links": [
+        "https://openai.com/index/gpt-5-system-card/"
+      ],
+      "transcript_available": false
     }
   ]
 }

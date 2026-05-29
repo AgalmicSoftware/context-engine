@@ -156,57 +156,63 @@ jest.mock('../DemoViews/CorpusViewer', () => {
   const React = require('react');
   const fullCorpusUrl = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
 
-  return {
-    __esModule: true,
-    default: (props) => {
-      mockCorpusViewer(props);
-      React.useEffect(() => {
-        let cancelled = false;
-        if (Number(props.externalLoadRequestNonce || 0) <= 0) return undefined;
+  function MockCorpusViewer({
+    externalLoadRequestNonce,
+    onAtlasIssueOpen,
+    onExternalLoadStateChange,
+  }) {
+    mockCorpusViewer({ externalLoadRequestNonce, onAtlasIssueOpen, onExternalLoadStateChange });
+    React.useEffect(() => {
+      let cancelled = false;
+      if (Number(externalLoadRequestNonce || 0) <= 0) return undefined;
 
-        const loadCorpus = async () => {
-          props.onExternalLoadStateChange?.({
+      const loadCorpus = async () => {
+        onExternalLoadStateChange?.({
+          activeCorpusKey: 'cross_corpus',
+          activeCorpusLabel: 'Cross-Corpus',
+          loadStatus: 'loading',
+          loadButtonLabel: 'Loading full corpus...',
+          disableLoadButton: true,
+          error: '',
+        });
+        const response = await global.fetch(fullCorpusUrl, { cache: 'no-store' });
+        if (response?.json) await response.json();
+        if (!cancelled) {
+          onExternalLoadStateChange?.({
             activeCorpusKey: 'cross_corpus',
             activeCorpusLabel: 'Cross-Corpus',
-            loadStatus: 'loading',
-            loadButtonLabel: 'Loading full corpus...',
+            loadStatus: 'loaded',
+            loadButtonLabel: 'Full corpus loaded',
             disableLoadButton: true,
             error: '',
           });
-          const response = await global.fetch(fullCorpusUrl, { cache: 'no-store' });
-          if (response?.json) await response.json();
-          if (!cancelled) {
-            props.onExternalLoadStateChange?.({
-              activeCorpusKey: 'cross_corpus',
-              activeCorpusLabel: 'Cross-Corpus',
-              loadStatus: 'loaded',
-              loadButtonLabel: 'Full corpus loaded',
-              disableLoadButton: true,
-              error: '',
-            });
-          }
-        };
+        }
+      };
 
-        loadCorpus();
-        return () => {
-          cancelled = true;
-        };
-      }, [props.externalLoadRequestNonce, props.onExternalLoadStateChange]);
+      loadCorpus();
+      return () => {
+        cancelled = true;
+      };
+    }, [externalLoadRequestNonce, onExternalLoadStateChange]);
 
-      return React.createElement(
-        'div',
-        { 'data-testid': 'corpus-viewer' },
-        React.createElement('button', { type: 'button' }, 'Tweets'),
-        React.createElement(
-          'button',
-          {
-            type: 'button',
-            onClick: () => props.onAtlasIssueOpen?.('0x2110000000000000000000000000000000000000000000000000000000000000'),
-          },
-          'Exponential Progress Debate',
-        ),
-      );
-    },
+    return React.createElement(
+      'div',
+      { 'data-testid': 'corpus-viewer' },
+      React.createElement('button', { type: 'button' }, 'Tweets'),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => onAtlasIssueOpen?.('0x2110000000000000000000000000000000000000000000000000000000000000'),
+        },
+        'Exponential Progress Debate',
+      ),
+    );
+  }
+
+  return {
+    __esModule: true,
+    default: MockCorpusViewer,
   };
 });
 jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
@@ -332,7 +338,11 @@ describe('OnePageSession results routing', () => {
     expect(loadButton).toHaveTextContent('Load full corpus');
     expect(loadButton.parentElement).toBe(githubLink.parentElement);
 
-    fireEvent.click(loadButton);
+    await act(async () => {
+      fireEvent.click(loadButton);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -641,6 +651,22 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByTestId('polis-report')).toBeInTheDocument();
   });
 
+  it('keeps selected results mode button glow inside a contained scroller gutter', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const tabletResultsBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 1024px)',
+      '.resultsModeActionsScroller'
+    );
+
+    expect(scss).toMatch(/\.resultsModeActionsScroller\s*{[\s\S]*?padding-block:\s*6px;[\s\S]*?margin-block:\s*-6px;/);
+    expect(tabletResultsBlock).toContain('.resultsModeActionsScroller');
+    expect(tabletResultsBlock).toContain('max-width: 100%;');
+    expect(tabletResultsBlock).toContain('overflow-x: auto;');
+    expect(tabletResultsBlock).toContain('overflow-y: hidden;');
+    expect(tabletResultsBlock).toContain('padding: 6px 10px;');
+  });
+
   it('keeps DebateSelector out of debate map mode', async () => {
     const props = buildProps();
 
@@ -905,7 +931,9 @@ describe('OnePageSession results routing', () => {
     expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
     expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
     expect(polisButton).toHaveAttribute('aria-pressed', 'false');
-    expect(mockDemoAnalysisWorkspace).toHaveBeenCalled();
+    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionSlug: 'demo' })
+    );
   });
 
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {

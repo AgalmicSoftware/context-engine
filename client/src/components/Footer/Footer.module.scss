@@ -1,7 +1,7 @@
 /* ---------------------------------------------------- Footer.tsx ---------------------------------------------------- */
 
 @media (min-width: 0px) and (max-width: 319px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -14,14 +14,34 @@
     nav {
       width: 100%;
       ul {
-        display: flex;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        justify-content: stretch;
         align-items: center;
-        flex-wrap: wrap;
+        gap: 4px;
         width: 100%;
+        li {
+          min-width: 0;
+          width: 100%;
+        }
+        li .footerLink {
+          align-items: center;
+          display: flex;
+          font-size: clamp(0.9rem, 5.4vw, 1.08rem);
+          font-weight: 700;
+          justify-content: center;
+          letter-spacing: 0;
+          margin-left: 0;
+          margin-right: 0;
+          min-height: 42px;
+          padding: 8px 4px;
+          text-align: center;
+          white-space: nowrap;
+          width: 100%;
+        }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -30,7 +50,7 @@
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -43,14 +63,34 @@
     nav {
       width: 100%;
       ul {
-        display: flex;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        justify-content: stretch;
         align-items: center;
-        flex-wrap: wrap;
+        gap: 4px;
         width: 100%;
+        li {
+          min-width: 0;
+          width: 100%;
+        }
+        li .footerLink {
+          align-items: center;
+          display: flex;
+          font-size: clamp(0.86rem, 3.05vw, 1.08rem);
+          font-weight: 700;
+          justify-content: center;
+          letter-spacing: 0;
+          margin-left: 0;
+          margin-right: 0;
+          min-height: 44px;
+          padding: 8px 2px;
+          text-align: center;
+          white-space: nowrap;
+          width: 100%;
+        }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -59,7 +99,7 @@
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #footer {
+  .footer {
     padding: 0;
     border-color: var(--ce-color-info);
     border-style: solid;
@@ -72,14 +112,34 @@
     nav {
       width: 100%;
       ul {
-        display: flex;
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        justify-content: stretch;
         align-items: center;
-        flex-wrap: wrap;
+        gap: 6px;
         width: 100%;
+        li {
+          min-width: 0;
+          width: 100%;
+        }
+        li .footerLink {
+          align-items: center;
+          display: flex;
+          font-size: clamp(1rem, 2.4vw, 1.22rem);
+          font-weight: 700;
+          justify-content: center;
+          letter-spacing: 0;
+          margin-left: 0;
+          margin-right: 0;
+          min-height: 46px;
+          padding: 8px 4px;
+          text-align: center;
+          white-space: nowrap;
+          width: 100%;
+        }
       }
     }
-    #copyright {
+    .copyright {
       text-align: center;
       line-height: 1.5;
       font-family: inherit;
@@ -88,7 +148,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #footer {
+  .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -101,7 +161,7 @@
     border-left-width: 0px;
     border-right-width: 0px;
     background: transparent;
-    #copyright {
+    .copyright {
       justify-self: flex-end;
       font-family: inherit;
     }
@@ -109,7 +169,7 @@
 }
 
 @media (min-width: 1367px) {
-  #footer {
+  .footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -122,7 +182,7 @@
     border-left-width: 0px;
     border-right-width: 0px;
     background: transparent;
-    #copyright {
+    .copyright {
       justify-self: flex-end;
       font-family: inherit;
       color: #ffffff5e;
@@ -130,14 +190,14 @@
   }
 }
 
-#footer {
+.footer {
   margin-top: 3%;
-  #copyright {
+  .copyright {
     font-size: 1rem;
   }
 }
 
-#footerLink {
+.footerLink {
   font-size: 1rem;
   margin-left: 5px;
   margin-right: 5px;

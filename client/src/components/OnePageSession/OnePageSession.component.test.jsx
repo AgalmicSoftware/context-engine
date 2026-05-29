@@ -243,6 +243,23 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
+  it('shows a Telegram-only notice instead of the web session UI', async () => {
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      }}
+    />);
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
+      /Telegram-only session/i
+    );
+    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
+    expect(mockSurveyPage).not.toHaveBeenCalled();
+  });
+
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
     render(<OnePageSession
       {...buildProps()}
@@ -280,7 +297,7 @@ describe('OnePageSession view gating', () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    const titleHeading = document.getElementById(styles.brandingSectionTitle);
+    const titleHeading = document.querySelector(`.${styles.brandingSectionTitle}`);
     const titleContainer = titleHeading?.closest(`.${styles.titleContainer}`);
     const latestSurveyPageProps = mockSurveyPage.mock.calls[mockSurveyPage.mock.calls.length - 1]?.[0];
 
@@ -438,7 +455,7 @@ describe('OnePageSession view gating', () => {
     }
   });
 
-  it('aggregates embedded PolisReport question responses across list scope on session pages', async () => {
+  it('keeps embedded PolisReport question responses scoped to visible route questions', async () => {
     jest.useFakeTimers();
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
@@ -450,11 +467,39 @@ describe('OnePageSession view gating', () => {
         if (slug === 'edge') {
           return {
             '84532': {
+              questions: {
+                q1: { id: 'q1', prompt: 'Edge prompt', type: 'binary' },
+                qPending: {
+                  id: 'qPending',
+                  prompt: '[encrypted]',
+                  type: 'binary',
+                  __ceQuestionMetadataPending: true,
+                },
+                qForeignExplicit: {
+                  id: 'qForeignExplicit',
+                  prompt: 'Foreign prompt',
+                  type: 'binary',
+                  sessionSlug: 'demo',
+                  sessionSlugExplicit: true,
+                },
+              },
               questionResponses: {
                 q1: {
                   '0xedge': {
                     type: 'binary',
                     answer: { value: 'yes', encrypted: false },
+                  },
+                },
+                qPending: {
+                  '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526': {
+                    type: 'binary',
+                    answer: { value: 'no', encrypted: false },
+                  },
+                },
+                qForeignExplicit: {
+                  '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526': {
+                    type: 'binary',
+                    answer: { value: 'no', encrypted: false },
                   },
                 },
               },
@@ -498,6 +543,7 @@ describe('OnePageSession view gating', () => {
       const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
       const latestQuestionResponses = polisCalls[polisCalls.length - 1]?.questionResponses || {};
       expect(Object.keys(latestQuestionResponses).sort()).toEqual(['q1']);
+      expect(JSON.stringify(latestQuestionResponses)).not.toContain('0x02a2a289d5cde3c7d7b957c7f32299ca35d53526');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
@@ -550,7 +596,31 @@ describe('OnePageSession view gating', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneBlock = extractMediaBlock(scss, '@media only screen and (max-width: 600px)', '.onePageDemoContainer');
     const smallTabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 601px) and (max-width: 767px)', '.sectionHeader {');
+    const tabletBlock = extractMediaBlock(scss, '@media only screen and (min-width: 768px) and (max-width: 1024px)', '.onePageDemoContainer');
+    const resultsTabletBlock = extractMediaBlock(scss, '@media only screen and (max-width: 1024px)', '.resultsModeActionsScroller');
+    const sectionContainerBlock = extractMediaBlock(scss, '.sectionContainer {');
+    const sectionHeaderRowBlock = extractMediaBlock(scss, '.sectionHeaderRow {');
+    const sectionActionsScrollerBlock = extractMediaBlock(scss, '.sectionHeaderActionsScroller {');
+    const miniContentBlock = extractMediaBlock(scss, '.miniSectionContent {');
+    const sectionsGridBlock = extractMediaBlock(scss, '.sectionsGrid {');
 
+    expect(sectionContainerBlock).toContain('box-sizing: border-box;');
+    expect(sectionContainerBlock).toContain('max-width: 100%;');
+    expect(sectionContainerBlock).toContain('min-width: 0;');
+    expect(sectionHeaderRowBlock).toContain('max-width: 100%;');
+    expect(sectionHeaderRowBlock).toContain('min-width: 0;');
+    expect(sectionActionsScrollerBlock).toContain('box-sizing: border-box;');
+    expect(sectionActionsScrollerBlock).toContain('max-width: 100%;');
+    expect(miniContentBlock).toContain('box-sizing: border-box;');
+    expect(miniContentBlock).toContain('max-width: 100%;');
+    expect(miniContentBlock).toContain('min-width: 0;');
+    expect(miniContentBlock).toContain('overflow-x: auto;');
+    expect(sectionsGridBlock).toContain('max-width: 100%;');
+    expect(sectionsGridBlock).toContain('min-width: 0;');
+    expect(resultsTabletBlock).toContain('.resultsModeActionsScroller {');
+    expect(resultsTabletBlock).toContain('max-width: 100%;');
+    expect(resultsTabletBlock).toContain('overflow-x: auto;');
+    expect(resultsTabletBlock).toContain('overflow-y: hidden;');
     expect(phoneBlock).toContain('.sectionContainer');
     expect(phoneBlock).toContain('border: none;');
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
@@ -561,10 +631,28 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
     expect(phoneBlock).toContain('opacity: 0.6;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderText {');
+    expect(phoneBlock).toContain('grid-template-areas:');
+    expect(phoneBlock).toContain('"title subtitle"');
+    expect(phoneBlock).toContain('"actions actions";');
+    expect(phoneBlock).toContain('.documentsSectionHeaderTitleRow {');
+    expect(phoneBlock).toContain('display: contents;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
+    expect(phoneBlock).toContain('margin-right: 0;');
+    expect(phoneBlock).toContain('grid-area: actions;');
+    expect(phoneBlock).toContain('justify-content: flex-end;');
+    expect(phoneBlock).toContain('flex-wrap: wrap;');
+    expect(phoneBlock).toContain('box-sizing: border-box;');
+    expect(phoneBlock).toContain('padding-right: 10px;');
     expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
     expect(phoneBlock).toContain('justify-content: center;');
     expect(phoneBlock).toContain('min-height: 44px;');
     expect(phoneBlock).toContain('min-width: 44px;');
+    expect(phoneBlock).toContain('.pileHeaderRow {');
+    expect(phoneBlock).toContain('flex-wrap: nowrap;');
+    expect(phoneBlock).toContain('.pileHeaderTitleWrap {');
+    expect(phoneBlock).toContain('width: auto;');
+    expect(phoneBlock).toContain('font-size: clamp(1.25rem, 4.7vw, 1.55rem);');
     expect(smallTabletBlock).toContain('.sectionHeader {');
     expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
@@ -576,13 +664,36 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('font-size: 1.2em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
     expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderText {');
+    expect(smallTabletBlock).toContain('grid-template-areas:');
+    expect(smallTabletBlock).toContain('"title subtitle"');
+    expect(smallTabletBlock).toContain('"actions actions";');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderTitleRow {');
+    expect(smallTabletBlock).toContain('display: contents;');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMain .sectionToggleIcon {');
+    expect(smallTabletBlock).toContain('margin-right: 0;');
+    expect(smallTabletBlock).toContain('grid-area: actions;');
+    expect(smallTabletBlock).toContain('justify-content: flex-end;');
+    expect(smallTabletBlock).toContain('flex-wrap: wrap;');
+    expect(smallTabletBlock).toContain('box-sizing: border-box;');
+    expect(smallTabletBlock).toContain('padding-right: 10px;');
     expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
     expect(smallTabletBlock).toContain('justify-content: center;');
     expect(smallTabletBlock).toContain('min-height: 44px;');
     expect(smallTabletBlock).toContain('min-width: 44px;');
     expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
     expect(smallTabletBlock).toContain('opacity: 0.6;');
+    expect(smallTabletBlock).toContain('.pileHeaderRow {');
+    expect(smallTabletBlock).toContain('flex-wrap: nowrap;');
+    expect(smallTabletBlock).toContain('.pileHeaderTitleWrap {');
+    expect(smallTabletBlock).toContain('width: auto;');
+    expect(smallTabletBlock).toContain('font-size: clamp(1.35rem, 4.2vw, 1.75rem);');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
+    expect(tabletBlock).toContain('.pileHeaderRow {');
+    expect(tabletBlock).toContain('flex-wrap: nowrap;');
+    expect(tabletBlock).toContain('.pileHeaderTitleWrap {');
+    expect(tabletBlock).toContain('width: auto;');
+    expect(tabletBlock).toContain('font-size: clamp(1.4rem, 3.2vw, 1.9rem);');
     expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
   });
 

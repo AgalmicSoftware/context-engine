@@ -1224,10 +1224,12 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
         {panelDisplayState.shouldRenderFilterToggleButton && (
           <Button
             onClick={this.toggleFilterOptions}
-            id={styles.filterButton}
-            className={surfaceClassNames.filterButtonClassName}
+            className={[
+              styles.filterButton,
+              surfaceClassNames.filterButtonClassName,
+            ].filter(Boolean).join(' ')}
           >
-            {buttonText} <FontAwesomeIcon icon={faFilter} id={styles.filterButtonIcon} />
+            {buttonText} <FontAwesomeIcon icon={faFilter} className={styles.filterButtonIcon} />
           </Button>
         )}
 

@@ -134,6 +134,36 @@ describe('sbtPagePasswordExportHelpers', () => {
       fileName: 'ALPHA_group-passwords_2026-05-05.json',
       mimeType: 'application/json',
     });
+    expect(buildSbtPagePasswordExportFile({
+      codeLabel: 'groupPassword',
+      date: '2026-05-05',
+      fileLabel: 'group-passwords',
+      format: 'csv',
+      rows: [
+        {
+          groupPassword: 'alpha,beta',
+          inviteLink: 'https://app.example/session?gp=alpha,beta',
+        },
+        {
+          groupPassword: 'quote"code',
+          inviteLink: 'https://app.example/session?gp=quote"code',
+        },
+        {
+          groupPassword: 'line\nbreak',
+          inviteLink: 'https://app.example/session?gp=line%0Abreak',
+        },
+      ],
+      sbtSymbolOrName: 'ALPHA',
+    })).toEqual({
+      content: [
+        'index,groupPassword,inviteLink',
+        '0,"alpha,beta","https://app.example/session?gp=alpha,beta"',
+        '1,"quote""code","https://app.example/session?gp=quote""code"',
+        '2,"line\nbreak",https://app.example/session?gp=line%0Abreak',
+      ].join('\n'),
+      fileName: 'ALPHA_group-passwords_2026-05-05.csv',
+      mimeType: 'text/csv',
+    });
     expect(buildSbtPagePasswordExportFile({ format: 'txt' })).toBeNull();
   });
 

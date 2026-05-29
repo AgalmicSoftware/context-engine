@@ -56,6 +56,24 @@
   overflow: visible;
 }
 
+.telegramOnlyShell {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px 16px;
+}
+
+.telegramOnlyNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(42, 109, 244, 0.24);
+  border-radius: var(--ce-radius-8);
+  background: #f6f9ff;
+  color: #172033;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;
@@ -82,7 +100,7 @@
   }
 }
 
-#brandingSectionTitle {
+.brandingSectionTitle {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -235,6 +253,9 @@
 
 /* Each collapsible section wrapper (Questions, Groups, Results) */
 .sectionContainer {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
   margin-bottom: 20px;
   margin-top: 20px; // background-color: rgba(168, 116, 255, 0.08);
   background-color: #5c58a630;
@@ -249,6 +270,8 @@
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sectionHeader {
@@ -394,9 +417,11 @@
 }
 
 .sectionHeaderActionsScroller {
+  box-sizing: border-box;
   display: flex;
   flex: 1 1 320px;
   justify-content: flex-end;
+  max-width: 100%;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -414,6 +439,8 @@
 
 .resultsModeActionsScroller {
   min-width: 0;
+  padding-block: 6px;
+  margin-block: -6px;
 }
 
 .resultsModeActions {
@@ -480,10 +507,12 @@
 @media only screen and (max-width: 1024px) {
   .resultsModeActionsScroller {
     flex: 1 1 100%;
+    max-width: 100%;
     width: 100%;
     justify-content: flex-start;
-    overflow: visible;
-    padding: 0 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 6px 10px;
   }
 
   .resultsModeActions {
@@ -537,7 +566,11 @@
 
 /* The content area inside each collapsible section */
 .miniSectionContent {
+  box-sizing: border-box;
   margin-top: 15px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
   background: transparent; // border: 1px solid #bfa0f4;
   padding: 15px;
   border-radius: var(--ce-radius-4);
@@ -594,19 +627,37 @@
 
 .pileHeaderTitleWrap {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--ce-color-white);
 }
 
 .pileHeaderTitle {
-  opacity: 0.25;
+  opacity: 0.82;
   margin: 0;
   font-size: 2rem;
   line-height: 1.1;
   font-weight: 700;
   color: rgba(255, 255, 255, 0.92);
+
+  .sectionHeaderText {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+  }
+
+  .sectionHeaderTitle {
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .sectionHeaderSubtitle {
+    font-size: 0.72em;
+    color: rgba(255, 255, 255, 0.5);
+  }
 }
 
 .pileHeaderTooltip {
@@ -731,7 +782,7 @@
     padding-top: 0px !important;
   }
 
-  #brandingSectionTitle {
+  .brandingSectionTitle {
     font-size: 1.4rem;
   }
 
@@ -795,15 +846,61 @@
 
   .documentsSectionHeader {
     gap: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMain {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
+    column-gap: 10px;
     flex: 1 1 220px;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderMain .sectionToggleIcon {
+    margin-right: 0;
+    margin-top: 0.1em;
+  }
+
+  .documentsSectionHeaderText {
+    display: grid;
+    grid-template-areas:
+      "title subtitle"
+      "actions actions";
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderTitleRow {
+    display: contents;
+  }
+
+  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
+    grid-area: title;
+  }
+
+  .documentsSectionHeaderText > .sectionHeaderSubtitle {
+    grid-area: subtitle;
+    justify-self: start;
+    font-size: 0.82em;
+    line-height: 1;
   }
 
   .documentsSectionHeaderMeta {
     align-items: center;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    grid-area: actions;
+    justify-self: end;
+    justify-content: flex-end;
     gap: 8px;
+    padding-right: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
@@ -852,15 +949,32 @@
   }
 
   .pileHeaderRow {
+    align-items: center;
+    flex-wrap: nowrap;
     gap: 12px;
   }
 
   .pileHeaderTitleWrap {
-    width: 100%;
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
   .pileHeaderTitle {
-    font-size: 1.35em;
+    font-size: clamp(1.25rem, 4.7vw, 1.55rem);
+    opacity: 0.9;
+  }
+
+  .pileHeaderTooltip {
+    align-items: center;
+    justify-content: center;
+    display: inline-flex;
+    min-height: 42px;
+    min-width: 42px;
+    margin-left: 0;
+    margin-top: 0;
   }
 
   .miniSectionContent {
@@ -903,15 +1017,61 @@
 
   .documentsSectionHeader {
     gap: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMain {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
+    column-gap: 10px;
     flex: 1 1 220px;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderMain .sectionToggleIcon {
+    margin-right: 0;
+    margin-top: 0.1em;
+  }
+
+  .documentsSectionHeaderText {
+    display: grid;
+    grid-template-areas:
+      "title subtitle"
+      "actions actions";
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderTitleRow {
+    display: contents;
+  }
+
+  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
+    grid-area: title;
+  }
+
+  .documentsSectionHeaderText > .sectionHeaderSubtitle {
+    grid-area: subtitle;
+    justify-self: start;
+    font-size: 0.82em;
+    line-height: 1;
   }
 
   .documentsSectionHeaderMeta {
     align-items: center;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    grid-area: actions;
+    justify-self: end;
+    justify-content: flex-end;
     gap: 8px;
+    padding-right: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
@@ -932,6 +1092,35 @@
     font-size: 0.78rem;
     min-height: 40px;
     padding: 8px 11px;
+  }
+
+  .pileHeaderRow {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .pileHeaderTitleWrap {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .pileHeaderTitle {
+    font-size: clamp(1.35rem, 4.2vw, 1.75rem);
+    opacity: 0.9;
+  }
+
+  .pileHeaderTooltip {
+    align-items: center;
+    justify-content: center;
+    display: inline-flex;
+    min-height: 42px;
+    min-width: 42px;
+    margin-left: 0;
+    margin-top: 0;
   }
 }
 
@@ -1003,7 +1192,32 @@
   }
 
   .pileHeaderTitle {
-    font-size: 1.6em;
+    font-size: clamp(1.4rem, 3.2vw, 1.9rem);
+    opacity: 0.9;
+  }
+
+  .pileHeaderRow {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 14px;
+  }
+
+  .pileHeaderTitleWrap {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .pileHeaderTooltip {
+    align-items: center;
+    justify-content: center;
+    display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
+    margin-left: 0;
+    margin-top: 0;
   }
 
   .miniSectionContent {
@@ -1117,6 +1331,8 @@
   grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 12px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 @media (min-width: 768px) {

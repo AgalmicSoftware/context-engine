@@ -282,6 +282,78 @@ describe('sessionCorsWorker auth routes', () => {
     expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
   });
 
+  it('issues login tokens with exact mixed scopes from resource gates', async () => {
+    const fetchMock = buildRpcFetchMock({
+      rpcUrl,
+      registryAddress,
+      sessionExists: true,
+      onChainGatesByResource: {
+        default: { sbtAddresses: [], chainId: 84532, mode: 0 },
+        ai: { sbtAddresses: [protectedSbt], chainId: 84532, mode: 0 },
+        arweave: { sbtAddresses: [], chainId: 84532, mode: 0 },
+        rpc: { sbtAddresses: [], chainId: 84532, mode: 0 },
+        txGas: { sbtAddresses: [], chainId: 84532, mode: 0 },
+        lit: { sbtAddresses: [protectedSbt], chainId: 84532, mode: 0 },
+      },
+      balancesByToken: {
+        [protectedSbt.toLowerCase()]: 0,
+      },
+    });
+    global.fetch = fetchMock;
+
+    const kv = createMemoryKv({
+      [`session:${sessionSlug}:config`]: JSON.stringify({
+        registryAddress,
+        registryChainId: 84532,
+        rpcUrl,
+      }),
+    });
+    const env = {
+      GROUP_KV: kv,
+      TOKEN_HMAC_SECRET: 'test-secret',
+    };
+
+    const nonceResponse = await sessionCorsWorker.fetch(
+      makeAuthJsonRequest('/auth/nonce', {
+        address: wallet.address,
+        sessionSlug,
+      }),
+      env,
+      {}
+    );
+    const { nonce } = await nonceResponse.json();
+
+    const message = buildLoginSiweMessage({
+      address: wallet.address,
+      nonce,
+    });
+    const signature = await wallet.signMessage(message);
+
+    const loginResponse = await sessionCorsWorker.fetch(
+      makeAuthJsonRequest('/auth/login', {
+        address: wallet.address,
+        sessionSlug,
+        message,
+        signature,
+      }),
+      env,
+      {}
+    );
+    const payload = await loginResponse.json();
+
+    expect(loginResponse.status).toBe(200);
+    const tokenPayload = decodeTokenPayload(payload.token);
+    expect(tokenPayload.scopes).toEqual({
+      ai: false,
+      arweave: true,
+      transcribe: false,
+      faucet: true,
+      fetch: true,
+      lit: false,
+    });
+    expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
+  });
+
   it('rejects login when the nonce is reused after a successful login', async () => {
     const fetchMock = buildRpcFetchMock({
       rpcUrl,

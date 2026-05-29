@@ -696,7 +696,7 @@ export const TagPageView = ({
   demoCorpusMode = false,
   demoCorpusRecords = [],
   hideEmbeddedSessionSelector = false,
-}: TagPageViewProps = {}) => {
+}: TagPageViewProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [cacheVersion, setCacheVersion] = useState(0);
@@ -1519,9 +1519,9 @@ export const TagPageView = ({
   );
 };
 
-const mapStateToProps = (state: RootState) => ({
-  network: state?.profile?.network || null,
-  sessionState: state?.sessionState || {},
+const mapStateToProps = (state: RootState): Pick<TagPageViewProps, 'network' | 'sessionState'> => ({
+  network: (state?.profile?.network || null) as NetworkLike,
+  sessionState: (state?.sessionState || {}) as SessionSelectionState,
 });
 
 export default connect(mapStateToProps)(TagPageView);

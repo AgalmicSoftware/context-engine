@@ -197,6 +197,56 @@ const normalizeChildrenArray = (value) => (
   Array.isArray(value) ? value : [value].filter(Boolean)
 );
 
+describe('UserPage survey route boundaries', () => {
+  it('keeps parent-owned survey href and open callbacks aligned with session and responder routes', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({ viewAddress });
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      surveyResponseInfo: [{
+        documentURLs: [],
+        id: 'survey response',
+        questionsCount: 1,
+        slug: 'alpha',
+        tags: [],
+        title: 'Response Survey',
+      }],
+      surveyCreationInfo: [{
+        documentURLs: [],
+        id: 'created survey',
+        questionIDs: [],
+        questionsCount: 1,
+        slug: 'beta',
+        tags: [],
+        title: 'Created Survey',
+      }],
+    };
+    const tree = instance.render();
+    const [surveySection] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageSurveySection'
+    );
+
+    expect(surveySection).toBeTruthy();
+    expect(surveySection.props.getSurveyCreatedHref({ id: 'created survey' }, 'beta')).toBe(
+      '/survey/created%20survey?session=beta'
+    );
+
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const event = { stopPropagation: jest.fn() };
+    surveySection.props.onOpenSurveyResponse({ id: 'survey response', slug: 'alpha' }, event);
+
+    expect(event.stopPropagation).toHaveBeenCalledTimes(1);
+    expect(openSpy).toHaveBeenCalledWith(
+      '/survey/survey%20response?session=alpha&responder=0x00000000000000000000000000000000000000aa',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    openSpy.mockRestore();
+  });
+});
+
 describe('UserPage cold-load network fallback', () => {
   it('renders cached survey/question/sbt data when network id is unavailable', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';

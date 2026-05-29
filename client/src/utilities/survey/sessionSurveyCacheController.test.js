@@ -7,7 +7,7 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -20,23 +20,23 @@ jest.mock('../web3/contractScripts.js', () => ({
     removeSurveyEventsListener: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
-}), { virtual: true });
+}));
 
 jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
   __esModule: true,
   normalizeArweaveFailureMeta: jest.fn(),
   shouldStopPendingMetadataRetry: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../components/MainSite/metadataCacheEntryBuilders.js', () => ({
   __esModule: true,
   prepareSurveyMetadataCacheEntry: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../components/MainSite/metadataSessionBinding.js', () => ({
   __esModule: true,
   resolveScopedMetadataSessionSlug: jest.fn(),
-}), { virtual: true });
+}));
 
 const { createSessionSurveyCacheController } = require('./sessionSurveyCacheController.js');
 const contractScriptsModule = require('../web3/contractScripts.js');

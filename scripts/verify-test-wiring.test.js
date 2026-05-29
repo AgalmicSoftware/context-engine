@@ -37,19 +37,27 @@ test('public-release style copies without .git still pass wiring checks', () => 
         scripts: {
           'test:surveys-sbt':
             'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
+          'test:contracts':
+            'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
+          'test:root:jest':
+            "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../test/deployHelper.worker.test.js' '<rootDir>/../test/sessionCorsWorker.auth.test.js'",
+          'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
           'test:node': 'node scripts/run-node-tests.js',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
-          'test:ci': 'npm run test:wiring && npm run verify:release && npm run test:node',
+          'test:ci':
+            'npm run test:wiring && npm run verify:release && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
+          'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage',
+          'typecheck:client': 'npm --prefix client run typecheck',
           'worker:bundle': 'node scripts/worker-bundle.mjs',
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:release':
-            'npm run lint && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );
@@ -85,10 +93,14 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/deploy-helper-deploy.mjs',
       'scripts/run-node-tests.js',
       'scripts/run-node-tests.test.js',
+      'scripts/testInventoryConfig.js',
+      'scripts/verify-test-inventory.js',
+      'scripts/verify-test-inventory.test.js',
       'scripts/vite-navigation-smoke.js',
       'scripts/vite-navigation-smoke.test.js',
       'scripts/verify-worker-bundle-sync.mjs',
       'scripts/verify-worker-bundle-sync.test.js',
+      'workers/sessionCorsWorker/package.json',
       'workers/deploy-helper/wrangler.example.toml',
       'workers/deploy-helper/.dev.vars.example',
       'workers/deploy-helper/LICENSE',

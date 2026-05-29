@@ -1,4 +1,3 @@
-/* eslint-disable import/first */
 // SessionWizard deploy render coverage owns worker deploy, post-deploy sync, and Lit provisioning.
 import fs from 'fs';
 import React from 'react';

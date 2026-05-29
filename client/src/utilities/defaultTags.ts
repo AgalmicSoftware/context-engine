@@ -14,8 +14,8 @@ const toIterableArray = (value: unknown): unknown[] => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') return [];
   try {
-    const iterable = value as Iterable<unknown>;
-    if (typeof (iterable as any)?.[Symbol.iterator] === 'function') return Array.from(iterable);
+    const iterable = value as Iterable<unknown> & { [Symbol.iterator]?: unknown };
+    if (typeof iterable[Symbol.iterator] === 'function') return Array.from(iterable);
   } catch (e) { void e; /* fallback: non-iterable input. */ }
   return [];
 };

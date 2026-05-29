@@ -10,7 +10,6 @@ import {
 import {
   beeswarmByExtremity,
   buildComparisonReportRows,
-  getMinMaxAgreement,
 } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './ComparisonReport.module.scss';
 
@@ -29,6 +28,8 @@ type FlatResponse = {
   responseText: string;
   segmentKey: string;
   rate?: number;
+  totalVotes?: number;
+  participantCount?: number;
 };
 
 type QuestionTag = {
@@ -81,9 +82,14 @@ type TagLegendProps = {
   colorScale: ColorScale;
 };
 
-type RateVisualizerProps = {
-  groupRates: GroupRate[];
-  colorScale: ColorScale;
+type DistributionDataset = {
+  groupName: string;
+  segmentKey?: string;
+  meta: string;
+  rows: Array<{
+    responseText: string;
+    rate: number;
+  }>;
 };
 
 type BinaryResponseTone = 'agree' | 'unsure' | 'disagree';
@@ -93,7 +99,8 @@ type ComparisonReportProps = {
   questions?: Question[];
   comparisonGroups?: ComparisonGroup[];
   questionTagsData?: QuestionTagsById;
-  onInspectQuestion: (questionId: string) => void;
+  selectedTagIDs?: string[];
+  onSelectedTagIDsChange?: (tagIDs: string[]) => void;
 };
 
 const Collapse = ({ isOpen, children }: CollapseProps) => (isOpen ? <div>{children}</div> : null);
@@ -104,6 +111,8 @@ const BINARY_RESPONSE_TONE_BY_LABEL: Record<string, BinaryResponseTone> = {
   disagree: 'disagree',
 };
 
+const RESPONSE_ORDER = ['Agree', 'Unsure', 'Disagree'];
+
 const getBinaryResponseTone = (responseText = ''): BinaryResponseTone | null => {
   const normalized = String(responseText || '').trim().toLowerCase();
   return BINARY_RESPONSE_TONE_BY_LABEL[normalized] || null;
@@ -113,6 +122,63 @@ const getResponsePillToneClassName = (tone: BinaryResponseTone) => {
   if (tone === 'agree') return styles.responsePillAgree;
   if (tone === 'disagree') return styles.responsePillDisagree;
   return styles.responsePillUnsure;
+};
+
+const getCandlestickSegmentClassName = (responseText = '') => {
+  const tone = getBinaryResponseTone(responseText);
+  if (tone === 'agree') return styles.analysisCandleSegmentAgree;
+  if (tone === 'disagree') return styles.analysisCandleSegmentDisagree;
+  if (tone === 'unsure') return styles.analysisCandleSegmentUnsure;
+  return styles.analysisCandleSegmentOther;
+};
+
+const getOrderedResponseTexts = (rows: FlatResponse[] = [], preferredResponseText = '') => {
+  const responseSet = new Set(
+    rows
+      .map((row) => String(row?.responseText || '').trim())
+      .filter(Boolean)
+  );
+  const preferred = String(preferredResponseText || '').trim();
+  if (preferred) responseSet.add(preferred);
+
+  return [
+    ...RESPONSE_ORDER.filter((responseText) => responseSet.has(responseText)),
+    ...Array.from(responseSet)
+      .filter((responseText) => !RESPONSE_ORDER.includes(responseText))
+      .sort((left, right) => left.localeCompare(right)),
+  ];
+};
+
+const formatDistributionMeta = (rows: FlatResponse[] = []) => {
+  const modeledResponseCount = rows.reduce(
+    (max, row) => Math.max(max, Number(row?.totalVotes || 0)),
+    0
+  );
+  const participantCount = rows.reduce(
+    (max, row) => Math.max(max, Number(row?.participantCount || 0)),
+    modeledResponseCount
+  );
+
+  if (modeledResponseCount > 0 && participantCount > 0) {
+    return `${participantCount} ${participantCount === 1 ? 'persona' : 'personas'} · ${modeledResponseCount} modeled responses`;
+  }
+  if (modeledResponseCount > 0) {
+    return `${modeledResponseCount} ${modeledResponseCount === 1 ? 'modeled response' : 'modeled responses'}`;
+  }
+  if (participantCount > 0) {
+    return `${participantCount} ${participantCount === 1 ? 'response' : 'responses'}`;
+  }
+  return '';
+};
+
+const dedupeAnalysisItemsByQuestion = (items: AnalysisRow[] = []) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const questionId = String(item?.questionId || '');
+    if (!questionId || seen.has(questionId)) return false;
+    seen.add(questionId);
+    return true;
+  });
 };
 
 type ResponseLineProps = {
@@ -182,69 +248,57 @@ const TagLegend = ({ selectedTags, colorScale }: TagLegendProps) => {
   );
 };
 
-const DivergenceVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
-  const { min, max } = getMinMaxAgreement(groupRates);
-  const minColor = colorScale(groupRates.findIndex((group) => group.groupName === min.groupName));
-  const maxColor = colorScale(groupRates.findIndex((group) => group.groupName === max.groupName));
-
-  return (
-    <div className={styles.divergenceVisualizer}>
-      <div className={styles.divergencePoint}>
-        <div className={styles.pointLabel}>Lowest Agreement</div>
-        <div className={styles.groupName} style={{ borderLeftColor: minColor }}>{min.groupName}</div>
-        <div className={styles.percentage}>{`${(min.rate * 100).toFixed(0)}%`}</div>
-        <div className={styles.visualBarContainer}>
-          <div className={styles.visualBar} style={{ width: `${min.rate * 100}%`, backgroundColor: minColor }} />
+const DistributionCandlesticks = ({ datasets }: { datasets: DistributionDataset[] }) => (
+  <div className={styles.analysisDistributionList}>
+    {datasets.map((dataset) => (
+      <div key={dataset.segmentKey || dataset.groupName} className={styles.analysisDistributionDataset}>
+        <div className={styles.analysisDistributionHeader}>
+          <span className={styles.analysisDistributionTitle}>{dataset.groupName}</span>
+          {dataset.meta ? (
+            <span className={styles.analysisDistributionMeta}>{dataset.meta}</span>
+          ) : null}
+        </div>
+        <div
+          className={styles.analysisCandlestick}
+          data-testid={`ce-demo-analysis-card-candlestick-${dataset.segmentKey || dataset.groupName}`}
+          aria-label={`${dataset.groupName} response distribution: ${dataset.rows.map((row) => `${row.responseText} ${(row.rate * 100).toFixed(0)}%`).join(', ')}.`}
+        >
+          {dataset.rows.map((row) => (
+            <span
+              key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}`}
+              className={`${styles.analysisCandleSegment} ${getCandlestickSegmentClassName(row.responseText)}`}
+              style={{ width: `${Math.max(0, Math.min(100, row.rate * 100))}%` }}
+              title={`${row.responseText}: ${(row.rate * 100).toFixed(0)}%`}
+            />
+          ))}
+        </div>
+        <div className={styles.analysisDistributionLegend}>
+          {dataset.rows.map((row) => (
+            <span key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}:legend`} className={styles.analysisDistributionLegendItem}>
+              <span className={`${styles.analysisDistributionDot} ${getCandlestickSegmentClassName(row.responseText)}`} />
+              {row.responseText} {(row.rate * 100).toFixed(0)}%
+            </span>
+          ))}
         </div>
       </div>
-      <div className={styles.divergencePoint}>
-        <div className={styles.pointLabel}>Highest Agreement</div>
-        <div className={styles.groupName} style={{ borderLeftColor: maxColor }}>{max.groupName}</div>
-        <div className={styles.percentage}>{`${(max.rate * 100).toFixed(0)}%`}</div>
-        <div className={styles.visualBarContainer}>
-          <div className={styles.visualBar} style={{ width: `${max.rate * 100}%`, backgroundColor: maxColor }} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ConsensusVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
-  const sortedGroupRates = [...groupRates].sort((left, right) => right.rate - left.rate);
-
-  return (
-    <div className={styles.consensusVisualizer}>
-      <div className={styles.consensusBreakdown}>
-        {sortedGroupRates.map((group) => {
-          const originalIndex = groupRates.findIndex((entry) => entry.groupName === group.groupName);
-          const groupColor = colorScale(originalIndex);
-          return (
-            <div key={group.groupName} className={styles.consensusGroupItem}>
-              <div className={styles.groupName} style={{ borderLeftColor: groupColor }}>{group.groupName}</div>
-              <div className={styles.percentage}>{(group.rate * 100).toFixed(0)}%</div>
-              <div className={styles.visualBarContainer}>
-                <div className={styles.visualBar} style={{ width: `${group.rate * 100}%`, backgroundColor: groupColor }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+    ))}
+  </div>
+);
 
 const ComparisonReport = ({
   flatResponses = [],
   questions = [],
   comparisonGroups = [],
   questionTagsData = {},
-  onInspectQuestion,
+  selectedTagIDs: selectedTagIDsProp,
+  onSelectedTagIDsChange,
 }: ComparisonReportProps) => {
   const [consensusOpen, setConsensusOpen] = useState(true);
   const [divergenceOpen, setDivergenceOpen] = useState(true);
   const [beeswarmOpen, setBeeswarmOpen] = useState(true);
+  const [reportOpen, setReportOpen] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [selectedTagIDs, setSelectedTagIDs] = useState<Set<string>>(new Set());
+  const [internalSelectedTagIDs, setInternalSelectedTagIDs] = useState<Set<string>>(new Set());
   const [hoveredContent, setHoveredContent] = useState<React.ReactNode | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [swarmWidth, setSwarmWidth] = useState(700);
@@ -301,6 +355,11 @@ const ComparisonReport = ({
     const tagIDs = tagInfo.displayTags.map((tag) => tag.tagID);
     return d3.scaleOrdinal<string | number, string>(d3.schemeTableau10).domain(tagIDs);
   }, [tagInfo.displayTags]);
+
+  const selectedTagIDs = useMemo(
+    () => new Set(Array.isArray(selectedTagIDsProp) ? selectedTagIDsProp : Array.from(internalSelectedTagIDs)),
+    [internalSelectedTagIDs, selectedTagIDsProp]
+  );
 
   const filteredRows = useMemo(() => {
     if (selectedTagIDs.size === 0) return analysisRows;
@@ -359,14 +418,39 @@ const ComparisonReport = ({
   );
 
   const handleTagChange = (tagID: string) => {
-    setSelectedTagIDs((previous) => {
-      const next = new Set(previous);
-      if (next.has(tagID)) {
-        next.delete(tagID);
-      } else {
-        next.add(tagID);
-      }
-      return next;
+    const next = new Set(selectedTagIDs);
+    if (next.has(tagID)) {
+      next.delete(tagID);
+    } else {
+      next.add(tagID);
+    }
+
+    if (onSelectedTagIDsChange) {
+      onSelectedTagIDsChange(Array.from(next));
+      return;
+    }
+
+    setInternalSelectedTagIDs(next);
+  };
+
+  const buildDistributionDatasets = (item: AnalysisRow): DistributionDataset[] => {
+    const questionRows = flatResponses.filter((row) => String(row.questionId) === String(item.questionId));
+    const responseTexts = getOrderedResponseTexts(questionRows, item.responseText);
+
+    return comparisonGroups.map((group) => {
+      const groupRows = questionRows.filter((row) => row.segmentKey === group.segmentKey);
+      return {
+        groupName: group.name,
+        segmentKey: group.segmentKey,
+        meta: formatDistributionMeta(groupRows),
+        rows: responseTexts.map((responseText) => {
+          const matchingRow = groupRows.find((row) => row.responseText === responseText);
+          return {
+            responseText,
+            rate: Math.max(0, Math.min(1, Number(matchingRow?.rate || 0))),
+          };
+        }),
+      };
     });
   };
 
@@ -434,29 +518,14 @@ const ComparisonReport = ({
 
     return (
       <ul className={styles.analysisList}>
-        {items.map((item) => {
-          const colorizedGroupRates = item.groupRates.map((groupRate, index) => ({
-            ...groupRate,
-            color: groupColorScale(index),
-          }));
-          const scoreElement = type === 'Consensus'
-            ? <ConsensusVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />
-            : <DivergenceVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />;
-
-          return (
-            <li key={`${type}:${item.questionId}:${item.responseText}`} className={styles.analysisListItem}>
-              <button
-                type="button"
-                className={styles.reportButtonReset}
-                onClick={() => onInspectQuestion(item.questionId)}
-              >
-                <div className={styles.questionText}>{item.questionText}</div>
-                <ResponseLine responseText={item.responseText} />
-                <div className={styles.scoreVisualizerContainer}>{scoreElement}</div>
-              </button>
-            </li>
-          );
-        })}
+        {dedupeAnalysisItemsByQuestion(items).map((item) => (
+          <li key={`${type}:${item.questionId}`} className={styles.analysisListItem}>
+            <div className={styles.reportAnalysisContent}>
+              <div className={styles.questionText}>{item.questionText}</div>
+              <DistributionCandlesticks datasets={buildDistributionDatasets(item)} />
+            </div>
+          </li>
+        ))}
       </ul>
     );
   };
@@ -474,6 +543,7 @@ const ComparisonReport = ({
   }
 
   const tagsToDisplay = showAllTags ? tagInfo.displayTags : tagInfo.displayTags.slice(0, 10);
+  const comparisonSummary = `Comparing ${comparisonGroups.map((group) => group.name).join(', ')}`;
 
   return (
     <div
@@ -482,86 +552,104 @@ const ComparisonReport = ({
       ref={containerRef}
       onMouseMove={handleMouseMove}
     >
-      <h3 className={styles.mainReportTitle}>Comparison Report</h3>
-      <p data-testid="demo-analysis-report-summary" style={{ marginTop: '-0.25rem', marginBottom: '1rem', color: '#6c757d' }}>
-        Comparing {comparisonGroups.map((group) => group.name).join(', ')}
-      </p>
+      <button
+        type="button"
+        className={styles.reportCollapseHeader}
+        aria-expanded={reportOpen}
+        aria-controls="demo-analysis-comparison-report-body"
+        data-testid="demo-analysis-comparison-report-toggle"
+        onClick={() => setReportOpen((value) => !value)}
+      >
+        <span className={styles.reportCollapseCopy}>
+          <span className={styles.mainReportTitle}>Comparison Report</span>
+          <span className={styles.reportSummaryText} data-testid="demo-analysis-report-summary">
+            {comparisonSummary}
+          </span>
+        </span>
+        <FontAwesomeIcon className={styles.reportCollapseIcon} icon={reportOpen ? faCaretUp : faCaretDown} />
+      </button>
 
-      <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
-      <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
+      <Collapse isOpen={reportOpen}>
+        <div id="demo-analysis-comparison-report-body" className={styles.reportCollapseBody} data-testid="demo-analysis-comparison-report-body">
 
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
-            Similarity & Difference Spectrum
-          </h5>
-        </div>
-        <Collapse isOpen={beeswarmOpen}>
-          {tagInfo.displayTags.length > 0 && (
-            <div className={styles.reportTagFilter}>
-              <h6 className={styles.reportTagFilterHeader}>
-                <FontAwesomeIcon icon={faTags} />
-                Filter by Tag
-              </h6>
-              <div className={styles.reportTagFilterCheckboxes}>
-                {tagsToDisplay.map((tag) => (
-                  <label key={tag.tagID} className={styles.reportTagFilterCheckboxItem}>
-                    <input
-                      type="checkbox"
-                      checked={selectedTagIDs.has(tag.tagID)}
-                      onChange={() => handleTagChange(tag.tagID)}
-                    />
-                    {tag.tagName} ({tagInfo.tagCounts[tag.tagID]})
-                  </label>
-                ))}
-              </div>
-              {tagInfo.displayTags.length > 10 && (
-                <div className={styles.viewMoreContainer}>
-                  <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
-                    {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
-                  </button>
+          <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
+          <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
+                Similarity & Difference Spectrum
+              </h5>
+            </div>
+            <Collapse isOpen={beeswarmOpen}>
+              {tagInfo.displayTags.length > 0 && (
+                <div className={styles.reportTagFilter}>
+                  <h6 className={styles.reportTagFilterHeader}>
+                    <FontAwesomeIcon icon={faTags} />
+                    Filter by Tag
+                  </h6>
+                  <div className={styles.reportTagFilterCheckboxes}>
+                    {tagsToDisplay.map((tag) => (
+                      <label key={tag.tagID} className={styles.reportTagFilterCheckboxItem}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTagIDs.has(tag.tagID)}
+                          onChange={() => handleTagChange(tag.tagID)}
+                        />
+                        {tag.tagName} ({tagInfo.tagCounts[tag.tagID]})
+                      </label>
+                    ))}
+                  </div>
+                  {tagInfo.displayTags.length > 10 && (
+                    <div className={styles.viewMoreContainer}>
+                      <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
+                        {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
+              {renderBeeswarmPlot()}
+            </Collapse>
+          </div>
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
+                Top Similar Items
+              </h5>
+            </div>
+            <Collapse isOpen={consensusOpen}>
+              {renderAnalysisList(analysisResults.topConsensus.slice(0, 5), 'Consensus')}
+            </Collapse>
+          </div>
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
+                Top Divergent Items
+              </h5>
+            </div>
+            <Collapse isOpen={divergenceOpen}>
+              {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
+            </Collapse>
+          </div>
+
+          {hoveredContent && (
+            <div
+              className={styles.beeTooltip}
+              data-testid="demo-analysis-beeswarm-tooltip"
+              style={{ left: tooltipPos.x, top: tooltipPos.y }}
+            >
+              {hoveredContent}
             </div>
           )}
-          {renderBeeswarmPlot()}
-        </Collapse>
-      </div>
 
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
-            Top Similar Items
-          </h5>
         </div>
-        <Collapse isOpen={consensusOpen}>
-          {renderAnalysisList(analysisResults.topConsensus.slice(0, 5), 'Consensus')}
-        </Collapse>
-      </div>
-
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
-            Top Divergent Items
-          </h5>
-        </div>
-        <Collapse isOpen={divergenceOpen}>
-          {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
-        </Collapse>
-      </div>
-
-      {hoveredContent && (
-        <div
-          className={styles.beeTooltip}
-          data-testid="demo-analysis-beeswarm-tooltip"
-          style={{ left: tooltipPos.x, top: tooltipPos.y }}
-        >
-          {hoveredContent}
-        </div>
-      )}
+      </Collapse>
     </div>
   );
 };

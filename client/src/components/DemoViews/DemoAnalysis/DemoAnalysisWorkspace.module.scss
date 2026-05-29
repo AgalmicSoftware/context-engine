@@ -40,15 +40,24 @@
   box-shadow: none;
 }
 
+.selectedQuestionFrame {
+  background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%);
+  border: 1px solid rgba(15, 94, 199, 0.14);
+  border-radius: var(--ce-radius-8, 8px);
+  box-shadow: 0 16px 38px rgba(15, 94, 199, 0.14);
+  padding: 1.25rem 1.35rem 1.1rem;
+}
+
 .selectedQuestionCard {
   margin-bottom: 0;
-  background: linear-gradient(145deg, #f8fbff 0%, #edf4ff 100%) !important;
-  border: 1px solid rgba(15, 94, 199, 0.14) !important;
-  box-shadow: 0 16px 38px rgba(15, 94, 199, 0.14) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 .selectedQuestionCardBody {
-  padding: 1.25rem 1.35rem 1.1rem;
+  padding: 0;
 }
 
 .selectedQuestionCardPrompt {
@@ -60,22 +69,65 @@
 }
 
 .selectedQuestionGrounding {
-  margin-top: 0.7rem;
-  padding: 0.95rem 1.1rem 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.9rem;
 }
 
 .selectedQuestionGroundingPills {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  justify-content: flex-end;
+  margin-left: auto;
+  max-width: min(34rem, 48%);
 }
 
 .selectedQuestionTension {
-  color: #516070;
+  color: #364252;
   font-size: 0.96rem;
   line-height: 1.55;
-  margin: 0.8rem 0 0;
-  max-width: 52rem;
+  margin: 0;
+  max-width: 44rem;
+}
+
+.selectedQuestionTagButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0.42rem 0.78rem;
+  border: 1px solid rgba(15, 94, 199, 0.18);
+  border-radius: var(--ce-radius-16, 16px);
+  background: #dbeafe;
+  color: #234267;
+  font-size: 0.88rem;
+  font-weight: 650;
+  line-height: 1.1;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(15, 94, 199, 0.08);
+  transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: #c7ddff;
+    border-color: rgba(15, 94, 199, 0.38);
+    color: #122c4d;
+    outline: none;
+    transform: translateY(-1px);
+  }
+}
+
+.selectedQuestionTagButtonActive,
+.selectedQuestionTagButtonActive:hover,
+.selectedQuestionTagButtonActive:focus-visible {
+  background: #0f5ec7;
+  border-color: #0b4da4;
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 94, 199, 0.24);
 }
 
 .heatmapPanel,
@@ -332,8 +384,7 @@
 }
 
 .suggestionsList,
-.breakdownList,
-.breakdownBars {
+.breakdownList {
   display: grid;
   gap: 0.75rem;
 }
@@ -527,7 +578,7 @@
 
 .breakdownDataset {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.65rem;
   padding: 0.9rem;
   border: 1px solid #e0e0e0;
   border-radius: var(--ce-radius-8, 8px);
@@ -559,29 +610,31 @@
   max-width: 60rem;
 }
 
-.breakdownBarRow {
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) 52px;
-  gap: 0.65rem;
-  align-items: center;
-}
-
-.breakdownBarLabel,
-.breakdownBarValue {
-  font-size: 0.88rem;
-  color: #495057;
-}
-
-.breakdownBarTrack {
-  height: 0.7rem;
-  border-radius: 999px;
-  background: #e9ecef;
+.breakdownCandlestick {
+  display: flex;
+  width: 100%;
+  height: 1.55rem;
+  border: 1px solid #1f2733;
+  background: #ffffff;
   overflow: hidden;
 }
 
-.breakdownBarFill {
+.breakdownCandleSegment {
+  display: block;
   height: 100%;
-  border-radius: 999px;
+  min-width: 0;
+}
+
+.breakdownCandleSegmentAgree {
+  background: #18a05f;
+}
+
+.breakdownCandleSegmentUnsure {
+  background: #ffd166;
+}
+
+.breakdownCandleSegmentDisagree {
+  background: #dc3f46;
 }
 
 .tableWrap {
@@ -711,119 +764,21 @@
   }
 }
 
-.modalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  z-index: 1100;
-}
-
-.modalCard {
-  width: min(960px, 100%);
-  max-height: 88vh;
-  overflow: auto;
-  background: #f4f6f9;
-  border: 1px solid #dee2e6;
-  border-radius: var(--ce-radius-8, 8px);
-  padding: 1rem 1.1rem;
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18);
-}
-
-.modalHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-  margin-bottom: 0.85rem;
-}
-
-.drilldownInsightCard,
-.drilldownProfileCard {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: var(--ce-radius-8, 8px);
-}
-
-.drilldownInsightCard {
-  margin-bottom: 1rem;
-  padding: 0.95rem 1rem;
-}
-
-.drilldownInsightLabel,
-.drilldownSectionTitle {
-  color: #212529;
-  font-size: 0.98rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.drilldownInsightText,
-.drilldownSectionMeta,
-.drilldownProfileCount,
-.drilldownProfileRationale {
-  color: #5f6b7a;
-  line-height: 1.55;
-}
-
-.drilldownInsightText {
-  margin-top: 0.45rem;
-}
-
-.drilldownProfileSection {
-  margin-bottom: 1rem;
-}
-
-.drilldownProfileHeader {
-  margin-bottom: 0.7rem;
-}
-
-.drilldownSectionMeta {
-  margin: 0.35rem 0 0;
-  font-size: 0.92rem;
-}
-
-.drilldownProfileGrid {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.drilldownProfileCard {
-  padding: 0.9rem 0.95rem;
-}
-
-.drilldownProfileTopRow {
-  align-items: center;
-  display: flex;
-  gap: 0.6rem;
-  justify-content: space-between;
-}
-
-.drilldownProfileLabel {
-  color: #212529;
-  font-size: 0.94rem;
-  font-weight: 700;
-}
-
-.drilldownProfileCount {
-  font-size: 0.88rem;
-  font-weight: 600;
-  margin-top: 0.55rem;
-}
-
-.drilldownProfileRationale {
-  font-size: 0.9rem;
-  margin-top: 0.45rem;
-}
-
 @media (max-width: 980px) {
   .primaryGrid,
   .secondaryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .selectedQuestionGrounding {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .selectedQuestionGroundingPills {
+    justify-content: flex-start;
+    margin-left: 0;
+    max-width: 100%;
   }
 
   .selectorLayout {
@@ -832,8 +787,11 @@
 }
 
 @media (max-width: 640px) {
-  .panel,
-  .modalCard {
+  .selectedQuestionFrame {
+    padding: 1rem;
+  }
+
+  .panel {
     padding: 0.9rem;
   }
 
@@ -856,9 +814,10 @@
     padding-right: 0.5rem;
   }
 
-  .breakdownBarRow {
-    grid-template-columns: 72px minmax(0, 1fr) 44px;
-    gap: 0.5rem;
+  .breakdownDatasetHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 }
 

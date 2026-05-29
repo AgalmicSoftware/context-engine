@@ -345,6 +345,245 @@
   font-size: 1.25em;
 }
 
+.htmlReportModal {
+  :global(.modal-content) {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: var(--ce-radius-12);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.34);
+    opacity: 1 !important;
+  }
+
+  :global(.btn-close),
+  :global(.close) {
+    color: #111827 !important;
+    opacity: 0.85 !important;
+    filter: none !important;
+
+    &:hover,
+    &:focus {
+      color: #000000 !important;
+      opacity: 1 !important;
+    }
+  }
+}
+
+.htmlReportModalHeader {
+  align-items: center;
+  background: #ffffff !important;
+  border-bottom: 1px solid #d7dde8 !important;
+  color: #111827 !important;
+  font-weight: 800;
+
+  :global(.modal-title) {
+    color: #111827 !important;
+    font-weight: 800;
+  }
+}
+
+.htmlReportModalBody {
+  background: #ffffff !important;
+  color: #1f2937 !important;
+  font-size: 1rem;
+  line-height: 1.55;
+
+  p,
+  strong,
+  td,
+  th {
+    color: #1f2937 !important;
+    opacity: 1 !important;
+  }
+
+  strong,
+  th {
+    font-weight: 800;
+  }
+}
+
+.htmlReportSectionTable {
+  margin: 1rem 0;
+  font-size: 0.92rem;
+
+  :global(table),
+  :global(.table) {
+    color: #1f2937 !important;
+  }
+
+  th {
+    background: #eef2f7 !important;
+    border-color: #d7dde8 !important;
+    color: #111827 !important;
+  }
+
+  td {
+    border-color: #e5e9f0 !important;
+    color: #1f2937 !important;
+    vertical-align: top;
+  }
+
+  th:first-child,
+  td:first-child {
+    width: 4.25rem;
+    text-align: center;
+  }
+
+  :global(.form-check-input),
+  input[type='checkbox'] {
+    position: static !important;
+    float: none !important;
+    margin: 0 !important;
+    width: 1rem;
+    height: 1rem;
+    opacity: 1 !important;
+    visibility: visible !important;
+    accent-color: #0f5ec7;
+  }
+}
+
+.htmlReportOptionGroup {
+  margin: 1rem 0;
+  padding: 0.95rem;
+  border: 1px solid #d7dde8;
+  border-radius: var(--ce-radius-8);
+  background: #f8fafc;
+  color: #1f2937;
+
+  h6 {
+    margin: 0 0 0.75rem;
+    color: #111827;
+    font-weight: 800;
+  }
+
+  p {
+    margin: 0.45rem 0;
+    color: #334155 !important;
+  }
+}
+
+.htmlReportOptionRow {
+  display: grid;
+  grid-template-columns: 1.15rem minmax(0, 1fr);
+  align-items: flex-start;
+  column-gap: 0.7rem;
+  row-gap: 0.15rem;
+  margin: 0.7rem 0;
+  padding: 0 !important;
+
+  :global(.form-check-input),
+  input[type='checkbox'],
+  input[type='radio'] {
+    position: static !important;
+    float: none !important;
+    width: 1rem;
+    height: 1rem;
+    margin: 0.2rem 0 0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    accent-color: #0f5ec7;
+  }
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0 !important;
+    padding: 0 !important;
+    color: #1f2937 !important;
+    line-height: 1.35;
+  }
+
+  small {
+    color: #475569 !important;
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+}
+
+.htmlReportWarning {
+  background: #fff8e5 !important;
+  border-color: #f5c451 !important;
+  color: #422006 !important;
+  font-weight: 600;
+}
+
+.htmlReportInfo {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+  color: #1e3a8a !important;
+  font-weight: 600;
+}
+
+.htmlReportModalFooter {
+  background: #ffffff !important;
+  border-top: 1px solid #d7dde8 !important;
+  gap: 0.75rem;
+}
+
+.htmlReportCancelButton,
+.htmlReportDownloadButton,
+.htmlReportGenerateButton {
+  border-radius: var(--ce-radius-8);
+  font-weight: 800;
+  min-height: 42px;
+  padding: 0.6rem 1rem;
+}
+
+.htmlReportCancelButton {
+  background: #ffffff !important;
+  border: 1px solid #64748b !important;
+  color: #111827 !important;
+
+  &:hover,
+  &:focus {
+    background: #f1f5f9 !important;
+    border-color: #334155 !important;
+    color: #020617 !important;
+  }
+}
+
+.htmlReportDownloadButton {
+  background: #0f5ec7 !important;
+  border: 1px solid #0f5ec7 !important;
+  color: #ffffff !important;
+
+  &:hover,
+  &:focus {
+    background: #0b4da6 !important;
+    border-color: #0b4da6 !important;
+    color: #ffffff !important;
+  }
+
+  &:disabled {
+    background: #d8dee8 !important;
+    border-color: #c7d0dd !important;
+    color: #475569 !important;
+    opacity: 1 !important;
+  }
+}
+
+.htmlReportGenerateButton {
+  background: #ffffff !important;
+  border: 1px solid #0f5ec7 !important;
+  color: #0f3d8a !important;
+  margin-top: 0.65rem;
+
+  &:hover,
+  &:focus {
+    background: #eff6ff !important;
+    border-color: #0b4da6 !important;
+    color: #0b4da6 !important;
+  }
+
+  &:disabled {
+    background: #eef2f7 !important;
+    border-color: #cbd5e1 !important;
+    color: #475569 !important;
+    opacity: 1 !important;
+  }
+}
+
 .filterSection {
   margin-bottom: 1rem;
 }
@@ -610,15 +849,33 @@
   .modalHeaderControls {
     width: 100%;
     justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
   }
 
   .demoResultsViewNav {
-    width: 100%;
+    width: auto;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    gap: 6px;
   }
 
   .demoResultsViewButton {
-    flex: 1 1 calc(50% - 0.55rem);
+    flex: 0 0 auto;
     justify-content: center;
+    min-height: 34px;
+    padding: 0.38rem 0.64rem;
+    font-size: 0.84rem;
+  }
+
+  .syncStatus__simple {
+    gap: 6px;
+    padding: 5px 9px;
+    font-size: 0.84rem;
+    overflow: visible;
   }
 
   .lockedSummaryToggle {
@@ -721,9 +978,10 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
+  position: relative;
   padding: 0.75rem 1.25rem;
   background-color: #2c10ff96 !important;
-  padding: 15px 15px 15px 15px !important;
+  padding: 15px 54px 15px 15px !important;
   &:hover {
     background-color: rgba(0, 0, 0, 0.06);
   }
@@ -740,12 +998,16 @@
 
 /* Aggregator improvements */
 .aggregatorSummaryCard {
-  background-color: var(--ce-color-surface) !important;
+  background-color: transparent !important;
   margin-bottom: 10px !important;
   border-radius: var(--ce-radius-12);
   /* rounder corners */
   border: 1px solid rgba(49, 64, 122, 0.24);
   box-shadow: 0 6px 22px rgba(13, 17, 47, 0.16);
+}
+
+.aggregatorSummaryCard:not(:has(.surveyResultsResponseCard)) .questionSummaryHeader {
+  border-radius: var(--ce-radius-12) !important;
 }
 
 .aggregatorDarkCardBody {
@@ -757,12 +1019,12 @@
 
 .surveyResultsResponseCard {
   margin: 0 !important;
-  background: rgba(50, 56, 117, 0.96) !important;
+  background: rgba(38, 49, 116, 0.98) !important;
   border: 1px solid rgba(124, 136, 201, 0.34) !important;
-  border-radius: 30px !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 8px 22px rgba(10, 14, 43, 0.18) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 var(--ce-radius-12) var(--ce-radius-12) !important;
+  box-shadow: 0 8px 18px rgba(10, 14, 43, 0.16) !important;
+  overflow: hidden;
 }
 
 .surveyResultsResponseCardBody {
@@ -787,9 +1049,9 @@
 
 .surveyResultsAggregatorPanel {
   // background: rgba(30, 36, 94, 0.92);
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
   padding: 22px 26px;
   margin: 0;
   box-shadow: none;
@@ -946,11 +1208,53 @@ grey background, white text, bigger icons, etc.
   cursor: pointer;
 }
 
-#questionSummaryHeaderIcons {
+.headerLeft {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.questionSummaryHeaderIcons {
+  position: absolute;
+  top: 10px;
+  right: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+}
+
+.questionBookmarkButton {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  background: transparent !important;
+  color: var(--ce-color-white);
+  cursor: pointer;
+
+  &:hover,
+  &:focus {
+    background: transparent !important;
+    outline: 2px solid rgba(255, 255, 255, 0.42);
+    outline-offset: 2px;
+  }
+}
+
+.questionBookmarkIcon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.questionExpandIcon {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 1.15rem;
+  line-height: 1;
+  pointer-events: none;
 }
 
 /* NEW: Smaller, half-opacity refresh icon for "Refresh" actions */
@@ -1494,17 +1798,22 @@ grey background, white text, bigger icons, etc.
 }
 
 .questionListCard {
-  padding: 10px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  padding: 0;
+  background: transparent !important;
+  border: 0;
   border-radius: var(--ce-radius-12) !important;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: stretch;
+  overflow: hidden;
   width: 100%;
   margin-bottom: 1em !important;
+}
+
+.questionListCard .questionSummaryHeader {
+  border-radius: var(--ce-radius-12) !important;
 }
 
 .surveyViewModeToggle {
@@ -1766,7 +2075,7 @@ grey background, white text, bigger icons, etc.
   white-space: nowrap;
 }
 
-#questionFilterButton {
+.questionFilterButton {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -1781,9 +2090,9 @@ grey background, white text, bigger icons, etc.
   font-weight: 600;
 }
 
-#questionFilterButton:hover,
-#questionFilterButton:focus,
-#questionFilterButton:active {
+.questionFilterButton:hover,
+.questionFilterButton:focus,
+.questionFilterButton:active {
   background-color: #111827 !important;
   background-image: none !important;
   border-color: #111827 !important;
@@ -1796,7 +2105,7 @@ grey background, white text, bigger icons, etc.
   margin-left: 10px;
 }
 
-#questionFilterIcon {
+.questionFilterIcon {
   margin-left: 10px;
 }
 
@@ -1851,27 +2160,47 @@ grey background, white text, bigger icons, etc.
   .biggerIcon {
     font-size: 1.8rem; // Slightly smaller for mobile    margin-left: 0px;
   }
-  // Stack the main filter/export container
   .exportAndFilterContainer {
-    flex-direction: column;
-    align-items: stretch; // Make children take full width    gap: 0px; // Space between the filter and export boxes
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .filterBox {
+    flex: 0 1 auto;
+    min-width: 0;
   }
 
   .exportDataBox {
-    align-items: flex-start; // Align export items to the left
+    align-items: flex-end;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .questionFilterButton,
+  .exportToggleButton {
+    min-height: 42px;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.95rem;
+    line-height: 1.1;
   }
 
   .exportAreaExpanded {
-    align-items: flex-start;
+    align-items: flex-end;
     width: 100%;
+    max-width: min(100%, 360px);
+    padding: 8px;
   }
 
   #exportOptions {
-    // Stack the dropdown and the download button
     flex-direction: row;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
     width: 100%;
-    gap: 10px;
+    gap: 8px;
   }
 
   .exportDropdown {
@@ -1918,7 +2247,8 @@ grey background, white text, bigger icons, etc.
   .questionSummaryHeader {
     display: flex;
     flex-direction: row;
-    justify-content: flex-end;
+    justify-content: space-between;
+    padding-right: 48px !important;
   }
 
   .questionTitle {
@@ -1950,13 +2280,13 @@ grey background, white text, bigger icons, etc.
   align-items: center;
 }
 
-#responseCountIcon {
+.responseCountIcon {
   font-weight: 600;
   font-size: 1em;
   opacity: 0.75;
 }
 
-#responseCountNumber {
+.responseCountNumber {
   font-weight: 600;
   font-size: 1em;
   opacity: 0.75;

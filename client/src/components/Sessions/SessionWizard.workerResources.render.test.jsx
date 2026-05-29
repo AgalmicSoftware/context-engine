@@ -41,9 +41,74 @@ describe('SessionWizard worker resource rendering', () => {
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Public read' }));
+    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByText(/serves reads through the session worker without wallet auth/i)).toBeInTheDocument();
+  });
+
+  it('keeps Arweave storage choices separate from Cloudflare payload access controls', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Lit-Arweave' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Lit-Arweave' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.getByText(/Lit-Arweave stores encrypted Arweave payloads/i)).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
+    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Arweave' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
+  });
+
+  it('shows Lit-encrypted Cloudflare copy while keeping Arweave credentials in worker resources', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    enableAdvancedMode();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Lit encrypted' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i))
+      .toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+
+    const arweaveCard = await waitFor(() => {
+      const card = getWizardResourceCard('arweave');
+      expect(card).toBeTruthy();
+      return card;
+    });
+    expect(within(arweaveCard).getByText('Arweave JWK *')).toBeInTheDocument();
+    expect(within(arweaveCard).getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeInTheDocument();
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {

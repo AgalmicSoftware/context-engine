@@ -17,6 +17,7 @@ export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
 } as const);
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 } as const);
@@ -48,6 +49,13 @@ interface ResolveSessionStorageBackendOptions {
 
 const normalizePayloadAccessMode = (value: unknown): SessionStoragePayloadAccessMode => {
   const normalized = toStr(value).trim().toLowerCase();
+  if (
+    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    normalized === 'public' ||
+    normalized === 'public-read'
+  ) {
+    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
   if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   }

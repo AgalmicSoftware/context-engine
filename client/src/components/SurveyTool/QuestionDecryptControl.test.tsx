@@ -16,6 +16,26 @@ describe('QuestionDecryptControl', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps manual decrypt inert when disabled', () => {
+    const onClick = jest.fn();
+    render(
+      <QuestionDecryptControl
+        actionLabel="Decrypt Prompt"
+        disabled
+        onClick={onClick}
+        title="Connect wallet to decrypt"
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Decrypt Prompt' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Connect wallet to decrypt');
+
+    fireEvent.click(button);
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
   it('shows the spinner-only state when auto-decrypt owns the field', () => {
     render(
       <QuestionDecryptControl
@@ -34,6 +54,18 @@ describe('QuestionDecryptControl', () => {
     const { container } = render(
       <QuestionDecryptControl
         autoDecryptEnabled
+        actionLabel="Decrypt Answer"
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders nothing for idle auto-decrypt spinner ownership', () => {
+    const { container } = render(
+      <QuestionDecryptControl
+        autoDecryptEnabled
+        showBusySpinnerWhenAutoDecryptEnabled
         actionLabel="Decrypt Answer"
       />
     );

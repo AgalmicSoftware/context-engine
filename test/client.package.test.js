@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { readFileSync } = require('node:fs');
+const { existsSync, readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 
 const rootDir = resolve(__dirname, '..');
@@ -16,6 +16,15 @@ test('client dev/build scripts stay rooted at / while package homepage points to
   assert.equal(pkg?.homepage, 'https://contextengine.xyz/');
   assert.equal(pkg?.scripts?.dev, 'PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
   assert.equal(pkg?.scripts?.build, 'PUBLIC_URL=/ vite build');
+});
+
+test('client installs use strict peer resolution without a package npmrc shim', () => {
+  const lock = readJson('client/package-lock.json');
+  const domPeer = lock?.packages?.['node_modules/@testing-library/dom'];
+
+  assert.equal(existsSync(resolve(rootDir, 'client/.npmrc')), false);
+  assert.equal(domPeer?.version, '10.4.1');
+  assert.equal(domPeer?.peer, true);
 });
 
 test('client HTML shell leaves route-specific canonical metadata to runtime head sync', () => {

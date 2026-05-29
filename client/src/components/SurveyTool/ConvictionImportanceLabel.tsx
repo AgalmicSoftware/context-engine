@@ -35,7 +35,7 @@ const ConvictionImportanceLabel = ({
 }: ConvictionImportanceLabelProps): ReactElement => {
   if (!importanceToggleEnabled) {
     return (
-      <h6 id={styles.importanceText} className={styles.convictionValueRow}>
+      <h6 className={`${styles.importanceText} ${styles.convictionValueRow}`}>
         <span className={styles.convictionToggleLabel}>Conviction</span>
         <span className={styles.convictionToggleValue}>{convictionValue}</span>
       </h6>
@@ -45,7 +45,7 @@ const ConvictionImportanceLabel = ({
   const isConviction = sliderMode === 'conviction';
 
   return (
-    <h6 id={styles.importanceText} className={styles.convictionToggleText}>
+    <h6 className={`${styles.importanceText} ${styles.convictionToggleText}`}>
       <span className={styles.convictionToggleStack}>
         <button
           type="button"

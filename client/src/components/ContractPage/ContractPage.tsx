@@ -1,7 +1,5 @@
-/* eslint-disable import/no-webpack-loader-syntax */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { connect } from 'react-redux';
-import PropTypes from 'prop-types';
 import contractScripts, {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -523,11 +521,6 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
       </div>
     </div>
   );
-};
-
-ContractPage.propTypes = {
-  activeSessionSlug: PropTypes.string,
-  reduxActiveSessionSlug: PropTypes.string,
 };
 
 const mapStateToProps = (state: { sessionState?: { activeSessionSlug?: string } }) => ({

@@ -2,6 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   getFaucetFallbackRpcUrls,
@@ -12,6 +14,8 @@ const {
   normalizeRpcUrl,
   resolveRpcRewriteConfig,
 } = require('./lib/rpc-rewrite-config.js');
+
+const SEED_SURVEY_SCRIPT_PATH = path.join(__dirname, 'seed-survey-question-types.js');
 
 test('resolveRpcRewriteConfig uses OP Sepolia defaults when no chain override is provided', () => {
   const result = resolveRpcRewriteConfig({ env: {} });
@@ -81,4 +85,12 @@ test('resolveRpcRewriteConfig still blocks browser-unsafe RPC_URL overrides when
   assert.deepEqual(result.rewriteTargets, ['https://rpc-one.example']);
   assert.ok(result.browserUnsafeRpcTargets.includes('https://sepolia.base.org'));
   assert.equal(result.rpcRewriteTarget, '');
+});
+
+test('standalone survey seed suppresses cold-load onboarding before opening session routes', () => {
+  const source = fs.readFileSync(SEED_SURVEY_SCRIPT_PATH, 'utf8');
+
+  assert.match(source, /localStorage\.setItem\('firstVisit', 'false'\)/);
+  assert.match(source, /sessionStorage\.setItem\('firstVisit', 'false'\)/);
+  assert.match(source, /sessionStorage\.setItem\('hasRedirectedToDemo', 'true'\)/);
 });

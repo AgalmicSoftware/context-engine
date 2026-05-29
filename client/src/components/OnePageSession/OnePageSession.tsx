@@ -46,6 +46,12 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
+import {
+  buildAggregatorFromLocalCache,
+  computeAggregatorDataSignature,
+  computeAggregatorQuestionMetadataSignature,
+  computeAggregatorSourceSnapshotSignature,
+} from './onePageSessionAggregator';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -58,7 +64,6 @@ const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
-const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
@@ -69,6 +74,14 @@ const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
   disableLoadButton: false,
   error: '',
 });
+type UnknownRecord = Record<string, unknown>;
+
+const toUnknownRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+);
+
 const globalState: any = globalThis as any;
 const contractScriptsAny: any = contractScripts as any;
 const DebateMapAny: any = DebateMap;
@@ -84,6 +97,19 @@ const resolveAutoFeatureBySessionSlug = (metadata: any) => (
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
+
+const isTelegramOnlySessionConfig = (metadata: unknown) => {
+  const config = toUnknownRecord(metadata);
+  const telegramConfig = toUnknownRecord(config.telegram);
+  return (
+    config.telegramOnly === true ||
+    config.telegram_only === true ||
+    config.sessionMode === 'telegram_only' ||
+    config.telegramMode === 'telegram_only' ||
+    telegramConfig.only === true ||
+    telegramConfig.mode === 'telegram_only'
+  );
+};
 
 const isPerfCountersEnabled = () => {
   try {
@@ -112,88 +138,6 @@ const bumpPerfCounter = (key: any, inc: any = 1) => {
     const scope = globalState.__CE_PERF_COUNTERS__[ONE_PAGE_DEMO_PERF_SCOPE];
     scope[key] = Number(scope[key] || 0) + Number(inc || 0);
   } catch (e) { void e; /* fallback: perf counter update. */ }
-};
-
-const hashMix = (seed: any, text: any) => {
-  let h = Number(seed) >>> 0;
-  const str = String(text || '');
-  for (let i = 0; i < str.length; i += 1) {
-    h = Math.imul(h ^ str.charCodeAt(i), 16777619) >>> 0;
-  }
-  return h >>> 0;
-};
-
-const computeAggregatorDataSignature = (map: any = {}) => {
-  if (!map || typeof map !== 'object') return '0:0:0';
-  const qids = Object.keys(map).sort();
-  if (qids.length === 0) return '0:0:0';
-  let hash = 2166136261;
-  let totalEntries = 0;
-  qids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const rows = Array.isArray(map[qid]) ? map[qid] : [];
-    const rowSignatures = rows
-      .map((row: any) => `${row?.responder || ''}|${row?.response || ''}`)
-      .sort();
-    totalEntries += rowSignatures.length;
-    rowSignatures.forEach((rowSig: any) => {
-      hash = hashMix(hash, rowSig);
-    });
-  });
-  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
-};
-
-const computeAggregatorDataSignatureFromRows = (qids: any = [], rowSignaturesByQuestion: any = {}) => {
-  const normalizedQids = Array.isArray(qids) ? qids.filter(Boolean).sort() : [];
-  if (normalizedQids.length === 0) return '0:0:0';
-  let hash = 2166136261;
-  let totalEntries = 0;
-  normalizedQids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const rowSignatures = Array.isArray(rowSignaturesByQuestion?.[qid])
-      ? [...rowSignaturesByQuestion[qid]].sort()
-      : [];
-    totalEntries += rowSignatures.length;
-    rowSignatures.forEach((rowSig: any) => {
-      hash = hashMix(hash, rowSig);
-    });
-  });
-  return `${normalizedQids.length}:${totalEntries}:${hash >>> 0}`;
-};
-
-const computeAggregatorSourceSnapshotSignature = (questionResponses: any = {}) => {
-  if (!questionResponses || typeof questionResponses !== 'object') return '0:0:0';
-  const qids = Object.keys(questionResponses);
-  if (qids.length === 0) return '0:0:0';
-
-  let hash = 2166136261;
-  let totalEntries = 0;
-
-  qids.forEach((qid: any) => {
-    hash = hashMix(hash, qid);
-    const responderMap = questionResponses[qid];
-    if (!responderMap || typeof responderMap !== 'object') return;
-    const responders = Object.keys(responderMap);
-    totalEntries += responders.length;
-    responders.forEach((resAddr: any) => {
-      hash = hashMix(hash, resAddr);
-      const rawResponse = responderMap[resAddr];
-      if (typeof rawResponse === 'string') {
-        hash = hashMix(hash, rawResponse);
-        return;
-      }
-      const answer = rawResponse?.answer;
-      hash = hashMix(hash, rawResponse?.type || '');
-      hash = hashMix(hash, answer?.value ?? '');
-      hash = hashMix(hash, answer?.encrypted ? '1' : '0');
-      hash = hashMix(hash, answer?.encryptedPortion || '');
-      // Include rating fields so results recompute when score inputs change.
-      hash = hashMix(hash, rawResponse?.importance ?? '');
-      hash = hashMix(hash, rawResponse?.conviction ?? '');
-    });
-  });
-
-  return `${qids.length}:${totalEntries}:${hash >>> 0}`;
 };
 
 const buildOnePageSessionEmptyFilterState = () => ({
@@ -268,77 +212,6 @@ function hasCachedCreateSbtForm(slug: any = '') {
     migrateLegacyToSessionKey: true,
     clearInvalid: true,
   } as any);
-}
-
-// Top-level helper (outside the class)
-function buildAggregatorFromLocalCache(networkObj: any, opts: any = {}) {
-  if (!networkObj) return { map: {}, dirty: false };
-  const parseMemo = opts?.parseMemo instanceof Map ? opts.parseMemo : null;
-  const questionResponses = networkObj.questionResponses || {};
-  const aggregatorMap: Record<string, any> = {};
-  const rowSignaturesByQuestion: Record<string, any> = {};
-  let dirty = false;
-
-  Object.keys(questionResponses).forEach((qId: any) => {
-    const responderMap = questionResponses[qId] || {};
-    aggregatorMap[qId] = [];
-    rowSignaturesByQuestion[qId] = [];
-    Object.keys(responderMap).forEach((resAddr: any) => {
-      let parsed;
-      let rawResponseString = '';
-      try {
-        const rawResponse = responderMap[resAddr];
-        if (typeof rawResponse === 'string') {
-          rawResponseString = rawResponse;
-          if (parseMemo && parseMemo.has(rawResponse)) {
-            parsed = parseMemo.get(rawResponse);
-            parseMemo.delete(rawResponse);
-            parseMemo.set(rawResponse, parsed);
-          } else {
-            parsed = JSON.parse(rawResponse);
-            if (parseMemo) {
-              parseMemo.set(rawResponse, parsed);
-              while (parseMemo.size > AGGREGATOR_PARSE_MEMO_MAX) {
-                const oldest = parseMemo.keys().next().value;
-                if (!oldest) break;
-                parseMemo.delete(oldest);
-              }
-            }
-          }
-        } else {
-          parsed = rawResponse;
-        }
-      } catch {
-        try { delete responderMap[resAddr]; dirty = true; } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
-        parsed = null;
-      }
-      if (!parsed) return;
-
-      const isBinary = parsed?.type === 'binary';
-      const ans = parsed?.answer;
-      const isEnc = !!(ans?.encrypted || ans?.encryptedPortion);
-      const isMasked = ans?.value === '*';
-
-      if (isBinary && ans && !isEnc && !isMasked) {
-        const responseJson = rawResponseString || JSON.stringify(parsed);
-        aggregatorMap[qId].push({
-          responder: resAddr,
-          questionId: qId,
-          response: responseJson,
-        });
-        rowSignaturesByQuestion[qId].push(`${resAddr}|${responseJson}`);
-      }
-    });
-  });
-
-  return {
-    map: aggregatorMap,
-    dirty,
-    signature: computeAggregatorDataSignatureFromRows(
-      Object.keys(aggregatorMap),
-      rowSignaturesByQuestion,
-    ),
-  };
 }
 
 export {
@@ -909,7 +782,7 @@ class OnePageSession extends Component<any, any> {
   }
 
 
-  buildAggregator: any = () => measureSync('ce.onePageDemo.buildAggregator', () => {
+  buildAggregator = () => measureSync('ce.onePageDemo.buildAggregator', () => {
     if (!this.state.showResults) return;
     bumpPerfCounter('aggregatorBuildCount');
     const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
@@ -943,9 +816,10 @@ class OnePageSession extends Component<any, any> {
           return;
         }
 
-        const sourceSig = computeAggregatorSourceSnapshotSignature(
-          qCache[netIdStr]?.questionResponses || {}
-        );
+        const sourceSig = [
+          computeAggregatorSourceSnapshotSignature(qCache[netIdStr]?.questionResponses || {}),
+          computeAggregatorQuestionMetadataSignature(qCache[netIdStr]?.questions || {}),
+        ].join('|');
         const sourceSigKey = `${slug}|${netIdStr}|${sourceSig}`;
         if (sourceSigKey === this._aggregatorSourceSigKey) {
           bumpPerfCounter('aggregatorSourceSkips');
@@ -954,6 +828,7 @@ class OnePageSession extends Component<any, any> {
 
         const { map, dirty, signature } = buildAggregatorFromLocalCache(qCache[netIdStr], {
           parseMemo: this._aggregatorResponseParseMemo,
+          sessionSlug: slug,
         });
         if (dirty) { void writeCache('questionsCache', slug, qCache); }
         applyAggregatorData(map, signature, sourceSigKey);
@@ -980,7 +855,7 @@ class OnePageSession extends Component<any, any> {
     if (typeof this.props.toggleLoginModal === 'function') {
       try { this.props.toggleLoginModal(false); } catch (e) { demoLog.warn('OnePageSession: callback', e); }
     }
-    this.setState((prevState: any) => {
+    this.setState((prevState: Readonly<OnePageSession['state']>) => {
       const prevTargets = Array.isArray(prevState.autoMintTargets) ? prevState.autoMintTargets : [];
       const nextTargets = successfulSbtKey
         ? prevTargets.filter((target: any) => String(target?.sbt || '').trim().toLowerCase() !== successfulSbtKey)
@@ -1084,7 +959,7 @@ class OnePageSession extends Component<any, any> {
 
       // Set immediate cache hits to UI
       if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
-        this.setState((prev: any) => {
+        this.setState((prev: Readonly<OnePageSession['state']>) => {
           const updates: Record<string, any> = {};
           if (Object.keys(cachedNames).length > 0) {
             updates.sbtNames = { ...(prev.sbtNames || {}), ...cachedNames };
@@ -1118,7 +993,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
-          this.setState((prev: any) => {
+          this.setState((prev: Readonly<OnePageSession['state']>) => {
             const updates: Record<string, any> = {};
             if (Object.keys(fetchedNames).length > 0) {
               updates.sbtNames = { ...(prev.sbtNames || {}), ...fetchedNames };
@@ -1386,7 +1261,7 @@ class OnePageSession extends Component<any, any> {
     } catch (e) { demoLog.warn('OnePageSession: callback', e); }
   }
 
-  handleFilterChange: any = (newFilterState: any) => {
+  handleFilterChange = (newFilterState: any) => {
     // Requirement: Internal Updates: Update local state WITHOUT modifying the URL.
     const nextFilterState = normalizeOnePageSessionFilterState(newFilterState || {});
     const nextSig = serializeOnePageSessionFilterState(nextFilterState);
@@ -1426,7 +1301,7 @@ class OnePageSession extends Component<any, any> {
       Object.keys(queuedNameUpdates).forEach((k: any) => { delete queuedNameUpdates[k]; });
       Object.keys(queuedImageUpdates).forEach((k: any) => { delete queuedImageUpdates[k]; });
 
-      this.setState((prev: any) => {
+      this.setState((prev: Readonly<OnePageSession['state']>) => {
         const updates: Record<string, any> = {};
         if (shouldFlushStatuses) {
           updates.autoMintStatuses = { ...statuses };
@@ -1932,7 +1807,7 @@ class OnePageSession extends Component<any, any> {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
-    this.setState((prevState: any) => ({
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
       embeddedAtlasNodeId: normalizedNodeId,
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
@@ -1945,7 +1820,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   handleCorpusViewerLoadStateChange(nextLoadState: any = DEFAULT_CORPUS_VIEWER_LOAD_STATE) {
-    this.setState((previousState: any) => {
+    this.setState((previousState: Readonly<OnePageSession['state']>) => {
       const currentLoadState = previousState.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
       const resolvedNextState = {
         ...DEFAULT_CORPUS_VIEWER_LOAD_STATE,
@@ -1971,13 +1846,13 @@ class OnePageSession extends Component<any, any> {
 
   handleLoadFullCorpusClick(event: any) {
     if (event?.stopPropagation) event.stopPropagation();
-    this.setState((previousState: any) => ({
+    this.setState((previousState: Readonly<OnePageSession['state']>) => ({
       corpusViewerLoadRequestNonce: Number(previousState.corpusViewerLoadRequestNonce || 0) + 1,
     }));
   }
 
   handleEmbeddedAtlasModalClose() {
-    this.setState((prevState: any) => {
+    this.setState((prevState: Readonly<OnePageSession['state']>) => {
       const returnState = prevState.embeddedAtlasReturnState;
       return {
         embeddedAtlasNodeId: null,
@@ -2011,7 +1886,7 @@ class OnePageSession extends Component<any, any> {
 
   toggleQuestions() {
     this.setState(
-      (prevState: any) => ({ showQuestions: !prevState.showQuestions }),
+      (prevState: Readonly<OnePageSession['state']>) => ({ showQuestions: !prevState.showQuestions }),
       () => {
         if (!this.state.showQuestions) {
           this.setState({ autoOpenResults: false });
@@ -2023,7 +1898,7 @@ class OnePageSession extends Component<any, any> {
 
   toggleGroups() {
     this.setState(
-      (prevState: any) => ({ showGroups: !prevState.showGroups }),
+      (prevState: Readonly<OnePageSession['state']>) => ({ showGroups: !prevState.showGroups }),
       () => this.resetDemoURL()
     );
   }
@@ -2033,7 +1908,7 @@ class OnePageSession extends Component<any, any> {
       event.preventDefault();
       event.stopPropagation();
     }
-    this.setState((prevState: any) => ({
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
       showEmbeddedCreateGroup: !prevState.showEmbeddedCreateGroup,
     }));
   }
@@ -2083,7 +1958,7 @@ class OnePageSession extends Component<any, any> {
 
   handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
-    this.setState((prevState: any) => (
+    this.setState((prevState: Readonly<OnePageSession['state']>) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }
@@ -2091,22 +1966,22 @@ class OnePageSession extends Component<any, any> {
   }
 
   toggleGroupsAbout() {
-    this.setState((prevState: any) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showGroupsAbout: !prevState.showGroupsAbout }));
   }
 
   toggleResults() {
     this.setState(
-      (prevState: any) => ({ showResults: !prevState.showResults }),
+      (prevState: Readonly<OnePageSession['state']>) => ({ showResults: !prevState.showResults }),
       () => this.resetDemoURL()
     );
   }
 
   toggleDocuments() {
-    this.setState((prevState: any) => ({ showDocuments: !prevState.showDocuments }));
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showDocuments: !prevState.showDocuments }));
   }
 
   toggleResultsAbout() {
-    this.setState((prevState: any) => ({ showResultsAbout: !prevState.showResultsAbout }));
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showResultsAbout: !prevState.showResultsAbout }));
   }
 
   /* =======================
@@ -2125,14 +2000,14 @@ class OnePageSession extends Component<any, any> {
   }
   dismissStatusItem(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
-    this.setState((prev: any) => ({
+    this.setState((prev: Readonly<OnePageSession['state']>) => ({
       dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true }
     }));
   }
 
   toggleStatusImagePreview(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
-    this.setState((prev: any) => ({
+    this.setState((prev: Readonly<OnePageSession['state']>) => ({
       expandedImages: {
         ...prev.expandedImages,
         [key]: !prev.expandedImages[key]
@@ -2246,6 +2121,30 @@ class OnePageSession extends Component<any, any> {
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
+    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
+
+    if (telegramOnlySession) {
+      return (
+        <div className={styles.onePageDemoContainer}>
+          <div className={styles.telegramOnlyShell}>
+            <div className={titleContainerClassName}>
+              <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
+            </div>
+            <Alert
+              color="info"
+              className={styles.telegramOnlyNotice}
+              data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
+              fade={false}
+            >
+              <strong>Telegram-only session</strong>
+              <span>
+                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
+              </span>
+            </Alert>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className={styles.onePageDemoContainer}>
@@ -2420,7 +2319,7 @@ class OnePageSession extends Component<any, any> {
         {/* Branding/header */}
         <div className={brandingSectionClassName}>
           <div className={titleContainerClassName}>
-            <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+            <h2 className={styles.brandingSectionTitle}>{titleText}</h2>
             <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
               <FontAwesomeIcon icon={faQuestionCircle} />
               <span className={styles.tooltiptext}>
@@ -2824,7 +2723,7 @@ class OnePageSession extends Component<any, any> {
                   )}
                   {isDemoSlug && resultsViewMode === 'analysis' && (
                     <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
-                      <DemoAnalysisWorkspace />
+                      <DemoAnalysisWorkspace sessionSlug={slug} />
                     </Suspense>
                   )}
                   {isDemoSlug && resultsViewMode === 'debateAtlas' && (

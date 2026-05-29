@@ -110,6 +110,18 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
+const flushMicrotasks = async (cycles = 3): Promise<void> => {
+  for (let i = 0; i < cycles; i += 1) {
+    await new Promise<void>((resolve) => {
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(resolve);
+        return;
+      }
+      Promise.resolve().then(resolve);
+    });
+  }
+};
+
 const attachStateHarness = (subject: any): any => {
   subject.setState = jest.fn((updater, cb) => {
     const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
@@ -352,8 +364,10 @@ describe('SurveyResults bookmark cache writes', () => {
 
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
+    const writeError = new Error('write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
-    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(new Error('write failed'));
+    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(writeError);
 
     const subject = createSubject({
       activeSessionSlug: 'edge',
@@ -365,9 +379,18 @@ describe('SurveyResults bookmark cache writes', () => {
       filterState: { types: ['radio'] },
     };
 
-    await subject.handleBookmarkFilter();
+    try {
+      await subject.handleBookmarkFilter();
 
-    expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        'Error saving bookmarked filters cache:',
+        writeError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
 
@@ -394,6 +417,11 @@ describe('SurveyResults fallback questions', () => {
 });
 
 describe('SurveyResults question-mode polling and filter state', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
   it('invalidates question-filter question memo on nonce ticks with stable refs', () => {
     const subject = createSubject({
       questionResponsesNonce: 30,
@@ -502,6 +530,67 @@ describe('SurveyResults question-mode polling and filter state', () => {
     peekSpy.mockRestore();
   });
 
+  it('polls question cache using networkChainId when wallet network is unavailable', () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      network: null,
+      networkChainId: 84532,
+    }));
+
+    const questionBucket = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: { q1: { id: 'q1' }, q2: { id: 'q2' } },
+      questionResponses: {},
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      return {};
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      surveyId: '',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      cachedQuestionsCount: 0,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(true);
+    expect(subject.state.cachedQuestionsCount).toBe(2);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+    peekSpy.mockRestore();
+  });
+
+  it('fetches and renders question results using networkChainId without wallet network', async () => {
+    const subject = createSubject({
+      network: null,
+      networkChainId: 84532,
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 1,
+    };
+    subject.fetchQuestionModeResponses = jest.fn(async () => undefined);
+    subject.fetchSurveyModeResponses = jest.fn(async () => undefined);
+
+    await subject.fetchResponses();
+
+    expect(subject.fetchQuestionModeResponses).toHaveBeenCalledTimes(1);
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.renderQuestionIDsTable({ q1: [] }, { q1: { id: 'q1', prompt: 'Prompt' } })).not.toBeNull();
+  });
+
   it('suppresses no-op filter activity state writes', () => {
     const subject = createSubject({});
     subject.state = {
@@ -569,7 +658,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.state.filterLoading).toBe(false);
   });
 
-  it('polls question-mode results across list scope on /session routes', () => {
+  it('keeps question-mode polling scoped to the /session route slug', () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
     try {
@@ -628,13 +717,13 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
       const changed = subject.pollLocalStorageForUpdates();
 
-      expect(changed).toBe(true);
-      expect(subject.state.questionLocalBlock).toBe(11);
-      expect(subject.state.responseLocalBlock).toBe(13);
-      expect(subject.state.cachedQuestionsCount).toBe(2);
-      expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+      expect(changed).toBe(false);
+      expect(subject.state.questionLocalBlock).toBe(5);
+      expect(subject.state.responseLocalBlock).toBe(7);
+      expect(subject.state.cachedQuestionsCount).toBe(1);
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
       expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
       expect(peekSpy.mock.calls.filter((args) => args[0] === 'surveysCache')).toHaveLength(0);
     } finally {
       window.history.replaceState({}, '', priorUrl);
@@ -681,6 +770,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
     first.resolve(101);
     await firstRunPromise;
+    await flushMicrotasks();
 
     expect(latestSpy).toHaveBeenCalledTimes(2);
     expect(maxInFlight).toBe(1);

@@ -1,4 +1,46 @@
 const fetchPonyfill = require('node-fetch');
+const { webcrypto: nodeWebCrypto } = require('crypto');
+
+const installWebCrypto = (target) => {
+  if (!target || !nodeWebCrypto) return;
+  const currentCrypto = target.crypto;
+  if (currentCrypto?.subtle && currentCrypto?.getRandomValues) return;
+
+  try {
+    Object.defineProperty(target, 'crypto', {
+      value: nodeWebCrypto,
+      configurable: true,
+      writable: true,
+    });
+    return;
+  } catch (error) {
+    // Some jsdom versions expose crypto as a read-only object; patch the missing APIs below.
+  }
+
+  if (!currentCrypto) return;
+
+  if (!currentCrypto.subtle) {
+    try {
+      Object.defineProperty(currentCrypto, 'subtle', {
+        value: nodeWebCrypto.subtle,
+        configurable: true,
+      });
+    } catch (error) {
+      // Leave crypto untouched if the host object refuses polyfills.
+    }
+  }
+
+  if (!currentCrypto.getRandomValues) {
+    try {
+      Object.defineProperty(currentCrypto, 'getRandomValues', {
+        value: nodeWebCrypto.getRandomValues.bind(nodeWebCrypto),
+        configurable: true,
+      });
+    } catch (error) {
+      // Leave crypto untouched if the host object refuses polyfills.
+    }
+  }
+};
 
 const readBodyAsText = async (body) => {
   if (body == null) return '';
@@ -60,6 +102,8 @@ if (typeof process !== 'undefined' && process.env && process.env.PUBLIC_URL == n
   process.env.PUBLIC_URL = '';
 }
 
+installWebCrypto(globalThis);
+
 if (typeof globalThis.fetch !== 'function') {
   globalThis.fetch = fetchPonyfill;
 }
@@ -75,6 +119,8 @@ if (typeof globalThis.Request !== 'function') {
 globalThis.Response = JestResponse;
 
 if (typeof window !== 'undefined') {
+  installWebCrypto(window);
+
   if (typeof window.fetch !== 'function') {
     window.fetch = globalThis.fetch;
   }
@@ -95,5 +141,10 @@ if (typeof window !== 'undefined') {
 
   if (typeof window.cancelAnimationFrame !== 'function') {
     window.cancelAnimationFrame = (handle) => clearTimeout(handle);
+  }
+
+  if (globalThis !== window) {
+    globalThis.requestAnimationFrame = (callback) => window.requestAnimationFrame(callback);
+    globalThis.cancelAnimationFrame = (handle) => window.cancelAnimationFrame(handle);
   }
 }

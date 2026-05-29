@@ -287,6 +287,56 @@ test('dispatchAdminRequest reads Lit Chipotle status from worker config plus ses
   });
 });
 
+test('dispatchAdminRequest rejects unsafe Lit Chipotle status API bases before status fetch', async () => {
+  let readCalled = false;
+  let fetchCalled = false;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        litApiBase: 'https://attacker.example',
+      }),
+    },
+    env: { GROUP_KV: {}, LIT_ACCOUNT_API_KEY: 'env-key' },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-chipotle-status',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          adminAddress: '0xabc',
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group_123',
+            litPkpId: 'pkp_123',
+            litActionCid: 'bafy123',
+          },
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({ litUsageApiKey: 'lit-secret' }),
+      readLitChipotleStatus: async () => {
+        readCalled = true;
+        return { ok: true };
+      },
+      fetchImpl: async () => {
+        fetchCalled = true;
+        return { ok: true, text: async () => '{}' };
+      },
+    }),
+  });
+
+  assert.equal(readCalled, false);
+  assert.equal(fetchCalled, false);
+  assert.deepEqual(result, {
+    body: { error: 'Lit Chipotle API base URL host is not approved.' },
+    status: 502,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
 test('dispatchAdminRequest issues one-time sponsored deploy and faucet grants', async () => {
   const kvCalls = [];
   const env = {

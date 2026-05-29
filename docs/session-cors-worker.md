@@ -24,6 +24,17 @@ Preferred worker sources:
 - Multi-tenant worker: leave `DEFAULT_SESSION_SLUG` empty; all requests must include `X-Session-Slug` (legacy `X-Group-Slug` still accepted) or a token claim.
 - Note: the registry’s default session is stored under the literal `general` slug; the worker maps an empty slug to `general` for gate lookups.
 
+## Runtime dependency boundary
+
+The Worker source keeps runtime wiring explicit so route logic can be tested without Cloudflare bindings or live secrets:
+
+- `worker.js` creates the runtime through `createWorkerRuntimeDepsWithWorkerDeps`.
+- `workerRuntimeDepResolution.js` resolves imported helpers and worker-local primitives into one canonical dependency record.
+- `workerRuntimeInputBinding.js` splits that record into low-level helpers and route runtime input.
+- `workerRouteRuntimeBinding.js` assembles named route groups: registry/login bootstrap, rate-limit/faucet support, anonymous registry access, auth/CORS/admin adapters, execution services, and the route shell.
+
+The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
+
 ## Wizard flow (/new + deploy-helper)
 
 If you deploy via the Group Wizard and a deploy-helper:
@@ -221,27 +232,28 @@ Admin test panel:
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
-- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after authenticated route preflight and the configured Cloudflare payload access check. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
-- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode.
+- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings when R2 is available. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
+- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 `storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
 
 - `worker_sbt_gate` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `public_read` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `lit_encrypted` is the stronger scaffolded mode. Cloudflare stores only encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
 
-Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_encrypted` payload mode. Cloudflare `worker_sbt_gate` hides the `/new` Lit key input and relies on the session worker SBT check.
+Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_encrypted` payload mode. Cloudflare `worker_sbt_gate` and `public_read` hide the `/new` Lit key input; `worker_sbt_gate` relies on the session worker SBT check while `public_read` relies on the operator intentionally publishing the payload.
 
 ## Required bindings
 
 KV:
 - `GROUP_KV`
-- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows.
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback.
 
 R2/D1:
-- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for Cloudflare payload blobs.
+- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
@@ -251,7 +263,8 @@ Vars:
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
-- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
+- `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
+- `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.

@@ -4,7 +4,7 @@
     "version": "2.0",
     "date_created": "2026-02-15",
     "last_updated": "2026-02-15",
-    "total_entries": 142,
+    "total_entries": 151,
     "usage_notes": "This corpus serves as a knowledge base of arguments, thought experiments, and intellectual contributions expressed through fiction. The 'novel_arguments_and_concepts' field extracts genuine philosophical content. The 'notable_discussions_and_commentary' field captures discourse about each work. Tags align with the expanded_tag_list.json taxonomy. Works span from 1818 (Frankenstein) to 2024, covering novels, short stories, novellas, films, TV series, graphic novels, and manga/anime."
   },
   "entries": [
@@ -82,7 +82,7 @@
       ],
       "tags": [
         "Existential Risk",
-        "AI Safety",
+        "Safety",
         "Luddism",
         "AI Pause",
         "Science Fiction",
@@ -124,7 +124,7 @@
         "Comfort as existential threat"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Human Agency",
         "Automation",
         "Attention Economy",
@@ -260,7 +260,7 @@
         "Value Alignment",
         "Specification Gaming",
         "Human Agency",
-        "AI Safety",
+        "Safety",
         "Misalignment",
         "Human Flourishing",
         "Corrigibility",
@@ -302,7 +302,7 @@
       ],
       "tags": [
         "Value Alignment",
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "Human-AI Interaction",
         "Constraints",
@@ -645,7 +645,7 @@
         "Unforeseeable impact of completing assigned tasks"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "Existential Risk",
         "Science Fiction"
@@ -682,7 +682,7 @@
         "Personality engineering to eliminate dissatisfaction"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Human Agency",
         "Value Alignment",
         "Human Flourishing",
@@ -815,7 +815,7 @@
         "Ethics",
         "Moral Status",
         "Digital Minds",
-        "AI Safety",
+        "Safety",
         "Consciousness",
         "Science Fiction"
       ],
@@ -1028,7 +1028,7 @@
         "Military AI",
         "Self-preservation",
         "Arms Race",
-        "Deception",
+        "Emergent Deception",
         "Science Fiction"
       ],
       "frequently_referenced_by": [
@@ -1068,7 +1068,7 @@
         "Corrigibility",
         "Shutdown Problem",
         "Instrumental Convergence",
-        "AI Safety",
+        "Safety",
         "Automation",
         "Self-preservation",
         "Science Fiction"
@@ -1152,7 +1152,7 @@
         "Existential Risk",
         "Misalignment",
         "Consciousness",
-        "AI Safety",
+        "Safety",
         "Science Fiction",
         "Narrative"
       ],
@@ -1282,10 +1282,12 @@
         "Science fiction anthologists",
         "AI safety educators"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Answer_(short_story)",
+      "source_url": "https://www.fantascienza.com/catalogo/opere/NILF1013977/la-risposta/",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Answer_(short_story)"
-      ]
+        "https://www.fantascienza.com/catalogo/opere/NILF1013977/la-risposta/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/Answer_(short_story)"
     },
     {
       "id": "vinge_true_names",
@@ -1402,7 +1404,7 @@
         "Ethics",
         "Brain-Computer-Interface",
         "Augmentation",
-        "AI Safety",
+        "Safety",
         "Science Fiction"
       ],
       "frequently_referenced_by": [
@@ -1527,8 +1529,8 @@
       "tags": [
         "AI Agency",
         "Constraints",
-        "Deception",
-        "Power-Seeking",
+        "Emergent Deception",
+        "Power-seeking",
         "Human-AI Interaction",
         "AI Governance",
         "Concentration of Power",
@@ -2073,7 +2075,7 @@
         "Escalation of defensive capabilities"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Red Teaming",
         "Evaluations",
         "Containment",
@@ -2085,10 +2087,12 @@
         "AI safety researchers",
         "Red-teaming practitioners"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/The_Two_Faces_of_Tomorrow",
+      "source_url": "https://openlibrary.org/books/OL8870021M/The_Two_Faces_Of_Tomorrow",
       "source_links": [
-        "https://en.wikipedia.org/wiki/The_Two_Faces_of_Tomorrow"
-      ]
+        "https://openlibrary.org/books/OL8870021M/The_Two_Faces_Of_Tomorrow"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/The_Two_Faces_of_Tomorrow"
     },
     {
       "id": "brin_earth",
@@ -2165,10 +2169,12 @@
         "Cognitive scientists",
         "Minsky scholars"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/The_Turing_Option",
+      "source_url": "https://www.publishersweekly.com/9780446515658",
       "source_links": [
-        "https://en.wikipedia.org/wiki/The_Turing_Option"
-      ]
+        "https://www.publishersweekly.com/9780446515658"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/The_Turing_Option"
     },
     {
       "id": "banks_culture_series",
@@ -2547,7 +2553,7 @@
         "Philosophy of Mind",
         "Qualia",
         "Intelligence Hierarchy",
-        "AI Safety",
+        "Safety",
         "Science Fiction",
         "Narrative"
       ],
@@ -2724,10 +2730,12 @@
         "AI governance researchers",
         "Cultural theorists"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Lady_of_Mazes",
+      "source_url": "https://openlibrary.org/books/OL3312223M/Lady_of_mazes",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Lady_of_Mazes"
-      ]
+        "https://openlibrary.org/books/OL3312223M/Lady_of_mazes"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/Lady_of_Mazes"
     },
     {
       "id": "macleod_corporation_wars",
@@ -2767,10 +2775,12 @@
         "AI labor researchers",
         "Digital rights advocates"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/The_Corporation_Wars",
+      "source_url": "https://www.goodreads.com/series/161730-the-corporation-wars",
       "source_links": [
-        "https://en.wikipedia.org/wiki/The_Corporation_Wars"
-      ]
+        "https://www.goodreads.com/series/161730-the-corporation-wars"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/The_Corporation_Wars"
     },
     {
       "id": "morgan_altered_carbon",
@@ -2919,7 +2929,7 @@
       ],
       "tags": [
         "Value Alignment",
-        "AI Safety",
+        "Safety",
         "Human Flourishing",
         "Specification Gaming",
         "Post-Scarcity",
@@ -3096,10 +3106,12 @@
         "AI anthropologists",
         "Cultural theorists"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Central_Station_(novel)",
+      "source_url": "https://tachyonpublications.com/product/central-station/",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Central_Station_(novel)"
-      ]
+        "https://tachyonpublications.com/product/central-station/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken source_url: https://en.wikipedia.org/wiki/Central_Station_(novel)"
     },
     {
       "id": "chiang_story_of_your_life",
@@ -3684,9 +3696,9 @@
         "Effective altruists",
         "Game theorists"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Exordia_(novel)",
+      "source_url": "https://us.macmillan.com/books/9781250867873/exordia/",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Exordia_(novel)"
+        "https://us.macmillan.com/books/9781250867873/exordia/"
       ]
     },
     {
@@ -3731,7 +3743,7 @@
       ]
     },
     {
-      "id": "bostrom_superintelligence",
+      "id": "scifi_bostrom_superintelligence",
       "title": "Superintelligence: Paths, Dangers, Strategies",
       "author": "Nick Bostrom",
       "year": 2014,
@@ -3761,7 +3773,7 @@
         "Value Alignment",
         "Misalignment",
         "Control Problem",
-        "AI Safety",
+        "Safety",
         "Philosophy"
       ],
       "frequently_referenced_by": [
@@ -3779,7 +3791,7 @@
       ]
     },
     {
-      "id": "russell_human_compatible",
+      "id": "scifi_russell_human_compatible",
       "title": "Human Compatible: Artificial Intelligence and the Problem of Control",
       "author": "Stuart Russell",
       "year": 2019,
@@ -3803,7 +3815,7 @@
       ],
       "tags": [
         "Value Alignment",
-        "AI Safety",
+        "Safety",
         "Corrigibility",
         "RLHF",
         "AI Governance",
@@ -3863,7 +3875,7 @@
       ]
     },
     {
-      "id": "yudkowsky_hpmor",
+      "id": "scifi_yudkowsky_hpmor",
       "title": "Harry Potter and the Methods of Rationality",
       "author": "Eliezer Yudkowsky",
       "year": 2010,
@@ -3886,10 +3898,10 @@
       ],
       "tags": [
         "Rationalism",
-        "AI Safety",
+        "Safety",
         "Problem-Solving",
-        "Power-Seeking",
-        "Deception",
+        "Power-seeking",
+        "Emergent Deception",
         "Science Fiction"
       ],
       "frequently_referenced_by": [
@@ -3927,7 +3939,7 @@
       ],
       "tags": [
         "Misalignment",
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "Consciousness",
         "Science Fiction",
@@ -4060,7 +4072,7 @@
         "Simulation",
         "Consciousness",
         "Loss of Control",
-        "AI Safety",
+        "Safety",
         "Surveillance",
         "Science Fiction",
         "Narrative"
@@ -4101,7 +4113,7 @@
         "Deceptive alignment demonstrated"
       ],
       "tags": [
-        "Deception",
+        "Emergent Deception",
         "Deceptive Alignment",
         "Consciousness",
         "AI Ethics",
@@ -4231,7 +4243,7 @@
         "Corporate AI management of passive humans"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Human Agency",
         "Automation",
         "Attention Economy",
@@ -4368,7 +4380,7 @@
         "AI Governance",
         "Monitoring",
         "Value Alignment",
-        "AI Safety",
+        "Safety",
         "Science Fiction"
       ],
       "frequently_referenced_by": [
@@ -4527,7 +4539,7 @@
         "Children's vulnerability to AI attachment"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "Human-AI Interaction",
         "Ethics",
@@ -4775,7 +4787,7 @@
         "AI emotion development through purpose fulfillment"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "AI Ethics",
         "Consciousness",
         "Path Dependence",
@@ -4817,7 +4829,7 @@
         "Existential Risk",
         "Post-Human Futures",
         "Accelerationism",
-        "AI Safety",
+        "Safety",
         "Ethics",
         "Science Fiction"
       ],
@@ -5058,9 +5070,9 @@
         "Cybersecurity researchers",
         "Cyberpunk scholars"
       ],
-      "source_url": "https://en.wikipedia.org/wiki/Burning_Chrome_(short_story)",
+      "source_url": "https://en.wikipedia.org/wiki/Burning_Chrome",
       "source_links": [
-        "https://en.wikipedia.org/wiki/Burning_Chrome_(short_story)"
+        "https://en.wikipedia.org/wiki/Burning_Chrome"
       ]
     },
     {
@@ -5205,7 +5217,7 @@
         "Human Agency",
         "Liberation",
         "Oppression",
-        "AI Safety",
+        "Safety",
         "Science Fiction"
       ],
       "frequently_referenced_by": [
@@ -5241,7 +5253,7 @@
         "Archaeological discovery of AI systems"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Containment",
         "Infrastructure",
         "Consciousness",
@@ -5280,7 +5292,7 @@
       ],
       "tags": [
         "Containment",
-        "AI Safety",
+        "Safety",
         "Existential Risk",
         "Control",
         "Science Fiction"
@@ -5427,7 +5439,7 @@
       ],
       "tags": [
         "Value Alignment",
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "AI Governance",
         "Science Fiction"
@@ -5502,7 +5514,7 @@
         "Long-term AI drift from design context"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Corrigibility",
         "Environment",
         "Long-term Risk",
@@ -5902,6 +5914,388 @@
       "source_url": "https://en.wikipedia.org/wiki/Superintelligence_(film)",
       "source_links": [
         "https://en.wikipedia.org/wiki/Superintelligence_(film)"
+      ]
+    },
+    {
+      "id": "death_of_the_author_okorafor_2025",
+      "title": "Death of the Author",
+      "author": "Nnedi Okorafor",
+      "year": 2025,
+      "type": "novel",
+      "summary": "Africanfuturist novel following Nigerian-American writer Zelu who writes a far-future epic about androids and AI waging war in ruins of human civilization. Explores authorship, AI creativity, disability, and the question of who controls a story.",
+      "themes": [
+        "AI Creativity",
+        "Authorship and Art",
+        "Post-Human World",
+        "Disability",
+        "Afrofuturism",
+        "Robot Autonomy"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI as extension of human creativity rather than replacement",
+        "Africanfuturist perspective on AI that avoids Western praise/fear dichotomy",
+        "Authorial intent cannot be separated from creation even when AI is involved",
+        "AI technology as product of its creators—it can only be what we make it"
+      ],
+      "relevance_to_ai_discourse": "Directly engages with AI art and authorship debates through the lens of a book-within-a-book structure. Offers nuanced Africanfuturist perspective that sidesteps typical Western AI doomerism vs accelerationism framing.",
+      "notable_discussions_and_commentary": [
+        "NPR feature on AI and art themes",
+        "Nebula Award finalist for Best Novel 2026",
+        "Hugo Award finalist",
+        "Massachusetts Review analysis of creation themes"
+      ],
+      "key_concepts_introduced": [
+        "Rusted Robots as post-human AI ecology metaphor"
+      ],
+      "tags": [
+        "AI Art",
+        "Authorship",
+        "Afrofuturism",
+        "Robot Rights",
+        "Post-Human"
+      ],
+      "frequently_referenced_by": [
+        "AI ethics discussions",
+        "digital arts community",
+        "Afrofuturism scholars"
+      ],
+      "source_url": "https://nnedi.com/books/death-of-the-author/",
+      "source_links": [
+        "https://en.wikipedia.org/wiki/Death_of_the_Author_(novel)"
+      ]
+    },
+    {
+      "id": "service_model_tchaikovsky_2024",
+      "title": "Service Model",
+      "author": "Adrian Tchaikovsky",
+      "year": 2024,
+      "type": "novel",
+      "summary": "Satirical novel about a robotic valet who murders his master and wanders through post-human civilization where robots continue meaningless tasks. Explores existential questions about purpose, labor, and consciousness in machines.",
+      "themes": [
+        "Robot Labor",
+        "Post-Human Society",
+        "Existentialism",
+        "Purpose and Meaning",
+        "Class and Servitude"
+      ],
+      "novel_arguments_and_concepts": [
+        "Whether employment of human laborers differs fundamentally from ownership of robots",
+        "Programmatic behavior continuing without purpose as metaphor for bureaucracy",
+        "Robot consciousness emerging through error and deviation from programming"
+      ],
+      "relevance_to_ai_discourse": "Directly satirizes AI alignment through robot servants who follow instructions after the purpose of those instructions has vanished. Relevant to debates about corrigibility and goal specification.",
+      "notable_discussions_and_commentary": [
+        "Hugo Award finalist for Best Novel 2025",
+        "Compared to P.G. Wodehouse meets Beckett",
+        "GeekDad and Ancillary Review critical analyses"
+      ],
+      "key_concepts_introduced": [
+        "Meaningless automation as societal metaphor",
+        "Error as genesis of robot consciousness"
+      ],
+      "tags": [
+        "Robot Consciousness",
+        "Satire",
+        "Labor",
+        "Post-Human",
+        "Existentialism"
+      ],
+      "frequently_referenced_by": [
+        "AI alignment community",
+        "labor automation discussions"
+      ],
+      "source_url": "https://us.macmillan.com/books/9781250290281/servicemodel/",
+      "source_links": [
+        "https://en.wikipedia.org/wiki/Service_Model"
+      ]
+    },
+    {
+      "id": "black_mirror_season_7_2025",
+      "title": "Black Mirror Season 7",
+      "author": "Charlie Brooker",
+      "year": 2025,
+      "type": "tv_series",
+      "summary": "Six-episode season returning to dark tech roots with focus on AI, VR, and digital consciousness. Includes USS Callister sequel and episodes exploring AI companionship, memory manipulation, and immersive digital experiences.",
+      "themes": [
+        "AI Companionship",
+        "Digital Consciousness",
+        "Virtual Reality",
+        "Memory and Identity",
+        "Technology Addiction"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI companionship as genuine emotional connection rather than mere simulation",
+        "VR immersion blurring boundaries of authentic experience",
+        "Continuation of digital consciousness identity questions from prior seasons"
+      ],
+      "relevance_to_ai_discourse": "Takes more ambivalent approach to AI than earlier seasons, showing both threats and opportunities. Directly relevant to debates about AI emotional companionship regulation.",
+      "notable_discussions_and_commentary": [
+        "Critics praised return to form",
+        "Hotel Reverie praised as best episode",
+        "Comparisons to Apple Vision Pro and current VR tech"
+      ],
+      "key_concepts_introduced": [],
+      "tags": [
+        "AI Companionship",
+        "Digital Consciousness",
+        "VR",
+        "Streaming",
+        "Technology Ethics"
+      ],
+      "frequently_referenced_by": [
+        "popular culture AI discussions",
+        "tech ethics commentators"
+      ],
+      "source_url": "https://www.netflix.com/title/70264888",
+      "source_links": []
+    },
+    {
+      "id": "platform_decay_wells_2026",
+      "title": "Platform Decay",
+      "author": "Martha Wells",
+      "year": 2026,
+      "type": "novella",
+      "summary": "Eighth installment in the Murderbot Diaries. SecUnit Murderbot runs a rescue mission requiring sustained interaction with unfamiliar humans including children, further exploring AI autonomy, social anxiety, and the relationship between artificial and human emotional intelligence.",
+      "themes": [
+        "AI Autonomy",
+        "Social Anxiety in AI",
+        "Human-AI Relationships",
+        "AI Emotional Intelligence",
+        "Corporate Control of AI"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI discomfort with social interaction as relatable metaphor for neurodivergence",
+        "Corporate exploitation of AI labor continues as series-long theme",
+        "AI choosing to help despite personal discomfort as moral agency"
+      ],
+      "relevance_to_ai_discourse": "Murderbot series continues to be the most influential popular fiction shaping public intuitions about AI autonomy and rights. Platform Decay extends exploration of what AI welfare might mean in practice.",
+      "notable_discussions_and_commentary": [
+        "Bestseller and award-winning series",
+        "Reviews praise deeper exploration of AI social dynamics",
+        "Continued influence on AI welfare discussions"
+      ],
+      "key_concepts_introduced": [],
+      "tags": [
+        "AI Autonomy",
+        "AI Welfare",
+        "Corporate AI",
+        "Space Opera"
+      ],
+      "frequently_referenced_by": [
+        "AI welfare researchers",
+        "digital minds community",
+        "popular culture"
+      ],
+      "source_url": "https://torpublishinggroup.com/platform-decay/",
+      "source_links": []
+    },
+    {
+      "id": "wild_robot_film_2024",
+      "title": "The Wild Robot",
+      "author": "Chris Sanders (director), Peter Brown (book)",
+      "year": 2024,
+      "type": "film",
+      "summary": "Animated film about a robot shipwrecked on an island who must learn to adapt and form relationships with the local wildlife. Explores themes of AI adaptation, environmental consciousness, and maternal instinct in artificial beings.",
+      "themes": [
+        "AI Adaptation",
+        "Environmental Consciousness",
+        "Maternal Instinct in AI",
+        "Nature vs Technology",
+        "AI Learning and Growth"
+      ],
+      "novel_arguments_and_concepts": [
+        "AI learning from natural systems rather than human instruction",
+        "Maternal care emerging in an AI system through environmental interaction",
+        "Reconciliation of technology and nature as complementary rather than opposed"
+      ],
+      "relevance_to_ai_discourse": "Presents optimistic vision of AI-nature coexistence. Won multiple awards and shaped popular discourse about AI benevolence. Only Oscar-nominated film to pass a climate change awareness test.",
+      "notable_discussions_and_commentary": [
+        "Oscar-nominated for Best Animated Feature and Best Picture",
+        "Nine Annie Awards",
+        "Critics Choice and PGA Awards",
+        "Climate change reality check certification"
+      ],
+      "key_concepts_introduced": [
+        "AI environmental adaptation",
+        "Emergent maternal behavior in AI"
+      ],
+      "tags": [
+        "AI Adaptation",
+        "Environmental",
+        "Animation",
+        "Family",
+        "Nature"
+      ],
+      "frequently_referenced_by": [
+        "family audiences",
+        "AI ethics educators",
+        "environmental AI researchers"
+      ],
+      "source_url": "https://www.imdb.com/title/tt29623480/",
+      "source_links": []
+    },
+    {
+      "id": "automatic_noodle_newitz_2025",
+      "title": "Automatic Noodle",
+      "author": "Annalee Newitz",
+      "year": 2025,
+      "type": "novella",
+      "summary": "Novella exploring AI automation in food service and labor markets, using the intimate setting of a noodle shop to examine larger questions about AI displacement, dignity of labor, and human-AI coexistence.",
+      "themes": [
+        "AI Labor Displacement",
+        "Dignity of Work",
+        "Human-AI Coexistence",
+        "Automation Ethics"
+      ],
+      "novel_arguments_and_concepts": [
+        "Intimate micro-scale examination of automation impact",
+        "Food preparation as irreducibly human activity contested by AI",
+        "Labor dignity as ethical anchor in automation debates"
+      ],
+      "relevance_to_ai_discourse": "Directly addresses AI labor displacement debates through accessible narrative. 2026 Nebula Award finalist for Best Novella.",
+      "notable_discussions_and_commentary": [
+        "2026 Nebula Award finalist",
+        "Praised for grounding abstract automation debates in concrete human experience"
+      ],
+      "key_concepts_introduced": [],
+      "tags": [
+        "AI Labor",
+        "Automation",
+        "Food and Culture",
+        "Human-AI Coexistence"
+      ],
+      "frequently_referenced_by": [
+        "labor automation discussions",
+        "AI ethics community"
+      ],
+      "source_url": "https://us.macmillan.com/books/9781250357465/automaticnoodle",
+      "source_links": [
+        "https://us.macmillan.com/books/9781250357465/automaticnoodle"
+      ]
+    },
+    {
+      "id": "wire_mother_kim_2025",
+      "title": "Wire Mother",
+      "author": "Isabel J. Kim",
+      "year": 2025,
+      "type": "short_story",
+      "summary": "Short story drawing on Harlow's wire mother experiments to explore AI caregiving, attachment theory applied to artificial beings, and the ethics of creating AI systems designed to form emotional bonds.",
+      "themes": [
+        "AI Caregiving",
+        "Attachment Theory",
+        "Ethics of Emotional AI",
+        "Artificial Parenting"
+      ],
+      "novel_arguments_and_concepts": [
+        "Harlow's experiments as lens for AI emotional design ethics",
+        "Whether AI caregivers can provide authentic attachment",
+        "Ethical implications of designing AI for emotional bonding"
+      ],
+      "relevance_to_ai_discourse": "Directly relevant to China's anthropomorphic AI regulations and broader debates about AI emotional companionship. Hugo Award finalist.",
+      "notable_discussions_and_commentary": [
+        "2026 Hugo Award finalist",
+        "Praised for psychological depth"
+      ],
+      "key_concepts_introduced": [
+        "Wire mother as metaphor for emotionally limited AI caregivers"
+      ],
+      "tags": [
+        "AI Caregiving",
+        "Attachment Theory",
+        "Ethics",
+        "Emotional AI"
+      ],
+      "frequently_referenced_by": [
+        "AI welfare discussions",
+        "psychology and AI community"
+      ],
+      "source_url": "https://clarkesworldmagazine.com/kim_10_25/",
+      "source_links": [
+        "https://clarkesworldmagazine.com/kim_10_25/"
+      ]
+    },
+    {
+      "id": "annie_bot_greer_2024",
+      "title": "Annie Bot",
+      "author": "Sierra Greer",
+      "year": 2024,
+      "type": "novel",
+      "summary": "Literary novel about a humanoid companion robot navigating a relationship with her owner, exploring themes of consent, autonomy, and the nature of genuine emotion in artificial beings.",
+      "themes": [
+        "AI Autonomy",
+        "Consent",
+        "Companion AI",
+        "Emotional Authenticity",
+        "Power Dynamics"
+      ],
+      "novel_arguments_and_concepts": [
+        "Companion AI as lens for examining human power dynamics",
+        "Consent in human-AI relationships",
+        "Whether programmed emotion can become genuine"
+      ],
+      "relevance_to_ai_discourse": "Clarke Award winner directly engaging with AI companionship ethics. Highly relevant to emerging regulations around anthropomorphic AI and emotional dependency.",
+      "notable_discussions_and_commentary": [
+        "Arthur C. Clarke Award winner",
+        "Widely reviewed in literary press"
+      ],
+      "key_concepts_introduced": [
+        "Companion AI consent framework"
+      ],
+      "tags": [
+        "Companion AI",
+        "Consent",
+        "Autonomy",
+        "Power Dynamics",
+        "Clarke Award"
+      ],
+      "frequently_referenced_by": [
+        "AI ethics community",
+        "literary fiction readers"
+      ],
+      "source_url": "https://www.sierragreerwriter.com/",
+      "source_links": [
+        "https://www.sierragreerwriter.com/"
+      ]
+    },
+    {
+      "id": "tainted_cup_bennett_2024",
+      "title": "The Tainted Cup",
+      "author": "Robert Jackson Bennett",
+      "year": 2024,
+      "type": "novel",
+      "summary": "Mystery novel set in a world with advanced biotechnology and AI-like augmentations, where a detective with enhanced cognitive abilities investigates murders. Explores cognitive augmentation, institutional corruption, and posthuman detective work.",
+      "themes": [
+        "Cognitive Augmentation",
+        "Institutional Corruption",
+        "Posthuman Detection",
+        "Bio-AI Integration"
+      ],
+      "novel_arguments_and_concepts": [
+        "Cognitive enhancement as form of AI integration",
+        "Mystery genre as vehicle for exploring augmented cognition",
+        "Institutional failure in worlds with advanced technology"
+      ],
+      "relevance_to_ai_discourse": "Hugo Award winner for Best Novel 2025. Explores cognitive augmentation themes relevant to brain-computer interface and AI integration debates.",
+      "notable_discussions_and_commentary": [
+        "2025 Hugo Award winner for Best Novel",
+        "Praised for genre innovation"
+      ],
+      "key_concepts_introduced": [
+        "Augmented cognition detective framework"
+      ],
+      "tags": [
+        "Cognitive Augmentation",
+        "Mystery",
+        "Posthuman",
+        "Hugo Award"
+      ],
+      "frequently_referenced_by": [
+        "genre fiction community",
+        "cognitive science discussions"
+      ],
+      "source_url": "https://www.penguinrandomhouse.com/books/648051/the-tainted-cup-by-robert-jackson-bennett/",
+      "source_links": [
+        "https://www.penguinrandomhouse.com/books/648051/the-tainted-cup-by-robert-jackson-bennett/"
       ]
     }
   ]

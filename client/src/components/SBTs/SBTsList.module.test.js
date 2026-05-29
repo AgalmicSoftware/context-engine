@@ -19,4 +19,11 @@ describe('SBTsList module styles', () => {
     expect(scss).toMatch(/\.sectionTitle\s*{[\s\S]*?font-size:\s*2rem;[\s\S]*?font-family:\s*var\(--ce-font-body\);[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
     expect(scss).toMatch(/\.modalViewContainer\s*{[\s\S]*?\.sectionTitle\s*{[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\)\s*!important;/);
   });
+
+  it('styles the featured SBT card container through a CSS-module class selector', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'SBTsList.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.featuredSBTsContainer\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex-wrap:\s*wrap;/);
+    expect(scss).not.toMatch(/#featuredSBTsContainer/);
+  });
 });

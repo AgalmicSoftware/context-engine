@@ -3,6 +3,7 @@ import {
   buildGatedPromptNoticeState,
   buildLockAudienceButtonAction,
   buildLockAudienceDisplayState,
+  buildQuestionPromptDecryptDisplayState,
   buildQuestionScanProgressDisplay,
   doesQuestionProgressMatchSlug,
   formatQuestionScanBlockCount,
@@ -137,6 +138,15 @@ describe('surveyToolViewState', () => {
       lockTitle: 'Encrypted',
     });
 
+    expect(buildAnswerLockDisplayState({
+      field: { encrypted: false },
+      masked: false,
+      isSubmitting: true,
+    })).toEqual({
+      lockDisabled: true,
+      lockTitle: 'Not encrypted',
+    });
+
     expect(buildGatedPromptNoticeState({
       questionId: 'Q 1',
       tooltipIdSuffix: 'pile',
@@ -160,6 +170,80 @@ describe('surveyToolViewState', () => {
     })).toEqual({
       tooltipId: 'ce-gated-prompt-tip-fallback-id-full',
       tooltipText: 'SBT gate required',
+    });
+
+    expect(buildGatedPromptNoticeState({
+      questionId: ' Q/2 ',
+      tooltipIdSuffix: 'full',
+      gateNames: [' ', 'Contributors'],
+      sbtLabel: 'Badge',
+      gateLabel: 'audience',
+      gatesLabel: 'audiences',
+    })).toEqual({
+      tooltipId: 'ce-gated-prompt-tip-q-2-full',
+      tooltipText: 'Required Badge audience: Contributors',
+    });
+  });
+
+  it('builds gated prompt decrypt display state from payload and auth state', () => {
+    expect(buildQuestionPromptDecryptDisplayState({
+      account: '',
+      canReloadPrompt: true,
+      loginComplete: false,
+      payloadDisplay: {
+        requiresAuth: true,
+        actionTitle: 'Open wallet',
+        label: 'Unlock prompt',
+        busyLabel: 'Unlocking...',
+        actionLabel: 'Decrypt Prompt',
+        noticeLeadingText: 'This prompt is',
+        noticeStatusText: 'private',
+        noticeSuffix: 'Unlock to respond.',
+      },
+      promptMasked: true,
+      promptReloading: true,
+      promptText: '[encrypted]',
+      questionId: ' Q1 ',
+    })).toEqual({
+      qid: 'q1',
+      promptText: '[encrypted]',
+      promptMasked: true,
+      showPromptAction: true,
+      promptTitle: 'Login required to decrypt gated prompts.',
+      promptLabel: 'Unlock prompt',
+      promptBusyLabel: 'Unlocking...',
+      noticeLeadingText: 'This prompt is',
+      noticeStatusText: 'private',
+      noticeSuffix: 'Unlock to respond.',
+      noticeActionBusy: true,
+      noticeActionDisabled: true,
+      noticeActionLabel: 'Decrypt Prompt',
+      noticeActionTitle: 'Login required to decrypt gated prompts.',
+      canReloadPrompt: true,
+    });
+  });
+
+  it('builds plaintext prompt and default decrypt notice labels', () => {
+    expect(buildQuestionPromptDecryptDisplayState({
+      account: '0xabc',
+      loginComplete: true,
+      payloadDisplay: {},
+      promptMasked: false,
+      promptText: 'Visible prompt',
+      questionId: '',
+    })).toMatchObject({
+      qid: '',
+      promptText: 'Visible prompt',
+      promptMasked: false,
+      showPromptAction: false,
+      promptTitle: 'Decrypt gated prompt',
+      promptLabel: 'Visible prompt',
+      promptBusyLabel: 'Decrypting...',
+      noticeActionBusy: false,
+      noticeActionDisabled: false,
+      noticeActionLabel: 'Decrypt Prompt',
+      noticeActionTitle: 'Decrypt gated prompt',
+      canReloadPrompt: false,
     });
   });
 

@@ -13,13 +13,14 @@ import styles from './SBTPage.module.scss';
 import SBTFilter from './SBTFilter';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveSbtPageCopyIconState } from './sbtPageHelpers';
 
 type SbtPageHolderModalProps = {
   isOpen: boolean;
   onClose: () => void;
   showHeaderCount: boolean;
-  holdersDisplayCount: number;
+  holdersDisplayCount: string;
   showCornerSpinner: boolean;
   holderItemsForFilter: unknown[];
   provider?: unknown;
@@ -33,8 +34,8 @@ type SbtPageHolderModalProps = {
   hasFilteredHolders: boolean;
   hasComputedHolders: boolean;
   showScanProgressInModal: boolean;
-  scanProgressText: string;
-  scanProgressSessionText: string;
+  scanProgressText: string | null;
+  scanProgressSessionText: string | null;
   scanProgressPct: number;
   scanProgressFillStyle: React.CSSProperties;
   showEmptyStateInModal: boolean;
@@ -178,7 +179,7 @@ export const renderSbtPageHolderModal = ({
                         className={styles.userBlockie}
                       />
                     ) : null}
-                    <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
+                    <a href={buildPublicRoute(`/u/${address}`)} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
                       {getShortenedAddress(address, false)}
                     </a>
                   </div>

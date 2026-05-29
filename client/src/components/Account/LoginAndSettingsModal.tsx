@@ -120,7 +120,16 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
-const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
+type AccountUserPageProps = {
+  viewAddress?: string;
+  account?: string;
+  provider?: string;
+  minimized?: boolean;
+  network?: unknown;
+};
+const AccountUserPage = React.lazy(
+  () => import("components/UserPage/UserPage")
+) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -653,13 +662,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  handleManualTestFundsRequest: any = async () => {
+  handleManualTestFundsRequest = async () => {
     await this.requestTestFunds({ source: 'manual' });
   };
 
   // Porto / passkey handlers
 
-  handlePortoSignUp: any = async () => {
+  handlePortoSignUp = async () => {
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -676,7 +685,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  handlePortoSignIn: any = async () => {
+  handlePortoSignIn = async () => {
     this.props.updateLoginInfo({
       loginInProgress: true,
       loginComplete: false,
@@ -693,7 +702,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  _finalizePortoLogin: any = (address: any, targetNetwork: any = null) => {
+  _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
       const portoNetwork = this.getPortoNetwork(targetNetwork);
       const web3info = {
         account: address,
@@ -710,7 +719,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       });
   };
 
-  handleLogout: any = async () => {
+  handleLogout = async () => {
     if (this.props.provider === 'porto_passkey') {
        portoFunctions.logoutPorto();
     }
@@ -870,7 +879,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  addCorrectNetwork: any = async () => {
+  addCorrectNetwork = async () => {
     if (window.ethereum && this.props.provider === "wagmi") {
       try {
         const tn = this.getTargetNetwork();
@@ -897,11 +906,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return false;
   };
 
-  switchToCorrectNetwork: any = async () => {
-    if (window.ethereum && this.props.provider === "wagmi") {
+  switchToCorrectNetwork = async () => {
+    const ethereum = window.ethereum;
+    if (ethereum && this.props.provider === "wagmi") {
       const tn = this.getTargetNetwork();
       const chainIdHex = chainHexId(tn);
-      const switchToTargetNetwork = () => window.ethereum.request({
+      const switchToTargetNetwork = () => ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: chainIdHex }],
       });
@@ -976,7 +986,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this.reloadPage();
   };
 
-  cloneAiSettings: any = (src: any) => {
+  cloneAiSettings = (src: any) => {
     const baseCandidate = src || getLocalAiSettings() || {};
     const base = (baseCandidate && typeof baseCandidate === 'object') ? baseCandidate : {};
     return {
@@ -996,7 +1006,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  applyAiPreset: any = (settings: any, presetKey: any) => {
+  applyAiPreset = (settings: any, presetKey: any) => {
     const current = this.cloneAiSettings(settings);
     const nextPreset = toStr(presetKey || '').trim() || 'custom';
     if (nextPreset === 'custom') {
@@ -1030,7 +1040,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  cloneResourceKeys: any = (src: any) => {
+  cloneResourceKeys = (src: any) => {
     const baseCandidate = src || getLocalSessionResourceKeys(this.getActiveSessionSlug()) || {};
     const base = (baseCandidate && typeof baseCandidate === 'object') ? baseCandidate : {};
     return {
@@ -1107,7 +1117,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  loadSponsoredAccess: any = async () => {
+  loadSponsoredAccess = async () => {
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
     const account = this.props.account || '';
@@ -1139,23 +1149,23 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  updateAiSettings: any = (updater: any) => {
-    this.setState((prev: any) => {
+  updateAiSettings = (updater: any) => {
+    this.setState((prev: Readonly<LoginAndSettingsModal['state']>) => {
       const current = this.cloneAiSettings(prev.aiSettings);
       const next = updater ? updater(current) : current;
       return { aiSettings: next, aiSettingsDirty: true, aiSettingsStatus: '' };
     });
   };
 
-  updateResourceKeys: any = (updater: any) => {
-    this.setState((prev: any) => {
+  updateResourceKeys = (updater: any) => {
+    this.setState((prev: Readonly<LoginAndSettingsModal['state']>) => {
       const current = this.cloneResourceKeys(prev.resourceKeys);
       const next = updater ? updater(current) : current;
       return { resourceKeys: next, resourceKeysDirty: true, resourceKeysStatus: '' };
     });
   };
 
-  updateResourceKeyField: any = (resource: any, field: any, value: any) => {
+  updateResourceKeyField = (resource: any, field: any, value: any) => {
     this.updateResourceKeys((s: any) => ({
       ...s,
       [resource]: {
@@ -1165,7 +1175,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  handleResourceToggleLocal: any = (resource: any, event: any) => {
+  handleResourceToggleLocal = (resource: any, event: any) => {
     const useLocal = !!event?.target?.checked;
     this.updateResourceKeys((s: any) => ({
       ...s,
@@ -1176,7 +1186,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  updateAiProviderField: any = (provider: any, field: any, value: any) => {
+  updateAiProviderField = (provider: any, field: any, value: any) => {
     this.updateAiSettings((s: any) => ({
       ...s,
       providers: {
@@ -1189,7 +1199,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  updateAiModelField: any = (modelType: any, value: any) => {
+  updateAiModelField = (modelType: any, value: any) => {
     this.updateAiSettings((s: any) => {
       const next = {
         ...s,
@@ -1205,7 +1215,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  updateAiTaskReasoningField: any = (taskType: any, value: any) => {
+  updateAiTaskReasoningField = (taskType: any, value: any) => {
     this.updateAiSettings((s: any) => ({
       ...s,
       taskReasoningEffort: {
@@ -1215,7 +1225,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  updateAiTranscriptionField: any = (field: any, value: any) => {
+  updateAiTranscriptionField = (field: any, value: any) => {
     this.updateAiSettings((s: any) => ({
       ...s,
       transcription: {
@@ -1225,7 +1235,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  handleAiModeChange: any = (event: any) => {
+  handleAiModeChange = (event: any) => {
     const nextMode = toStr(event?.target?.value || '').trim().toLowerCase() || 'openai';
     this.updateAiSettings((s: any) => {
       const next = {
@@ -1244,11 +1254,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleAiPresetChange: any = (event: any) => {
+  handleAiPresetChange = (event: any) => {
     const presetKey = toStr(event?.target?.value || '').trim() || 'custom';
     this.updateAiSettings((s: any) => this.applyAiPreset(s, presetKey));
     if (presetKey === 'custom') {
-      this.setState((prevState: any) => ({
+      this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
         aiSettingsSectionsOpen: {
           ...(prevState.aiSettingsSectionsOpen || {}),
           aiAdvanced: true,
@@ -1257,12 +1267,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  handleAiToggleLocal: any = (event: any) => {
+  handleAiToggleLocal = (event: any) => {
     const useLocal = !!event?.target?.checked;
     this.updateAiSettings((s: any) => ({ ...s, useLocal }));
   };
 
-  handleSaveAiSettings: any = () => {
+  handleSaveAiSettings = () => {
     const saved = saveLocalAiSettings(this.state.aiSettings || {});
     this.setState({
       aiSettings: saved,
@@ -1271,7 +1281,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleSaveResourceKeys: any = () => {
+  handleSaveResourceKeys = () => {
     const saved = saveLocalResourceKeys(this.getActiveSessionSlug(), this.state.resourceKeys || {});
     this.setState({
       resourceKeys: saved,
@@ -1280,7 +1290,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleClearAiSettings: any = () => {
+  handleClearAiSettings = () => {
     clearLocalAiSettings();
     const aiSettings = getLocalAiSettings();
     this.setState({
@@ -1290,7 +1300,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleClearResourceKeys: any = () => {
+  handleClearResourceKeys = () => {
     const sessionSlug = this.getActiveSessionSlug();
     clearLocalResourceKeys(sessionSlug);
     const resourceKeys = getLocalSessionResourceKeys(sessionSlug);
@@ -1301,8 +1311,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  togglePreLoginSettingsPanel: any = () => {
-    this.setState((prevState: any) => {
+  togglePreLoginSettingsPanel = () => {
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => {
       const preLoginSettingsOpen = !prevState.preLoginSettingsOpen;
       return {
         preLoginSettingsOpen,
@@ -1313,13 +1323,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  togglePreLoginConfigPanel: any = () => {
-    this.setState((prevState: any) => ({
+  togglePreLoginConfigPanel = () => {
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       preLoginConfigOpen: !prevState.preLoginConfigOpen,
     }));
   };
 
-  getDisplaySessionConfig: any = (slugIn: any = '', cfgIn: any = null) => {
+  getDisplaySessionConfig = (slugIn: any = '', cfgIn: any = null) => {
     const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
     return (
       cfgIn
@@ -1329,7 +1339,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  handlePreLoginAiEndpointChange: any = (event: any) => {
+  handlePreLoginAiEndpointChange = (event: any) => {
     const rpcUrl = toStr(event?.target?.value || '');
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings({
@@ -1349,7 +1359,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handlePreLoginAiProviderKeyChange: any = (provider: any, event: any) => {
+  handlePreLoginAiProviderKeyChange = (provider: any, event: any) => {
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings(applyPreLoginAiProviderKeyChange(current, {
       provider,
@@ -1362,9 +1372,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  toggleAiSettingsSection: any = (sectionKey: any) => {
+  toggleAiSettingsSection = (sectionKey: any) => {
     if (!sectionKey) return;
-    this.setState((prevState: any) => ({
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       aiSettingsSectionsOpen: {
         ...(prevState.aiSettingsSectionsOpen || {}),
         [sectionKey]: !prevState.aiSettingsSectionsOpen?.[sectionKey],
@@ -1372,7 +1382,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  isAiSettingsSectionOpen: any = (sectionKey: any) => {
+  isAiSettingsSectionOpen = (sectionKey: any) => {
     const sections = this.state.aiSettingsSectionsOpen || {};
     if (Object.prototype.hasOwnProperty.call(sections, sectionKey)) {
       return !!sections[sectionKey];
@@ -1380,10 +1390,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return sectionKey === 'aiConfig';
   };
 
-  toggleSupportedResourceSessions: any = (resourceKey: any) => {
+  toggleSupportedResourceSessions = (resourceKey: any) => {
     const key = toStr(resourceKey).trim();
     if (!key) return;
-    this.setState((prevState: any) => ({
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       expandedSponsorResources: {
         ...(prevState.expandedSponsorResources || {}),
         [key]: !prevState.expandedSponsorResources?.[key],
@@ -1391,7 +1401,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  getSessionDescriptor: any = (slugIn: any = '', cfgIn: any = null, activeSlugIn: any = this.getActiveSessionSlug()) => {
+  getSessionDescriptor = (slugIn: any = '', cfgIn: any = null, activeSlugIn: any = this.getActiveSessionSlug()) => {
     const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
     const cfg = this.getDisplaySessionConfig(slug, cfgIn);
     const slugKey = toStr(slug).trim();
@@ -1408,7 +1418,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  getSettingsSessionOptions: any = (activeSlugIn: any = this.getActiveSessionSlug()) => {
+  getSettingsSessionOptions = (activeSlugIn: any = this.getActiveSessionSlug()) => {
     const activeSlug = normalizeSettingsSessionSlug(activeSlugIn);
     const options: any = new Map();
     const pushSession = (slugIn: any = '') => {
@@ -1429,7 +1439,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  formatSettingsSessionOptionLabel: any = (descriptor: any = {}) => {
+  formatSettingsSessionOptionLabel = (descriptor: any = {}) => {
     const slug = normalizeSettingsSessionSlug(descriptor.slug);
     if (!slug) return 'General';
     if (descriptor.sessionName && descriptor.sessionName.toLowerCase() !== descriptor.slugLabel) {
@@ -1438,7 +1448,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return descriptor.label || descriptor.slugLabel || 'General';
   };
 
-  renderConfigToggleControl: any = ({
+  renderConfigToggleControl = ({
     expanded = false,
     onToggle = null,
     testId = '',
@@ -1448,7 +1458,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     testId,
   });
 
-  renderSessionSummary: any = (activeSessionIn: any = null) => {
+  renderSessionSummary = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
     return LoginSettingsSessionSummary({
       activeSession,
@@ -1456,7 +1466,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  renderSettingsControlRow: any = ({
+  renderSettingsControlRow = ({
     activeSession = this.getSessionDescriptor(this.getActiveSessionSlug()),
     configOpen = false,
     onToggleConfig = null,
@@ -1486,7 +1496,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sessionHref: buildSettingsSessionHref(activeSession.slug),
   });
 
-  handleActiveSessionChange: any = (event: any) => {
+  handleActiveSessionChange = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
     if (nextSlug === this.getActiveSessionSlug()) return;
     this.props.updateGlobalSessionSelection?.({
@@ -1494,7 +1504,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  getScanScopeSessionSlugs: any = ({
+  getScanScopeSessionSlugs = ({
     activeSlug = this.getActiveSessionSlug(),
     sessionScanScope = this.getSessionScanScopeValue(),
     sessionScanSlugs = this.state.sessionScanSlugs,
@@ -1525,7 +1535,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return uniqueList(selected.filter((slug: any) => available.includes(slug)));
   };
 
-  getSponsoredSessionSources: any = ({
+  getSponsoredSessionSources = ({
     activeSlug = this.getActiveSessionSlug(),
     sessionScanScope = this.getSessionScanScopeValue(),
     sessionScanSlugs = this.state.sessionScanSlugs,
@@ -1580,13 +1590,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  toggleAiSettingsPanel: any = () => {
-    this.setState((prevState: any) => ({
+  toggleAiSettingsPanel = () => {
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       aiSettingsOpen: !prevState.aiSettingsOpen,
     }));
   };
 
-  handleSessionScanScopeChange: any = (event: any) => {
+  handleSessionScanScopeChange = (event: any) => {
     const nextScope = normalizeSessionScanScope(event?.target?.value || '');
     this.setState({
       sessionScanScope: nextScope,
@@ -1594,9 +1604,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleSessionScanSlugToggle: any = (slugIn: any) => {
+  handleSessionScanSlugToggle = (slugIn: any) => {
     const slug = normalizeSettingsSessionSlug(slugIn);
-    this.setState((prevState: any) => {
+    this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => {
       const current = this.getConfiguredSessionScanSlugs(prevState);
       const next = current.includes(slug)
         ? current.filter((entry: any) => entry !== slug)
@@ -1609,7 +1619,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleSaveSessionScanSettings: any = () => {
+  handleSaveSessionScanSettings = () => {
     const desiredScope = normalizeSessionScanScope(
       this.state?.sessionScanScope ??
       this.props.selectedSessionScope ??
@@ -1648,7 +1658,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handleResetSessionScanSettings: any = () => {
+  handleResetSessionScanSettings = () => {
     this.props.updateGlobalSessionSelection?.({
       selectedSessionScope: 'general',
       selectedSessionSlugs: [],
@@ -1661,7 +1671,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  buildSessionScopeChipOptions: any = ({
+  buildSessionScopeChipOptions = ({
     dataTestIdPrefix = 'ce-web3modal-session-scope',
     includePrimaryBadge = false,
   }: any = {}) => {
@@ -1682,7 +1692,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  renderSessionScopeChips: any = ({
+  renderSessionScopeChips = ({
     dataTestIdPrefix = 'ce-web3modal-session-scope',
     includePrimaryBadge = false,
   }: any = {}) => (
@@ -1702,7 +1712,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     />
   );
 
-  renderGlobalSessionSettings: any = ({
+  renderGlobalSessionSettings = ({
     compact = false,
     sessionSelectTestId = 'ce-web3modal-session-select',
     scopePrefix = 'ce-web3modal-session-scope',
@@ -1791,7 +1801,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderPreLoginConfigPanel: any = () => {
+  renderPreLoginConfigPanel = () => {
     const aiSettings = this.state.aiSettings || getLocalAiSettings() || {};
     const openAiApiKey = toStr(aiSettings?.providers?.openai?.apiKey || '');
     const anthropicApiKey = toStr(aiSettings?.providers?.anthropic?.apiKey || '');
@@ -1842,7 +1852,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  getSettingsOverviewContext: any = () => {
+  getSettingsOverviewContext = () => {
     const walletNet = (this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network);
     const tn = this.getTargetNetwork();
     const targetNetworkName = tn?.name || 'not configured';
@@ -1875,7 +1885,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     };
   };
 
-  renderInlineNetworkSummary: any = ({
+  renderInlineNetworkSummary = ({
     targetNetworkName = 'not configured',
     walletNetworkName = 'not connected',
     showWalletNetwork = false,
@@ -1889,7 +1899,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  renderPanelNetworkSummary: any = ({
+  renderPanelNetworkSummary = ({
     targetNetwork = null,
     targetNetworkName = 'not configured',
     walletNetworkName = 'not connected',
@@ -1908,12 +1918,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  getPrimarySponsorSession: any = (sessions: any = []) => {
+  getPrimarySponsorSession = (sessions: any = []) => {
     const list = Array.isArray(sessions) ? sessions : [];
     return list.find((entry: any) => entry?.isActive) || list[0] || null;
   };
 
-  formatResourceSponsorHint: any = ({
+  formatResourceSponsorHint = ({
     resourceKey = '',
     resourceLabel = '',
     sponsoredKeys = {},
@@ -1925,7 +1935,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     sponsorSessions,
   });
 
-  renderSupportedResourceCard: any = (card: any) => {
+  renderSupportedResourceCard = (card: any) => {
     const activeSession = card?.activeSession || this.getSessionDescriptor(this.getActiveSessionSlug());
     const activeSponsorSession = card?.activeSponsorSession || null;
     const extraSessions = Array.isArray(card?.otherSponsorSessions)
@@ -1947,7 +1957,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderStaticSettingsSection: any = ({
+  renderStaticSettingsSection = ({
     title = '',
     summary = '',
     children = null,
@@ -1957,7 +1967,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     </LoginSettingsSectionCard>
   );
 
-  renderSettingsOverviewPanel: any = ({
+  renderSettingsOverviewPanel = ({
     overview = this.getSettingsOverviewContext(),
     extraContent = null,
     networkTooltipId = 'networkInfoTooltipPanel',
@@ -1979,7 +1989,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     </div>
   );
 
-  getSettingsDisplay: any = () => {
+  getSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
     const {
       activeSession,
@@ -2503,12 +2513,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   }
 
-  openLoginModal: any = () => {
+  openLoginModal = () => {
     document.body.classList.add('modal-open');
     this.props.toggleLoginModal(true);
   };
 
-  closeLoginModal: any = () => {
+  closeLoginModal = () => {
     document.body.classList.remove('modal-open');
     this.props.toggleLoginModal(false);
     if (this.state.firstModalAfterLogin === true) {
@@ -2516,7 +2526,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  updateStateUponWagmiLogin: any = async () => {
+  updateStateUponWagmiLogin = async () => {
     const wagmiAddr = (this.props.wagmiAddress || '').toLowerCase();
     const reduxAddr = (this.props.account || '').toLowerCase();
     const reduxIsWagmi = this.props.provider === 'wagmi' && this.props.loginComplete === true;
@@ -2552,7 +2562,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  openCryptoModal: any = () => {
+  openCryptoModal = () => {
     const { openConnectModal, openAccountModal, wagmiAddress, loginComplete } = this.props;
     try {
       if (wagmiAddress || loginComplete) {
@@ -2566,7 +2576,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
-  renderTooltipsToggleControl: any = ({ infoId, tooltipPlacement = 'top' }: any) => {
+  renderTooltipsToggleControl = ({ infoId, tooltipPlacement = 'top' }: any) => {
     const tooltipsEnabled = this.props.tooltipsEnabled !== false;
 
     return (
@@ -2604,7 +2614,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderDemoSurfaceToggleControl: any = () => {
+  renderDemoSurfaceToggleControl = () => {
     const demoSurfaceEnabled = this.props.demoSurfaceMode !== false;
 
     return (
@@ -2621,7 +2631,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  getPreLoginSettingsDisplay: any = () => {
+  getPreLoginSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
     const { activeSession, cryptoTerminology } = overview;
 
@@ -2672,14 +2682,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  openBookmarks: any = () => {
+  openBookmarks = () => {
     this.closeLoginModal();
     if (typeof window !== 'undefined') {
-      window.location.href = '/bookmarks';
+      window.location.href = buildBookmarksRoutePath();
     }
   };
 
-  getModalDisplay: any = () => {
+  getModalDisplay = () => {
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
     const showTestnetOnly = !!activeChain?.testnet;
 
@@ -2781,7 +2791,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return <CardBody><p>Please log in.</p></CardBody>;
   }
 
-  getModalTitle: any = () => {
+  getModalTitle = () => {
     if (!this.props.loginComplete && !this.props.loginInProgress) return "LOGIN";
     if (this.props.loginInProgress) return "ACCOUNT";
     if (this.props.loginComplete) return "ACCOUNT";

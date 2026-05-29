@@ -4,13 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const STATIC_NODE_TEST_FILES = Object.freeze([
-  'test/arweave-metadata-uri.test.js',
-  'test/client.package.test.js',
-  'test/sessionCorsWorker.package.test.js',
-  'test/sessionCorsWorker.faucet-proof.test.mjs',
-  'test/deployHelperOrigins.test.mjs',
-]);
+const {
+  ROOT_NODE_TEST_FILES,
+  ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
+} = require('./testInventoryConfig');
+
+const STATIC_NODE_TEST_FILES = ROOT_NODE_TEST_FILES;
 
 const NODE_TEST_FILE_RE = /\.test\.(?:c?js|mjs)$/;
 
@@ -35,6 +34,10 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..')) {
     }
   });
 
+  files.push(
+    ...readOptionalTestDir(rootDir, 'test')
+      .filter((relativePath) => ROOT_PRIVATE_STRIPPED_TEST_FILE_RE.test(relativePath)),
+  );
   files.push(...readOptionalTestDir(rootDir, 'scripts'));
   files.push(...readOptionalTestDir(rootDir, path.join('scripts', 'lib', 'e2e')));
 

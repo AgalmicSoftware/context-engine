@@ -19,6 +19,7 @@ export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
 });
 
 export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
+  PUBLIC_READ: 'public_read',
   WORKER_SBT_GATE: 'worker_sbt_gate',
   LIT_ENCRYPTED: 'lit_encrypted',
 });
@@ -33,12 +34,75 @@ export const SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES = Object.freeze({
   images: 'docUploads',
 });
 
+export type SessionStorageBackendOptionDescriptor = {
+  backend: string;
+  label: string;
+  selected: boolean;
+};
+
+export type SessionStoragePayloadAccessOptionDescriptor = {
+  mode: string;
+  label: string;
+  selected: boolean;
+};
+
+export type SessionStorageProfileDisplayDescriptor = {
+  backend: string;
+  backendOptions: SessionStorageBackendOptionDescriptor[];
+  backendHelperText: string;
+  showCloudflarePayloadAccessControls: boolean;
+  cloudflarePayloadAccessMode: string;
+  cloudflarePayloadAccessOptions: SessionStoragePayloadAccessOptionDescriptor[];
+  cloudflarePayloadAccessHelperText: string;
+};
+
+const SESSION_STORAGE_BACKEND_DISPLAY_OPTIONS = Object.freeze([
+  { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
+  { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave' },
+  { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
+]);
+
+const SESSION_STORAGE_PAYLOAD_ACCESS_DISPLAY_OPTIONS = Object.freeze([
+  {
+    mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ,
+    label: 'Public read',
+  },
+  {
+    mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+    label: 'Worker SBT gate',
+  },
+  {
+    mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+    label: 'Lit encrypted',
+  },
+]);
+
+export const SESSION_STORAGE_PROFILE_DISPLAY_COPY = Object.freeze({
+  litArweave:
+    'Lit-Arweave stores encrypted Arweave payloads for session documents and context.',
+  cloudflare:
+    'Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.',
+  publicRead:
+    'Public-read mode stores canonical payloads in Cloudflare and serves reads through the session worker without wallet auth. Writes still require an authenticated session worker request.',
+  litEncrypted:
+    'Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes. Lit credentials are required; plaintext Cloudflare uploads are rejected until the Lit envelope path supplies payloadEncrypted data.',
+  workerSbtGate:
+    "Worker SBT gate mode is worker-enforced access control, not end-to-end encryption. The session worker checks the requester's SBT on the configured chain/RPC before serving Cloudflare objects.",
+});
+
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trim = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
 
 const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
 export const normalizeSessionStoragePayloadAccessMode = (value: unknown): string => {
   const normalized = trim(value).toLowerCase();
+  if (
+    normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ ||
+    normalized === 'public' ||
+    normalized === 'public-read'
+  ) {
+    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
+  }
   if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
     return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
   }
@@ -50,13 +114,16 @@ export const buildSessionStoragePayloadAccessControl = (
 ): AnyRecord => {
   const normalizedMode = normalizeSessionStoragePayloadAccessMode(mode);
   const litEncrypted = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  const publicRead = normalizedMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ;
   return {
     mode: normalizedMode,
-    enforcement: litEncrypted ? 'lit_access_control_conditions' : 'session_worker_sbt_gate',
+    enforcement: litEncrypted
+      ? 'lit_access_control_conditions'
+      : (publicRead ? 'session_worker_public_read' : 'session_worker_sbt_gate'),
     litRequired: litEncrypted,
     label: litEncrypted
       ? 'Lit-encrypted Cloudflare payloads'
-      : 'Worker-enforced SBT access control',
+      : (publicRead ? 'Public-read Cloudflare payloads' : 'Worker-enforced SBT access control'),
     resources: { ...SESSION_STORAGE_PAYLOAD_ACCESS_RESOURCE_GATES },
   };
 };
@@ -159,7 +226,9 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       ...normalized.sbtGatedAccess,
       litRequired: payloadAccessControl.litRequired
         ? 'required_for_cloudflare_payload_encryption'
-        : 'not_required_worker_enforced',
+        : (payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
+          ? 'not_required_public_read'
+          : 'not_required_worker_enforced'),
     };
     normalized.cloudflare = {
       primitives: SESSION_STORAGE_CLOUDFLARE_PRIMITIVES,
@@ -177,4 +246,45 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
   }
 
   return normalized;
+};
+
+export const buildSessionStorageProfileDisplayDescriptor = (
+  input: unknown = {}
+): SessionStorageProfileDisplayDescriptor => {
+  const profile = normalizeSessionStorageProfileConfig(input);
+  const backend = trim(profile.backend);
+  const showCloudflarePayloadAccessControls = backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE;
+  const cloudflarePayloadAccessMode = showCloudflarePayloadAccessControls
+    ? normalizeSessionStoragePayloadAccessMode(
+      isObj(profile.payloadAccessControl) ? profile.payloadAccessControl.mode : ''
+    )
+    : '';
+  const backendHelperText = backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE
+    ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.litArweave
+    : (showCloudflarePayloadAccessControls ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.cloudflare : '');
+  const cloudflarePayloadAccessHelperText = !showCloudflarePayloadAccessControls
+    ? ''
+    : cloudflarePayloadAccessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ
+      ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.publicRead
+      : cloudflarePayloadAccessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+        ? SESSION_STORAGE_PROFILE_DISPLAY_COPY.litEncrypted
+        : SESSION_STORAGE_PROFILE_DISPLAY_COPY.workerSbtGate;
+
+  return {
+    backend,
+    backendOptions: SESSION_STORAGE_BACKEND_DISPLAY_OPTIONS.map((option) => ({
+      ...option,
+      selected: backend === option.backend,
+    })),
+    backendHelperText,
+    showCloudflarePayloadAccessControls,
+    cloudflarePayloadAccessMode,
+    cloudflarePayloadAccessOptions: showCloudflarePayloadAccessControls
+      ? SESSION_STORAGE_PAYLOAD_ACCESS_DISPLAY_OPTIONS.map((option) => ({
+        ...option,
+        selected: cloudflarePayloadAccessMode === option.mode,
+      }))
+      : [],
+    cloudflarePayloadAccessHelperText,
+  };
 };

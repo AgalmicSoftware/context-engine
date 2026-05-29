@@ -8,6 +8,6 @@ describe('SessionWizard dev mode detection', () => {
   it('disables dev-only persistence in production', () => {
     expect(__test__isSessionWizardDevMode({
       env: { NODE_ENV: 'production', PUBLIC_URL: '' },
-    } as any)).toBe(false);
+    })).toBe(false);
   });
 });

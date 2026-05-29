@@ -4153,6 +4153,55 @@
                 ]
               }
             }
+          },
+          {
+            "name": "AI Environmental Impact",
+            "id": "0x4140000000000000000000000000000000000000000000000000000000000000",
+            "children": [],
+            "compass": {
+              "xAxis": {
+                "label": "How Environmental Claims Should Be Judged",
+                "left": "Aggregate infrastructure burden",
+                "right": "Per-query measurements"
+              },
+              "yAxis": {
+                "label": "Policy Response",
+                "top": "Mandatory siting/reporting rules",
+                "bottom": "Efficiency and transparency first"
+              }
+            },
+            "arguments": {
+              "pro": [
+                {
+                  "id": "pro-1",
+                  "claim": "AI infrastructure can stress local water, land, and electricity systems, so policy should require facility-level transparency and careful siting.",
+                  "strength": 8,
+                  "source": "Li et al., Making AI Less Thirsty (2023); Data Centers Water Footprint transparency literature",
+                  "children": []
+                }
+              ],
+              "con": [
+                {
+                  "id": "con-1",
+                  "claim": "Production-scale measurements show per-query impacts can be far lower than viral estimates, so policy should distinguish inference efficiency from aggregate demand growth.",
+                  "strength": 8,
+                  "source": "Elsworth et al., Measuring the environmental impact of delivering AI at Google Scale (2025)",
+                  "children": []
+                }
+              ],
+              "votes": {
+                "pro-1": [
+                  "RachelCarson",
+                  "EleanorRoosevelt",
+                  "JamesMadison"
+                ],
+                "con-1": [
+                  "VannevarBush",
+                  "NikolaTesla",
+                  "AdamSmith"
+                ]
+              }
+            }
           }
         ]
       },

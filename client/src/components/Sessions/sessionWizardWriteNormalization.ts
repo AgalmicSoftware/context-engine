@@ -114,6 +114,34 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
+  next.telegramOnly = next.telegramOnly === true ||
+    next.telegram_only === true ||
+    trimString(next.sessionMode).toLowerCase() === 'telegram_only' ||
+    trimString(next.telegramMode).toLowerCase() === 'telegram_only' ||
+    (isObj(next.telegram) && (
+      next.telegram.only === true ||
+      trimString(next.telegram.mode).toLowerCase() === 'telegram_only'
+    ));
+  delete next.telegram_only;
+  delete next.telegramMode;
+  if (next.telegramOnly) {
+    next.sessionMode = 'telegram_only';
+    next.telegramBridgeEnabled = true;
+    next.telegram = {
+      ...(isObj(next.telegram) ? next.telegram : {}),
+      mode: 'telegram_only',
+      only: true,
+    };
+  } else {
+    delete next.telegramOnly;
+    delete next.telegramBridgeEnabled;
+    delete next.sessionMode;
+    if (isObj(next.telegram)) {
+      delete next.telegram.only;
+      delete next.telegram.mode;
+      if (!Object.keys(next.telegram).length) delete next.telegram;
+    }
+  }
   if (!next.sessionName) delete next.sessionName;
   if (!next.sessionInfo) delete next.sessionInfo;
   if (!next.sessionInfoEncrypted) delete next.sessionInfoEncrypted;
@@ -309,6 +337,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
       : buildWorkerLitCredentialsConfig(workerSecrets),
     storageProfile,
   };
+  if (resolvedDraft.telegramOnly === true) {
+    next.telegramOnly = true;
+    next.sessionMode = 'telegram_only';
+    next.telegramBridgeEnabled = true;
+  }
 
   if (
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||

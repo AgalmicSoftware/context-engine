@@ -149,7 +149,7 @@ What users can do:
 - Answer surveys and questions, including optional voice-to-text input.
 - After a successful submit, see a stable `Submitted` state (instead of `Submit (N)`) until making a new edit.
 - View results and filter responses by SBT membership and other criteria.
-- Export results for external analysis (CSV, CSV (Questions), and Polis-style report generation).
+- Export results for external analysis (CSV, JSON, redacted session-results HTML viewer/static HTML/PDF report options, and Polis-style PDF/report generation). Session-results exports require a logged-in authorized viewer, embed downloader metadata, and can derive local/session-private AI analysis sections using synthetic participant ids instead of sending wallet addresses to AI.
 - Generate/read Polis-style report views inside survey/question/session result surfaces (rather than on a standalone top-level route).
 
 Question types (current core set):
@@ -292,8 +292,8 @@ Intent for these features:
 
 ### Frontend (React)
 
-- UI lives under `client/` and is primarily React class components with some modern hooks-based modules.
-- CRA/react-app-rewired remains the canonical client dev/build toolchain. Vite is available only as a sidecar compatibility path (`npm run dev:vite`, `npm run build:vite`, `npm run preview:vite`) and writes to `client/build-vite/`.
+- UI lives under `client/` and is a mixed JavaScript/TypeScript React app with class components plus hooks-based modules.
+- Vite is the canonical client dev/build toolchain. `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview:vite` serves a local Vite preview.
 - Routing is centralized via `client/src/components/MainSite/MainSite.tsx` (path parsing and lazy module loading).
 - State management uses Redux (`client/src/store.js`, reducers under `client/src/reducers/`).
 - Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).

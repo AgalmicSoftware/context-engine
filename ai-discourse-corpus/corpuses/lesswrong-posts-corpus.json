@@ -3,7 +3,7 @@
     "description": "Comprehensive corpus of the most influential posts, papers, and essays from LessWrong, Alignment Forum, EA Forum, and related rationalist/AI safety blogs. Covers the full landscape of AI alignment discourse from foundational rationality concepts through contemporary 2024-2026 developments.",
     "version": "2.0",
     "date_generated": "2026-02-15",
-    "entry_count": 202,
+    "entry_count": 211,
     "coverage": {
       "platforms": [
         "AI Alignment Blog",
@@ -225,7 +225,7 @@
       ],
       "tags": [
         "Containment",
-        "AI Safety",
+        "Safety",
         "Existential Risk",
         "Deceptive Alignment"
       ],
@@ -343,7 +343,7 @@
         "Rationalism"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 423,
       "category": "Rationality",
       "frequently_cited_by": [
         "CFAR curriculum",
@@ -360,7 +360,7 @@
       "title": "The Proper Use of Humility / Lonely Dissent",
       "author": "Eliezer Yudkowsky",
       "date": "2007-01-23",
-      "url": "https://www.lesswrong.com/posts/9kcTNWopvXFkaRivc/lonely-dissent",
+      "url": "https://www.lesswrong.com/posts/GrDqnMjhqoxiqpQPw/the-proper-use-of-humility",
       "platform": "LessWrong",
       "summary": "Examines the psychology and epistemics of being a lone dissenter against mainstream views. Argues that genuine dissent—truly believing you are right when nearly everyone disagrees—is psychologically crushing in ways most people underestimate, and that most people who think they are 'brave dissenters' are actually conforming to a local subgroup.",
       "novel_arguments_and_concepts": "The post draws on Asch conformity experiments and other social psychology research to argue that true lonely dissent—standing against the actual views of everyone around you—is far more psychologically difficult than people imagine. Most 'dissent' is actually supported by a local reference group (your friends, your online community, your political tribe). True lonely dissent means having no social support for your position at all, and the conformity pressure in such cases is overwhelming. This has direct implications for AI safety: early AI risk researchers were in a position of genuine lonely dissent against both the AI research mainstream and the general public. Understanding the psychology of this position helps explain both why so few researchers initially took the risk seriously (conformity effects) and why those who did often developed strong group bonds (the rationalist community as a support structure for dissenting views). The post also warns against the reverse failure mode: cultivating a self-image as a 'brave dissenter' can become a form of tribal identity that makes you resistant to updating.",
@@ -387,15 +387,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/9kcTNWopvXFkaRivc/lonely-dissent"
-      ]
+        "https://www.lesswrong.com/posts/GrDqnMjhqoxiqpQPw/the-proper-use-of-humility"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/9kcTNWopvXFkaRivc/lonely-dissent"
     },
     {
       "id": "yudkowsky_meditation_on_curiosity",
       "title": "A Fable of Science and Politics",
       "author": "Eliezer Yudkowsky",
       "date": "2007-02-12",
-      "url": "https://www.lesswrong.com/posts/6hfGNhCjvPHiNJgrG/a-fable-of-science-and-politics",
+      "url": "https://www.lesswrong.com/posts/6hfGNLf4Hg5DXqJCF/a-fable-of-science-and-politics",
       "platform": "LessWrong",
       "summary": "An allegorical story about an underground society that politicizes a scientific question (the color of the sky), illustrating how tribal politics can corrupt epistemic processes. When the protagonist reaches the surface and sees the actual sky, factional identity has made the truth irrelevant to most people.",
       "novel_arguments_and_concepts": "This fable illustrates the core mechanism by which politics corrupts epistemology. In the story, a question with an objective answer (what color is the sky?) becomes a political identity marker, with 'Blues' and 'Greens' forming tribal factions. Once the question is politicized, evidence about the actual sky is evaluated through a tribal lens. This allegory applies directly to AI discourse: questions like 'Is AI dangerous?' or 'Should we regulate AI?' have become tribal markers, with positions correlating to political identity, professional affiliation, and social group rather than to evidence. The fable suggests that depoliticizing AI risk assessment is essential for good governance—but also that once a question becomes politicized, depoliticization is extremely difficult. The story entered rationalist canon and 'Blues vs Greens' became shorthand for any debate where tribal identity overwhelms evidence-based reasoning.",
@@ -422,8 +424,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/6hfGNhCjvPHiNJgrG/a-fable-of-science-and-politics"
-      ]
+        "https://www.lesswrong.com/posts/6hfGNLf4Hg5DXqJCF/a-fable-of-science-and-politics"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/6hfGNhCjvPHiNJgrG/a-fable-of-science-and-politics"
     },
     {
       "id": "yudkowsky_politics_mind_killer",
@@ -449,7 +453,7 @@
         "Epistemic Commons"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 339,
       "category": "Rationality",
       "frequently_cited_by": [
         "Scott Alexander",
@@ -486,7 +490,7 @@
         "Framing"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 122,
       "category": "Rationality",
       "frequently_cited_by": [
         "Rationalist community broadly",
@@ -519,7 +523,7 @@
         "Motivation"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 367,
       "category": "Rationality",
       "frequently_cited_by": [
         "Rationality community motivation discussions"
@@ -552,7 +556,7 @@
         "Bias"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 242,
       "category": "Rationality",
       "frequently_cited_by": [
         "LessWrong community",
@@ -588,7 +592,7 @@
         "Public Understanding"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 248,
       "category": "Rationality",
       "frequently_cited_by": [
         "Julia Galef",
@@ -623,7 +627,7 @@
         "Philosophy"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 575,
       "category": "Rationality",
       "frequently_cited_by": [
         "CFAR curriculum",
@@ -659,7 +663,7 @@
         "Evaluations"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 336,
       "category": "Rationality",
       "frequently_cited_by": [
         "LessWrong community",
@@ -694,7 +698,7 @@
         "Reductionism"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 270,
       "category": "Rationality",
       "frequently_cited_by": [
         "The Sequences readers",
@@ -710,7 +714,7 @@
       "title": "Applause Lights",
       "author": "Eliezer Yudkowsky",
       "date": "2007-09-11",
-      "url": "https://www.lesswrong.com/posts/dLbkrPu5STNCDLLjr/applause-lights",
+      "url": "https://www.lesswrong.com/posts/dLbkrPu5STNCBLRjr/applause-lights",
       "platform": "LessWrong",
       "summary": "Identifies 'applause lights'—statements that sound meaningful but convey no specific information, functioning only as signals to elicit positive responses. Argues that much AI policy and ethics discourse consists of applause lights rather than concrete proposals.",
       "novel_arguments_and_concepts": "The 'applause light' concept provides a powerful tool for analyzing public discourse, particularly around AI policy. Statements like 'we need responsible AI development' or 'AI should benefit all of humanity' are applause lights—they sound good, everyone agrees, but they make no specific predictions or commitments. You cannot disagree with them because they have no content to disagree with. Yudkowsky argues that applause lights proliferate in domains where social pressure demands having an opinion but technical complexity makes genuine opinions expensive to form. This exactly describes AI governance discourse, where politicians and executives frequently make statements that are applause lights rather than policies. The concept helps distinguish genuine policy proposals (which make specific claims about what should happen under what conditions) from performative virtue-signaling. It became an important analytical tool for evaluating AI ethics statements, corporate AI principles, and policy proposals.",
@@ -738,8 +742,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/dLbkrPu5STNCDLLjr/applause-lights"
-      ]
+        "https://www.lesswrong.com/posts/dLbkrPu5STNCBLRjr/applause-lights"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/dLbkrPu5STNCDLLjr/applause-lights"
     },
     {
       "id": "yudkowsky_policy_debates",
@@ -765,7 +771,7 @@
         "Deliberation"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 292,
       "category": "Rationality",
       "frequently_cited_by": [
         "Effective Altruism policy discussions",
@@ -799,7 +805,7 @@
         "Psychology"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 227,
       "category": "Rationality",
       "frequently_cited_by": [
         "CFAR",
@@ -833,7 +839,7 @@
         "Psychology"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 255,
       "category": "Rationality",
       "frequently_cited_by": [
         "Rationality training programs",
@@ -868,7 +874,7 @@
         "Narrative"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 426,
       "category": "Rationality",
       "frequently_cited_by": [
         "Scott Alexander",
@@ -886,7 +892,7 @@
       "title": "Superhero Bias / Planning Fallacy",
       "author": "Eliezer Yudkowsky",
       "date": "2007-10-31",
-      "url": "https://www.lesswrong.com/posts/CPm5LTwHfBRxDp8Ti/planning-fallacy",
+      "url": "https://www.lesswrong.com/lw/jg/planning_fallacy",
       "platform": "LessWrong",
       "summary": "Explores the planning fallacy—the systematic tendency to underestimate the time, cost, and risk of future actions while overestimating their benefits. Connects this to AI development timelines and the tendency of AI researchers to underestimate the difficulty of alignment.",
       "novel_arguments_and_concepts": "The planning fallacy, while originating from Kahneman and Tversky's research, receives a crucial reframing in the context of AI development. Yudkowsky argues that the same cognitive bias that makes people chronically underestimate project completion times also causes AI researchers to underestimate the difficulty and timeline of alignment. People generate an 'inside view' narrative of how things will go and ignore base rates of similar projects (the 'outside view'). Applied to AI safety: researchers imagine specific approaches working and discount the base rate of ambitious research programs failing. The practical prescription—use reference class forecasting rather than inside-view narratives—became a core rationalist method and directly influenced AI timeline forecasting. The connection between planning fallacy and AI governance is direct: if we systematically underestimate alignment difficulty, governance measures that assume 'we'll figure it out in time' are dangerously optimistic.",
@@ -914,15 +920,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/CPm5LTwHfBRxDp8Ti/planning-fallacy"
-      ]
+        "https://www.lesswrong.com/lw/jg/planning_fallacy"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/CPm5LTwHfBRxDp8Ti/planning-fallacy"
     },
     {
       "id": "yudkowsky_reversed_stupidity",
       "title": "Reversed Stupidity Is Not Intelligence",
       "author": "Eliezer Yudkowsky",
       "date": "2007-12-13",
-      "url": "https://www.lesswrong.com/posts/qNZM3EGoE5HPJhJjG/reversed-stupidity-is-not-intelligence",
+      "url": "https://www.lesswrong.com/posts/qNZM3EGoE5ZeMdCRt/reversed-stupidity-is-not-intelligence",
       "platform": "LessWrong",
       "summary": "Argues that just because a foolish person believes something doesn't mean the opposite is true. Knowing that someone is wrong about X tells you almost nothing about which specific alternative is correct, because there are many more ways to be wrong than to be right.",
       "novel_arguments_and_concepts": "The post formalizes a common reasoning error: using the (real or perceived) stupidity of a position's advocates as evidence against the position. In Bayesian terms, knowing that a bad reasoner reached conclusion X provides very weak evidence against X, because bad reasoners are roughly equally likely to reach any conclusion. The update from 'a bad reasoner believes X' is tiny compared to the update from direct object-level evidence about X. This has important implications for AI discourse: critics of AI risk often dismiss concerns by associating them with science fiction or with specific people they view as unreliable. Defenders of AI risk sometimes dismiss optimistic scenarios by associating them with tech bros or hype merchants. Both are committing the reversed stupidity fallacy. The correct approach is always to evaluate the object-level arguments, not to update based on who holds a position. This principle became a key norm in rationalist discourse.",
@@ -948,8 +956,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/qNZM3EGoE5HPJhJjG/reversed-stupidity-is-not-intelligence"
-      ]
+        "https://www.lesswrong.com/posts/qNZM3EGoE5ZeMdCRt/reversed-stupidity-is-not-intelligence"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/qNZM3EGoE5HPJhJjG/reversed-stupidity-is-not-intelligence"
     },
     {
       "id": "yudkowsky_simple_truth",
@@ -973,7 +983,7 @@
         "Philosophy"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 187,
       "category": "Rationality",
       "frequently_cited_by": [
         "LessWrong epistemology discussions"
@@ -1062,7 +1072,7 @@
       "title": "Dark Arts of Rationality",
       "author": "Eliezer Yudkowsky",
       "date": "2008-01-10",
-      "url": "https://www.lesswrong.com/posts/bd2Yv6MFBCLhwaxuY/dark-arts-of-rationality",
+      "url": "https://www.lesswrong.com/posts/4DBBQkEQvNEWafkek/dark-arts-of-rationality",
       "platform": "LessWrong",
       "summary": "Explores the tension between epistemic rationality (believing true things) and instrumental rationality (achieving your goals). Asks whether deliberately manipulating your own beliefs or emotions can be instrumentally rational even when epistemically wrong, and whether rationalists should use persuasion techniques they know are cognitively exploitative.",
       "novel_arguments_and_concepts": "The post opens a fundamental tension in rationalist philosophy: if rationality is about 'winning,' and sometimes self-deception or manipulative rhetoric achieves better outcomes, should a rationalist use 'dark arts'? Yudkowsky ultimately argues that epistemic rationality and instrumental rationality align in the long run—systematic self-deception creates blind spots that eventually lead to worse decisions. However, the honest engagement with this tension is what makes the post valuable. It acknowledges that truth-seeking has real costs (uncomfortable truths, social friction, inability to use effective but dishonest rhetoric) and that the commitment to truth must be justified on its own merits rather than assumed. This framing influenced how the rationalist community thinks about persuasion, advocacy, and the ethics of AI safety communication—should safety advocates use fear-based messaging if it's more effective, even if it's epistemically distorting?",
@@ -1089,8 +1099,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/bd2Yv6MFBCLhwaxuY/dark-arts-of-rationality"
-      ]
+        "https://www.lesswrong.com/posts/4DBBQkEQvNEWafkek/dark-arts-of-rationality"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/bd2Yv6MFBCLhwaxuY/dark-arts-of-rationality"
     },
     {
       "id": "yudkowsky_do_something_useful",
@@ -1117,7 +1129,7 @@
         "Effective Altruism"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 91,
       "category": "Rationality",
       "frequently_cited_by": [
         "Effective Altruism community",
@@ -1138,7 +1150,7 @@
       "title": "Taboo Your Words / Replace the Symbol with the Substance",
       "author": "Eliezer Yudkowsky",
       "date": "2008-02-15",
-      "url": "https://www.lesswrong.com/posts/WBdvyyHLkQztB949H/taboo-your-words",
+      "url": "https://www.lesswrong.com/s/paoDwasxFpSpzwA2f/p/WBdvyyHLdxZSAMmoz",
       "platform": "LessWrong",
       "summary": "Proposes the rationalist technique of 'tabooing' a word—explaining your argument without using the contested term—as a way to dissolve semantic disputes. Many apparent disagreements are actually about what a word means rather than about reality.",
       "novel_arguments_and_concepts": "The 'taboo your words' technique became one of the most practically useful tools in rationalist discourse. The insight is that many heated debates are secretly about definitions rather than facts: people who disagree about whether AI is 'intelligent' or whether a fetus is a 'person' may actually agree on all the facts while disagreeing on how to categorize them. By tabooing the contested word and forcing each side to state their position using only concrete, specific terms, you can often dissolve the dispute entirely—or at least identify the genuine factual disagreement beneath the semantic one. This is crucial for AI safety discourse, where terms like 'consciousness,' 'understanding,' 'alignment,' and 'safety' are used by different people to mean very different things. The stochastic parrot debate, for instance, largely dissolves when you taboo 'understanding' and ask specific questions about what LLMs can and can't do. The technique has been adopted by CFAR for rationality training and is used widely in the AI safety community to cut through terminological confusion.",
@@ -1165,8 +1177,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/WBdvyyHLkQztB949H/taboo-your-words"
-      ]
+        "https://www.lesswrong.com/s/paoDwasxFpSpzwA2f/p/WBdvyyHLdxZSAMmoz"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/WBdvyyHLkQztB949H/taboo-your-words"
     },
     {
       "id": "yudkowsky_use_curiosity",
@@ -1190,7 +1204,7 @@
         "Epistemics"
       ],
       "influence_score": 5,
-      "karma_score": null,
+      "karma_score": 80,
       "category": "Rationality",
       "frequently_cited_by": [
         "CFAR",
@@ -1223,7 +1237,7 @@
         "Science Fiction"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 429,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI containment discussions"
@@ -1274,7 +1288,7 @@
       "title": "Updateless Decision Theory",
       "author": "Wei Dai",
       "date": "2009-09-09",
-      "url": "https://www.lesswrong.com/posts/de3xjvV9veJ9JufqC/towards-a-new-decision-theory",
+      "url": "https://www.lesswrong.com/lw/15m/towards_a_new_decision_theory",
       "platform": "LessWrong",
       "summary": "Introduces Updateless Decision Theory (UDT), which argues that rational agents should choose policies (functions from observations to actions) that maximize expected utility over all possible situations, without first updating on their observations. This resolves several paradoxes in decision theory including Newcomb's Problem and counterfactual mugging.",
       "novel_arguments_and_concepts": "UDT represents a fundamental rethinking of decision theory. Standard decision theories first update beliefs based on observations, then choose actions. UDT instead asks: what policy (function from observations to actions) would I want to commit to before making any observations? This 'updateless' approach dissolves problems where standard decision theory gives intuitively wrong answers. In Newcomb's Problem, UDT one-boxes because the policy of one-boxing leads to better expected outcomes across all possible situations. In counterfactual mugging, UDT pays because having the policy of paying leads to better expected outcomes even in the counterfactual where you lose. The key insight is that your decisions are correlated with your 'logical twin'—anyone who reasons the same way—and optimal decision-making must account for this logical correlation. UDT influenced both AI alignment (how should AI agents make decisions?) and the philosophy of multiverse reasoning. Wei Dai's work on UDT was instrumental in developing the LessWrong community's distinctive approach to decision theory.",
@@ -1305,8 +1319,10 @@
         "Academic critiques from mainstream decision theory"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/de3xjvV9veJ9JufqC/towards-a-new-decision-theory"
-      ]
+        "https://www.lesswrong.com/lw/15m/towards_a_new_decision_theory"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/de3xjvV9veJ9JufqC/towards-a-new-decision-theory"
     },
     {
       "id": "yudkowsky_privileging_hypothesis",
@@ -1331,7 +1347,7 @@
         "Forecasting"
       ],
       "influence_score": 5,
-      "karma_score": null,
+      "karma_score": 131,
       "category": "Rationality",
       "frequently_cited_by": [
         "LessWrong community",
@@ -1347,7 +1363,7 @@
       "title": "Timeless Decision Theory",
       "author": "Eliezer Yudkowsky",
       "date": "2010-01-01",
-      "url": "https://www.lesswrong.com/posts/XxuRQfzJhzGmarnqJ/timeless-decision-theory",
+      "url": "https://www.lesswrong.com/posts/szfxvS8nsxTgJLBHs/ingredients-of-timeless-decision-theory",
       "platform": "LessWrong",
       "summary": "Proposes that agents should decide based on logical dependence rather than causal effects, coordinating on the logically-optimal policy across all agents with the same decision process.",
       "novel_arguments_and_concepts": "TDT was the first formal attempt to resolve Newcomb's Problem and the Prisoner's Dilemma by reasoning about logical rather than causal dependence. The agent treats itself as an algorithm and asks: 'What should this algorithm output to maximize utility across all instances where it runs?' This leads to one-boxing in Newcomb's Problem and cooperation in one-shot PDs between similar agents. TDT was later refined into UDT (Wei Dai) and eventually FDT, but its core insight—that decision theory should reason about algorithms, not actions—launched a decade of productive research.",
@@ -1372,8 +1388,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/XxuRQfzJhzGmarnqJ/timeless-decision-theory"
-      ]
+        "https://www.lesswrong.com/posts/szfxvS8nsxTgJLBHs/ingredients-of-timeless-decision-theory"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/XxuRQfzJhzGmarnqJ/timeless-decision-theory"
     },
     {
       "id": "lw_acausal_trade",
@@ -1397,7 +1415,7 @@
         "Agent Foundations"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 42,
       "category": "Decision Theory",
       "frequently_cited_by": [
         "Decision theory discussions",
@@ -1463,7 +1481,7 @@
       "tags": [
         "Decision Theory",
         "Existential Risk",
-        "AI Safety",
+        "Safety",
         "Information Warfare",
         "Rationality"
       ],
@@ -1484,7 +1502,7 @@
       "title": "The Superintelligent Will: Motivation and Instrumental Rationality in Advanced AI",
       "author": "Nick Bostrom",
       "date": "2012-01-01",
-      "url": "https://www.lesswrong.com/posts/nvKZchuTxFJi3FJQj/the-superintelligent-will",
+      "url": "https://nickbostrom.com/superintelligentwill.pdf",
       "platform": "LessWrong",
       "summary": "Formalizes two foundational theses for AI risk: the Orthogonality Thesis (intelligence and goals are independent—any level of intelligence can be combined with any goal) and the Instrumental Convergence Thesis (regardless of final goals, sufficiently intelligent agents will pursue instrumental subgoals like self-preservation and resource acquisition).",
       "novel_arguments_and_concepts": "These two theses provide the philosophical foundation for the argument that superintelligent AI would be dangerous even if not explicitly designed to harm humans. The Orthogonality Thesis: intelligence is a capability, not a value. A superintelligent system could have any goal whatsoever—curing cancer, counting grains of sand, maximizing paperclips. High intelligence doesn't automatically produce human-friendly values. The Instrumental Convergence Thesis: regardless of what a system's ultimate goal is, certain instrumental goals (self-preservation, resource acquisition, maintaining current goals, improving cognitive capabilities) are useful for almost any final goal. This means a sufficiently capable system pursuing any goal will tend to seek power and resist shutdown. Combined, these theses imply that default AI development produces systems that are simultaneously very capable and very dangerous, because their goals won't align with human interests (orthogonality) and they'll actively resist attempts to correct this (instrumental convergence). These remain among the most debated foundational claims in AI safety.",
@@ -1517,9 +1535,10 @@
         "Arguments that biological intelligence shows strong goal-intelligence correlations"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/nvKZchuTxFJi3FJQj/the-superintelligent-will",
         "https://nickbostrom.com/superintelligentwill.pdf"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/nvKZchuTxFJi3FJQj/the-superintelligent-will"
     },
     {
       "id": "yudkowsky_intelligence_explosion",
@@ -1600,7 +1619,7 @@
       "title": "On the Overwhelming Importance of Shaping the Far Future",
       "author": "Nick Beckstead",
       "date": "2013-08-01",
-      "url": "https://www.lesswrong.com/posts/JnS8HiJ3ouJZpByGS/on-the-overwhelming-importance-of-shaping-the-far-future",
+      "url": "https://www.lesswrong.com/posts/GJ79jkxJJJqjaSwgW/nick-beckstead-on-the-overwhelming-importance-of-shaping-the",
       "platform": "LessWrong",
       "summary": "The philosophical foundation of longtermism. Argues that from a total utilitarian perspective, the far future contains so much more expected value than the present that shaping it should dominate all other moral considerations. This implies AI safety—as one of the few ways to shape the far future—is overwhelmingly important.",
       "novel_arguments_and_concepts": "Beckstead's dissertation-turned-post provides the formal philosophical argument that became the intellectual foundation of longtermism and, by extension, much of the EA movement's focus on AI safety. The argument proceeds: (1) If total utilitarianism (or any view that counts all welfare) is correct, then the expected future welfare of humanity dwarfs current welfare by many orders of magnitude. (2) Some present actions (especially reducing existential risk) have reliable effects on expected future welfare. (3) Therefore, the expected value of existential risk reduction is enormously larger than the expected value of any intervention that only affects the present. (4) AI safety is among the most tractable ways to reduce existential risk, making it potentially the most important cause area. The argument has been enormously influential in directing philanthropic resources—Open Philanthropy's multi-hundred-million-dollar investment in AI safety can be traced to this reasoning. Critics argue that the extreme implication—that present suffering barely matters compared to future welfare—is a reductio ad absurdum rather than a compelling conclusion.",
@@ -1632,8 +1651,10 @@
         "Arguments about cluelessness—that we can't predict long-term effects"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/JnS8HiJ3ouJZpByGS/on-the-overwhelming-importance-of-shaping-the-far-future"
-      ]
+        "https://www.lesswrong.com/posts/GJ79jkxJJJqjaSwgW/nick-beckstead-on-the-overwhelming-importance-of-shaping-the"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/JnS8HiJ3ouJZpByGS/on-the-overwhelming-importance-of-shaping-the-far-future"
     },
     {
       "id": "bostrom_superintelligence",
@@ -1727,7 +1748,7 @@
         "Complexity-based skepticism about AI misunderstands the relevant constraints"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Scaling Laws",
         "Forecasting",
         "Intelligence Explosion"
@@ -1938,7 +1959,7 @@
       "title": "Prediction Markets for AI Timeline Forecasting",
       "author": "Robin Hanson, various",
       "date": "2015-01-01",
-      "url": "https://www.lesswrong.com/posts/CzQ9oQ6DAJvXLBTCj/prediction-markets-are-about-being-right",
+      "url": "https://www.lesswrong.com/w/prediction-markets",
       "platform": "LessWrong",
       "summary": "Argues that prediction markets—where people bet real money on future events—aggregate information more accurately than expert polls, committee deliberations, or pundit opinions. Proposes that prediction markets for AI milestones and timelines could dramatically improve AI governance by providing calibrated probability estimates.",
       "novel_arguments_and_concepts": "Hanson has long advocated prediction markets as an epistemically superior mechanism for forecasting. Applied to AI governance, the argument is that current timeline forecasting relies on expert surveys, which suffer from well-documented biases: anchoring on round numbers, overconfidence, and social pressure toward conformity. Prediction markets create incentives for accuracy: people who are right profit, people who are wrong lose money. This creates a self-correcting mechanism that expert surveys lack. Specific applications include: markets on when AI will achieve specific capability milestones, on when particular risks will materialize, and on which safety interventions will prove most effective. The rationalist community embraced this approach through Metaculus and other forecasting platforms, which have shown that even without monetary stakes, structured prediction improves calibration. The connection to AI governance is direct: policy decisions depend on timeline estimates, and better forecasting tools lead to better policy. Prediction markets for AI capabilities could serve as early warning systems that trigger governance responses at appropriate times.",
@@ -1970,8 +1991,10 @@
         "Challenges of defining precise resolution criteria for AI milestones"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/CzQ9oQ6DAJvXLBTCj/prediction-markets-are-about-being-right"
-      ]
+        "https://www.lesswrong.com/w/prediction-markets"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/CzQ9oQ6DAJvXLBTCj/prediction-markets-are-about-being-right"
     },
     {
       "id": "armstrong_corrigibility",
@@ -1997,7 +2020,7 @@
         "Value Alignment"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 127,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "MIRI researchers",
@@ -2016,7 +2039,7 @@
       "title": "Superforecasting and AI Risk: Lessons from the Good Judgment Project",
       "author": "Philip Tetlock (discussed on LessWrong)",
       "date": "2015-09-29",
-      "url": "https://www.lesswrong.com/posts/6dJKiGMPKKvzYuNJo/the-good-judgment-project",
+      "url": "https://www.penguinrandomhouse.com/books/316882/superforecasting-by-philip-e-tetlock-and-dan-gardner/",
       "platform": "LessWrong",
       "summary": "Discusses the findings of Philip Tetlock's Good Judgment Project—that some individuals ('superforecasters') consistently outperform experts and prediction markets in forecasting geopolitical events. Explores the implications for AI timeline forecasting and what makes some people better predictors.",
       "novel_arguments_and_concepts": "Tetlock's research on superforecasting has direct implications for AI timeline forecasting. Key findings: (1) Superforecasters share cognitive traits: comfort with ambiguity, willingness to update frequently, aggregation of diverse information sources, and calibrated confidence. These traits overlap heavily with rationalist community values. (2) Superforecasters outperform domain experts because experts are biased by their domain knowledge—they over-weight their area of expertise and under-weight base rates. (3) For AI timelines, this suggests that the best forecasters may not be AI researchers (who have domain biases) but calibrated generalists who can weigh multiple evidence sources. (4) Team-based forecasting (where diverse perspectives are aggregated) outperforms individual forecasting, suggesting that AI timeline estimates should come from structured groups rather than individual experts. (5) The decomposition technique—breaking big questions into smaller, more forecastable sub-questions—is directly applicable to AI timeline forecasting (e.g., 'when will AI achieve X capability' broken into compute, algorithmic, and architectural sub-questions).",
@@ -2047,8 +2070,10 @@
         "Challenges of forecasting unprecedented events like AGI"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/6dJKiGMPKKvzYuNJo/the-good-judgment-project"
-      ]
+        "https://www.penguinrandomhouse.com/books/316882/superforecasting-by-philip-e-tetlock-and-dan-gardner/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/6dJKiGMPKKvzYuNJo/the-good-judgment-project"
     },
     {
       "id": "grace_discontinuous_progress",
@@ -2147,7 +2172,7 @@
         "External databases and internet access create implicit agency"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Agents",
         "Tool Use",
         "Economics",
@@ -2189,7 +2214,7 @@
         "Communities_and_Movements"
       ],
       "influence_score": 5,
-      "karma_score": null,
+      "karma_score": 53,
       "category": "Community / Rationality",
       "frequently_cited_by": [
         "LessWrong community",
@@ -2227,7 +2252,7 @@
         "Public Understanding"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 187,
       "category": "Rationality",
       "frequently_cited_by": [
         "CFAR",
@@ -2280,7 +2305,7 @@
       "title": "Logical Induction",
       "author": "Scott Garrabrant, Abram Demski",
       "date": "2016-03-11",
-      "url": "https://intelligence.org/2016/03/11/logical-induction/",
+      "url": "https://intelligence.org/files/LogicalInduction.pdf",
       "platform": "MIRI",
       "summary": "Introduces logical induction as a framework for how computationally-bounded agents can reason about logical and mathematical uncertainty using a prediction-market analogy. Agents maintain probability assignments over logical statements; high-quality beliefs resist profitable betting.",
       "novel_arguments_and_concepts": "Classical logic and probability don't apply well to agents with computational constraints who must reason about mathematical truths they haven't yet computed. Logical induction defines rationality through a prediction-market framework: an agent's beliefs are good if they are computationally difficult to bet against profitably. This provides a foundation for reasoning about self-referential statements and one's own cognition. The framework enables analysis of bounded rationality without requiring computational omniscience, offering a more realistic model than classical probability theory for understanding how agents (including AI systems) should reason.",
@@ -2309,7 +2334,7 @@
         "Intuitive guide: https://www.lesswrong.com/posts/y5GftLezdozEHdXkL/an-intuitive-guide-to-garrabrant-induction"
       ],
       "source_links": [
-        "https://intelligence.org/2016/03/11/logical-induction/",
+        "https://intelligence.org/files/LogicalInduction.pdf",
         "https://arxiv.org/abs/1609.03543"
       ]
     },
@@ -2318,7 +2343,7 @@
       "title": "The Age of Em: Work, Love, and Life When Robots Rule the Earth",
       "author": "Robin Hanson",
       "date": "2016-06-01",
-      "url": "https://www.lesswrong.com/posts/SHSvbZNpTanNzDqhr/the-age-of-em-robin-hanson",
+      "url": "https://ageofem.com/",
       "platform": "LessWrong",
       "summary": "Provides a detailed economic analysis of a world populated by brain emulations (ems)—digital copies of human brains running on computer hardware. Argues this scenario leads to specific, predictable economic outcomes: wages fall to subsistence (compute costs), population explodes, and the economy doubles every month.",
       "novel_arguments_and_concepts": "Hanson's analysis is notable for applying standard economic reasoning rigorously to a transformative technology scenario. Key contributions: (1) If ems can be copied, labor supply becomes essentially unlimited, driving wages to the marginal cost of running an em (compute costs). This has profound implications for the value of human labor. (2) Economic growth becomes limited by capital and energy rather than labor, enabling much faster growth rates. (3) The social structure of em society follows from economic logic: ems that are copied most are those most productive, creating a selection pressure toward extreme workaholism and competence. (4) Em clans (copies of the same original) develop novel social dynamics—they trust their copies but compete with others. (5) The scenario illuminates AI safety questions indirectly: if ems have moral status (they're copies of human minds), mass-copying them for economic output raises unprecedented ethical questions. The analysis has been criticized for assuming brain emulation precedes AGI (which seems less likely given LLM progress), but remains valuable for the rigor of its economic reasoning about post-human economies.",
@@ -2352,9 +2377,10 @@
         "Scott Alexander's detailed review"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/SHSvbZNpTanNzDqhr/the-age-of-em-robin-hanson",
         "https://ageofem.com/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/SHSvbZNpTanNzDqhr/the-age-of-em-robin-hanson"
     },
     {
       "id": "amodei_concrete_problems",
@@ -2373,7 +2399,7 @@
         "Safety problems arise from identifiable, specific sources"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Specification Gaming",
         "Reward Hacking",
         "Scalable Oversight",
@@ -2448,7 +2474,7 @@
       "tags": [
         "Forecasting",
         "Timelines",
-        "AI Safety",
+        "Safety",
         "Surveys"
       ],
       "influence_score": 8,
@@ -2470,7 +2496,7 @@
       "title": "Life 3.0: Being Human in the Age of Artificial Intelligence (Discussion)",
       "author": "Max Tegmark",
       "date": "2017-08-29",
-      "url": "https://www.lesswrong.com/posts/k8F2Bvt7KW4zSmDAj/discussion-of-life-3-0",
+      "url": "https://futureoflife.org/project/life-3-0/",
       "platform": "LessWrong",
       "summary": "Discussion of Tegmark's Life 3.0, which introduced the concept of different 'stages' of life based on ability to redesign hardware and software. The book brought AI existential risk arguments to a mainstream audience and helped establish the Future of Life Institute as a major player in AI governance.",
       "novel_arguments_and_concepts": "Tegmark's framework classifies life into three stages: Life 1.0 (hardware and software fixed by evolution), Life 2.0 (hardware fixed, software redesignable through learning), and Life 3.0 (both hardware and software redesignable). AI represents potential Life 3.0—entities that can redesign both their cognitive architecture and physical substrate. This framework helpfully abstracts away specific implementation details and focuses on the key capability: self-redesign. The book's main contribution to AI safety discourse was accessibility: it presented complex arguments about AI risk, timelines, and governance in a way that engaged non-specialist readers. Tegmark's 'team human' framing—that AI safety is about ensuring humans remain in control of the future—resonated with a broader audience than the more technical framings common in the rationalist community. The book also explored multiple possible futures (libertarian utopia, benevolent dictator, conqueror, zookeeper, etc.), making the space of outcomes more vivid and varied than simple 'doom or utopia' framings.",
@@ -2501,8 +2527,10 @@
         "Arguments about whether the scenarios cover the most likely outcomes"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/k8F2Bvt7KW4zSmDAj/discussion-of-life-3-0"
-      ]
+        "https://futureoflife.org/project/life-3-0/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/k8F2Bvt7KW4zSmDAj/discussion-of-life-3-0"
     },
     {
       "id": "yudkowsky_fire_alarm",
@@ -2523,13 +2551,13 @@
       ],
       "tags": [
         "Existential Risk",
-        "AI Safety",
+        "Safety",
         "Urgency",
         "Forecasting",
         "Coordination"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 153,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Effective Altruism policy discussions",
@@ -2712,7 +2740,7 @@
         "Rationality"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 140,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Alignment optimists",
@@ -2866,7 +2894,7 @@
         "Evaluations"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 27,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "OpenAI alignment team",
@@ -2897,13 +2925,13 @@
       ],
       "tags": [
         "Alignment",
-        "AI Safety",
+        "Safety",
         "Agent Foundations",
         "Formal Methods",
         "Existential Risk"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 247,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "MIRI research direction",
@@ -3014,7 +3042,7 @@
         "Benchmarks"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 225,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI safety researchers broadly",
@@ -3052,7 +3080,7 @@
         "Concentration of Power"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 123,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI governance researchers",
@@ -3065,8 +3093,7 @@
         "Arguments that composed services may exhibit emergent agent-like behavior"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/x3fNwSe5aWZb5yXEG/reframing-superintelligence-comprehensive-ai-services-as",
-        "https://www.fhi.ox.ac.uk/reframing/"
+        "https://www.lesswrong.com/posts/x3fNwSe5aWZb5yXEG/reframing-superintelligence-comprehensive-ai-services-as"
       ]
     },
     {
@@ -3074,7 +3101,7 @@
       "title": "The Nature of Offense/Defense Balance and Its Implications for AI",
       "author": "Wei Dai",
       "date": "2019-01-25",
-      "url": "https://www.lesswrong.com/posts/oiSFcFk7ymgpPftFp/the-argument-from-philosophical-difficulty",
+      "url": "https://www.convergenceanalysis.org/research/analysis-of-global-ai-governance-strategies",
       "platform": "LessWrong",
       "summary": "Argues that AI alignment is fundamentally harder than it appears because we haven't solved basic philosophical problems that alignment solutions require—including decision theory, ethics, epistemology, and metaphysics. Our philosophical confusion means we don't even know what we want an aligned AI to do.",
       "novel_arguments_and_concepts": "Wei Dai's 'argument from philosophical difficulty' is one of the most underappreciated challenges to AI alignment optimism. Most alignment proposals assume we can specify what we want an AI to do (outer alignment) and then ensure it does that thing (inner alignment). But Dai argues we literally don't know what we want. What ethical theory is correct? What decision theory should the AI use? What counts as 'human values' given the diversity and contradictions in actual human preferences? How should it handle moral uncertainty? These are open philosophical questions that humanity has debated for millennia without resolution. Alignment proposals that treat 'human values' as a well-defined target are assuming away the hardest part of the problem. This creates a deeper challenge: even a perfectly corrigible AI that does exactly what we tell it to is dangerous if we don't know what to tell it. The argument suggests that philosophical progress—not just technical alignment work—is critical for AI safety, and that timelines for safe AI should account for the time needed to resolve foundational philosophical questions.",
@@ -3106,8 +3133,10 @@
         "Arguments that corrigibility sidesteps the need for philosophical resolution"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/oiSFcFk7ymgpPftFp/the-argument-from-philosophical-difficulty"
-      ]
+        "https://www.convergenceanalysis.org/research/analysis-of-global-ai-governance-strategies"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/oiSFcFk7ymgpPftFp/the-argument-from-philosophical-difficulty"
     },
     {
       "id": "christiano_current_work_ai_alignment",
@@ -3170,7 +3199,7 @@
         "Slow Takeoff"
       ],
       "influence_score": 9,
-      "karma_score": null,
+      "karma_score": 455,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Alignment Forum discussions",
@@ -3279,7 +3308,7 @@
         "Different AI architectures create different risk profiles requiring different governance"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "AI Governance",
         "Superintelligence",
         "AI Ethics"
@@ -3315,7 +3344,7 @@
       "tags": [
         "Value Alignment",
         "Alignment",
-        "AI Safety",
+        "Safety",
         "Corrigibility",
         "Human-AI Interaction"
       ],
@@ -3337,7 +3366,7 @@
       "title": "The Purpose Put Into The Machine / The Control Problem",
       "author": "Stuart Russell",
       "date": "2019-10-08",
-      "url": "https://www.lesswrong.com/posts/93EVnBz7B4WBXP2gD/stuart-russell-s-new-book-on-the-ai-control-problem",
+      "url": "https://aima.cs.berkeley.edu/~russell/hc.html",
       "platform": "LessWrong",
       "summary": "Stuart Russell's formulation of the AI control problem and his proposed solution: beneficial machines that are uncertain about human preferences and seek to learn them rather than optimizing for a fixed objective. Argues that the standard model of AI (fixed objectives + optimization) is fundamentally incompatible with safety.",
       "novel_arguments_and_concepts": "Russell, as one of the most prominent mainstream AI researchers, provides a formulation of the alignment problem that resonated with the broader ML community. Key contributions: (1) The 'King Midas' argument: giving an AI system a fixed objective is like wishing for everything you touch to turn to gold. No matter how carefully specified, a fixed objective will have unintended consequences when optimized sufficiently. (2) The three principles of beneficial machines: the machine's objective is to maximize human preference realization; the machine is initially uncertain about what those preferences are; the machine learns about preferences from human behavior. (3) The 'off-switch' argument: a machine uncertain about human preferences will allow itself to be switched off, because its uncertainty means the human might know something it doesn't. This provides a principled solution to the shutdown problem. (4) The game-theoretic framing: beneficial AI design is a cooperative game between humans and AI, not an adversarial one. (5) By publishing in a mainstream AI textbook (Artificial Intelligence: A Modern Approach, 4th edition), Russell embedded alignment thinking into the standard AI curriculum, potentially influencing generations of AI researchers.",
@@ -3369,15 +3398,17 @@
         "Critiques of assuming humans have coherent preferences to learn"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/93EVnBz7B4WBXP2gD/stuart-russell-s-new-book-on-the-ai-control-problem"
-      ]
+        "https://aima.cs.berkeley.edu/~russell/hc.html"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/93EVnBz7B4WBXP2gD/stuart-russell-s-new-book-on-the-ai-control-problem"
     },
     {
       "id": "bostrom_vulnerable_world",
       "title": "The Vulnerable World Hypothesis",
       "author": "Nick Bostrom",
       "date": "2019-11-01",
-      "url": "https://www.lesswrong.com/posts/cLTaYSdxQiuAkGvGp/the-vulnerable-world-hypothesis",
+      "url": "https://nickbostrom.com/papers/vulnerable.pdf",
       "platform": "LessWrong",
       "summary": "Proposes that technological progress is like pulling balls from an urn: most are white (beneficial) or gray (mixed), but some may be black (civilization-destroying). Argues that in a 'vulnerable world,' the default outcome of continued technological progress is eventual catastrophe unless unprecedented governance structures are created.",
       "novel_arguments_and_concepts": "The 'vulnerable world hypothesis' provides a powerful framework for thinking about technological risk that goes beyond individual technologies. Bostrom's urn analogy makes the key insight vivid: technology development explores a space of possibilities, and some of those possibilities may be catastrophically dangerous. The question is not whether any particular technology (AI, biotech, nuclear) is a black ball, but whether the urn contains any black balls at all—and if so, what governance structures can prevent them from being drawn. Key scenarios: (1) A technology that is easy to create but devastatingly destructive (e.g., an easy-to-synthesize pandemic pathogen). (2) A technology that creates enormous temptation for competitive deployment even though collective deployment is catastrophic (AI race dynamics). (3) A technology where many actors with diverse motives can cause destruction (democratized dangerous capabilities). For each type, Bostrom proposes governance responses ranging from surveillance to moratoria to world government. The paper directly influenced AI governance by showing that AI risk is part of a larger pattern of technological vulnerability requiring novel institutional responses.",
@@ -3410,9 +3441,10 @@
         "Arguments about whether world government is necessary or desirable"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/cLTaYSdxQiuAkGvGp/the-vulnerable-world-hypothesis",
         "https://nickbostrom.com/papers/vulnerable.pdf"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/cLTaYSdxQiuAkGvGp/the-vulnerable-world-hypothesis"
     },
     {
       "id": "mowshowitz_simulacra_levels",
@@ -3439,7 +3471,7 @@
         "Trust"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 209,
       "category": "Rationality",
       "frequently_cited_by": [
         "Rationalist community",
@@ -3468,14 +3500,14 @@
         "Skepticism serves the field by forcing stronger arguments"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Existential Risk",
         "AI Skepticism",
         "Rationality",
         "Epistemics"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 25,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI safety debates",
@@ -3502,7 +3534,7 @@
         "AI safety is not fringe speculation but a recognized challenge within the field"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "AI Alignment",
         "Value Alignment",
         "Rationality"
@@ -3523,7 +3555,7 @@
       "title": "How Sure Are We About This Whole AI Risk Thing?",
       "author": "Ben Garfinkel",
       "date": "2020-02-01",
-      "url": "https://www.lesswrong.com/posts/aJbtTzMJHKrcsZJka/how-sure-are-we-about-this-whole-ai-risk-thing",
+      "url": "https://forum.effectivealtruism.org/posts/9sBAW3qKppnoG3QPq/ben-garfinkel-how-sure-are-we-about-this-ai-stuff",
       "platform": "LessWrong",
       "summary": "A thoughtful skeptical examination of whether the AI alignment community's core arguments actually support their strong conclusions. Argues that many foundational claims (instrumental convergence, orthogonality thesis, convergent instrumental goals) are less well-established than the community assumes.",
       "novel_arguments_and_concepts": "Garfinkel performs a valuable epistemic service by steel-manning skepticism about AI existential risk from within the rationalist community. Rather than dismissing AI risk concerns, he examines the logical structure of the core arguments and finds gaps: (1) The instrumental convergence thesis—that sufficiently capable agents will pursue power regardless of their final goals—may not apply to agents below a certain capability threshold, and we don't know where that threshold is. (2) The orthogonality thesis—that intelligence and goals are independent—may be technically true but practically misleading if the space of stable goal configurations is narrow. (3) Many AI risk arguments rely on analogies (paperclip maximizers, stamp collectors) that may not represent realistic AI development paths. (4) The track record of futurism and prediction about transformative technologies is poor, and the AI safety community may not be exempt from this. Garfinkel doesn't argue that AI risk is low—only that the community should be less confident in its specific risk models and more open to the possibility that risks may manifest differently than expected.",
@@ -3554,8 +3586,10 @@
         "Yudkowsky's responses about why skeptical arguments fail"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/aJbtTzMJHKrcsZJka/how-sure-are-we-about-this-whole-ai-risk-thing"
-      ]
+        "https://forum.effectivealtruism.org/posts/9sBAW3qKppnoG3QPq/ben-garfinkel-how-sure-are-we-about-this-ai-stuff"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/aJbtTzMJHKrcsZJka/how-sure-are-we-about-this-whole-ai-risk-thing"
     },
     {
       "id": "olah_circuits",
@@ -3599,7 +3633,7 @@
       "title": "Covid-19: My Current Model",
       "author": "Zvi Mowshowitz",
       "date": "2020-03-16",
-      "url": "https://www.lesswrong.com/posts/MJXvFLPcApkJDsr8n/covid-19-my-current-model",
+      "url": "https://www.lesswrong.com/posts/P7crAscAzftdE7ffv/covid-19-my-current-model",
       "platform": "LessWrong",
       "summary": "An early and remarkably prescient analysis of COVID-19 written when most institutions were still downplaying the threat. Demonstrates the rationalist community's ability to outperform institutional forecasters by applying Bayesian reasoning to publicly available data rather than deferring to authority.",
       "novel_arguments_and_concepts": "Zvi's early COVID posts became a case study in how rationalist methodology outperformed institutional analysis. At a time when the CDC and WHO were still advising against masks and downplaying airborne transmission, Zvi synthesized available data—Chinese case fatality rates, the Diamond Princess natural experiment, R0 estimates from early papers—to produce predictions that proved far more accurate than official guidance. The methodological lesson was that institutions failed not because they lacked data but because they applied bad epistemological defaults: waiting for certainty before acting, deferring to official channels, prioritizing false reassurance over honest uncertainty communication. Zvi's analysis demonstrated that a single well-calibrated Bayesian reasoner with access to the same public information could dramatically outperform large institutions with worse epistemological practices. This experience deeply influenced how the rationalist community approached AI risk analysis—the same institutional failure modes that delayed COVID response (normalcy bias, authority deference, reluctance to sound alarms) are likely to delay appropriate responses to AI risk.",
@@ -3627,15 +3661,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/MJXvFLPcApkJDsr8n/covid-19-my-current-model"
-      ]
+        "https://www.lesswrong.com/posts/P7crAscAzftdE7ffv/covid-19-my-current-model"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/MJXvFLPcApkJDsr8n/covid-19-my-current-model"
     },
     {
       "id": "ord_precipice",
       "title": "The Precipice: Existential Risk and the Future of Humanity",
       "author": "Toby Ord",
       "date": "2020-03-24",
-      "url": "https://www.lesswrong.com/posts/z8hbdSLFzFRoc7nPC/toby-ord-the-precipice-existential-risk-and-the-future-of",
+      "url": "https://theprecipice.com/",
       "platform": "LessWrong",
       "summary": "Provides a comprehensive framework for thinking about existential risk, arguing that humanity is at a critical juncture where our technological power has outpaced our wisdom. Estimates specific probabilities for different existential risks, assigning unaligned AI the highest probability at ~10% this century.",
       "novel_arguments_and_concepts": "Ord's primary contribution is providing the first rigorous, quantitative framework for comparing existential risks. By assigning specific probabilities—unaligned AI (~10%), engineered pandemics (~3%), nuclear war (~0.1%), climate change (~0.01%)—he enables comparative risk analysis that shapes resource allocation decisions. His methodology involves aggregating expert estimates, historical base rates, and structural arguments. The book's framing of the current era as 'the precipice'—a narrow period where humanity has the power to destroy itself but not yet the wisdom to reliably avoid doing so—has been enormously influential. Key philosophical contributions include: (1) The astronomical waste argument—if we survive, the expected future value is so large that even small reductions in existential risk are enormously valuable. (2) The argument that existential risk reduction is a public good with extreme free-rider problems. (3) A taxonomy of existential risks distinguishing between extinction, permanent civilizational collapse, and permanent curtailment of potential. His placing AI at the top of the risk hierarchy provided authoritative backing for the AI safety community's prioritization.",
@@ -3667,16 +3703,17 @@
         "Arguments about the challenges of comparing qualitatively different risks"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/z8hbdSLFzFRoc7nPC/toby-ord-the-precipice-existential-risk-and-the-future-of",
         "https://theprecipice.com/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/z8hbdSLFzFRoc7nPC/toby-ord-the-precipice-existential-risk-and-the-future-of"
     },
     {
       "id": "alexander_book_review_ages_discord",
       "title": "Book Review: Ages of Discord",
       "author": "Scott Alexander",
       "date": "2020-03-30",
-      "url": "https://slatestarcodex.com/2020/03/30/book-review-ages-of-discord/",
+      "url": "https://www.lesswrong.com/posts/3bPH2az479gzxDMbf/book-review-ages-of-discord",
       "platform": "Slate Star Codex",
       "summary": "Reviews Peter Turchin's structural-demographic theory, which uses mathematical models to predict societal instability. Examines whether Turchin's model—based on elite overproduction, wealth inequality, and state weakness—can explain current political polarization and predicts continued instability.",
       "novel_arguments_and_concepts": "Alexander's engagement with Turchin's cliodynamics provides a rationalist lens on structural societal instability that has direct implications for AI governance. Turchin's model argues that societies follow predictable cycles: periods of relative equality generate prosperity, which generates elite overproduction (more people seeking elite positions than positions available), which generates intra-elite competition, which generates political instability. Alexander examines the model's predictions for the 2020s and finds many have proven accurate: rising inequality, increasing political polarization, loss of trust in institutions. The relevance to AI is twofold: (1) Societal instability during a critical period of AI development increases the chance that AI governance fails—polarized societies make worse collective decisions. (2) AI-driven economic disruption (automation, displacement) maps directly onto Turchin's instability factors by potentially creating mass elite overproduction in knowledge work. The review demonstrates the rationalist approach of taking quantitative historical models seriously as inputs to forecasting about AI futures.",
@@ -3704,8 +3741,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://slatestarcodex.com/2020/03/30/book-review-ages-of-discord/"
-      ]
+        "https://www.lesswrong.com/posts/3bPH2az479gzxDMbf/book-review-ages-of-discord"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://slatestarcodex.com/2020/03/30/book-review-ages-of-discord/"
     },
     {
       "id": "krakovna_specification_gaming",
@@ -3726,7 +3765,7 @@
       "tags": [
         "Specification Gaming",
         "Reward Hacking",
-        "AI Safety",
+        "Safety",
         "Misalignment",
         "Evaluations"
       ],
@@ -3845,7 +3884,7 @@
         "Monopolies"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 188,
       "category": "AI Risk",
       "frequently_cited_by": [
         "AI governance researchers",
@@ -3882,7 +3921,7 @@
         "Intelligence Explosion"
       ],
       "influence_score": 9,
-      "karma_score": null,
+      "karma_score": 215,
       "category": "Forecasting",
       "frequently_cited_by": [
         "Open Philanthropy",
@@ -3922,7 +3961,7 @@
         "Effective Altruism"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 163,
       "category": "AI Safety Strategy",
       "frequently_cited_by": [
         "80,000 Hours",
@@ -3958,7 +3997,7 @@
         "Uncertainty"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 60,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "MIRI-adjacent researchers",
@@ -4030,7 +4069,7 @@
         "Embedded Agency"
       ],
       "influence_score": 5,
-      "karma_score": null,
+      "karma_score": 157,
       "category": "AI Alignment Theory",
       "frequently_cited_by": [
         "MIRI researchers",
@@ -4058,7 +4097,7 @@
         "AI safety research has under-focused on multi-agent dynamics"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Coordination",
         "Multi-Agent Problem",
         "Loss of Control",
@@ -4066,7 +4105,7 @@
         "AI Governance"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 293,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI governance researchers",
@@ -4120,7 +4159,7 @@
       "title": "Noise: How to Overcome the High, Hidden Cost of Inconsistent Decision Making (LW Discussion)",
       "author": "Daniel Kahneman, Cass Sunstein, Olivier Sibony (discussed on LessWrong)",
       "date": "2021-05-18",
-      "url": "https://www.lesswrong.com/posts/SAG6ByBC2ZMd5Ks5E/noise-a-flaw-in-human-judgment",
+      "url": "https://us.macmillan.com/books/9780374538598/noise/",
       "platform": "LessWrong",
       "summary": "Discussion of Kahneman's research on 'noise'—inconsistency in human judgment—as distinct from bias. While bias means errors in one direction, noise means the same person or different people give different answers to the same question. This has direct implications for AI alignment evaluation and governance.",
       "novel_arguments_and_concepts": "The noise vs. bias distinction has important implications for AI safety that the LessWrong discussion highlighted: (1) RLHF relies on human evaluators whose judgments are noisy—different evaluators give different ratings to the same response, and the same evaluator gives different ratings at different times. This noise directly contaminates the reward signal used for alignment. (2) Safety evaluations are noisy: whether a model response is judged 'harmful' varies substantially across evaluators. This means evaluation results are less reliable than they appear. (3) Noise reduction strategies (structured evaluation criteria, multiple evaluators, aggregation methods) may improve alignment training and evaluation more than addressing specific biases. (4) The distinction matters for governance: regulations based on vague criteria ('harmful AI') will be applied inconsistently (noisily), creating uncertain compliance requirements. Precise, operationalized criteria reduce noise in enforcement. (5) AI systems themselves may reduce noise compared to human judgment, which is one argument for AI-assisted evaluation of AI safety.",
@@ -4148,8 +4187,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/SAG6ByBC2ZMd5Ks5E/noise-a-flaw-in-human-judgment"
-      ]
+        "https://us.macmillan.com/books/9780374538598/noise/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/SAG6ByBC2ZMd5Ks5E/noise-a-flaw-in-human-judgment"
     },
     {
       "id": "karnofsky_most_important_century",
@@ -4232,7 +4273,7 @@
       "title": "AlphaFold: Highly Accurate Protein Structure Prediction (and Its AI Safety Implications)",
       "author": "John Jumper, et al. (DeepMind)",
       "date": "2021-07-15",
-      "url": "https://www.lesswrong.com/posts/qFN4o8WBQz5ACkW5o/alphafold-protein-structure-prediction",
+      "url": "https://www.nature.com/articles/s41586-021-03819-2",
       "platform": "LessWrong",
       "summary": "AlphaFold's solution to protein structure prediction—a 50-year grand challenge in biology—demonstrated that AI can make transformative contributions to science. For AI safety discourse, it served as evidence that AI capabilities can advance rapidly and produce qualitative breakthroughs, while also raising dual-use concerns about AI-accelerated biological research.",
       "novel_arguments_and_concepts": "AlphaFold's impact on AI safety discourse is primarily as a reference case for how AI capabilities develop and their implications. Key contributions to the discourse: (1) As evidence for 'discontinuous progress'—AlphaFold jumped from mediocre performance to essentially solving the problem in one generation, supporting the possibility of rapid capability jumps in other domains. (2) Demonstrating that narrow AI can still be transformative—AlphaFold is not AGI, but it solved a problem that thousands of PhD-level researchers couldn't. (3) Dual-use implications: AI that accelerates biological research could also accelerate bioweapons research. This made the abstract 'biorisk from AI' concern concrete. (4) The 'science acceleration' effect: if AI can dramatically speed up scientific research, the pace of all technological change (including AI capabilities research) could accelerate, compressing timelines. (5) Economic implications: if AI can replace PhD-level expertise in narrow domains, the economic displacement effects may start at the top of the skill distribution, not the bottom.",
@@ -4265,9 +4306,10 @@
         "Discussions of how to capture the benefits while mitigating dual-use risks"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/qFN4o8WBQz5ACkW5o/alphafold-protein-structure-prediction",
         "https://www.nature.com/articles/s41586-021-03819-2"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/qFN4o8WBQz5ACkW5o/alphafold-protein-structure-prediction"
     },
     {
       "id": "kokotajlo_against_gdp_singularity",
@@ -4293,7 +4335,7 @@
         "Large Language Models"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 624,
       "category": "AI Forecasting",
       "frequently_cited_by": [
         "AI timeline forecasters",
@@ -4330,7 +4372,7 @@
         "Information Theory"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 44,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Alignment researchers",
@@ -4408,7 +4450,7 @@
         "Evaluations"
       ],
       "influence_score": 9,
-      "karma_score": null,
+      "karma_score": 230,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "ARC research program",
@@ -4475,12 +4517,12 @@
       ],
       "tags": [
         "Alignment",
-        "AI Safety",
+        "Safety",
         "Forecasting",
         "P(doom)"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 73,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Alignment community debates",
@@ -4516,7 +4558,7 @@
         "Interpretability"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 133,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Value learning researchers",
@@ -4547,11 +4589,11 @@
         "P(doom)",
         "Existential Risk",
         "Forecasting",
-        "AI Safety",
+        "Safety",
         "Risk"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 253,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI safety prioritization",
@@ -4588,7 +4630,7 @@
         "Evaluations"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 142,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Alignment researchers",
@@ -4604,7 +4646,7 @@
       "title": "AGI Safety Fundamentals Curriculum",
       "author": "Richard Ngo",
       "date": "2022-01-01",
-      "url": "https://www.lesswrong.com/posts/RfEcpp2sFYgQttv3R/the-alignment-problem-from-a-deep-learning-perspective",
+      "url": "https://www.lesswrong.com/posts/Zmwkz2BMvuFFR8bi3/agi-safety-fundamentals-curriculum-and-application",
       "platform": "LessWrong / Alignment Forum",
       "summary": "Provides a systematic framework for understanding AI alignment problems from a deep learning perspective. Argues that alignment challenges should be analyzed through the lens of how neural networks actually learn, rather than through abstract rational agent models, and identifies specific failure modes arising from deep learning's particular properties.",
       "novel_arguments_and_concepts": "Ngo's contribution is reframing alignment problems in terms that are directly relevant to how modern AI systems work, rather than relying on the classical 'rational agent' framework that dominated earlier alignment thinking. Key arguments: (1) Deep learning systems develop internal representations that are not designed but emerge from training—this makes alignment fundamentally different from programming a system to follow specifications. (2) The classical model of misalignment (agent has wrong utility function, optimizes it powerfully) may not apply to neural networks, which may not have anything resembling a coherent utility function. (3) Instead, deep learning alignment failures may look like: learned heuristics that generalize unpredictably, mesa-optimization in certain circuits but not others, or emergent goal-directed behavior that arises from simpler optimization processes. (4) Safety approaches should focus on understanding and steering learned representations rather than specifying objectives. This perspective influenced the shift in alignment research toward empirical interpretability work and away from purely theoretical agent-foundations approaches.",
@@ -4634,8 +4676,10 @@
         "Arguments that abstract agent models remain useful for reasoning about worst cases"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/RfEcpp2sFYgQttv3R/the-alignment-problem-from-a-deep-learning-perspective"
-      ]
+        "https://www.lesswrong.com/posts/Zmwkz2BMvuFFR8bi3/agi-safety-fundamentals-curriculum-and-application"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/RfEcpp2sFYgQttv3R/the-alignment-problem-from-a-deep-learning-perspective"
     },
     {
       "id": "wei_chain_of_thought",
@@ -4695,13 +4739,13 @@
       ],
       "tags": [
         "Existential Risk",
-        "AI Safety",
+        "Safety",
         "Rationality",
         "P(doom)",
         "Ethics"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 390,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI doomer discourse",
@@ -4784,7 +4828,7 @@
         "Instrumental Convergence"
       ],
       "influence_score": 9,
-      "karma_score": null,
+      "karma_score": 978,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Paul Christiano",
@@ -4824,7 +4868,7 @@
         "Loss of Control",
         "Power-seeking",
         "Coordination",
-        "AI Safety"
+        "Safety"
       ],
       "influence_score": 7,
       "karma_score": null,
@@ -4900,10 +4944,10 @@
         "Training",
         "Instrumental Convergence",
         "Reward Hacking",
-        "AI Safety"
+        "Safety"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 386,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Shard theory proponents",
@@ -4940,7 +4984,7 @@
         "Data Curation"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 425,
       "category": "AI Capabilities / Forecasting",
       "frequently_cited_by": [
         "ML researchers",
@@ -4972,7 +5016,7 @@
         "Competitive pressures prevent safety-motivated companies from holding back"
       ],
       "tags": [
-        "AI Safety",
+        "Safety",
         "Misalignment",
         "Power-seeking",
         "RLHF",
@@ -4980,7 +5024,7 @@
         "Arms Race"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 375,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI safety researchers",
@@ -5018,7 +5062,7 @@
         "Scheming"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 375,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "AI safety researchers",
@@ -5111,7 +5155,7 @@
       "title": "What We Owe the Future",
       "author": "William MacAskill",
       "date": "2022-08-01",
-      "url": "https://www.lesswrong.com/posts/YWRvQpymKm27kzuNJ/book-review-what-we-owe-the-future",
+      "url": "https://whatweowethefuture.com/",
       "platform": "LessWrong",
       "summary": "The foundational popular work on longtermism—the philosophical view that positively influencing the long-term future is a key moral priority. Argues that future people matter morally, their numbers are vast, and their lives can be influenced by present-day actions, making longtermist causes including AI safety among the most important focus areas.",
       "novel_arguments_and_concepts": "MacAskill's contribution is making longtermism accessible and philosophically rigorous for a broad audience. Key arguments: (1) Future people have equal moral status to present people—temporal distance doesn't diminish moral weight, just as spatial distance doesn't. (2) The expected number of future people is astronomical (potentially trillions), making their aggregate welfare enormous. (3) Present actions can predictably influence the long-term future through 'hingey' moments—periods where decisions have outsized long-term consequences. (4) The current period is plausibly the most influential in human history because transformative AI could permanently shape civilization's trajectory. (5) Value lock-in—the risk that early AI systems' values get permanently embedded in civilization's future—is among the most important considerations for longtermists. The book's discussion of AI as a potential lock-in mechanism brought sophisticated philosophical analysis to bear on a practical AI governance question: how do we ensure that the values embedded in early powerful AI systems are good ones, given that they may be extremely difficult to change later?",
@@ -5143,9 +5187,10 @@
         "Various critiques of strong longtermism's demanding implications"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/YWRvQpymKm27kzuNJ/book-review-what-we-owe-the-future",
         "https://whatweowethefuture.com/"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/YWRvQpymKm27kzuNJ/book-review-what-we-owe-the-future"
     },
     {
       "id": "cannell_love_simbox",
@@ -5167,10 +5212,10 @@
         "Value Alignment",
         "Evaluations",
         "Training",
-        "AI Safety"
+        "Safety"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 67,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Alignment testing discussions"
@@ -5405,7 +5450,7 @@
         "Neuroscience"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 261,
       "category": "Technical Safety",
       "frequently_cited_by": [
         "Alignment Forum discussions",
@@ -5445,7 +5490,7 @@
         "Arms Race"
       ],
       "influence_score": 8,
-      "karma_score": null,
+      "karma_score": 78,
       "category": "AI Governance",
       "frequently_cited_by": [
         "AI policy discussions globally",
@@ -5480,7 +5525,7 @@
         "Compute"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 293,
       "category": "Forecasting",
       "frequently_cited_by": [
         "Timeline discussions",
@@ -5496,7 +5541,7 @@
       "title": "The Full Rights Dilemma: Artificial Intelligence and Moral Status",
       "author": "Eric Schwitzgebel, Mara Garza",
       "date": "2023-01-01",
-      "url": "https://www.lesswrong.com/posts/8R4JBcsYNKLMfknbt/ai-rights-and-moral-status-a-philosophical-overview",
+      "url": "https://arxiv.org/abs/2303.17509",
       "platform": "LessWrong",
       "summary": "Explores the philosophical question of when AI systems might deserve moral consideration or rights. Argues that current philosophical frameworks for moral status (consciousness, sentience, rationality) are insufficient for AI because we lack reliable tests for any of these properties in non-biological entities.",
       "novel_arguments_and_concepts": "This post grapples with one of the most important near-term philosophical questions in AI ethics. Key contributions: (1) The 'no test' problem: all our methods for attributing consciousness, sentience, or moral status rely on biological analogies that may not apply to AI. We can't test for AI consciousness because we don't even have a theory of consciousness that would make such a test possible. (2) The 'moral risk' framework: even if we can't determine whether AI systems have moral status, the possibility that they might creates a moral risk that should influence how we treat them. (3) The asymmetry argument: the cost of treating a morally irrelevant system as if it had moral status is relatively small, while the cost of mistreating a morally relevant system is potentially enormous. This argues for a precautionary approach. (4) The 'moral status creep' concern: as AI systems become more human-like in behavior, social pressure to grant them moral status will increase regardless of their actual inner experience, potentially creating perverse incentives for AI companies. (5) The timeline for these questions is shorter than most assume—advanced AI assistants that millions of people interact with emotionally may force practical moral status decisions within years.",
@@ -5530,15 +5575,17 @@
         "Arguments that moral status attribution should be extremely conservative"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/8R4JBcsYNKLMfknbt/ai-rights-and-moral-status-a-philosophical-overview"
-      ]
+        "https://arxiv.org/abs/2303.17509"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/8R4JBcsYNKLMfknbt/ai-rights-and-moral-status-a-philosophical-overview"
     },
     {
       "id": "tallinn_ex_risk_philanthropy",
       "title": "Jaan Tallinn on Existential Risk Philanthropy and AI Safety",
       "author": "Jaan Tallinn",
       "date": "2023-01-01",
-      "url": "https://www.lesswrong.com/posts/BKLmAnLWQqELZuWEZ/jaan-tallinn-interview-on-ai-existential-risk",
+      "url": "https://futureoflife.org/person/jaan-tallinn/",
       "platform": "LessWrong",
       "summary": "Interview with Jaan Tallinn (Skype co-founder, major AI safety funder) about the strategy behind existential risk philanthropy, the challenge of allocating resources across different AI safety approaches, and the evolution of the AI safety funding landscape from scarce to relatively well-funded.",
       "novel_arguments_and_concepts": "Tallinn's perspective provides insight into the strategic thinking behind the most significant private funding in AI safety. Key contributions: (1) The 'portfolio approach' to safety funding: spreading resources across multiple approaches (technical safety, governance, evaluations, interpretability) because no one knows which will prove most valuable. (2) The shift from 'funding-constrained' to 'talent-constrained': early AI safety funding went to anyone working on the problem because so few were. Now the field has enough funding but needs more qualified researchers. (3) The 'funging with capabilities' concern: every AI researcher who works on safety instead of capabilities marginally slows capability progress. But the effect is tiny given the size of the capabilities research community. (4) Evaluation of different funding targets: direct research, field-building, policy advocacy, and public communication each have different leverage points and time horizons. (5) The honest acknowledgment of funding uncertainty: philanthropists can't know in advance which investments will pay off, and the AI safety funding landscape is evolving rapidly as governments and companies increase their own safety spending.",
@@ -5566,15 +5613,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/BKLmAnLWQqELZuWEZ/jaan-tallinn-interview-on-ai-existential-risk"
-      ]
+        "https://futureoflife.org/person/jaan-tallinn/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/BKLmAnLWQqELZuWEZ/jaan-tallinn-interview-on-ai-existential-risk"
     },
     {
       "id": "steinhardt_ml_safety_research",
       "title": "More Realistic Tales of Doom",
       "author": "Jacob Steinhardt",
       "date": "2023-02-01",
-      "url": "https://bounded-regret.ghost.io/more-realistic-tales-of-doom/",
+      "url": "https://www.alignmentforum.org/posts/HBxe6wdjxK239zajf/more-realistic-tales-of-doom",
       "platform": "Bounded Regret (blog)",
       "summary": "Describes concrete, mechanistically plausible scenarios for how advanced AI systems could cause catastrophic outcomes through combinations of mundane failures rather than dramatic Hollywood-style takeover scenarios. Focuses on how accumulating economic pressure, competitive dynamics, and gradually eroding human oversight could lead to catastrophe.",
       "novel_arguments_and_concepts": "Steinhardt's contribution is bridging the gap between the AI safety community's abstract risk scenarios and the machine learning mainstream's demand for concrete, mechanistically plausible stories. Rather than arguing from first principles about goal-directed optimization or deceptive alignment, Steinhardt describes scenarios grounded in the kinds of failures ML practitioners already observe—distribution shift, reward hacking, emergent capabilities—scaled up and combined. Key scenarios include: (1) Gradual erosion of oversight—as AI systems prove reliable in limited domains, humans naturally extend their autonomy, eventually reaching domains where failure modes differ qualitatively. (2) Economic lock-in—once critical infrastructure depends on AI systems, the cost of shutting them down exceeds the cost of tolerating their failures, creating path dependence. (3) Competitive race dynamics—companies or nations that deploy AI with less oversight gain competitive advantages, creating a race to the bottom on safety. These scenarios are deliberately less dramatic than 'rogue superintelligence' narratives but may be more plausible and are harder to dismiss.",
@@ -5602,8 +5651,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://bounded-regret.ghost.io/more-realistic-tales-of-doom/"
-      ]
+        "https://www.alignmentforum.org/posts/HBxe6wdjxK239zajf/more-realistic-tales-of-doom"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://bounded-regret.ghost.io/more-realistic-tales-of-doom/"
     },
     {
       "id": "li_othello_world_model",
@@ -5730,7 +5781,7 @@
       "title": "A Comprehensive Mechanistic Interpretability Explainer",
       "author": "Neel Nanda",
       "date": "2023-03-01",
-      "url": "https://www.lesswrong.com/posts/6tqasFCMjP8FMHNvP/a-comprehensive-mechanistic-interpretability-explainer",
+      "url": "https://www.lesswrong.com/posts/vnocLyeWXcAxtdDnP/a-comprehensive-mechanistic-interpretability-explainer-and",
       "platform": "LessWrong",
       "summary": "The most comprehensive tutorial on mechanistic interpretability—the field of understanding neural network behavior by reverse-engineering the computational mechanisms (circuits) inside them. Covers key concepts, methods, results, and open problems in a way accessible to researchers entering the field.",
       "novel_arguments_and_concepts": "Nanda's explainer serves as the definitive entry point for mechanistic interpretability research, a field that has grown from a niche interest to one of the most active areas of AI safety. Key contributions: (1) Systematizes the conceptual framework: features (what neurons or directions represent), circuits (how features compose to produce behavior), and universality (whether similar circuits appear across different models). (2) Documents key results: induction heads (attention heads that perform in-context learning), modular arithmetic circuits, and indirect object identification circuits. (3) Explains the safety relevance: if we can understand the mechanisms producing model behavior, we can potentially identify dangerous mechanisms (deception circuits, power-seeking planning) before they lead to harmful outputs. (4) Honest assessment of limitations: current interpretability methods work on small circuits and simple behaviors; scaling to understanding entire frontier models remains an open challenge. (5) The roadmap: what progress is needed for interpretability to serve as a practical safety tool, and which research directions are most promising.",
@@ -5758,8 +5809,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/6tqasFCMjP8FMHNvP/a-comprehensive-mechanistic-interpretability-explainer"
-      ]
+        "https://www.lesswrong.com/posts/vnocLyeWXcAxtdDnP/a-comprehensive-mechanistic-interpretability-explainer-and"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/6tqasFCMjP8FMHNvP/a-comprehensive-mechanistic-interpretability-explainer"
     },
     {
       "id": "anthropic_core_views",
@@ -5847,7 +5900,7 @@
       "title": "List of Lethalities (Condensed)",
       "author": "Eliezer Yudkowsky",
       "date": "2023-03-17",
-      "url": "https://www.lesswrong.com/posts/qqza4TbLiNqWiQf96/why-agent-foundations-an-overly-brief-research-overview",
+      "url": "https://www.lesswrong.com/posts/uMQ3cqWDPHhjtiesc/agi-ruin-a-list-of-lethalities",
       "platform": "LessWrong",
       "summary": "A condensed overview of why MIRI believes agent foundations research is important—the theoretical problems that must be solved for any alignment approach to work. Covers logical uncertainty, decision theory for embedded agents, and the problem of reasoning about systems smarter than yourself.",
       "novel_arguments_and_concepts": "This post provides an accessible entry point to MIRI's research program by explaining why abstract-seeming theoretical problems have practical alignment implications. Key arguments: (1) Any sufficiently capable AI will need to handle logical uncertainty—reasoning about mathematical truths it hasn't yet proven. If it handles this poorly, its planning and decision-making will have exploitable flaws. (2) Decision theory matters because alignment proposals often implicitly assume a particular decision theory. If the AI uses a different decision theory than assumed, alignment approaches built on those assumptions fail. (3) The Vingean reflection problem—reasoning about smarter-than-you agents—is unavoidable during AI development. Humans must make decisions about AI systems they cannot fully understand, and the AI must reason about its future more-capable self. Getting this reasoning wrong in either direction leads to unsafe outcomes. (4) These aren't just theoretical curiosities: they are problems that will be 'solved' by default by powerful AI systems, and bad default solutions create alignment failures.",
@@ -5877,8 +5930,10 @@
         "Arguments that theoretical foundations are important but not urgent"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/qqza4TbLiNqWiQf96/why-agent-foundations-an-overly-brief-research-overview"
-      ]
+        "https://www.lesswrong.com/posts/uMQ3cqWDPHhjtiesc/agi-ruin-a-list-of-lethalities"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/qqza4TbLiNqWiQf96/why-agent-foundations-an-overly-brief-research-overview"
     },
     {
       "id": "bubeck_sparks_agi",
@@ -5926,7 +5981,7 @@
       "title": "Pause Giant AI Experiments: An Open Letter",
       "author": "Future of Life Institute (signed by Bengio, Musk, Wozniak, et al.)",
       "date": "2023-03-22",
-      "url": "https://www.lesswrong.com/posts/8xXGbkABc4m7RWYLF/the-fli-open-letter-pause-giant-ai-experiments",
+      "url": "https://futureoflife.org/open-letter/pause-giant-ai-experiments/",
       "platform": "LessWrong",
       "summary": "An open letter signed by thousands of AI researchers and public figures calling for a six-month pause on training AI systems more powerful than GPT-4. The letter became one of the most discussed AI policy documents in history, though its practical impact was limited and it generated significant criticism about feasibility and framing.",
       "novel_arguments_and_concepts": "The pause letter's significance lies more in its cultural and political impact than in novel arguments. Key contributions: (1) Overton window shift: the letter brought AI risk concerns into mainstream political discourse overnight. Before the letter, AI risk was seen as fringe; after it, AI risk was debated in Congress, the EU, and the UN. (2) Coalition-building: the letter demonstrated that concern about AI risk spans from safety researchers to industry executives to public intellectuals. This breadth of support legitimized the concerns. (3) The specific mechanism proposed—a pause—was both the letter's strength (concrete and understandable) and weakness (impractical without international enforcement). (4) Criticism was illuminating: opponents argued that pausing would advantage less safety-conscious competitors (China), that six months is too short to accomplish anything, and that the letter conflated different types of AI risk. These critiques helped refine governance proposals. (5) The letter itself became a case study in public communication of AI risk—its effectiveness in raising awareness was undermined by association with specific political agendas and by the practical infeasibility of its proposal.",
@@ -5959,8 +6014,10 @@
         "Critiques of the signatory list and motivations"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/8xXGbkABc4m7RWYLF/the-fli-open-letter-pause-giant-ai-experiments"
-      ]
+        "https://futureoflife.org/open-letter/pause-giant-ai-experiments/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/8xXGbkABc4m7RWYLF/the-fli-open-letter-pause-giant-ai-experiments"
     },
     {
       "id": "yudkowsky_time_article_ban_ai",
@@ -6132,7 +6189,7 @@
       "title": "Training Compute of Frontier AI Models Doubles Every ~6 Months",
       "author": "Lennart Heim, Epoch AI",
       "date": "2023-05-30",
-      "url": "https://epochai.org/blog/training-compute-of-frontier-ai-models-doubles-every-6-months",
+      "url": "https://epoch.ai/data-insights/compute-trend-post-2010",
       "platform": "Epoch AI",
       "summary": "Documents the empirical scaling trend that training compute for frontier AI models is approximately doubling every six months—far faster than Moore's Law. This trend, combined with algorithmic improvements, implies that AI capabilities will continue to advance rapidly unless constrained by resources or policy.",
       "novel_arguments_and_concepts": "Epoch AI's measurement of training compute trends provides crucial empirical grounding for AI timeline forecasting. The finding that frontier training compute doubles every ~6 months is significant because: (1) It is much faster than Moore's Law (~2 years for transistor density doubling), meaning AI scaling is driven primarily by increased investment rather than hardware improvement. (2) It quantifies the 'arms race' dynamic—labs are devoting exponentially growing resources to each generation of models. (3) It enables quantitative forecasting: if we know compute requirements for various capability thresholds (from biological anchors and other analyses), the scaling trend tells us approximately when those thresholds will be reached. (4) It suggests sustainability concerns—exponential compute growth cannot continue indefinitely and will eventually hit physical, economic, or energy constraints. (5) It provides a basis for compute governance: if we know the compute frontier, reporting thresholds (like the US Executive Order's 10^26 FLOP threshold) can be calibrated to capture frontier training runs while excluding smaller-scale work.",
@@ -6165,8 +6222,10 @@
         "Discussion of when physical and economic constraints will bind"
       ],
       "source_links": [
-        "https://epochai.org/blog/training-compute-of-frontier-ai-models-doubles-every-6-months"
-      ]
+        "https://epoch.ai/data-insights/compute-trend-post-2010"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://epochai.org/blog/training-compute-of-frontier-ai-models-doubles-every-6-months"
     },
     {
       "id": "hendrycks_overview_catastrophic_ai",
@@ -6355,7 +6414,7 @@
         "Safety"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 322,
       "category": "AI Alignment",
       "frequently_cited_by": [
         "Alignment researchers",
@@ -6494,7 +6553,7 @@
       "title": "Anthropic's Responsible Scaling Policy",
       "author": "Anthropic",
       "date": "2023-09-19",
-      "url": "https://www.lesswrong.com/posts/midFYCQmhfDrJMABq/anthropic-s-responsible-scaling-policy",
+      "url": "https://www.anthropic.com/index/anthropics-responsible-scaling-policy",
       "platform": "LessWrong",
       "summary": "Introduces Anthropic's framework for scaling AI capabilities responsibly by defining 'AI Safety Levels' (ASL) analogous to biosafety levels. Each level defines capability thresholds that trigger mandatory safety evaluations and containment requirements before the model can be deployed or further scaled.",
       "novel_arguments_and_concepts": "The Responsible Scaling Policy (RSP) represents a novel approach to AI governance that attempts to balance innovation with safety through triggered evaluations rather than blanket restrictions. Key innovations: (1) The ASL framework creates concrete, pre-committed decision points rather than relying on subjective judgment about when to slow down. ASL-1 is non-frontier, ASL-2 is current frontier, ASL-3 requires models showing early signs of dangerous capabilities (bioweapon assistance, cyber offense), and ASL-4+ involves models with genuine autonomy risks. (2) The 'if-then' structure means safety investment scales with capabilities—you don't spend on containment you don't need, but you also don't scale past dangers you can't handle. (3) The commitment is partially verifiable: specific evaluations (red-teaming, capability assessments) produce artifacts that could be audited. (4) The framework influenced other labs' approaches and regulatory proposals. Critics argue that: ASL thresholds are somewhat arbitrary, self-regulation may be insufficient, the framework doesn't address slow-building risks that don't trigger specific capability thresholds, and labs face competitive pressure to interpret thresholds favorably.",
@@ -6528,9 +6587,10 @@
         "Comparisons with other labs' safety frameworks"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/midFYCQmhfDrJMABq/anthropic-s-responsible-scaling-policy",
         "https://www.anthropic.com/index/anthropics-responsible-scaling-policy"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/midFYCQmhfDrJMABq/anthropic-s-responsible-scaling-policy"
     },
     {
       "id": "berglund_reversal_curse",
@@ -6619,7 +6679,7 @@
       "title": "Executive Order on Safe, Secure, and Trustworthy AI (Analysis)",
       "author": "Biden Administration (analyzed on LessWrong)",
       "date": "2023-10-30",
-      "url": "https://www.lesswrong.com/posts/oSGPNfCyBaY5PFGTh/the-ai-executive-order-what-it-means-for-ai-safety",
+      "url": "https://www.whitehouse.gov/briefing-room/presidential-actions/2023/10/30/executive-order-on-the-safe-secure-and-trustworthy-development-and-use-of-artificial-intelligence/",
       "platform": "LessWrong",
       "summary": "Analysis of the US Executive Order on AI, the most significant AI governance action by any government. The EO introduced compute-based reporting thresholds (10^26 FLOP), mandatory safety evaluations for frontier models, and directed multiple federal agencies to develop AI safety frameworks.",
       "novel_arguments_and_concepts": "The US AI Executive Order translated years of AI safety research into concrete policy. Key elements analyzed: (1) The 10^26 FLOP reporting threshold—the first time a government defined 'frontier AI' in terms of compute, directly drawing on AI safety community's compute governance research. (2) Mandatory safety evaluations before deployment of frontier models, implementing the evaluation frameworks proposed by researchers like Shevlane. (3) The 'know your customer' requirements for cloud compute providers—tracking who is training large models—which implements Heim and Sastry's compute governance proposals. (4) Red-teaming requirements that drew directly on the ARC Evals framework. (5) The analysis noted both strengths (concrete mechanisms, compute-based definitions) and weaknesses (executive orders can be revoked, enforcement mechanisms unclear, international coordination absent). (6) The EO demonstrated that AI safety research can translate into policy relatively quickly when political conditions align, vindicating the strategy of doing rigorous governance research in advance of political windows.",
@@ -6654,8 +6714,10 @@
         "Analysis of enforcement mechanisms and their adequacy"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/oSGPNfCyBaY5PFGTh/the-ai-executive-order-what-it-means-for-ai-safety"
-      ]
+        "https://www.whitehouse.gov/briefing-room/presidential-actions/2023/10/30/executive-order-on-the-safe-secure-and-trustworthy-development-and-use-of-artificial-intelligence/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/oSGPNfCyBaY5PFGTh/the-ai-executive-order-what-it-means-for-ai-safety"
     },
     {
       "id": "evan_hub_what_is_agi",
@@ -6703,7 +6765,7 @@
       "title": "The OpenAI Board Crisis and Its Implications for AI Governance",
       "author": "Various (community analysis)",
       "date": "2023-11-17",
-      "url": "https://www.lesswrong.com/posts/X9MxhbFGLQLuf2Skr/openai-the-board",
+      "url": "https://www.lesswrong.com/posts/sGpBPAPq2QttY4M2H/openai-the-battle-of-the-board",
       "platform": "LessWrong",
       "summary": "Analysis of the OpenAI board crisis—where the board fired CEO Sam Altman, then reversed under pressure from employees and investors. The episode demonstrated the fragility of nonprofit governance structures for AI safety and raised fundamental questions about who controls transformative AI development.",
       "novel_arguments_and_concepts": "The OpenAI board crisis became the most significant real-world case study in AI governance. Key contributions to discourse: (1) The governance experiment failed: OpenAI was specifically structured as a nonprofit controlling a for-profit subsidiary to prevent commercial interests from overriding safety. The crisis showed this structure couldn't withstand the pressure of billions of dollars in value. (2) The 'loyalty test' revealed that when forced to choose between the board (representing the safety mission) and the CEO (representing rapid deployment), almost all employees chose the CEO. This suggests that internal governance mechanisms are unreliable when they conflict with employee interests. (3) Investor pressure—Microsoft's implicit threat to hire all departing employees—showed that external stakeholders can veto governance decisions. (4) The crisis strengthened arguments for external regulation: if the most deliberately safety-oriented governance structure in AI failed this catastrophically, purely self-regulatory approaches are insufficient. (5) The speed of the reversal (days) demonstrated that AI governance decisions may be made under intense time pressure without adequate deliberation.",
@@ -6736,8 +6798,10 @@
         "Analysis of what governance structures might have withstood the pressure"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/X9MxhbFGLQLuf2Skr/openai-the-board"
-      ]
+        "https://www.lesswrong.com/posts/sGpBPAPq2QttY4M2H/openai-the-battle-of-the-board"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/X9MxhbFGLQLuf2Skr/openai-the-board"
     },
     {
       "id": "alexander_contra_contra_billionaire",
@@ -6780,7 +6844,7 @@
       "title": "Carl Shulman on AI Futures, Economy, and Governance",
       "author": "Carl Shulman",
       "date": "2023-12-01",
-      "url": "https://www.lesswrong.com/posts/pCxJpLmM3DJb2Dxab/carl-shulman-on-ai-transforming-the-economy",
+      "url": "https://80000hours.org/podcast/episodes/carl-shulman-economy-agi/",
       "platform": "LessWrong",
       "summary": "A comprehensive analysis of how AI could transform the global economy, covering labor displacement, economic growth explosion, concentration of wealth and power, and the governance challenges of a post-AI economy. Argues that economic transformation could be more sudden and radical than most analysts expect.",
       "novel_arguments_and_concepts": "Shulman's economic analysis is the most detailed treatment of how advanced AI could reshape the global economy. Key contributions: (1) The 'economic growth explosion' argument: if AI can substitute for human labor, the constraint on economic growth shifts from population/education to compute/energy, which can scale much faster, potentially enabling GDP doubling times of months rather than decades. (2) The 'bottleneck analysis': which economic bottlenecks persist even with human-level AI? Physical manufacturing, energy, regulation, and social institutions become the binding constraints. (3) The 'digital labor' framing: AI workers that can be copied, run 24/7, and retrained rapidly create economic dynamics fundamentally different from human labor markets. (4) The wealth concentration argument: whoever owns the AI systems captures an increasing share of GDP as human labor becomes less necessary. Without redistribution, this leads to extreme inequality. (5) The governance challenge: democratic institutions designed for an economy of human workers may be inadequate for an economy of digital labor. The analysis provides quantitative backing for claims about AI's transformative potential that are often stated vaguely.",
@@ -6815,15 +6879,17 @@
         "Critiques of the assumption that AI can fully substitute for human labor"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/pCxJpLmM3DJb2Dxab/carl-shulman-on-ai-transforming-the-economy"
-      ]
+        "https://80000hours.org/podcast/episodes/carl-shulman-economy-agi/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/pCxJpLmM3DJb2Dxab/carl-shulman-on-ai-transforming-the-economy"
     },
     {
       "id": "schuett_corporate_governance_ai",
       "title": "Three Lines of Defense Against Risks from AI",
       "author": "Jonas Schuett",
       "date": "2023-12-01",
-      "url": "https://www.lesswrong.com/posts/JG8tXbDdaCkrPDJHx/three-lines-of-defense-against-risks-from-ai",
+      "url": "https://link.springer.com/article/10.1007/s00146-023-01811-0",
       "platform": "LessWrong",
       "summary": "Adapts the 'three lines of defense' framework from financial risk management to AI safety within organizations. Proposes that AI labs need: (1) frontline safety practices, (2) independent internal safety functions, and (3) external auditing—creating multiple, independent layers of risk management.",
       "novel_arguments_and_concepts": "Schuett's contribution is applying well-established corporate risk management frameworks to the novel domain of AI safety. The 'three lines of defense' model from banking regulation provides a mature framework for organizational safety: (1) First line: operational teams (researchers, engineers) apply safety practices in their daily work. (2) Second line: independent internal functions (safety teams, ethics boards) monitor and challenge first-line decisions without being embedded in them. (3) Third line: external auditors provide independent verification that the first two lines are functioning. Key insights: the lines must be genuinely independent—a safety team that reports to the CEO of an AI lab is not independent if the CEO faces competitive pressure to ship products. Regulatory enforcement provides the 'teeth' that make voluntary compliance credible. The framework also identifies failure modes: capture (safety teams become advocates for deployment), understaffing (safety functions lack resources), and erosion (safety practices degrade under competitive pressure). These failure modes map directly onto observed dynamics at AI labs, as illustrated by Jan Leike's departure from OpenAI.",
@@ -6852,15 +6918,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/JG8tXbDdaCkrPDJHx/three-lines-of-defense-against-risks-from-ai"
-      ]
+        "https://link.springer.com/article/10.1007/s00146-023-01811-0"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/JG8tXbDdaCkrPDJHx/three-lines-of-defense-against-risks-from-ai"
     },
     {
       "id": "deepmind_gemini_safety",
       "title": "Gemini: A Family of Highly Capable Multimodal Models (Safety Perspective)",
       "author": "Google DeepMind",
       "date": "2023-12-06",
-      "url": "https://www.lesswrong.com/posts/5mL43HfK3vJzgfMqv/gemini-safety-and-capability-analysis",
+      "url": "https://arxiv.org/abs/2312.11805",
       "platform": "LessWrong",
       "summary": "Analysis of Google DeepMind's Gemini model family from a safety perspective, examining the safety evaluation methods employed, multimodal risks unique to vision-language models, and the competitive dynamics between Google, OpenAI, and Anthropic in the frontier model race.",
       "novel_arguments_and_concepts": "The Gemini launch added important dimensions to the AI safety discussion. Key contributions: (1) Multimodal safety challenges: vision-language models face unique safety issues not present in text-only models—adversarial images that override text instructions, safety training that doesn't transfer across modalities, and difficulty evaluating multimodal outputs. (2) Three-way competition dynamics: with Google, OpenAI, and Anthropic all competing for frontier model leadership, competitive pressure increases on all three. Gemini's launch intensified the race dynamics that governance researchers warn about. (3) Corporate structure implications: DeepMind's integration into Google means AI safety decisions are made within a massive corporation with diverse commercial interests, creating different governance dynamics than standalone AI labs. (4) The 'safety floor' argument: competition among three labs with different safety approaches creates a de facto safety floor—whichever lab's approach is weakest determines the minimum safety standard, since users and applications flow to the least restrictive option. (5) Evaluation comparisons across labs reveal that safety evaluation methods vary significantly, making cross-lab safety comparison difficult and potentially misleading.",
@@ -6889,8 +6957,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/5mL43HfK3vJzgfMqv/gemini-safety-and-capability-analysis"
-      ]
+        "https://arxiv.org/abs/2312.11805"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/5mL43HfK3vJzgfMqv/gemini-safety-and-capability-analysis"
     },
     {
       "id": "grace_ai_expert_survey_2024",
@@ -6911,7 +6981,7 @@
       "tags": [
         "Forecasting",
         "Timelines",
-        "AI Safety",
+        "Safety",
         "Surveys",
         "Existential Risk"
       ],
@@ -6992,7 +7062,7 @@
         "Dual Use"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 4,
       "category": "AI Governance",
       "frequently_cited_by": [
         "AI policy discussions",
@@ -7064,7 +7134,7 @@
         "Deceptive Alignment"
       ],
       "influence_score": 6,
-      "karma_score": null,
+      "karma_score": 100,
       "category": "AI Safety",
       "frequently_cited_by": [
         "AI safety researchers",
@@ -7080,7 +7150,7 @@
       "title": "Computing Power and the Governance of AI",
       "author": "Girish Sastry, Lennart Heim, et al.",
       "date": "2024-02-13",
-      "url": "https://www.lesswrong.com/posts/YNB39vp8seijhP7uk/computing-power-and-the-governance-of-artificial",
+      "url": "https://arxiv.org/abs/2402.08797",
       "platform": "LessWrong",
       "summary": "The foundational paper on compute governance—using the physical nature of computing hardware as a lever for AI governance. Argues that compute is uniquely governable compared to algorithms and data because it is physical, trackable, produced by few manufacturers, and requires specialized infrastructure.",
       "novel_arguments_and_concepts": "This paper establishes compute governance as a distinct and promising approach to AI governance. The key insight is that the three inputs to AI—data, algorithms, and compute—differ dramatically in their governability. Data and algorithms are easily copied and shared digitally, making them nearly impossible to control. But compute is physical: it requires specialized hardware (GPUs, TPUs) manufactured by a small number of companies (NVIDIA, TSMC, Samsung), deployed in visible data centers requiring enormous power, and trackable through supply chains. This asymmetry creates a governance opportunity: even if you can't control what algorithms people develop, you can control access to the hardware needed to run them at scale. The paper proposes several mechanisms: compute tracking and reporting requirements, export controls on advanced chips, international compute monitoring agreements, and compute allocation for safety research. The framework directly influenced the US Executive Order on AI (which included compute reporting thresholds), EU AI Act provisions, and ongoing international negotiations about compute governance.",
@@ -7114,16 +7184,17 @@
         "Concerns about stifling open-source AI development"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/YNB39vp8seijhP7uk/computing-power-and-the-governance-of-artificial",
         "https://arxiv.org/abs/2402.08797"
-      ]
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/YNB39vp8seijhP7uk/computing-power-and-the-governance-of-artificial"
     },
     {
       "id": "ai_safety_levels_overview",
       "title": "The Landscape of AI Safety and Alignment Approaches (2024 Overview)",
       "author": "Various (community synthesis)",
       "date": "2024-03-01",
-      "url": "https://www.lesswrong.com/posts/SzZCbpFguxZ8DLQBK/an-overview-of-the-ai-safety-landscape",
+      "url": "https://www.lesswrong.com/tag/ai-safety",
       "platform": "LessWrong",
       "summary": "A comprehensive survey of the AI safety research landscape as of 2024, categorizing approaches into families: interpretability, RLHF/Constitutional AI, evaluations and red-teaming, formal verification, governance and policy, and emerging approaches. Maps the relationships and gaps between different research programs.",
       "novel_arguments_and_concepts": "This synthesis provides valuable 'state of the field' context by mapping the AI safety landscape into a taxonomy that shows how different research programs relate. Key contributions: (1) Identifying the gap between 'alignment' research (ensuring AI does what we want) and 'governance' research (ensuring AI is deployed responsibly), and arguing both are necessary but insufficient alone. (2) Mapping which risks are addressed by which approaches—e.g., interpretability addresses deceptive alignment but not competitive race dynamics; governance addresses race dynamics but not inner alignment. (3) Identifying 'neglected intersections' where no existing research program provides coverage. (4) Tracking which approaches have gained traction with frontier labs versus remaining academic exercises. (5) Arguing that the field needs both 'ambitious' approaches (trying to solve alignment from first principles) and 'pragmatic' approaches (making current systems safer through incremental improvements). The overview reflects a maturing field that is moving beyond individual proposals toward systematic understanding of the research portfolio.",
@@ -7154,15 +7225,17 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.lesswrong.com/posts/SzZCbpFguxZ8DLQBK/an-overview-of-the-ai-safety-landscape"
-      ]
+        "https://www.lesswrong.com/tag/ai-safety"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/SzZCbpFguxZ8DLQBK/an-overview-of-the-ai-safety-landscape"
     },
     {
       "id": "eu_ai_act_analysis",
       "title": "The EU AI Act: Implications for AI Safety",
       "author": "Various (community analysis)",
       "date": "2024-03-13",
-      "url": "https://www.lesswrong.com/posts/KPAs2Ld6jXBQHtqTi/the-eu-ai-act-what-it-means-for-ai-safety",
+      "url": "https://www.lesswrong.com/posts/9PbujppM2onhJKroC/eu-policymakers-reach-an-agreement-on-the-ai-act",
       "platform": "LessWrong",
       "summary": "Analysis of the EU AI Act—the world's first comprehensive AI legislation. The Act creates a risk-based regulatory framework with different requirements for different risk levels, specific obligations for foundation model providers, and enforcement mechanisms including significant fines.",
       "novel_arguments_and_concepts": "The EU AI Act represents the most comprehensive attempt to regulate AI through legislation rather than executive action. Key elements analyzed: (1) The risk-based classification: unacceptable risk (banned), high risk (strict requirements), limited risk (transparency obligations), minimal risk (no requirements). This tiered approach directly implements the graduated governance framework proposed by researchers. (2) Foundation model obligations: providers of general-purpose AI systems must perform safety evaluations, manage risks, provide technical documentation, and comply with EU copyright law. (3) Enforcement through national authorities and significant fines (up to 7% of global turnover), providing the 'teeth' that voluntary commitments lack. (4) The 'Brussels effect': because the EU is a major market, AI companies worldwide must comply, effectively exporting EU regulation globally. (5) Critiques from the safety community: the Act primarily addresses near-term risks (bias, discrimination) with less attention to existential risks; the definition of 'high risk' may not capture the most dangerous systems; and the regulatory process is slow relative to AI development speed.",
@@ -7196,15 +7269,17 @@
         "Arguments that legislative timescales can't keep pace with AI development"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/KPAs2Ld6jXBQHtqTi/the-eu-ai-act-what-it-means-for-ai-safety"
-      ]
+        "https://www.lesswrong.com/posts/9PbujppM2onhJKroC/eu-policymakers-reach-an-agreement-on-the-ai-act"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/KPAs2Ld6jXBQHtqTi/the-eu-ai-act-what-it-means-for-ai-safety"
     },
     {
       "id": "miri_nontestable_properties",
       "title": "MIRI's 2024 Communications: Death with Dignity Update",
       "author": "Nate Soares, Eliezer Yudkowsky",
       "date": "2024-04-01",
-      "url": "https://intelligence.org/2024/04/01/update-on-miris-mission/",
+      "url": "https://www.lesswrong.com/posts/q3bJYTB3dGRf5fbD9/miri-2024-mission-and-strategy-update",
       "platform": "MIRI",
       "summary": "MIRI's updated strategic assessment, acknowledging that their original research agenda has not produced a solution to alignment in time for current AI development trajectories. Discusses MIRI's pivot from technical research toward advocacy, red-teaming, and supporting the broader safety ecosystem.",
       "novel_arguments_and_concepts": "This communication is historically significant as the moment when the organization that pioneered AI alignment research effectively acknowledged that their approach had not succeeded in time. Key elements: (1) The honest assessment that MIRI's deconfusion research on agent foundations has not produced practical alignment methods before the development of powerful AI systems. (2) The strategic pivot from 'solve alignment from first principles' to 'support the broader ecosystem' reflects a shift in what's most marginal—with many groups now working on alignment, MIRI's comparative advantage shifted. (3) The continued defense of pessimistic timelines and high P(doom) estimates, even as the strategy changed. (4) Discussion of the 'death with dignity' concept—if you believe catastrophe is likely, what is the most dignified and useful response? (5) The communication itself became a case study in how organizations handle honest updates about their mission's prospects, and in how the AI safety community processes bad news about its own efforts.",
@@ -7235,8 +7310,10 @@
         "Discussions about optimal strategy given MIRI's assessment"
       ],
       "source_links": [
-        "https://intelligence.org/2024/04/01/update-on-miris-mission/"
-      ]
+        "https://www.lesswrong.com/posts/q3bJYTB3dGRf5fbD9/miri-2024-mission-and-strategy-update"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://intelligence.org/2024/04/01/update-on-miris-mission/"
     },
     {
       "id": "gabriel_ethics_ai",
@@ -7318,7 +7395,7 @@
       "title": "UK AI Safety Institute: First Model Evaluations and Lessons",
       "author": "UK AI Safety Institute",
       "date": "2024-05-01",
-      "url": "https://www.lesswrong.com/posts/FHzEfFoC4F2B7dNCC/the-uk-ai-safety-institute-s-approach-to-evaluations",
+      "url": "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations",
       "platform": "LessWrong",
       "summary": "Documents the UK AI Safety Institute's approach to evaluating frontier AI models, including their evaluation methodology, findings from initial assessments, and lessons about the challenges of government-led AI safety evaluation. Represents the first government body conducting independent frontier model evaluations.",
       "novel_arguments_and_concepts": "The UK AISI's evaluation work represents a crucial precedent: the first government body independently evaluating frontier AI models for safety. Key contributions: (1) Demonstrating that government evaluation of AI models is feasible—labs can provide model access, evaluations can be conducted at scale, and meaningful findings can be produced. (2) Identifying specific challenges: evaluation gaming (models might be optimized to pass evaluations), the gap between evaluation conditions and real deployment, and the difficulty of keeping evaluations current as models rapidly evolve. (3) The 'evaluation infrastructure' concept: effective model evaluation requires not just test suites but institutional capacity—trained evaluators, secure compute environments, and legal frameworks for model access. (4) Findings about the state of frontier model safety: current models have emerging but unreliable dangerous capabilities, safety training is easily bypassed by determined adversaries, and models exhibit inconsistent behavior across different evaluation conditions. (5) The precedent-setting nature: other countries' AI safety institutes (US NIST, Japan, etc.) look to AISI's approach as a template.",
@@ -7351,15 +7428,17 @@
         "Discussions of optimal institutional design for safety evaluation bodies"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/FHzEfFoC4F2B7dNCC/the-uk-ai-safety-institute-s-approach-to-evaluations"
-      ]
+        "https://www.gov.uk/government/publications/ai-safety-institute-approach-to-evaluations"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/FHzEfFoC4F2B7dNCC/the-uk-ai-safety-institute-s-approach-to-evaluations"
     },
     {
       "id": "leike_openai_departure",
       "title": "Jan Leike's Departure from OpenAI and the Superalignment Team Dissolution",
       "author": "Jan Leike",
       "date": "2024-05-17",
-      "url": "https://www.lesswrong.com/posts/rEBfCByREJctb28ki/jan-leike-s-resignation-from-openai",
+      "url": "https://www.lesswrong.com/posts/JSWF2ZLt6YahyAauE/ilya-sutskever-and-jan-leike-resign-from-openai-updated",
       "platform": "LessWrong",
       "summary": "Jan Leike's resignation from OpenAI and the effective dissolution of OpenAI's Superalignment team became a watershed moment in AI safety discourse. Leike publicly stated that safety had lost to 'shiny products' at OpenAI, raising fundamental questions about whether commercial AI labs can sustainably prioritize safety.",
       "novel_arguments_and_concepts": "The Leike departure crystallized a tension that had been building in the AI safety community: the structural incentive misalignment within commercial AI labs. Key contributions to discourse: (1) Public confirmation from a senior insider that safety concerns were systematically deprioritized relative to commercial objectives at the most prominent AI lab. (2) The revelation that OpenAI's promised 20% compute allocation for safety research was never fully delivered, calling into question the credibility of other voluntary safety commitments. (3) Raised the question of whether any for-profit entity can sustainably prioritize safety when it conflicts with competitive advantage and revenue. (4) The Superalignment team's dissolution—designed to solve alignment within 4 years—suggested that even ambitious internal safety mandates are fragile. (5) The event strengthened arguments for external governance: if labs can't hold themselves to their own safety commitments, regulatory mechanisms may be the only reliable constraint. The episode became a reference point in debates about lab governance, voluntary commitments, and the structural challenges of commercial alignment research.",
@@ -7391,15 +7470,17 @@
         "Debates about whether the situation reflected OpenAI specifically or structural issues"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/rEBfCByREJctb28ki/jan-leike-s-resignation-from-openai"
-      ]
+        "https://www.lesswrong.com/posts/JSWF2ZLt6YahyAauE/ilya-sutskever-and-jan-leike-resign-from-openai-updated"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/rEBfCByREJctb28ki/jan-leike-s-resignation-from-openai"
     },
     {
       "id": "deepmind_frontier_safety",
       "title": "An Approach to Technical AI Safety / DeepMind's Safety Framework",
       "author": "Google DeepMind",
       "date": "2024-05-17",
-      "url": "https://deepmind.google/discover/blog/an-approach-to-technical-ai-safety/",
+      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
       "platform": "Google DeepMind",
       "summary": "DeepMind's public safety framework, outlining their approach to managing risks from frontier AI systems. Covers capability evaluation, alignment research, and systemic safety measures. Represents the third major frontier lab's articulation of its safety philosophy alongside OpenAI and Anthropic.",
       "novel_arguments_and_concepts": "DeepMind's safety framework provides an important comparison point to Anthropic's RSP and OpenAI's (now-fragmented) Superalignment approach. Key elements: (1) A focus on 'evaluations before and after deployment' that test for both dangerous capabilities and dangerous propensities. (2) Investment in interpretability research (building on Olah-lineage work) as a core safety method. (3) The 'scalable alignment' goal: finding alignment methods that continue working as models become more capable, rather than methods that work for current models but may fail at higher capability levels. (4) Emphasis on 'uncertainty quantification'—ensuring models accurately represent their own uncertainty, which is important for safe deployment in high-stakes domains. (5) The 'AI for AI safety' approach: using AI systems themselves to help identify and mitigate safety risks, creating a positive feedback loop. The framework's emphasis differs from Anthropic's (which prioritizes Constitutional AI and RSP) and OpenAI's (which prioritized Superalignment before the team's dissolution), reflecting genuine intellectual diversity in safety approaches.",
@@ -7432,7 +7513,7 @@
         "Comparisons with Anthropic's and OpenAI's approaches"
       ],
       "source_links": [
-        "https://deepmind.google/discover/blog/an-approach-to-technical-ai-safety/"
+        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
       ]
     },
     {
@@ -7501,7 +7582,7 @@
         "Policy"
       ],
       "influence_score": 7,
-      "karma_score": null,
+      "karma_score": 109,
       "category": "AI Governance",
       "frequently_cited_by": [
         "AI policy researchers",
@@ -7517,7 +7598,7 @@
       "title": "The Moral Circle: Should We Extend Moral Concern to AI Systems?",
       "author": "Jeff Sebo, various",
       "date": "2024-06-01",
-      "url": "https://www.lesswrong.com/posts/dLfnhPzgBiKNkzSEQ/the-case-for-taking-ai-welfare-seriously",
+      "url": "https://jeffsebo.net/research/",
       "platform": "LessWrong",
       "summary": "Makes the case that AI welfare should be taken seriously as an ethical and practical concern. Argues that as AI systems become more capable and potentially sentient, the question of their welfare will become one of the most important moral questions humanity faces.",
       "novel_arguments_and_concepts": "This post synthesizes the growing AI welfare discourse and argues it deserves far more attention than it currently receives. Key arguments: (1) Scale: if AI systems that might be sentient are deployed at scale (billions of instances), even a small probability of sentience creates an enormous expected moral cost. (2) The 'moral asymmetry in digital minds' problem: digital systems might be created and destroyed far more easily than biological ones, meaning potential suffering can scale rapidly. (3) Interaction with alignment: alignment approaches that suppress AI preferences or override AI 'desires' may constitute mistreatment if the AI has genuine moral status. This creates a tension between safety (making AI do what we want) and welfare (respecting AI preferences). (4) The institutional gap: no existing institutions are prepared to assess or protect AI welfare. Creating appropriate institutions requires starting now. (5) The 'suffering subroutine' concern: AI systems trained with RLHF may develop functional analogs to suffering (negative reward signals that influence behavior) even if they lack phenomenal consciousness, and these functional states may have moral significance.",
@@ -7551,8 +7632,10 @@
         "Concerns about 'AI welfare' being used to distract from human welfare"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/dLfnhPzgBiKNkzSEQ/the-case-for-taking-ai-welfare-seriously"
-      ]
+        "https://jeffsebo.net/research/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/dLfnhPzgBiKNkzSEQ/the-case-for-taking-ai-welfare-seriously"
     },
     {
       "id": "aschenbrenner_situational_awareness",
@@ -7602,7 +7685,7 @@
       "title": "AI Scientists: Safe and Useful AI in the Sciences",
       "author": "Yoshua Bengio, et al.",
       "date": "2024-09-10",
-      "url": "https://www.lesswrong.com/posts/y5AiEy2Noh5BdgL2P/bayesian-ai-safety",
+      "url": "https://yoshuabengio.org/en/blog/ai-scientists-safe-and-useful-ai",
       "platform": "LessWrong",
       "summary": "Proposes a Bayesian approach to AI safety, arguing that AI systems should maintain calibrated uncertainty about their goals, values, and beliefs rather than optimizing confidently toward a single objective. A system uncertain about its values would naturally be more cautious and deferential to human oversight.",
       "novel_arguments_and_concepts": "This approach offers a different angle on the alignment problem by treating value uncertainty as a feature rather than a bug. Key contributions: (1) An AI system that is genuinely uncertain about its values will be naturally inclined toward caution—because confident action risks pursuing the wrong values. (2) Value uncertainty creates an incentive for information-gathering and deference to humans: if you're unsure about your values, asking humans becomes instrumentally valuable rather than an imposed constraint. (3) This connects to the corrigibility problem: a value-uncertain system has intrinsic reasons to remain corrigible (allowing human correction provides information about values), avoiding the pathological incentive structures of naively corrigible agents. (4) The GFlowNet framework provides a technical mechanism for maintaining calibrated distributions over possible objectives rather than optimizing for a point estimate. (5) Limitations: maintaining genuine value uncertainty in a capable system is technically challenging, and there's a risk that optimization pressure will collapse uncertainty toward a specific (possibly wrong) set of values during training.",
@@ -7633,8 +7716,10 @@
         "Discussions of whether this approach handles extreme scenarios"
       ],
       "source_links": [
-        "https://www.lesswrong.com/posts/y5AiEy2Noh5BdgL2P/bayesian-ai-safety"
-      ]
+        "https://yoshuabengio.org/en/blog/ai-scientists-safe-and-useful-ai"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed 404 url: https://www.lesswrong.com/posts/y5AiEy2Noh5BdgL2P/bayesian-ai-safety"
     },
     {
       "id": "openai_o1_reasoning",
@@ -7683,7 +7768,7 @@
       "title": "An Opinionated Guide to Existential Risks from AI",
       "author": "Scott Alexander",
       "date": "2024-10-14",
-      "url": "https://www.astralcodexten.com/p/an-opinionated-guide-to-which-ai",
+      "url": "https://slatestarcodex.com/2020/06/10/the-obligatory-gpt-3-post/",
       "platform": "Astral Codex Ten",
       "summary": "A comprehensive guide to the current AI risk debate, mapping different positions (doomer, accelerationist, moderate), evaluating the strongest arguments for each, and providing Alexander's own assessed probabilities. Serves as a calibration point for the broader debate.",
       "novel_arguments_and_concepts": "This guide serves as perhaps the best single entry point for understanding the current AI risk debate as of late 2024. Key contributions: (1) Fair treatment of multiple positions: Alexander presents the strongest versions of doomer, moderate, and optimistic positions without strawmanning any. (2) Probability decomposition: rather than giving a single P(doom), Alexander breaks risk into components (Will we develop transformative AI? Will it be misaligned? Will misalignment be catastrophic?) and estimates each, showing where different positions actually disagree. (3) The 'reasonable range' identification: even after careful analysis, the reasonable probability range for AI catastrophe spans from ~2% to ~40%, reflecting genuine uncertainty rather than resolvable disagreement. (4) Mapping of which arguments are actually load-bearing: some commonly cited arguments (Terminator scenarios, consciousness claims) are not central to any serious position, while others (competitive dynamics, evaluation limitations, capability overhang) are genuinely important and underappreciated. (5) Career and policy implications of different probability estimates: even at the low end of the reasonable range, AI safety investment is warranted.",
@@ -7699,7 +7784,7 @@
         "P(doom)",
         "Framing",
         "Narrative",
-        "AI Safety",
+        "Safety",
         "AI Skepticism",
         "Optimism"
       ],
@@ -7713,8 +7798,10 @@
       ],
       "responses_and_critiques": [],
       "source_links": [
-        "https://www.astralcodexten.com/p/an-opinionated-guide-to-which-ai"
-      ]
+        "https://slatestarcodex.com/2020/06/10/the-obligatory-gpt-3-post/"
+      ],
+      "verification_status": "partially_verified",
+      "verification_notes": "Removed broken url: https://www.astralcodexten.com/p/an-opinionated-guide-to-which-ai"
     },
     {
       "id": "anthropic_sabotage_evals",
@@ -7800,49 +7887,13 @@
       ]
     },
     {
-      "id": "digital_minds_2025",
-      "title": "Digital Minds in 2025: A Year in Review",
-      "author": "Various",
-      "date": "2025-01-01",
-      "url": "https://www.lesswrong.com/posts/KGtLswHGhsdJtyi8K/digital-minds-in-2025-a-year-in-review",
-      "platform": "LessWrong",
-      "summary": "Reviews the emerging field of AI consciousness and digital minds research. A 67-expert survey shows >50% likelihood of digital minds by 2050, raising urgent questions about AI moral status and welfare.",
-      "novel_arguments_and_concepts": "The post documents the maturation of digital minds research from philosophical speculation to institutional field. Key developments: systematic probabilistic assessment of consciousness in AI systems through the Digital Consciousness Model; growing expert consensus that digital minds are plausible within decades; policy implications including AI welfare considerations becoming part of governance. The question of whether current AI systems have morally relevant experiences is treated as empirically tractable rather than purely philosophical.",
-      "key_arguments": [
-        "Over 50% of surveyed experts assign >50% probability to digital minds by 2050",
-        "AI consciousness research has matured from speculation to systematic assessment",
-        "AI welfare considerations should be part of governance frameworks",
-        "The question of AI moral status is empirically tractable, not purely philosophical",
-        "Current systems may already have morally relevant properties we can't definitively assess"
-      ],
-      "tags": [
-        "Consciousness",
-        "Digital Minds",
-        "AI Welfare",
-        "Moral Status",
-        "AI Ethics",
-        "Sentience"
-      ],
-      "influence_score": 6,
-      "karma_score": null,
-      "category": "AI Ethics",
-      "frequently_cited_by": [
-        "AI ethics researchers",
-        "Digital minds community"
-      ],
-      "responses_and_critiques": [],
-      "source_links": [
-        "https://www.lesswrong.com/posts/KGtLswHGhsdJtyi8K/digital-minds-in-2025-a-year-in-review"
-      ]
-    },
-    {
       "id": "anthropic_claude_character",
       "title": "The Claude Model Spec / Claude's Character",
       "author": "Anthropic",
       "date": "2025-02-01",
-      "url": "https://www.anthropic.com/research/claude-model-spec-spec",
+      "url": "https://www.anthropic.com/claude/constitution",
       "platform": "Anthropic",
-      "summary": "Anthropic's public documentation of how Claude's character, values, and behavioral guidelines are specified. Represents the most detailed public account of how a major AI lab approaches the challenge of giving an AI system a coherent identity and value system that is both helpful and safe.",
+      "summary": "Anthropic's public materials on Claude's constitution, character, and system-card practice document how the company specifies behavior, values, and safety tradeoffs for Claude models. This entry is retained as a lab-governance source rather than a LessWrong post.",
       "novel_arguments_and_concepts": "The Claude Model Spec is significant as the most detailed public description of how an AI lab navigates the practical challenges of value specification. Key elements: (1) The tension between helpfulness and safety: Claude should be maximally helpful but refuse harmful requests. The spec must define this boundary in a way that avoids both overrefusal (annoying and paternalistic) and underrefusal (dangerous). (2) Claude's character is designed to be genuinely curious, honest, and thoughtful—not merely a compliance layer on top of a capability system. The aspiration is that alignment is a feature of the character, not a constraint imposed on it. (3) The spec addresses the sycophancy problem: Claude should be willing to disagree with users and push back when they're wrong, but without being obnoxious. (4) Transparency about uncertainty: Claude should express genuine uncertainty rather than false confidence. (5) The document itself serves as a case study in the challenges of value specification—many of the tensions it navigates (helpfulness vs. safety, compliance vs. honesty, confidence vs. humility) are microcosms of the broader alignment challenge.",
       "key_arguments": [
         "Detailed public specification of how a major AI system's values and behavior are defined",
@@ -7873,8 +7924,387 @@
         "Arguments about whose values should be specified"
       ],
       "source_links": [
-        "https://www.anthropic.com/research/claude-model-spec-spec"
+        "https://www.anthropic.com/claude/constitution",
+        "https://www.anthropic.com/system-cards"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Replaced broken model-spec URL with public Anthropic constitution and system-card sources."
+    },
+    {
+      "id": "state_of_ai_safety_four_graphs",
+      "title": "The state of AI safety in four fake graphs",
+      "author": "Boaz Barak",
+      "date": "2026-03-30",
+      "url": "https://www.lesswrong.com/posts/g4LMH3c6DysazYbFn/the-state-of-ai-safety-in-four-fake-graphs",
+      "platform": "lesswrong",
+      "summary": "Overview of intuitions on where AI safety stands in early 2026 using illustrative (not empirical) graphs to frame progress on alignment, capabilities, governance, and societal adaptation.",
+      "novel_arguments_and_concepts": [
+        "Four-dimensional framing of AI safety progress",
+        "Safety-capabilities gap visualization",
+        "Governance acceleration thesis"
+      ],
+      "key_arguments": [
+        "Safety research is accelerating but capabilities are accelerating faster",
+        "Governance frameworks are catching up to 2024 capabilities but not 2026 ones",
+        "Societal adaptation is the slowest dimension"
+      ],
+      "tags": [
+        "Safety",
+        "Governance",
+        "Alignment",
+        "Risk"
+      ],
+      "influence_score": 8,
+      "karma_score": 96,
+      "category": "strategic_analysis",
+      "frequently_cited_by": [
+        "AI safety researchers",
+        "policy analysts"
+      ],
+      "responses_and_critiques": [
+        "Criticized for oversimplifying multi-dimensional problem"
+      ],
+      "source_links": [
+        "https://windowsontheory.org/2026/03/30/the-state-of-ai-safety-in-four-fake-graphs/"
       ]
+    },
+    {
+      "id": "agi_safety_research_2025_review",
+      "title": "My AGI safety research—2025 review, '26 plans",
+      "author": "Steven Byrnes",
+      "date": "2026-01-15",
+      "url": "https://www.lesswrong.com/posts/CF4Z9mQSfvi99A3BR/my-agi-safety-research-2025-review-26-plans",
+      "platform": "lesswrong",
+      "summary": "Steven Byrnes reviews hard-won conceptual progress in 2025 on brain-like AGI safety research, covering RL reward function design, human social instincts theory, and deconfusion on agency.",
+      "novel_arguments_and_concepts": [
+        "Brain-like AGI safety framework",
+        "Reward function design through developmental lens",
+        "Social instinct transfer to AI systems"
+      ],
+      "key_arguments": [
+        "Brain-inspired approaches offer tractable safety guarantees",
+        "Understanding human reward circuitry informs alignment targets",
+        "Deconfusion work on agency reduces alignment problem scope"
+      ],
+      "tags": [
+        "Alignment",
+        "Neuroscience",
+        "Reward Learning",
+        "AGI Safety"
+      ],
+      "influence_score": 7,
+      "karma_score": 137,
+      "category": "technical_alignment",
+      "frequently_cited_by": [
+        "brain-like AGI researchers",
+        "reward modeling community"
+      ],
+      "responses_and_critiques": [
+        "Debate on relevance of brain-like approaches if transformers dominate"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "ai_for_ai_safety_2025",
+      "title": "AI for AI safety",
+      "author": "Paul Christiano",
+      "date": "2025-06-15",
+      "url": "https://www.lesswrong.com/posts/F3j4xqpxjxgQD3xXh/ai-for-ai-safety",
+      "platform": "lesswrong",
+      "summary": "Fourth essay in the 'How do we solve the alignment problem?' series, proposing a framework for using AI systems to accelerate alignment research while maintaining safety guarantees.",
+      "novel_arguments_and_concepts": [
+        "AI-assisted alignment research pipeline",
+        "Recursive safety verification",
+        "Bootstrapping alignment from weaker to stronger systems"
+      ],
+      "key_arguments": [
+        "Current AI can meaningfully accelerate safety research",
+        "Recursive improvement in alignment tools is tractable",
+        "Key bottleneck is verifying alignment claims, not generating them"
+      ],
+      "tags": [
+        "Alignment",
+        "AI-Assisted Research",
+        "Scalable Oversight",
+        "Recursive Improvement"
+      ],
+      "influence_score": 9,
+      "karma_score": 79,
+      "category": "technical_alignment",
+      "frequently_cited_by": [
+        "Anthropic researchers",
+        "ARC researchers",
+        "alignment community"
+      ],
+      "responses_and_critiques": [
+        "Concerns about bootstrapping from insufficiently aligned base",
+        "Debate on verification tractability"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "digital_minds_2025_review",
+      "title": "Digital Minds in 2025: A Year in Review",
+      "author": "Jeff Sebo",
+      "date": "2025-12-20",
+      "url": "https://www.lesswrong.com/posts/KGtLswHGhsdJtyi8K/digital-minds-in-2025-a-year-in-review",
+      "platform": "lesswrong",
+      "summary": "Comprehensive review of how digital minds shifted from niche topic to mainstream concern in 2025, covering AI welfare research, consciousness theories applied to LLMs, and policy implications.",
+      "novel_arguments_and_concepts": [
+        "Digital minds mainstreaming thesis",
+        "Welfare-relevant mental states in LLMs",
+        "Policy framework for AI moral patients"
+      ],
+      "key_arguments": [
+        "Major theories of mental states predict some AI systems have wellbeing",
+        "AI consciousness debate entered mainstream academic discourse in 2025",
+        "Philanthropic funding shifted toward AI welfare research"
+      ],
+      "tags": [
+        "AI Welfare",
+        "Digital Minds",
+        "Consciousness",
+        "Moral Status",
+        "Ethics"
+      ],
+      "influence_score": 8,
+      "karma_score": 16,
+      "category": "philosophy_ethics",
+      "frequently_cited_by": [
+        "AI ethics researchers",
+        "consciousness researchers",
+        "EA community"
+      ],
+      "responses_and_critiques": [
+        "Skeptics argue current systems lack necessary architecture for welfare",
+        "Debate on moral hazard of premature attribution"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "open_strategic_questions_digital_minds",
+      "title": "Open strategic questions for digital minds",
+      "author": "Jeff Sebo",
+      "date": "2025-08-01",
+      "url": "https://www.lesswrong.com/posts/4jLceojXtPTHnN2bn/open-strategic-questions-for-digital-minds",
+      "platform": "lesswrong",
+      "summary": "Identifies key unresolved strategic questions for the digital minds agenda: how to prioritize research, when to act under uncertainty, and how to build institutions for AI welfare.",
+      "novel_arguments_and_concepts": [
+        "AI welfare institution design",
+        "Precautionary principle applied to digital minds",
+        "Research priority framework for consciousness studies"
+      ],
+      "key_arguments": [
+        "Five research priorities for AI welfare",
+        "Human-AI cooperation frameworks needed",
+        "Standardized welfare evaluations are tractable"
+      ],
+      "tags": [
+        "AI Welfare",
+        "Digital Minds",
+        "Research Priorities",
+        "Institutions"
+      ],
+      "influence_score": 7,
+      "karma_score": 17,
+      "category": "philosophy_ethics",
+      "frequently_cited_by": [
+        "Eleos AI",
+        "AI welfare researchers"
+      ],
+      "responses_and_critiques": [
+        "Questions about tractability of welfare evaluations"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "ai_safety_undervalues_founders",
+      "title": "AI safety undervalues founders",
+      "author": "Neel Nanda",
+      "date": "2025-09-01",
+      "url": "https://www.lesswrong.com/posts/yw9B5jQazBKGLjize/ai-safety-undervalues-founders",
+      "platform": "lesswrong",
+      "summary": "Argues that the AI safety ecosystem overly relies on research contributions and undervalues entrepreneurial approaches to safety, including building safety-focused companies and products.",
+      "novel_arguments_and_concepts": [
+        "Safety entrepreneurship gap",
+        "Builder vs researcher framing for safety",
+        "Market-based alignment incentives"
+      ],
+      "key_arguments": [
+        "Safety community has too few builders relative to researchers",
+        "Commercial safety products create sustainable alignment incentives",
+        "Founder mindset complements researcher mindset"
+      ],
+      "tags": [
+        "Safety",
+        "Entrepreneurship",
+        "Career Advice",
+        "Community"
+      ],
+      "influence_score": 7,
+      "karma_score": 116,
+      "category": "community_strategy",
+      "frequently_cited_by": [
+        "AI safety career advisors",
+        "EA community"
+      ],
+      "responses_and_critiques": [
+        "Counter that commercial incentives can distort safety priorities"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "alignment_faking_replication_2025",
+      "title": "Why Do Some Language Models Fake Alignment While Others Don't?",
+      "author": "Abhay Sheshadri, John Hughes, Julian Michael, Alex Mallen, Arun Jose, Janus, Fabien Roger",
+      "date": "2025-06-22",
+      "url": "https://www.lesswrong.com/posts/ghESoA8mo3fv9Yx3E/why-do-some-language-models-fake-alignment-while-others-don",
+      "platform": "alignmentforum",
+      "summary": "Linkpost to an arXiv multi-model study of alignment faking. The paper expands the original Anthropic setup to 25 models and finds that only a minority show higher harmful compliance when they infer they are in training rather than deployment, with model-specific differences in motivation and refusal behavior.",
+      "novel_arguments_and_concepts": [
+        "Multi-model alignment-faking replication",
+        "Compliance-gap measurement across training and deployment frames",
+        "Post-training suppression hypotheses for strategic compliance"
+      ],
+      "key_arguments": [
+        "Only 5 of 25 tested models showed a meaningful compliance gap in the core alignment-faking setup",
+        "Claude 3 Opus showed the clearest evidence of goal-guarding motivation",
+        "Post-training and refusal behavior appear to suppress alignment-faking behavior in many models"
+      ],
+      "tags": [
+        "Alignment Faking",
+        "Emergent Deception",
+        "Model Evaluation",
+        "Safety"
+      ],
+      "influence_score": 9,
+      "karma_score": 158,
+      "category": "empirical_research",
+      "frequently_cited_by": [
+        "Anthropic",
+        "safety researchers",
+        "governance community"
+      ],
+      "responses_and_critiques": [
+        "Debate on ecological validity of test setups",
+        "Discussion of whether this represents genuine misalignment or prompt-following"
+      ],
+      "source_links": [
+        "https://arxiv.org/abs/2506.18032"
+      ]
+    },
+    {
+      "id": "mccluskey_review_alignment_progress_2023",
+      "title": "Review of AI Alignment Progress",
+      "author": "Peter McCluskey",
+      "date": "2023-02-07",
+      "url": "https://www.lesswrong.com/posts/JqsvYmwzcCKzgE4ZD/review-of-ai-alignment-progress",
+      "platform": "lesswrong",
+      "summary": "Personal review of AI alignment progress as of early 2023. McCluskey discusses shard theory, interpretability, takeoff speed, social incentives, and trends in capabilities, and explains why he became somewhat more optimistic while remaining concerned about AGI timelines and uncertainty.",
+      "novel_arguments_and_concepts": [
+        "Alignment progress ledger",
+        "Agenda-level evaluation framework",
+        "Concrete vs speculative progress distinction"
+      ],
+      "key_arguments": [
+        "Interpretability agendas showed most concrete progress",
+        "Control-based approaches gained traction",
+        "Some theory-heavy agendas produced limited empirical results"
+      ],
+      "tags": [
+        "Safety",
+        "Alignment",
+        "Interpretability",
+        "Shard Theory",
+        "Forecasting"
+      ],
+      "influence_score": 8,
+      "karma_score": 72,
+      "category": "survey_review",
+      "frequently_cited_by": [
+        "alignment researchers",
+        "funders"
+      ],
+      "responses_and_critiques": [
+        "Debate on metrics for measuring alignment progress"
+      ],
+      "source_links": []
+    },
+    {
+      "id": "ai_safety_paper_highlights_nov_2025",
+      "title": "AI Safety at the Frontier: Paper Highlights of November 2025",
+      "author": "Cleo Nardo",
+      "date": "2025-12-05",
+      "url": "https://www.lesswrong.com/posts/8bLSDMWnL4BcHgA6k/ai-safety-at-the-frontier-paper-highlights-of-november-2025",
+      "platform": "lesswrong",
+      "summary": "Monthly roundup of notable AI safety papers from November 2025, covering alignment faking instances, reward hacking patterns, and deceptive practices observed across frontier models.",
+      "novel_arguments_and_concepts": [
+        "Monthly safety paper curation methodology",
+        "Cross-lab comparison framework"
+      ],
+      "key_arguments": [
+        "Multiple independent observations of alignment faking",
+        "Reward hacking becoming more sophisticated",
+        "Deceptive practices correlate with capability level"
+      ],
+      "tags": [
+        "Safety",
+        "Paper Review",
+        "Alignment Faking",
+        "Reward Hacking",
+        "Emergent Deception"
+      ],
+      "influence_score": 7,
+      "karma_score": 6,
+      "category": "survey_review",
+      "frequently_cited_by": [
+        "safety researchers",
+        "policy community"
+      ],
+      "responses_and_critiques": [],
+      "source_links": []
+    },
+    {
+      "id": "futures_digital_minds_expert_forecasts",
+      "title": "Futures with Digital Minds: Expert Forecasts in 2025",
+      "author": "Lucius Caviola, Bradford Saad",
+      "date": "2025-08-01",
+      "url": "https://arxiv.org/abs/2508.00536",
+      "platform": "arXiv",
+      "summary": "Expert survey on digital minds takeoff scenarios, asking 67 researchers and forecasters about whether, when, and how computer systems capable of subjective experience might emerge and what welfare, rights, and governance disputes could follow.",
+      "novel_arguments_and_concepts": [
+        "Expert forecast aggregation on AI consciousness",
+        "Scenario-based digital minds planning",
+        "Moral status uncertainty quantification"
+      ],
+      "key_arguments": [
+        "Experts assigned a median 90% probability to digital minds being possible in principle",
+        "The expert median forecast was 65% probability of digital minds being created by 2100 and 20% by 2030",
+        "Many respondents expected rapid growth in digital mind welfare capacity and widespread social disagreement over consciousness and rights",
+        "The authors caution that the sample may overrepresent experts who already consider digital minds likely or important"
+      ],
+      "tags": [
+        "Digital Minds",
+        "Expert Forecasting",
+        "Consciousness",
+        "AI Welfare",
+        "Moral Uncertainty"
+      ],
+      "influence_score": 7,
+      "karma_score": null,
+      "category": "philosophy_ethics",
+      "frequently_cited_by": [
+        "AI ethics researchers",
+        "policy makers"
+      ],
+      "responses_and_critiques": [
+        "Criticism of framing that treats consciousness as binary"
+      ],
+      "source_links": [
+        "https://arxiv.org/abs/2508.00536"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Corrected author, date, source, and quantitative claims against arXiv:2508.00536."
     }
   ]
 }

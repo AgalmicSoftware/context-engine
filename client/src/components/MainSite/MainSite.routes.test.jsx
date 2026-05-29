@@ -755,6 +755,25 @@ describe('MainSite route render smoke', () => {
     expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-network-id', '84532');
   });
 
+  it('does not expose the private Telegram demo setup route', async () => {
+    const subject = createSubject({
+      path: '/telegram-demo-setup',
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByText('Page not found')).toBeInTheDocument();
+    expect(screen.getByText(/This URL is not part of the supported public surface/i)).toBeInTheDocument();
+    expect(screen.getByText((_, node) => node?.textContent === 'Path: /telegram-demo-setup')).toBeInTheDocument();
+  });
+
   it.each([
     ['/debate', /Debate view is not part of the supported public surface yet\./i],
   ])('renders the experimental stub for %s without waiting for cache bootstrap', async (path, descriptionMatcher) => {
@@ -827,6 +846,21 @@ describe('MainSite route render smoke', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).not.toBeInTheDocument();
     expect(mockOnePageSession).not.toHaveBeenCalled();
   });
+
+  it.each(['/atlas-old', '/surveys-old', '/questions-old', '/foo/question/abc'])(
+    'renders a clean 404 for invalid lookalike route %s',
+    async (path) => {
+      const subject = createSubject({ path });
+
+      render(subject.render());
+
+      expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SURVEYS_ROOT)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_QUESTIONS_ROOT)).not.toBeInTheDocument();
+      expect(mockSurveyPage).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['/compare', '/compare/'])('renders the compare route root for %s', async (path) => {
     const subject = createSubject({ path });
@@ -1003,6 +1037,14 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Signals Session');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
+  });
+
+  it('resolves PUBLIC_URL-prefixed SBT detail paths during route reinitialization', () => {
+    process.env.PUBLIC_URL = '/ce/';
+    const sbtAddress = '0x1234567890abcdef1234567890abcdef12345678';
+    const subject = createSubject({ path: `/ce/group/${sbtAddress}` });
+
+    expect(subject.getSbtAddressFromPath(`/ce/group/${sbtAddress}`)).toBe(sbtAddress);
   });
 
   it('renders the session route with explicit demo-session metadata when strict shared config misses', async () => {

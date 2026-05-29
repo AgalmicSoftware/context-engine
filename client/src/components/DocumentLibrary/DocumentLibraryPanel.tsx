@@ -1185,8 +1185,8 @@ export default function DocumentLibraryPanel({
       : buildDocLibraryPlaintextFileMetaTags({ name: file.name, mime: file.type, size: file.size });
     const tags = resolveAssociationTags({ kind: 'file', storage, plaintextMeta });
 
-    // Session doc library requires sessionIdHex to index; do not silently upload unindexed docs.
-    if (mode === 'session' && !normalizedSessionIdHex) {
+    // Arweave-backed session docs require sessionIdHex tags; Cloudflare storage is session-slug scoped.
+    if (isArweaveBackedDocProvider && mode === 'session' && !normalizedSessionIdHex) {
       setError('Session ID is unavailable; cannot upload session docs.');
       return;
     }
@@ -1285,6 +1285,7 @@ export default function DocumentLibraryPanel({
     }
   }, [
     docProvider,
+    isArweaveBackedDocProvider,
     isUploadableDocProvider,
     requiresLitDocumentStorage,
     file,
@@ -1349,7 +1350,7 @@ export default function DocumentLibraryPanel({
       : buildDocLibraryPlaintextFileMetaTags({ name: record.title || record.url, mime: 'application/json', size: '' });
     const tags = resolveAssociationTags({ kind: 'link', storage, plaintextMeta });
 
-    if (mode === 'session' && !normalizedSessionIdHex) {
+    if (isArweaveBackedDocProvider && mode === 'session' && !normalizedSessionIdHex) {
       setError('Session ID is unavailable; cannot upload session docs.');
       return;
     }
@@ -1461,6 +1462,7 @@ export default function DocumentLibraryPanel({
     }
   }, [
     docProvider,
+    isArweaveBackedDocProvider,
     isUploadableDocProvider,
     requiresLitDocumentStorage,
     urlInput,

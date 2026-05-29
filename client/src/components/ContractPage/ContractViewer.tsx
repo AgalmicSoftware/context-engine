@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCopy } from '@fortawesome/free-solid-svg-icons';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
@@ -326,27 +325,6 @@ const ContractViewer = ({
       )}
     </div>
   );
-};
-
-ContractViewer.propTypes = {
-  contracts: PropTypes.arrayOf(PropTypes.shape({
-    key: PropTypes.string.isRequired,
-    name: PropTypes.string.isRequired,
-    explainer: PropTypes.string,
-    sourceFile: PropTypes.string,
-    source: PropTypes.string,
-    extraAction: PropTypes.node,
-    addresses: PropTypes.arrayOf(PropTypes.shape({
-      address: PropTypes.string.isRequired,
-      id: PropTypes.number,
-      testnet: PropTypes.bool,
-      explorerUrl: PropTypes.string,
-    })),
-  })),
-  variant: PropTypes.oneOf(['full', 'compact']),
-  autoOpenContractKey: PropTypes.string,
-  renderSourceHeaderActions: PropTypes.func,
-  onClose: PropTypes.func,
 };
 
 export default ContractViewer;

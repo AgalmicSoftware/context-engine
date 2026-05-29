@@ -227,6 +227,7 @@ describe('PolisReport cache read options', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+      expect(screen.getByText('Summary and Statistics')).toHaveClass('sectionHeader', 'sectionTitle');
       expect(screen.getByText('OP Sepolia (11155420)')).toBeInTheDocument();
     });
   });
@@ -356,7 +357,7 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.POLIS_REPORT_LOADING_PROGRESS)).not.toBeInTheDocument();
   });
 
-  it('reads question and SBT caches across list scope on session routes when applying filters', () => {
+  it('keeps question and SBT cache reads scoped to the session route when applying filters', () => {
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
     try {
@@ -396,15 +397,13 @@ describe('PolisReport cache read options', () => {
         'edge'
       );
 
-      expect(out).toEqual({
-        q2: [{ responder: '0xAbC', questionId: 'q2', response: { answer: { value: 'yes' } } }],
-      });
+      expect(out).toEqual({});
       expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
         'questionsCache',
         'edge',
         { clone: false }
       );
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
         'questionsCache',
         'alpha',
         { clone: false }
@@ -414,7 +413,7 @@ describe('PolisReport cache read options', () => {
         'edge',
         { clone: false }
       );
-      expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith(
+      expect(cacheScripts.peekCacheSync).not.toHaveBeenCalledWith(
         'sbtCache',
         'alpha',
         { clone: false }
@@ -533,10 +532,11 @@ describe('PolisReport demo data defaults', () => {
   });
 
   it('shows the demo data toggle as enabled by default for the demo slug', () => {
-    render(<PolisReport {...baseReportProps} slug="demo" />);
+    const { container } = render(<PolisReport {...baseReportProps} slug="demo" />);
 
     openSettingsRow();
 
+    expect(container.querySelector('.settingsRow')).toHaveClass('pdfIgnore');
     expect(screen.getByTestId(E2E_TESTIDS.POLIS_DEMO_DATA_TOGGLE)).toBeChecked();
   });
 

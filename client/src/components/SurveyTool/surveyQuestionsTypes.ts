@@ -1,5 +1,11 @@
 import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes.js';
+import {
+  buildQuestionScanProgressDisplay,
+  doesQuestionProgressMatchSlug,
+  normalizeQuestionProgressSlug,
+} from './surveyToolViewState.js';
 
 export type SurveyQuestionsProps = UnknownRecord & {
   displayAnswerMode?: boolean;
@@ -19,6 +25,84 @@ export type SurveyQuestionPoolLoadState = {
   pendingIds: string[];
   pendingCount: number;
   isIncomplete: boolean;
+};
+
+type SurveyQuestionsQuestionScanProgress = {
+  slug?: unknown;
+  phase?: unknown;
+  discoveredQuestions?: unknown;
+  hydratedQuestions?: unknown;
+  totalBlocks?: unknown;
+  requestedTotalBlocks?: unknown;
+  wasCapped?: boolean;
+  scannedBlocks?: unknown;
+  remainingBlocks?: unknown;
+} | null;
+
+export type SurveyQuestionsFullLoadingProgressState = {
+  questionScanProgress: SurveyQuestionsQuestionScanProgress;
+  scanProgressDisplay: ReturnType<typeof buildQuestionScanProgressDisplay>;
+  hydrateDiscovered: number;
+  hydrateDone: number;
+  isHydrating: boolean;
+  hasFullLoadingProgress: boolean;
+  metaLeftText: string;
+  metaRightText: string;
+  fillStyle: { width: string };
+};
+
+export type SurveyQuestionsJsonPanelDisplayState = {
+  showQuestionJsonControls: boolean;
+  showSurveyJsonPanel: boolean;
+  showQuestionsJsonPanel: boolean;
+  showResponseJsonPanel: boolean;
+  surveyJsonRowClassName: string | undefined;
+  surveyJsonToggleClassName: string | undefined;
+  questionJsonToggleClassName: string | undefined;
+  responseJsonToggleClassName: string | undefined;
+  surveyJsonPanelClassName: string | undefined;
+};
+
+export type SurveyQuestionsJsonForDisplayState = {
+  jsonForDisplay: unknown;
+};
+
+export type SurveyQuestionsLayoutDisplayState = {
+  activeTagModalTag: string;
+  responseViewClassName: string | undefined;
+  surveyPageClassName: string | undefined;
+  topSectionClassName: string | undefined;
+  useTagModal: boolean;
+};
+
+export type SurveyQuestionsRouteViewDisplayState = {
+  viewedAddressRaw: string;
+  viewedAddressLower: string;
+  shortenedViewAddress: string;
+  isOwnResponse: unknown;
+  isSingleQuestionView: unknown;
+  showViewAnswersButton: unknown;
+  viewAnswersButtonText: string;
+};
+
+export type SurveyQuestionsSubmitFooterDisplayState = {
+  submittedStateActive: boolean;
+  submittedIndicatorActive: boolean;
+  singleQuestionSubmittedIndicatorActive: boolean;
+  showSubmitAux: boolean;
+  uploadStatusText: string;
+  submitDisabled: boolean;
+  canEditQuestions: boolean;
+  hasPendingEdits: boolean;
+  genericShowInlineSubmit: boolean;
+  showInlineSubmit: boolean;
+  showTopInlineSubmit: boolean;
+};
+
+export type SurveyQuestionsPrimarySubmitPlan = {
+  action: 'inert' | 'navigate' | 'submit';
+  reason: string;
+  path: string;
 };
 
 export type SurveyAutoDecryptDisabledStatePatch = {
@@ -593,12 +677,391 @@ export const buildSurveyQuestionsFullLoadingProgressFillStyle = ({
     : scanPercent}%`,
 });
 
+export const buildSurveyQuestionsFullLoadingProgressState = ({
+  questionScanProgress = null,
+  progressSlug = '',
+}: {
+  questionScanProgress?: SurveyQuestionsQuestionScanProgress;
+  progressSlug?: unknown;
+} = {}): SurveyQuestionsFullLoadingProgressState => {
+  const normalizedProgressSlug = normalizeQuestionProgressSlug(String(progressSlug || ''));
+  const matchedProgress = questionScanProgress &&
+    doesQuestionProgressMatchSlug(String(questionScanProgress.slug || ''), normalizedProgressSlug)
+    ? questionScanProgress
+    : null;
+  const scanProgressDisplay = buildQuestionScanProgressDisplay(matchedProgress);
+  const hydrateDiscovered = Math.max(0, Number(matchedProgress?.discoveredQuestions || 0));
+  const hydrateDone = Math.max(0, Number(matchedProgress?.hydratedQuestions || 0));
+  const isHydrating = matchedProgress?.phase === 'hydrate';
+  const hasFullLoadingProgress = (scanProgressDisplay.requestedTotalBlocks > 0) || isHydrating;
+  const hydrateDoneClamped = Math.min(hydrateDone, hydrateDiscovered);
+
+  return {
+    questionScanProgress: matchedProgress,
+    scanProgressDisplay,
+    hydrateDiscovered,
+    hydrateDone,
+    isHydrating,
+    hasFullLoadingProgress,
+    metaLeftText: isHydrating
+      ? `${Math.max(0, hydrateDiscovered - hydrateDoneClamped)} items left`
+      : scanProgressDisplay.metaLeftText,
+    metaRightText: isHydrating
+      ? `${hydrateDoneClamped} / ${hydrateDiscovered}`
+      : scanProgressDisplay.metaRightText,
+    fillStyle: buildSurveyQuestionsFullLoadingProgressFillStyle({
+      hydrateDiscovered,
+      hydrateDone,
+      isHydrating,
+      scanPercent: scanProgressDisplay.percentComplete,
+    }),
+  };
+};
+
 export const buildSurveyQuestionsSubmitAuxIconClassName = (
   styleMap: Record<string, string>,
   isSingleQuestionView: unknown
 ) => {
   const className = `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
   return className || undefined;
+};
+
+export const buildSurveyQuestionsJsonPanelDisplayState = ({
+  isSingleQuestionView = false,
+  isStandalone = false,
+  singleQuestionMode = false,
+  showQuestionsJson = false,
+  showResponseJson = false,
+  showSurveyJson = false,
+  styleMap = {},
+}: {
+  isSingleQuestionView?: unknown;
+  isStandalone?: unknown;
+  singleQuestionMode?: unknown;
+  showQuestionsJson?: unknown;
+  showResponseJson?: unknown;
+  showSurveyJson?: unknown;
+  styleMap?: Record<string, string>;
+} = {}): SurveyQuestionsJsonPanelDisplayState => {
+  const showQuestionJsonControls = !!(singleQuestionMode || isStandalone);
+  const showSurveyJsonPanel = !!showSurveyJson && !isStandalone && !singleQuestionMode;
+  const showQuestionsJsonPanel = !!showQuestionsJson && showQuestionJsonControls;
+  const showResponseJsonPanel = !!showResponseJson;
+  const surveyJsonToggleClassName = isSingleQuestionView ? styleMap.singleQuestionJsonToggle : undefined;
+  const surveyJsonRowClassName = [
+    styleMap.surveyJsonRow,
+    isSingleQuestionView ? styleMap.singleQuestionJsonRow : '',
+  ].filter(Boolean).join(' ') || undefined;
+  const questionJsonToggleClassName = [
+    surveyJsonToggleClassName,
+    isSingleQuestionView ? styleMap.singleQuestionJsonToggleQuestion : '',
+  ].filter(Boolean).join(' ') || undefined;
+  const responseJsonToggleClassName = [
+    surveyJsonToggleClassName,
+    isSingleQuestionView ? styleMap.singleQuestionJsonToggleResponse : '',
+  ].filter(Boolean).join(' ') || undefined;
+
+  return {
+    showQuestionJsonControls,
+    showSurveyJsonPanel,
+    showQuestionsJsonPanel,
+    showResponseJsonPanel,
+    surveyJsonRowClassName,
+    surveyJsonToggleClassName,
+    questionJsonToggleClassName,
+    responseJsonToggleClassName,
+    surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
+};
+
+export const buildSurveyQuestionsJsonForDisplayState = ({
+  isOwnResponse,
+  jsonPreview = null,
+  noResponse,
+  parsedViewAddressAnswers = null,
+  responderAddress,
+  singleQuestionMode,
+  userAnswers = null,
+  viewAddress,
+  viewingAnswers,
+}: {
+  isOwnResponse?: unknown;
+  jsonPreview?: unknown;
+  noResponse?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  responderAddress?: unknown;
+  singleQuestionMode?: unknown;
+  userAnswers?: unknown;
+  viewAddress?: unknown;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsJsonForDisplayState => {
+  if (!viewingAnswers) {
+    return { jsonForDisplay: jsonPreview };
+  }
+
+  if (noResponse) {
+    return {
+      jsonForDisplay: {
+        message: `No response found for ${singleQuestionMode ? 'question' : 'survey'} from address: ${
+          viewAddress || responderAddress || 'N/A'
+        }`,
+      },
+    };
+  }
+
+  return {
+    jsonForDisplay: isOwnResponse
+      ? (userAnswers || jsonPreview)
+      : (parsedViewAddressAnswers || { info: 'Loading viewed response...' }),
+  };
+};
+
+export const buildSurveyQuestionsLayoutDisplayState = ({
+  activeTagModalTag = '',
+  isSingleQuestionView = false,
+  isStandalone = false,
+  singleQuestionMode = false,
+  styleMap = {},
+  viewingAnswers = false,
+}: {
+  activeTagModalTag?: unknown;
+  isSingleQuestionView?: unknown;
+  isStandalone?: unknown;
+  singleQuestionMode?: unknown;
+  styleMap?: Record<string, string>;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsLayoutDisplayState => {
+  const useTagModal = !singleQuestionMode && !isStandalone;
+  const surveyPageClassName = [
+    isSingleQuestionView ? styleMap.singleQuestionPage : '',
+    isSingleQuestionView && viewingAnswers ? styleMap.singleQuestionReadPage : '',
+  ].filter(Boolean).join(' ') || undefined;
+
+  return {
+    activeTagModalTag: useTagModal ? String(activeTagModalTag || '').trim() : '',
+    responseViewClassName: isSingleQuestionView ? styleMap.singleQuestionResponseView : undefined,
+    surveyPageClassName,
+    topSectionClassName: isSingleQuestionView ? styleMap.singleQuestionTopBar : undefined,
+    useTagModal,
+  };
+};
+
+export const buildSurveyQuestionsRouteViewDisplayState = ({
+  account,
+  isEditing,
+  isStandalone,
+  questionPool,
+  responderAddress,
+  shortenAddress,
+  singleQuestionMode,
+  userHasResponse,
+  viewAddress,
+  viewingAnswers,
+}: {
+  account?: string;
+  isEditing?: unknown;
+  isStandalone?: unknown;
+  questionPool?: unknown;
+  responderAddress?: string;
+  shortenAddress?: (address: string, notClickable: boolean) => string;
+  singleQuestionMode?: unknown;
+  userHasResponse?: unknown;
+  viewAddress?: string;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsRouteViewDisplayState => {
+  const viewedAddressRaw = String(viewAddress || responderAddress || '').trim();
+  const viewedAddressLower = viewedAddressRaw.toLowerCase();
+  const shortenedViewAddress = viewedAddressRaw
+    ? (shortenAddress || ((address: string) => address))(viewedAddressRaw, false)
+    : '';
+  const isOwnResponse =
+    (viewAddress &&
+      account &&
+      viewAddress.toLowerCase() === account.toLowerCase()) ||
+    (responderAddress &&
+      account &&
+      responderAddress.toLowerCase() === account.toLowerCase()) ||
+    (!viewAddress && !responderAddress && account && userHasResponse);
+  const isSingleQuestionView =
+    singleQuestionMode ||
+    (isStandalone && Array.isArray(questionPool) && questionPool.length === 1);
+  const showViewAnswersButton =
+    (viewAddress || responderAddress) && (!isOwnResponse || !isEditing);
+  const viewAnswersButtonText = viewingAnswers
+    ? ` Fill out ${singleQuestionMode ? 'question' : 'survey'}`
+    : ` View ${shortenedViewAddress} ${singleQuestionMode ? 'answer' : 'answers'}`;
+
+  return {
+    viewedAddressRaw,
+    viewedAddressLower,
+    shortenedViewAddress,
+    isOwnResponse,
+    isSingleQuestionView,
+    showViewAnswersButton,
+    viewAnswersButtonText,
+  };
+};
+
+export const buildSurveyQuestionsSubmitFooterDisplayState = ({
+  currentStep = 0,
+  hasEncryptedAnswers = false,
+  hasMaskedCurrentQuestionPayload = false,
+  isDirty = false,
+  isEditing = false,
+  isLoadingResponse = false,
+  isSingleQuestionView = false,
+  isSubmitting = false,
+  pendingEditCount = 0,
+  responseUrl = '',
+  singleQuestionMode = false,
+  startFresh = false,
+  submissionComplete = false,
+  submittedSinceLastEdit = false,
+  useHeaderSubmit = false,
+  userHasResponse = false,
+}: {
+  currentStep?: unknown;
+  hasEncryptedAnswers?: unknown;
+  hasMaskedCurrentQuestionPayload?: unknown;
+  isDirty?: unknown;
+  isEditing?: unknown;
+  isLoadingResponse?: unknown;
+  isSingleQuestionView?: unknown;
+  isSubmitting?: unknown;
+  pendingEditCount?: unknown;
+  responseUrl?: unknown;
+  singleQuestionMode?: unknown;
+  startFresh?: unknown;
+  submissionComplete?: unknown;
+  submittedSinceLastEdit?: unknown;
+  useHeaderSubmit?: unknown;
+  userHasResponse?: unknown;
+} = {}): SurveyQuestionsSubmitFooterDisplayState => {
+  const pendingCount = Number(pendingEditCount || 0);
+  const isSingle = !!isSingleQuestionView;
+  const submittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
+  const submittedIndicatorActive = submittedStateActive && !isLoadingResponse;
+  const singleQuestionSubmittedIndicatorActive = !isSingle && submittedIndicatorActive;
+  const showSubmitAux =
+    !isSingle && (
+      (pendingCount > 0 && !isSubmitting && !singleQuestionSubmittedIndicatorActive) ||
+      (singleQuestionSubmittedIndicatorActive && !!responseUrl)
+    );
+  const uploadStatusText =
+    isSubmitting &&
+    Number(currentStep || 0) === 1 &&
+    !!hasEncryptedAnswers
+      ? 'Encrypting...'
+      : 'Uploading...';
+  const submitDisabled = !!(
+    isSubmitting ||
+    (singleQuestionMode && hasMaskedCurrentQuestionPayload)
+  );
+  const canEditQuestions = !userHasResponse || !!startFresh || !!isEditing;
+  const hasPendingEdits = !!isDirty || pendingCount > 0;
+  const genericShowInlineSubmit = !useHeaderSubmit && (
+    canEditQuestions
+      ? hasPendingEdits || submittedIndicatorActive
+      : submittedIndicatorActive
+  );
+  const showInlineSubmit = isSingle
+    ? hasPendingEdits
+    : genericShowInlineSubmit;
+
+  return {
+    submittedStateActive,
+    submittedIndicatorActive,
+    singleQuestionSubmittedIndicatorActive,
+    showSubmitAux,
+    uploadStatusText,
+    submitDisabled,
+    canEditQuestions,
+    hasPendingEdits,
+    genericShowInlineSubmit,
+    showInlineSubmit,
+    showTopInlineSubmit: showInlineSubmit && !isSingle,
+  };
+};
+
+export const buildSurveyQuestionsPrimarySubmitPlan = ({
+  account = '',
+  draftSlug = '',
+  isStandalone = false,
+  isSubmitting = false,
+  pendingEditCount = 0,
+  questionID = '',
+  singleQuestionMode = false,
+  submissionComplete = false,
+  submitGuardActive = false,
+  submittedSinceLastEdit = false,
+  surveyId = '',
+}: {
+  account?: unknown;
+  draftSlug?: unknown;
+  isStandalone?: unknown;
+  isSubmitting?: unknown;
+  pendingEditCount?: unknown;
+  questionID?: unknown;
+  singleQuestionMode?: unknown;
+  submissionComplete?: unknown;
+  submitGuardActive?: unknown;
+  submittedSinceLastEdit?: unknown;
+  surveyId?: unknown;
+} = {}): SurveyQuestionsPrimarySubmitPlan => {
+  if (isSubmitting) {
+    return { action: 'inert', reason: 'submitting', path: '' };
+  }
+  if (submitGuardActive) {
+    return { action: 'inert', reason: 'submit_guard', path: '' };
+  }
+
+  const pendingCount = Number(pendingEditCount || 0);
+  const hasPendingEdits = pendingCount > 0;
+  const completed = !!submissionComplete;
+  const submittedStateActive = !!(submittedSinceLastEdit || completed);
+  if (submittedStateActive && !completed && !hasPendingEdits) {
+    return { action: 'inert', reason: 'submitted_without_new_edits', path: '' };
+  }
+
+  if (completed && !hasPendingEdits) {
+    const accountLower = String(account || '').toLowerCase();
+    if (!accountLower) {
+      return { action: 'inert', reason: 'missing_account', path: '' };
+    }
+    if (singleQuestionMode) {
+      const questionIdLower = String(questionID || '').toLowerCase();
+      if (!questionIdLower) {
+        return { action: 'inert', reason: 'missing_question_id', path: '' };
+      }
+      return {
+        action: 'navigate',
+        reason: 'completed_single_question_response',
+        path: buildQuestionRoutePath(questionIdLower, {
+          responderAddress: accountLower,
+          sessionSlug: draftSlug,
+        }),
+      };
+    }
+    if (!isStandalone) {
+      const surveyIdLower = String(surveyId || '').toLowerCase();
+      if (!surveyIdLower) {
+        return { action: 'inert', reason: 'missing_survey_id', path: '' };
+      }
+      const normalizedDraftSlug = String(draftSlug || '');
+      return {
+        action: 'navigate',
+        reason: 'completed_survey_response',
+        path: `/survey/${surveyIdLower}/${accountLower}${normalizedDraftSlug ? `?session=${encodeURIComponent(normalizedDraftSlug)}` : ''}`,
+      };
+    }
+    return { action: 'inert', reason: 'completed_standalone_response', path: '' };
+  }
+
+  return {
+    action: 'submit',
+    reason: hasPendingEdits ? 'pending_edits' : 'submit_requested',
+    path: '',
+  };
 };
 
 export const buildCopiedQuestionsJsonState = (copiedQuestionsJson: unknown) => ({

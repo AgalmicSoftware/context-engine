@@ -1,5 +1,4 @@
 import React from "react";
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faGithub } from "@fortawesome/free-brands-svg-icons";
@@ -22,13 +21,6 @@ type FooterProps = {
 };
 
 class Footer extends React.Component<FooterProps> {
-  static propTypes = {
-    changeFocusedTab: PropTypes.func.isRequired,
-    toggleLoginModal: PropTypes.func.isRequired,
-    focusedTab: PropTypes.number,
-    loginModalToggled: PropTypes.bool,
-  };
-
   clickedSettingsLink = (e: React.MouseEvent<HTMLElement>) => {
     e.preventDefault();
     this.props.toggleLoginModal(true)
@@ -51,14 +43,14 @@ class Footer extends React.Component<FooterProps> {
   render() {
     return (
       <>
-        <footer id={styles.footer} className="footer footer-simple">
+        <footer className={`footer footer-simple ${styles.footer}`}>
             <nav>
               <ul>
                 <li>
                   <NavLink
                     href={buildPublicRoute('/new')}
                     target=""
-                    id={styles.footerLink}
+                    className={styles.footerLink}
                   >
                     NEW
                   </NavLink>
@@ -70,7 +62,7 @@ class Footer extends React.Component<FooterProps> {
                     href={buildPublicRoute('/about')}
                     target=""
                     onClick={this.clickedAboutLink}
-                    id={styles.footerLink}
+                    className={styles.footerLink}
                   >
                     ABOUT
                       </NavLink>
@@ -80,7 +72,7 @@ class Footer extends React.Component<FooterProps> {
                     href="/contributors"
                     target=""
                     onClick={this.clickedContributorsLink}
-                    id={styles.footerLink}
+                    className={styles.footerLink}
                     >
                     CONTRIBUTORS
                   </NavLink>
@@ -90,7 +82,7 @@ class Footer extends React.Component<FooterProps> {
                     href=""
                     target=""
                     onClick={this.clickedSettingsLink}
-                    id={styles.footerLink}
+                    className={styles.footerLink}
                     >
                     SETTINGS
                   </NavLink>
@@ -99,8 +91,7 @@ class Footer extends React.Component<FooterProps> {
                   <NavLink
                     href=""
                     target="_blank"
-                    className="ml-1"
-                    id={styles.footerLink}
+                    className={`ml-1 ${styles.footerLink}`}
                   >
                     CONTACT
                     </NavLink>
@@ -109,9 +100,8 @@ class Footer extends React.Component<FooterProps> {
                   <NavLink
                     href={buildPublicRoute('/contracts')}
                     target=""
-                    className="ml-1"
                     onClick={this.clickedContractsLink}
-                    id={styles.footerLink}
+                    className={`ml-1 ${styles.footerLink}`}
                   >
                     CONTRACTS
                   </NavLink>
@@ -120,16 +110,15 @@ class Footer extends React.Component<FooterProps> {
                   <NavLink
                     href="/beta"
                     target=""
-                    className="ml-1"
                     onClick={this.clickedBetaLink}
-                    id={styles.footerLink}
+                    className={`ml-1 ${styles.footerLink}`}
                   >
                     BETA
                   </NavLink>
                 </li> */}
               </ul>
             </nav>
-            <div id={styles.copyright}>
+            <div className={styles.copyright}>
               {/* CPAL-1.0 Attribution (Exhibit B)
                   This line serves as both org branding and the required CPAL attribution.
                   Required by LICENSE Exhibit B. Do not remove in OSS builds.

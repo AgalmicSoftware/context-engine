@@ -1,4 +1,5 @@
 import SBTPage from './SBTPage';
+import SbtPageMiniCard from './SbtPageMiniCard';
 import styles from './SBTPage.module.scss';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -16,6 +17,11 @@ jest.mock('../../utilities/ui/terminology.js', () => {
 
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: jest.fn(() => ''),
+}));
+
+jest.mock('../Shared/CETooltip', () => ({
+  __esModule: true,
+  default: ({ children }) => <span>{children}</span>,
 }));
 
 const createSubject = (props = {}) => {
@@ -57,6 +63,10 @@ const flattenText = (node) => {
   return '';
 };
 
+const nodeHasClassName = (node, className) => String(node?.props?.className || '')
+  .split(/\s+/)
+  .includes(className);
+
 const renderMiniCardNode = (props = {}) => {
   const sbtAddress = '0x00000000000000000000000000000000000000f1';
   const subject = createSubject({
@@ -86,7 +96,7 @@ const renderMiniCardNode = (props = {}) => {
   const tree = subject.render();
   const cardNode = findElementInTree(
     tree,
-    (element) => element?.props?.role === 'button' && typeof element?.props?.onClick === 'function'
+    (element) => element?.type === SbtPageMiniCard
   );
   return { cardNode, sbtAddress };
 };
@@ -108,7 +118,7 @@ describe('SBTPage mini-card', () => {
     const stopPropagation = jest.fn();
     const cardTarget = { closest: jest.fn(() => cardTarget) };
 
-    cardNode.props.onClick({
+    cardNode.props.onCardClick({
       target: cardTarget,
       currentTarget: cardTarget,
       preventDefault,
@@ -128,15 +138,19 @@ describe('SBTPage mini-card', () => {
   it('hides the mini-card address in plain mode', () => {
     mockIsCryptoMode.mockReturnValue(false);
     const { cardNode } = renderMiniCardNode();
+    const cardTree = SbtPageMiniCard(cardNode.props);
 
-    expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
+    expect(cardNode.props.showMiniSbtAddress).toBe(false);
+    expect(findElementInTree(cardTree, (element) => nodeHasClassName(element, styles.miniSbtAddress))).toBeNull();
   });
 
   it('shows the mini-card address in crypto mode', () => {
     mockIsCryptoMode.mockReturnValue(true);
     const { cardNode, sbtAddress } = renderMiniCardNode();
-    const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
+    const cardTree = SbtPageMiniCard(cardNode.props);
+    const addressNode = findElementInTree(cardTree, (element) => nodeHasClassName(element, styles.miniSbtAddress));
 
+    expect(cardNode.props.showMiniSbtAddress).toBe(true);
     expect(addressNode).not.toBeNull();
     expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
   });
@@ -148,7 +162,7 @@ describe('SBTPage mini-card', () => {
     const stopPropagation = jest.fn();
     const cardTarget = { closest: jest.fn(() => cardTarget) };
 
-    cardNode.props.onClick({
+    cardNode.props.onCardClick({
       target: cardTarget,
       currentTarget: cardTarget,
       preventDefault,
@@ -173,13 +187,13 @@ describe('SBTPage mini-card', () => {
     const nestedTarget = { closest: jest.fn(() => nestedInteractive) };
     const currentTarget = {};
 
-    cardNode.props.onClick({
+    cardNode.props.onCardClick({
       target: nestedTarget,
       currentTarget,
       preventDefault,
       stopPropagation: jest.fn(),
     });
-    cardNode.props.onKeyDown({
+    cardNode.props.onCardKeyDown({
       key: 'Enter',
       target: nestedTarget,
       currentTarget,

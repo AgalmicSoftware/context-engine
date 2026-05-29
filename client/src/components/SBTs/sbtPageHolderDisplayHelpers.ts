@@ -61,7 +61,7 @@ export type SbtPageHolderResolutionState = {
 };
 export type SbtPageHolderFilterItems = {
   filteredMintedUsers: unknown[];
-  holderItemsForFilter: unknown;
+  holderItemsForFilter: unknown[];
   keepStaleFilterRowsWhileRefreshing: boolean;
 };
 export type SbtPageHolderModalDisplayState = {
@@ -166,9 +166,12 @@ export const resolveSbtPageHolderFilterItems = ({
     !!hasFilteredHolders &&
     !hasComputedHolders &&
     !!isScanActive;
-  const holderItemsForFilter = hasComputedHolders
+  const rawHolderItemsForFilter = hasComputedHolders
     ? netHolders
     : (keepStaleFilterRowsWhileRefreshing ? filteredMintedUsersRaw : []);
+  const holderItemsForFilter = Array.isArray(rawHolderItemsForFilter)
+    ? rawHolderItemsForFilter
+    : [];
   const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw)
     ? filteredMintedUsersRaw
     : [];

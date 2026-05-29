@@ -110,6 +110,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     expect(txId).toBe('tx-explicit');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
     expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(resolveCorsProxyUrl).not.toHaveBeenCalled();
   });
 
   it('normalizes arweave gateway URLs in worker upload responses to canonical tx ids', async () => {
@@ -344,21 +345,39 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
         },
       };
     });
+    const unsupportedAuthRouteError = new Error('Worker auth login route not supported (404).');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     fetchWorkerWithAuth
-      .mockRejectedValueOnce(new Error('Worker auth login route not supported (404).'))
+      .mockRejectedValueOnce(unsupportedAuthRouteError)
       .mockResolvedValueOnce(jsonResp(200, { id: 'tx-supported' }));
 
-    const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
-      sessionSlug: 'selected',
-    });
+    try {
+      const txId = await arweaveScripts.uploadDataToArweave({ ok: true }, 'json', {
+        sessionSlug: 'selected',
+      });
 
-    expect(txId).toBe('tx-supported');
-    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
-    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
-    expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example.test/arweave/upload');
-    expect(fetchWorkerWithAuth.mock.calls[1][2]).toEqual(
-      expect.objectContaining({ sessionSlug: 'supported', workerUrl: 'https://supported.worker.example.test' })
-    );
+      expect(txId).toBe('tx-supported');
+      expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+      expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+      expect(String(fetchWorkerWithAuth.mock.calls[1][0])).toBe('https://supported.worker.example.test/arweave/upload');
+      expect(fetchWorkerWithAuth.mock.calls[1][2]).toEqual(
+        expect.objectContaining({ sessionSlug: 'supported', workerUrl: 'https://supported.worker.example.test' })
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[general]',
+        '[arweave][client] fetch error',
+        expect.objectContaining({
+          attemptIndex: 0,
+          endpoint: 'https://selected.worker.example.test/arweave/upload',
+          message: unsupportedAuthRouteError.message,
+          name: 'Error',
+          sessionSlug: 'selected',
+          workerUrl: 'https://selected.worker.example.test',
+        })
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('prefers scoped sessions that advertise sponsored Arweave keys after missing-key upload failures', async () => {
