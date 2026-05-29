@@ -49,7 +49,7 @@ import {
   writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
 import {
-  listTelegramProposedQuestionsForSession,
+  listTelegramProposedQuestionsForSessionWithSummary,
   mergeTelegramProposedQuestions,
   inferQuestionTags,
   normalizeQuestionTags,
@@ -896,6 +896,125 @@ function allQuestionsPayloadUnavailable(questions = []) {
   return Array.isArray(questions) && questions.length > 0 && questions.every(questionIsPayloadUnavailable);
 }
 
+function questionTextValueIsString(value) {
+  if (value === undefined || value === null) return true;
+  return typeof value === 'string';
+}
+
+function questionTagsShapeIsValid(value) {
+  if (value === undefined) return true;
+  if (value === null) return false;
+  return Array.isArray(value) || typeof value === 'string';
+}
+
+function firstQuestionTextValue(question = {}) {
+  if (question.questionText !== undefined && question.questionText !== null) return question.questionText;
+  if (question.prompt !== undefined && question.prompt !== null) return question.prompt;
+  if (question.title !== undefined && question.title !== null) return question.title;
+  return '';
+}
+
+function questionRecordMalformedReason(question = {}) {
+  if (!question || typeof question !== 'object' || Array.isArray(question)) return 'record_not_object';
+  let qid = '';
+  try {
+    qid = safeString(question.questionId || question.id);
+  } catch {
+    return 'question_id_invalid';
+  }
+  if (!qid) return 'question_id_missing';
+  if (!questionTagsShapeIsValid(question.tags)) return 'question_tags_invalid';
+  const textValue = firstQuestionTextValue(question);
+  if (!questionTextValueIsString(textValue)) return 'question_prompt_invalid';
+  let locked = false;
+  let unavailable = false;
+  try {
+    locked = questionIsLocked(question);
+    unavailable = questionIsPayloadUnavailable(question);
+  } catch {
+    return 'question_visibility_invalid';
+  }
+  if (!locked && !unavailable) {
+    let prompt = '';
+    try {
+      prompt = safeString(textValue);
+    } catch {
+      return 'question_prompt_invalid';
+    }
+    if (!prompt) return 'question_prompt_missing';
+  }
+  return '';
+}
+
+function orderQuestionsForPresentationWithSummary(questions = []) {
+  const rows = [];
+  let skippedMalformed = 0;
+  (Array.isArray(questions) ? questions : []).forEach((question, index) => {
+    try {
+      if (questionRecordMalformedReason(question)) {
+        skippedMalformed += 1;
+        return;
+      }
+      rows.push({ question, index });
+    } catch {
+      skippedMalformed += 1;
+    }
+  });
+  rows.sort((left, right) => {
+    let leftRank = 2;
+    let rightRank = 2;
+    try {
+      leftRank = questionPresentationRank(left.question);
+    } catch {
+      leftRank = 2;
+    }
+    try {
+      rightRank = questionPresentationRank(right.question);
+    } catch {
+      rightRank = 2;
+    }
+    return leftRank - rightRank || left.index - right.index;
+  });
+  return {
+    questions: rows.map(({ question }) => question),
+    skippedMalformed,
+  };
+}
+
+function questionAvailabilitySummary(questions = []) {
+  const entries = Array.isArray(questions) ? questions : [];
+  let skippedMalformed = 0;
+  let answerable = false;
+  let unavailableCount = 0;
+  entries.forEach((question) => {
+    try {
+      if (questionRecordMalformedReason(question)) {
+        skippedMalformed += 1;
+        return;
+      }
+      if (questionIsAnswerable(question)) answerable = true;
+      if (questionIsPayloadUnavailable(question)) unavailableCount += 1;
+    } catch {
+      skippedMalformed += 1;
+    }
+  });
+  const validCount = Math.max(0, entries.length - skippedMalformed);
+  return {
+    hasAnswerableQuestions: answerable,
+    allPayloadUnavailable: validCount > 0 && unavailableCount === validCount,
+    skippedMalformed,
+  };
+}
+
+function withSkippedMalformed(result = {}, skippedMalformed = 0) {
+  const count = Number(skippedMalformed || 0) || 0;
+  if (count <= 0) return result;
+  return {
+    ...result,
+    skippedMalformed: (Number(result.skippedMalformed || 0) || 0) + count,
+  };
+}
+
 function questionPresentationRank(question = {}) {
   if (questionIsPayloadUnavailable(question)) return 2;
   if (questionIsLocked(question)) return 1;
@@ -903,21 +1022,27 @@ function questionPresentationRank(question = {}) {
 }
 
 function orderQuestionsForPresentation(questions = []) {
-  return (Array.isArray(questions) ? questions : [])
-    .map((question, index) => ({ question, index }))
-    .sort((left, right) => (
-      questionPresentationRank(left.question) - questionPresentationRank(right.question) ||
-      left.index - right.index
-    ))
-    .map(({ question }) => question);
+  return orderQuestionsForPresentationWithSummary(questions).questions;
 }
 
 async function withTelegramProposedQuestions(env = {}, sessionSlug = '', result = {}) {
-  const proposed = await listTelegramProposedQuestionsForSession(env, sessionSlug).catch(() => []);
-  if (!proposed.length) return result;
-  const questions = orderQuestionsForPresentation(mergeTelegramProposedQuestions(result.questions || [], proposed));
+  const proposedSummary = await listTelegramProposedQuestionsForSessionWithSummary(env, sessionSlug)
+    .catch(() => ({ questions: [], skippedMalformed: 1 }));
+  const proposed = Array.isArray(proposedSummary.questions) ? proposedSummary.questions : [];
+  const baseSummary = orderQuestionsForPresentationWithSummary(result.questions || []);
+  const skippedMalformed = (Number(proposedSummary.skippedMalformed || 0) || 0) + baseSummary.skippedMalformed;
+  if (!proposed.length) {
+    if (skippedMalformed <= 0) return result;
+    return withSkippedMalformed({
+      ...result,
+      questions: baseSummary.questions,
+      questionCount: baseSummary.questions.length,
+    }, skippedMalformed);
+  }
+  const mergedSummary = orderQuestionsForPresentationWithSummary(mergeTelegramProposedQuestions(baseSummary.questions, proposed));
+  const questions = mergedSummary.questions;
   return {
-    ...result,
+    ...withSkippedMalformed(result, skippedMalformed + mergedSummary.skippedMalformed),
     questions,
     questionCount: questions.length,
     proposedQuestionCount: proposed.length,
@@ -1234,15 +1359,18 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   } else {
     live = await livePromise;
   }
-  const liveQuestions = Array.isArray(live.questions) ? live.questions : [];
-  const liveHasAnswerableQuestions = liveQuestions.some(questionIsAnswerable);
-  const liveOnlyUnavailablePayloads = allQuestionsPayloadUnavailable(liveQuestions);
+  const liveQuestionSummary = orderQuestionsForPresentationWithSummary(Array.isArray(live.questions) ? live.questions : []);
+  const liveQuestions = liveQuestionSummary.questions;
+  const availability = questionAvailabilitySummary(liveQuestions);
+  const liveHasAnswerableQuestions = availability.hasAnswerableQuestions;
+  const liveOnlyUnavailablePayloads = availability.allPayloadUnavailable;
+  const liveMalformedCount = liveQuestionSummary.skippedMalformed + availability.skippedMalformed;
   if (live?.timedOut || liveOnlyUnavailablePayloads) {
     return withTelegramProposedQuestions(env, sessionSlug, {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: orderQuestionsForPresentation(liveQuestions),
-    });
+      questions: liveQuestions,
+    }).then((result) => withSkippedMalformed(result, liveMalformedCount));
   }
   if (
     (live.ok && liveQuestions.length && (liveHasAnswerableQuestions || !fallbackAllowed || !liveOnlyUnavailablePayloads)) ||
@@ -1251,8 +1379,8 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     return withTelegramProposedQuestions(env, sessionSlug, {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: orderQuestionsForPresentation(liveQuestions),
-    });
+      questions: liveQuestions,
+    }).then((result) => withSkippedMalformed(result, liveMalformedCount));
   }
   return withTelegramProposedQuestions(env, sessionSlug, {
     ok: true,
@@ -1260,7 +1388,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     source: 'demo_fixture',
     fallbackFrom: live.reason || (liveOnlyUnavailablePayloads ? 'live_questions_payload_unavailable' : 'live_question_cache_unavailable'),
     questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
-  });
+  }).then((result) => withSkippedMalformed(result, liveMalformedCount));
 }
 
 function summarizeQuestionPrefetch(result = {}, sessionSlug = '') {

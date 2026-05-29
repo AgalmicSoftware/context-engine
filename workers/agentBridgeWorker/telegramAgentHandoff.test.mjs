@@ -315,6 +315,14 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
   assert.equal(body.updateNote, '');
 });
 
+test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
+  const response = await handleTelegramAgentHandoffRequest({});
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 500);
+  assert.deepEqual(body, { ok: false, reason: 'telegram_agent_internal_error' });
+});
+
 test('Telegram agent skill-version payload includes admin update flag', async () => {
   const env = baseEnv();
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({

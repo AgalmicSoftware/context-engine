@@ -8,6 +8,7 @@ import {
   dispatchTelegramCommandResponse,
   fetchUrlQuestionSource,
   handleTelegramWebhookUpdate,
+  loadQuestionsForSession,
   loadSubmittedResultRecords,
   loadSessionPolicy,
   parseTelegramCommandText,
@@ -3049,6 +3050,68 @@ test('/questions does not invent demo questions when live question cache is empt
   assert.equal(result.response.text, 'Questions (0/0)\n\nNo questions are available.');
   assert.equal(result.response.text.includes('q-readiness'), false);
   assert.equal(result.response.text.includes('What should Alpha decide next'), false);
+});
+
+test('loadQuestionsForSession skips malformed live and proposed records', async () => {
+  __test__sessionQuestions.clearCaches();
+  const env = baseEnv({ AGENT_BRIDGE_QUESTION_SOURCE: 'live' });
+  const cachedAtMs = Date.now();
+  __test__sessionQuestions.questionMemoryCache.set(__test__sessionQuestions.cacheKey('alpha'), {
+    ok: true,
+    reason: 'live_questions_loaded',
+    source: 'unit_live_cache',
+    cachedAtMs,
+    complete: true,
+    questions: [
+      {
+        questionId: 'q-live-good',
+        questionType: 'freeform',
+        prompt: 'What should the live loader keep?',
+        sessionSlug: 'alpha',
+        tags: ['valid'],
+      },
+      {
+        questionType: 'freeform',
+        prompt: 'Missing ids should be skipped.',
+        sessionSlug: 'alpha',
+      },
+      {
+        questionId: 'q-null-tags',
+        questionType: 'freeform',
+        prompt: 'Null tags should be skipped.',
+        sessionSlug: 'alpha',
+        tags: null,
+      },
+      {
+        questionId: 'q-object-prompt',
+        questionType: 'freeform',
+        prompt: { text: 'Object prompts should be skipped.' },
+        sessionSlug: 'alpha',
+      },
+      {
+        questionId: 'q-number-prompt',
+        questionType: 'freeform',
+        prompt: 42,
+        sessionSlug: 'alpha',
+      },
+    ],
+  });
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-bad-proposed', JSON.stringify({
+    version: 1,
+    questionId: 'q-bad-proposed',
+    sessionSlug: 'alpha',
+    questionType: 'freeform',
+    prompt: { text: 'Malformed proposed prompt' },
+    status: 'active',
+    createdAt: '2026-05-29T12:00:00.000Z',
+  }));
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.questionCount, 1);
+  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-live-good']);
+  assert.equal(loaded.skippedMalformed, 5);
 });
 
 test('/questions reads telegram_only preloaded policy questions without chain indexing', async () => {

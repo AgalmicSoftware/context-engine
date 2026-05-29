@@ -1102,6 +1102,25 @@ function publicAgentQuestion(question = {}, {
   };
 }
 
+function withPublicSkippedMalformed(loaded = {}, skippedMalformed = 0) {
+  const count = Number(skippedMalformed || 0) || 0;
+  if (count <= 0) return loaded;
+  return {
+    ...loaded,
+    skippedMalformed: (Number(loaded.skippedMalformed || 0) || 0) + count,
+  };
+}
+
+function safePublicAgentQuestion(question = {}, options = {}) {
+  try {
+    const normalized = publicAgentQuestion(question, options);
+    if (!normalized.questionId) return { question: null, skippedMalformed: 1 };
+    return { question: normalized, skippedMalformed: 0 };
+  } catch {
+    return { question: null, skippedMalformed: 1 };
+  }
+}
+
 function normalizePreferenceTagHints(input = {}) {
   const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
     ? input.preferences
@@ -1238,10 +1257,14 @@ function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
 
 async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil = null } = {}) {
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug, { waitUntil });
-  const questions = (Array.isArray(loaded.questions) ? loaded.questions : [])
-    .map((question) => publicAgentQuestion(question, { session: context.session }))
-    .filter((question) => question.questionId);
-  return { loaded, questions };
+  const questions = [];
+  let skippedMalformed = 0;
+  (Array.isArray(loaded.questions) ? loaded.questions : []).forEach((question) => {
+    const normalized = safePublicAgentQuestion(question, { session: context.session });
+    skippedMalformed += normalized.skippedMalformed;
+    if (normalized.question) questions.push(normalized.question);
+  });
+  return { loaded: withPublicSkippedMalformed(loaded, skippedMalformed), questions };
 }
 
 async function handleQuestionsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
@@ -1258,6 +1281,7 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     permissionMode: context.permission.mode,
     questionSource: loaded.source || '',
     questionSourceReason: loaded.reason || '',
+    ...(Number(loaded.skippedMalformed || 0) > 0 ? { skippedMalformed: Number(loaded.skippedMalformed || 0) } : {}),
     relevance: ranked.relevance,
     skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
     skillUpdateAvailable: flag.updateAvailable === true,
@@ -4284,7 +4308,7 @@ async function handleClientLoginExchangeRequest({
   return jsonClientLogin(request, env, payload);
 }
 
-export async function handleTelegramAgentHandoffRequest({
+async function handleTelegramAgentHandoffRequestUnsafe({
   request,
   env = {},
   waitUntil = null,
@@ -4463,6 +4487,16 @@ export async function handleTelegramAgentHandoffRequest({
     return handleChildSessionRequest({ env, context, input });
   }
   return json({ ok: false, reason: 'telegram_agent_route_not_found' }, { status: 404 });
+}
+
+export async function handleTelegramAgentHandoffRequest(args = {}) {
+  try {
+    return await handleTelegramAgentHandoffRequestUnsafe(args);
+  } catch {
+    const body = { ok: false, reason: 'telegram_agent_internal_error' };
+    assertNoSecretShape(body, 'Telegram agent internal error response must not serialize secrets.');
+    return json(body, { status: 500 });
+  }
 }
 
 export const __test__telegramAgentHandoff = {

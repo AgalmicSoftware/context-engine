@@ -361,6 +361,39 @@ function proposedRecordToQuestion(record = {}) {
   return question;
 }
 
+function questionTextValueIsString(value) {
+  if (value === undefined || value === null) return true;
+  return typeof value === 'string';
+}
+
+function questionTagsShapeIsValid(value) {
+  if (value === undefined) return true;
+  if (value === null) return false;
+  return Array.isArray(value) || typeof value === 'string';
+}
+
+function proposedRecordMalformedReason(record = {}) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return 'record_not_object';
+  let questionId = '';
+  try {
+    questionId = safeString(record.questionId);
+  } catch {
+    return 'question_id_invalid';
+  }
+  if (!questionId) return 'question_id_missing';
+  const promptValue = record.prompt ?? record.questionText;
+  if (!questionTextValueIsString(promptValue)) return 'question_prompt_invalid';
+  let prompt = '';
+  try {
+    prompt = normalizePrompt(promptValue);
+  } catch {
+    return 'question_prompt_invalid';
+  }
+  if (!prompt) return 'question_prompt_missing';
+  if (!questionTagsShapeIsValid(record.tags)) return 'question_tags_invalid';
+  return '';
+}
+
 export async function persistTelegramProposedQuestion({
   env = {},
   normalized = {},
@@ -459,12 +492,13 @@ export async function persistTelegramProposedQuestion({
   };
 }
 
-export async function listTelegramProposedQuestionsForSession(env = {}, sessionSlug = '') {
+export async function listTelegramProposedQuestionsForSessionWithSummary(env = {}, sessionSlug = '') {
   const prefix = proposedQuestionPrefix(sessionSlug);
   if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.list !== 'function') {
-    return [];
+    return { questions: [], skippedMalformed: 0 };
   }
   const records = [];
+  let skippedMalformed = 0;
   let cursor = '';
   for (let page = 0; page < 20; page += 1) {
     const listed = await env.AGENT_ACTION_KV.list({
@@ -477,16 +511,36 @@ export async function listTelegramProposedQuestionsForSession(env = {}, sessionS
       const name = safeString(item?.name);
       if (!name || typeof env.AGENT_ACTION_KV.get !== 'function') continue;
       const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(name).catch(() => null), null);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
-      assertNoSecretShape(parsed, 'Telegram proposed questions must not serialize secrets.');
-      if (parsed.status && lower(parsed.status) !== 'active') continue;
-      const question = proposedRecordToQuestion(parsed);
-      if (question) records.push(question);
+      try {
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          skippedMalformed += 1;
+          continue;
+        }
+        assertNoSecretShape(parsed, 'Telegram proposed questions must not serialize secrets.');
+        if (parsed.status && lower(parsed.status) !== 'active') continue;
+        if (proposedRecordMalformedReason(parsed)) {
+          skippedMalformed += 1;
+          continue;
+        }
+        const question = proposedRecordToQuestion(parsed);
+        if (question) {
+          records.push(question);
+        } else {
+          skippedMalformed += 1;
+        }
+      } catch {
+        skippedMalformed += 1;
+      }
     }
     if (listed?.list_complete !== false || !listed?.cursor) break;
     cursor = listed.cursor;
   }
-  return records;
+  return { questions: records, skippedMalformed };
+}
+
+export async function listTelegramProposedQuestionsForSession(env = {}, sessionSlug = '') {
+  const summary = await listTelegramProposedQuestionsForSessionWithSummary(env, sessionSlug);
+  return summary.questions;
 }
 
 export function mergeTelegramProposedQuestions(questions = [], proposedQuestions = []) {
@@ -513,5 +567,6 @@ export const __test__telegramQuestionProposals = {
   normalizeSessionContext,
   proposedQuestionPrefix,
   proposedRecordToQuestion,
+  proposedRecordMalformedReason,
   sessionContextFromPolicySession,
 };
