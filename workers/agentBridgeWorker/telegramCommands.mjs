@@ -87,6 +87,7 @@ import {
 } from './telegramResponseExport.mjs';
 import {
   buildQueuedSubmitRecord,
+  canonicalAnswerSessionKvPrefix,
   persistTelegramSubmitRecord,
   queueTelegramSubmitRecord,
   SUBMIT_REQUEST_KV_PREFIX,
@@ -5045,7 +5046,11 @@ async function loadSubmittedResultRecords(env = {}, sessionSlug = '') {
     ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity })
     : [];
   const legacyRecords = await listKvRecordsByPrefix(env, SUBMIT_REQUEST_KV_PREFIX, { limit: Infinity });
-  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords]);
+  const canonicalPrefix = canonicalAnswerSessionKvPrefix(slug);
+  const canonicalRecords = canonicalPrefix
+    ? await listKvRecordsByPrefix(env, canonicalPrefix, { limit: Infinity })
+    : [];
+  const records = dedupeSubmitRecords([...indexedRecords, ...legacyRecords, ...canonicalRecords]);
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   return records
     .filter((record) => (

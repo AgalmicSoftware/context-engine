@@ -17,7 +17,10 @@ import {
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
-import { submitRequestSessionKvKey } from './telegramSubmitQueue.mjs';
+import {
+  canonicalAnswerSessionKvKey,
+  submitRequestSessionKvKey,
+} from './telegramSubmitQueue.mjs';
 
 class MemoryKv {
   constructor() {
@@ -1466,6 +1469,36 @@ test('submitted result reads use per-session indexes instead of capped global sc
   const records = await loadSubmittedResultRecords(env, 'alpha');
 
   assert.deepEqual(records.map((record) => record.requestId), ['alpha-0', 'alpha-1', 'alpha-2']);
+});
+
+test('submitted result reads include durable canonical answer records', async () => {
+  const env = baseEnv();
+  const record = {
+    version: 1,
+    type: 'telegram_canonical_answer',
+    requestId: 'durable-result',
+    status: 'direct_submitted',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-durable-result',
+    answer: {
+      questionType: 'agree_unsure_disagree',
+      value: 'agree',
+      label: 'Agree',
+      comments: 'Durable comment',
+    },
+    createdAt: '2026-05-23T12:00:00.000Z',
+    updatedAt: '2026-05-23T12:00:00.000Z',
+  };
+  await env.AGENT_ACTION_KV.put(canonicalAnswerSessionKvKey(record), JSON.stringify(record));
+
+  const records = await loadSubmittedResultRecords(env, 'alpha');
+
+  assert.equal(records.length, 1);
+  assert.equal(records[0].requestId, 'durable-result');
+  assert.equal(records[0].questionId, 'q-durable-result');
+  assert.equal(records[0].label, 'Agree');
+  assert.equal(records[0].comments, 'Durable comment');
 });
 
 test('/results group shows participant graph with question legend', async () => {
