@@ -52,7 +52,7 @@ export type RunSurveyQuestionsSubmitSuccessControllerArgs = {
   editBaseline?: unknown;
   hasEncrypted?: unknown;
   responseUrl?: unknown;
-  submittedSinceLastEdit?: unknown;
+  submittedSinceLastEdit?: boolean;
   surveysResponseState?: unknown;
   userAnswers?: unknown;
   submitAttemptId?: unknown;
@@ -62,7 +62,7 @@ export type RunSurveyQuestionsSubmitSuccessControllerArgs = {
 
 export type RunSurveyQuestionsSubmitFailureControllerArgs = {
   error?: unknown;
-  submittedSinceLastEdit?: unknown;
+  submittedSinceLastEdit?: boolean;
   submitAttemptId?: unknown;
   ports?: SurveyQuestionsSubmitCompletionPorts;
 };
