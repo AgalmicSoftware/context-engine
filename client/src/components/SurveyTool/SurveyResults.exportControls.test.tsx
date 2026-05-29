@@ -34,7 +34,11 @@ import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 import { callAI } from '../../utilities/ai/aiScripts.js';
-import { downloadSessionResultsHtmlReport, downloadSessionResultsPdfReport } from '../../utilities/sessionResultsExport';
+import {
+  SESSION_RESULTS_EXPORT_FORMAT_PDF,
+  downloadSessionResultsHtmlReport,
+  downloadSessionResultsPdfReport,
+} from '../../utilities/sessionResultsExport';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -464,7 +468,7 @@ describe('SurveyResults export/view controls', () => {
     expect(treeHasText(tree, 'Redacted')).toBe(true);
     expect(treeHasText(tree, 'Exported viewer')).toBe(true);
     expect(treeHasText(tree, 'Single HTML file')).toBe(true);
-    expect(treeHasText(tree, 'Single-page PDF')).toBe(true);
+    expect(treeHasText(tree, 'PDF report')).toBe(true);
     expect(treeHasText(tree, 'Embedded Snapshot JSON')).toBe(true);
     expect(treeHasText(tree, 'Unavailable')).toBe(true);
     expect(treeHasText(tree, 'Connect a wallet to download authenticated exports.')).toBe(true);
@@ -677,7 +681,7 @@ describe('SurveyResults export/view controls', () => {
     expect(subject.state.htmlReportModalOpen).toBe(false);
   });
 
-  it('downloads the selected report as a single-page PDF when that format is selected', async () => {
+  it('downloads the selected report as a PDF report when that format is selected', async () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
       sessionName: 'Demo Session',
@@ -689,7 +693,7 @@ describe('SurveyResults export/view controls', () => {
 
     subject.state = {
       ...subject.state,
-      htmlReportExportFormat: 'single-page-pdf',
+      htmlReportExportFormat: SESSION_RESULTS_EXPORT_FORMAT_PDF,
       htmlReportModalOpen: true,
       htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
       viewMode: 'questions',
