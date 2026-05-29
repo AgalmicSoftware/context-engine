@@ -225,6 +225,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /clear\.textContent = 'X';/);
   assert.match(html, /clear\.setAttribute\('aria-label', 'Clear question filters'\);/);
   assert.match(html, /return 'Questions: ' \+ filteredQuestionEntries\(\)\.length \+ '\/' \+ total;/);
+  assert.match(html, /return 'Questions: ' \+ loaded \+ '\/' \+ total;/);
   assert.match(html, /return 'Questions: ' \+ total;/);
   assert.equal(html.includes("' (Filter: '"), false);
   assert.match(html, /AI search/);
@@ -237,6 +238,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('-7px -7px 14px'), false);
   assert.match(html, /--question-card-shadow: 7px 7px 14px var\(--pile-shadow-dark\);/);
   assert.match(html, /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*padding: 2px 0 8px;/);
+  assert.match(html, /\.loadMoreQuestions/);
+  assert.match(html, /function loadMoreQuestions\(\)/);
+  assert.match(html, /stateUrl\.searchParams\.set\('questionLimit', String\(state\.questionLimit\)\);/);
   assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
   assert.match(html, /\.card\[data-active="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\), var\(--question-card-shadow\);/);
   assert.match(html, /\.card\[data-highlight="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--settings-accent\), var\(--question-card-shadow\);/);
@@ -920,6 +924,57 @@ test('Mini App session picker lists sessions and loads multi-selected questions'
   assert.equal(selected.questionCount, 2);
   assert.deepEqual(selected.questions.map((question) => question.sessionSlug), ['alpha', 'beta']);
   assert.equal(selected.session.title, '2 sessions');
+});
+
+test('Mini App question state defaults to 50 questions and supports loading more', async () => {
+  const kv = new MemoryKv();
+  const launch = 'cecb_page1234';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionPicker: true },
+  }));
+  const questions = Array.from({ length: 55 }, (_, index) => ({
+    sessionSlug: 'alpha',
+    questionId: `q-${String(index + 1).padStart(2, '0')}`,
+    questionType: 'freeform',
+    prompt: `Prompt ${index + 1}`,
+    tags: index < 5 ? ['organizer'] : ['general'],
+  }));
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions),
+  };
+
+  const initial = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`),
+    env,
+  });
+  assert.equal(initial.ok, true);
+  assert.equal(initial.pageSize, 50);
+  assert.equal(initial.questionCount, 55);
+  assert.equal(initial.loadedQuestionCount, 50);
+  assert.equal(initial.loadedQuestionLimit, 50);
+  assert.equal(initial.hasMoreQuestions, true);
+  assert.equal(initial.questions.length, 50);
+  assert.equal(initial.questions[0].tags.includes('organizer'), true);
+
+  const loadedMore = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha&questionLimit=100`),
+    env,
+  });
+  assert.equal(loadedMore.questionCount, 55);
+  assert.equal(loadedMore.loadedQuestionCount, 55);
+  assert.equal(loadedMore.hasMoreQuestions, false);
+  assert.equal(loadedMore.questions.length, 55);
 });
 
 test('Mini App session picker honors the Telegram session created-after cutoff', async () => {

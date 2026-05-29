@@ -117,7 +117,8 @@ import {
 } from './telegramMiniAppLoadingAsset.mjs';
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
-const DEFAULT_MINI_APP_PAGE_SIZE = 5;
+const DEFAULT_MINI_APP_PAGE_SIZE = 50;
+const MAX_MINI_APP_QUESTION_LIMIT = 500;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
@@ -253,6 +254,30 @@ function miniResultsLevelState(exposure = {}) {
 
 function sanitizeSessionSlug(value = '') {
   return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+}
+
+function miniAppQuestionPageSize(env = {}) {
+  const parsed = Number(env.AGENT_BRIDGE_MINIAPP_QUESTION_PAGE_SIZE);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_MINI_APP_PAGE_SIZE;
+  return Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Math.floor(parsed)));
+}
+
+function miniAppQuestionLimitFromRequest(url, pageSize = DEFAULT_MINI_APP_PAGE_SIZE) {
+  const raw = url?.searchParams?.get('questionLimit') || url?.searchParams?.get('limit');
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return pageSize;
+  return Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Math.floor(parsed)));
+}
+
+function pagedMiniAppQuestions(questions = [], limit = DEFAULT_MINI_APP_PAGE_SIZE) {
+  const source = Array.isArray(questions) ? questions : [];
+  const boundedLimit = Math.max(1, Math.min(MAX_MINI_APP_QUESTION_LIMIT, Number(limit) || DEFAULT_MINI_APP_PAGE_SIZE));
+  const page = source.slice(0, boundedLimit);
+  const launchQuestion = source.find((question) => question?.activeFromLaunch === true);
+  if (launchQuestion && !page.some((question) => question?.questionKey === launchQuestion.questionKey)) {
+    return [launchQuestion, ...page].slice(0, boundedLimit);
+  }
+  return page;
 }
 
 function shortAddress(value = '') {
@@ -1350,6 +1375,8 @@ async function buildMiniAppState({
   createdAt = new Date().toISOString(),
 } = {}) {
   const url = new URL(request.url);
+  const pageSize = miniAppQuestionPageSize(env);
+  const requestedQuestionLimit = miniAppQuestionLimitFromRequest(url, pageSize);
   const launch = safeString(url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const auth = await authorizeMiniAppRequest(request, env);
   const authSummary = {
@@ -1381,7 +1408,8 @@ async function buildMiniAppState({
       questions: [],
       activeQuestionKey: '',
       questionCount: 0,
-      pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
+      pageSize,
+      loadedQuestionLimit: requestedQuestionLimit,
       questionSource: '',
       questionSourceReason: '',
       sourceOk: false,
@@ -1413,7 +1441,8 @@ async function buildMiniAppState({
       questions: [],
       activeQuestionKey: '',
       questionCount: 0,
-      pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
+      pageSize,
+      loadedQuestionLimit: requestedQuestionLimit,
       questionSource: '',
       questionSourceReason: '',
       sourceOk: false,
@@ -1484,7 +1513,8 @@ async function buildMiniAppState({
       discoveredQuestionCount: 0,
       skippedQuestionCount: 0,
       questionIndexComplete: true,
-      pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
+      pageSize,
+      loadedQuestionLimit: requestedQuestionLimit,
       questionSource: 'session_picker',
       questionSourceReason: 'session_selection_required',
       sourceOk: true,
@@ -1539,13 +1569,14 @@ async function buildMiniAppState({
       createdAt,
     })));
   }));
-  const questions = questionGroups.flat();
-  const availableQuestionCount = questions.filter((question) => question?.canAnswer).length;
-  const unavailableQuestionCount = questions.filter((question) => question?.payloadUnavailable === true).length;
-  const lockedQuestionCount = questions.filter((question) => question?.locked === true).length;
+  const allQuestions = questionGroups.flat();
+  const questions = pagedMiniAppQuestions(allQuestions, requestedQuestionLimit);
+  const availableQuestionCount = allQuestions.filter((question) => question?.canAnswer).length;
+  const unavailableQuestionCount = allQuestions.filter((question) => question?.payloadUnavailable === true).length;
+  const lockedQuestionCount = allQuestions.filter((question) => question?.locked === true).length;
   const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
     sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
-  ), 0) || questions.length;
+  ), 0) || allQuestions.length;
   const activeQuestionKey = questions.find((question) => question.activeFromLaunch)?.questionKey ||
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
@@ -1625,7 +1656,10 @@ async function buildMiniAppState({
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
     draftAnswersByQuestionKey: savedDraftState.draftAnswersByQuestionKey,
     activeQuestionKey,
-    questionCount: questions.length,
+    questionCount: allQuestions.length,
+    loadedQuestionCount: questions.length,
+    loadedQuestionLimit: requestedQuestionLimit,
+    hasMoreQuestions: allQuestions.length > questions.length,
     availableQuestionCount,
     unavailableQuestionCount,
     lockedQuestionCount,
@@ -1634,7 +1668,7 @@ async function buildMiniAppState({
       sum + (Number(entry.loaded.skippedSessionMismatchCount || entry.loaded.scopedOutQuestionCount || 0) || 0)
     ), 0),
     questionIndexComplete: loadedEntries.every((entry) => entry.loaded.complete !== false),
-    pageSize: DEFAULT_MINI_APP_PAGE_SIZE,
+    pageSize,
     questionSource: sourceNames.length === 1 ? sourceNames[0] : 'multi_session_question_cache',
     questionSourceReason: sourceReasons.join(', '),
     sourceOk,
@@ -5887,6 +5921,7 @@ function telegramMiniAppHtml() {
     .sessionOption input { width: 18px; height: 18px; accent-color: var(--accent); }
     .sessionActions { display: flex; justify-content: flex-end; }
     .questionStack { display: grid; gap: 18px; min-height: 0; padding: 2px 0 8px; }
+    .loadMoreQuestions { justify-self: center; min-width: min(100%, 280px); }
     .questionVotes {
       display: grid;
       grid-template-columns: 30px minmax(28px, auto) 30px;
@@ -6685,6 +6720,7 @@ function telegramMiniAppHtml() {
       highlightedQuestionKey: '',
       highlightScrollDone: false,
       sessionsPanelOpen: false,
+      questionLimit: 0,
       loadedOnce: false,
     };
     const el = {
@@ -7419,6 +7455,16 @@ function telegramMiniAppHtml() {
       });
       updateFooterControls();
       scrollHighlightedQuestionIntoView();
+      if (state.data?.hasMoreQuestions === true) {
+        const loadMore = document.createElement('button');
+        loadMore.type = 'button';
+        loadMore.className = 'secondary loadMoreQuestions';
+        const loaded = Number(state.data?.loadedQuestionCount || questions.length) || questions.length;
+        const total = Number(state.data?.questionCount || loaded) || loaded;
+        loadMore.textContent = 'Load more questions (' + loaded + '/' + total + ')';
+        loadMore.onclick = () => loadMoreQuestions();
+        el.questionStack.appendChild(loadMore);
+      }
     }
     function selectValue(question, value) {
       activate(question);
@@ -8354,9 +8400,13 @@ function telegramMiniAppHtml() {
     }
     function questionCountText(data) {
       const total = Number(data?.questionCount ?? data?.availableQuestionCount ?? 0) || 0;
+      const loaded = Number(data?.loadedQuestionCount || data?.questions?.length || 0) || 0;
       const activeFilters = activeQuestionFilterCount();
       if (activeFilters > 0) {
         return 'Questions: ' + filteredQuestionEntries().length + '/' + total;
+      }
+      if (data?.hasMoreQuestions === true && total > loaded) {
+        return 'Questions: ' + loaded + '/' + total;
       }
       return 'Questions: ' + total;
     }
@@ -10531,6 +10581,7 @@ function telegramMiniAppHtml() {
         stateUrl.searchParams.set('launch', launch);
         const sessions = selectedSessionQuery();
         if (sessions) stateUrl.searchParams.set('sessions', sessions);
+        if (state.questionLimit > 0) stateUrl.searchParams.set('questionLimit', String(state.questionLimit));
         response = await fetch(stateUrl.pathname + stateUrl.search, {
           headers: headers(),
         });
@@ -10546,6 +10597,8 @@ function telegramMiniAppHtml() {
         return;
       }
       state.data = body;
+      const loadedLimit = Number(body.loadedQuestionLimit || body.loadedQuestionCount || body.pageSize || 0);
+      if (loadedLimit > 0) state.questionLimit = loadedLimit;
       if (body.sessionPicker?.enabled === true && !state.selectedSessionSlugs.size) {
         (body.sessionPicker.selectedSessionSlugs || []).forEach((slug) => state.selectedSessionSlugs.add(slug));
       }
@@ -10592,6 +10645,12 @@ function telegramMiniAppHtml() {
       state.loadedOnce = true;
       if (state.aiSearchQuery) scheduleAiSearch(0);
     }
+    function loadMoreQuestions() {
+      const current = Number(state.data?.loadedQuestionLimit || state.questionLimit || state.data?.loadedQuestionCount || state.data?.pageSize || 0);
+      const increment = Number(state.data?.pageSize || 50) || 50;
+      state.questionLimit = current + increment;
+      load();
+    }
     el.continueSessions.onclick = () => {
       if (!state.selectedSessionSlugs.size) return;
       state.activeKey = '';
@@ -10604,6 +10663,7 @@ function telegramMiniAppHtml() {
       state.expandedQuestionKeys = new Set();
       state.highlightedQuestionKey = '';
       state.highlightScrollDone = false;
+      state.questionLimit = 0;
       state.sessionsPanelOpen = false;
       load();
     };
