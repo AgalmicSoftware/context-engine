@@ -139,10 +139,9 @@ export const renderSurveyResultsSyncStatusPanel = ({
 type SurveyResultsFilterSummaryArgs = {
   displayedTotalQuestionsCount: number;
   displayedTotalResponsesCount: number;
-  normalizedFilteredQuestionsCount: number;
-  normalizedFilteredResponsesCount: number;
-  filterLoading: boolean;
-  areSummaryCountsHydrated: boolean;
+  normalizedFilteredQuestionsCount: React.ReactNode;
+  normalizedFilteredResponsesCount: React.ReactNode;
+  showFilteredCountSpinner: boolean;
 };
 
 export const renderSurveyResultsFilterSummary = ({
@@ -150,14 +149,13 @@ export const renderSurveyResultsFilterSummary = ({
   displayedTotalResponsesCount,
   normalizedFilteredQuestionsCount,
   normalizedFilteredResponsesCount,
-  filterLoading,
-  areSummaryCountsHydrated,
+  showFilteredCountSpinner,
 }: SurveyResultsFilterSummaryArgs) => (
   <div className={styles.filterSummaryBox}>
     <p className={styles.filterSummaryText}>
       Questions: <strong>{displayedTotalQuestionsCount}</strong> ‎  Filtered:{' '}
       <strong>
-        {filterLoading || !areSummaryCountsHydrated ? (
+        {showFilteredCountSpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
           normalizedFilteredQuestionsCount
@@ -166,7 +164,7 @@ export const renderSurveyResultsFilterSummary = ({
       <br />
       Responses: <strong>{displayedTotalResponsesCount}</strong> ‎  Filtered:{' '}
       <strong>
-        {filterLoading || !areSummaryCountsHydrated ? (
+        {showFilteredCountSpinner ? (
           <FontAwesomeIcon icon={faSpinner} spin />
         ) : (
           normalizedFilteredResponsesCount
