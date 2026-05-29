@@ -85,6 +85,9 @@ const getWalletContext = (override = {}) => {
 };
 
 const inFlightTokenRequests = new Map();
+const inFlightTelegramWorkerLoginRefreshes = new Map();
+const telegramWorkerLoginRefreshFailures = new Map();
+const TELEGRAM_WORKER_LOGIN_REFRESH_FAILURE_COOLDOWN_MS = 5_000;
 let workerAuthEpoch = 0;
 const getCurrentWorkerAuthStoreAddress = () => {
   try {
@@ -335,7 +338,7 @@ const buildTelegramWorkerLoginKey = ({ slug }) => (
   `${TELEGRAM_WORKER_LOGIN_PREFIX}:${normalizeSessionSlug(slug)}`
 );
 
-const readTelegramWorkerLogin = ({ slug, workerUrl } = {}) => {
+export const readTelegramWorkerLogin = ({ slug, workerUrl } = {}) => {
   if (typeof window === 'undefined') return null;
   const normalizedSlug = normalizeSessionSlug(slug);
   if (!normalizedSlug) return null;
@@ -442,6 +445,57 @@ const normalizeAgentBridgeUrl = (value = '') => {
   } catch (_) {
     return '';
   }
+};
+
+const buildTelegramWorkerLoginRefreshKey = ({ slug, agentBridgeUrl, workerUrl } = {}) => (
+  [
+    normalizeSessionSlug(slug),
+    normalizeAgentBridgeUrl(agentBridgeUrl),
+    normalizeWorkerUrl(workerUrl),
+  ].join('|')
+);
+
+const refreshTelegramWorkerLoginFromStoredCredential = async ({
+  slug,
+  agentBridgeUrl,
+  workerUrl,
+} = {}) => {
+  const credentials = getTelegramAgentBridgeCredentials({ slug, agentBridgeUrl });
+  if (!credentials?.token || !credentials.agentBridgeUrl) return null;
+  const refreshKey = buildTelegramWorkerLoginRefreshKey({
+    slug: credentials.sessionSlug,
+    agentBridgeUrl: credentials.agentBridgeUrl,
+    workerUrl,
+  });
+  if (!refreshKey.replace(/\|/g, '')) return null;
+  const nowMs = Date.now();
+  const lastFailureAt = Number(telegramWorkerLoginRefreshFailures.get(refreshKey) || 0);
+  if (lastFailureAt && nowMs - lastFailureAt < TELEGRAM_WORKER_LOGIN_REFRESH_FAILURE_COOLDOWN_MS) {
+    return null;
+  }
+  if (!inFlightTelegramWorkerLoginRefreshes.has(refreshKey)) {
+    const refreshPromise = exchangeTelegramSessionToken({
+      token: credentials.token,
+      sessionSlug: credentials.sessionSlug,
+      agentBridgeUrl: credentials.agentBridgeUrl,
+    })
+      .then(() => {
+        telegramWorkerLoginRefreshFailures.delete(refreshKey);
+        return readTelegramWorkerLogin({
+          slug: credentials.sessionSlug,
+          workerUrl,
+        });
+      })
+      .catch(() => {
+        telegramWorkerLoginRefreshFailures.set(refreshKey, Date.now());
+        return null;
+      })
+      .finally(() => {
+        inFlightTelegramWorkerLoginRefreshes.delete(refreshKey);
+      });
+    inFlightTelegramWorkerLoginRefreshes.set(refreshKey, refreshPromise);
+  }
+  return inFlightTelegramWorkerLoginRefreshes.get(refreshKey);
 };
 
 export const extractTelegramSessionToken = (value = '') => {
@@ -1022,6 +1076,8 @@ export const clearWorkerSessionToken = ({
 
 export const clearAllWorkerSessionTokens = () => {
   invalidateWorkerAuthState({ nextAddress: '' });
+  inFlightTelegramWorkerLoginRefreshes.clear();
+  telegramWorkerLoginRefreshFailures.clear();
   if (typeof window === 'undefined') return;
   try {
     Object.keys(localStorage).forEach((key) => {
@@ -1039,10 +1095,23 @@ const getWorkerAuthHeadersWithMeta = async ({
   workerUrl,
   allowDemoFallback,
 } = {}) => {
-  const telegramLogin = readTelegramWorkerLogin({
-    slug: sessionSlug || sessionConfig?.slug,
+  const telegramSlug = sessionSlug || sessionConfig?.slug;
+  let telegramLogin = readTelegramWorkerLogin({
+    slug: telegramSlug,
     workerUrl,
   });
+  if (!telegramLogin?.token) {
+    telegramLogin = await refreshTelegramWorkerLoginFromStoredCredential({
+      slug: telegramSlug,
+      agentBridgeUrl:
+        sessionConfig?.agentBridgeWorkerUrl ||
+        sessionConfig?.telegramAgentBridgeUrl ||
+        sessionConfig?.agentBridgeUrl ||
+        sessionConfig?.telegram?.agentBridgeUrl ||
+        sessionConfig?.telegram?.worker,
+      workerUrl,
+    });
+  }
   if (telegramLogin?.token) {
     return {
       headers: {
@@ -1436,6 +1505,7 @@ export const workerAuthUtils = {
   extractTelegramSessionToken,
   exchangeTelegramSessionToken,
   getTelegramAgentBridgeCredentials,
+  readTelegramWorkerLogin,
   getWorkerSessionToken,
   getWorkerAuthHeaders,
   clearWorkerSessionToken,

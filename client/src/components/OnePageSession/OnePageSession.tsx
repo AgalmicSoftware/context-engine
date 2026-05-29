@@ -49,6 +49,8 @@ import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js
 import {
   exchangeTelegramSessionToken,
   extractTelegramSessionToken,
+  getTelegramAgentBridgeCredentials,
+  readTelegramWorkerLogin,
 } from '../../utilities/worker/workerAuth.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import {
@@ -123,6 +125,7 @@ const TELEGRAM_LOGIN_QUERY_PARAMS = [
   'agentToken',
   'token',
 ];
+const TELEGRAM_CLIENT_AUTH_EXPIRY_SKEW_SECONDS = 60;
 
 const normalizeAgentBridgeUrl = (value: any = '') => {
   const raw = String(value || '').trim();
@@ -448,6 +451,7 @@ class OnePageSession extends Component<any, any> {
     this.handleTelegramLoginInputChange = this.handleTelegramLoginInputChange.bind(this);
     this.handleTelegramLoginSubmit = this.handleTelegramLoginSubmit.bind(this);
     this.tryTelegramTokenLogin = this.tryTelegramTokenLogin.bind(this);
+    this.restoreTelegramClientAuthFromStorage = this.restoreTelegramClientAuthFromStorage.bind(this);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -461,10 +465,36 @@ class OnePageSession extends Component<any, any> {
     } catch (e) { demoLog.warn('OnePageSession: callback', e); }
   }
 
+  resolveCurrentSessionSlug() {
+    return normalizeOnePageSessionSlug(
+      resolveEffectiveSlug(this.props) ||
+      (this.props.sessionConfig && this.props.sessionConfig.slug) ||
+      this.props.sessionSlug
+    );
+  }
+
+  resolveCurrentSessionConfig(sessionSlug: any = this.resolveCurrentSessionSlug()) {
+    return this.getResolvedSessionConfig({
+      slug: sessionSlug,
+      sessionName: this.props.sessionName,
+      questionsGenPrompt: this.props.questionsGenPrompt,
+      autoFeatureSBTsBySessionSlug: this.props.autoFeatureSBTsBySessionSlug,
+      autoFeatureSBTsWithFeaturedSbtTags: this.props.autoFeatureSBTsWithFeaturedSbtTags,
+      incomingSessionConfig: this.props.sessionConfig,
+      contracts: this.props.contracts,
+    });
+  }
+
   hasTelegramClientAuth(sessionSlug: any = '') {
     const auth = this.state.telegramClientAuth || {};
-    const slug = normalizeOnePageSessionSlug(sessionSlug || resolveEffectiveSlug(this.props));
+    const slug = normalizeOnePageSessionSlug(sessionSlug || this.resolveCurrentSessionSlug());
     const authSlug = normalizeOnePageSessionSlug(auth.sessionSlug || '');
+    const exp = Number(auth.exp || 0);
+    if (Number.isFinite(exp) && exp > 0) {
+      const expiresAtMs = exp * 1000;
+      const skewMs = TELEGRAM_CLIENT_AUTH_EXPIRY_SKEW_SECONDS * 1000;
+      if (expiresAtMs <= Date.now() + skewMs) return false;
+    }
     return Boolean(auth.accountAddress && auth.workerToken && (!slug || !authSlug || slug === authSlug));
   }
 
@@ -484,16 +514,8 @@ class OnePageSession extends Component<any, any> {
       });
       return null;
     }
-    const sessionSlug = normalizeOnePageSessionSlug(resolveEffectiveSlug(this.props));
-    const sessionConfig = this.getResolvedSessionConfig({
-      slug: sessionSlug,
-      sessionName: this.props.sessionName,
-      questionsGenPrompt: this.props.questionsGenPrompt,
-      autoFeatureSBTsBySessionSlug: this.props.autoFeatureSBTsBySessionSlug,
-      autoFeatureSBTsWithFeaturedSbtTags: this.props.autoFeatureSBTsWithFeaturedSbtTags,
-      incomingSessionConfig: this.props.sessionConfig,
-      contracts: this.props.contracts,
-    });
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
     this.setState({ telegramLoginStatus: 'loading', telegramLoginError: '' });
     try {
       const login = await exchangeTelegramSessionToken({
@@ -521,6 +543,60 @@ class OnePageSession extends Component<any, any> {
         telegramLoginStatus: 'error',
         telegramLoginError: getErrorMessage(error, 'Telegram login failed.'),
       });
+      return null;
+    }
+  }
+
+  async restoreTelegramClientAuthFromStorage() {
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    if (!sessionSlug) return null;
+    const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
+    if (!isTelegramOnlySessionConfig(sessionConfig)) return null;
+
+    const cachedLogin = readTelegramWorkerLogin({ slug: sessionSlug });
+    if (cachedLogin?.token) {
+      this.setState({
+        telegramLoginStatus: 'ready',
+        telegramLoginError: '',
+        telegramClientAuth: {
+          accountAddress: cachedLogin.address,
+          workerToken: cachedLogin.token,
+          sessionSlug: cachedLogin.sessionSlug || sessionSlug,
+          workerUrl: cachedLogin.workerUrl,
+          exp: cachedLogin.exp,
+          buckets: null,
+        },
+      });
+      return cachedLogin;
+    }
+
+    const credentials = getTelegramAgentBridgeCredentials({
+      slug: sessionSlug,
+      agentBridgeUrl: resolveTelegramAgentBridgeUrl(sessionConfig),
+    });
+    if (!credentials?.token) return null;
+    this.setState({ telegramLoginStatus: 'loading', telegramLoginError: '' });
+    try {
+      const login = await exchangeTelegramSessionToken({
+        token: credentials.token,
+        sessionSlug,
+        agentBridgeUrl: credentials.agentBridgeUrl,
+      });
+      this.setState({
+        telegramLoginStatus: 'ready',
+        telegramLoginError: '',
+        telegramClientAuth: {
+          accountAddress: login.accountAddress,
+          workerToken: login.workerToken || login.token,
+          sessionSlug: login.sessionSlug || sessionSlug,
+          workerUrl: login.workerUrl,
+          exp: login.exp,
+          buckets: login.buckets || null,
+        },
+      });
+      return login;
+    } catch (_) {
+      this.setState({ telegramLoginStatus: 'idle' });
       return null;
     }
   }
@@ -586,6 +662,8 @@ class OnePageSession extends Component<any, any> {
     if (this.state.telegramLoginInput) {
       removeTelegramLoginInputFromUrl();
       this.tryTelegramTokenLogin(this.state.telegramLoginInput);
+    } else {
+      this.restoreTelegramClientAuthFromStorage();
     }
   }
 

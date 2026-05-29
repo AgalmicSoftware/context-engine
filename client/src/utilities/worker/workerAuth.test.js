@@ -253,9 +253,63 @@ describe('workerAuth token cache envelopes', () => {
 });
 
 describe('workerAuth Telegram token login', () => {
+  const originalFetch = global.fetch;
+  const storeTelegramCredential = ({
+    slug = 'edge',
+    agentToken = `ceagt_${'C'.repeat(32)}`,
+    agentBridgeUrl = 'https://bridge.example',
+    workerUrl = 'https://session-worker.example',
+    workerToken = 'worker-jwt-old',
+    exp = Math.floor(Date.now() / 1000) + 3600,
+    address = TEST_ADDRESS,
+  } = {}) => {
+    localStorage.setItem(
+      __test__workerAuthTokenCache.buildTelegramWorkerLoginKey({ slug }),
+      JSON.stringify({
+        v: 1,
+        sessionSlug: slug,
+        workerUrl,
+        agentBridgeUrl,
+        agentToken,
+        address,
+        updatedAt: Date.now(),
+      })
+    );
+    if (workerToken) {
+      localStorage.setItem(
+        __test__workerAuthTokenCache.buildTokenCacheKey({ workerUrl, slug, address }),
+        JSON.stringify(__test__workerAuthTokenCache.buildTokenCacheEnvelope({
+          token: workerToken,
+          exp,
+          workerUrl,
+          sessionSlug: slug,
+          address,
+        }))
+      );
+    }
+    return { slug, agentToken, agentBridgeUrl, workerUrl, workerToken, exp, address };
+  };
+
   beforeEach(() => {
+    const mockStore = require('../../store.js').default;
+    mockStore.getState.mockReturnValue({
+      profile: {
+        account: TEST_ADDRESS,
+        provider: 'wagmi',
+        network: { id: 84532 },
+      },
+      sessionState: {},
+    });
+    mockProviderRequest.mockClear();
+    mockProviderRequest.mockImplementation(defaultProviderRequest);
+    global.fetch = originalFetch;
+    clearAllWorkerSessionTokens();
     localStorage.clear();
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
   });
 
   it('extracts a ceagt token from either a bare token or copied bot message', () => {
@@ -340,6 +394,147 @@ describe('workerAuth Telegram token login', () => {
       Authorization: 'Bearer worker-jwt-1',
       'X-Group-Slug': 'edge',
     });
+  });
+
+  it('silently refreshes expired Telegram worker JWTs from the stored ceagt token', async () => {
+    const agentToken = `ceagt_${'D'.repeat(32)}`;
+    const freshExp = Math.floor(Date.now() / 1000) + 3600;
+    storeTelegramCredential({
+      agentToken,
+      workerToken: 'expired-worker-jwt',
+      exp: Math.floor(Date.now() / 1000) - 60,
+    });
+    global.fetch = jest.fn(async (url, init = {}) => {
+      expect(String(url)).toBe('https://bridge.example/telegram/agent/api/client-login/exchange');
+      expect(JSON.parse(init.body)).toEqual({
+        token: agentToken,
+        sessionSlug: 'edge',
+      });
+      return jsonResp(200, {
+        ok: true,
+        workerToken: 'worker-jwt-fresh',
+        exp: freshExp,
+        workerUrl: 'https://session-worker.example',
+        sessionSlug: 'edge',
+        accountAddress: TEST_ADDRESS,
+      });
+    });
+
+    const headers = await getWorkerAuthHeaders({
+      sessionSlug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(headers).toEqual({
+      Authorization: 'Bearer worker-jwt-fresh',
+      'X-Group-Slug': 'edge',
+    });
+    expect(__test__workerAuthTokenCache.readTelegramWorkerLogin({
+      slug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    })).toEqual(expect.objectContaining({
+      token: 'worker-jwt-fresh',
+      exp: freshExp,
+      workerUrl: 'https://session-worker.example',
+    }));
+  });
+
+  it('single-flights concurrent Telegram worker JWT refreshes', async () => {
+    const agentToken = `ceagt_${'E'.repeat(32)}`;
+    const freshExp = Math.floor(Date.now() / 1000) + 3600;
+    storeTelegramCredential({
+      agentToken,
+      workerToken: null,
+    });
+    let resolveExchange;
+    global.fetch = jest.fn((url, init = {}) => {
+      expect(String(url)).toBe('https://bridge.example/telegram/agent/api/client-login/exchange');
+      expect(JSON.parse(init.body)).toEqual({
+        token: agentToken,
+        sessionSlug: 'edge',
+      });
+      return new Promise((resolve) => {
+        resolveExchange = () => resolve(jsonResp(200, {
+          ok: true,
+          workerToken: 'worker-jwt-single-flight',
+          exp: freshExp,
+          workerUrl: 'https://session-worker.example',
+          sessionSlug: 'edge',
+          accountAddress: TEST_ADDRESS,
+        }));
+      });
+    });
+
+    const first = getWorkerAuthHeaders({
+      sessionSlug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    });
+    const second = getWorkerAuthHeaders({
+      sessionSlug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    });
+    await flushPromises();
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    resolveExchange();
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      {
+        Authorization: 'Bearer worker-jwt-single-flight',
+        'X-Group-Slug': 'edge',
+      },
+      {
+        Authorization: 'Bearer worker-jwt-single-flight',
+        'X-Group-Slug': 'edge',
+      },
+    ]);
+  });
+
+  it('falls back without leaking refresh failures or retry loops', async () => {
+    const agentToken = `ceagt_${'F'.repeat(32)}`;
+    const mockStore = require('../../store.js').default;
+    mockStore.getState.mockReturnValue({
+      profile: {
+        account: '',
+        provider: 'wagmi',
+        network: { id: 84532 },
+      },
+      sessionState: {},
+    });
+    mockProviderRequest.mockImplementation(async () => []);
+    storeTelegramCredential({
+      agentToken,
+      workerToken: null,
+    });
+    global.fetch = jest.fn(async () => jsonResp(401, {
+      ok: false,
+      reason: 'agent_token_invalid',
+    }));
+
+    let firstError = null;
+    let secondError = null;
+    try {
+      await getWorkerAuthHeaders({
+        sessionSlug: 'edge',
+        workerUrl: 'https://session-worker.example',
+      });
+    } catch (error) {
+      firstError = error;
+    }
+    try {
+      await getWorkerAuthHeaders({
+        sessionSlug: 'edge',
+        workerUrl: 'https://session-worker.example',
+      });
+    } catch (error) {
+      secondError = error;
+    }
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(firstError).toBeTruthy();
+    expect(secondError).toBeTruthy();
+    expect(String(firstError?.message || '')).not.toMatch(/agent_token_invalid|Telegram login failed/i);
+    expect(String(secondError?.message || '')).not.toMatch(/agent_token_invalid|Telegram login failed/i);
   });
 });
 

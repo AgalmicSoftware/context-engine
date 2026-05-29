@@ -14,6 +14,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { __test__workerAuthTokenCache } from '../../utilities/worker/workerAuth.js';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -162,6 +163,7 @@ describe('OnePageSession view gating', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     window.sessionStorage.clear();
+    window.localStorage.clear();
     Object.defineProperty(global, 'fetch', {
       writable: true,
       value: originalFetch,
@@ -265,6 +267,67 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByText(/passkey/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
     expect(mockSurveyPage).not.toHaveBeenCalled();
+  });
+
+  it('restores Telegram token login from stored credentials on reload', async () => {
+    const address = '0x00000000000000000000000000000000000000aa';
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    window.localStorage.setItem(
+      __test__workerAuthTokenCache.buildTelegramWorkerLoginKey({ slug: 'edge' }),
+      JSON.stringify({
+        v: 1,
+        sessionSlug: 'edge',
+        workerUrl: 'https://session-worker.example',
+        agentBridgeUrl: 'https://bridge.example',
+        agentToken: `ceagt_${'G'.repeat(32)}`,
+        address,
+        updatedAt: Date.now(),
+      })
+    );
+    window.localStorage.setItem(
+      __test__workerAuthTokenCache.buildTokenCacheKey({
+        workerUrl: 'https://session-worker.example',
+        slug: 'edge',
+        address,
+      }),
+      JSON.stringify(__test__workerAuthTokenCache.buildTokenCacheEnvelope({
+        token: 'worker-jwt-cached',
+        exp,
+        workerUrl: 'https://session-worker.example',
+        sessionSlug: 'edge',
+        address,
+      }))
+    );
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-telegram-token-login')).not.toBeInTheDocument();
+  });
+
+  it('treats expired in-memory Telegram client auth as logged out', () => {
+    const subject = createSubject({
+      sessionConfig: {
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+      },
+    });
+    subject.state.telegramClientAuth = {
+      accountAddress: '0x00000000000000000000000000000000000000aa',
+      workerToken: 'worker-jwt-expired',
+      sessionSlug: 'edge',
+      exp: Math.floor(Date.now() / 1000) - 60,
+    };
+
+    expect(subject.hasTelegramClientAuth('edge')).toBe(false);
   });
 
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
