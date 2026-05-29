@@ -465,6 +465,24 @@ If the response has `admin: true` and
 manage sponsored questions without needing exact question IDs. Use a two-step
 confirm-before-write flow:
 
+Admins can also read aggregate bridge metrics:
+
+```http
+GET /telegram/agent/api/admin/metrics?sessionSlug=telegram-demo-4
+```
+
+This endpoint is admin-only and returns counts only: token mints, distinct
+onboarded Telegram users, bridge-created questions, rolling 30-day submitted
+answer records, answer drafts, group proposals, distinct respondents,
+registry-session count, and sessions with bridge KV activity. Measurement
+boundaries matter: `agentsOnboarded` means CE delegation-token mints, not
+external skill installs; `registrySessionCount` comes from the cached on-chain
+SessionRegistry read and is not a count of worker-created sessions; and
+`questionsAnswered` counts submit-queue records with submitted statuses during
+the submit-record TTL window. Env-level root admins receive global totals and a
+per-session breakdown; session admins receive only their token-bound or target
+session.
+
 ```http
 POST /telegram/agent/api/question-queue/plan
 POST /telegram/agent/api/question-queue/apply
@@ -748,5 +766,7 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   agent menu and `/activity` for recent activity.
 - The worker exposes `/telegram/agent/api/skill-version` so agents can check
   whether their installed skill is current.
-- Planned/active agent API coverage includes admin metrics, creating questions
-  from agent-summarized URLs, and active-tag lookup for consistent tagging.
+- Admin agents can read aggregate bridge metrics through
+  `/telegram/agent/api/admin/metrics`.
+- Planned agent API coverage includes creating questions from
+  agent-summarized URLs and active-tag lookup for consistent tagging.

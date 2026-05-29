@@ -46,6 +46,7 @@ import {
   AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX,
   listTelegramAgentActivity,
 } from './telegramAgentActivity.mjs';
+import { listRegistrySessionsForBridge } from './registrySessions.mjs';
 import {
   loadTelegramQuestionQueueConfig,
   saveTelegramQuestionQueueConfig,
@@ -56,15 +57,29 @@ import {
   createTelegramAgentDelegationToken,
   delegationTokenHasScope,
   loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
+import {
+  SUBMIT_REQUEST_KV_PREFIX,
+  SUBMIT_REQUEST_SESSION_KV_PREFIX,
+  SUBMIT_REQUEST_USER_KV_PREFIX,
+  SUBMIT_REQUEST_TTL_SECONDS,
+  SUBMITTED_RESULT_STATUSES,
+  submitRequestSessionKvPrefix,
+} from './telegramSubmitQueue.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-28 (v2)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
+const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
+const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
+const LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposal:';
+const ADMIN_METRICS_CACHE_KV_PREFIX = 'telegram:admin-metrics-cache:v1:';
+const ADMIN_METRICS_CACHE_TTL_SECONDS = 60;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -370,6 +385,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/admin/status') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (pathname === '/telegram/agent/api/admin/metrics') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/onboarding') {
     return methodName === 'POST'
       ? TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS
@@ -493,6 +511,154 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
   };
   assertNoSecretShape(payload, 'Telegram agent onboarding state must not serialize secrets.');
   return payload;
+}
+
+function normalizeAddress(value = '') {
+  const text = safeString(value).toLowerCase();
+  return /^0x[0-9a-f]{40}$/.test(text) ? text : '';
+}
+
+function parseAddressList(value = '') {
+  const raw = safeString(value);
+  if (!raw) return [];
+  const parsed = safeJsonParse(raw, null);
+  if (Array.isArray(parsed)) return parsed.map(normalizeAddress).filter(Boolean);
+  return raw.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
+}
+
+function isRootResponseExportAdmin(env = {}, accountAddress = '') {
+  const account = normalizeAddress(accountAddress);
+  if (!account) return false;
+  return parseAddressList(env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES).includes(account);
+}
+
+async function listMetricKvEntriesByPrefix(env = {}, prefix = '', {
+  limit = 10000,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!prefix || !kv || typeof kv.list !== 'function') return [];
+  const maxEntries = Math.max(1, Math.min(20000, Number(limit) || 10000));
+  const pageLimit = Math.min(1000, maxEntries);
+  const entries = [];
+  let cursor = undefined;
+  do {
+    const page = await kv.list({
+      prefix,
+      limit: pageLimit,
+      ...(cursor ? { cursor } : {}),
+    }).catch(() => null);
+    const keys = Array.isArray(page?.keys) ? page.keys : [];
+    for (const entry of keys) {
+      const key = safeString(entry?.name || entry);
+      if (!key) continue;
+      entries.push({
+        key,
+        metadata: entry && typeof entry === 'object' && !Array.isArray(entry)
+          ? (entry.metadata || null)
+          : null,
+      });
+      if (entries.length >= maxEntries) return entries;
+    }
+    cursor = page?.list_complete === false ? safeString(page.cursor) : '';
+  } while (cursor);
+  return entries;
+}
+
+async function readMetricRecord(env = {}, key = '') {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') return null;
+  const record = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return record && typeof record === 'object' && !Array.isArray(record) ? record : null;
+}
+
+function sessionFromSessionFirstKey(key = '', prefix = '') {
+  const rest = safeString(key).startsWith(prefix) ? safeString(key).slice(prefix.length) : '';
+  return sanitizeSessionSlug(rest.split(':')[0]);
+}
+
+function sessionFromDraftKey(key = '') {
+  const rest = safeString(key).startsWith(ANSWER_DRAFT_KV_PREFIX)
+    ? safeString(key).slice(ANSWER_DRAFT_KV_PREFIX.length)
+    : '';
+  return sanitizeSessionSlug(rest.split(':')[1]);
+}
+
+function userFromSubmitUserKey(key = '') {
+  const rest = safeString(key).startsWith(SUBMIT_REQUEST_USER_KV_PREFIX)
+    ? safeString(key).slice(SUBMIT_REQUEST_USER_KV_PREFIX.length)
+    : '';
+  const [sessionSlug, telegramUserId] = rest.split(':');
+  return {
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    telegramUserId: safeString(telegramUserId),
+  };
+}
+
+function emptyAdminMetricTotals() {
+  return {
+    agentsOnboarded: 0,
+    distinctUsersOnboarded: 0,
+    questionsCreated: 0,
+    questionsAnswered: 0,
+    answerDrafts: 0,
+    groupProposals: 0,
+    sessionsWithBridgeActivity: 0,
+    registrySessionCount: 0,
+    distinctRespondents: 0,
+  };
+}
+
+function incrementMetric(perSession = new Map(), sessionSlug = '', field = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug || !field) return;
+  const current = perSession.get(slug) || {
+    sessionSlug: slug,
+    ...emptyAdminMetricTotals(),
+    _usersOnboarded: new Set(),
+    _respondents: new Set(),
+  };
+  current[field] = Number(current[field] || 0) + 1;
+  perSession.set(slug, current);
+}
+
+function sessionMetric(perSession = new Map(), sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return null;
+  const current = perSession.get(slug) || {
+    sessionSlug: slug,
+    ...emptyAdminMetricTotals(),
+    _usersOnboarded: new Set(),
+    _respondents: new Set(),
+  };
+  perSession.set(slug, current);
+  return current;
+}
+
+function publicSessionMetric(metric = {}) {
+  const out = {
+    sessionSlug: sanitizeSessionSlug(metric.sessionSlug),
+    agentsOnboarded: Number(metric.agentsOnboarded || 0),
+    distinctUsersOnboarded: metric._usersOnboarded instanceof Set
+      ? metric._usersOnboarded.size
+      : Number(metric.distinctUsersOnboarded || 0),
+    questionsCreated: Number(metric.questionsCreated || 0),
+    questionsAnswered: Number(metric.questionsAnswered || 0),
+    answerDrafts: Number(metric.answerDrafts || 0),
+    groupProposals: Number(metric.groupProposals || 0),
+    sessionsWithBridgeActivity: 0,
+    registrySessionCount: Number(metric.registrySessionCount || 0),
+    distinctRespondents: metric._respondents instanceof Set
+      ? metric._respondents.size
+      : Number(metric.distinctRespondents || 0),
+  };
+  out.sessionsWithBridgeActivity = [
+    out.agentsOnboarded,
+    out.questionsCreated,
+    out.questionsAnswered,
+    out.answerDrafts,
+    out.groupProposals,
+  ].some((count) => count > 0) ? 1 : 0;
+  return out;
 }
 
 function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = 'GET') {
@@ -1170,6 +1336,181 @@ async function handleOnboardingRequest({
     }, { status: 400 });
   }
   return json(publicOnboardingState({ sessionSlug, settings: saved.settings }));
+}
+
+async function loadAdminMetricsCache(env = {}, cacheKey = '') {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!cacheKey || !kv || typeof kv.get !== 'function') return null;
+  const cached = safeJsonParse(await kv.get(cacheKey).catch(() => null), null);
+  if (!cached || typeof cached !== 'object' || Array.isArray(cached) || cached.ok !== true) return null;
+  assertNoSecretShape(cached, 'Cached Telegram admin metrics must not serialize secrets.');
+  return {
+    ...cached,
+    cached: true,
+  };
+}
+
+async function saveAdminMetricsCache(env = {}, cacheKey = '', payload = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!cacheKey || !kv || typeof kv.put !== 'function') return;
+  assertNoSecretShape(payload, 'Telegram admin metrics cache payload must not serialize secrets.');
+  await kv.put(cacheKey, JSON.stringify(payload), { expirationTtl: ADMIN_METRICS_CACHE_TTL_SECONDS });
+}
+
+async function buildAdminMetricsSnapshot({
+  env = {},
+  scope = 'session',
+  sessionSlug = '',
+} = {}) {
+  const scopedSessionSlug = scope === 'session' ? sanitizeSessionSlug(sessionSlug) : '';
+  const inScope = (slug = '') => {
+    const normalized = sanitizeSessionSlug(slug);
+    return scope !== 'session' || normalized === scopedSessionSlug;
+  };
+  const totals = emptyAdminMetricTotals();
+  const perSession = new Map();
+  const onboardedUsers = new Set();
+  const respondents = new Set();
+  const activitySessions = new Set();
+
+  const tokenEntries = await listMetricKvEntriesByPrefix(env, TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX);
+  for (const entry of tokenEntries) {
+    const metadata = entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata)
+      ? entry.metadata
+      : null;
+    let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
+    let telegramUserId = safeString(metadata?.u);
+    if (!tokenSessionSlug || !telegramUserId) {
+      const record = await readMetricRecord(env, entry.key);
+      tokenSessionSlug = sanitizeSessionSlug(record?.sessionSlug);
+      telegramUserId = safeString(record?.telegramUserId);
+    }
+    if (!tokenSessionSlug || !inScope(tokenSessionSlug)) continue;
+    totals.agentsOnboarded += 1;
+    activitySessions.add(tokenSessionSlug);
+    incrementMetric(perSession, tokenSessionSlug, 'agentsOnboarded');
+    if (telegramUserId) {
+      onboardedUsers.add(telegramUserId);
+      sessionMetric(perSession, tokenSessionSlug)?._usersOnboarded.add(telegramUserId);
+    }
+  }
+
+  const proposedEntries = await listMetricKvEntriesByPrefix(env, PROPOSED_QUESTION_KV_PREFIX);
+  for (const entry of proposedEntries) {
+    const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, PROPOSED_QUESTION_KV_PREFIX);
+    if (!slug || !inScope(slug)) continue;
+    totals.questionsCreated += 1;
+    activitySessions.add(slug);
+    incrementMetric(perSession, slug, 'questionsCreated');
+  }
+
+  const draftEntries = await listMetricKvEntriesByPrefix(env, ANSWER_DRAFT_KV_PREFIX);
+  for (const entry of draftEntries) {
+    const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromDraftKey(entry.key);
+    if (!slug || !inScope(slug)) continue;
+    totals.answerDrafts += 1;
+    activitySessions.add(slug);
+    incrementMetric(perSession, slug, 'answerDrafts');
+  }
+
+  const groupEntries = await listMetricKvEntriesByPrefix(env, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
+  for (const entry of groupEntries) {
+    const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
+    if (!slug || !inScope(slug)) continue;
+    totals.groupProposals += 1;
+    activitySessions.add(slug);
+    incrementMetric(perSession, slug, 'groupProposals');
+  }
+
+  const submitPrefix = scopedSessionSlug ? submitRequestSessionKvPrefix(scopedSessionSlug) : SUBMIT_REQUEST_KV_PREFIX;
+  const submitEntries = await listMetricKvEntriesByPrefix(env, submitPrefix);
+  const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
+  for (const entry of submitEntries) {
+    const record = await readMetricRecord(env, entry.key);
+    const slug = sanitizeSessionSlug(record?.sessionSlug) ||
+      (scopedSessionSlug || sessionFromSessionFirstKey(entry.key, SUBMIT_REQUEST_SESSION_KV_PREFIX));
+    if (!slug || !inScope(slug)) continue;
+    const status = safeString(record?.status);
+    if (!submittedStatuses.has(status)) continue;
+    const telegramUserId = safeString(record?.telegramUserId);
+    totals.questionsAnswered += 1;
+    activitySessions.add(slug);
+    incrementMetric(perSession, slug, 'questionsAnswered');
+    if (telegramUserId) {
+      respondents.add(`${slug}:${telegramUserId}`);
+      sessionMetric(perSession, slug)?._respondents.add(telegramUserId);
+    }
+  }
+
+  const submitUserEntries = await listMetricKvEntriesByPrefix(env, scopedSessionSlug
+    ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${scopedSessionSlug}:`
+    : SUBMIT_REQUEST_USER_KV_PREFIX);
+  for (const entry of submitUserEntries) {
+    const parsed = userFromSubmitUserKey(entry.key);
+    if (!parsed.sessionSlug || !parsed.telegramUserId || !inScope(parsed.sessionSlug)) continue;
+    respondents.add(`${parsed.sessionSlug}:${parsed.telegramUserId}`);
+    sessionMetric(perSession, parsed.sessionSlug)?._respondents.add(parsed.telegramUserId);
+  }
+
+  const registry = await listRegistrySessionsForBridge({ env }).catch(() => ({ ok: false, sessions: [] }));
+  const registrySessionCount = Array.isArray(registry?.sessions) ? registry.sessions.length : 0;
+  totals.distinctUsersOnboarded = onboardedUsers.size;
+  totals.distinctRespondents = respondents.size;
+  totals.sessionsWithBridgeActivity = activitySessions.size;
+  totals.registrySessionCount = registrySessionCount;
+  for (const metric of perSession.values()) {
+    metric.registrySessionCount = registrySessionCount;
+  }
+
+  return {
+    totals,
+    perSession: [...perSession.values()]
+      .map(publicSessionMetric)
+      .sort((left, right) => left.sessionSlug.localeCompare(right.sessionSlug)),
+  };
+}
+
+async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } = {}) {
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized: context.normalized,
+    session: context.session,
+    createdAt: input.createdAt || null,
+  });
+  if (!manager.ok) {
+    return json({
+      ok: false,
+      reason: 'metrics_admin_required',
+      accountAddress: manager.accountAddress || '',
+    }, { status: 403 });
+  }
+  const rootAdmin = isRootResponseExportAdmin(env, manager.accountAddress);
+  const scope = rootAdmin ? 'global' : 'session';
+  const sessionSlug = context.session.sessionSlug;
+  const cacheKey = `${ADMIN_METRICS_CACHE_KV_PREFIX}${scope}:${scope === 'session' ? sessionSlug : 'all'}`;
+  const cached = await loadAdminMetricsCache(env, cacheKey);
+  if (cached) return json(cached);
+
+  const computedAt = new Date().toISOString();
+  const snapshot = await buildAdminMetricsSnapshot({ env, scope, sessionSlug });
+  const payload = {
+    ok: true,
+    scope,
+    ...(scope === 'session' ? { sessionSlug } : {}),
+    computedAt,
+    cached: false,
+    definitions: {
+      agentsOnboarded: 'Delegation-token mints observed by the worker; this is not a count of external skill installs.',
+      registrySessionCount: 'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
+      sessionsWithBridgeActivity: 'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
+      questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
+    },
+    totals: snapshot.totals,
+    ...(rootAdmin ? { perSession: snapshot.perSession } : {}),
+  };
+  assertNoSecretShape(payload, 'Telegram admin metrics response must not serialize secrets.');
+  await saveAdminMetricsCache(env, cacheKey, payload);
+  return json(payload);
 }
 
 async function handleQuestionQueuePlanRequest({
@@ -2498,6 +2839,7 @@ export async function handleTelegramAgentHandoffRequest({
     : delegated.input;
   const routeRequiresQuestionAuthoring = ![
     '/telegram/agent/api/admin/status',
+    '/telegram/agent/api/admin/metrics',
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
     '/telegram/agent/api/question-queue/apply',
@@ -2520,6 +2862,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/admin/metrics' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleAdminMetricsRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
     return handleOnboardingRequest({ env, context, input, body, method: request.method });

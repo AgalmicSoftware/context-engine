@@ -16,12 +16,14 @@ import {
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
+import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 
 class MemoryKv {
   constructor() {
     this.store = new Map();
     this.metadata = new Map();
     this.getCalls = 0;
+    this.listCalls = 0;
   }
 
   async put(key, value, options = {}) {
@@ -43,6 +45,7 @@ class MemoryKv {
   }
 
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
+    this.listCalls += 1;
     const keys = Array.from(this.store.keys())
       .filter((key) => String(key).startsWith(prefix))
       .sort();
@@ -61,6 +64,10 @@ class MemoryKv {
 
   resetGetCalls() {
     this.getCalls = 0;
+  }
+
+  resetListCalls() {
+    this.listCalls = 0;
   }
 }
 
@@ -1292,6 +1299,155 @@ test('Telegram agent admin can revoke group approval through the API', async () 
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
   assert.equal(nonAdminResponse.status, 403);
   assert.equal(nonAdmin.reason, 'group_approval_admin_required');
+});
+
+test('Telegram admin metrics report scoped KV aggregate counts and cache snapshots', async () => {
+  const env = baseEnv({
+    DEFAULT_RPC_URL: '',
+    ADDITIONAL_RPC_URL: '',
+  });
+  const rootAdminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  const betaAdminAddress = await managedAccountAddressForTelegramUser(env, '44');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = rootAdminAddress;
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+    defaultSessionSlug: 'alpha',
+    riskCeiling: 'submit',
+    sessions: [
+      {
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+      },
+      {
+        sessionSlug: 'beta',
+        sessionName: 'Beta Session',
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        responseExportAllowedAddresses: [betaAdminAddress],
+      },
+    ],
+  });
+  await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'alpha_admin',
+    sessionSlug: 'alpha',
+    accountAddress: rootAdminAddress,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '43',
+    username: 'beta_user',
+    sessionSlug: 'beta',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q1', JSON.stringify({
+    sessionSlug: 'alpha',
+    questionId: 'q1',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:beta:q2', JSON.stringify({
+    sessionSlug: 'beta',
+    questionId: 'q2',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:alpha:q1', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:beta:q2', JSON.stringify({
+    sessionSlug: 'beta',
+    telegramUserId: '43',
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:lightweight-group-proposal:beta:g1', JSON.stringify({
+    sessionSlug: 'beta',
+    proposedBy: '43',
+  }));
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'submit-alpha-ok',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q1',
+      status: 'direct_submitted',
+    },
+  });
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'submit-alpha-failed',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-failed',
+      status: 'submit_failed',
+    },
+  });
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'submit-beta-ok',
+      sessionSlug: 'beta',
+      telegramUserId: '43',
+      questionId: 'q2',
+      status: 'submit_queued',
+    },
+  });
+
+  const rootResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
+    env,
+  });
+  const root = await jsonBody(rootResponse);
+  const listCallsAfterRoot = env.AGENT_ACTION_KV.listCalls;
+  const cachedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
+    env,
+  });
+  const cached = await jsonBody(cachedResponse);
+  const listCallsAfterCachedRoot = env.AGENT_ACTION_KV.listCalls;
+  const betaResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=beta&telegramUserId=44'),
+    env,
+  });
+  const beta = await jsonBody(betaResponse);
+  const deniedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=45'),
+    env,
+  });
+  const denied = await jsonBody(deniedResponse);
+
+  assert.equal(rootResponse.status, 200);
+  assert.equal(root.scope, 'global');
+  assert.equal(root.cached, false);
+  assert.equal(root.totals.agentsOnboarded, 2);
+  assert.equal(root.totals.distinctUsersOnboarded, 2);
+  assert.equal(root.totals.questionsCreated, 2);
+  assert.equal(root.totals.answerDrafts, 2);
+  assert.equal(root.totals.groupProposals, 1);
+  assert.equal(root.totals.questionsAnswered, 2);
+  assert.equal(root.totals.distinctRespondents, 2);
+  assert.equal(root.totals.sessionsWithBridgeActivity, 2);
+  assert.equal(root.definitions.agentsOnboarded.includes('skill installs'), true);
+  assert.equal(root.perSession.find((entry) => entry.sessionSlug === 'alpha').questionsAnswered, 1);
+  assert.equal(root.perSession.find((entry) => entry.sessionSlug === 'beta').groupProposals, 1);
+  assert.equal(cachedResponse.status, 200);
+  assert.equal(cached.cached, true);
+  assert.equal(listCallsAfterCachedRoot, listCallsAfterRoot);
+  assert.equal(betaResponse.status, 200);
+  assert.equal(beta.scope, 'session');
+  assert.equal(beta.sessionSlug, 'beta');
+  assert.equal(beta.totals.agentsOnboarded, 1);
+  assert.equal(beta.totals.questionsCreated, 1);
+  assert.equal(beta.totals.questionsAnswered, 1);
+  assert.equal(Object.hasOwn(beta, 'perSession'), false);
+  assert.equal(deniedResponse.status, 403);
+  assert.equal(denied.reason, 'metrics_admin_required');
+  assert.equal(JSON.stringify(root).includes('ceagt_'), false);
 });
 
 test('Telegram agent question queue management rejects non-admin service users', async () => {
