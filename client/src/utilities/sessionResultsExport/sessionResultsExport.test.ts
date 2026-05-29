@@ -11,6 +11,7 @@ import {
   buildSessionResultsAnalysisAiPayload,
   buildSessionResultsAnalysisInputSignature,
   buildSessionResultsAnalysisPrompt,
+  mergeGeneratedSessionResultsAnalysisArtifacts,
   normalizeGeneratedSessionResultsAnalysisArtifact,
 } from './sessionResultsAnalysisArtifacts';
 
@@ -243,6 +244,7 @@ describe('sessionResultsExport utilities', () => {
       session: { name: 'Demo', slug: 'demo' },
     });
     const prompt = buildSessionResultsAnalysisPrompt(built.aiPayload);
+    const riskPrompt = buildSessionResultsAnalysisPrompt(built.aiPayload, 'riskMatrix');
     const inputSignature = buildSessionResultsAnalysisInputSignature(built.aiPayload);
 
     expect(built.aiPayload.responses).toEqual([
@@ -269,6 +271,11 @@ describe('sessionResultsExport utilities', () => {
     expect(prompt).toContain('participant_001');
     expect(prompt).toContain('segmentDimensions');
     expect(prompt).toContain('Builders Guild');
+    expect(prompt).toContain('inputLimits');
+    expect(riskPrompt).toContain('Generate only this result view: Risk Matrix');
+    expect(riskPrompt).toContain('"riskMatrix"');
+    expect(riskPrompt).not.toContain('"argumentMap"');
+    expect(riskPrompt).not.toContain('"atlas"');
     expect(prompt).not.toContain('0x9999999999999999999999999999999999999999');
     expect(prompt).not.toContain('0x8888888888888888888888888888888888888888');
     expect(prompt).not.toContain('0x1111111111111111111111111111111111111111');
@@ -309,6 +316,27 @@ describe('sessionResultsExport utilities', () => {
     expect(artifact.sections.riskMatrix.available).toBe(true);
     expect(artifact.sections.atlas.available).toBe(true);
     expect(artifact.participants[0].address).toBe('0x1111111111111111111111111111111111111111');
+
+    const partialRiskArtifact = normalizeGeneratedSessionResultsAnalysisArtifact({
+      inputSignature: 'sig',
+      participants: built.participants,
+      rawOutput: JSON.stringify({
+        riskMatrix: {
+          categories: [{ id: 'risk_2', label: 'Export confusion' }],
+          comments: [{ id: 'risk_comment_2' }],
+        },
+      }),
+    });
+    const merged = mergeGeneratedSessionResultsAnalysisArtifacts({
+      base: artifact,
+      next: partialRiskArtifact,
+      sections: ['riskMatrix'],
+    });
+    expect(merged?.sections.breakdown.available).toBe(true);
+    expect(merged?.sections.argumentMap.available).toBe(true);
+    expect(merged?.sections.riskMatrix.categories).toEqual([
+      { id: 'risk_2', label: 'Export confusion' },
+    ]);
   });
 
   it('downloads browser files with object URLs and revokes them', () => {

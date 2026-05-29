@@ -202,6 +202,17 @@ viewable in the client:
   identifying freeform text.
 - The first implementation uses minimums of 3 viewable responses, 2
   participants, and 1 hydrated question before AI generation is allowed.
+- Generation runs per result view (`breakdown`, `argumentMap`, `riskMatrix`,
+  `atlas`) instead of forcing one large all-sections response. The export modal
+  generates the selected sections sequentially and merges each section into the
+  same local artifact so a later run can fill only the missing views.
+- AI input is capped before prompt construction to protect context windows. The
+  payload includes `inputLimits` so generated summaries can reflect that they
+  were derived from the included visible sample.
+- Live non-demo payloads derive `breakdown.dimensions` from locally available
+  question tags, active SBT filter selections, and response-gate/SBT labels.
+  Address-like labels are dropped before provider calls; wallet addresses remain
+  only in the local participant mapping.
 - Generated artifacts are saved in the local `analysisCache` for the session
   with an input signature and timestamp so the UI can reuse them without
   regenerating. Publishing or syncing generated artifacts for other users is a
@@ -346,8 +357,9 @@ HTML string:
 4. Add the confirmation modal and `Export HTML Report` buttons.
 5. Add login gating, exporter metadata, selected-section controls, and explicit
    unavailable reasons.
-6. Add local/session-private AI analysis generation with synthetic participant
-   ids and local address re-association.
+6. Add local/session-private per-section AI analysis generation with synthetic
+   participant ids, live segment dimensions, capped prompt input, and local
+   address re-association.
 7. Add unit tests for helpers and targeted component tests for the buttons/modal.
 8. Add one browser/manual verification path for opening the exported HTML from a
    demo session and checking navigation/search.
@@ -406,6 +418,8 @@ npm run lint
 - AI-generated analysis uses synthetic participant ids in provider payloads and
   stores generated artifacts locally/session-privately with timestamp/signature
   metadata.
+- AI generation can fill selected result views section-by-section without
+  sending wallet addresses or address-like SBT labels to the provider.
 - Exported artifacts visibly show the shortened downloader address and embed the
   full downloader address in metadata.
 - Redacted mode is the default and is covered by tests.
