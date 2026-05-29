@@ -89,7 +89,7 @@ export function normalizeQuestionTag(value = '') {
   return safeString(value)
     .toLowerCase()
     .replace(/&/g, ' and ')
-    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/[^a-z0-9:]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, MAX_QUESTION_TAG_LENGTH);
 }
@@ -233,6 +233,41 @@ function normalizeOptions(value = []) {
     .slice(0, 12);
 }
 
+function normalizeReferenceUrl(value = '') {
+  const text = safeString(value).slice(0, 2000);
+  if (!text) return '';
+  try {
+    const url = new URL(text);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+export function normalizeQuestionReferences(value = []) {
+  const source = Array.isArray(value) ? value : (value ? [value] : []);
+  const seen = new Set();
+  const references = [];
+  source.forEach((entry) => {
+    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? entry
+      : { type: 'url', url: entry };
+    const type = lower(raw.type || 'url').replace(/[^a-z0-9_-]+/g, '_').slice(0, 32) || 'url';
+    const url = type === 'url' ? normalizeReferenceUrl(raw.url || raw.href || raw.value) : '';
+    if (type === 'url' && !url) return;
+    const key = `${type}:${url}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const reference = { type };
+    if (url) reference.url = url;
+    const title = safeString(raw.title || raw.label || raw.name).replace(/\s+/g, ' ').slice(0, 160);
+    if (title) reference.title = title;
+    references.push(reference);
+  });
+  return references.slice(0, 5);
+}
+
 function proposedQuestionPrefix(sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${PROPOSED_QUESTION_KV_PREFIX}${slug}:` : '';
@@ -262,6 +297,7 @@ function proposedRecordToQuestion(record = {}) {
   if (!questionId || !prompt) return null;
   const questionType = normalizeQuestionType(record.questionType);
   const tags = normalizeQuestionTags(record.tags);
+  const references = normalizeQuestionReferences(record.references);
   const question = {
     questionId,
     id: questionId,
@@ -278,6 +314,7 @@ function proposedRecordToQuestion(record = {}) {
   const options = normalizeOptions(record.options);
   if (options.length) question.options = options;
   if (tags.length) question.tags = tags;
+  if (references.length) question.references = references;
   return question;
 }
 
@@ -289,6 +326,7 @@ export async function persistTelegramProposedQuestion({
   questionType = 'freeform',
   options = [],
   tags = [],
+  references = [],
   sessionContext = '',
   metadata = null,
   createdAt = null,
@@ -298,6 +336,7 @@ export async function persistTelegramProposedQuestion({
   const promptText = normalizePrompt(prompt);
   const type = normalizeQuestionType(questionType);
   const normalizedOptions = normalizeOptions(options);
+  const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
   const normalizedTags = inferQuestionTags({
     prompt: promptText,
@@ -329,6 +368,7 @@ export async function persistTelegramProposedQuestion({
     prompt: promptText,
     options: normalizedOptions,
     tags: normalizedTags,
+    references: normalizedReferences,
     sessionContext: normalizedSessionContext || null,
     source: 'telegram_question_proposal',
     status: 'active',
@@ -407,6 +447,7 @@ export const __test__telegramQuestionProposals = {
   PROPOSED_QUESTION_KV_PREFIX,
   inferQuestionTags,
   normalizeQuestionTag,
+  normalizeQuestionReferences,
   normalizeQuestionTags,
   normalizeQuestionType,
   normalizeSessionContext,

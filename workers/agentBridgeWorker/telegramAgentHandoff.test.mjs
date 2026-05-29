@@ -1818,6 +1818,103 @@ test('Telegram agent can create and dry-run pose a new group question', async ()
   )), true);
 });
 
+test('Telegram agent can batch-create sourced proposed questions without posing them', async () => {
+  const env = baseEnv();
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const sourceUrl = 'https://example.com/agent-village/report?view=public';
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/create', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        sourceUrl,
+        questions: [
+          {
+            prompt: 'Should Agent Village organizers publish a daily recap?',
+            questionType: 'binary',
+            tags: ['event'],
+          },
+          {
+            prompt: 'Should the demo prioritize organizer feedback?',
+            questionType: 'binary',
+          },
+          {
+            prompt: 'Which topics need a follow-up discussion?',
+            questionType: 'multichoice',
+            options: ['onboarding', 'results', 'groups'],
+            references: [{ type: 'url', url: 'https://example.com/followup', title: 'Follow-up note' }],
+          },
+        ],
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const proposedRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:proposed-question:alpha:'))
+    .map(([, value]) => JSON.parse(value));
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
+    env,
+  });
+  const questions = await jsonBody(questionsResponse);
+  const sourcedQuestion = questions.questions.find((question) => (
+    question.prompt === 'Should Agent Village organizers publish a daily recap?'
+  ));
+  const emptyResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/create', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        questions: [],
+      },
+    }),
+    env,
+  });
+  const oversizedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions/create', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        questions: Array.from({ length: 21 }, (_, index) => ({
+          prompt: `Batch question ${index + 1}?`,
+        })),
+      },
+    }),
+    env,
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.created.length, 3);
+  assert.equal(body.skipped.length, 0);
+  assert.equal(body.created[0].references[0].url, sourceUrl);
+  assert.equal(body.created[0].tags.includes('src:example-com'), true);
+  assert.equal(proposedRecords.length, 3);
+  assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
+  assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
+  assert.equal(proposedRecords.every((record) => record.actionMetadata.endpoint === '/telegram/agent/api/questions/create'), true);
+  assert.equal(proposedRecords[0].references[0].url, sourceUrl);
+  assert.equal(sourcedQuestion.references[0].url, sourceUrl);
+  assert.equal(sourcedQuestion.tags.includes('src:example-com'), true);
+  assert.equal(JSON.stringify(body).includes('ceagt_'), false);
+  assert.equal(emptyResponse.status, 400);
+  assert.equal((await jsonBody(emptyResponse)).reason, 'questions_create_batch_required');
+  assert.equal(oversizedResponse.status, 400);
+  assert.equal((await jsonBody(oversizedResponse)).reason, 'questions_create_batch_too_large');
+});
+
 test('Telegram agent can propose Cloudflare-only groups for user approval', async () => {
   const env = telegramOnlyEnv();
   await buildTelegramCommandResponse({
