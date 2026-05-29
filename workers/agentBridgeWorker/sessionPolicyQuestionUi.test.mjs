@@ -29,6 +29,7 @@ import {
   evaluateSessionSbtGateJoin,
   evaluateResponseActionPolicy,
   evaluateSbtJoinPolicy,
+  evaluateTelegramGroupSessionAccess,
   evaluateSponsoredResourceEligibility,
   normalizeSessionPolicy,
   resolveSessionInvocation,
@@ -63,6 +64,24 @@ test('session policy resolves defaults and invocation by slug or name', () => {
   assert.equal(workerSlugSession.workerSessionSlug, 'custom-13-may-2026');
   assert.equal(workerSlugSession.workerLoginOrigin, 'http://localhost:3000');
   assert.deepEqual(workerSlugSession.allowOrigins, ['http://localhost:3000', 'https://contextengine.xyz']);
+});
+
+test('Telegram group session access is closed by default unless explicitly open or approved', () => {
+  const policy = normalizeSessionPolicy({
+    defaultSessionSlug: 'alpha',
+    sessions: [
+      { sessionSlug: 'alpha', sessionName: 'Alpha Room', telegramBridgeEnabled: true },
+      { sessionSlug: 'beta', sessionName: 'Beta Room', telegramBridgeEnabled: true, telegramGroupOpenAccess: true },
+      { sessionSlug: 'gamma', sessionName: 'Gamma Room', telegramBridgeEnabled: true, approvedTelegramGroupChatIds: ['-100123'] },
+    ],
+  });
+
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[0], { chatId: '-100123' }).ok, false);
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[0], { chatId: '-100123' }).reason, 'telegram_group_not_approved_for_session');
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[1], { chatId: '-100999' }).ok, true);
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[1], { chatId: '-100999' }).telegramGroupOpenAccess, true);
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[2], { chatId: '-100123' }).ok, true);
+  assert.equal(evaluateTelegramGroupSessionAccess(policy.linkedSessions[2], { chatId: '-100999' }).ok, false);
 });
 
 test('SBT join and sponsored resources follow session policy without exposing secrets', () => {
