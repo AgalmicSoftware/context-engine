@@ -148,7 +148,16 @@ export async function persistTelegramSubmitRecord({
   if (!canonicalKey) return { ok: false, reason: 'submit_request_key_missing' };
   assertNoSecretShape(record, 'Telegram submit records must not serialize secrets.');
   const serialized = JSON.stringify(record);
-  const putOptions = { expirationTtl: SUBMIT_REQUEST_TTL_SECONDS };
+  const submitMetadata = {
+    v: 1,
+    t: 'submit_request',
+    st: safeString(record.status).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 64),
+    sg: sanitizeSessionSlug(record.sessionSlug),
+    u: safeString(record.telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128),
+    c: safeString(record.createdAt).slice(0, 32),
+  };
+  assertNoSecretShape(submitMetadata, 'Telegram submit record metadata must not serialize secrets.');
+  const putOptions = { expirationTtl: SUBMIT_REQUEST_TTL_SECONDS, metadata: submitMetadata };
   await kv.put(canonicalKey, serialized, putOptions);
   const indexKeys = [
     submitRequestSessionKvKey(record),

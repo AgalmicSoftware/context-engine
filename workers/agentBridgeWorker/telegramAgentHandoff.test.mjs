@@ -23,6 +23,7 @@ class MemoryKv {
     this.store = new Map();
     this.metadata = new Map();
     this.getCalls = 0;
+    this.getKeys = [];
     this.listCalls = 0;
   }
 
@@ -37,6 +38,7 @@ class MemoryKv {
 
   async get(key) {
     this.getCalls += 1;
+    this.getKeys.push(key);
     return this.store.get(key) || null;
   }
 
@@ -64,6 +66,7 @@ class MemoryKv {
 
   resetGetCalls() {
     this.getCalls = 0;
+    this.getKeys = [];
   }
 
   resetListCalls() {
@@ -1452,11 +1455,14 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
     },
   });
 
+  env.AGENT_ACTION_KV.resetGetCalls();
   const rootResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
     env,
   });
   const root = await jsonBody(rootResponse);
+  const submitRecordGetsAfterRoot = env.AGENT_ACTION_KV.getKeys
+    .filter((key) => String(key).startsWith('telegram:submit-request'));
   const listCallsAfterRoot = env.AGENT_ACTION_KV.listCalls;
   const cachedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
@@ -1486,6 +1492,7 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
   assert.equal(root.totals.questionsAnswered, 2);
   assert.equal(root.totals.distinctRespondents, 2);
   assert.equal(root.totals.sessionsWithBridgeActivity, 2);
+  assert.deepEqual(submitRecordGetsAfterRoot, []);
   assert.equal(root.definitions.agentsOnboarded.includes('skill installs'), true);
   assert.equal(root.perSession.find((entry) => entry.sessionSlug === 'alpha').questionsAnswered, 1);
   assert.equal(root.perSession.find((entry) => entry.sessionSlug === 'beta').groupProposals, 1);
@@ -1502,6 +1509,73 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
   assert.equal(deniedResponse.status, 403);
   assert.equal(denied.reason, 'metrics_admin_required');
   assert.equal(JSON.stringify(root).includes('ceagt_'), false);
+});
+
+test('Telegram admin metrics falls back to legacy submit record bodies without metadata', async () => {
+  const env = baseEnv({
+    DEFAULT_RPC_URL: '',
+    ADDITIONAL_RPC_URL: '',
+  });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  await env.AGENT_ACTION_KV.put('telegram:submit-request:legacy-alpha-ok', JSON.stringify({
+    requestId: 'legacy-alpha-ok',
+    sessionSlug: 'alpha',
+    telegramUserId: '77',
+    questionId: 'q-legacy',
+    status: 'direct_submitted',
+  }));
+
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
+    env,
+  });
+  const body = await jsonBody(response);
+  const submitRecordGets = env.AGENT_ACTION_KV.getKeys
+    .filter((key) => String(key).startsWith('telegram:submit-request'));
+
+  assert.equal(response.status, 200);
+  assert.equal(body.totals.questionsAnswered, 1);
+  assert.equal(body.totals.distinctRespondents, 1);
+  assert.equal(body.perSession.find((entry) => entry.sessionSlug === 'alpha').questionsAnswered, 1);
+  assert.deepEqual(submitRecordGets, ['telegram:submit-request:legacy-alpha-ok']);
+});
+
+test('Telegram admin metrics counts more than one KV page of submit metadata without per-record gets', async () => {
+  const env = baseEnv({
+    DEFAULT_RPC_URL: '',
+    ADDITIONAL_RPC_URL: '',
+  });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  for (let index = 0; index < 1005; index += 1) {
+    await persistTelegramSubmitRecord({
+      env,
+      record: {
+        requestId: `submit-alpha-${index}`,
+        sessionSlug: 'alpha',
+        telegramUserId: `user-${index % 25}`,
+        questionId: `q-${index}`,
+        status: 'direct_submitted',
+        createdAt: `2026-05-23T12:${String(index % 60).padStart(2, '0')}:00.000Z`,
+      },
+    });
+  }
+
+  env.AGENT_ACTION_KV.resetGetCalls();
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
+    env,
+  });
+  const body = await jsonBody(response);
+  const submitRecordGets = env.AGENT_ACTION_KV.getKeys
+    .filter((key) => String(key).startsWith('telegram:submit-request'));
+
+  assert.equal(response.status, 200);
+  assert.equal(body.totals.questionsAnswered, 1005);
+  assert.equal(body.totals.distinctRespondents, 25);
+  assert.deepEqual(submitRecordGets, []);
 });
 
 test('Telegram agent question queue management rejects non-admin service users', async () => {

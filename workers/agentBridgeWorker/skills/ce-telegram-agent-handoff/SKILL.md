@@ -552,9 +552,10 @@ boundaries matter: `agentsOnboarded` means CE delegation-token mints, not
 external skill installs; `registrySessionCount` comes from the cached on-chain
 SessionRegistry read and is not a count of worker-created sessions; and
 `questionsAnswered` counts submit-queue records with submitted statuses during
-the submit-record TTL window. Env-level root admins receive global totals and a
-per-session breakdown; session admins receive only their token-bound or target
-session.
+the submit-record TTL window. The worker reads submit status from KV list
+metadata for current records, with a legacy body-read fallback for older records.
+Env-level root admins receive global totals and a per-session breakdown; session
+admins receive only their token-bound or target session.
 
 ```http
 POST /telegram/agent/api/question-queue/plan
