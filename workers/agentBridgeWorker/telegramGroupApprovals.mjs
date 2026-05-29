@@ -75,6 +75,21 @@ export async function persistTelegramGroupApproval({
   return { ok: true, key, record };
 }
 
+export async function deleteTelegramGroupApproval({
+  env = {},
+  sessionSlug = '',
+  chatId = '',
+} = {}) {
+  const key = telegramGroupApprovalKey({ sessionSlug, chatId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.delete !== 'function') {
+    return { ok: false, revoked: false, reason: 'action_kv_unavailable' };
+  }
+  const existing = await readTelegramGroupApproval({ env, sessionSlug, chatId });
+  await kv.delete(key);
+  return { ok: true, revoked: !!existing, key };
+}
+
 export async function evaluateTelegramGroupSessionAccessForEnv({
   env = {},
   session = {},

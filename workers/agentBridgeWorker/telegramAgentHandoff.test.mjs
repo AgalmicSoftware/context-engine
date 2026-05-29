@@ -27,6 +27,10 @@ class MemoryKv {
     return this.store.get(key) || null;
   }
 
+  async delete(key) {
+    this.store.delete(key);
+  }
+
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
     const keys = Array.from(this.store.keys())
       .filter((key) => String(key).startsWith(prefix))
@@ -963,6 +967,32 @@ test('Telegram agent group approval links require an explicit delegated admin sc
     env,
   });
   const allowed = await jsonBody(allowedResponse);
+  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
+    version: 1,
+    type: 'telegram_group_approval',
+    sessionSlug: 'alpha',
+    sessionName: 'Alpha Session',
+    chatId: '-100123',
+    approvedByTelegramUserId: '42',
+    approvedByAccountAddress: adminAddress.toLowerCase(),
+    approvalTokenId: 'scope-test',
+  }));
+  const revokeDeniedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-revoke?sessionSlug=alpha&chatId=-100123', {
+      method: 'POST',
+      token: defaultToken.token,
+    }),
+    env,
+  });
+  const revokeDenied = await jsonBody(revokeDeniedResponse);
+  const revokeAllowedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-revoke?sessionSlug=alpha&chatId=-100123', {
+      method: 'POST',
+      token: scopedToken.token,
+    }),
+    env,
+  });
+  const revokeAllowed = await jsonBody(revokeAllowedResponse);
 
   assert.equal(deniedResponse.status, 403);
   assert.equal(denied.reason, 'agent_token_scope_denied');
@@ -970,6 +1000,63 @@ test('Telegram agent group approval links require an explicit delegated admin sc
   assert.equal(allowedResponse.status, 200);
   assert.equal(allowed.ok, true);
   assert.match(allowed.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
+  assert.equal(revokeDeniedResponse.status, 403);
+  assert.equal(revokeDenied.reason, 'agent_token_scope_denied');
+  assert.equal(revokeDenied.requiredScope, 'manage_group_approvals');
+  assert.equal(revokeAllowedResponse.status, 200);
+  assert.equal(revokeAllowed.revoked, true);
+});
+
+test('Telegram agent admin can revoke group approval through the API', async () => {
+  const env = baseEnv();
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
+    version: 1,
+    type: 'telegram_group_approval',
+    sessionSlug: 'alpha',
+    sessionName: 'Alpha Session',
+    chatId: '-100123',
+    chatTitle: 'Alpha Lobby',
+    approvedAt: '2026-12-01T12:00:00.000Z',
+    approvedByTelegramUserId: '42',
+    approvedByAccountAddress: adminAddress.toLowerCase(),
+    approvalTokenId: 'admin_launch',
+  }));
+
+  const revokedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-revoke', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        sessionSlug: 'alpha',
+        chatId: '-100123',
+      },
+    }),
+    env,
+  });
+  const revoked = await jsonBody(revokedResponse);
+  const nonAdminResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-revoke', {
+      method: 'POST',
+      body: {
+        telegramUserId: '43',
+        sessionSlug: 'alpha',
+        chatId: '-100123',
+      },
+    }),
+    env,
+  });
+  const nonAdmin = await jsonBody(nonAdminResponse);
+
+  assert.equal(revokedResponse.status, 200);
+  assert.equal(revoked.ok, true);
+  assert.equal(revoked.revoked, true);
+  assert.equal(revoked.sessionSlug, 'alpha');
+  assert.equal(revoked.chatId, '-100123');
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
+  assert.equal(nonAdminResponse.status, 403);
+  assert.equal(nonAdmin.reason, 'group_approval_admin_required');
 });
 
 test('Telegram agent question queue management rejects non-admin service users', async () => {
