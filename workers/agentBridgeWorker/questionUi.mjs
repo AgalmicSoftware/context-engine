@@ -68,7 +68,7 @@ export const TELEGRAM_SCREEN_IDS = Object.freeze([
 export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   setup_welcome: { command: '/start', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   test_checklist: { command: '/start' },
-  agent_action_menu: { command: '/actions', aliases: ['/agent'], callback: OPAQUE_CALLBACK_LAUNCH },
+  agent_action_menu: { command: '/agent', callback: OPAQUE_CALLBACK_LAUNCH },
   agent_account_create: { command: '/create_agent', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   agent_settings_overview: { command: '/settings', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   agent_settings_edit: { command: '/settings', callback: OPAQUE_CALLBACK_LAUNCH },
@@ -328,7 +328,7 @@ function buildDefaultScreenButtons(screen) {
         command: '/settings',
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/actions',
+        command: '/agent',
       }),
     ];
   }
@@ -336,7 +336,7 @@ function buildDefaultScreenButtons(screen) {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS, 'Edit Settings', TELEGRAM_CHAT_LANES.MINI_APP),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/actions',
+        command: '/agent',
       }),
     ];
   }

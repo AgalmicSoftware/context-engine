@@ -157,7 +157,6 @@ const DEFAULT_QUESTION = Object.freeze({
 
 const COMMANDS = Object.freeze({
   START: '/start',
-  ACTIONS: '/actions',
   AGENT: '/agent',
   CREATE_AGENT: '/create_agent',
   SETTINGS: '/settings',
@@ -188,7 +187,6 @@ const COMMANDS = Object.freeze({
 });
 
 const LEGACY_COMMAND_ALIASES = Object.freeze({
-  '/ce_actions': COMMANDS.ACTIONS,
   '/ce_agent': COMMANDS.AGENT,
   '/ce_create_agent': COMMANDS.CREATE_AGENT,
   '/ce_settings': COMMANDS.SETTINGS,
@@ -8999,7 +8997,7 @@ export async function buildTelegramCommandResponse({
       })
       : buildHelpResponse({ normalized, command: parsed.command, env, createdAt, waitUntil });
   }
-  if ([COMMANDS.ACTIONS, COMMANDS.AGENT].includes(parsed.command)) {
+  if (parsed.command === COMMANDS.AGENT) {
     return buildAgentActionsResponse({
       normalized,
       command: parsed.command,
