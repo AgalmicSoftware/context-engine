@@ -371,6 +371,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/questions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
+  if (pathname === '/telegram/agent/api/tags') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
   if (pathname === '/telegram/agent/api/questions/next') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
@@ -959,6 +962,39 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     relevance: ranked.relevance,
     questions: ranked.questions,
   });
+}
+
+async function handleTagsRequest({ env = {}, context = {}, waitUntil = null } = {}) {
+  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const counts = new Map();
+  questions.forEach((question) => {
+    normalizeQuestionTags(question.tags).forEach((tag) => {
+      counts.set(tag, (counts.get(tag) || 0) + 1);
+    });
+  });
+  const tags = Array.from(counts.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((left, right) => right.count - left.count || left.tag.localeCompare(right.tag))
+    .slice(0, 200);
+  const payload = {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    tags,
+    total: tags.length,
+  };
+  assertNoSecretShape(payload, 'Telegram tags response must not serialize secrets.');
+  return json(payload);
+}
+
+function emptyTagsResponse(sessionSlug = '') {
+  const payload = {
+    ok: true,
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    tags: [],
+    total: 0,
+  };
+  assertNoSecretShape(payload, 'Telegram empty tags response must not serialize secrets.');
+  return json(payload);
 }
 
 async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
@@ -2962,6 +2998,7 @@ export async function handleTelegramAgentHandoffRequest({
   const routeRequiresQuestionAuthoring = ![
     '/telegram/agent/api/admin/status',
     '/telegram/agent/api/admin/metrics',
+    '/telegram/agent/api/tags',
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
     '/telegram/agent/api/question-queue/apply',
@@ -2977,10 +3014,18 @@ export async function handleTelegramAgentHandoffRequest({
     auth,
     requireQuestionAuthoring: routeRequiresQuestionAuthoring,
   });
-  if (!context.ok) return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+  if (!context.ok) {
+    if (url.pathname === '/telegram/agent/api/tags' && context.status === 404) {
+      return emptyTagsResponse(context.sessionSlug || input.sessionSlug);
+    }
+    return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+  }
 
   if (url.pathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionsRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/tags' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleTagsRequest({ env, context, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });

@@ -302,6 +302,36 @@ For queue-driven reads, `POST /telegram/agent/api/questions/next` supports `spon
 
 If the user is interacting in an OpenClaw DM, use this endpoint to fetch CE questions, then ask the user in natural language. Save their answer through `POST /telegram/agent/api/preferences` for CE Mini App review. Do not claim the response is submitted.
 
+## Tags: Reuse Before You Invent
+
+Before generating or creating questions, pull the tags already active in the
+session:
+
+```http
+GET /telegram/agent/api/tags?sessionSlug=<slug>
+POST /telegram/agent/api/tags
+```
+
+The response is text-safe metadata only:
+
+```json
+{
+  "ok": true,
+  "sessionSlug": "telegram-demo-4",
+  "tags": [
+    { "tag": "organizer-feedback", "count": 6 },
+    { "tag": "src:example-org", "count": 3 }
+  ],
+  "total": 2
+}
+```
+
+Prefer an existing tag when one fits the user's intent. Create a new short,
+topic-like tag only when the current list has no good match. This applies to
+URL-based question generation, future geographic/topic generation, and any
+agent-authored questions. It keeps the one-session-by-tags model navigable in
+the Mini App. See also "Tags Instead Of Child Sessions" below.
+
 ## Preference Object
 
 Build preferences as drafts keyed by exact `questionId`:
@@ -813,4 +843,5 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   `/telegram/agent/api/admin/metrics`.
 - Agents can create approved batches of proposed questions from
   agent-summarized URLs with durable `references` citations.
-- Planned agent API coverage includes active-tag lookup for consistent tagging.
+- Agents can read active tag counts through `/telegram/agent/api/tags` before
+  creating new question tags.
