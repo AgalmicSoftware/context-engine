@@ -398,6 +398,7 @@ function inputFromRequest(request, body = {}) {
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
     view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
+    limit: Object.hasOwn(body, 'limit') ? body.limit : url.searchParams.get('limit'),
     declined: Object.hasOwn(body, 'declined') ? body.declined : url.searchParams.get('declined'),
     createdAt: safeString(body.createdAt || url.searchParams.get('createdAt')),
     now: safeString(body.now || url.searchParams.get('now')),
@@ -419,6 +420,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/geo-backlink') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/digest') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/ce-install-preference') {
@@ -2608,6 +2612,101 @@ async function handleActionsRequest({
   });
 }
 
+function normalizeDigestLimit(value = null) {
+  const parsed = Number(value);
+  return Math.max(1, Math.min(5, Number.isFinite(parsed) ? Math.floor(parsed) : 3));
+}
+
+function selectDigestQuestions(questions = [], sponsoredQuestionIds = [], limit = 3) {
+  const sponsoredIds = normalizeQuestionQueueRefs(sponsoredQuestionIds);
+  const answerable = (Array.isArray(questions) ? questions : [])
+    .filter((question) => question?.answerable === true);
+  const byId = new Map(answerable.map((question) => [safeString(question.questionId || question.id), question]));
+  const selected = [];
+  const seen = new Set();
+  sponsoredIds.forEach((questionId) => {
+    const question = byId.get(questionId);
+    if (!question || seen.has(questionId)) return;
+    selected.push({ ...question, sponsored: true, digestReason: 'admin_sponsored' });
+    seen.add(questionId);
+  });
+  answerable.forEach((question) => {
+    const questionId = safeString(question.questionId || question.id);
+    if (!questionId || seen.has(questionId)) return;
+    selected.push({ ...question, sponsored: false, digestReason: 'preference_ranked' });
+    seen.add(questionId);
+  });
+  return selected.slice(0, normalizeDigestLimit(limit));
+}
+
+function pendingDigestItems(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  return {
+    answerDrafts: source.filter((item) => (
+      item?.type === 'answer_draft' &&
+      safeString(item.pendingAction || 'review_draft') === 'review_draft'
+    )),
+    voteRecommendations: source.filter((item) => (
+      item?.type === 'question_vote_recommendation' &&
+      safeString(item.status || 'pending_review') === 'pending_review'
+    )),
+  };
+}
+
+async function handleDigestRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
+  const telegramUserId = safeString(context.normalized.user.telegramUserId);
+  const limit = normalizeDigestLimit(input.limit);
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const ranked = rankQuestionsByPreferences(questions, input, context);
+  const queueConfig = await loadTelegramQuestionQueueConfig({ env, sessionSlug });
+  const digestQuestions = selectDigestQuestions(
+    ranked.questions,
+    queueConfig.sponsoredQuestionIds,
+    limit
+  );
+  const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  const activityItems = await listTelegramAgentActivity({
+    env,
+    telegramUserId,
+    sessionSlugs: sessionSlug ? [sessionSlug] : [],
+    includeContent: false,
+    limit: 50,
+  });
+  const pending = pendingDigestItems(activityItems);
+  const payload = {
+    ok: true,
+    sessionSlug,
+    telegramUserId,
+    optedIn: settings.dailyDigestOptIn === true,
+    limit,
+    permissionMode: context.permission.mode,
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    relevance: ranked.relevance,
+    queueConfig: {
+      source: queueConfig.source || '',
+      sponsoredQuestionCount: Array.isArray(queueConfig.sponsoredQuestionIds)
+        ? queueConfig.sponsoredQuestionIds.length
+        : 0,
+    },
+    questions: digestQuestions,
+    pendingAnswerDrafts: pending.answerDrafts.slice(0, 10),
+    pendingVoteRecommendations: pending.voteRecommendations.slice(0, 10),
+    pending: {
+      answerDraftCount: pending.answerDrafts.length,
+      voteRecommendationCount: pending.voteRecommendations.length,
+    },
+  };
+  assertNoSecretShape(payload, 'Telegram agent digest response must not serialize secrets.');
+  return json(payload);
+}
+
 function agentBoolean(value) {
   if (typeof value === 'boolean') return value;
   return ['1', 'true', 'yes', 'on', 'demo'].includes(lower(value));
@@ -3271,6 +3370,7 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/group-approval-revoke',
     '/telegram/agent/api/onboarding',
     '/telegram/agent/api/geo-backlink',
+    '/telegram/agent/api/digest',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
   ].includes(url.pathname);
@@ -3316,6 +3416,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/geo-backlink' && request.method === 'GET') {
     return handleGeoBacklinkRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/digest' && request.method === 'GET') {
+    return handleDigestRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });

@@ -254,8 +254,9 @@ The current questions map to these settings:
 }
 ```
 
-The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
-digest integrations. In Phase 1 this flag is only stored and echoed back.
+The onboarding endpoint also persists `dailyDigestOptIn` for Edge daily digest
+integrations. If the user opts in, register this skill with the event or agent
+host's daily-digest cron tool. CE does not run its own digest cron.
 
 Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
 
@@ -270,6 +271,35 @@ Use this path when the user should become a CE participant by answering one CE q
 5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
 
 If the user is only in a one-on-one OpenClaw Telegram DM, send them a CE deep link or group link first. CE-owned inline response buttons cannot appear inside a normal private DM with another bot unless CE sends the message in a CE-accessible chat.
+
+## Edge Daily Digest
+
+CE is read-only in the Edge daily-digest flow. It does not add a Cloudflare cron
+trigger and does not push outbound events to EdgeOS, Geo, or any event host.
+
+During onboarding, ask the built-in daily-digest opt-in question and persist the
+answer with `/telegram/agent/api/onboarding`. If `dailyDigestOptIn` is true, use
+the agent host's own cronjob or scheduler tool to add this skill to that user's
+daily-digest invocation list.
+
+On each digest run, call:
+
+```http
+GET /telegram/agent/api/digest?sessionSlug=<slug>&limit=3
+```
+
+The endpoint accepts a `ceagt_` user token or service token. It returns up to
+three top questions by default, capped at five. Sponsored questions configured by
+session admins are listed first, then the remaining questions are ranked with
+the same preference and Geo relevance inputs used by `/questions` and
+`/questions/next`. You may pass `tags`, `geoIds`, `sessionsAttended`, and
+`relevanceMode` to tune the digest.
+
+The response includes `optedIn`, `questions`, `pendingAnswerDrafts`, and
+`pendingVoteRecommendations`. If `optedIn` is false, the endpoint still serves
+an on-demand digest, but the agent should not schedule recurring delivery until
+the user opts in. Route answer approval and submission through the Mini App or
+the normal user-approved submit path.
 
 ## Read Active Questions
 
@@ -878,8 +908,9 @@ answers with `POST /telegram/agent/api/onboarding`:
 
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
 `agentAutoApplyQuestionVotes`, and `dailyDigestOptIn`. Auto-apply votes remain
-off unless the user says yes to question 4. The digest flag is stored for Phase
-2 and should not be treated as an active delivery subscription yet.
+off unless the user says yes to question 4. If the user says yes to question 5,
+register this skill with the agent host's daily-digest scheduler and call
+`GET /telegram/agent/api/digest` during each digest run.
 
 ## Changelog
 
@@ -898,6 +929,9 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   agent menu and `/activity` for recent activity.
 - The worker exposes `/telegram/agent/api/skill-version` so agents can check
   whether their installed skill is current.
+- The worker exposes `/telegram/agent/api/digest` so agent hosts can run their
+  own daily digest cron without CE adding a Cloudflare cron or outbound Edge
+  push.
 - Admin agents can read aggregate bridge metrics through
   `/telegram/agent/api/admin/metrics`.
 - Agents can create approved batches of proposed questions from
