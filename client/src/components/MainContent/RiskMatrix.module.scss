@@ -505,10 +505,24 @@ button.cell {
 }
 
 .atlasScenarioMetaLine {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
-  color: $muted-text;
-  font-size: 0.8rem;
-  line-height: 1.4;
+}
+
+.atlasScenarioMetaPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(244, 247, 255, 0.82);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .atlasScenarioMechanism {
@@ -682,14 +696,46 @@ button.cell {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   margin-bottom: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: $text;
+  text-align: left;
+  cursor: pointer;
   flex-wrap: wrap;
+
+  &:hover .commentSectionTitle,
+  &:focus-visible .commentSectionTitle {
+    color: $accent;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $accent-border;
+    outline-offset: 4px;
+    border-radius: var(--ce-radius-8);
+  }
+}
+
+.commentSectionHeaderText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.commentSectionChevron {
+  flex: 0 0 auto;
+  color: $accent;
+  font-size: 0.9rem;
 }
 
 .commentSectionTitle {
   margin: 0;
   color: $text;
-  font-size: 0.96rem;
+  font-size: 1.18rem;
+  font-weight: 700;
   line-height: 1.2;
 }
 
@@ -880,6 +926,26 @@ button.cell {
   font-size: 0.76rem;
   line-height: 1.45;
   font-style: italic;
+}
+
+.commentReferenceLink {
+  color: #d7e8ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(77, 255, 164, 0.72);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+
+  &:hover,
+  &:focus {
+    color: #ffffff;
+    text-decoration-color: #4dffa4;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #4dffa4;
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
 }
 
 .modalDivider {

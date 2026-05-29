@@ -510,8 +510,7 @@
     max-width: 100%;
     width: 100%;
     justify-content: flex-start;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     padding: 6px 10px;
   }
 

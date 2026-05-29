@@ -11,7 +11,6 @@ import ComparisonReport from './ComparisonReport';
 import ComparisonSuggestions from './ComparisonSuggestions';
 import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
-import QuestionDrilldownModal from './QuestionDrilldownModal';
 import WorldResultsMap from './WorldResultsMap';
 import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
 import styles from './DemoAnalysisWorkspace.module.scss';
@@ -56,14 +55,6 @@ type ComparisonGroup = {
 
 type QuestionTagsById = Record<string, QuestionTag[]>;
 
-type QuestionProfileSummary = {
-  profileId: string;
-  label: string;
-  confidence: string;
-  rationale: string;
-  count: number;
-};
-
 type Suggestion = {
   pair: string[];
   questionId: string;
@@ -76,7 +67,6 @@ type AnalysisData = {
   demographics: DemographicsByCategory;
   segmentCounts: SegmentCounts;
   questionTagsData: QuestionTagsById;
-  questionProfileSummaries: Record<string, QuestionProfileSummary[]>;
 };
 
 type DemoAnalysisWorkspaceProps = {
@@ -109,7 +99,7 @@ const DemoAnalysisWorkspace = ({
 
   const [selectedSegmentKeys, setSelectedSegmentKeys] = useState<string[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
-  const [drilldownQuestionId, setDrilldownQuestionId] = useState('');
+  const [selectedReportTagIDs, setSelectedReportTagIDs] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedQuestionId && !questionMap.has(selectedQuestionId)) {
@@ -117,22 +107,19 @@ const DemoAnalysisWorkspace = ({
     }
   }, [questionMap, selectedQuestionId]);
 
-  useEffect(() => {
-    if (drilldownQuestionId && !questionMap.has(drilldownQuestionId)) {
-      setDrilldownQuestionId('');
-    }
-  }, [drilldownQuestionId, questionMap]);
-
   const comparisonGroups = useMemo(
     () => selectedSegmentKeys.map((segmentKey) => getComparisonGroup(segmentKey)),
     [selectedSegmentKeys]
   );
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
-  const drilldownQuestion = questionMap.get(drilldownQuestionId) || null;
   const selectedQuestionTags = selectedQuestionId
     ? (analysisData.questionTagsData[selectedQuestionId] || [])
     : [];
+  const selectedReportTagIDSet = useMemo(
+    () => new Set(selectedReportTagIDs),
+    [selectedReportTagIDs]
+  );
   const activeSuggestionKey = useMemo(() => {
     if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
     return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
@@ -210,10 +197,12 @@ const DemoAnalysisWorkspace = ({
     handleSuggestionClick(candidateSuggestions[0]);
   };
 
-  const openDrilldown = (questionId: string | number) => {
-    const normalizedQuestionId = String(questionId || '');
-    setSelectedQuestionId(normalizedQuestionId);
-    setDrilldownQuestionId(normalizedQuestionId);
+  const toggleReportTagFilter = (tagID: string) => {
+    setSelectedReportTagIDs((previous) => (
+      previous.includes(tagID)
+        ? previous.filter((value) => value !== tagID)
+        : [...previous, tagID]
+    ));
   };
 
   return (
@@ -230,37 +219,49 @@ const DemoAnalysisWorkspace = ({
 
       {selectedQuestion ? (
         <section className={styles.selectedQuestionBanner} data-testid="demo-analysis-question-banner">
-          <SingleQuestionResponse
-            mode="fullscreen"
-            questionOnly={true}
-            question={{
-              prompt: selectedQuestion.text,
-              type: 'binary',
-            }}
-            response={null}
-            containerClassName={styles.selectedQuestionCard}
-            bodyClassName={styles.selectedQuestionCardBody}
-            questionPromptClassName={styles.selectedQuestionCardPrompt}
-            questionPromptTestId="demo-analysis-selected-question"
-          />
-          {(selectedQuestionTags.length > 0 || selectedQuestion.keyTension) ? (
-            <div className={styles.selectedQuestionGrounding}>
-              {selectedQuestionTags.length > 0 ? (
-                <div className={styles.selectedQuestionGroundingPills}>
-                  {selectedQuestionTags.map((tag) => (
-                    <span key={tag.tagID} className={styles.ratePill}>
-                      {tag.tagName}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-              {selectedQuestion.keyTension ? (
-                <p className={styles.selectedQuestionTension}>
-                  <strong>Key tension:</strong> {selectedQuestion.keyTension}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          <div className={styles.selectedQuestionFrame}>
+            <SingleQuestionResponse
+              mode="fullscreen"
+              questionOnly={true}
+              question={{
+                prompt: selectedQuestion.text,
+                type: 'binary',
+              }}
+              response={null}
+              containerClassName={styles.selectedQuestionCard}
+              bodyClassName={styles.selectedQuestionCardBody}
+              questionPromptClassName={styles.selectedQuestionCardPrompt}
+              questionPromptTestId="demo-analysis-selected-question"
+            />
+            {(selectedQuestionTags.length > 0 || selectedQuestion.keyTension) ? (
+              <div className={styles.selectedQuestionGrounding}>
+                {selectedQuestion.keyTension ? (
+                  <p className={styles.selectedQuestionTension} data-testid="demo-analysis-selected-question-tension">
+                    <strong>Key tension:</strong> {selectedQuestion.keyTension}
+                  </p>
+                ) : null}
+                {selectedQuestionTags.length > 0 ? (
+                  <div className={styles.selectedQuestionGroundingPills} data-testid="demo-analysis-selected-question-tags">
+                    {selectedQuestionTags.map((tag) => {
+                      const isSelected = selectedReportTagIDSet.has(tag.tagID);
+                      return (
+                        <button
+                          key={tag.tagID}
+                          type="button"
+                          className={`${styles.selectedQuestionTagButton} ${isSelected ? styles.selectedQuestionTagButtonActive : ''}`}
+                          aria-pressed={isSelected}
+                          title="Toggle tag filter"
+                          onClick={() => toggleReportTagFilter(tag.tagID)}
+                        >
+                          {tag.tagName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
@@ -281,7 +282,6 @@ const DemoAnalysisWorkspace = ({
         question={selectedQuestion}
         flatResponses={analysisData.flatResponses}
         comparisonGroups={comparisonGroups}
-        onOpenDrilldown={openDrilldown}
       />
 
       <ComparisonReport
@@ -289,17 +289,8 @@ const DemoAnalysisWorkspace = ({
         questions={analysisData.questions}
         comparisonGroups={comparisonGroups}
         questionTagsData={analysisData.questionTagsData}
-        onInspectQuestion={openDrilldown}
-      />
-
-      <QuestionDrilldownModal
-        isOpen={Boolean(drilldownQuestion)}
-        question={drilldownQuestion}
-        comparisonGroups={comparisonGroups}
-        flatResponses={analysisData.flatResponses}
-        questionTags={analysisData.questionTagsData[drilldownQuestionId] || []}
-        questionProfileSummaries={analysisData.questionProfileSummaries[drilldownQuestionId] || []}
-        onClose={() => setDrilldownQuestionId('')}
+        selectedTagIDs={selectedReportTagIDs}
+        onSelectedTagIDsChange={setSelectedReportTagIDs}
       />
     </div>
   );

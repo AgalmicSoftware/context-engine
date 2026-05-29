@@ -64,19 +64,26 @@ const SurveyResultsQuestionSummaryCard = ({
           </span>
         </div>
         <div className={styleMap.questionSummaryHeaderIcons}>
-          <FontAwesomeIcon
-            icon={faBookmark}
-            className={styleMap.biggerIcon}
-            onClick={(e: React.MouseEvent<SVGSVGElement>) => {
+          <button
+            type="button"
+            className={styleMap.questionBookmarkButton}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               onToggleBookmark();
             }}
-            color={bookmarked ? 'gold' : 'white'}
-            style={bookmarkIconStyle}
-          />
+            aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark question'}
+            title={bookmarked ? 'Remove bookmark' : 'Bookmark question'}
+          >
+            <FontAwesomeIcon
+              icon={faBookmark}
+              className={styleMap.questionBookmarkIcon}
+              color={bookmarked ? 'gold' : 'white'}
+              style={bookmarkIconStyle}
+            />
+          </button>
           <FontAwesomeIcon
             icon={isActive ? faCaretUp : faCaretDown}
-            className={styleMap.biggerIcon}
+            className={styleMap.questionExpandIcon}
           />
         </div>
       </CardHeader>

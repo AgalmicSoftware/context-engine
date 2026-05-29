@@ -62,15 +62,21 @@ describe('sessionResultsExport utilities', () => {
         participants: 1,
       },
       filters: {
+        note: 'owner 0x1111111111111111111111111111111111111111',
         walletAddress: '0xabc',
         tag: 'governance',
       },
       sections: {
         report: {
+          dimensions: [{
+            id: 'sbt_groups',
+            label: 'SBT / Groups',
+            values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
+          }],
           questions: [
             {
               id: 'q1',
-              prompt: 'Should CE export HTML?',
+              prompt: 'Should CE export HTML for 0x2222222222222222222222222222222222222222?',
               type: 'binary',
               tags: ['export'],
               options: ['Yes', 'No'],
@@ -83,7 +89,7 @@ describe('sessionResultsExport utilities', () => {
         argumentMap: {
           debates: [
             {
-              claim: 'Export helps audits',
+              claim: 'Export helps audits for 0x3333333333333333333333333333333333333333',
               responderAddress: '0xdef',
               encryptedData: 'ciphertext',
             },
@@ -100,12 +106,12 @@ describe('sessionResultsExport utilities', () => {
       chainId: 11155420,
       displayAddress: '0x9999...9999',
     });
-    expect(snapshot.filters).toEqual({ tag: 'governance' });
+    expect(snapshot.filters).toEqual({ note: 'owner [redacted-address]', tag: 'governance' });
     expect(snapshot.sections.report.available).toBe(true);
     expect(snapshot.sections.report.questions).toEqual([
       {
         id: 'q1',
-        prompt: 'Should CE export HTML?',
+        prompt: 'Should CE export HTML for [redacted-address]?',
         type: 'binary',
         tags: ['export'],
         options: ['Yes', 'No'],
@@ -113,7 +119,7 @@ describe('sessionResultsExport utilities', () => {
       },
     ]);
     expect(snapshot.sections.argumentMap.debates).toEqual([
-      { claim: 'Export helps audits' },
+      { claim: 'Export helps audits for [redacted-address]' },
     ]);
     expect(snapshot.sections.riskMatrix.available).toBe(false);
     expect(snapshot.redactions).toEqual(expect.arrayContaining([
@@ -143,6 +149,11 @@ describe('sessionResultsExport utilities', () => {
       },
       sections: {
         report: {
+          dimensions: [{
+            id: 'sbt_groups',
+            label: 'SBT / Groups',
+            values: [{ id: 'builders', label: 'Builders Guild', count: 1 }],
+          }],
           questions: [
             {
               id: 'q1',
@@ -163,6 +174,8 @@ describe('sessionResultsExport utilities', () => {
     expect(html).toContain('Download Snapshot JSON');
     expect(html).toContain('Downloaded by 0x9999...9999');
     expect(html).toContain('ce-report-integrity-warning');
+    expect(html).toContain('Comparison Dimensions');
+    expect(html).toContain('Builders Guild');
     expect(html).toContain('Argument Map');
     expect(html).toContain('No hydrated data was available');
     expect(html).toContain('Prompt &lt;b&gt;unsafe&lt;/b&gt;');
@@ -218,6 +231,15 @@ describe('sessionResultsExport utilities', () => {
           questionId: 'q1',
         },
       ],
+      segmentDimensions: [{
+        id: 'sbt-groups',
+        label: 'SBT / Groups',
+        source: 'sbt',
+        values: [
+          { id: '0x9999999999999999999999999999999999999999', label: 'Builders Guild', count: 2 },
+          { id: '0x8888888888888888888888888888888888888888', label: '0x8888888888888888888888888888888888888888', count: 1 },
+        ],
+      }],
       session: { name: 'Demo', slug: 'demo' },
     });
     const prompt = buildSessionResultsAnalysisPrompt(built.aiPayload);
@@ -228,6 +250,12 @@ describe('sessionResultsExport utilities', () => {
       expect.objectContaining({ answer: 'Make PDFs readable', participantId: 'participant_002' }),
     ]);
     expect(built.aiPayload.questions[0].prompt).toContain('[redacted-address]');
+    expect(built.aiPayload.segmentDimensions).toEqual([{
+      id: 'sbt_groups',
+      label: 'SBT / Groups',
+      source: 'sbt',
+      values: [{ id: 'sbt_groups_builders_guild', label: 'Builders Guild', count: 2 }],
+    }]);
     expect(built.participants).toEqual([
       expect.objectContaining({
         address: '0x1111111111111111111111111111111111111111',
@@ -239,6 +267,10 @@ describe('sessionResultsExport utilities', () => {
       }),
     ]);
     expect(prompt).toContain('participant_001');
+    expect(prompt).toContain('segmentDimensions');
+    expect(prompt).toContain('Builders Guild');
+    expect(prompt).not.toContain('0x9999999999999999999999999999999999999999');
+    expect(prompt).not.toContain('0x8888888888888888888888888888888888888888');
     expect(prompt).not.toContain('0x1111111111111111111111111111111111111111');
     expect(prompt).not.toContain('0x3333333333333333333333333333333333333333');
     expect(inputSignature).toMatch(/^session-results-analysis-v1-[0-9a-f]{8}-[0-9a-f]{8}$/);
@@ -249,6 +281,17 @@ describe('sessionResultsExport utilities', () => {
       inputSignature: 'sig',
       participants: built.participants,
       rawOutput: JSON.stringify({
+        breakdown: {
+          summary: {
+            overview: 'Address should not survive 0x4444444444444444444444444444444444444444',
+            walletAddress: '0x5555555555555555555555555555555555555555',
+          },
+          dimensions: [{
+            id: 'sbt_groups',
+            label: 'SBT / Groups',
+            values: [{ id: 'builders_guild', label: 'Builders Guild 0x6666666666666666666666666666666666666666', count: 2 }],
+          }],
+        },
         argumentMap: { debates: [{ id: 'debate_1' }] },
         riskMatrix: { categories: [{ id: 'risk_1' }], comments: [{ id: 'c1' }] },
         atlas: { nodes: [{ id: 'atlas_1' }] },
@@ -257,6 +300,12 @@ describe('sessionResultsExport utilities', () => {
 
     expect(artifact.kind).toBe('ce_session_results_analysis_artifact');
     expect(artifact.sections.argumentMap.available).toBe(true);
+    expect(artifact.sections.breakdown.dimensions).toEqual([
+      expect.objectContaining({ id: 'sbt_groups', label: 'SBT / Groups' }),
+    ]);
+    expect(JSON.stringify(artifact.sections.breakdown)).toContain('[redacted-address]');
+    expect(JSON.stringify(artifact.sections.breakdown)).not.toContain('0x4444444444444444444444444444444444444444');
+    expect(JSON.stringify(artifact.sections.breakdown)).not.toContain('walletAddress');
     expect(artifact.sections.riskMatrix.available).toBe(true);
     expect(artifact.sections.atlas.available).toBe(true);
     expect(artifact.participants[0].address).toBe('0x1111111111111111111111111111111111111111');

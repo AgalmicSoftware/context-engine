@@ -13,6 +13,11 @@ export type RiskMatrixCorpusRef = {
   url?: string;
 };
 
+export type RiskMatrixCorpusSourceCitation = {
+  label: string;
+  url?: string;
+};
+
 type RiskMatrixCommentContextEntry = {
   historicalFigure?: RiskMatrixHistoricalFigure | null;
   corpusRefs?: RiskMatrixCorpusRef[];
@@ -181,17 +186,37 @@ const getSpecificCorpusCitation = (ref: RiskMatrixCorpusRef): string | null => {
   return hasText(documentLine) ? compactSourceText(documentLine) : null;
 };
 
-export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => {
+const getSafeExternalCorpusUrl = (value: unknown = '') => {
+  const normalizedUrl = normalizeCorpusUrl(value);
+  if (!/^https?:\/\//i.test(normalizedUrl)) return '';
+  return normalizedUrl;
+};
+
+export const getRiskMatrixCorpusSourceCitationItems = (
+  refs: RiskMatrixCorpusRef[] = []
+): RiskMatrixCorpusSourceCitation[] => {
   const seen = new Set<string>();
 
-  return refs.reduce<string[]>((acc, ref) => {
-    const citation = getSpecificCorpusCitation(ref);
-    if (!citation || seen.has(citation)) return acc;
-    seen.add(citation);
-    acc.push(citation);
+  return refs.reduce<RiskMatrixCorpusSourceCitation[]>((acc, ref) => {
+    const label = getSpecificCorpusCitation(ref);
+    if (!label) return acc;
+
+    const url = getSafeExternalCorpusUrl(ref?.url || '');
+    const key = `${label}::${url}`;
+    if (seen.has(key)) return acc;
+
+    seen.add(key);
+    acc.push({
+      label,
+      ...(url ? { url } : {}),
+    });
     return acc;
   }, []);
 };
+
+export const getRiskMatrixCorpusSourceCitations = (refs: RiskMatrixCorpusRef[] = []) => (
+  getRiskMatrixCorpusSourceCitationItems(refs).map((citation) => citation.label)
+);
 
 export const enrichRiskMatrixCommentRecord = <T extends EnrichableRiskCommentRecord>(
   entry: T
