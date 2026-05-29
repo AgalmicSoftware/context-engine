@@ -5,6 +5,7 @@ import {
 } from './constants.mjs';
 import {
   buildTelegramCommandResponse,
+  clearAdminDefaultSessionOverride,
   loadQuestionsForSession,
   loadSessionPolicy,
   loadSubmittedResultRecords,
@@ -16,6 +17,7 @@ import {
   readGroupSessionBinding,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
+  writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { buildResultsImage } from './resultImage.mjs';
@@ -520,6 +522,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/metrics') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/admin/default-session') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/onboarding') {
@@ -1509,6 +1514,108 @@ function hasExplicitSponsoredQueueApproval(input = {}) {
 async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } = {}) {
   const status = await loadAgentAdminStatus({ env, context, input });
   return json(status);
+}
+
+async function handleAdminDefaultSessionRequest({
+  env = {},
+  context = {},
+  input = {},
+  method = 'GET',
+} = {}) {
+  const methodName = safeString(method).toUpperCase();
+  if (methodName === 'GET') {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: true });
+    if (!admin.ok) {
+      return json({
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      }, { status: admin.status || 403 });
+    }
+    const policy = await loadSessionPolicy(env);
+    const payload = {
+      ok: true,
+      effectiveDefaultSessionSlug: policy.defaultSessionSlug,
+      adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+      scheduledDefaultSessionSlug: policy.scheduledDefaultSessionSlug || policy.defaultSessionSlug,
+      configuredDefaultSessionSlug: policy.configuredDefaultSessionSlug || '',
+      adminDefaultSessionInvalidSlug: policy.adminDefaultSessionInvalidSlug || '',
+    };
+    assertNoSecretShape(payload, 'Telegram admin default-session status must not serialize secrets.');
+    return json(payload);
+  }
+
+  const clearRequested = methodName === 'DELETE' ||
+    (methodName === 'POST' && normalizeBoolean(input.clear, false));
+  if (methodName === 'POST' && !clearRequested) {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    if (!admin.ok) {
+      return json({
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      }, { status: admin.status || 403 });
+    }
+    const slug = sanitizeSessionSlug(input.sessionSlug || input.defaultSessionSlug || input.slug);
+    if (!slug) return json({ ok: false, reason: 'invalid_session_slug' }, { status: 400 });
+    const policy = await loadSessionPolicy(env);
+    const resolved = resolveSessionInvocation(policy, slug);
+    if (!resolved.ok) {
+      return json({
+        ok: false,
+        reason: resolved.reason,
+        sessionSlug: slug,
+      }, { status: resolved.reason === 'session_not_linked' ? 404 : 400 });
+    }
+    const written = await writeAdminDefaultSessionOverride({
+      env,
+      sessionSlug: resolved.session.sessionSlug,
+      accountAddress: admin.manager?.accountAddress || '',
+      createdAt: input.createdAt || null,
+    });
+    if (!written.ok) {
+      return json({
+        ok: false,
+        reason: written.reason || 'admin_default_session_write_failed',
+      }, { status: 500 });
+    }
+    const payload = {
+      ok: true,
+      adminDefaultSessionSlug: resolved.session.sessionSlug,
+      effectiveDefaultSessionSlug: resolved.session.sessionSlug,
+    };
+    assertNoSecretShape(payload, 'Telegram admin default-session set response must not serialize secrets.');
+    return json(payload);
+  }
+
+  if (methodName === 'DELETE' || clearRequested) {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    if (!admin.ok) {
+      return json({
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      }, { status: admin.status || 403 });
+    }
+    const cleared = await clearAdminDefaultSessionOverride(env);
+    if (!cleared.ok) {
+      return json({
+        ok: false,
+        reason: cleared.reason || 'admin_default_session_clear_failed',
+      }, { status: 500 });
+    }
+    const policy = await loadSessionPolicy(env);
+    const payload = {
+      ok: true,
+      cleared: true,
+      effectiveDefaultSessionSlug: policy.defaultSessionSlug,
+      configuredDefaultSessionSlug: policy.configuredDefaultSessionSlug || '',
+    };
+    assertNoSecretShape(payload, 'Telegram admin default-session clear response must not serialize secrets.');
+    return json(payload);
+  }
+
+  return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
 }
 
 async function handleOnboardingRequest({
@@ -3698,6 +3805,7 @@ export async function handleTelegramAgentHandoffRequest({
   const routeRequiresQuestionAuthoring = ![
     '/telegram/agent/api/admin/status',
     '/telegram/agent/api/admin/metrics',
+    '/telegram/agent/api/admin/default-session',
     '/telegram/agent/api/tags',
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
@@ -3754,6 +3862,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/admin/metrics' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminMetricsRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/admin/default-session') {
+    return handleAdminDefaultSessionRequest({ env, context, input, method: request.method });
   }
   if (url.pathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
     return handleOnboardingRequest({ env, context, input, body, method: request.method });

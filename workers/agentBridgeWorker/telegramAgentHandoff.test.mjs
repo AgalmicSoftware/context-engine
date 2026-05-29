@@ -2150,6 +2150,107 @@ test('Telegram sponsored question planning rejects non-admin ceagt tokens', asyn
   assert.equal(plan.reason, 'response_export_admin_required');
 });
 
+test('Telegram admin default-session endpoint exposes delegated status and service-token mutations', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  await env.AGENT_ACTION_KV.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'beta',
+    updatedBy: '0x1234...abcd',
+    updatedAt: '2026-12-01T12:00:00.000Z',
+  }));
+
+  const statusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const status = await jsonBody(statusResponse);
+  const delegatedPostResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session', {
+      method: 'POST',
+      token: issued.token,
+      body: { telegramUserId: '42', sessionSlug: 'alpha' },
+    }),
+    env,
+  });
+  const delegatedPost = await jsonBody(delegatedPostResponse);
+  const emptySlugResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session', {
+      method: 'POST',
+      body: { telegramUserId: '42', sessionSlug: '' },
+    }),
+    env,
+  });
+  const emptySlug = await jsonBody(emptySlugResponse);
+  const unknownSlugResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session', {
+      method: 'POST',
+      body: { telegramUserId: '42', sessionSlug: 'missing-session' },
+    }),
+    env,
+  });
+  const unknownSlug = await jsonBody(unknownSlugResponse);
+  const setResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session', {
+      method: 'POST',
+      body: { telegramUserId: '42', sessionSlug: 'beta' },
+    }),
+    env,
+  });
+  const set = await jsonBody(setResponse);
+  const deleteResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/default-session?telegramUserId=42&sessionSlug=alpha', {
+      method: 'DELETE',
+    }),
+    env,
+  });
+  const deleted = await jsonBody(deleteResponse);
+
+  assert.equal(statusResponse.status, 200);
+  assert.equal(status.ok, true);
+  assert.equal(status.effectiveDefaultSessionSlug, 'beta');
+  assert.equal(status.adminDefaultSessionSlug, 'beta');
+  assert.equal(status.scheduledDefaultSessionSlug, 'alpha');
+  assert.equal(status.configuredDefaultSessionSlug, 'alpha');
+  assert.equal(status.adminDefaultSessionInvalidSlug, '');
+  assert.equal(delegatedPostResponse.status, 403);
+  assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
+  assert.equal(emptySlugResponse.status, 400);
+  assert.equal(emptySlug.reason, 'invalid_session_slug');
+  assert.equal(unknownSlugResponse.status, 404);
+  assert.equal(unknownSlug.reason, 'session_not_linked');
+  assert.equal(setResponse.status, 200);
+  assert.equal(set.ok, true);
+  assert.equal(set.adminDefaultSessionSlug, 'beta');
+  assert.equal(set.effectiveDefaultSessionSlug, 'beta');
+  assert.equal(deleteResponse.status, 200);
+  assert.equal(deleted.ok, true);
+  assert.equal(deleted.cleared, true);
+  assert.equal(deleted.effectiveDefaultSessionSlug, 'alpha');
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:admin-default-session:v1'), null);
+});
+
 test('Telegram agent can recommend and auto-apply question importance votes with research metadata', async () => {
   const env = baseEnv();
   await buildTelegramCommandResponse({

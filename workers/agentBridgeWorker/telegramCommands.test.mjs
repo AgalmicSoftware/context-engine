@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
+  clearAdminDefaultSessionOverride,
   dispatchTelegramCommandResponse,
   fetchUrlQuestionSource,
   handleTelegramWebhookUpdate,
   loadSubmittedResultRecords,
   loadSessionPolicy,
   parseTelegramCommandText,
+  readAdminDefaultSessionOverride,
+  writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
@@ -25,9 +28,11 @@ import {
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.putCalls = [];
   }
 
-  async put(key, value) {
+  async put(key, value, options = undefined) {
+    this.putCalls.push({ key, value, options });
     this.store.set(key, value);
   }
 
@@ -1110,6 +1115,178 @@ test('/sessions can use the Edge 2026 cutoff to hide the test session', async ()
   });
   assert.equal(start.ok, true);
   assert.match(start.response.text, /\/sessions - choose session/);
+});
+
+test('admin default-session override writes a durable KV record', async () => {
+  const kv = new MemoryKv();
+  const env = baseEnv({ AGENT_ACTION_KV: kv });
+  const written = await writeAdminDefaultSessionOverride({
+    env,
+    sessionSlug: 'Beta',
+    accountAddress: `0x${'ab'.repeat(20)}`,
+    createdAt: '2026-05-29T12:00:00.000Z',
+  });
+  const read = await readAdminDefaultSessionOverride(env);
+  const putCall = kv.putCalls.find((call) => call.key === 'telegram:admin-default-session:v1');
+
+  assert.deepEqual(written, { ok: true, sessionSlug: 'beta' });
+  assert.equal(read.sessionSlug, 'beta');
+  assert.equal(read.updatedBy, '0xabab...abab');
+  assert.equal(putCall.options?.expirationTtl, undefined);
+  assert.equal(putCall.options?.expiration, undefined);
+});
+
+test('loadSessionPolicy applies a valid admin default-session pin', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'beta',
+    updatedBy: '0x1234...abcd',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.defaultSessionSlug, 'beta');
+  assert.equal(policy.adminDefaultSessionSlug, 'beta');
+  assert.equal(policy.scheduledDefaultSessionSlug, 'alpha');
+});
+
+test('admin default-session pin wins over the schedule', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'beta',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_NOW: '2026-05-30T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      defaultSessionSchedule: [
+        { sessionSlug: 'alpha', until: '2026-05-30T00:00:00.000Z' },
+        { sessionSlug: 'alpha', from: '2026-05-30T00:00:00.000Z' },
+      ],
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.scheduledDefaultSessionSlug, 'alpha');
+  assert.equal(policy.defaultSessionSlug, 'beta');
+  assert.equal(policy.adminDefaultSessionSlug, 'beta');
+});
+
+test('loadSessionPolicy ignores a stale admin default-session pin', async () => {
+  const kv = new MemoryKv();
+  await kv.put('telegram:admin-default-session:v1', JSON.stringify({
+    version: 1,
+    sessionSlug: 'missing-session',
+    updatedAt: '2026-05-29T12:00:00.000Z',
+  }));
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+
+  const policy = await loadSessionPolicy(env);
+
+  assert.equal(policy.defaultSessionSlug, 'alpha');
+  assert.equal(policy.adminDefaultSessionSlug, '');
+  assert.equal(policy.adminDefaultSessionInvalidSlug, 'missing-session');
+});
+
+test('/set_default is private-chat only and admin-gated', async () => {
+  const now = '2026-05-29T12:00:00.000Z';
+  const kv = new MemoryKv();
+  const adminAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const env = baseEnv({
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
+        { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
+      ],
+    }),
+  });
+  const nonAdminEnv = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+  });
+
+  const groupDenied = await buildTelegramCommandResponse({
+    update: groupMessage('/set_default beta'),
+    env,
+    now,
+  });
+  const adminDenied = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default beta'),
+    env: nonAdminEnv,
+    now,
+  });
+  const unknown = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default missing'),
+    env,
+    now,
+  });
+  const set = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default beta'),
+    env,
+    now,
+  });
+  const putsAfterSet = kv.putCalls.length;
+  const status = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default'),
+    env,
+    now,
+  });
+
+  assert.equal(groupDenied.screen, 'admin_default_session_private_required');
+  assert.equal(adminDenied.screen, 'admin_default_session_denied');
+  assert.equal(adminDenied.ok, false);
+  assert.equal(unknown.screen, 'admin_default_session_invalid');
+  assert.equal(unknown.ok, false);
+  assert.equal(set.screen, 'admin_default_session_set');
+  assert.match(set.response.text, /Default session pinned to Beta/);
+  assert.equal(JSON.parse(await kv.get('telegram:admin-default-session:v1')).sessionSlug, 'beta');
+  assert.equal(status.screen, 'admin_default_session_status');
+  assert.match(status.response.text, /Effective default: beta/);
+  assert.match(status.response.text, /Admin pin: beta/);
+  assert.equal(kv.putCalls.length, putsAfterSet);
+
+  const clear = await buildTelegramCommandResponse({
+    update: privateMessage('/set_default clear'),
+    env,
+    now,
+  });
+
+  assert.equal(clear.screen, 'admin_default_session_cleared');
+  assert.equal(await kv.get('telegram:admin-default-session:v1'), null);
 });
 
 test('private voice message updates the latest Mini App launch draft', async () => {

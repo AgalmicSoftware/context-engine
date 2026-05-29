@@ -118,6 +118,7 @@ const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
 const RESULT_PHOTO_KV_PREFIX = 'telegram:result-photo:';
 const RESULTS_EXPOSURE_OVERRIDE_KV_PREFIX = 'telegram:results-exposure:';
+const ADMIN_DEFAULT_SESSION_KV_KEY = 'telegram:admin-default-session:v1';
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
@@ -185,6 +186,7 @@ const COMMANDS = Object.freeze({
   EXPORT_ACCESS: '/export_access',
   EXPORT_ALLOW: '/export_allow',
   EXPORT_REVOKE: '/export_revoke',
+  SET_DEFAULT: '/set_default',
   QUESTION_QUEUE: '/question_queue',
   GROUP_ID: '/group_id',
   GROUP_LINK: '/group_link',
@@ -217,6 +219,9 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_export_access': COMMANDS.EXPORT_ACCESS,
   '/ce_export_allow': COMMANDS.EXPORT_ALLOW,
   '/ce_export_revoke': COMMANDS.EXPORT_REVOKE,
+  '/ce_set_default': COMMANDS.SET_DEFAULT,
+  '/default_session': COMMANDS.SET_DEFAULT,
+  '/ce_default_session': COMMANDS.SET_DEFAULT,
   '/ce_question_queue': COMMANDS.QUESTION_QUEUE,
   '/ce_group_id': COMMANDS.GROUP_ID,
   '/ce_group_link': COMMANDS.GROUP_LINK,
@@ -570,13 +575,79 @@ async function applyResultsExposureOverrides(env = {}, policy = {}) {
   return { ...policy, linkedSessions };
 }
 
+async function readAdminDefaultSessionOverride(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.get !== 'function') return {};
+  const parsed = safeJsonParse(await kv.get(ADMIN_DEFAULT_SESSION_KV_KEY).catch(() => null), null);
+  const sessionSlug = sanitizeSessionSlug(parsed?.sessionSlug);
+  if (!sessionSlug) return {};
+  return {
+    sessionSlug,
+    updatedAt: safeString(parsed?.updatedAt).slice(0, 64),
+    updatedBy: safeString(parsed?.updatedBy).slice(0, 64),
+  };
+}
+
+async function writeAdminDefaultSessionOverride({
+  env = {},
+  sessionSlug = '',
+  accountAddress = '',
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return { ok: false, reason: 'invalid_session_slug' };
+  const record = {
+    version: 1,
+    sessionSlug: slug,
+    updatedBy: accountAddress ? shortAddress(accountAddress) : '',
+    updatedAt: createdAt || nowIso(),
+  };
+  assertNoSecretShape(record, 'Telegram admin default-session override must not serialize secrets.');
+  await kv.put(ADMIN_DEFAULT_SESSION_KV_KEY, JSON.stringify(record));
+  return { ok: true, sessionSlug: slug };
+}
+
+async function clearAdminDefaultSessionOverride(env = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.delete !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  await kv.delete(ADMIN_DEFAULT_SESSION_KV_KEY);
+  return { ok: true };
+}
+
+async function applyAdminDefaultSessionOverride(env = {}, policy = {}) {
+  const override = await readAdminDefaultSessionOverride(env);
+  const slug = sanitizeSessionSlug(override.sessionSlug);
+  if (!slug) return policy;
+  const resolved = resolveSessionInvocation(policy, slug);
+  if (!resolved.ok) {
+    return {
+      ...policy,
+      adminDefaultSessionSlug: '',
+      adminDefaultSessionInvalidSlug: slug,
+    };
+  }
+  return {
+    ...policy,
+    defaultSessionSlug: resolved.session.sessionSlug,
+    adminDefaultSessionSlug: resolved.session.sessionSlug,
+    scheduledDefaultSessionSlug: policy.defaultSessionSlug,
+  };
+}
+
+async function finalizeSessionPolicy(env = {}, normalizedPolicy = {}) {
+  const withExposure = await applyResultsExposureOverrides(env, normalizedPolicy);
+  return applyAdminDefaultSessionOverride(env, withExposure);
+}
+
 async function loadSessionPolicy(env = {}, {
   forceRefresh = false,
 } = {}) {
   const policyNow = env.AGENT_BRIDGE_SESSION_POLICY_NOW || env.AGENT_BRIDGE_NOW || null;
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
-    return applyResultsExposureOverrides(env, normalizeSessionPolicy(configured, { now: policyNow }));
+    return finalizeSessionPolicy(env, normalizeSessionPolicy(configured, { now: policyNow }));
   }
   const registry = await listRegistrySessionsForBridge({ env, forceRefresh }).catch((error) => ({
     ok: false,
@@ -585,7 +656,7 @@ async function loadSessionPolicy(env = {}, {
     sessions: [],
   }));
   if (registry.ok && registry.sessions.length) {
-    return applyResultsExposureOverrides(env, normalizeSessionPolicy({
+    return finalizeSessionPolicy(env, normalizeSessionPolicy({
       defaultSessionSlug: (
         sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) ||
         registry.sessions.find((session) => session.default)?.sessionSlug ||
@@ -602,7 +673,7 @@ async function loadSessionPolicy(env = {}, {
     env.DEFAULT_SESSION_SLUG ||
     'general'
   ) || 'general';
-  return applyResultsExposureOverrides(env, normalizeSessionPolicy({
+  return finalizeSessionPolicy(env, normalizeSessionPolicy({
     defaultSessionSlug,
     riskCeiling: RISK_CEILINGS.SUBMIT,
     allowQuestionGeneration: true,
@@ -7034,6 +7105,231 @@ async function buildTelegramGroupApprovalRevokeResponse({
   });
 }
 
+function resolveDefaultSessionAdminGateSession(policy = {}) {
+  const current = resolveSessionInvocation(policy, policy.defaultSessionSlug);
+  if (current.ok) return current;
+  const fallback = (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : [])
+    .find((session) => session?.telegramBridgeEnabled === true) ||
+    (Array.isArray(policy.linkedSessions) ? policy.linkedSessions[0] : null);
+  if (fallback?.sessionSlug) return { ok: true, session: fallback, policy };
+  return { ok: false, reason: 'session_not_configured' };
+}
+
+async function requireDefaultSessionCommandAdmin({
+  env = {},
+  normalized = {},
+  command = COMMANDS.SET_DEFAULT,
+  policy = {},
+  session = {},
+  createdAt = null,
+  method = 'sendMessage',
+  messageId = '',
+  screen = 'admin_default_session_denied',
+} = {}) {
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session,
+    createdAt,
+  });
+  if (manager.ok) return { ok: true, manager };
+  return {
+    ok: false,
+    response: reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'The default session can only be managed by a configured session admin.',
+        `Reason: ${manager.reason || 'response_export_admin_required'}.`,
+        manager.accountAddress ? `Account: ${shortAddress(manager.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen,
+      command,
+      normalized,
+      extra: {
+        ok: false,
+        reason: manager.reason || 'response_export_admin_required',
+        accountAddress: manager.accountAddress || '',
+        sessionSlug: session.sessionSlug || policy.defaultSessionSlug || '',
+        adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+      },
+    }),
+  };
+}
+
+async function buildSetDefaultSessionResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  createdAt,
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: 'The default session can be managed in private chat only.',
+      screen: 'admin_default_session_private_required',
+      command,
+      normalized,
+      extra: { ok: false, reason: 'private_chat_required' },
+    });
+  }
+  const intent = lower(args[0]);
+  const policy = await loadSessionPolicy(env);
+  const clearRequested = ['clear', 'reset', 'none', 'off'].includes(intent);
+  if (!intent || clearRequested) {
+    const current = resolveDefaultSessionAdminGateSession(policy);
+    if (!current.ok) {
+      return reply({
+        method,
+        chatId: normalized.chat.chatId,
+        messageId,
+        text: 'No Telegram sessions are configured.',
+        screen: 'admin_default_session_no_sessions',
+        command,
+        normalized,
+        extra: { ok: false, reason: current.reason || 'session_not_configured' },
+      });
+    }
+    const allowed = await requireDefaultSessionCommandAdmin({
+      env,
+      normalized,
+      command,
+      policy,
+      session: current.session,
+      createdAt,
+      method,
+      messageId,
+      screen: clearRequested ? 'admin_default_session_clear_denied' : 'admin_default_session_denied',
+    });
+    if (!allowed.ok) return allowed.response;
+    if (clearRequested) {
+      const cleared = await clearAdminDefaultSessionOverride(env);
+      if (!cleared.ok) {
+        return errorReply({
+          normalized,
+          command,
+          reason: cleared.reason || 'admin_default_session_clear_failed',
+          text: `Could not clear the default-session pin: ${cleared.reason || 'admin_default_session_clear_failed'}.`,
+          method,
+          messageId,
+        });
+      }
+      const fallback = policy.scheduledDefaultSessionSlug || policy.configuredDefaultSessionSlug || policy.defaultSessionSlug;
+      const payload = {
+        sessionSlug: fallback,
+        adminDefaultSessionSlug: '',
+      };
+      assertNoSecretShape(payload, 'Telegram admin default-session clear reply must not serialize secrets.');
+      return reply({
+        method,
+        chatId: normalized.chat.chatId,
+        messageId,
+        text: [
+          'Default-session pin cleared.',
+          `Default now follows the schedule/config: ${fallback}.`,
+        ].join('\n'),
+        screen: 'admin_default_session_cleared',
+        command,
+        normalized,
+        extra: payload,
+      });
+    }
+    const payload = {
+      sessionSlug: policy.defaultSessionSlug || '',
+      adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+    };
+    assertNoSecretShape(payload, 'Telegram admin default-session status reply must not serialize secrets.');
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        `Effective default: ${policy.defaultSessionSlug || ''}`,
+        policy.adminDefaultSessionSlug ? `Admin pin: ${policy.adminDefaultSessionSlug}` : 'Admin pin: none',
+        `Configured base: ${policy.configuredDefaultSessionSlug || ''}`,
+        'Set:  /set_default <slug>',
+        'Clear: /set_default clear',
+      ].join('\n'),
+      screen: 'admin_default_session_status',
+      command,
+      normalized,
+      extra: payload,
+    });
+  }
+
+  const targetSlug = sanitizeSessionSlug(args[0]);
+  const resolved = resolveSessionInvocation(policy, targetSlug);
+  if (!resolved.ok) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: `Session "${targetSlug}" is not an available Telegram session. Run /sessions to see options.`,
+      screen: 'admin_default_session_invalid',
+      command,
+      normalized,
+      extra: {
+        ok: false,
+        reason: resolved.reason || 'session_not_linked',
+        sessionSlug: targetSlug,
+        adminDefaultSessionSlug: policy.adminDefaultSessionSlug || '',
+      },
+    });
+  }
+  const allowed = await requireDefaultSessionCommandAdmin({
+    env,
+    normalized,
+    command,
+    policy,
+    session: resolved.session,
+    createdAt,
+    method,
+    messageId,
+  });
+  if (!allowed.ok) return allowed.response;
+  const saved = await writeAdminDefaultSessionOverride({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    accountAddress: allowed.manager.accountAddress,
+    createdAt,
+  });
+  if (!saved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: saved.reason || 'admin_default_session_write_failed',
+      text: `Could not pin the default session: ${saved.reason || 'admin_default_session_write_failed'}.`,
+      method,
+      messageId,
+    });
+  }
+  const payload = {
+    sessionSlug: resolved.session.sessionSlug,
+    adminDefaultSessionSlug: resolved.session.sessionSlug,
+  };
+  assertNoSecretShape(payload, 'Telegram admin default-session set reply must not serialize secrets.');
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      `Default session pinned to ${sessionLabel(resolved.session)}.`,
+      `Slug: ${resolved.session.sessionSlug}`,
+      'This overrides the schedule until you run /set_default clear.',
+    ].join('\n'),
+    screen: 'admin_default_session_set',
+    command,
+    normalized,
+    extra: payload,
+  });
+}
+
 async function buildAdminActionsResponse({
   normalized,
   command,
@@ -7113,6 +7409,7 @@ async function buildAdminActionsResponse({
       '',
       'Choose an admin action.',
       '',
+      'Default session: /set_default <slug>',
       `Revoke group access: /group_revoke ${sessionSlug} <telegram_group_id>`,
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
@@ -9695,6 +9992,15 @@ export async function buildTelegramCommandResponse({
       createdAt,
     });
   }
+  if (parsed.command === COMMANDS.SET_DEFAULT) {
+    return buildSetDefaultSessionResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
+      createdAt,
+    });
+  }
   if (parsed.command === COMMANDS.QUESTION_QUEUE) {
     return buildQuestionQueueSettingsResponse({
       normalized,
@@ -10095,5 +10401,8 @@ export {
   summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,
   telegramVisibleSessions,
+  readAdminDefaultSessionOverride,
+  writeAdminDefaultSessionOverride,
+  clearAdminDefaultSessionOverride,
   writeResultsExposureOverride,
 };
