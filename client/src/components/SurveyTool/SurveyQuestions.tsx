@@ -478,6 +478,8 @@ import {
 } from './surveyQuestionSubmitFeedback.js';
 import {
   runSurveyQuestionsSubmitController,
+  runSurveyQuestionsSubmitFailureController,
+  runSurveyQuestionsSubmitSuccessController,
 } from './surveyQuestionsSubmitController.js';
 import {
   buildActiveTagModalState,
@@ -504,9 +506,7 @@ import {
   buildResponseEditCompleteState,
   buildResponseLoadingResetState,
   buildShowJsonState,
-  buildSubmitFailureState,
   buildSubmitPreparationErrorState,
-  buildSubmitSuccessState,
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
   buildSubmitStartState,
@@ -8413,66 +8413,79 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this.invalidateDiffCaches();
       this._userAnswersSliceCache = { source: null, value: null };
 
-      this._submitGuard = false;
-      this.finishSubmitAttempt(submitContext.submitAttemptId);
-      this.setState(buildSubmitSuccessState({
+      runSurveyQuestionsSubmitSuccessController({
         editBaseline: nextBaseline,
         hasEncrypted,
         responseUrl,
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_success'),
+        submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+        submitAttemptId: submitContext.submitAttemptId,
         surveysResponseState: nextSurveysResponseState,
         userAnswers: optimisticUserAnswers,
-      }), async () => {
-        try {
-          if (!this.isSubmitContextCurrent(submitContext)) return;
-          const cacheWriteResult = await this.writeSubmittedResponsesToLocalCaches({
-            receipt,
-            questionResponses: receipt?.__ceQuestionResponses,
-            surveyResponse: receipt?.__ceSurveyResponse,
-            surveyId: receipt?.__ceSurveyId,
-            submissionSlug: submittedCacheSlug,
-          }, submitContext).catch((error) => {
-            surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
-            return { questionCacheWritten: false, surveyCacheWritten: false };
-          });
-          if (!this.isSubmitContextCurrent(submitContext)) return;
+        ports: {
+          clearSubmitGuard: () => {
+            this._submitGuard = false;
+          },
+          finishSubmitAttempt: (submitAttemptId) => this.finishSubmitAttempt(submitAttemptId),
+          setSubmitSuccessState: (statePatch, afterStateApplied) => this.setState(statePatch, afterStateApplied),
+        },
+        afterStateApplied: async () => {
+          try {
+            if (!this.isSubmitContextCurrent(submitContext)) return;
+            const cacheWriteResult = await this.writeSubmittedResponsesToLocalCaches({
+              receipt,
+              questionResponses: receipt?.__ceQuestionResponses,
+              surveyResponse: receipt?.__ceSurveyResponse,
+              surveyId: receipt?.__ceSurveyId,
+              submissionSlug: submittedCacheSlug,
+            }, submitContext).catch((error) => {
+              surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
+              return { questionCacheWritten: false, surveyCacheWritten: false };
+            });
+            if (!this.isSubmitContextCurrent(submitContext)) return;
 
-          if (
-            !cacheWriteResult?.questionCacheWritten &&
-            typeof this.props.refreshQuestionResponses === 'function'
-          ) {
-            const ids = Array.from(changedQids).map((id) => normalizeQuestionIdKey(id)).filter(Boolean);
-            if (ids.length > 0 && this.isSubmitContextCurrent(submitContext)) {
-              await this.props.refreshQuestionResponses(ids, {
-                slug: submittedCacheSlug,
-                responder: submitContext.account || '',
-              });
+            if (
+              !cacheWriteResult?.questionCacheWritten &&
+              typeof this.props.refreshQuestionResponses === 'function'
+            ) {
+              const ids = Array.from(changedQids).map((id) => normalizeQuestionIdKey(id)).filter(Boolean);
+              if (ids.length > 0 && this.isSubmitContextCurrent(submitContext)) {
+                await this.props.refreshQuestionResponses(ids, {
+                  slug: submittedCacheSlug,
+                  responder: submitContext.account || '',
+                });
+              }
             }
-          }
-          if (
-            !cacheWriteResult?.surveyCacheWritten &&
-            !submitContext.singleQuestionMode &&
-            typeof this.props.refreshSurveyResponsesByID === 'function' &&
-            submitContext.surveyId
-          ) {
-            if (this.isSubmitContextCurrent(submitContext)) {
-              await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
+            if (
+              !cacheWriteResult?.surveyCacheWritten &&
+              !submitContext.singleQuestionMode &&
+              typeof this.props.refreshSurveyResponsesByID === 'function' &&
+              submitContext.surveyId
+            ) {
+              if (this.isSubmitContextCurrent(submitContext)) {
+                await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
+              }
             }
-          }
-        } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+          } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
+        },
       });
     } catch (error) {
       surveyLog.error('Failed to submit survey:', error);
-      this._submitGuard = false;
       if (submitContext && !this.isSubmitContextCurrent(submitContext)) {
         this.handleStaleSubmitContext(submitContext);
         return;
       }
-      if (submitContext?.submitAttemptId) this.finishSubmitAttempt(submitContext.submitAttemptId);
-      this.setState(buildSubmitFailureState({
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_error'),
-        submissionError: error.message || 'Submission failed.',
-      }));
+      runSurveyQuestionsSubmitFailureController({
+        error,
+        submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+        submitAttemptId: submitContext?.submitAttemptId,
+        ports: {
+          clearSubmitGuard: () => {
+            this._submitGuard = false;
+          },
+          finishSubmitAttempt: (submitAttemptId) => this.finishSubmitAttempt(submitAttemptId),
+          setSubmitFailureState: (statePatch) => this.setState(statePatch),
+        },
+      });
     }
   };
 
