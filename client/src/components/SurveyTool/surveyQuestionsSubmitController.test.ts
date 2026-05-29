@@ -62,4 +62,26 @@ describe('surveyQuestionsSubmitController', () => {
     expect(ports.navigateToResponse).toHaveBeenCalledWith(plan.path, plan);
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
+
+  it('dispatches submit plans through the injected submit port', () => {
+    const ports = createPorts();
+    const plan: SurveyQuestionsPrimarySubmitPlan = {
+      action: 'submit',
+      path: '',
+      reason: 'pending_edits',
+    };
+
+    const result = runSurveyQuestionsSubmitController({ plan, ports });
+
+    expect(result).toEqual({
+      action: 'submit',
+      path: '',
+      plan,
+      reason: 'pending_edits',
+      status: 'dispatched',
+    });
+    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
+    expect(ports.dispatchSubmit).toHaveBeenCalledWith(plan);
+    expect(ports.navigateToResponse).not.toHaveBeenCalled();
+  });
 });

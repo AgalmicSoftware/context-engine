@@ -21,13 +21,23 @@ export type SurveyQuestionsSubmitControllerResult = {
   path: string;
   plan: SurveyQuestionsPrimarySubmitPlan;
   reason: string;
-  status: 'inert' | 'navigated' | 'unhandled';
+  status: 'dispatched' | 'inert' | 'navigated' | 'unhandled';
 };
 
 export type RunSurveyQuestionsSubmitControllerArgs = {
   plan: SurveyQuestionsPrimarySubmitPlan;
   ports?: SurveyQuestionsSubmitControllerPorts;
 };
+
+const buildUnhandledResult = (
+  plan: SurveyQuestionsPrimarySubmitPlan
+): SurveyQuestionsSubmitControllerResult => ({
+  action: plan.action,
+  path: plan.path || '',
+  plan,
+  reason: plan.reason,
+  status: 'unhandled',
+});
 
 export const runSurveyQuestionsSubmitController = ({
   plan,
@@ -45,9 +55,10 @@ export const runSurveyQuestionsSubmitController = ({
 
   if (plan.action === 'navigate') {
     const path = plan.path || '';
-    if (typeof ports.navigateToResponse === 'function') {
-      ports.navigateToResponse(path, plan);
+    if (typeof ports.navigateToResponse !== 'function') {
+      return buildUnhandledResult(plan);
     }
+    ports.navigateToResponse(path, plan);
     return {
       action: plan.action,
       path,
@@ -57,11 +68,19 @@ export const runSurveyQuestionsSubmitController = ({
     };
   }
 
-  return {
-    action: plan.action,
-    path: plan.path || '',
-    plan,
-    reason: plan.reason,
-    status: 'unhandled',
-  };
+  if (plan.action === 'submit') {
+    if (typeof ports.dispatchSubmit !== 'function') {
+      return buildUnhandledResult(plan);
+    }
+    ports.dispatchSubmit(plan);
+    return {
+      action: plan.action,
+      path: plan.path || '',
+      plan,
+      reason: plan.reason,
+      status: 'dispatched',
+    };
+  }
+
+  return buildUnhandledResult(plan);
 };
