@@ -81,6 +81,7 @@ const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposal:';
 const ADMIN_METRICS_CACHE_KV_PREFIX = 'telegram:admin-metrics-cache:v1:';
 const ADMIN_METRICS_CACHE_TTL_SECONDS = 60;
+const ADMIN_METRICS_SUBMIT_ENTRY_LIMIT = 100000;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -541,7 +542,7 @@ async function listMetricKvEntriesByPrefix(env = {}, prefix = '', {
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!prefix || !kv || typeof kv.list !== 'function') return [];
-  const maxEntries = Math.max(1, Math.min(20000, Number(limit) || 10000));
+  const maxEntries = Math.max(1, Math.min(ADMIN_METRICS_SUBMIT_ENTRY_LIMIT, Number(limit) || 10000));
   const pageLimit = Math.min(1000, maxEntries);
   const entries = [];
   let cursor = undefined;
@@ -1462,16 +1463,26 @@ async function buildAdminMetricsSnapshot({
   }
 
   const submitPrefix = scopedSessionSlug ? submitRequestSessionKvPrefix(scopedSessionSlug) : SUBMIT_REQUEST_KV_PREFIX;
-  const submitEntries = await listMetricKvEntriesByPrefix(env, submitPrefix);
+  const submitEntries = await listMetricKvEntriesByPrefix(env, submitPrefix, {
+    limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT,
+  });
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   for (const entry of submitEntries) {
-    const record = await readMetricRecord(env, entry.key);
-    const slug = sanitizeSessionSlug(record?.sessionSlug) ||
-      (scopedSessionSlug || sessionFromSessionFirstKey(entry.key, SUBMIT_REQUEST_SESSION_KV_PREFIX));
+    const meta = entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata)
+      ? entry.metadata
+      : null;
+    let status = safeString(meta?.st);
+    let slug = sanitizeSessionSlug(meta?.sg);
+    let telegramUserId = safeString(meta?.u);
+    if (!status || !slug) {
+      const record = await readMetricRecord(env, entry.key);
+      status = status || safeString(record?.status);
+      slug = slug || sanitizeSessionSlug(record?.sessionSlug);
+      telegramUserId = telegramUserId || safeString(record?.telegramUserId);
+    }
+    slug = slug || scopedSessionSlug || sessionFromSessionFirstKey(entry.key, SUBMIT_REQUEST_SESSION_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
-    const status = safeString(record?.status);
     if (!submittedStatuses.has(status)) continue;
-    const telegramUserId = safeString(record?.telegramUserId);
     totals.questionsAnswered += 1;
     activitySessions.add(slug);
     incrementMetric(perSession, slug, 'questionsAnswered');
@@ -1481,9 +1492,12 @@ async function buildAdminMetricsSnapshot({
     }
   }
 
-  const submitUserEntries = await listMetricKvEntriesByPrefix(env, scopedSessionSlug
+  const submitUserPrefix = scopedSessionSlug
     ? `${SUBMIT_REQUEST_USER_KV_PREFIX}${scopedSessionSlug}:`
-    : SUBMIT_REQUEST_USER_KV_PREFIX);
+    : SUBMIT_REQUEST_USER_KV_PREFIX;
+  const submitUserEntries = await listMetricKvEntriesByPrefix(env, submitUserPrefix, {
+    limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT,
+  });
   for (const entry of submitUserEntries) {
     const parsed = userFromSubmitUserKey(entry.key);
     if (!parsed.sessionSlug || !parsed.telegramUserId || !inScope(parsed.sessionSlug)) continue;

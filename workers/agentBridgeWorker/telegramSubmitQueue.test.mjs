@@ -12,10 +12,12 @@ import {
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.putCalls = [];
   }
 
-  async put(key, value) {
+  async put(key, value, options = {}) {
     this.store.set(key, value);
+    this.putCalls.push({ key, value, options });
   }
 
   async get(key) {
@@ -86,6 +88,99 @@ test('Telegram submit queue persists accepted responses before async processing'
   assert.equal(JSON.parse(await kv.get('telegram:submit-request:submit-one')).status, 'submit_queued');
   assert.equal(JSON.parse(await kv.get(submitRequestSessionKvKey(record))).status, 'submit_queued');
   assert.equal(JSON.parse(await kv.get(submitRequestUserKvKey(record))).status, 'submit_queued');
+  const expectedMetadata = {
+    v: 1,
+    t: 'submit_request',
+    st: 'submit_queued',
+    sg: 'alpha',
+    u: '42',
+    c: '2026-05-23T12:00:00.000Z',
+  };
+  for (const key of [
+    'telegram:submit-request:submit-one',
+    submitRequestSessionKvKey(record),
+    submitRequestUserKvKey(record),
+  ]) {
+    const call = kv.putCalls.find((entry) => entry.key === key);
+    assert.ok(call, `expected KV put for ${key}`);
+    assert.deepEqual(call.options.metadata, expectedMetadata);
+  }
+});
+
+test('Telegram submit queue caps metadata fields within KV metadata limits', async () => {
+  const kv = new MemoryKv();
+  const queue = new MemoryQueue();
+  const oversizedStatus = `${'direct_submit_failed'.repeat(20)}!@#$`;
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_RESPONSE_QUEUE: queue,
+    AGENT_BRIDGE_ASYNC_SUBMIT_ENABLED: 'true',
+  };
+  const record = buildQueuedSubmitRecord({
+    session: {
+      sessionSlug: 'alpha',
+      managedAccountSubmitAllowed: true,
+    },
+    canonicalBody: {
+      session: 'alpha',
+      questionId: `0x${'34'.repeat(32)}`,
+      answerRef: 'telegram_private_answer_ref',
+      idempotencyKey: 'idem-oversized',
+    },
+    baseRecord: {
+      version: 1,
+      requestId: 'submit-oversized',
+      idempotencyKey: 'idem-oversized',
+      answerFingerprint: 'fp-oversized',
+      lane: 'telegram_mini_app',
+      telegramUserId: `${'User_'.repeat(80)}!@#$${'9'.repeat(80)}`,
+      sessionSlug: 'alpha',
+      questionId: `0x${'34'.repeat(32)}`,
+      questionIdShort: '0x3434...3434',
+      answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+      onChainAnswer: {
+        questionType: 'agree_unsure_disagree',
+        value: 'agree',
+        label: 'Agree',
+        comments: '',
+      },
+      createdAt: '2026-05-23T12:00:00.000Z-extra-created-at-value-that-should-be-truncated',
+    },
+  });
+  record.status = oversizedStatus;
+
+  const queued = await queueTelegramSubmitRecord({
+    env,
+    kvKey: 'telegram:submit-request:submit-oversized',
+    record,
+  });
+
+  assert.equal(queued.ok, true);
+  const expectedMetadata = {
+    v: 1,
+    t: 'submit_request',
+    st: safeMetadataToken(record.status, 64),
+    sg: 'alpha',
+    u: safeMetadataToken(record.telegramUserId, 128),
+    c: record.createdAt.slice(0, 32),
+  };
+  assert.equal(expectedMetadata.st.length, 64);
+  assert.equal(expectedMetadata.u.length, 128);
+  assert.equal(expectedMetadata.c.length, 32);
+
+  for (const key of [
+    'telegram:submit-request:submit-oversized',
+    submitRequestSessionKvKey(record),
+    submitRequestUserKvKey(record),
+  ]) {
+    const call = kv.putCalls.find((entry) => entry.key === key);
+    assert.ok(call, `expected KV put for ${key}`);
+    assert.deepEqual(call.options.metadata, expectedMetadata);
+    assert.ok(
+      Buffer.byteLength(JSON.stringify(call.options.metadata), 'utf8') <= 1024,
+      `expected metadata for ${key} to fit Cloudflare KV metadata limit`,
+    );
+  }
 });
 
 test('Telegram submit queue consumer updates persisted records after processing', async () => {
@@ -142,3 +237,7 @@ test('Telegram submit queue consumer updates persisted records after processing'
   assert.equal(indexed.status, 'direct_submit_failed');
   assert.equal(stored.onChain.reason, 'session_worker_url_missing');
 });
+
+function safeMetadataToken(value, cap) {
+  return String(value || '').trim().replace(/[^0-9A-Za-z_-]/g, '').slice(0, cap);
+}
