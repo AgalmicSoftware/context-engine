@@ -5,6 +5,8 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
+**Skill version:** 2026-05-28 (v2)
+
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
 ## What Context Engine Does
@@ -57,6 +59,20 @@ CE_SKILL_REF="${CE_SKILL_REF:-edge-2026}" CE_SKILL_HOME="${CODEX_HOME:-$HOME/.co
 ```
 
 Set `CE_SKILL_REF=main` after the skill lands on the default public branch. After installation, tell the agent to use the `ce-telegram-agent-handoff` skill and ask the user for the copied CE agent install info from the Telegram bot `/start` screen's `Onboard Agent` button.
+
+## Staying Up To Date
+
+At the start of a CE session, when the user asks, or after an unexpected API
+error, check the worker's current skill version:
+
+```http
+GET /telegram/agent/api/skill-version
+```
+
+Compare the returned `version` with the `Skill version` line above. If the
+worker is newer, re-run the install command using the configured `CE_SKILL_REF`
+raw GitHub URL and review the changelog at the bottom of this file before
+continuing.
 
 ## Preconditions
 
@@ -674,3 +690,21 @@ Named `/start` deep-link payloads could later drive a permission-preferences onb
 4. Can your agent upvote questions it thinks you will find relevant?
 
 This maps onto the existing consent fields: `allowedProfileFields`, `allowedUses`, `approvalMode`, and `agentAutoApplyQuestionVotes`. This design is parked; the current implemented onboarding is the fixed `Onboard Agent` token handoff.
+
+## Changelog
+
+### 2026-05-28 (v2)
+
+- Host-neutral description now covers Hermes, OpenClaw, Claude Code, and
+  similar HTTP-capable agents.
+- Direct Link Mini App onboarding can mint a per-tapper token in a private
+  Telegram WebView while the DM `Onboard Agent` path remains available.
+- Admin agents can request group approval links and revoke group approvals.
+- Telegram group access is closed by default unless a group is statically or
+  dynamically approved, or the session explicitly enables open group access.
+- The confusing `/actions` Telegram command was removed; use `/agent` for the
+  agent menu and `/activity` for recent activity.
+- The worker exposes `/telegram/agent/api/skill-version` so agents can check
+  whether their installed skill is current.
+- Planned/active agent API coverage includes admin metrics, creating questions
+  from agent-summarized URLs, and active-tag lookup for consistent tagging.

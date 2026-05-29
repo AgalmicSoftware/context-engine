@@ -58,6 +58,8 @@ import {
 } from './telegramAgentDelegationTokens.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
+const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-28 (v2)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 
@@ -95,6 +97,25 @@ function json(data, init = {}) {
 
 function agentBridgePublicUrl(env = {}) {
   return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+}
+
+function agentSkillUrl(env = {}) {
+  return safeString(
+    env.AGENT_BRIDGE_AGENT_SKILL_URL ||
+      env.CE_TELEGRAM_AGENT_SKILL_URL ||
+      DEFAULT_AGENT_SKILL_URL
+  );
+}
+
+function skillVersionPayload(env = {}) {
+  const skillUrl = agentSkillUrl(env);
+  return {
+    ok: true,
+    version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    skill: 'ce-telegram-agent-handoff',
+    skillUrl,
+    changelogUrl: `${skillUrl}#changelog`,
+  };
 }
 
 function miniAppOnboardAllowedOrigins(env = {}) {
@@ -2281,6 +2302,11 @@ export async function handleTelegramAgentHandoffRequest({
   const url = new URL(request.url);
   if (url.pathname === '/telegram/agent/api/miniapp/onboard') {
     return handleMiniAppOnboardRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
+    const payload = skillVersionPayload(env);
+    assertNoSecretShape(payload, 'Telegram agent skill-version response must not serialize secrets.');
+    return json(payload);
   }
 
   const auth = await authenticateAgentHandoff(request, env);
