@@ -40,4 +40,26 @@ describe('surveyQuestionsSubmitController', () => {
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
+
+  it('routes navigate plans through the injected navigation port', () => {
+    const ports = createPorts();
+    const plan: SurveyQuestionsPrimarySubmitPlan = {
+      action: 'navigate',
+      path: '/survey/0xsurvey/0xabc?session=edge%20session',
+      reason: 'completed_survey_response',
+    };
+
+    const result = runSurveyQuestionsSubmitController({ plan, ports });
+
+    expect(result).toEqual({
+      action: 'navigate',
+      path: '/survey/0xsurvey/0xabc?session=edge%20session',
+      plan,
+      reason: 'completed_survey_response',
+      status: 'navigated',
+    });
+    expect(ports.navigateToResponse).toHaveBeenCalledTimes(1);
+    expect(ports.navigateToResponse).toHaveBeenCalledWith(plan.path, plan);
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+  });
 });
