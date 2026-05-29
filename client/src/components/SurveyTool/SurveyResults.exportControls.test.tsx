@@ -728,24 +728,39 @@ describe('SurveyResults export/view controls', () => {
   });
 
   it('generates AI analysis with synthetic participant IDs and stores the local artifact', async () => {
-    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
-      breakdown: {
-        summary: { overview: 'Participants broadly prioritize clear export controls.' },
-        groups: [{ id: 'group_1', label: 'Export controls', participantIds: ['participant_001'] }],
-      },
-      argumentMap: {
-        debates: [{ id: 'debate_1', title: 'Export scope', claims: [{ id: 'claim_1', participantIds: ['participant_001'] }] }],
-      },
-      riskMatrix: {
-        categories: [{ id: 'risk_1', label: 'Privacy leakage' }],
-        comments: [{ id: 'risk_comment_1', participantIds: ['participant_002'] }],
-        heatmap: { risk_1: { likelihood: 'medium', impact: 'high' } },
-      },
-      atlas: {
-        nodes: [{ id: 'atlas_1', label: 'Privacy-preserving exports', participantIds: ['participant_001'] }],
-        edges: [],
-      },
-    }));
+    (callAI as jest.Mock).mockImplementation((prompt: string) => {
+      if (prompt.includes('Generate only this result view: Breakdown')) {
+        return Promise.resolve(JSON.stringify({
+          breakdown: {
+            dimensions: [{ id: 'question_tags', label: 'Question Tags', values: [{ id: 'exports', label: 'exports', count: 3 }] }],
+            summary: { overview: 'Participants broadly prioritize clear export controls.' },
+            groups: [{ id: 'group_1', label: 'Export controls', participantIds: ['participant_001'] }],
+          },
+        }));
+      }
+      if (prompt.includes('Generate only this result view: Argument Map')) {
+        return Promise.resolve(JSON.stringify({
+          argumentMap: {
+            debates: [{ id: 'debate_1', title: 'Export scope', claims: [{ id: 'claim_1', participantIds: ['participant_001'] }] }],
+          },
+        }));
+      }
+      if (prompt.includes('Generate only this result view: Risk Matrix')) {
+        return Promise.resolve(JSON.stringify({
+          riskMatrix: {
+            categories: [{ id: 'risk_1', label: 'Privacy leakage' }],
+            comments: [{ id: 'risk_comment_1', participantIds: ['participant_002'] }],
+            heatmap: { risk_1: { likelihood: 'medium', impact: 'high' } },
+          },
+        }));
+      }
+      return Promise.resolve(JSON.stringify({
+        atlas: {
+          nodes: [{ id: 'atlas_1', label: 'Privacy-preserving exports', participantIds: ['participant_001'] }],
+          edges: [],
+        },
+      }));
+    });
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
       sessionName: 'Demo Session',
@@ -758,9 +773,30 @@ describe('SurveyResults export/view controls', () => {
     subject.state = {
       ...subject.state,
       viewMode: 'questions',
+      htmlReportSelectedSections: {
+        argumentMap: true,
+        atlas: true,
+        report: true,
+        riskMatrix: true,
+        snapshotJson: true,
+      },
       totalQuestionsCount: 2,
       totalResponsesCount: 3,
       filteredResponsesCount: 3,
+      filterState: {
+        sbtFilter: {
+          onlyVerifiedHumans: true,
+          selectedSBTGroupsResponder: [
+            {
+              address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              label: 'Builders Guild',
+            },
+            {
+              address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            },
+          ],
+        },
+      },
       sbtFilteredAggregatorQuestionResponses: {
         q1: [
           { responder: '0x1111111111111111111111111111111111111111', response: { answer: { value: 'Use a viewer.' } } },
@@ -773,22 +809,33 @@ describe('SurveyResults export/view controls', () => {
       sbtFilteredResponses: [],
     };
     subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
-      q1: { id: 'q1', prompt: 'What export should exist?', type: 'freeform' },
-      q2: { id: 'q2', prompt: 'What risk matters?', type: 'freeform' },
+      q1: { id: 'q1', prompt: 'What export should exist?', tags: ['exports'], type: 'freeform' },
+      q2: { id: 'q2', prompt: 'What risk matters?', tags: ['safety'], type: 'freeform' },
     }));
     subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
     subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(() => Promise.resolve());
 
     await subject.generateHtmlReportAnalysisViews();
 
-    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(callAI).toHaveBeenCalledTimes(4);
     const prompt = (callAI as jest.Mock).mock.calls[0][0];
     expect(prompt).toContain('participant_001');
     expect(prompt).toContain('Use a viewer.');
+    expect(prompt).toContain('Question Tags');
+    expect(prompt).toContain('Builders Guild');
+    expect(prompt).toContain('Verified humans');
     expect(prompt).not.toContain('0x1111111111111111111111111111111111111111');
     expect(prompt).not.toContain('0x2222222222222222222222222222222222222222');
-    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    expect(prompt).not.toContain('0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(4);
+    expect((callAI as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('Generate only this result view: Breakdown'),
+      expect.stringContaining('Generate only this result view: Argument Map'),
+      expect.stringContaining('Generate only this result view: Risk Matrix'),
+      expect.stringContaining('Generate only this result view: Atlas Nodes'),
+    ]);
     expect(subject.state.htmlReportAnalysisArtifact.sections.argumentMap.available).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact.sections.breakdown.available).toBe(true);
 
     const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
     expect(snapshot.sections.argumentMap.available).toBe(true);
