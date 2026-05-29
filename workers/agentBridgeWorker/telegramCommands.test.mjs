@@ -252,6 +252,36 @@ function arweaveId(byte = 7) {
   return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
 }
 
+function u16le(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function u32le(bytes, offset) {
+  return (bytes[offset] |
+    (bytes[offset + 1] << 8) |
+    (bytes[offset + 2] << 16) |
+    (bytes[offset + 3] << 24)) >>> 0;
+}
+
+function readZipTextFiles(bytes) {
+  const out = {};
+  const decoder = new TextDecoder();
+  let offset = 0;
+  while (offset + 30 <= bytes.length && u32le(bytes, offset) === 0x04034b50) {
+    const method = u16le(bytes, offset + 8);
+    const compressedSize = u32le(bytes, offset + 18);
+    const nameLength = u16le(bytes, offset + 26);
+    const extraLength = u16le(bytes, offset + 28);
+    const nameStart = offset + 30;
+    const dataStart = nameStart + nameLength + extraLength;
+    const name = decoder.decode(bytes.slice(nameStart, nameStart + nameLength));
+    const data = bytes.slice(dataStart, dataStart + compressedSize);
+    if (method === 0) out[name] = decoder.decode(data);
+    offset = dataStart + compressedSize;
+  }
+  return out;
+}
+
 function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
   return async (url, init = {}) => {
     calls.push({ url: String(url), init });
@@ -2449,12 +2479,13 @@ test('/export_all falls back to Telegram submit records when storage payload lis
     telegramUserId: '42',
     questionId: `0x${'12'.repeat(32)}`,
     questionIdShort: '0x121212...1212',
-    answer: { label: 'Agree', value: 'agree', controlType: 'binary' },
-    onChain: {
-      ok: true,
-      accountAddress,
-      storageRef: { backend: 'cloudflare', id: arweaveId(51), resource: 'responses' },
+    answer: {
+      label: 'Agree',
+      value: 'agree',
+      controlType: 'binary',
+      comments: 'This needs a rollback plan.',
     },
+    onChain: null,
     createdAt: now,
   }));
   const env = baseEnv({
@@ -2516,6 +2547,23 @@ test('/export_all falls back to Telegram submit records when storage payload lis
   assert.match(result.response.text, /Responses were exported from Telegram submit records\./);
   assert.match(result.response.text, /Storage payloads unavailable: Storage route read\/list is only available for Cloudflare storage\./);
   assert.equal(result.response.document.filename, 'context-engine-telegram-demo-2-responses.zip');
+  const normalizedAccountAddress = accountAddress.toLowerCase();
+  const files = readZipTextFiles(result.response.document.bytes);
+  const responsePayload = JSON.parse(files['responses/001-storage-list-fallback.json']);
+  assert.equal(responsePayload.type, 'telegram_research_response');
+  assert.equal(responsePayload.participant.accountAddress, normalizedAccountAddress);
+  assert.equal(responsePayload.participant.stableRef, `evm:${normalizedAccountAddress}`);
+  assert.equal(responsePayload.answer.comments, 'This needs a rollback plan.');
+  assert.equal(responsePayload.answer.value, 'agree');
+  assert.equal(responsePayload.session.sessionSlug, 'telegram-demo-2');
+  assert.equal(responsePayload.question.questionId, `0x${'12'.repeat(32)}`);
+  assert.equal(Object.hasOwn(responsePayload, 'telegramUserId'), false);
+  assert.equal(Object.hasOwn(responsePayload, 'idempotencyKey'), false);
+  const responsesIndex = JSON.parse(files['responses.json']);
+  assert.equal(responsesIndex[0].payload.answer.comments, 'This needs a rollback plan.');
+  assert.equal(Object.hasOwn(responsesIndex[0], 'submitRecord'), false);
+  const submitRecords = JSON.parse(files['telegram-submit-records.json']);
+  assert.equal(submitRecords[0].answer.comments, 'This needs a rollback plan.');
 });
 
 test('/export_all denies non-allowlisted Telegram managed wallets', async () => {
