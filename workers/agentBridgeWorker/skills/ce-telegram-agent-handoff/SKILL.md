@@ -85,10 +85,10 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 ```
 
 After the user taps `Start`, Telegram should land directly on the private
-`Agent Install Info` screen. Ask the user to tap `Copy Agent Info` and paste
+agent install screen. Ask the user to tap `Copy Agent Info` and paste
 the copied install info back into Claude Code. Do not call the CE worker until
-the pasted install info provides a `worker=...`, `skill=...`, and `ceagt_...`
-token.
+the pasted install info provides a `ceagt_...` token, worker URL, and skill URL
+(either as `worker=...` / `skill=...` fields or line-separated URLs).
 
 ## Staying Up To Date
 

@@ -4711,20 +4711,18 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.text, [
-    'Agent Install Info',
-    '',
     'Press Copy Agent Info and paste to your agent',
     '',
-    'Context Engine will ask you questions and create a privacy-preserving map of opinions',
+    'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n'));
   const copyInfoButton = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Copy Agent Info');
   const copyInfo = copyInfoButton?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(copyInfo, /token=ceagt_[A-Za-z0-9_-]+/);
-  assert.match(copyInfo, /worker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /skill=https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(copyInfo, /CE: onboard prefs\./);
+  assert.match(copyInfo, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);
@@ -4858,7 +4856,7 @@ test('/start Onboard Agent deep-link mints private install info without exposing
   assert.equal(privateStart.screen, 'agent_token');
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(privateStart.response.text.includes(token), false);
-  assert.match(copyInfo, /worker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
 });
 
 test('/start agent_onboarding slug deep-link opens the private copy install screen directly', async () => {
@@ -4937,7 +4935,9 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(result.response.text.includes('/add_question'), false);
   assert.equal(result.response.text.includes('/attachments'), false);
   assert.equal(result.response.text.split('\n').includes('/questions'), true);
-  assert.equal(result.response.text.split('\n').includes('/me - My Account'), true);
+  assert.equal(result.response.text.split('\n').includes('Onboard Agent or use Mini-App'), true);
+  assert.equal(result.response.text.split('\n').includes('/me'), true);
+  assert.equal(result.response.text.includes('/me - My Account'), false);
   assert.equal(result.response.text.includes('/questions - view session questions'), false);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');

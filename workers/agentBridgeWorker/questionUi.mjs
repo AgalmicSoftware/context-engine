@@ -517,7 +517,7 @@ function buildDefaultScreenCopy(screen) {
   }
   if (screen === 'my_account') {
     return {
-      title: 'My Account',
+      title: 'Account',
       text: 'Managed account summary.',
     };
   }

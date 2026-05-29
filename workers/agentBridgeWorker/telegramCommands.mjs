@@ -455,7 +455,11 @@ function buildAgentInstallCopyInfo({
   skillUrl = '',
 } = {}) {
   const compactSkillUrl = compactGithubRawUrl(skillUrl);
+  const intro = 'Below is the information you need to install Context Engine - connect to worker and perform onboarding for your human, asking their preferences.';
   const candidates = [
+    `${intro}\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `Install CE; connect worker and ask preferences.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `CE: onboard prefs.\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
@@ -3606,12 +3610,12 @@ function formatHelpText({
   if (session?.sessionSlug) {
     lines.push(`Session: ${sessionLabel(session)}`, '');
   }
-  lines.push('Onboard Agent: let your trusted agent pull questions and draft responses for review.', '');
+  lines.push('Onboard Agent or use Mini-App', '');
   if (showSessions) lines.push('/sessions - choose session');
   lines.push(
     '/questions',
     '/results',
-    '/me - My Account',
+    '/me',
   );
   return lines.join('\n');
 }
@@ -8815,11 +8819,9 @@ async function buildAgentTokenResponse({
     createdAt,
   });
   const bodyText = [
-    'Agent Install Info',
-    '',
     'Press Copy Agent Info and paste to your agent',
     '',
-    'Context Engine will ask you questions and create a privacy-preserving map of opinions',
+    'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n');
   assertNoSecretShape({ bodyText }, 'Agent token response body must not expose secret-shaped values.');
   return reply({
