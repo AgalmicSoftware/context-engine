@@ -133,7 +133,7 @@ The current browser Lit runtime fans out from `client/src/utilities/crypto/litPr
 
 ### Session metadata and MainSite
 
-- `client/src/components/MainSite/MainSite.jsx`
+- `client/src/components/MainSite/MainSite.tsx`
 - `client/src/components/Sessions/SessionWizard.tsx`
 
 ### SBT metadata

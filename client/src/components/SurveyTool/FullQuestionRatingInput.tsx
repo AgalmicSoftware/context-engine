@@ -14,6 +14,10 @@ type FullQuestionRatingInputProps = {
   onChangeComplete?: ((event?: unknown) => void) | null;
 };
 
+export const resolveFullQuestionRatingSliderStyle = (): React.CSSProperties => ({
+  width: '200px',
+});
+
 const FullQuestionRatingInput = ({
   value = 0,
   disabled = false,
@@ -35,7 +39,7 @@ const FullQuestionRatingInput = ({
           if (typeof onChangeComplete === 'function') onChangeComplete(event);
         }}
         className={styles.ratingSlider}
-        style={{ width: '200px' }}
+        style={resolveFullQuestionRatingSliderStyle()}
         disabled={disabled}
       />
     </div>

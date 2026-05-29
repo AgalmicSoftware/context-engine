@@ -100,15 +100,14 @@ export const resolveMainSiteLitSessionConfig = ({
   sessionConfig?: MainSiteLitSessionConfigLike | null;
   networkChainIdFallback?: number | null;
 } = {}) => {
-  const cfg: any = sessionConfig || {};
+  const cfg: MainSiteLitSessionConfigLike = sessionConfig || {};
   const litCredentials = (
     cfg?.litCredentials &&
     typeof cfg.litCredentials === 'object' &&
     !Array.isArray(cfg.litCredentials)
-  ) ? cfg.litCredentials : null;
+  ) ? cfg.litCredentials as LitCredentialsLike : null;
   const chipotleWorkerUrl = toStr(cfg?.corsWorkerUrl).trim();
-  const hasChipotleRuntime = (
-    chipotleWorkerUrl &&
+  const hasCompleteLitCredentials = !!(
     litCredentials &&
     toStr(litCredentials?.litApiBase).trim() &&
     toStr(litCredentials?.litPkpId).trim() &&
@@ -120,7 +119,6 @@ export const resolveMainSiteLitSessionConfig = ({
   const litNetworkHint = toStr(litConfig?.network || (cfg as Record<string, unknown>)?.litNetwork).trim().toLowerCase();
   const gate = resolvePrimaryLitGate(cfg);
   const chainId = gate?.chainId || cfg?.networkChainId || networkChainIdFallback || null;
-  const litNetwork = hasChipotleRuntime ? 'chipotle' : '';
   const userMaxPrice = cfg?.lit?.userMaxPrice || cfg?.litUserMaxPrice || '';
   const litChain = resolveLitChain({
     chainId,
@@ -156,7 +154,7 @@ export const resolveMainSiteLitSessionConfig = ({
     chipotle: hasChipotleRuntime ? {
       enabled: true,
       workerUrl: chipotleWorkerUrl,
-      litCredentials,
+      litCredentials: litCredentials || {},
       sessionConfig: cfg,
     } : null,
   };

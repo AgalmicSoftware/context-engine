@@ -1,4 +1,6 @@
 import {
+  buildLoginSettingsSponsorshipCard,
+  buildLoginSettingsSponsorshipCards,
   formatSponsoredStatusMeta,
   formatResourceSponsorHint,
   getSponsoredKeyAliases,

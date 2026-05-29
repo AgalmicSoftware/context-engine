@@ -42,7 +42,7 @@ describe('historicalFigureDemographics', () => {
 
   it('does not pull the demo polis vote fixture into the demographics module', () => {
     const demographicsSource = fs.readFileSync(
-      path.join(__dirname, 'historical_figure_demographics.js'),
+      path.join(__dirname, 'historical_figure_demographics.ts'),
       'utf8'
     );
 

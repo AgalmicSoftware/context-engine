@@ -726,132 +726,6 @@ function unifyAggregatorWithAllQuestionIDs(
   return loweredMap;
 }
 
-const INVALID_RESPONSE_TIMESTAMP = Number.NEGATIVE_INFINITY;
-
-const normalizeResponseTimestampMs = (value) => {
-  if (value === null || value === undefined || value === '') return INVALID_RESPONSE_TIMESTAMP;
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return INVALID_RESPONSE_TIMESTAMP;
-    return Math.abs(value) < 1e12 ? Math.floor(value * 1000) : value;
-  }
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return INVALID_RESPONSE_TIMESTAMP;
-    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
-      const numeric = Number(trimmed);
-      if (!Number.isFinite(numeric)) return INVALID_RESPONSE_TIMESTAMP;
-      return Math.abs(numeric) < 1e12 ? Math.floor(numeric * 1000) : numeric;
-    }
-    const parsed = Date.parse(trimmed);
-    return Number.isNaN(parsed) ? INVALID_RESPONSE_TIMESTAMP : parsed;
-  }
-  return INVALID_RESPONSE_TIMESTAMP;
-};
-
-const getSurveyResponseQuestionId = (row = {}) => (
-  String(row?.questionID || row?.questionId || '').trim().toLowerCase()
-);
-
-const getSurveyResponseEntryTimestampMs = (row = {}) => (
-  normalizeResponseTimestampMs(row?.timestamp ?? row?.timeStamp)
-);
-
-const getSurveyResponsePayloadTimestampMs = (payload = {}) => (
-  normalizeResponseTimestampMs(payload?.timestamp ?? payload?.timeStamp)
-);
-
-const getSurveyResponseAggregateTimestampMs = (row = {}, payload = {}) => {
-  const entryTimestamp = getSurveyResponseEntryTimestampMs(row);
-  const payloadTimestamp = getSurveyResponsePayloadTimestampMs(payload);
-  // Regression guard: merged survey payloads can advance the top-level recency
-  // without rewriting preserved per-question rows. Keep the newer of the two so
-  // stale row timestamps do not pin an older answer ahead of a newer payload edit.
-  if (
-    entryTimestamp === INVALID_RESPONSE_TIMESTAMP &&
-    payloadTimestamp === INVALID_RESPONSE_TIMESTAMP
-  ) {
-    return 0;
-  }
-  if (entryTimestamp === INVALID_RESPONSE_TIMESTAMP) return payloadTimestamp;
-  if (payloadTimestamp === INVALID_RESPONSE_TIMESTAMP) return entryTimestamp;
-  return Math.max(entryTimestamp, payloadTimestamp);
-};
-
-const isSurveyQuestionResponseNewer = (candidate, existing) => {
-  // Regression guard: current client edits may advance only the payload timestamp.
-  // Compare effective recency first, then payload recency, and let later array
-  // order win within the same payload revision so stale per-answer timestamps do
-  // not pin an older answer ahead of a newer payload-backed edit.
-  if (candidate.aggregateTimestampMs !== existing.aggregateTimestampMs) {
-    return candidate.aggregateTimestampMs > existing.aggregateTimestampMs;
-  }
-  if (candidate.payloadTimestampMs !== existing.payloadTimestampMs) {
-    return candidate.payloadTimestampMs > existing.payloadTimestampMs;
-  }
-  if (
-    candidate.payloadTimestampMs !== INVALID_RESPONSE_TIMESTAMP &&
-    candidate.payloadTimestampMs === existing.payloadTimestampMs
-  ) {
-    return candidate.index >= existing.index;
-  }
-  if (candidate.entryTimestampMs !== existing.entryTimestampMs) {
-    return candidate.entryTimestampMs > existing.entryTimestampMs;
-  }
-  return candidate.index >= existing.index;
-};
-
-const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
-  const source = (payload && typeof payload === 'object') ? payload : null;
-  if (!source) return payload;
-  if (!Array.isArray(source.responses)) return { ...source };
-
-  const payloadTimestampMs = getSurveyResponsePayloadTimestampMs(source);
-  const passthroughRows = [];
-  const latestByQuestionId = new Map();
-
-  source.responses.forEach((row, index) => {
-    const clonedRow = (row && typeof row === 'object') ? { ...row } : row;
-    const questionId = getSurveyResponseQuestionId(row);
-    if (!questionId) {
-      passthroughRows.push({
-        index,
-        orderIndex: index,
-        row: clonedRow,
-      });
-      return;
-    }
-
-    const candidate = {
-      index,
-      orderIndex: index,
-      row: clonedRow,
-      entryTimestampMs: getSurveyResponseEntryTimestampMs(row),
-      payloadTimestampMs,
-      aggregateTimestampMs: getSurveyResponseAggregateTimestampMs(row, source),
-    };
-    const existing = latestByQuestionId.get(questionId);
-    if (!existing || isSurveyQuestionResponseNewer(candidate, existing)) {
-      latestByQuestionId.set(questionId, {
-        ...candidate,
-        // Keep the original slot while replacing only the row contents.
-        orderIndex: existing?.orderIndex ?? index,
-      });
-    }
-  });
-
-  const normalizedResponses = [
-    ...passthroughRows,
-    ...Array.from(latestByQuestionId.values()),
-  ]
-    .sort((left, right) => left.orderIndex - right.orderIndex)
-    .map((entry) => entry.row);
-
-  return {
-    ...source,
-    responses: normalizedResponses,
-  };
-};
-
 /** Prefix-preserver used by SurveySelector */
 const readPathSearch = (path: unknown = ''): string => {
   const value = String(path || '');
@@ -1885,10 +1759,7 @@ class SurveyResults extends Component<any, any> {
       initialViewMode = 'survey';
     }
 
-    this.setState({
-      viewMode: initialViewMode,
-      surveyId: initialSurveyId
-    }, () => {
+    this.setState(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId), () => {
       this.handleUrlBasedView();
 
       if (this.props.isOpen) {
@@ -1992,7 +1863,6 @@ class SurveyResults extends Component<any, any> {
       }
     }
   }
-
 
 
   componentDidUpdate(prevProps: SurveyResultsRecord, prevState: SurveyResultsRecord): void {
@@ -2410,7 +2280,7 @@ class SurveyResults extends Component<any, any> {
     const surveyMatch = path.match(surveyResultsRegex);
 
     const questionResultsRegex = /^\/questions\/results/;
-    let questionMatch = path.match(questionResultsRegex);
+    const questionMatch = path.match(questionResultsRegex);
 
     if (surveyMatch) {
         newViewMode = "survey";
@@ -2886,7 +2756,7 @@ if (this.state.viewMode === 'survey') {
       const responderLower = String(responder || '').toLowerCase();
       const rawResp = normalizeSurveyResponsePayloadByQuestionId(
         this.parseResponse(srMap[responder])
-      );
+      ) as SurveyResultsSurveyResponsePayload | null;
       if (!hasAnyCountableSurveyAnswer(rawResp, networkQuestions)) return;
       rawResponses.push({
         responder: responderLower,
@@ -2894,7 +2764,7 @@ if (this.state.viewMode === 'survey') {
         response: rawResp,
       });
       if (!rawResp || !Array.isArray(rawResp.responses)) return;
-      rawResp.responses.forEach((ans) => {
+      rawResp.responses.forEach((ans: SurveyResultsResponseRecord) => {
         const qIdL = getSurveyResponseQuestionId(ans);
         if (!qIdL) return;
         if (!aggregatorMap[qIdL]) aggregatorMap[qIdL] = [];
@@ -4578,10 +4448,12 @@ transformIndividualResponsesToAggregator = (individualResponses: unknown): Surve
 
   const aggregator: SurveyResultsIndividualAggregator = {};
 
-  individualResponses.forEach(response => {
-    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(response.response); // Already an object
+  responseRows.forEach((response) => {
+    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
+      response.response
+    ) as SurveyResultsSurveyResponsePayload | null; // Already an object
     if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach(answerItem => {
+      parsedResponse.responses.forEach((answerItem) => {
         const qIdLower = getSurveyResponseQuestionId(answerItem);
         if (!qIdLower) return;
 
@@ -4631,7 +4503,7 @@ getMemoizedViewableResponsesCount = (responses: unknown, questionType: unknown =
   if (cached && cached.questionType === normalizedQuestionType) {
     return cached.count;
   }
-  const count = this.getLatestResponsesByResponder(list).reduce((acc, row) => {
+  const count = this.getLatestResponsesByResponder(list).reduce((acc: number, row) => {
     const parsedResponse = row?.response;
     if (!parsedResponse || !parsedResponse.answer) {
       return acc;
@@ -5323,9 +5195,9 @@ const entries = Object.keys(questionRecord).map((qId) => {
   return {
     questionId: qId,
     responsesCount: this.getLatestResponsesByResponder(responses).length,
-    type: qData.type || '',
-    prompt: qData.prompt || '',
-    sessionSlug: qData.sessionSlug || '',
+    type: (qData.type || '') as string,
+    prompt: (qData.prompt || '') as string,
+    sessionSlug: (qData.sessionSlug || '') as string,
   };
 });
 

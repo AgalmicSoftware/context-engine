@@ -56,12 +56,15 @@ The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`,
 | `ce-page-matrix-root` | `/matrix` | Matrix demo page root | yes |
 | `ce-page-agent-root` | `/agent` (dev-only) | Agent page root | yes |
 
-## DebateMap / Atlas Historical Cases
+## DebateMap / Atlas
 
-Component: `client/src/components/DebateMap/DebateMap.jsx`
+Component: `client/src/components/DebateMap/DebateMap.tsx`
 
 | `data-testid` | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- |
+| `ce-debate-view-mode` | Primary DebateMap mode button for `Circles`, `Atlas`, `Tree`, or `List`. | yes | `data-ce-view-mode` (`circles`, `atlas`, `tree`, `list`) |
+| `ce-atlas-node` | Clickable atlas node in either orbital or packed layout. | yes | `data-ce-node-id`, `data-ce-node-layout` (`orbital` or `packed`) |
+| `ce-atlas-title-action` | Clickable packed-view root title that opens the current drilled node. | yes | `data-ce-node-id` |
 | `ce-atlas-historical-case-card` | Historical-case card shown in the atlas modal when demo mode attaches Loophole case data to a leaf node. | yes | `data-ce-case-id` |
 | `ce-atlas-historical-case-expand` | Expand/collapse button for a historical-case brief. | yes | `data-ce-case-id` |
 | `ce-atlas-historical-case-detail` | Expanded brief container with the enriched case sections. | yes | `data-ce-case-id` |
@@ -179,6 +182,15 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.tsx` | Pile view "View All Questions" control. | yes |  |
 | `ce-survey-pile-hologram-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Reserved top-right pile-view hologram toggle for the future voice-only avatar mode. The test ID remains stable, but the button is currently hidden in the UI. | yes |  |
 | `ce-survey-pile-hologram-panel` | `client/src/components/SurveyTool/PileHologramAssistant.tsx` | Full-card light-blue hologram face takeover rendered while the pile hologram toggle is active. | yes |  |
+| `ce-session-listening-toggle` | `client/src/components/SurveyTool/surveyPileInteractionSurface.tsx` | Pile action microphone toggle that opens/closes the session listening panel. | yes |  |
+| `ce-session-listening-panel` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Pile-adjacent listening panel opened by the microphone toggle or `?mode=listening`. | yes |  |
+| `ce-session-listening-start` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Starts the rolling microphone recording after a user gesture. | yes |  |
+| `ce-session-listening-stop` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Stops the active rolling recording session. | yes |  |
+| `ce-session-listening-clear` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Clears the current listening transcript/draft from the transcript overlay control. | yes |  |
+| `ce-session-listening-transcript-details` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Compact transcript character-count button that opens/closes the stitched transcript. | yes |  |
+| `ce-session-listening-transcript` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Read-only stitched transcript textarea. | yes |  |
+| `ce-session-listening-generate` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Generates draft questions from the stitched transcript. Hidden until transcript/audio content exists. | yes |  |
+| `ce-session-listening-suggestions` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Wrapper around the generated-question review surface. | yes |  |
 | `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
 | `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
 | `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyQuestionsUserResponseNotice.tsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
@@ -218,20 +230,20 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-create-panel` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Root element of the CreateQuestionsAndSurveys panel. | yes |  |
-| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
-| `ce-create-clear` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Clear form button (when visible). | yes |  |
-| `ce-create-title` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Title input for Survey mode. | yes |  |
-| `ce-create-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
-| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Question prompt textarea within a question container. | yes |  |
-| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Tag input within a question container. | yes |  |
-| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
-| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | "Add Option" control for multichoice questions. | yes |  |
-| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Checkbox that enables single-select multichoice mode. | yes |  |
-| `ce-create-submit` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
-| `ce-create-success` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
-| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
-| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
+| `ce-create-panel` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Root element of the CreateQuestionsAndSurveys panel. | yes |  |
+| `ce-create-mode-switch` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Switch between Manual and "from URL / Content" modes (when available). | yes |  |
+| `ce-create-clear` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Clear form button (when visible). | yes |  |
+| `ce-create-title` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Title input for Survey mode. | yes |  |
+| `ce-create-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Per-question container in the authoring form. | yes | `data-ce-question-index` |
+| `ce-create-question-prompt` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Question prompt textarea within a question container. | yes |  |
+| `ce-create-question-tag-input` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Tag input within a question container. | yes |  |
+| `ce-create-question-add-tag` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | "Add Tag" control (checkmark) within a question container (only visible when input is non-empty). | yes |  |
+| `ce-create-question-add-option` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | "Add Option" control for multichoice questions. | yes |  |
+| `ce-create-question-single-select` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Checkbox that enables single-select multichoice mode. | yes |  |
+| `ce-create-submit` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Primary submit button for Create Questions / Create Survey. | yes |  |
+| `ce-create-success` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Success confirmation wrapper shown after authoring submit completes. | yes |  |
+| `ce-create-uploaded-questions` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Wrapper around the list of uploaded questions (when present). | yes |  |
+| `ce-create-uploaded-question` | `client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx` | Per-uploaded-question list item in the success UI (when present). | yes | `data-ce-question-id` |
 
 ## SBT Create / View
 

@@ -107,10 +107,19 @@ broadcast/
 
 # Local scratch
 /.tmp/
+/.tmp-review/
 /tmp/
 /tmp-launch-channel-chrome.js
+/node-compile-cache/
+/ce-hook-*/
+/ce-install-*/
+/ce-router-*/
+/ce-startup-*/
 /.jest-cache/
 /.jest-tmp/
+/.tmp-jest/
+/tmp_jest/
+/tmp_jest_cache/
 /client/.jest-cache/
 /client/.jest-tmp/
 /client/.tmp-jest/
@@ -187,6 +196,7 @@ docs/outreach/
 
 # Public release staging artifact (output of `make release`)
 /release-public/
+/private-pack.manifest.json
 
 # Python bytecode (repo includes small workflow builders)
 __pycache__/

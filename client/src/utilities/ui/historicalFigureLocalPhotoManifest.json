@@ -298,25 +298,5 @@
   "\u00c9milieDuCh\u00e2telet": {
     "name": "\u00c9milieDuCh\u00e2telet",
     "src": "/historical-avatars/emilieduchatelet.jpg"
-  },
-  "FlorenceNightingale": {
-    "name": "FlorenceNightingale",
-    "src": "/historical-avatars/florencenightingale.jpg"
-  },
-  "GalileoGalilei": {
-    "name": "GalileoGalilei",
-    "src": "/historical-avatars/galileogalilei.jpg"
-  },
-  "RosaParks": {
-    "name": "RosaParks",
-    "src": "/historical-avatars/rosaparks.jpg"
-  },
-  "WangariMaathai": {
-    "name": "WangariMaathai",
-    "src": "/historical-avatars/wangarimaathai.jpg"
-  },
-  "Aristotle": {
-    "name": "Aristotle",
-    "src": "/historical-avatars/aristotle.jpg"
   }
 }

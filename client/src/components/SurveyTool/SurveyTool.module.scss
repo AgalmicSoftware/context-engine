@@ -454,8 +454,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18),
     $hover-box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24)
   );
-  text-transform: uppercase;
-  opacity: 1;
+  & {
+    text-transform: uppercase;
+    opacity: 1;
+  }
 }
 
 #submitSurveyButton.singleQuestionSubmitButton {
@@ -3126,7 +3128,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* Container for Card + Controls Side-by-Side */
 .pileInteractionUnit {
-  --pile-desktop-submit-rail-offset: 64px;
+  --pile-desktop-submit-rail-offset: 42px;
   --pile-desktop-rail-gap: 24px;
   --pile-card-width: min(550px, 90vw);
   display: flex;
@@ -3222,7 +3224,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* --- Controls Container (Nav + Actions) --- */
 .pileControls {
   position: absolute;
-  top: var(--pile-current-submit-rail-offset);
+  top: 0;
   right: 0;
   bottom: 0;
   left: 0;
@@ -3370,7 +3372,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .miniSpinnerWrapper {
     opacity: 0.5;
     position: absolute;
-    top: calc(var(--pile-current-submit-rail-offset) - 30px);
+    top: -30px;
     right: -75px;
     z-index: 2;
     display: flex;
@@ -3387,7 +3389,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .pileHologramToggle {
   position: absolute;
-  top: calc(var(--pile-current-submit-rail-offset) + 6px);
+  top: 6px;
   right: 16px;
   width: 42px;
   height: 42px;
@@ -3705,15 +3707,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 1367px) {
-  .pileInteractionUnit {
-    --pile-current-submit-rail-offset: 0px;
-    --pile-current-submit-rail-padding: 0px;
-  }
-
-  .pileControls {
-    top: 0;
-  }
-
   .miniSpinnerWrapper {
     top: 0;
   }
@@ -3723,7 +3716,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .pileFooter {
-    top: -72px;
+    top: -50px;
     right: 32px;
     left: 0;
     width: auto;
@@ -4038,11 +4031,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (max-width: 480px) {
-  .pileInteractionUnit {
-    --pile-current-submit-rail-offset: 0px;
-    --pile-current-submit-rail-padding: 0px;
-  }
-
   .pileControls {
     position: static;
     transform: none;
@@ -4089,7 +4077,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileFooter {
     position: absolute;
-    top: -60px;
+    top: -52px;
     right: 20px;
     left: 10px;
     flex: 0 0 auto;
@@ -4321,15 +4309,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),
     $hover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15)
   );
-  white-space: nowrap;
-  max-width: 300px;
-  overflow: visible;
+  & {
+    --pile-submit-button-radius: var(--ce-radius-8);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: visible;
+  }
 }
 
 .pileFooter .pileSubmitButton {
   position: relative;
   isolation: isolate;
   z-index: 0;
+  --pile-submit-button-radius: var(--ce-radius-16);
   width: 100%;
   max-width: none;
   min-height: 60px;
@@ -4390,6 +4382,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 60px;
   border-radius: 50%;
   color: var(--ce-color-white);
+  text-decoration: none;
   background:
     radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03) 48%),
     linear-gradient(135deg, #59d77d 0%, #39b963 100%);
@@ -4397,39 +4390,48 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     0 14px 30px rgba(6, 44, 18, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.18);
   animation: pileSubmitSuccessPop 220ms ease-out;
+
+  &:hover,
+  &:focus {
+    color: var(--ce-color-white);
+    text-decoration: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(255, 255, 255, 0.86);
+    outline-offset: 3px;
+  }
 }
 
 .pileSubmitSuccessIcon {
   font-size: 1.35rem;
 }
 
-@media (min-width: 1367px), (max-width: 480px) {
+@media (min-width: 769px), (max-width: 480px) {
   .pileSubmitButtonTrail {
     display: inline-flex;
   }
 }
 
-@media (min-width: 769px), (max-width: 480px) {
-  .pileFooter .pileSubmitButton.submitGlow::before {
-    position: absolute;
-    content: '';
-    background: linear-gradient(90deg, #fff 40%, transparent 40%);
-    top: -5px;
-    bottom: -5px;
-    left: -5px;
-    right: -5px;
-    z-index: 2;
-    border-radius: calc(var(--ce-radius-16) + 5px);
-    background-size: 200% 4px;
-    background-repeat: no-repeat;
-    filter: drop-shadow(0 0 8px #fff);
-    pointer-events: none;
-  }
+.pileFooter .pileSubmitButton.submitGlow::before {
+  position: absolute;
+  content: '';
+  background: linear-gradient(90deg, #fff 40%, transparent 40%);
+  top: -5px;
+  bottom: -5px;
+  left: -5px;
+  right: -5px;
+  z-index: 2;
+  border-radius: calc(var(--pile-submit-button-radius) + 5px);
+  background-size: 200% 4px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 8px #fff);
+  pointer-events: none;
+}
 
-  .pileFooter .pileSubmitButton.submitGlow::before {
-    background-position: 80% 0;
-    animation: beforeLineAnim 5.4s linear infinite;
-  }
+.pileFooter .pileSubmitButton.submitGlow::before {
+  background-position: 80% 0;
+  animation: beforeLineAnim 5.4s linear infinite;
 }
 
 @keyframes beforeLineAnim {
@@ -4478,6 +4480,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 @media (max-width: 480px) {
   .pileFooter .pileSubmitButton {
+    --pile-submit-button-radius: var(--ce-radius-16);
     width: 100%;
     max-width: none;
     min-height: 54px;

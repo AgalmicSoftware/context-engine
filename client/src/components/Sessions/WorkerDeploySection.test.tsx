@@ -3,9 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const buildWorkerDeploySectionProps = (props = {}) => ({
+type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['renderInfoTooltip']>>[0];
+
+const buildWorkerDeploySectionProps = (
+  props: Partial<WorkerDeploySectionProps> = {}
+): WorkerDeploySectionProps => ({
   isNormalMode: false,
-  renderInfoTooltip: ({ testId }) => <button type="button" data-testid={testId} />,
+  renderInfoTooltip: ({ testId }: RenderInfoTooltipProps) => <button type="button" data-testid={testId} />,
   workerMode: 'custom',
   shouldUseSponsoredAutoDeployFlow: false,
   deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
@@ -40,13 +44,16 @@ const buildWorkerDeploySectionProps = (props = {}) => ({
   ...props,
 });
 
-const renderWorkerDeploySection = (props = {}) => render(
+const renderWorkerDeploySection = (props: Partial<WorkerDeploySectionProps> = {}) => render(
   <WorkerDeploySection
     {...buildWorkerDeploySectionProps(props)}
   />
 );
 
-const rerenderWorkerDeploySection = (rerender, props = {}) => rerender(
+const rerenderWorkerDeploySection = (
+  rerender: ReturnType<typeof render>['rerender'],
+  props: Partial<WorkerDeploySectionProps> = {}
+) => rerender(
   <WorkerDeploySection
     {...buildWorkerDeploySectionProps(props)}
   />

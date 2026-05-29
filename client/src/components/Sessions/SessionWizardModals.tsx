@@ -1,9 +1,9 @@
 import React from 'react';
 
-import styles from './SessionWizard.module.scss';
-import CreateSBTGroup from '../SBTs/CreateSBTGroup';
-import ContractViewer, { type ContractViewerContract } from '../ContractPage/ContractViewer';
-import { WIZARD_CONTRACT_MODAL_TESTID } from '../ContractPage/contractMetadata.js';
+import type { ContractViewerContract } from '../ContractPage/ContractViewer';
+import SessionHeaderPreviewModal from './SessionHeaderPreviewModal';
+import SessionWizardContractViewerModal from './SessionWizardContractViewerModal';
+import SessionWizardCreateSbtModal from './SessionWizardCreateSbtModal';
 
 type GateLike = {
   id?: string;
@@ -26,7 +26,7 @@ type WizardDraftLike = Record<string, unknown> & {
   defaultSbtTags?: string;
 };
 
-type SessionWizardModalsProps = {
+export type SessionWizardModalsProps = {
   account?: string;
   provider?: unknown;
   createSbtModalState: CreateSbtModalState;

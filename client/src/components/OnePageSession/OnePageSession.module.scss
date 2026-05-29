@@ -79,10 +79,17 @@
   z-index: 41;
 }
 
+@media only screen and (min-width: 769px) and (max-width: 1366px) {
+  .titleContainerWithPileSubmitRail {
+    margin-bottom: 5px !important;
+    transform: translateY(-40px);
+  }
+}
+
 @media only screen and (max-width: 480px) {
   .titleContainerWithPileSubmitRail {
     margin-bottom: 5px !important;
-    transform: translateY(-44px);
+    transform: translateY(-40px);
   }
 }
 
@@ -337,20 +344,32 @@
 
 .documentsSectionHeader {
   width: 100%;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .documentsSectionHeaderMain {
   align-items: flex-start;
   display: inline-flex;
   gap: 10px;
+  flex-wrap: wrap;
   min-width: 0;
+}
+
+.documentsSectionHeaderText {
+  gap: 4px;
+}
+
+.documentsSectionHeaderTitleRow {
+  align-items: flex-start;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 100%;
 }
 
 .documentsSectionHeaderMeta {
   flex: 0 0 auto;
   flex-wrap: nowrap;
-  margin-left: auto;
   min-width: 0;
 }
 
@@ -360,6 +379,7 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   color: var(--ce-color-white);
+  cursor: pointer;
   display: inline-flex;
   gap: 6px;
   font-size: 0.8rem;
@@ -373,6 +393,25 @@
   &:focus-visible {
     color: var(--ce-color-white);
     border-color: rgba(255, 255, 255, 0.32);
+    outline: none;
+  }
+}
+
+.sectionHeaderLinkButton {
+  appearance: none;
+  font-family: inherit;
+  white-space: nowrap;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.72;
+    transform: none;
+  }
+
+  &:disabled:hover,
+  &:disabled:focus-visible {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: var(--ce-color-white);
     outline: none;
   }
 }
@@ -782,21 +821,23 @@
   }
 
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1em;
+    font-weight: inherit;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: rgba(255, 255, 255, 0.15);
   }
 
   .sectionHeaderRow {
@@ -864,10 +905,16 @@
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    justify-content: center;
     display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
     margin-left: 0;
     margin-top: 0;
-    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {
@@ -945,21 +992,23 @@
 /* Keep smaller tablets on the inline header layout without pulling in the full phone chrome. */
 @media only screen and (min-width: 601px) and (max-width: 767px) {
   .sectionHeader {
+    align-items: center;
     font-size: 1.6em;
     padding-left: 10px;
   }
 
   .sectionHeader .sectionHeaderText {
     flex-direction: row;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 6px 12px;
   }
 
   .sectionHeader .sectionHeaderSubtitle {
-    font-size: 0.68em;
+    font-size: 1.2em;
+    font-weight: inherit;
     line-height: 1;
-    color: rgba(244, 247, 255, 0.58);
+    color: rgba(255, 255, 255, 0.15);
   }
 
   .sectionHeaderRow {
@@ -1027,10 +1076,16 @@
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
     align-items: center;
+    justify-content: center;
     display: inline-flex;
+    min-height: 44px;
+    min-width: 44px;
     margin-left: 0;
     margin-top: 0;
-    min-height: 40px;
+  }
+
+  .documentsSectionHeaderMeta .sectionHeaderTooltip > svg {
+    opacity: 0.6;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderLink {

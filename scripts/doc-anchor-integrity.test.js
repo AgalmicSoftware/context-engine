@@ -10,6 +10,8 @@ const ROOT = path.resolve(__dirname, '..');
 const TRACKED_ANCHOR_FILES = Object.freeze([
   'AGENTS.md',
   'ARCHITECTURE.md',
+  'client/src/variables/demo/LOOPHOLE_SCHEMA.md',
+  'client/src/variables/demo/README.md',
   'docs/MainSite.MAP.md',
   'docs/SessionWizard.MAP.md',
   'docs/SurveyTool.MAP.md',

@@ -483,13 +483,29 @@ export default function DocumentLibraryPanel({
       typeof sessionConfig.litCredentials === 'object' &&
       !Array.isArray(sessionConfig.litCredentials)
     ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+    const hasCompleteLitCredentials = !!(
+      litCredentials &&
       toStr(litCredentials?.litApiBase).trim() &&
       toStr(litCredentials?.litActionCid).trim() &&
       toStr(litCredentials?.litPkpId).trim()
     );
-  }, [sessionConfig]);
+    const litConfig = (
+      sessionConfig &&
+      typeof sessionConfig === 'object' &&
+      sessionConfig.lit &&
+      typeof sessionConfig.lit === 'object' &&
+      !Array.isArray(sessionConfig.lit)
+    ) ? sessionConfig.lit as Record<string, unknown> : null;
+    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork).trim().toLowerCase();
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+      (
+        hasCompleteLitCredentials ||
+        litNetworkHint === 'chipotle' ||
+        docUploadsGate.hasRecipients
+      )
+    );
+  }, [docUploadsGate.hasRecipients, sessionConfig]);
   const sessionGateUnsupportedMessage = useMemo(() => (
     docUploadsGate.hasRecipients && !sessionHasLitChipotle
       ? getUnsupportedLitContractAccessControlErrorUntyped({

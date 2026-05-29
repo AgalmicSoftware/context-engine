@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({

@@ -39,7 +39,7 @@ const ethers =
   resolveEthersCompat(ethersModule);
 
 // --- Question ID generation ---
-// Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.jsx.
+// Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.tsx.
 // The ID is a keccak256 hash of "type:prompt[:options][:single]"
 
 export function generateQuestionId(type, prompt, options = [], singleSelect = false) {

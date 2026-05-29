@@ -678,10 +678,7 @@ const buildChipotleGateFromOptions = ({
 
 const isChipotleRuntimeConfigured = (chipotle: UnknownRecord = {}) => (
   !!toStr(chipotle?.workerUrl).trim() &&
-  !!toStr(chipotle?.sessionSlug).trim() &&
-  !!toStr(chipotle?.litCredentials?.litApiBase).trim() &&
-  !!toStr(chipotle?.litCredentials?.litPkpId).trim() &&
-  !!toStr(chipotle?.litCredentials?.litActionCid).trim()
+  !!toStr(chipotle?.sessionSlug).trim()
 );
 
 const resolveLitErrorMessage = (err: unknown) => {
@@ -1529,7 +1526,7 @@ const createLitChipotleHooks = ({
     if (!gate) throw new Error('Lit Chipotle gate is required.');
     const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
     const response = await fetchWorkerWithAuth(
-      normalizedWorkerUrl,
+      chipotleActionUrl,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -27,6 +27,26 @@ import {
 } from '../../utilities/session/globalSessionState.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
+type RecognitionLink = {
+  url: string;
+  text: string;
+};
+
+type RecognitionGroup = {
+  name: string;
+  description: string;
+  links: RecognitionLink[];
+  logo?: string;
+  itemClassName?: string;
+  logoClassName?: string;
+  image?: string;
+};
+
+type RecognitionIndividual = {
+  name: string;
+  url?: string;
+};
+
 const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' },
 ];
@@ -38,7 +58,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEthereum',
     logoClassName: 'recognitionLogoEthereum',
     description:
-      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. In the whitepaper, Ethereum matters as the cryptographic base that natively supports proof-of-human credentials, digital group membership tokens, access gates, and durable on-chain references, while decentralized protocols add censorship-resistance and data permanence. Although the app runs on Ethereum infrastructure, users do not need to know anything about cryptocurrency to use it.',
+      'Context Engine uses a passkey Ethereum wallet model rather than email for accounts. Ethereum provides the cryptographic foundation for proof-of-human and attestation-based access, SBT-style membership, gated encryption, and durable on-chain references, while decentralized infrastructure adds censorship-resistance and data permanence. Users do not need any crypto expertise to use it.',
     links: [
       { url: 'https://ethereum.org/', text: 'Ethereum.org' },
       { url: 'https://ethereum.org/en/what-is-ethereum/', text: 'What is Ethereum?' },
@@ -50,7 +70,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemRadicalxchange',
     logoClassName: 'recognitionLogoRxc',
     description:
-      'The whitepaper explicitly leans on RadicalxChange ideas around social identity, plural governance, and group-owned value. Context Engine uses SBT-style credentials issued by disparate communities for filtering and encryption, and points toward digital groups retaining ownership over the preference data and value they create instead of surrendering it to platforms.',
+      'Context Engine builds on RadicalxChange ideas around social identity, plural governance, and groups owning the data and value they create. SBT-style credentials issued by different communities can shape filtering and encryption, while the broader direction is for digital groups to retain ownership over the preference data and value they create instead of surrendering it to platforms.',
     links: [
       { url: 'https://www.radicalxchange.org/', text: 'Official Website' },
       { url: 'https://twitter.com/RadxChange', text: 'Twitter / X' },
@@ -62,7 +82,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemPolis',
     logoClassName: 'recognitionLogoPolis',
     description:
-      'Pol.is is the current SOTA for large-group discourse software, especially its vTaiwan demonstration that simple Agree / Unsure / Disagree inputs can clarify both consensus and persistent difference. Context Engine builds on that pioneering approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
+      'Pol.is showed how large-group discourse software can clarify both consensus and persistent difference, especially in vTaiwan where simple Agree / Unsure / Disagree inputs helped structure public reasoning. Context Engine builds on that approach with more question types, optional privacy, AI-native workflows, and permanent public storage.',
     links: [
       { url: 'https://pol.is/', text: 'Official Website' },
     ],
@@ -74,7 +94,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     logoClassName: 'recognitionLogoCip',
     image: cipPhoto,
     description:
-      'The whitepaper frames Context Engine as social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That places the project in close conversation with CIP’s work on scalable collective decision-making for transformative technology.',
+      'Context Engine is social infrastructure for the AI transition: a toolkit for collective intelligence, large-group deliberation, and coordination under information overload. That mission sits directly alongside CIP’s work on scalable collective decision-making for transformative technology.',
     links: [
       { url: 'https://cip.org/', text: 'CIP Website' },
     ],
@@ -85,7 +105,7 @@ const RECOGNITION_GROUPS: RecognitionGroup[] = [
     itemClassName: 'recognitionItemEdgePatagonia',
     logoClassName: 'recognitionLogoEdge',
     description:
-      'Residencies like the d/acc residency at Edge Patagonia (sponsored by Protocol Labs) created room to prototype tools for resilient technology, coordination, and governance in live community settings.',
+      'Residencies like the d/acc residency at Edge Patagonia, sponsored by Protocol Labs, created space to prototype tools for resilient technology, coordination, and governance in live community settings.',
     links: [
       { url: 'https://www.edgecity.live/patagonia', text: 'Edge City' },
     ],
@@ -309,7 +329,7 @@ const AboutPage = () => {
               </a>
             </div>
             <p className={styles.tagline}>
-              An open-source toolkit for large-group deliberation, sensemaking, and negotiation 
+              An open-source toolkit for large-group deliberation, sensemaking, and negotiation
             </p>
 
             <div className={styles.heroActions}>
@@ -377,7 +397,12 @@ const AboutPage = () => {
           </div>
 
           {activeUseCaseConfig && (
-            <article className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
+            <article
+              ref={useCaseDetailRef}
+              className={styles.useCaseDetail}
+              aria-live="polite"
+              aria-atomic="true"
+            >
               <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
               <div className={styles.useCaseDetailRow}>
                 <span className={styles.useCaseDetailProblemTag}>

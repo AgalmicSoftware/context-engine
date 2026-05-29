@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
   faCaretUp,
+  faDownload,
   faExternalLinkAlt,
   faQuestionCircle,
   faSpinner,
@@ -258,10 +259,13 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
+      riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
       pileSubmitRailVisible: false,
+      corpusViewerLoadRequestNonce: 0,
+      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -312,6 +316,7 @@ class OnePageSession extends Component<any, any> {
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
     this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
     this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
+    this.handleRiskMatrixRestoreApplied = this.handleRiskMatrixRestoreApplied.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -1672,8 +1677,8 @@ class OnePageSession extends Component<any, any> {
         } else {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (unknown path)' });
         }
-      } catch (e) {
-        const msg = (e.message || e.toString() || '').toLowerCase();
+	      } catch (e: any) {
+	        const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
 
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
@@ -1798,7 +1803,7 @@ class OnePageSession extends Component<any, any> {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
-  handleCorpusAtlasIssueOpen(nodeId) {
+  handleCorpusAtlasIssueOpen(nodeId: any, riskMatrixRestoreState: RiskMatrixRestoreState | null = null) {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
@@ -1807,6 +1812,7 @@ class OnePageSession extends Component<any, any> {
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
         resultsViewMode: prevState.resultsViewMode,
+        riskMatrixRestoreState: riskMatrixRestoreState || null,
       },
       showResults: true,
       resultsViewMode: 'debateAtlas',
@@ -1851,10 +1857,18 @@ class OnePageSession extends Component<any, any> {
       return {
         embeddedAtlasNodeId: null,
         embeddedAtlasReturnState: null,
+        riskMatrixRestoreState: returnState?.resultsViewMode === 'riskMatrix'
+          ? (returnState?.riskMatrixRestoreState || null)
+          : null,
         showResults: returnState ? returnState.showResults : prevState.showResults,
         resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
       };
     });
+  }
+
+  handleRiskMatrixRestoreApplied() {
+    if (!this.state.riskMatrixRestoreState) return;
+    this.setState({ riskMatrixRestoreState: null });
   }
 
 
@@ -1942,7 +1956,7 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible) {
+  handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
     this.setState((prevState: Readonly<OnePageSession['state']>) => (
       prevState.pileSubmitRailVisible === nextVisible
@@ -2094,7 +2108,10 @@ class OnePageSession extends Component<any, any> {
       renderSectionHeading('Questions', 'Answer or Add')
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
-    const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
+    const documentsSectionTooltip = 'Allows the conversation to be enriched by data, and the formats can change per-session';
+    const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
+    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
+    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
     const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
     const brandingSectionClassName = [
       styles.brandingSection,
@@ -2549,37 +2566,57 @@ class OnePageSession extends Component<any, any> {
                   ) : (
                     <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                   )}
-                  {renderSectionHeading('Context', 'View')}
-                </span>
-                {this.state.showDocuments && (
-                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                    <div
-                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                      <span className={styles.tooltiptext}>
-                        {documentsSectionTooltip}
-                      </span>
-                    </div>
-                    <a
-                      href={DEMO_CORPUS_GITHUB_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.sectionHeaderLink}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      <span>GitHub</span>
-                    </a>
+                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
+                    <span className={styles.documentsSectionHeaderTitleRow}>
+                      <span className={styles.sectionHeaderTitle}>Context</span>
+                      {this.state.showDocuments && (
+                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                          <div
+                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faQuestionCircle} />
+                            <span className={styles.tooltiptext}>
+                              {documentsSectionTooltip}
+                            </span>
+                          </div>
+                          <a
+                            href={DEMO_CORPUS_GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.sectionHeaderLink}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            <span>GitHub</span>
+                          </a>
+                          <button
+                            type="button"
+                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
+                            onClick={this.handleLoadFullCorpusClick}
+                            disabled={disableLoadFullCorpusButton}
+                            data-testid='ce-demo-documents-load-full-corpus'
+                          >
+                            <FontAwesomeIcon icon={faDownload} />
+                            <span>{loadFullCorpusButtonLabel}</span>
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.sectionHeaderSubtitle}>View</span>
                   </span>
-                )}
+                </span>
               </h2>
             </div>
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen} showGithubLink={false} />
+                    <CorpusViewer
+                      onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
+                      showGithubLink={false}
+                      externalLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
+                      onExternalLoadStateChange={this.handleCorpusViewerLoadStateChange}
+                    />
                   </Suspense>
                 </div>
               )}
@@ -2702,7 +2739,7 @@ class OnePageSession extends Component<any, any> {
                           embedded={true}
                           requestedModalNodeId={this.state.embeddedAtlasNodeId}
                           onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-                        />
+	                        />
                       </div>
                     </Suspense>
                   )}

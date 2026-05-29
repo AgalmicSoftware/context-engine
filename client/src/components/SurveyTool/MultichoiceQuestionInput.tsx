@@ -11,6 +11,19 @@ type MultichoiceQuestionInputProps = {
   onChange?: ((nextValues: unknown[]) => void) | null;
 };
 
+export const buildMultichoiceOptionClassName = ({
+  baseClassName = '',
+  isSelected = false,
+  selectedClassName = '',
+}: {
+  baseClassName?: unknown;
+  isSelected?: unknown;
+  selectedClassName?: unknown;
+} = {}): string => ([
+  String(baseClassName || ''),
+  isSelected ? String(selectedClassName || '') : '',
+].filter(Boolean).join(' '));
+
 const MultichoiceQuestionInput = ({
   questionId,
   options = [],
@@ -32,7 +45,11 @@ const MultichoiceQuestionInput = ({
           <Label
             check
             key={`${optionLabel}-${optionIndex}`}
-            className={`${styles.checkboxOptionText} ${isSelected ? styles.selected : ''}`}
+            className={buildMultichoiceOptionClassName({
+              baseClassName: styles.checkboxOptionText,
+              isSelected,
+              selectedClassName: styles.selected,
+            })}
           >
             <Input
               type="checkbox"

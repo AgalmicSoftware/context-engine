@@ -832,9 +832,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) => (
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx))
     ),
-    onSurveyEventDetectedForGroup: (slug: string, event: unknown) => (
-      this.onNewSurveyEventDetectedForGroup(slug, event as MainSiteSurveyEventLike)
-    ),
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     logScopeSkipOnce: (op: string, slug: string, scopeCtx?: unknown) => (
       this.logScopeSkipOnce(op, slug, toMainSiteScanScopeContext(scopeCtx))

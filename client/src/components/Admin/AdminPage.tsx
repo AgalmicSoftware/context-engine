@@ -87,8 +87,6 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import type { AdminTestResults } from './adminPageTestResultHelpers';
-import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
   ADMIN_SECRET_CARDS,
   buildAdminSecretRemoveTestId,
@@ -1898,13 +1896,6 @@ const AdminPage = ({
     }
   };
 
-  const SECRET_CARDS = [
-    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
-    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
-    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
-    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
-  ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
@@ -3048,20 +3039,9 @@ const AdminPage = ({
                       <div className={styles.secretOptionBody}>
                         {card.fields.map((fieldKey: any) => {
                           const secretFieldKey = String(fieldKey);
-                          const isTextarea = secretFieldKey === 'arweaveJwk';
-                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
-                          const secretFieldLabels: Record<string, string> = {
-                            openaiKey: 'OpenAI API key',
-                            anthropicKey: 'Anthropic API key',
-                            openrouterKey: 'OpenRouter API key',
-                            customRpcUrl: 'Custom RPC URL',
-                            customRpcKey: 'Custom RPC key',
-                            arweaveJwk: 'Arweave JWK (JSON)',
-                            faucetPrivateKey: 'Faucet private key',
-                            litAccountApiKey: 'Lit account API key',
-                            litUsageApiKey: 'Lit usage API key',
-                          };
-                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
+                          const inputType = getAdminSecretFieldInputType(secretFieldKey);
+                          const isTextarea = inputType === 'textarea';
+                          const label = getAdminSecretFieldLabel(secretFieldKey);
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>

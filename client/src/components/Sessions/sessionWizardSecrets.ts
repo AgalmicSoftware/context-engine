@@ -7,7 +7,28 @@ import type {
   WorkerSecretsRefLike,
 } from '../shellTypes';
 
-type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
+type AsyncShellCallback<TInput extends AnyRecord = AnyRecord, TResult = any> = (input: TInput) => Promise<TResult>;
+
+type SignAdminActionInput = {
+  action: string;
+  body: AnyRecord;
+  targetSlug: string;
+  workerUrl: string;
+};
+
+type PostWorkerSecretsInput = {
+  auth: AnyRecord;
+  secrets: AnyRecord;
+  body: AnyRecord;
+  workerUrl: string;
+  slug: string;
+};
+
+type EnsureSessionConfigInput = {
+  workerUrl: string;
+  slug: string;
+  account: string;
+};
 
 export const resolveWorkerSecretsSnapshot = ({
   workerSecretsRef = null,
@@ -104,9 +125,9 @@ export const syncWorkerSecretsAfterDeploy = async ({
   account?: string;
   slug?: string;
   deploySecrets?: WorkerSecretsLike | null;
-  signAdminAction?: AsyncShellCallback;
-  postSecrets?: AsyncShellCallback;
-  ensureSessionConfig?: AsyncShellCallback;
+  signAdminAction?: AsyncShellCallback<SignAdminActionInput, AnyRecord>;
+  postSecrets?: AsyncShellCallback<PostWorkerSecretsInput>;
+  ensureSessionConfig?: AsyncShellCallback<EnsureSessionConfigInput>;
   helperWritesSecrets?: boolean;
   retryDelaysMs?: number[];
   wait?: (ms: number) => Promise<void>;
@@ -158,7 +179,7 @@ export const syncWorkerSecretsAfterDeploy = async ({
         body: requestBody,
         targetSlug: slug,
         workerUrl: resolvedWorkerUrl,
-      });
+      }) || {};
       await postSecrets?.({ auth, secrets, body: requestBody, workerUrl: resolvedWorkerUrl, slug });
       return { warning: '', note: '', synced: true, attempts: attempt + 1 };
     } catch (err) {
@@ -207,7 +228,7 @@ export const syncWorkerConfigAfterPartialDeploy = async ({
   workerUrl?: string;
   account?: string;
   slug?: string;
-  ensureSessionConfig?: AsyncShellCallback;
+  ensureSessionConfig?: AsyncShellCallback<EnsureSessionConfigInput>;
 } = {}): Promise<WorkerSecretSyncResult> => {
   if (deployResponse?.partial !== true) {
     return { warning: '', note: '', synced: false, skipped: true };

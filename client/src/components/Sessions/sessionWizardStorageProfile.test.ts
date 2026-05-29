@@ -20,6 +20,8 @@ describe('sessionWizardStorageProfile', () => {
       questions: 'staged',
       surveys: 'staged',
       responses: 'staged',
+      generatedArtifacts: 'staged',
+      media: 'staged',
       images: 'staged',
     });
     expect(profile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');

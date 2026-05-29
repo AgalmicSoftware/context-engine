@@ -90,9 +90,10 @@ jest.mock('../../utilities/ui/notify.js', () => ({
   },
 }));
 
-const SponsorPage = require('./SponsorPage.jsx').default;
+const SponsorPage = require('./SponsorPage').default as React.ComponentType<any>;
+const getFetchMock = () => global.fetch as jest.Mock;
 
-const renderSponsorPage = ({
+const renderSponsorPage = async ({
   account = ADMIN_ADDRESS,
   initialSessionId,
   initialRegistryChainId,

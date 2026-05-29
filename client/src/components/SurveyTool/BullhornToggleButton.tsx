@@ -11,6 +11,35 @@ type BullhornToggleButtonProps = {
   active?: boolean;
 };
 
+export const buildBullhornToggleButtonClassName = ({
+  active = false,
+  activeClassName = '',
+  baseClassName = '',
+  bullhornClassName = '',
+  commentClassName = '',
+}: {
+  active?: unknown;
+  activeClassName?: unknown;
+  baseClassName?: unknown;
+  bullhornClassName?: unknown;
+  commentClassName?: unknown;
+} = {}): string => ([
+  String(baseClassName || ''),
+  String(commentClassName || ''),
+  String(bullhornClassName || ''),
+  active ? String(activeClassName || '') : '',
+].filter(Boolean).join(' '));
+
+export const resolveBullhornToggleIconClassName = ({
+  active = false,
+  iconGlowClassName = '',
+}: {
+  active?: unknown;
+  iconGlowClassName?: unknown;
+} = {}): string | undefined => (
+  active ? String(iconGlowClassName || '') || undefined : undefined
+);
+
 const BullhornToggleButton = ({
   onClick,
   disabled = false,
@@ -22,11 +51,23 @@ const BullhornToggleButton = ({
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className={`${styles.iconButton} ${styles.commentButton} ${styles.bullhornButton} ${active ? styles.iconButtonActive : ''}`}
+    className={buildBullhornToggleButtonClassName({
+      active,
+      activeClassName: styles.iconButtonActive,
+      baseClassName: styles.iconButton,
+      bullhornClassName: styles.bullhornButton,
+      commentClassName: styles.commentButton,
+    })}
     title={title}
     aria-label={ariaLabel}
   >
-    <FontAwesomeIcon icon={faBullhorn} className={active ? styles.iconGlow : undefined} />
+    <FontAwesomeIcon
+      icon={faBullhorn}
+      className={resolveBullhornToggleIconClassName({
+        active,
+        iconGlowClassName: styles.iconGlow,
+      })}
+    />
   </button>
 );
 

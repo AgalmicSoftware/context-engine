@@ -264,7 +264,7 @@
         {
           "url": "https://x.com/sama/status/1983584366547829073",
           "author": "@sama",
-          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit calledOpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
+          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it is somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit called OpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
           "created_at": "2025-10-29T17:19:00.000Z",
           "tags": [
             "Alignment",
@@ -2449,28 +2449,6 @@
           ]
         },
         {
-          "id": "amodei_dario_dwarkesh_2023_scaling",
-          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
-          "title": "Scaling, Alignment, & AI Progress",
-          "author": "Dario Amodei",
-          "interviewer": "Dwarkesh Patel",
-          "date": "2023-08-15",
-          "image_url": null,
-          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
-          "top_quotes": [
-            "If you can understand the model better, you can also steer it better."
-          ],
-          "tags": [
-            "alignment",
-            "scaling",
-            "interpretability",
-            "anthropic",
-            "rlhf",
-            "constitutional-ai",
-            "safety-culture"
-          ]
-        },
-        {
           "id": "hassabis_demis_dwarkesh_2024_superhuman",
           "url": "https://www.dwarkeshpatel.com/p/demis-hassabis",
           "title": "Scaling, superhuman AIs, AlphaZero atop LLMs, AlphaFold",
@@ -2490,6 +2468,28 @@
             "alphafold",
             "hybrid-architectures",
             "reasoning"
+          ]
+        },
+        {
+          "id": "amodei_dario_dwarkesh_2023_scaling",
+          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
+          "title": "Scaling, Alignment, & AI Progress",
+          "author": "Dario Amodei",
+          "interviewer": "Dwarkesh Patel",
+          "date": "2023-08-15",
+          "image_url": null,
+          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
+          "top_quotes": [
+            "If you can understand the model better, you can also steer it better."
+          ],
+          "tags": [
+            "alignment",
+            "scaling",
+            "interpretability",
+            "anthropic",
+            "rlhf",
+            "constitutional-ai",
+            "safety-culture"
           ]
         },
         {

@@ -12,13 +12,11 @@ import AboutPage, {
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 
-const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
-
 beforeEach(() => {
   if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
-    delete process.env.PUBLIC_URL;
+    delete mutableEnv.PUBLIC_URL;
   } else {
-    process.env.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
+    mutableEnv.PUBLIC_URL = ORIGINAL_PUBLIC_URL;
   }
   window.localStorage.clear();
 });
@@ -72,7 +70,7 @@ describe('AboutPage', () => {
   });
 
   it('prepends PUBLIC_URL to the new-session CTA for subpath deployments', () => {
-    process.env.PUBLIC_URL = '/ce/';
+    mutableEnv.PUBLIC_URL = '/ce/';
 
     renderAboutPage();
 

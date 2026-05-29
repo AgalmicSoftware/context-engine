@@ -125,7 +125,10 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(findGenerateQuestionsButton()).toBeTruthy();
   });
 
-  it('treats queued photo uploads as valid DatabaseTool input content', async () => {
+  it('queues multiple photo uploads as preview cards and treats them as valid DatabaseTool input content', async () => {
+    const firstPhoto = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
+
     await renderSubject(
       <AudioSurveyGenerator
         provider={{}}
@@ -138,11 +141,63 @@ describe('AudioSurveyGenerator input and question generation', () => {
 
     expect(findGenerateQuestionsButton()).toBeUndefined();
 
-    addAdditionalPhoto();
+    addAdditionalPhoto([firstPhoto, secondPhoto]);
+    await act(async () => {});
 
-    expect(container.textContent).toContain('[photo]');
+    expect(getPhotoCards()).toHaveLength(2);
+    expect(container.querySelectorAll(`[data-testid="${E2E_TESTIDS.DATABASE_PHOTO_SOURCE_PREVIEW}"]`)).toHaveLength(2);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+    expect(container.textContent).toContain('memo.png');
+    expect(container.textContent).toContain('diagram.webp');
     expect(container.textContent).toContain('Queued for analysis');
     expect(findGenerateQuestionsButton()).toBeTruthy();
+  });
+
+  it('queues valid docs and photos from a mixed upload selection and skips unsupported files', async () => {
+    const validPng = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const validPdf = new File(['doc-one'], 'notes.pdf', { type: 'application/pdf' });
+    const validGif = new File(['photo-two'], 'diagram.gif', { type: 'image/gif' });
+    const invalidSvg = new File(['not-supported'], 'vector.svg', { type: 'image/svg+xml' });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto([validPng, validPdf, validGif, invalidSvg]);
+
+    expect(getPhotoCards()).toHaveLength(2);
+    expect(container.textContent).toContain('Skipped 1 unsupported file. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.');
+    expect(container.textContent).toContain('memo.png');
+    expect(container.textContent).toContain('diagram.gif');
+    expect(container.textContent).toContain('notes.pdf');
+  });
+
+  it('does not expose inline photo analysis while a queued photo is not ready', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto();
+
+    const photoCard = getPhotoCardByName('memo.png');
+    const sourceId = getPhotoSourceId(photoCard);
+
+    expect(photoCard).toBeTruthy();
+    expect(photoCard.textContent).toContain('Queued for analysis');
+    expect(getPhotoAnalysisToggleBySourceId(sourceId)).toBeNull();
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
   });
 
   it('uses simplified section headings in the generator surface', async () => {

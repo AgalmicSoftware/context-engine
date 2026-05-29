@@ -51,6 +51,104 @@ const resolveExplicitSessionSlugFromPathToken = ({
   return { hasExplicitSessionSlug: false, sessionSlug: '' };
 };
 
+export const resolveMainSiteExplicitSessionSlugFromPath = ({
+  path = '',
+  resolveSessionSlugFromPathToken,
+}: {
+  path?: string;
+  resolveSessionSlugFromPathToken?: ResolveSessionSlugFromPathToken;
+} = {}): {
+  hasExplicitSessionSlug: boolean;
+  sessionSlug: string;
+} => {
+  const sessionToken = readSessionTokenFromPath(path);
+  if (!sessionToken) {
+    return { hasExplicitSessionSlug: false, sessionSlug: '' };
+  }
+  if (sessionToken.toLowerCase() === 'new') {
+    return { hasExplicitSessionSlug: true, sessionSlug: '' };
+  }
+  return resolveExplicitSessionSlugFromPathToken({
+    sessionToken,
+    resolveSessionSlugFromPathToken,
+  });
+};
+
+const readSessionStateStringList = (value: unknown): unknown[] => (
+  Array.isArray(value) ? value : []
+);
+
+export const resolveMainSiteGlobalPrimarySessionSlug = ({
+  sessionState = {},
+  derivePrimarySessionSlugFromList,
+}: {
+  sessionState?: Record<string, unknown> | null;
+  derivePrimarySessionSlugFromList?: (slugs: unknown[]) => string;
+} = {}): string => {
+  const state = sessionState || {};
+  const primarySessionSlug = normalizeSessionSlug(state.primarySessionSlug || '');
+  const primarySessionExplicit = state.primarySessionExplicit === true;
+  const selectedSessionScope = String(state.selectedSessionScope || '').trim().toLowerCase();
+  const selectedSessionSlugs = readSessionStateStringList(state.selectedSessionSlugs);
+  const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
+  if (primarySessionSlug) return primarySessionSlug;
+  if (primarySessionExplicit) {
+    if (selectedSessionScope === 'list' && !listIncludesGeneral) {
+      return typeof derivePrimarySessionSlugFromList === 'function'
+        ? derivePrimarySessionSlugFromList(selectedSessionSlugs)
+        : '';
+    }
+    return primarySessionSlug;
+  }
+  if (selectedSessionScope === 'list') {
+    return typeof derivePrimarySessionSlugFromList === 'function'
+      ? derivePrimarySessionSlugFromList(selectedSessionSlugs)
+      : '';
+  }
+  return '';
+};
+
+export const resolveMainSiteSessionSlugFromProps = ({
+  path = '',
+  activeSessionSlug = '',
+  sessionState = {},
+  resolveSessionSlugFromPathToken,
+  derivePrimarySessionSlugFromList,
+}: {
+  path?: string;
+  activeSessionSlug?: string;
+  sessionState?: Record<string, unknown> | null;
+  resolveSessionSlugFromPathToken?: ResolveSessionSlugFromPathToken;
+  derivePrimarySessionSlugFromList?: (slugs: unknown[]) => string;
+} = {}): string => {
+  const routeSession = resolveMainSiteExplicitSessionSlugFromPath({
+    path,
+    resolveSessionSlugFromPathToken,
+  });
+  if (routeSession.hasExplicitSessionSlug) return routeSession.sessionSlug;
+
+  const state = sessionState || {};
+  const primarySessionExplicit = state.primarySessionExplicit === true;
+  const selectedSessionScope = String(state.selectedSessionScope || '').trim().toLowerCase();
+  const selectedSessionSlugs = readSessionStateStringList(state.selectedSessionSlugs);
+  const listIncludesGeneral = selectedSessionSlugs.some((slug: unknown) => normalizeSessionSlug(slug || '') === '');
+  if (activeSessionSlug) return activeSessionSlug;
+  if (primarySessionExplicit) {
+    if (selectedSessionScope === 'list' && !listIncludesGeneral) {
+      return typeof derivePrimarySessionSlugFromList === 'function'
+        ? derivePrimarySessionSlugFromList(selectedSessionSlugs)
+        : '';
+    }
+    return activeSessionSlug;
+  }
+  if (selectedSessionScope === 'list') {
+    return typeof derivePrimarySessionSlugFromList === 'function'
+      ? derivePrimarySessionSlugFromList(selectedSessionSlugs)
+      : '';
+  }
+  return '';
+};
+
 const readResolvedSessionConfigById = (
   resolveSessionConfigById?: ResolveSessionConfigById,
   sessionId?: string | number | null

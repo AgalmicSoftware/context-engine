@@ -326,29 +326,6 @@ test('sync-public-history rejects replayed commit messages that mention private 
   });
 });
 
-test('sync-public-history can sanitize private tokens in otherwise public replay messages', () => {
-  withSourceRepo(({ sourceDir }) => {
-    writeFile(sourceDir, 'public-sanitized.txt', 'public change\n');
-    commitAll(sourceDir, 'Public sanitized change\n\nMentions contextEngine-cc and agent-native follow-up details.\n', {
-      authorDate: '2025-01-05T06:07:08Z',
-      committerDate: '2025-01-05T06:07:08Z',
-    });
-
-    const result = runSyncScript(sourceDir, ['--sanitize-private-replay-messages', 'release-candidate']);
-
-    assert.equal(result.status, 0);
-    assert.match(result.stderr, /Sanitized private replay message tokens/);
-    assert.match(result.stdout, /Replayed commits: 3/);
-
-    const latestMessage = git(sourceDir, ['log', '-1', '--format=%B', 'release-candidate']);
-    assert.match(latestMessage, /Public sanitized change/);
-    assert.match(latestMessage, /private companion tooling/);
-    assert.match(latestMessage, /private integration/);
-    assert.doesNotMatch(latestMessage, /contextEngine-cc/i);
-    assert.doesNotMatch(latestMessage, /agent-native/i);
-  });
-});
-
 test('sync-public-history rejects private replay tokens case-insensitively', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-lowercase-leak.txt', 'public change\n');

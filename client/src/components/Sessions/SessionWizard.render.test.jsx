@@ -50,7 +50,7 @@ const buildMockSponsoredBundle = () => ({
     createdBy: '0xadmin',
     expiresAt: '2099-03-21T12:00:00.000Z',
     sourceSessionSlug: 'source-session',
-    sourceWorkerUrl: 'https://source-worker.example',
+    sourceWorkerUrl: 'https://source-worker.example.test',
   },
 });
 const buildMockPendingSbtDraft = ({
@@ -186,7 +186,7 @@ jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
   arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
-    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.net/${txId}`),
+    buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
   },
 }));
 

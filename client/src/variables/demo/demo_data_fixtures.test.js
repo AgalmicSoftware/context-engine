@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 import corpusSample from './corpus_sample.json';
+import demoAnalysisGenerationConfig from './demo_analysis_generation_config.json';
 import debateMapData from './debate_map_demo_data.json';
 import demoAnalysisData from './demo_analysis_data.json';
 import debates from './debates.json';
@@ -30,6 +31,9 @@ describe('demo data fixture cleanup', () => {
 
   it('keeps the dedicated breakdown analysis fixture separate from the canonical Polis demo fixture', () => {
     const demoDir = __dirname;
+    const syntheticVariantCount = Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)
+      ? demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length
+      : 0;
 
     expect(fs.existsSync(path.join(demoDir, 'demo_analysis_data.json'))).toBe(true);
     expect(Object.keys(demoAnalysisData)).toEqual([
@@ -37,7 +41,24 @@ describe('demo data fixture cleanup', () => {
       'participantsVotes',
     ]);
     expect(demoAnalysisData.comments).toHaveLength(demoPolisData.comments.length);
-    expect(demoAnalysisData.participantsVotes).toHaveLength(demoPolisData.participantsVotes.length);
+    expect(demoAnalysisData.participantsVotes).toHaveLength(
+      demoPolisData.participantsVotes.length * (syntheticVariantCount + 1)
+    );
+  });
+
+  it('keeps breakdown generation curation in a dedicated demo variable file', () => {
+    const demoDir = __dirname;
+
+    expect(fs.existsSync(path.join(demoDir, 'demo_analysis_generation_config.json'))).toBe(true);
+    expect(Object.keys(demoAnalysisGenerationConfig)).toEqual([
+      'treeNodeIdsByQuestionId',
+      'questionOverridesByQuestionId',
+      'syntheticParticipantConfig',
+    ]);
+    expect(Object.keys(demoAnalysisGenerationConfig.treeNodeIdsByQuestionId).length).toBeGreaterThan(0);
+    expect(Object.keys(demoAnalysisGenerationConfig.questionOverridesByQuestionId).length).toBeGreaterThan(0);
+    expect(Array.isArray(demoAnalysisGenerationConfig?.syntheticParticipantConfig?.variantProfiles)).toBe(true);
+    expect(demoAnalysisGenerationConfig.syntheticParticipantConfig.variantProfiles.length).toBeGreaterThan(0);
   });
 
   it('merges the split debate fixtures into a single dataset', () => {
@@ -92,10 +113,20 @@ describe('demo data fixture cleanup', () => {
         'gpt4_technical_report',
         'attention_all_you_need_vaswani_2017',
       ],
+      lesswrong_posts: [
+        'yudkowsky_ai_box',
+        'bostrom_dragon_tyrant',
+        'sequences_rationality_az',
+      ],
+      cross_corpus: [
+        'debate_exponential_progress',
+        'debate_reward_hacking_misalignment',
+        'debate_predeployment_eval_adequacy',
+      ],
       dwarkesh_lab_insiders: [
         'amodei_dario_dwarkesh_2026_scaling',
-        'amodei_dario_dwarkesh_2023_scaling',
         'hassabis_demis_dwarkesh_2024_superhuman',
+        'amodei_dario_dwarkesh_2023_scaling',
       ],
       ai_scifi_books: [
         'shelley_frankenstein',
@@ -128,6 +159,37 @@ describe('demo data fixture cleanup', () => {
           expectedIds
         );
       });
+  });
+
+  it('keeps the canonical demo fixtures internally consistent with normalized UTC datetimes', () => {
+    const formatDemoUtcDateTime = (timestamp) => {
+      const date = new Date(Number(timestamp));
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pad = (value) => String(value).padStart(2, '0');
+      return [
+        weekdays[date.getUTCDay()],
+        months[date.getUTCMonth()],
+        pad(date.getUTCDate()),
+        `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`,
+        'UTC',
+        date.getUTCFullYear(),
+      ].join(' ');
+    };
+
+    [demoPolisData.comments, demoAnalysisData.comments].forEach((comments) => {
+      comments.forEach((comment) => {
+        expect(comment.datetime).toBe(formatDemoUtcDateTime(comment.timestamp));
+      });
+    });
+  });
+
+  it('removes the known demo corpus text glitches that made the sample feel synthetic', () => {
+    const serializedCorpusSample = JSON.stringify(corpusSample);
+
+    expect(serializedCorpusSample).not.toMatch(/partneredwith/);
+    expect(serializedCorpusSample).not.toMatch(/calledOpenAI/);
+    expect(serializedCorpusSample).not.toMatch(/it somewhat fragile/);
   });
 
   it('covers every atlas leaf node with at least one Loophole historical case', () => {

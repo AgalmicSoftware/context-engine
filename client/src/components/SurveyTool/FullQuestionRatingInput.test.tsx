@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
+import FullQuestionRatingInput, {
+  resolveFullQuestionRatingSliderStyle,
+} from './FullQuestionRatingInput';
 import {
   RATING_MAX,
   RATING_MIN,
@@ -29,5 +31,9 @@ describe('FullQuestionRatingInput', () => {
 
     expect(onChange).toHaveBeenCalledWith(8, expect.anything());
     expect(onChangeComplete).toHaveBeenCalled();
+  });
+
+  it('resolves the fixed rating slider width', () => {
+    expect(resolveFullQuestionRatingSliderStyle()).toEqual({ width: '200px' });
   });
 });

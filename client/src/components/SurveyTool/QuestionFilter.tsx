@@ -1266,7 +1266,7 @@ class QuestionFilter extends React.Component<any, any> {
     }
 
     const slug = resolveFilterStorageSlug(this.props);
-    let bookmarksCacheObject = {};
+    let bookmarksCacheObject: QuestionFilterBookmarkCache = {};
 
     try {
       const parsedCache = peekCacheSync('filters', slug, { clone: false });
@@ -1291,26 +1291,32 @@ class QuestionFilter extends React.Component<any, any> {
       bookmarksCacheObject.bookmarkedFilters.push(currentFilterString);
     }
 
-    void writeCache('filters', slug, bookmarksCacheObject)
-      .then((ok) => {
-        if (!ok) {
-          questionFilterLog.warn('Failed to persist bookmarked filter state');
-          return;
-        }
-        this.setState({ filterBookmarkedFeedback: true }, () => {
-          this.checkIfCurrentFilterIsBookmarked();
-        });
+	    const writeResult = (writeCache as QuestionFilterWriteCache)('filters', slug, bookmarksCacheObject);
+	    const handleSuccess = (ok: unknown) => {
+	      if (!ok) {
+	        questionFilterLog.warn('Failed to persist bookmarked filter state');
+	        return;
+	      }
+	      this.setState(buildQuestionFilterBookmarkFeedbackPatch(true), () => {
+	        this.checkIfCurrentFilterIsBookmarked();
+	      });
 
-        clearTimeout(this.bookmarkFeedbackTimeout);
-        this.bookmarkFeedbackTimeout = setTimeout(() => {
-          if (this._isMounted) {
-            this.setState({ filterBookmarkedFeedback: false });
-          }
-        }, 2000);
-      })
-      .catch((e) => {
-        questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
-      });
+	      if (this.bookmarkFeedbackTimeout) clearTimeout(this.bookmarkFeedbackTimeout);
+	      this.bookmarkFeedbackTimeout = setTimeout(() => {
+	        if (this._isMounted) {
+	          this.setState(buildQuestionFilterBookmarkFeedbackPatch(false));
+	        }
+	      }, 2000);
+	    };
+	    if (writeResult && typeof writeResult !== 'boolean' && typeof writeResult.then === 'function') {
+	      void writeResult
+	        .then(handleSuccess)
+	        .catch((e: unknown) => {
+	          questionFilterLog.error("Error saving bookmarksCache to local cache:", e);
+	        });
+	    } else {
+	      handleSuccess(writeResult);
+	    }
   };
 
   // ----------------------------------------------------------------------------------
@@ -2413,53 +2419,8 @@ class QuestionFilter extends React.Component<any, any> {
     ) as QuestionFilterSerializableState;
   }
 
-  isFilterStateDefault = (filterStateToTest) => {
-    if (!filterStateToTest) {
-      return true;
-    }
-
-    const isTopQuestionsDefault = filterStateToTest.topQuestions === null;
-    const isQuestionTypesDefault = Array.isArray(filterStateToTest.questionTypes) && filterStateToTest.questionTypes.length === 0;
-
-    const sbtFilter = filterStateToTest.sbtFilter;
-    let isSbtFilterDefault = sbtFilter === null;
-    if (sbtFilter && typeof sbtFilter === 'object') {
-        const allSbtListsEmpty =
-            (!sbtFilter.selectedSBTGroupsCreator || sbtFilter.selectedSBTGroupsCreator.length === 0) &&
-            (!sbtFilter.excludedSBTGroupsCreator || sbtFilter.excludedSBTGroupsCreator.length === 0) &&
-            (!sbtFilter.selectedSBTGroupsResponder || sbtFilter.selectedSBTGroupsResponder.length === 0) &&
-            (!sbtFilter.excludedSBTGroupsResponder || sbtFilter.excludedSBTGroupsResponder.length === 0) &&
-            (!sbtFilter.selectedSBTGroups || sbtFilter.selectedSBTGroups.length === 0) &&
-            (!sbtFilter.excludedSBTGroups || sbtFilter.excludedSBTGroups.length === 0);
-        if (allSbtListsEmpty) {
-            isSbtFilterDefault = true;
-        } else {
-            isSbtFilterDefault = false;
-        }
-    }
-
-    const isAiFilterDefault = filterStateToTest.aiFilter === null || filterStateToTest.aiFilter === '';
-    const isAiTopNDefault = filterStateToTest.aiTopN == null;
-    const isAiCombineDefault = filterStateToTest.aiCombine !== true;
-    const isSelectedTagsDefault = Array.isArray(filterStateToTest.selectedTags) && filterStateToTest.selectedTags.length === 0;
-    const responseStatus = filterStateToTest.responseStatus;
-    const responded = responseStatus?.responded === true;
-    const notResponded = responseStatus?.notResponded === true;
-    const isResponseStatusDefault = (
-      responseStatus === null ||
-      responseStatus === undefined ||
-      (!responded && !notResponded) ||
-      (responded && notResponded)
-    );
-
-    return isTopQuestionsDefault &&
-           isQuestionTypesDefault &&
-           isSbtFilterDefault &&
-           isAiFilterDefault &&
-           isAiTopNDefault &&
-           isAiCombineDefault &&
-           isSelectedTagsDefault &&
-           isResponseStatusDefault;
+  isFilterStateDefault = (filterStateToTest: unknown): boolean => {
+    return isQuestionFilterStateDefault(filterStateToTest);
   }
 
   handleCopyFilterUrl = (): void => {
@@ -2676,7 +2637,7 @@ class QuestionFilter extends React.Component<any, any> {
         throw new Error("Invalid filter string.");
       }
 
-      const newState = {};
+      const newState: QuestionFilterMutableStatePatch = {};
       // Map deserialized state to component's state structure
       if (deserializedState.questionTypes) {
         newState.selectedTypes = deserializedState.questionTypes;
@@ -3067,12 +3028,7 @@ class QuestionFilter extends React.Component<any, any> {
         <FontAwesomeIcon
           icon={this.state.copiedUrlSuccess ? faCheck : faClipboard}
           onClick={!isDefault && !this.state.copiedUrlSuccess ? this.handleCopyFilterUrl : undefined}
-          style={{
-            cursor: isDefault || this.state.copiedUrlSuccess ? 'not-allowed' : 'pointer',
-            color: this.state.copiedUrlSuccess ? 'green' : (isDefault ? '#cccccc' : '#6c757d'),
-            fontSize: '1.1em',
-            marginRight: '15px'
-          }}
+          style={resolveQuestionFilterCopyIconStyle(isDefault, this.state.copiedUrlSuccess)}
           title={isDefault ? "No custom filters to copy" : (this.state.copiedUrlSuccess ? "URL Copied!" : "Copy Filter URL")}
         />
         {/* Bookmark Icon */}

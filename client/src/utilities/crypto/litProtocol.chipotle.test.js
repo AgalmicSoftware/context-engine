@@ -174,6 +174,7 @@ describe('litProtocol Chipotle hooks', () => {
 
     const keyBytes = new Uint8Array(32).fill(0x11);
     const wrapped = await hooks.saveKey(keyBytes, { accessControlConditions });
+    expect(mockFetchWorkerWithAuth.mock.calls[0][0]).toBe('https://worker.example.test/lit/chipotle-action');
     expect(wrapped).toEqual(expect.objectContaining({
       ciphertext: 'wrapped-cek',
     }));

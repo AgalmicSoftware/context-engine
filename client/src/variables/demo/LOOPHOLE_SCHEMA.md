@@ -38,7 +38,7 @@ Each case is a JSON object with these fields. Fields marked **NEW** did not exis
 
 ## Rendering contract
 
-`DebateMap.jsx` must:
+`DebateMap.tsx` must:
 1. If `draft_legal_code` is present → render its articles as a numbered list.
 2. If `loophole_exploit` is present → render institution/actor/action/victims/why_legal/why_immoral as a grid.
 3. If `overreach_variant` is present → render the foil in a secondary panel.

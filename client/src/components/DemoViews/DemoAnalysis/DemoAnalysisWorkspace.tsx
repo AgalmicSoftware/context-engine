@@ -20,6 +20,9 @@ type Question = {
   id: string;
   text: string;
   options: string[];
+  category?: string;
+  keyTension?: string;
+  sourcePromptType?: string;
 };
 
 type FlatResponse = {

@@ -1893,15 +1893,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           const qid = uploadedQid || fallbackQid;
           if (!qid) return null;
           const uploaded = uploadedById.get(qid) || uploadedByIndex || null;
-          const arweaveTxId = String(uploaded?.arweaveTxId || row?.arweaveTxId || '').trim();
-          const storageRef = uploaded?.storageRef || row?.storageRef || storageRefFromLegacyArweaveTxId(arweaveTxId);
-          return {
+          const compatible = attachStorageRefCompatibilityFields({
             ...row,
             ...(uploaded || {}),
             id: qid,
-            ...(arweaveTxId ? { arweaveTxId } : {}),
-            ...(storageRef ? { storageRef } : {}),
-          };
+          });
+          return compatible as CreateQuestionsSeededQuestionRow;
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
       if (!normalizedRows.length) return false;
@@ -2691,7 +2688,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             path: `question metadata[${index}]`,
           });
         });
-        const questionIdsForContract = uniqueQuestions.map(q => q.id);
+        const questionIdsForContract = uniqueQuestions.map((q) => q.id);
 
         // Fetch current block number for creationBlock optimization
         let creationBlock = 0;
@@ -2777,7 +2774,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
         const surveyDataString = JSON.stringify(completeSurveyData);
         let surveyArweaveTxId = '';
-        const cloudflareSurveyStorage = usesCloudflareSessionStorage(sessionConfig, { resource: 'surveys' });
+        const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, { resource: 'surveys' });
         if (!cloudflareSurveyStorage) {
           try {
             surveyArweaveTxId = String(

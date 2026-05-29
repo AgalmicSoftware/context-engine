@@ -22,6 +22,13 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+const originalFetch = global.fetch;
+const fullCrossCorpusPayload = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
+    'utf8'
+  )
+);
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
@@ -56,7 +63,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
+jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
     return (
@@ -311,21 +318,37 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
+  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
       '.titleContainerWithPileSubmitRail'
     );
+    const desktopRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const widescreenRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 1367px)',
+      '.titleContainerWithPileSubmitRail'
+    );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (max-width: 600px)',
+      '@media only screen and (min-width: 481px) and (max-width: 768px)',
       '.titleContainerWithPileSubmitRail'
     );
 
+    expect(scss).toContain('.brandingSectionWithPileSubmitRail');
+    expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
+    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
+    expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(desktopRailBlock).toContain('transform: translateY(-40px);');
+    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
     expect(tabletRailBlock).toBeNull();
   });
 
@@ -631,10 +654,11 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('width: auto;');
     expect(phoneBlock).toContain('font-size: clamp(1.25rem, 4.7vw, 1.55rem);');
     expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
     expect(smallTabletBlock).toContain('flex-direction: row;');
-    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('gap: 6px 12px;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(smallTabletBlock).toContain('font-size: 1.2em;');

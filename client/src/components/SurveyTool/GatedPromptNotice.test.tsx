@@ -1,6 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import GatedPromptNotice from './GatedPromptNotice';
+import { fireEvent, render, screen } from '@testing-library/react';
+import GatedPromptNotice, {
+  buildGatedPromptTooltipIconClassName,
+  resolveGatedPromptLockIconStyle,
+} from './GatedPromptNotice';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('../Shared/CETooltip', () => ({
   __esModule: true,

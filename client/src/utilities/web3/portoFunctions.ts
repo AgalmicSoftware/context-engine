@@ -440,7 +440,7 @@ function createWebAuthnViemAccount(credentialId: string, publicKey: string, sign
   return toAccount({
     address: publicKey,
 
-    async signMessage({ message }) {
+    async signMessage({ message }: AnyObj) {
       if (requireUserVerification) {
         await promptForPasskey(credentialId);
       }
@@ -614,7 +614,7 @@ export async function authenticatePorto(): Promise<string> {
   };
 
   try {
-    const credential = await navigator.credentials.create({ publicKey: createOptions });
+    const credential: any = await navigator.credentials.create({ publicKey: createOptions as any });
 
     // Derive the private key and address deterministically from the rawId bytes
     // This ensures the address we show the user is the same one that signs the tx
@@ -1105,7 +1105,7 @@ export const createPortoProviderMock = (): any => {
           if (!viemWalletClient) throw new Error("Porto client not initialized. Please authenticate first.");
 
           // params[0] is the address (from), params[1] is the typed data (JSON string or object)
-          let typedData = typeof params[1] === 'string' ? JSON.parse(params[1]) : params[1];
+          let typedData = typeof params?.[1] === 'string' ? JSON.parse(params[1]) : params?.[1];
 
           // Sanitization: Viem throws if 'EIP712Domain' is present in 'types'
           // We must remove it, as Viem infers it from the 'domain' property
@@ -1183,8 +1183,8 @@ export const createPortoProviderMock = (): any => {
     },
 
     // Stub event listeners to prevent Ethers errors
-    on: (event, handler) => {},
-    removeListener: (event, handler) => {},
+    on: (event: any, handler: any) => {},
+    removeListener: (event: any, handler: any) => {},
     enable: async () => {
         const addr = getPortoAddress();
         return addr ? [addr] : [];

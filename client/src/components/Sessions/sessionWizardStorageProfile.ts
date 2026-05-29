@@ -1,10 +1,10 @@
-import { toStr } from '../../utilities/shared/primitives.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageBackend,
+} from '../../utilities/storage/storageRefs.js';
 import type { AnyRecord } from '../shellTypes';
 
-export const SESSION_STORAGE_BACKENDS = Object.freeze({
-  ARWEAVE: 'arweave',
-  CLOUDFLARE: 'cloudflare',
-});
+export const SESSION_STORAGE_BACKENDS = STORAGE_BACKENDS;
 
 export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
   ACTIVE: 'active',
@@ -91,7 +91,7 @@ export const SESSION_STORAGE_PROFILE_DISPLAY_COPY = Object.freeze({
 });
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const trim = (value: unknown): string => toStr(value).trim();
+const trim = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
 
 const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
 export const normalizeSessionStoragePayloadAccessMode = (value: unknown): string => {
@@ -157,6 +157,8 @@ export const buildDefaultSessionStorageProfile = (): AnyRecord => ({
     questions: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     surveys: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     responses: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    generatedArtifacts: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    media: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     images: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
   },
   sbtGatedAccess: {
@@ -178,6 +180,12 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
     ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
     : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   const docsContext = trim(rawResources.docsContext || raw.docsContext || '').toLowerCase();
+  const normalizeResourceStage = (value: unknown, fallback: string): string => {
+    const normalized = trim(value).toLowerCase();
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.ACTIVE) return SESSION_STORAGE_RESOURCE_STAGES.ACTIVE;
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.STAGED) return SESSION_STORAGE_RESOURCE_STAGES.STAGED;
+    return fallback;
+  };
   const normalized: AnyRecord = {
     ...base,
     backend,
