@@ -350,7 +350,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(stateResponse.status, 200);
   assert.equal(state.ok, true);
   assert.equal(state.session.sessionSlug, 'alpha');
-  assert.equal(state.pageSize, 5);
+  assert.equal(state.pageSize, 50);
   assert.equal(state.questionCount, 6);
   assert.equal(state.availableQuestionCount, 6);
   assert.equal(state.discoveredQuestionCount, 6);
