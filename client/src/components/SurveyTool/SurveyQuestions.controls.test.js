@@ -251,6 +251,28 @@ describe('SurveyQuestions controls', () => {
     expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
   });
 
+  it('falls back to modifiedCount when primary submit pending stats are unavailable', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      modifiedCount: 1,
+    };
+    subject.getPendingEditStats = undefined;
+    subject.encryptAndUpload = jest.fn();
+
+    subject.handlePrimarySubmitClick();
+
+    expect(subject._submitGuard).toBe(true);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps in-flight primary submit inert before reading pending stats or routes', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
