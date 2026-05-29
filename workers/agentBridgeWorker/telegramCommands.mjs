@@ -6390,6 +6390,40 @@ function telegramAddBotToGroupUrl(env = {}, payload = '') {
     : '';
 }
 
+export async function mintTelegramGroupApprovalLink({
+  env = {},
+  session = {},
+  approvedByTelegramUserId = '',
+  approvedByAccountAddress = '',
+  createdAt,
+} = {}) {
+  const ttlSeconds = telegramGroupApprovalLinkTtlSeconds(env);
+  const expiresAt = new Date(Date.parse(createdAt || nowIso()) + ttlSeconds * 1000).toISOString();
+  const start = createRandomTelegramStartAction({
+    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: {
+      sessionSlug: session.sessionSlug,
+      approvedByTelegramUserId: safeString(approvedByTelegramUserId),
+      approvedByAccountAddress: safeString(approvedByAccountAddress),
+    },
+    createdAt,
+    expiresAt,
+  });
+  await persistActionRecord(env, start.deepLinkPayload, {
+    ...start.record,
+    deepLinkPayload: start.deepLinkPayload,
+    oneUse: true,
+  }, {
+    ttlSeconds,
+  });
+  return {
+    url: telegramAddBotToGroupUrl(env, start.deepLinkPayload),
+    expiresAt,
+    startPayload: start.deepLinkPayload,
+  };
+}
+
 async function buildTelegramGroupApprovalLinkResponse({
   normalized,
   command,
@@ -6412,28 +6446,14 @@ async function buildTelegramGroupApprovalLinkResponse({
       extra: { reason: context.reason, accountAddress: context.accountAddress || '' },
     });
   }
-  const ttlSeconds = telegramGroupApprovalLinkTtlSeconds(env);
-  const expiresAt = new Date(Date.parse(createdAt || nowIso()) + ttlSeconds * 1000).toISOString();
-  const start = createRandomTelegramStartAction({
-    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
-    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-    serverContextRef: {
-      sessionSlug: context.session.sessionSlug,
-      approvedByTelegramUserId: normalized.user.telegramUserId,
-      approvedByAccountAddress: context.manager.accountAddress,
-    },
+  const minted = await mintTelegramGroupApprovalLink({
+    env,
+    session: context.session,
+    approvedByTelegramUserId: normalized.user.telegramUserId,
+    approvedByAccountAddress: context.manager.accountAddress,
     createdAt,
-    expiresAt,
   });
-  await persistActionRecord(env, start.deepLinkPayload, {
-    ...start.record,
-    deepLinkPayload: start.deepLinkPayload,
-    oneUse: true,
-  }, {
-    ttlSeconds,
-  });
-  const url = telegramAddBotToGroupUrl(env, start.deepLinkPayload);
-  if (!url) {
+  if (!minted.url) {
     return reply({
       method,
       chatId: normalized.chat.chatId,
@@ -6461,15 +6481,15 @@ async function buildTelegramGroupApprovalLinkResponse({
     text: [
       `Telegram group invite for ${sessionLabel(context.session)}`,
       `Session: ${context.session.sessionSlug}`,
-      `Expires: ${expiresAt}`,
+      `Expires: ${minted.expiresAt}`,
       '',
       'Send this one-use link to add the bot to a Telegram group. The first group that opens it is approved and selected for this session.',
       '',
-      url,
+      minted.url,
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [
-        [{ text: 'Add Bot To Group', url }],
+        [{ text: 'Add Bot To Group', url: minted.url }],
         [backButton],
       ],
     },
@@ -6478,9 +6498,9 @@ async function buildTelegramGroupApprovalLinkResponse({
     normalized,
     extra: {
       sessionSlug: context.session.sessionSlug,
-      expiresAt,
-      startPayload: start.deepLinkPayload,
-      url,
+      expiresAt: minted.expiresAt,
+      startPayload: minted.startPayload,
+      url: minted.url,
     },
   });
 }

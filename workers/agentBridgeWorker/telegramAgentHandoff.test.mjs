@@ -9,6 +9,8 @@ import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import {
   createTelegramAgentDelegationToken,
   loadTelegramAgentDelegationToken,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
+  TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './telegramAgentDelegationTokens.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 
@@ -876,6 +878,96 @@ test('Telegram agent service token can manage sponsored question queue as sessio
   assert.equal(next.sponsored, true);
   assert.equal(aliasResponse.status, 200);
   assert.deepEqual(aliasBody.questionQueue.sponsoredQuestionIds, ['q-binary']);
+});
+
+test('Telegram agent admin can mint a one-use group approval link through the API', async () => {
+  const env = baseEnv();
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = await managedAccountAddressForTelegramUser(env, '42');
+
+  const adminResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-link', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        sessionSlug: 'alpha',
+      },
+    }),
+    env,
+  });
+  const adminBody = await jsonBody(adminResponse);
+  const payload = new URL(adminBody.url).searchParams.get('startgroup');
+  const actionRecord = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${payload}`));
+  const nonAdminResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-link', {
+      method: 'POST',
+      body: {
+        telegramUserId: '43',
+        sessionSlug: 'alpha',
+      },
+    }),
+    env,
+  });
+  const nonAdmin = await jsonBody(nonAdminResponse);
+
+  assert.equal(adminResponse.status, 200);
+  assert.equal(adminBody.ok, true);
+  assert.equal(adminBody.sessionSlug, 'alpha');
+  assert.match(adminBody.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
+  assert.equal(payload.length <= 64, true);
+  assert.equal(actionRecord.serverContextRef.sessionSlug, 'alpha');
+  assert.equal(actionRecord.serverContextRef.approvedByTelegramUserId, '42');
+  assert.equal(nonAdminResponse.status, 403);
+  assert.equal(nonAdmin.reason, 'group_approval_admin_required');
+});
+
+test('Telegram agent group approval links require an explicit delegated admin scope', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const defaultToken = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  const scopedToken = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    scopes: [
+      ...TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
+      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS,
+    ],
+    createdAt: '2026-12-01T12:01:00.000Z',
+  });
+
+  const deniedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-link?sessionSlug=alpha', {
+      method: 'POST',
+      token: defaultToken.token,
+    }),
+    env,
+  });
+  const denied = await jsonBody(deniedResponse);
+  const allowedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/group-approval-link?sessionSlug=alpha', {
+      method: 'POST',
+      token: scopedToken.token,
+    }),
+    env,
+  });
+  const allowed = await jsonBody(allowedResponse);
+
+  assert.equal(deniedResponse.status, 403);
+  assert.equal(denied.reason, 'agent_token_scope_denied');
+  assert.equal(denied.requiredScope, 'manage_group_approvals');
+  assert.equal(allowedResponse.status, 200);
+  assert.equal(allowed.ok, true);
+  assert.match(allowed.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
 });
 
 test('Telegram agent question queue management rejects non-admin service users', async () => {
