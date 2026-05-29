@@ -5,8 +5,10 @@ import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs'
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
 const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice']);
+const SUPPORTED_GEO_REF_KINDS = new Set(['event', 'venue', 'track']);
 const MAX_QUESTION_TAGS = 10;
 const MAX_QUESTION_TAG_LENGTH = 48;
+const MAX_QUESTION_GEO_REFS = 5;
 const TAG_STOP_WORDS = new Set([
   'about',
   'after',
@@ -116,6 +118,96 @@ function firstString(...values) {
   return values.find((value) => safeString(value) !== '');
 }
 
+export function normalizeGeoId(value = '') {
+  return safeString(value).replace(/\s+/g, ' ').slice(0, 128);
+}
+
+function normalizeGeoRefKind(value = '') {
+  const kind = lower(value || 'event').replace(/_/g, '-');
+  return SUPPORTED_GEO_REF_KINDS.has(kind) ? kind : 'event';
+}
+
+export function geoTagForId(value = '') {
+  const normalized = normalizeQuestionTag(normalizeGeoId(value));
+  if (!normalized) return '';
+  return normalized.startsWith('geo:') ? normalized : `geo:${normalized}`;
+}
+
+function geoRefFromCandidate(entry = {}, fallback = {}) {
+  const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+    ? entry
+    : { geoId: entry };
+  const geoId = normalizeGeoId(firstString(
+    raw.geoId,
+    raw.geoID,
+    raw.id,
+    raw.geo,
+    raw.eventId,
+    raw.venueId,
+    raw.trackId,
+    fallback.geoId
+  ));
+  if (!geoId) return null;
+  const kind = normalizeGeoRefKind(firstString(raw.kind, raw.geoKind, raw.type, fallback.kind));
+  const label = safeString(firstString(raw.label, raw.name, raw.title, fallback.label, geoId))
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
+  return {
+    geoId,
+    kind,
+    ...(label ? { label } : {}),
+  };
+}
+
+export function normalizeQuestionGeoRefs(value = [], fallback = {}) {
+  const source = [];
+  if (Array.isArray(value)) {
+    source.push(...value);
+  } else if (value && typeof value === 'object') {
+    if (Array.isArray(value.geoRefs)) source.push(...value.geoRefs);
+    else source.push(value);
+  } else if (safeString(value)) {
+    source.push(value);
+  }
+  if (fallback && typeof fallback === 'object' && !Array.isArray(fallback) && safeString(fallback.geoId)) {
+    source.push(fallback);
+  }
+  const refs = [];
+  const seen = new Set();
+  source.forEach((entry) => {
+    const ref = geoRefFromCandidate(entry, fallback);
+    if (!ref) return;
+    const key = `${lower(ref.geoId)}:${ref.kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    refs.push(ref);
+  });
+  return refs.slice(0, MAX_QUESTION_GEO_REFS);
+}
+
+export function questionSourceGeoRefs(question = {}) {
+  const metadata = question?.metadata && typeof question.metadata === 'object' && !Array.isArray(question.metadata)
+    ? question.metadata
+    : {};
+  const payload = question?.payload && typeof question.payload === 'object' && !Array.isArray(question.payload)
+    ? question.payload
+    : {};
+  return normalizeQuestionGeoRefs([
+    ...normalizeQuestionGeoRefs(question.geoRefs),
+    ...normalizeQuestionGeoRefs(question.geoRef),
+    ...normalizeQuestionGeoRefs(metadata.geoRefs),
+    ...normalizeQuestionGeoRefs(metadata.geoRef),
+    ...normalizeQuestionGeoRefs(payload.geoRefs),
+    ...normalizeQuestionGeoRefs(payload.geoRef),
+  ]);
+}
+
+export function geoTagsFromGeoRefs(value = []) {
+  return normalizeQuestionGeoRefs(value)
+    .map((ref) => geoTagForId(ref.geoId))
+    .filter(Boolean);
+}
+
 export function normalizeSessionContext(value = '') {
   return safeString(value).replace(/\s+/g, ' ').slice(0, 1200);
 }
@@ -204,9 +296,11 @@ export function inferQuestionTags({
   options = [],
   session = {},
   explicitTags = [],
+  geoRefs = [],
   sessionContext = '',
 } = {}) {
   const tags = [];
+  addQuestionTags(tags, geoTagsFromGeoRefs(normalizeQuestionGeoRefs(geoRefs).length ? geoRefs : questionSourceGeoRefs(question)));
   addQuestionTags(tags, explicitTags);
   questionSourceTags(question).forEach((source) => addQuestionTags(tags, source));
   sessionSourceTags(session).forEach((source) => addQuestionTags(tags, source));
@@ -298,6 +392,7 @@ function proposedRecordToQuestion(record = {}) {
   const questionType = normalizeQuestionType(record.questionType);
   const tags = normalizeQuestionTags(record.tags);
   const references = normalizeQuestionReferences(record.references);
+  const geoRefs = normalizeQuestionGeoRefs(record.geoRefs);
   const question = {
     questionId,
     id: questionId,
@@ -315,6 +410,7 @@ function proposedRecordToQuestion(record = {}) {
   if (options.length) question.options = options;
   if (tags.length) question.tags = tags;
   if (references.length) question.references = references;
+  if (geoRefs.length) question.geoRefs = geoRefs;
   return question;
 }
 
@@ -327,6 +423,10 @@ export async function persistTelegramProposedQuestion({
   options = [],
   tags = [],
   references = [],
+  geoRefs = [],
+  geoId = '',
+  geoKind = '',
+  geoLabel = '',
   sessionContext = '',
   metadata = null,
   createdAt = null,
@@ -337,12 +437,18 @@ export async function persistTelegramProposedQuestion({
   const type = normalizeQuestionType(questionType);
   const normalizedOptions = normalizeOptions(options);
   const normalizedReferences = normalizeQuestionReferences(references);
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs, {
+    geoId,
+    kind: geoKind,
+    label: geoLabel,
+  });
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
   const normalizedTags = inferQuestionTags({
     prompt: promptText,
     questionType: type,
     options: normalizedOptions,
     explicitTags: tags,
+    geoRefs: normalizedGeoRefs,
     sessionContext: normalizedSessionContext,
   });
   const prefix = proposedQuestionPrefix(slug);
@@ -369,6 +475,7 @@ export async function persistTelegramProposedQuestion({
     options: normalizedOptions,
     tags: normalizedTags,
     references: normalizedReferences,
+    geoRefs: normalizedGeoRefs,
     sessionContext: normalizedSessionContext || null,
     source: 'telegram_question_proposal',
     status: 'active',
@@ -445,7 +552,11 @@ export function mergeTelegramProposedQuestions(questions = [], proposedQuestions
 
 export const __test__telegramQuestionProposals = {
   PROPOSED_QUESTION_KV_PREFIX,
+  geoTagForId,
+  geoTagsFromGeoRefs,
   inferQuestionTags,
+  normalizeGeoId,
+  normalizeQuestionGeoRefs,
   normalizeQuestionTag,
   normalizeQuestionReferences,
   normalizeQuestionTags,

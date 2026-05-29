@@ -19,10 +19,15 @@ import { buildResultsImage } from './resultImage.mjs';
 import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import { validateTelegramMiniAppInitData } from './telegramMiniApp.mjs';
 import {
+  geoTagForId,
+  geoTagsFromGeoRefs,
   inferQuestionTags,
+  normalizeGeoId,
+  normalizeQuestionGeoRefs,
   normalizeQuestionReferences,
   normalizeQuestionTags,
   persistTelegramProposedQuestion,
+  questionSourceGeoRefs,
   sessionContextFromPolicySession,
 } from './telegramQuestionProposals.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
@@ -349,6 +354,8 @@ function inputFromRequest(request, body = {}) {
     username: safeString(body.username || url.searchParams.get('username')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
     interests: body.interests || url.searchParams.get('interests'),
+    geoIds: body.geoIds || body.geoId || url.searchParams.get('geoIds') || url.searchParams.get('geoId'),
+    attendedGeoEvents: body.attendedGeoEvents || url.searchParams.get('attendedGeoEvents'),
     sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
     relevanceMode: safeString(body.relevanceMode || url.searchParams.get('relevanceMode')),
     questionTypes: body.questionTypes || body.questionType || url.searchParams.get('questionTypes') || url.searchParams.get('questionType'),
@@ -783,6 +790,7 @@ function publicAgentQuestion(question = {}, {
   const questionType = safeString(question.questionType || question.type || 'freeform') || 'freeform';
   const options = Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [];
   const references = locked || unavailable ? [] : normalizeQuestionReferences(question.references);
+  const geoRefs = locked || unavailable ? [] : questionSourceGeoRefs(question);
   const tags = locked || unavailable
     ? []
     : inferQuestionTags({
@@ -791,6 +799,7 @@ function publicAgentQuestion(question = {}, {
       questionType,
       options,
       session,
+      geoRefs,
       sessionContext: sessionContextFromPolicySession(session),
     });
   return {
@@ -806,6 +815,7 @@ function publicAgentQuestion(question = {}, {
     proposed: question.proposed === true,
     source: safeString(question.source),
     references,
+    geoRefs,
   };
 }
 
@@ -859,13 +869,55 @@ function normalizePreferenceSessionHints(input = {}) {
   return { slugs: [...slugs], tags: [...names] };
 }
 
+function normalizePreferenceGeoHints(input = {}) {
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const profile = preferences.profile && typeof preferences.profile === 'object' && !Array.isArray(preferences.profile)
+    ? preferences.profile
+    : {};
+  const source = [
+    input.geoIds,
+    input.geoId,
+    input.attendedGeoEvents,
+    preferences.geoIds,
+    preferences.geoId,
+    preferences.attendedGeoEvents,
+    preferences.geoRefs,
+    profile.geoIds,
+    profile.attendedGeoEvents,
+  ].flatMap((value) => (Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/)));
+  const ids = new Set();
+  const tags = new Set();
+  source.forEach((entry) => {
+    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? firstValue(entry.geoId, entry.id, entry.eventId, entry.venueId, entry.trackId, entry.slug, entry.label, entry.name)
+      : entry;
+    const geoId = normalizeGeoId(raw);
+    if (!geoId) return;
+    const tag = geoTagForId(geoId);
+    const idKey = tag.replace(/^geo:/, '');
+    if (idKey) ids.add(idKey);
+    if (tag) tags.add(tag);
+  });
+  return { ids: [...ids], tags: [...tags] };
+}
+
 function questionRelevance(question = {}, {
   tagHints = [],
   sessionHints = { slugs: [], tags: [] },
+  geoHints = { ids: [], tags: [] },
   session = {},
 } = {}) {
-  const qTags = normalizeQuestionTags(question.tags);
+  const qGeoRefs = normalizeQuestionGeoRefs(question.geoRefs);
+  const qTags = normalizeQuestionTags([
+    ...(Array.isArray(question.tags) ? question.tags : normalizeQuestionTags(question.tags)),
+    ...geoTagsFromGeoRefs(qGeoRefs),
+  ]);
   const tagSet = new Set(qTags);
+  const geoIdSet = new Set(qGeoRefs
+    .map((ref) => geoTagForId(ref.geoId).replace(/^geo:/, ''))
+    .filter(Boolean));
   const promptText = [
     question.prompt,
     question.questionType,
@@ -899,23 +951,42 @@ function questionRelevance(question = {}, {
       if (!matchedTags.includes(tag)) matchedTags.push(tag);
     }
   });
+  const matchedGeoIds = [];
+  geoHints.ids.forEach((geoId) => {
+    const tag = `geo:${geoId}`;
+    if (geoId && (geoIdSet.has(geoId) || tagSet.has(tag))) {
+      score += 35;
+      matchedGeoIds.push(geoId);
+    }
+  });
+  geoHints.tags.forEach((tag) => {
+    const geoId = safeString(tag).replace(/^geo:/, '');
+    if (geoId && matchedGeoIds.includes(geoId)) return;
+    if (tag && tagSet.has(tag)) {
+      score += 35;
+      if (geoId) matchedGeoIds.push(geoId);
+    }
+  });
   return {
     score,
     matchedTags: [...new Set(matchedTags)],
     matchedSessions: [...new Set(matchedSessions)],
+    matchedGeoIds: [...new Set(matchedGeoIds)],
   };
 }
 
 function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
   const tagHints = normalizePreferenceTagHints(input);
   const sessionHints = normalizePreferenceSessionHints(input);
-  if (!tagHints.length && !sessionHints.slugs.length && !sessionHints.tags.length) {
+  const geoHints = normalizePreferenceGeoHints(input);
+  if (!tagHints.length && !sessionHints.slugs.length && !sessionHints.tags.length && !geoHints.ids.length && !geoHints.tags.length) {
     return {
       questions,
       relevance: {
         mode: 'none',
         tags: [],
         sessionsAttended: [],
+        geoIds: [],
       },
     };
   }
@@ -923,6 +994,7 @@ function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
     const relevance = questionRelevance(question, {
       tagHints,
       sessionHints,
+      geoHints,
       session: context.session,
     });
     return { question: { ...question, relevance }, index, relevance };
@@ -939,6 +1011,7 @@ function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
       tags: tagHints,
       sessionsAttended: sessionHints.slugs,
       sessionTags: sessionHints.tags,
+      geoIds: geoHints.ids,
     },
   };
 }
@@ -1904,6 +1977,7 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
   const tagHints = normalizePreferenceTagHints(input);
   const negativeTags = normalizeNegativePreferenceTagHints(input);
   const sessionHints = normalizePreferenceSessionHints(input);
+  const geoHints = normalizePreferenceGeoHints(input);
   const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
     ? input.preferences
     : {};
@@ -1915,13 +1989,15 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
     negativeTags.length ||
     sessionHints.slugs.length ||
     sessionHints.tags.length ||
+    geoHints.ids.length ||
+    geoHints.tags.length ||
     importantIds.size ||
     deprioritizeIds.size
   );
   const entries = (Array.isArray(questions) ? questions : [])
     .filter((question) => question.answerable === true)
     .map((question, index) => {
-      const positive = questionRelevance(question, { tagHints, sessionHints, session: context.session });
+      const positive = questionRelevance(question, { tagHints, sessionHints, geoHints, session: context.session });
       const negative = questionRelevance(question, {
         tagHints: negativeTags,
         sessionHints: { slugs: [], tags: [] },
@@ -1936,8 +2012,9 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
       const fallbackScore = rawScore > 0 ? rawScore : Math.max(1, questions.length - index);
       const confidence = Math.max(0.35, Math.min(0.95, 0.45 + (fallbackScore / 100)));
       const matchedTags = suggestedVote === 'down' ? negative.matchedTags : positive.matchedTags;
-      const reason = matchedTags.length
-        ? `Matched ${suggestedVote === 'down' ? 'deprioritized' : 'relevant'} tags: ${matchedTags.join(', ')}.`
+      const matchedGeoIds = suggestedVote === 'down' ? [] : positive.matchedGeoIds;
+      const reason = matchedTags.length || matchedGeoIds.length
+        ? `Matched ${suggestedVote === 'down' ? 'deprioritized' : 'relevant'} ${matchedTags.length ? `tags: ${matchedTags.join(', ')}` : `geo ids: ${matchedGeoIds.join(', ')}`}.`
         : 'No strong tag match; surfaced from the active question list for human review.';
       return {
         questionId: question.questionId,
@@ -1953,6 +2030,7 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
           positiveScore,
           negativeScore,
           matchedTags,
+          matchedGeoIds,
           matchedSessions: positive.matchedSessions,
         },
         index,
@@ -1971,6 +2049,7 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
       downvoteTags: negativeTags,
       sessionsAttended: sessionHints.slugs,
       sessionTags: sessionHints.tags,
+      geoIds: geoHints.ids,
     },
   };
 }
@@ -2695,6 +2774,10 @@ async function handleCreateQuestionsRequest({
         options: question.options,
         tags,
         references,
+        geoRefs: question.geoRefs || input.geoRefs,
+        geoId: question.geoId || input.geoId,
+        geoKind: question.geoKind || question.kind || input.geoKind || input.kind,
+        geoLabel: question.geoLabel || question.label || input.geoLabel || input.label,
         sessionContext: question.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
         metadata: {
           source: 'agent_handoff',
@@ -2718,6 +2801,7 @@ async function handleCreateQuestionsRequest({
       questionType: saved.record.questionType,
       tags: saved.record.tags,
       references: saved.record.references || [],
+      geoRefs: saved.record.geoRefs || [],
     });
   }
   const payload = {
@@ -2748,6 +2832,10 @@ async function handlePoseRequest({
       questionType: input.questionType || 'freeform',
       options: input.options,
       tags: input.tags,
+      geoRefs: input.geoRefs,
+      geoId: input.geoId,
+      geoKind: input.geoKind || input.kind,
+      geoLabel: input.geoLabel || input.label,
       sessionContext: input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
       metadata: {
         source: 'agent_handoff',

@@ -4,6 +4,7 @@ import {
   authenticateSessionWorker,
   resolveSessionWorkerUrl,
 } from './onChainResponses.mjs';
+import { normalizeQuestionGeoRefs } from './telegramQuestionProposals.mjs';
 
 const DEFAULT_CHAIN_ID = '11155420';
 const ARWEAVE_GATEWAY = 'https://ar-io.dev';
@@ -910,6 +911,7 @@ function normalizeQuestionPayload(payload = {}, {
     ? safeString(root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title)
     : '';
   const type = normalizeQuestionType(root);
+  const geoRefs = normalizeQuestionGeoRefs(root.geoRefs || payload.geoRefs || root.geoRef || payload.geoRef);
   const normalized = {
     questionId: id,
     id,
@@ -919,6 +921,7 @@ function normalizeQuestionPayload(payload = {}, {
     questionText: publicPrompt,
     title: publicPrompt || (visibility === 'public' ? 'Untitled question' : 'Locked question'),
     options: visibility === 'public' ? normalizeOptions(root) : [],
+    ...(visibility === 'public' && geoRefs.length ? { geoRefs } : {}),
     singleSelect: root.singleSelect === true || root.singleChoice === true || root.oneSelectionOnly === true,
     visibility,
     ...(encryption?.encrypted === true ? { encrypted: true } : {}),

@@ -278,7 +278,7 @@ GET /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupCh
 POST /telegram/agent/api/questions
 ```
 
-Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped. Public question objects include normalized `tags`; use them when deciding relevance.
+Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped. Public question objects include normalized `tags`; use them when deciding relevance. Questions that are tied to an Edge/Geo event, venue, or track may also include `geoRefs`, for example `{ "geoId": "edge-town-hall", "kind": "venue", "label": "Town Hall" }`, and a matching `geo:<geoId>` tag.
 
 For personalized question selection, send a POST body with preferences:
 
@@ -291,12 +291,15 @@ For personalized question selection, send a POST body with preferences:
   "preferences": {
     "tags": ["ai", "governance"],
     "interests": ["funding"],
+    "geoIds": ["edge-town-hall"],
     "sessionsAttended": ["edge-city-ai-salon"]
   }
 }
 ```
 
 The `GET` endpoint also accepts `tags=<tag-a>,<tag-b>` and `relevanceMode=filter` when the caller only wants tag matches. The default `rank` mode returns all questions sorted by inferred relevance. Use `relevanceMode: "filter"` only when the user wants unrelated questions hidden. Relevance is inferred from explicit question tags, prompt text, selected session metadata, and attended-session hints.
+
+If the user's agent knows public Edge/Geo ids for talks, venues, or tracks the user attended or searched, include them as `preferences.geoIds` or `attendedGeoEvents`. CE treats those ids as public relevance hints, boosts questions with matching `geoRefs` or `geo:<geoId>` tags, and returns the `geoRefs` field so the agent can group or explain why a question was surfaced. Do not send EdgeOS bearer tokens or private Geo credentials to CE.
 
 For queue-driven reads, `POST /telegram/agent/api/questions/next` supports `sponsoredFirst` and `includeSponsored` so admin-selected sponsored questions can be served before the general queue.
 

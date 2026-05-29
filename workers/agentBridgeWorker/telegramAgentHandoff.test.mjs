@@ -919,6 +919,58 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
 });
 
+test('Telegram agent ranks and returns geo-linked questions from geo preferences', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-general',
+        questionType: 'binary',
+        prompt: 'Should every session collect organizer feedback?',
+        tags: ['governance'],
+      },
+      {
+        questionId: 'q-geo',
+        questionType: 'binary',
+        prompt: 'Should the town hall venue host more agent demos?',
+        tags: ['venue-feedback'],
+        geoRefs: [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }],
+      },
+    ]),
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        preferences: {
+          geoIds: ['edge-town-hall'],
+        },
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const serialized = JSON.stringify(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.relevance.mode, 'rank');
+  assert.deepEqual(body.relevance.geoIds, ['edge-town-hall']);
+  assert.equal(body.questions[0].questionId, 'q-geo');
+  assert.equal(body.questions[0].tags.includes('geo:edge-town-hall'), true);
+  assert.deepEqual(body.questions[0].geoRefs, [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }]);
+  assert.equal(body.questions[0].relevance.matchedGeoIds.includes('edge-town-hall'), true);
+  assert.equal(serialized.includes('agent-test-token'), false);
+  assert.equal(serialized.includes('123456:test-token'), false);
+});
+
 test('Telegram agent tags endpoint returns active tag counts and falls back to the default session', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
