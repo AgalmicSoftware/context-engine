@@ -394,6 +394,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /const participantCount = Number\(state\.resultsData\?\.participantCount \|\| state\.resultsData\?\.counts\?\.uniqueParticipants \|\| 0\) \|\| 0;/);
   assert.match(html, /if \(state\.resultsData\?\.groupView\?\.enabled === false\) \{[\s\S]*el\.resultGroupsSection\.hidden = true;[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /if \(participantCount >= 2\) renderResultClusterControls\(\);[\s\S]*if \(!groups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(groups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;/);
+  assert.match(html, /function appendLoadingResult\(mount, message\)/);
+  assert.match(html, /if \(state\.resultsLoading === true && !topicMap\) \{[\s\S]*appendLoadingResult\(el\.topicMapChart, 'Loading topic map\.\.\.'\);[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /resultsCache: new Map\(\)/);
   assert.match(html, /function loadResults\(\{ force = false \} = \{\}\) \{[\s\S]*const cacheKey = currentResultsCacheKey\(\);[\s\S]*state\.resultsCache\.set\(cacheKey, nextData\);/);
   assert.match(html, /function setResultsDemoData\(value\) \{[\s\S]*restoreCachedResults\(\);[\s\S]*loadResults\(\{ force: true \}\);/);

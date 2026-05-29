@@ -8812,6 +8812,17 @@ function telegramMiniAppHtml() {
       empty.appendChild(text);
       mount.appendChild(empty);
     }
+    function appendLoadingResult(mount, message) {
+      const row = document.createElement('div');
+      row.className = 'resultRow';
+      const spinner = document.createElement('span');
+      spinner.className = 'inlineSpinner';
+      spinner.setAttribute('aria-label', 'Loading');
+      const text = document.createElement('span');
+      text.textContent = message;
+      row.append(spinner, text);
+      mount.appendChild(row);
+    }
     function renderResultRows(mount, rows, emptyText, scoreKind, visibleCount = 5, moreButton = null) {
       mount.innerHTML = '';
       if (!rows.length) {
@@ -9129,6 +9140,10 @@ function telegramMiniAppHtml() {
     function renderTopicMap(topicMap) {
       el.topicMapChart.innerHTML = '';
       el.topicMapSummary.textContent = '';
+      if (state.resultsLoading === true && !topicMap) {
+        appendLoadingResult(el.topicMapChart, 'Loading topic map...');
+        return;
+      }
       const available = topicMap?.availability?.available === true;
       if (!available) {
         const reason = topicMap?.availability?.reason || 'not_enough_data';
