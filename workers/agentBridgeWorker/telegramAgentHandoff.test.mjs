@@ -2024,6 +2024,9 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
           {
             prompt: 'Should the demo prioritize organizer feedback?',
             questionType: 'binary',
+            geoId: 'edge-organizer-hall',
+            geoKind: 'venue',
+            geoLabel: 'Organizer Hall',
           },
           {
             prompt: 'Which topics need a follow-up discussion?',
@@ -2045,8 +2048,24 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
     env,
   });
   const questions = await jsonBody(questionsResponse);
+  const geoResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        preferences: { geoIds: ['edge-organizer-hall'] },
+      },
+    }),
+    env,
+  });
+  const geoRanked = await jsonBody(geoResponse);
   const sourcedQuestion = questions.questions.find((question) => (
     question.prompt === 'Should Agent Village organizers publish a daily recap?'
+  ));
+  const geoQuestion = questions.questions.find((question) => (
+    question.prompt === 'Should the demo prioritize organizer feedback?'
   ));
   const emptyResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions/create', {
@@ -2081,6 +2100,8 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(body.skipped.length, 0);
   assert.equal(body.created[0].references[0].url, sourceUrl);
   assert.equal(body.created[0].tags.includes('src:example-com'), true);
+  assert.deepEqual(body.created[1].geoRefs, [{ geoId: 'edge-organizer-hall', kind: 'venue', label: 'Organizer Hall' }]);
+  assert.equal(body.created[1].tags.includes('geo:edge-organizer-hall'), true);
   assert.equal(proposedRecords.length, 3);
   assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
   assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
@@ -2088,6 +2109,9 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(proposedRecords[0].references[0].url, sourceUrl);
   assert.equal(sourcedQuestion.references[0].url, sourceUrl);
   assert.equal(sourcedQuestion.tags.includes('src:example-com'), true);
+  assert.deepEqual(geoQuestion.geoRefs, [{ geoId: 'edge-organizer-hall', kind: 'venue', label: 'Organizer Hall' }]);
+  assert.equal(geoResponse.status, 200);
+  assert.equal(geoRanked.questions[0].questionId, geoQuestion.questionId);
   assert.equal(JSON.stringify(body).includes('ceagt_'), false);
   assert.equal(emptyResponse.status, 400);
   assert.equal((await jsonBody(emptyResponse)).reason, 'questions_create_batch_required');

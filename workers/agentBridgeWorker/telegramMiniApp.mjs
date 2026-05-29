@@ -56,8 +56,11 @@ import {
 } from './telegramGroups.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import {
+  geoTagsFromGeoRefs,
   inferQuestionTags,
+  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
+  questionSourceGeoRefs,
   normalizeSessionContext,
   persistTelegramProposedQuestion,
   sessionContextFromPolicySession,
@@ -903,6 +906,7 @@ async function miniQuestionFromRecord({
       options,
       session,
     });
+  const geoRefs = locked || payloadUnavailable ? [] : questionSourceGeoRefs(question);
   const lockMessage = payloadUnavailable
     ? 'Question payload is not available yet. The app will keep retrying.'
     : encrypted
@@ -932,6 +936,7 @@ async function miniQuestionFromRecord({
     prompt,
     options,
     tags,
+    geoRefs,
     locked,
     encrypted,
     requiredSbtAddresses,
@@ -4156,6 +4161,7 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
   questionType = '',
   fallbackText = '',
   tags = [],
+  geoRefs = [],
   session = {},
   sessionContext = '',
   inferQuestionType = false,
@@ -4173,15 +4179,18 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
   const options = type === 'multichoice'
     ? (parsedOptions.length >= 2 ? parsedOptions : inferMiniAppQuestionOptionsFromDraft(fallbackText))
     : [];
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const inferredTags = inferQuestionTags({
     prompt,
     questionType: type,
     options,
     session,
     explicitTags: [
+      ...geoTagsFromGeoRefs(normalizedGeoRefs),
       ...normalizeQuestionTags(tags),
       ...normalizeQuestionTags(parsed?.tags || parsed?.tagIds || parsed?.topics),
     ],
+    geoRefs: normalizedGeoRefs,
     sessionContext,
   });
   return {
@@ -4189,6 +4198,7 @@ function normalizeFormattedMiniAppQuestionDraft(parsed = {}, {
     prompt,
     options,
     tags: inferredTags,
+    geoRefs: normalizedGeoRefs,
   };
 }
 
@@ -4196,6 +4206,7 @@ function fallbackFormattedMiniAppQuestionDraft({
   text = '',
   questionType = '',
   tags = [],
+  geoRefs = [],
   session = {},
   sessionContext = '',
   inferQuestionType = false,
@@ -4213,6 +4224,7 @@ function fallbackFormattedMiniAppQuestionDraft({
     questionType: type,
     fallbackText: text,
     tags,
+    geoRefs,
     session,
     sessionContext,
     inferQuestionType: false,
@@ -4255,12 +4267,21 @@ async function handleAddQuestionRequest({
   const options = questionType === 'multichoice' ? normalizeMiniAppQuestionOptions(body.options || body.choices) : [];
   const metadataSession = miniAppPolicySessionForContext(context);
   const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
+  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
+    geoId: body.geoId,
+    kind: body.geoKind || body.kind,
+    label: body.geoLabel || body.label,
+  });
   const tags = inferQuestionTags({
     prompt,
     questionType,
     options,
     session: metadataSession,
-    explicitTags: body.tags,
+    explicitTags: [
+      ...geoTagsFromGeoRefs(geoRefs),
+      ...normalizeQuestionTags(body.tags),
+    ],
+    geoRefs,
     sessionContext,
   });
   if (!prompt) return json({ ok: false, error: 'question_prompt_required' }, { status: 400 });
@@ -4283,6 +4304,7 @@ async function handleAddQuestionRequest({
     questionType,
     options,
     tags,
+    geoRefs,
     sessionContext,
     createdAt,
   });
@@ -4316,12 +4338,18 @@ async function handleFormatQuestionRequest({
   const metadataSession = miniAppPolicySessionForContext(context);
   const sessionContext = normalizeSessionContext(body.sessionContext || body.context || sessionContextFromPolicySession(metadataSession));
   const tags = normalizeQuestionTags(body.tags);
+  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
+    geoId: body.geoId,
+    kind: body.geoKind || body.kind,
+    label: body.geoLabel || body.label,
+  });
   if (!text) return json({ ok: false, error: 'question_draft_required' }, { status: 400 });
 
   const fallback = fallbackFormattedMiniAppQuestionDraft({
     text,
     questionType,
     tags,
+    geoRefs,
     session: metadataSession,
     sessionContext,
     inferQuestionType,
@@ -4368,6 +4396,14 @@ async function handleFormatQuestionRequest({
         question: fallback,
       });
     }
+    const formatInput = {
+      questionType,
+      inferQuestionType,
+      draft: text,
+      sessionContext,
+      existingTags: tags,
+    };
+    if (geoRefs.length) formatInput.geoRefs = geoRefs;
     const response = await fetchImpl(`${sessionAuth.workerUrl}/ai`, {
       method: 'POST',
       headers: {
@@ -4384,13 +4420,7 @@ async function handleFormatQuestionRequest({
           },
           {
             role: 'user',
-            content: JSON.stringify({
-              questionType,
-              inferQuestionType,
-              draft: text,
-              sessionContext,
-              existingTags: tags,
-            }),
+            content: JSON.stringify(formatInput),
           },
         ],
         max_output_tokens: 700,
@@ -4412,6 +4442,7 @@ async function handleFormatQuestionRequest({
       questionType,
       fallbackText: text,
       tags,
+      geoRefs,
       session: metadataSession,
       sessionContext,
       inferQuestionType,
@@ -4457,6 +4488,11 @@ async function handleGenerateQuestionsFromUrlRequest({
   const questionType = normalizeMiniAppQuestionType(body.questionType || body.type || 'agree_unsure_disagree');
   const regenerationFeedback = normalizeText(body.feedback || body.regenerationFeedback || '', 1000);
   const previousCandidates = Array.isArray(body.previousCandidates) ? body.previousCandidates : [];
+  const geoRefs = normalizeQuestionGeoRefs(body.geoRefs, {
+    geoId: body.geoId,
+    kind: body.geoKind || body.kind,
+    label: body.geoLabel || body.label,
+  });
   const authoring = await evaluateMiniAppQuestionAuthoring({ env, context });
   if (!authoring.ok) {
     return json({
@@ -4482,6 +4518,7 @@ async function handleGenerateQuestionsFromUrlRequest({
     session: metadataSession,
     questionType,
     count,
+    geoRefs,
   }).slice(0, count);
   const fallbackResponse = (reason = 'question_generation_empty') => json({
     ok: true,
@@ -4530,6 +4567,7 @@ async function handleGenerateQuestionsFromUrlRequest({
     questionType,
     regenerationFeedback,
     previousCandidates,
+    geoRefs,
   });
   const firstAi = await requestUrlQuestionGenerationAi({
     env,
@@ -4545,6 +4583,7 @@ async function handleGenerateQuestionsFromUrlRequest({
   let candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
     session: metadataSession,
     questionType,
+    geoRefs,
   }).slice(0, count);
   if (!candidates.length) {
     const retryAi = await requestUrlQuestionGenerationAi({
@@ -4559,6 +4598,7 @@ async function handleGenerateQuestionsFromUrlRequest({
       candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
         session: metadataSession,
         questionType,
+        geoRefs,
       }).slice(0, count);
     }
   }
@@ -10495,6 +10535,7 @@ function telegramMiniAppHtml() {
               options: candidateOptions,
               sessionContext: state.addQuestionSessionContext,
               tags: normalizeQuestionTags(candidate.tags || state.addQuestionTags),
+              geoRefs: Array.isArray(candidate.geoRefs) ? candidate.geoRefs : [],
             }),
           });
           body = await response.json().catch(() => ({}));

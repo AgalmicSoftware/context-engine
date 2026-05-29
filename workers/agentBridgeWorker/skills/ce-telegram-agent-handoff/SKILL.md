@@ -425,7 +425,8 @@ Example body:
     {
       "prompt": "Should organizers publish a daily Agent Village recap?",
       "questionType": "binary",
-      "tags": ["organizer-feedback"]
+      "tags": ["organizer-feedback"],
+      "geoRefs": [{ "geoId": "edge-town-hall", "kind": "venue", "label": "Town Hall" }]
     }
   ]
 }
@@ -437,6 +438,12 @@ The worker validates and persists the approved questions, adds a host-derived
 the normal pose/surfacing flow later if the user wants them posted into a
 Telegram group. Never auto-create questions before the user approves the exact
 list.
+
+For Edge/Geo-originated questions, include `geoId`/`geoKind`/`geoLabel` on the
+question or a structured `geoRefs` array. The worker forces the matching
+`geo:<geoId>` tag and stores the structured ref so later `/questions`,
+`/questions/next`, and `/digest` calls can surface questions relevant to public
+Geo nodes.
 
 ## Read Aggregate Results
 
@@ -649,6 +656,9 @@ Create and pose a new freeform question:
   "prompt": "What should the group decide next?",
   "questionType": "freeform",
   "tags": ["governance", "agent-village"],
+  "geoId": "edge-town-hall",
+  "geoKind": "venue",
+  "geoLabel": "Town Hall",
   "sessionContext": "Short public context that helps CE format and tag the question."
 }
 ```
