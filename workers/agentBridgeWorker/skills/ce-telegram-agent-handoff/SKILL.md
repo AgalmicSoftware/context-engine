@@ -127,7 +127,8 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 8. When you have a reviewed sequence of questions, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
 9. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
 10. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
-11. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
+11. For an interactive report, give the user a private client auto-login link built from their copied `ceagt_` token.
+12. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
 
@@ -553,6 +554,27 @@ bubbles. It does not return raw response records, Telegram user ids, wallet
 addresses, or individual answer text. The image endpoint returns a PNG rendering
 of that same topic map for agents that can send or display images.
 
+### Interactive Client Report
+
+When the user wants the full interactive report, create a private client link
+instead of asking them to connect a wallet. Use the public CE client origin
+(`https://contextengine.xyz` unless the operator gives you a different client
+URL), the copied worker URL, the token-bound session slug, and the user's
+copied `ceagt_...` token:
+
+```text
+https://contextengine.xyz/session/<session-slug>/questions/results?telegramToken=<urlencoded-ceagt-token>&agentBridgeUrl=<urlencoded-worker-url>
+```
+
+The client accepts `telegramToken`, `ceTelegramToken`, `ceagt`, `agentToken`, or
+`token`, extracts a bare `ceagt_...` token even when the user pasted the full
+Telegram install message, exchanges it through
+`POST <Worker>/telegram/agent/api/client-login/exchange`, and then strips the
+token query parameter from browser history. Treat this URL as a login
+credential: only send it in a private channel controlled by the user. If the
+user does not want a token-bearing URL, send `/session/<session-slug>` and ask
+them to paste the copied Telegram bot install info into the login box.
+
 If the response has `available: false`, do not invent a map. Explain the
 `unavailableReason` and ask the user to gather more answered questions. For demos
 or previews, pass `demo=1` to either endpoint.
@@ -939,6 +961,8 @@ subscription yet.
   consent, and explicit draft-divergence research consent.
 - Mini App settings expose the same topic and opt-in controls; draft-divergence
   records are only persisted after the user opts in.
+- Agents can send private interactive-report links that auto-login with the
+  copied Telegram `ceagt_` token and worker URL.
 
 ### 2026-05-28 (v2)
 

@@ -204,6 +204,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /demographicLinkOptIn/);
   assert.match(source, /draftDivergenceOptIn/);
   assert.match(source, /topicPreferences/);
+  assert.match(source, /Interactive Client Report/);
+  assert.match(source, /\/session\/<session-slug>\/questions\/results\?telegramToken=/);
+  assert.match(source, /client-login\/exchange/);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
   assert.match(source, /Non-Telegram Agent Token Flow/);
   assert.match(source, /Install From Public Git/);
