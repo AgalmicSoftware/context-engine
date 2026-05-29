@@ -16,6 +16,7 @@ type SurveyResultsExportOption = {
 };
 
 type SurveyResultsExportControlsProps = {
+  canExportRawResults?: boolean;
   exportAreaOpen?: boolean;
   exportOptions: readonly SurveyResultsExportOption[];
   exportTypeLabel?: string;
@@ -26,6 +27,7 @@ type SurveyResultsExportControlsProps = {
 };
 
 const SurveyResultsExportControls = ({
+  canExportRawResults = false,
   exportAreaOpen = false,
   exportOptions,
   exportTypeLabel = '',
@@ -33,53 +35,55 @@ const SurveyResultsExportControls = ({
   onExportTypeChange,
   onToggleExportArea,
   styleMap,
-}: SurveyResultsExportControlsProps): React.ReactElement => (
-  <div className={styleMap.exportDataBox}>
-    {!exportAreaOpen ? (
-      <Button
-        onClick={onToggleExportArea}
-        className={styleMap.exportToggleButton}
-        aria-expanded={exportAreaOpen}
-        aria-controls="surveyResultsExportArea"
-      >
-        Export Data
-      </Button>
-    ) : (
-      <div className={styleMap.exportAreaExpanded} id="surveyResultsExportArea">
-        <div className={styleMap.exportAreaHeader}>
-          <Label for="exportType" className={styleMap.exportLabel}>
-            Export Data:
-          </Label>
-          <Button
-            type="button"
-            color="link"
-            className={styleMap.exportCollapseButton}
-            onClick={onToggleExportArea}
-            aria-label="Collapse export area"
-          >
-            <FontAwesomeIcon icon={faCaretUp} />
-          </Button>
+}: SurveyResultsExportControlsProps): React.ReactElement | null => (
+  canExportRawResults ? (
+    <div className={styleMap.exportDataBox}>
+      {!exportAreaOpen ? (
+        <Button
+          onClick={onToggleExportArea}
+          className={styleMap.exportToggleButton}
+          aria-expanded={exportAreaOpen}
+          aria-controls="surveyResultsExportArea"
+        >
+          Export Data
+        </Button>
+      ) : (
+        <div className={styleMap.exportAreaExpanded} id="surveyResultsExportArea">
+          <div className={styleMap.exportAreaHeader}>
+            <Label for="exportType" className={styleMap.exportLabel}>
+              Export Data:
+            </Label>
+            <Button
+              type="button"
+              color="link"
+              className={styleMap.exportCollapseButton}
+              onClick={onToggleExportArea}
+              aria-label="Collapse export area"
+            >
+              <FontAwesomeIcon icon={faCaretUp} />
+            </Button>
+          </div>
+          <div id={styleMap.exportOptions}>
+            <UncontrolledDropdown direction="down" className={styleMap.exportDropdownBox}>
+              <DropdownToggle caret className={styleMap.exportDropdown}>
+                {exportTypeLabel}
+              </DropdownToggle>
+              <DropdownMenu>
+                {exportOptions.map((option: SurveyResultsExportOption) => (
+                  <DropdownItem key={option.value} onClick={() => onExportTypeChange(option.value)}>
+                    {option.label}
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </UncontrolledDropdown>
+            <Button onClick={onDownload} className={styleMap.downloadButton}>
+              Download
+            </Button>
+          </div>
         </div>
-        <div id={styleMap.exportOptions}>
-          <UncontrolledDropdown direction="down" className={styleMap.exportDropdownBox}>
-            <DropdownToggle caret className={styleMap.exportDropdown}>
-              {exportTypeLabel}
-            </DropdownToggle>
-            <DropdownMenu>
-              {exportOptions.map((option: SurveyResultsExportOption) => (
-                <DropdownItem key={option.value} onClick={() => onExportTypeChange(option.value)}>
-                  {option.label}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </UncontrolledDropdown>
-          <Button onClick={onDownload} className={styleMap.downloadButton}>
-            Download
-          </Button>
-        </div>
-      </div>
-    )}
-  </div>
+      )}
+    </div>
+  ) : null
 );
 
 export default SurveyResultsExportControls;

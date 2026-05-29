@@ -26,6 +26,7 @@ describe('SurveyResultsExportControls', () => {
     const onToggleExportArea = jest.fn();
     render(
       <SurveyResultsExportControls
+        canExportRawResults={true}
         exportAreaOpen={false}
         exportOptions={exportOptions}
         exportTypeLabel="CSV: Questions"
@@ -52,6 +53,7 @@ describe('SurveyResultsExportControls', () => {
     const onToggleExportArea = jest.fn();
     render(
       <SurveyResultsExportControls
+        canExportRawResults={true}
         exportAreaOpen={true}
         exportOptions={exportOptions}
         exportTypeLabel="CSV: Questions"
@@ -74,5 +76,23 @@ describe('SurveyResultsExportControls', () => {
 
     fireEvent.click(screen.getByLabelText('Collapse export area'));
     expect(onToggleExportArea).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders nothing when the connected account is not a session admin', () => {
+    const { container } = render(
+      <SurveyResultsExportControls
+        canExportRawResults={false}
+        exportAreaOpen={false}
+        exportOptions={exportOptions}
+        exportTypeLabel="CSV: Questions"
+        onDownload={jest.fn()}
+        onExportTypeChange={jest.fn()}
+        onToggleExportArea={jest.fn()}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: 'Export Data' })).toBeNull();
   });
 });

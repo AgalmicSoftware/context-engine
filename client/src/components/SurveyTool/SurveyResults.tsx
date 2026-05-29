@@ -537,6 +537,9 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
+const normalizeSurveyResultsAddress = (value: unknown): string => (
+  String(value || '').trim().toLowerCase()
+);
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
@@ -1301,6 +1304,18 @@ class SurveyResults extends Component<any, any> {
       sessionSlug: this.getEffectiveSlug(),
       resolveBySlug: getSessionConfigBySlug,
     });
+  }
+
+  isConnectedSessionAdmin() {
+    const accountLower = normalizeSurveyResultsAddress(this.props.account);
+    if (!accountLower) return false;
+    const resolvedSession = this.getEffectiveSessionContext();
+    const sessionConfig = Object.keys(toSurveyResultsRecord(resolvedSession.sessionConfig)).length
+      ? toSurveyResultsRecord(resolvedSession.sessionConfig)
+      : toSurveyResultsRecord(this.props.sessionConfig);
+    const registry = toSurveyResultsRecord(sessionConfig.__registry);
+    const adminAddress = normalizeSurveyResultsAddress(registry.adminAddress || sessionConfig.adminAddress);
+    return !!adminAddress && adminAddress === accountLower;
   }
 
   resolveBaseQuestionReadScopeContextFor({
@@ -4496,6 +4511,7 @@ const exportControlsDisplay = buildSurveyResultsExportControlsDisplayDescriptor(
   exportAreaOpen,
   exportType,
 });
+const canExportRawResults = this.isConnectedSessionAdmin();
 const aggregatorEntries = this.getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
 const aggregatorEntriesCount = aggregatorEntries.length;
 const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQuestions);
@@ -4791,6 +4807,7 @@ return (
         </div>
 
         <SurveyResultsExportControls
+          canExportRawResults={canExportRawResults}
           exportAreaOpen={exportControlsDisplay.exportAreaOpen}
           exportOptions={exportControlsDisplay.exportOptions}
           exportTypeLabel={exportControlsDisplay.exportTypeLabel}

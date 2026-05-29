@@ -37,6 +37,8 @@ import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeTogg
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
+const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
+const VIEWER_ADDRESS = '0x2222222222222222222222222222222222222222';
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
 
@@ -347,12 +349,18 @@ describe('SurveyResults export/view controls', () => {
 
   it('renders the current export options list', () => {
     const subject = createSubject({
+      account: ADMIN_ADDRESS,
       isOpen: true,
       viewMode: 'questions',
       filterState: {},
       isResponsesCacheReady: true,
       isQuestionCacheReady: true,
       isSBTCacheReady: true,
+      sessionConfig: {
+        __registry: {
+          adminAddress: ADMIN_ADDRESS,
+        },
+      },
     });
 
     subject.state = {
@@ -374,6 +382,7 @@ describe('SurveyResults export/view controls', () => {
     const optionLabels = exportControls?.props?.exportOptions?.map((option: any) => option.label) || [];
 
     expect(exportControls).toBeTruthy();
+    expect(exportControls.props.canExportRawResults).toBe(true);
     expect(exportControls.props.exportTypeLabel).toBe('CSV: Questions + Responses');
     expect(optionLabels).toEqual([
       'CSV: Questions',
@@ -382,6 +391,43 @@ describe('SurveyResults export/view controls', () => {
       'JSON: Questions + Responses',
     ]);
     expect(optionLabels).not.toContain('Polis Report');
+  });
+
+  it('does not expose raw export controls to non-admin accounts', () => {
+    const subject = createSubject({
+      account: VIEWER_ADDRESS,
+      isOpen: true,
+      viewMode: 'questions',
+      filterState: {},
+      isResponsesCacheReady: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      sessionConfig: {
+        __registry: {
+          adminAddress: ADMIN_ADDRESS,
+        },
+      },
+    });
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      exportAreaOpen: true,
+      exportType: 'csv-questions-and-responses',
+      aggregateQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+      responses: [],
+      sbtFilteredResponses: [],
+    };
+
+    const tree = subject.render();
+    const exportControls = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsExportControls
+    );
+
+    expect(exportControls).toBeTruthy();
+    expect(exportControls.props.canExportRawResults).toBe(false);
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
@@ -739,12 +785,18 @@ describe('SurveyResults export/view controls', () => {
 
   it('routes the rendered download button through the export controller path', () => {
     const subject = attachStateHarness(createSubject({
+      account: ADMIN_ADDRESS,
       isOpen: true,
       viewMode: 'questions',
       filterState: {},
       isResponsesCacheReady: true,
       isQuestionCacheReady: true,
       isSBTCacheReady: true,
+      sessionConfig: {
+        __registry: {
+          adminAddress: ADMIN_ADDRESS,
+        },
+      },
     }));
 
     subject.state = {
