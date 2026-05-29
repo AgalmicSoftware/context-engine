@@ -2694,8 +2694,35 @@ function parseAgentOnboardingStartParam(value = '') {
   const payload = safeString(value);
   if (payload === 'sensemaking_trial') return { ok: true, sessionSlug: '' };
   if (payload === 'agent_onboarding') return { ok: true, sessionSlug: '' };
+  if (payload === 'onboard') return { ok: true, sessionSlug: '' };
   const match = /^agent_onboarding__([a-z0-9_-]{1,128})$/.exec(payload);
-  return match ? { ok: true, sessionSlug: sanitizeSessionSlug(match[1]) } : { ok: false };
+  if (match) return { ok: true, sessionSlug: sanitizeSessionSlug(match[1]) };
+  const shortMatch = /^onboard__([a-z0-9_-]{1,128})$/.exec(payload);
+  return shortMatch ? { ok: true, sessionSlug: sanitizeSessionSlug(shortMatch[1]) } : { ok: false };
+}
+
+function directLinkMiniAppShortName(env = {}) {
+  return normalizeBotUsername(
+    env.AGENT_BRIDGE_MINIAPP_SHORT_NAME ||
+    env.AGENT_BRIDGE_MINI_APP_SHORT_NAME ||
+    env.TELEGRAM_MINIAPP_SHORT_NAME ||
+    env.TELEGRAM_MINI_APP_SHORT_NAME
+  );
+}
+
+function makeAgentOnboardingMiniAppButton({
+  env = {},
+  sessionSlug = '',
+} = {}) {
+  const botUsername = normalizeBotUsername(env.TELEGRAM_BOT_USERNAME);
+  const shortName = directLinkMiniAppShortName(env);
+  if (!botUsername || !shortName) return null;
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const payload = slug ? `onboard__${slug}` : 'onboard';
+  return {
+    text: 'Onboard Agent (Mini App)',
+    url: `https://t.me/${botUsername}/${shortName}?startapp=${encodeURIComponent(payload)}`,
+  };
 }
 
 async function makeAgentOnboardingButton({
@@ -2753,10 +2780,15 @@ async function buildAgentOnboardingStartResponse({
     seed: `agent_onboarding|group_prompt|${sessionSlugOverride || 'default'}|${normalized.chat?.chatId}|${normalized.updateId}`,
     createdAt,
   });
+  const miniAppButton = makeAgentOnboardingMiniAppButton({
+    env,
+    sessionSlug: sessionSlugOverride,
+  });
+  const buttons = [button, miniAppButton].filter(Boolean);
   return reply({
     chatId: normalized.chat.chatId,
     text: 'Agent onboarding is private. Tap Onboard Agent to open a private chat and copy your install info.',
-    replyMarkup: button ? { inline_keyboard: [[button]] } : null,
+    replyMarkup: buttons.length ? { inline_keyboard: buttons.map((entry) => [entry]) } : null,
     screen: 'agent_onboarding_private_required',
     command,
     normalized,
@@ -3427,6 +3459,13 @@ async function buildHelpResponse({
     createdAt,
   });
   if (agentOnboardingButton) keyboard.push([agentOnboardingButton]);
+  if (!normalized.chat.isPrivate) {
+    const agentOnboardingMiniAppButton = makeAgentOnboardingMiniAppButton({
+      env,
+      sessionSlug: activeSession?.sessionSlug || activeBinding?.sessionSlug || '',
+    });
+    if (agentOnboardingMiniAppButton) keyboard.push([agentOnboardingMiniAppButton]);
+  }
   const adminActionsButton = await makeAdminActionsButton({
     env,
     normalized,
@@ -9285,6 +9324,7 @@ export {
   loadSubmittedResultRecords,
   loadSessionPolicy,
   loadQuestionsForSession,
+  parseAgentOnboardingStartParam,
   parseTelegramCommandText,
   persistActionRecord,
   persistAnswerDraft,
@@ -9294,6 +9334,7 @@ export {
   readAnswerDraft,
   readGroupSessionBinding,
   readPrivateSessionBinding,
+  resolveAgentTokenSession,
   shortQuestionId,
   summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,

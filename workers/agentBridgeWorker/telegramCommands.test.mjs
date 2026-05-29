@@ -3833,12 +3833,18 @@ test('/start Onboard Agent deep-link mints private install info without exposing
   });
   const onboard = flattenButtons(groupStart.response.replyMarkup)
     .find((button) => button.text === 'Onboard Agent');
+  const miniAppOnboard = flattenButtons(groupStart.response.replyMarkup)
+    .find((button) => button.text === 'Onboard Agent (Mini App)');
   assert.ok(onboard?.url);
+  assert.ok(miniAppOnboard?.url);
   assert.equal(JSON.stringify(groupStart).includes('ceagt_'), false);
   assert.equal(JSON.stringify(onboard).includes('copy_text'), false);
   const onboardUrl = new URL(onboard.url);
   assert.equal(onboardUrl.pathname, `/${env.TELEGRAM_BOT_USERNAME}`);
   assert.equal(onboardUrl.searchParams.has('startapp'), false);
+  const miniAppOnboardUrl = new URL(miniAppOnboard.url);
+  assert.equal(miniAppOnboardUrl.pathname, `/${env.TELEGRAM_BOT_USERNAME}/${env.AGENT_BRIDGE_MINI_APP_SHORT_NAME}`);
+  assert.equal(miniAppOnboardUrl.searchParams.get('startapp'), 'onboard__alpha');
   const payload = onboardUrl.searchParams.get('start');
   const privateStart = await buildTelegramCommandResponse({
     update: privateMessage(`/start ${payload}`),
