@@ -3325,6 +3325,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 10px;
 }
 
+.actionButton.pileActionMenuToggle {
+  display: none;
+}
+
+.pileActionButtonGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: inherit;
+}
+
 .actionButton {
   background: transparent;
   border: none;
@@ -3912,10 +3923,67 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileActions {
     flex-direction: row;
-    gap: 16px;
+    gap: 12px;
     order: 1;
     justify-self: start;
     padding: 0;
+  }
+
+  .pileActionButtonGroup {
+    flex-direction: row;
+    gap: 16px;
+  }
+
+  .pileActionsMenuEligible {
+    position: relative;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .pileActionsMenuEligible .pileActionMenuToggle {
+    display: flex;
+    width: 46px;
+    height: 46px;
+    background: transparent;
+    border: none;
+    color: var(--ce-color-white);
+    opacity: 0.75;
+    box-shadow: none;
+  }
+
+  .pileActionsMenuEligible .pileActionMenuToggle:hover,
+  .pileActionsMenuEligible .pileActionMenuToggle:focus-visible {
+    color: var(--ce-color-accent);
+    opacity: 1;
+    outline: none;
+  }
+
+  .pileActionsMenuEligible .pileActionButtonGroup {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    z-index: 24;
+    display: none;
+    flex-direction: column;
+    min-width: 56px;
+    padding: 10px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--ce-radius-14);
+    background: rgba(23, 25, 65, 0.98);
+    box-shadow:
+      0 18px 36px rgba(7, 12, 38, 0.42),
+      inset 0 0 0 1px rgba(77, 255, 164, 0.08);
+  }
+
+  .pileActionsMenuEligible:focus-within .pileActionButtonGroup,
+  .pileActionsMenuEligible:hover .pileActionButtonGroup {
+    display: flex;
+  }
+
+  .pileActionsMenuEligible .pileActionButtonGroup .actionButton {
+    width: 42px;
+    height: 42px;
+    opacity: 0.78;
   }
 
   .pileFooter {
@@ -3925,8 +3993,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: auto;
     max-width: none;
     min-height: 0;
-    margin-right: 12px;
-    gap: 16px;
+    margin-right: 8px;
+    gap: 12px;
   }
 
   .pileFooter .pileSubmitButton {
@@ -4002,6 +4070,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     gap: 16px;
     order: 1;
     padding: 0;
+  }
+
+  .pileActionButtonGroup {
+    flex-direction: row;
+    gap: 16px;
   }
 
   .pileNav {

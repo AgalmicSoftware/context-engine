@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import {
   MAX_QUESTION_COUNT,
   MIN_QUESTION_COUNT,
@@ -111,6 +114,15 @@ describe('surveyGeneratorHelpers', () => {
     expect(buildSurveyGeneratorTypePillClassName(styles, 'disagree')).toBe(
       `${styles.pill} ${styles.pillDisagree}`
     );
+  });
+
+  it('keeps the AI prompt toggle visually quiet on the dark generator panel', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'AudioSurveyGenerator.module.scss'), 'utf8');
+    const toggleBlock = scss.match(/\.aiPromptToggleBtn\s*{[\s\S]*?^\s*}/m)?.[0] || '';
+
+    expect(toggleBlock).toMatch(/background:\s*transparent;/);
+    expect(toggleBlock).toMatch(/color:\s*rgba\(255,\s*255,\s*255,\s*0\.5\);/);
+    expect(toggleBlock).toMatch(/&:hover\s*{[\s\S]*?background:\s*transparent;[\s\S]*?color:\s*rgba\(255,\s*255,\s*255,\s*0\.72\);/);
   });
 
   it('builds stable additional source ids from a mutable counter ref', () => {
