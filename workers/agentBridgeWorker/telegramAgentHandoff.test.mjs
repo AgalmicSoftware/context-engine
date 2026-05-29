@@ -170,6 +170,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-28 \(v2\)/);
+  assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
+  assert.match(source, /## Changelog/);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
   assert.match(source, /Non-Telegram Agent Token Flow/);
   assert.match(source, /Install From Public Git/);
@@ -189,6 +192,24 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /\/question_queue 1 3 4/);
   assert.match(source, /allowedProfileFields/);
   assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
+});
+
+test('Telegram agent handoff exposes unauthenticated skill version metadata', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_AGENT_SKILL_URL: 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/skill-version', { token: '' }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.version, '2026-05-28 (v2)');
+  assert.equal(body.skill, 'ce-telegram-agent-handoff');
+  assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
+  assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
 });
 
 test('Telegram agent handoff requires the configured token', async () => {
