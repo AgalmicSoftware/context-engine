@@ -1,6 +1,7 @@
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
+import { assignTelegramQuestionNumber } from './telegramQuestionNumbers.mjs';
 
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -393,10 +394,19 @@ export async function persistTelegramProposedQuestion({
     expirationTtl: ttlSeconds,
     metadata: activityMetadata,
   });
+  const assigned = await assignTelegramQuestionNumber({
+    env,
+    sessionSlug: slug,
+    questionId,
+    createdAt: record.createdAt,
+  });
+  if (assigned.ok) record.stableQuestionNumber = assigned.number;
   return {
     ok: true,
     questionId,
-    question: proposedRecordToQuestion(record),
+    question: assigned.ok
+      ? { ...proposedRecordToQuestion(record), stableQuestionNumber: assigned.number }
+      : proposedRecordToQuestion(record),
     record,
   };
 }

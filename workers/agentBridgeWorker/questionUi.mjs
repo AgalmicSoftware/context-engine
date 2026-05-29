@@ -734,6 +734,7 @@ function questionGateMode(question = {}) {
 
 function summarizeQuestionForList(question = {}, index = 0) {
   const questionId = safeString(question.questionId || question.id);
+  const stableQuestionNumber = Math.floor(Number(question.stableQuestionNumber || question.questionNumber));
   const visibility = normalizeQuestionVisibility(question);
   const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC && !payloadUnavailable;
@@ -742,6 +743,7 @@ function summarizeQuestionForList(question = {}, index = 0) {
   return sanitizeForGroup({
     type: 'telegram_question_list_item',
     displayIndex: index + 1,
+    stableQuestionNumber: Number.isInteger(stableQuestionNumber) && stableQuestionNumber > 0 ? stableQuestionNumber : null,
     questionId,
     questionType: normalizeQuestionType(question.questionType || question.type),
     title: payloadUnavailable

@@ -59,6 +59,10 @@ import {
   saveTelegramQuestionQueueConfig,
 } from './telegramQuestionQueue.mjs';
 import {
+  ensureTelegramQuestionNumbers,
+  findQuestionByStableNumber,
+} from './telegramQuestionNumbers.mjs';
+import {
   loadTelegramLightweightGroups,
   saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
@@ -841,12 +845,14 @@ function questionLoadIssueText(result = {}) {
 function questionListPromptLine(question = {}) {
   const displayIndex = Number(question.displayIndex) || 0;
   const prefix = displayIndex > 0 ? `${displayIndex}. ` : '';
-  if (question.payloadUnavailable === true) return `${prefix}Failed to load question prompt.`;
+  const stableNumber = Number(question.stableQuestionNumber) || 0;
+  const stableSuffix = stableNumber > 0 ? ` (#${stableNumber})` : '';
+  if (question.payloadUnavailable === true) return `${prefix}Failed to load question prompt.${stableSuffix}`;
   if (question.locked === true) {
     const visibility = lower(question.visibility);
-    return `${prefix}${visibility === 'lit_encrypted' ? 'Encrypted question' : 'Requires session access'}`;
+    return `${prefix}${visibility === 'lit_encrypted' ? 'Encrypted question' : 'Requires session access'}${stableSuffix}`;
   }
-  return `${prefix}${safeString(question.title) || 'Failed to load question prompt.'}`;
+  return `${prefix}${safeString(question.title) || 'Failed to load question prompt.'}${stableSuffix}`;
 }
 
 async function buildTelegramOnlyStorageAuth({
@@ -1374,6 +1380,17 @@ function findQuestion(questions = [], selector = '') {
     || questions.find((question) => lower(shortQuestionId(questionId(question))) === needle)
     || questions.find((question) => lower(questionText(question)).includes(needle))
     || null;
+}
+
+async function findQuestionForSession({
+  env = {},
+  sessionSlug = '',
+  questions = [],
+  selector = '',
+  createdAt = null,
+} = {}) {
+  return await findQuestionByStableNumber({ env, sessionSlug, selector, questions, createdAt })
+    || findQuestion(questions, selector);
 }
 
 function buildAdHocQuestion(text = '', {
@@ -3972,7 +3989,13 @@ async function buildQuestionsResponse({
   });
   if (groupAccessError) return groupAccessError;
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
-  const questions = loadedQuestions.questions;
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions: loadedQuestions.questions,
+    createdAt,
+  });
+  const questions = numbered.questions || loadedQuestions.questions;
   const state = buildTelegramQuestionListState({
     sessionSlug: resolved.session.sessionSlug,
     questions,
@@ -6857,18 +6880,30 @@ function publicQuestionQueueCandidates(questions = []) {
     .filter((question) => questionId(question) && questionText(question));
 }
 
-function resolveQuestionQueueRefs(tokens = [], questions = []) {
+async function resolveQuestionQueueRefsForSession({
+  env = {},
+  sessionSlug = '',
+  tokens = [],
+  questions = [],
+  createdAt = null,
+} = {}) {
   const ids = [];
   const skipped = [];
-  tokens.forEach((token) => {
-    const selected = findQuestion(questions, token);
+  for (const token of tokens) {
+    const selected = await findQuestionForSession({
+      env,
+      sessionSlug,
+      questions,
+      selector: token,
+      createdAt,
+    });
     const selectedId = questionId(selected || {});
     if (!selected || !selectedId) {
       skipped.push(token);
-      return;
+      continue;
     }
     if (!ids.includes(selectedId)) ids.push(selectedId);
-  });
+  }
   return { ids, skipped };
 }
 
@@ -6889,7 +6924,7 @@ function formatQuestionQueueStatus({
     })
     : ['None.'];
   const availableLines = questions.slice(0, 10).map((question, index) => (
-    `${index + 1}. ${questionText(question)} (${shortQuestionId(questionId(question))})`
+    `${Number(question.stableQuestionNumber) > 0 ? `#${Number(question.stableQuestionNumber)}` : `${index + 1}.`} ${questionText(question)} (${shortQuestionId(questionId(question))})`
   ));
   return [
     `Question queue for ${sessionLabel(session)}`,
@@ -6936,7 +6971,13 @@ async function buildQuestionQueueSettingsResponse({
     });
   }
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug);
-  const questions = publicQuestionQueueCandidates(loaded.questions);
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    questions: loaded.questions,
+    createdAt,
+  });
+  const questions = publicQuestionQueueCandidates(numbered.questions || loaded.questions);
   const tokens = questionQueueCommandTokens(args);
   const operation = lower(tokens[0]);
   let saved = null;
@@ -6944,7 +6985,15 @@ async function buildQuestionQueueSettingsResponse({
   if (tokens.length && !['list', 'show'].includes(operation)) {
     const requestedTokens = ['set', 'sponsored'].includes(operation) ? tokens.slice(1) : tokens;
     const clearRequested = ['clear', 'reset', 'none', 'empty'].includes(operation);
-    const resolvedRefs = clearRequested ? { ids: [], skipped: [] } : resolveQuestionQueueRefs(requestedTokens, questions);
+    const resolvedRefs = clearRequested
+      ? { ids: [], skipped: [] }
+      : await resolveQuestionQueueRefsForSession({
+        env,
+        sessionSlug: context.session.sessionSlug,
+        tokens: requestedTokens,
+        questions,
+        createdAt,
+      });
     const nextIds = clearRequested
       ? []
       : resolvedRefs.ids;
@@ -7319,8 +7368,20 @@ async function buildPoseQuestionResponse({
     });
   }
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
-  const questions = loadedQuestions.questions;
-  const matched = findQuestion(questions, selector);
+  const numbered = await ensureTelegramQuestionNumbers({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions: loadedQuestions.questions,
+    createdAt,
+  });
+  const questions = numbered.questions || loadedQuestions.questions;
+  const matched = await findQuestionForSession({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    questions,
+    selector,
+    createdAt,
+  });
   let selected = matched || null;
   let selectedSource = matched ? 'existing_session_question' : 'telegram_command';
   if (!selected) {
