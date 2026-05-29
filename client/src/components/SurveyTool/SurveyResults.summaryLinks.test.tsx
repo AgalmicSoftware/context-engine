@@ -680,6 +680,9 @@ describe('SurveyResults demo results views', () => {
       expect(screen.getByTestId('surveyresults-demo-breakdown-view')).toBeInTheDocument();
     });
     expect(subject.state.demoResultsViewMode).toBe('breakdown');
+    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionSlug: 'demo' })
+    );
 
     fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-riskMatrix'));
     rerenderSubject();
