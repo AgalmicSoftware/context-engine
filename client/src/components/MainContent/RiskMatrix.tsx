@@ -6,8 +6,23 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
-import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
-import { buildPublicRoute, buildPublicUrlPath } from '../../utilities/ui/publicUrl.js';
+import {
+  getRiskMatrixAtlasScenarioCountForCell,
+  getRiskMatrixAtlasScenariosForCell,
+} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
+import {
+  enrichRiskMatrixCommentRecord,
+  getRiskMatrixCorpusSourceCitationItems,
+  type RiskMatrixCorpusRef,
+  type RiskMatrixHistoricalFigure,
+} from '../../variables/demo/riskMatrixCommentContext';
+import {
+  buildAtlasNodeRoute,
+  buildPublicUrlPath,
+  readWindowLocationPath,
+} from '../../utilities/ui/publicUrl.js';
+import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
 
 export type RiskValence = 'opportunity' | 'risk';
 
@@ -180,6 +195,98 @@ const formatSelectionTitle = (cellId = '') => {
 
   const [catX, subX, catY, subY] = cellId.split('.');
   return `${catX} / ${subX} vs ${catY} / ${subY}`;
+};
+
+const parseSelectionStateFromCell = (cellId = '') => {
+  if (isAggregateCellId(cellId)) {
+    const [activeCategoryX, activeCategoryY] = cellId.split('_vs_');
+    if (!activeCategoryX || !activeCategoryY) return null;
+
+    return {
+      activeCategoryX,
+      activeCategoryY,
+      activeSubcategoryX: null,
+      activeSubcategoryY: null,
+    };
+  }
+
+  if (!isCanonicalCellId(cellId)) return null;
+
+  const [activeCategoryX, activeSubcategoryX, activeCategoryY, activeSubcategoryY] = cellId.split('.');
+  return {
+    activeCategoryX,
+    activeCategoryY,
+    activeSubcategoryX,
+    activeSubcategoryY,
+  };
+};
+
+const getCommentsForCellRecords = (
+  cellId: string,
+  comments: RiskCommentRecord[] = []
+): RiskCommentRecord[] => {
+  if (typeof cellId !== 'string' || !cellId) return [];
+
+  if (isAggregateCellId(cellId)) {
+    const [catX, catY] = cellId.split('_vs_');
+    if (!catX || !catY) return [];
+
+    return comments.filter(
+      (entry) => isCanonicalCellId(entry.cell)
+        && entry.cell.startsWith(`${catX}.`)
+        && entry.cell.includes(`.${catY}.`)
+    );
+  }
+
+  return comments.filter((entry) => entry.cell === cellId);
+};
+
+const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) => (
+  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0)
+);
+
+const buildInitialRiskMatrixState = (
+  restoreState: RiskMatrixRestoreState | null | undefined
+): RiskMatrixState => {
+  const nextComments = Array.isArray(restoreState?.comments)
+    ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
+    : INITIAL_COMMENTS;
+  const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
+  const selectedCellId = (isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId))
+    ? rawSelectedCellId
+    : '';
+  const derivedSelectionState = parseSelectionStateFromCell(selectedCellId);
+  const nextValence = VALID_VALENCES.has(String(restoreState?.valence || ''))
+    ? (restoreState?.valence as RiskValence)
+    : DEFAULT_VALENCE;
+  const parsedIntensity = Number(restoreState?.intensity);
+  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0
+    ? parsedIntensity
+    : DEFAULT_INTENSITY;
+  const modal = Boolean(restoreState?.modal && selectedCellId);
+
+  return {
+    comments: nextComments,
+    modal,
+    selectedCellId: modal ? selectedCellId : '',
+    existingComments: modal ? getCommentsForCellRecords(selectedCellId, nextComments) : [],
+    comment: typeof restoreState?.comment === 'string' ? restoreState.comment : '',
+    valence: nextValence,
+    intensity: nextIntensity,
+    heatmap: buildHeatmapFromComments(nextComments),
+    activeCategoryX: restoreState?.activeCategoryX ?? derivedSelectionState?.activeCategoryX ?? null,
+    activeCategoryY: restoreState?.activeCategoryY ?? derivedSelectionState?.activeCategoryY ?? null,
+    activeSubcategoryX: restoreState?.activeSubcategoryX ?? derivedSelectionState?.activeSubcategoryX ?? null,
+    activeSubcategoryY: restoreState?.activeSubcategoryY ?? derivedSelectionState?.activeSubcategoryY ?? null,
+    hoveredRowIndex: null,
+    hoveredColIndex: null,
+    hoveredSubRowIndex: null,
+    hoveredSubColIndex: null,
+    openCommentGroups: {
+      opportunity: true,
+      risk: true,
+    },
+  };
 };
 
 const resolveAtlasAssetPath = (value = '') => {
@@ -834,12 +941,13 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         <span className={styles.atlasScenarioNodeLabel}>{scenario.atlasNodeLabel}</span>
                         <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
                         <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
-                        <div
-                          className={styles.atlasScenarioMetaLine}
-                          aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}
-                        >
-                          <span className={styles.atlasScenarioMetaPill}>{scenario.confidence} confidence</span>
-                          <span className={styles.atlasScenarioMetaPill}>{scenario.timeHorizon}</span>
+                        <div className={styles.atlasScenarioMetaLine} aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}>
+                          <span className={styles.atlasScenarioMetaPill}>
+                            {scenario.confidence} confidence
+                          </span>
+                          <span className={styles.atlasScenarioMetaPill}>
+                            {scenario.timeHorizon}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -944,12 +1052,12 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
         </button>
         {isOpen && (
           <ul id={listId} className={styles.commentList} data-testid={listId}>
-            {entries.map((entry, index) =>
-              (() => {
-                const figureName = String(entry.historicalFigure?.name || '').trim();
-                const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
-                const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
-                const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
+          {entries.map((entry, index) => (
+            (() => {
+              const figureName = String(entry.historicalFigure?.name || '').trim();
+              const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
+              const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
+              const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
 
                 return (
                   <li
@@ -982,50 +1090,32 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                     </div>
                     <p className={styles.commentText}>{entry.comment}</p>
 
-                    {figureName && (
-                      <div className={styles.commentFigureRow}>
-                        {figureAvatar ? (
-                          <img className={styles.commentFigureAvatar} src={figureAvatar} alt={figureName} />
-                        ) : (
-                          <div className={styles.commentFigureAvatarFallback} aria-hidden="true">
-                            {figureName.charAt(0)}
-                          </div>
-                        )}
-                        <div className={styles.commentFigureCopy}>
-                          <span className={styles.commentFigureName}>{figureName}</span>
-                          {entry.historicalFigure?.role && (
-                            <span className={styles.commentFigureRole}>{entry.historicalFigure.role}</span>
+                  {sourceCitations.length > 0 && (
+                    <div className={styles.commentReferenceLine}>
+                      {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
+                      {sourceCitations.map((citation, citationIndex) => (
+                        <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
+                          {citationIndex > 0 && <span aria-hidden="true"> • </span>}
+                          {citation.url ? (
+                            <a
+                              className={styles.commentReferenceLink}
+                              href={citation.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {citation.label}
+                            </a>
+                          ) : (
+                            <span>{citation.label}</span>
                           )}
-                        </div>
-                      </div>
-                    )}
-
-                    {sourceCitations.length > 0 && (
-                      <div className={styles.commentReferenceLine}>
-                        {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
-                        {sourceCitations.map((citation, citationIndex) => (
-                          <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
-                            {citationIndex > 0 && <span aria-hidden="true"> • </span>}
-                            {citation.url ? (
-                              <a
-                                className={styles.commentReferenceLink}
-                                href={citation.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {citation.label}
-                              </a>
-                            ) : (
-                              <span>{citation.label}</span>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                );
-              })(),
-            )}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })()
+          ))}
           </ul>
         )}
       </section>

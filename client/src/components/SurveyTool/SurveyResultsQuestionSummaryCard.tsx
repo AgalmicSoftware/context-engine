@@ -68,7 +68,10 @@ const SurveyResultsQuestionSummaryCard = ({
               style={bookmarkIconStyle}
             />
           </button>
-          <FontAwesomeIcon icon={isActive ? faCaretUp : faCaretDown} className={styleMap.questionExpandIcon} />
+          <FontAwesomeIcon
+            icon={isActive ? faCaretUp : faCaretDown}
+            className={styleMap.questionExpandIcon}
+          />
         </div>
       </CardHeader>
       <Collapse isOpen={isActive} id={styleMap.surveyResultsCollapse}>

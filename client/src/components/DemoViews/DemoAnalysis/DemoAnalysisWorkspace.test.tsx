@@ -65,9 +65,7 @@ describe('DemoAnalysisWorkspace', () => {
     const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
 
-    expect(scss).toMatch(
-      /\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/,
-    );
+    expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\);/);
     expect(scss).toMatch(/\.selectedQuestionFrame\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\);/);
     expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*transparent !important;/);
     expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
@@ -193,12 +191,16 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     const banner = screen.getByTestId('demo-analysis-question-banner');
-    const customGroundingTag = within(banner).getByRole('link', { name: 'Custom Grounding' });
-    const tweetsTag = within(banner).getByRole('link', { name: 'Tweets' });
+    const customGroundingTag = within(banner).getByRole('button', { name: 'Custom Grounding' });
+    const tweetsTag = within(banner).getByRole('button', { name: 'Tweets' });
 
     expect(screen.getByTestId('demo-analysis-selected-question-tension')).toHaveTextContent(/Key tension:/i);
-    expect(customGroundingTag).toHaveAttribute('href', '/tag/Custom%20Grounding?session=demo');
-    expect(tweetsTag).toHaveAttribute('href', '/tag/Tweets?session=demo');
+    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'false');
+    expect(tweetsTag).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(customGroundingTag);
+
+    expect(customGroundingTag).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {
