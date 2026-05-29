@@ -1,5 +1,6 @@
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
 
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -339,8 +340,18 @@ export async function persistTelegramProposedQuestion({
     record.actionMetadata = { ...metadata };
   }
   assertNoSecretShape(record, 'Telegram proposed questions must not serialize secrets.');
+  const activityMetadata = buildTelegramAgentActivityMetadata({
+    type: 'proposed_question',
+    status: record.status,
+    createdAt: record.createdAt,
+    pendingAction: '',
+    sessionSlug: record.sessionSlug,
+    questionId: record.questionId,
+    telegramUserId: record.createdByTelegramUserId,
+  });
   await env.AGENT_ACTION_KV.put(`${prefix}${questionId}`, JSON.stringify(record), {
     expirationTtl: ttlSeconds,
+    metadata: activityMetadata,
   });
   return {
     ok: true,

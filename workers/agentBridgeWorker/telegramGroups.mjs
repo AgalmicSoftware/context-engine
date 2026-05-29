@@ -1,4 +1,5 @@
 import { assertNoSecretShape } from './redaction.mjs';
+import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs';
 
 export const TELEGRAM_LIGHTWEIGHT_GROUPS_KV_PREFIX = 'telegram:lightweight-groups:';
 export const TELEGRAM_LIGHTWEIGHT_GROUP_MEMBERSHIP_KV_PREFIX = 'telegram:lightweight-group-membership:';
@@ -507,7 +508,18 @@ export async function persistTelegramLightweightGroupProposal({
     record.actionMetadata = { ...metadata };
   }
   assertNoSecretShape(record, 'Telegram lightweight group proposals must not serialize secrets.');
-  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record));
+  const activityMetadata = buildTelegramAgentActivityMetadata({
+    type: 'group_proposal',
+    status: record.status,
+    createdAt: record.createdAt,
+    pendingAction: 'review_group_proposal',
+    sessionSlug: record.sessionSlug,
+    telegramUserId: record.proposedBy,
+    targetTelegramUserId: record.targetTelegramUserId,
+  });
+  await kv.put(`${proposalPrefix(sessionSlug)}${proposalId}`, JSON.stringify(record), {
+    metadata: activityMetadata,
+  });
   return {
     ok: true,
     sessionSlug,

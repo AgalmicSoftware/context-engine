@@ -68,6 +68,7 @@ import {
   persistTelegramGroupApproval,
 } from './telegramGroupApprovals.mjs';
 import {
+  buildTelegramAgentActivityMetadata,
   listTelegramAgentActivity,
   summarizeTelegramAgentActivityCounts,
 } from './telegramAgentActivity.mjs';
@@ -2313,8 +2314,18 @@ async function persistAnswerDraft({
     return { ok: false, reason: 'answer_draft_incomplete' };
   }
   assertNoSecretShape(record, 'Telegram answer drafts must not serialize secrets.');
+  const activityMetadata = buildTelegramAgentActivityMetadata({
+    type: 'answer_draft',
+    status: record.status,
+    createdAt: record.selectedAt,
+    pendingAction: 'review_draft',
+    sessionSlug: record.sessionSlug,
+    questionId: record.questionId,
+    telegramUserId: record.telegramUserId,
+  });
   await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+    metadata: activityMetadata,
   });
   return { ok: true, key, draft: record };
 }
