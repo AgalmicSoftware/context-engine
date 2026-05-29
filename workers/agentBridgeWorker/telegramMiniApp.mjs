@@ -136,6 +136,7 @@ const DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
+const MINI_APP_RESULT_GROUP_COUNT = 2;
 const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
@@ -220,9 +221,10 @@ function normalizeResultBoolean(value, fallback = false) {
   return fallback;
 }
 
-function normalizeMiniResultClusterCount(value, fallback = 3) {
-  const count = normalizePositiveInteger(value, fallback);
-  return Math.max(1, Math.min(6, count));
+function normalizeMiniResultClusterCount(value, fallback = MINI_APP_RESULT_GROUP_COUNT) {
+  void value;
+  void fallback;
+  return MINI_APP_RESULT_GROUP_COUNT;
 }
 
 function miniResultsExposurePolicy(session = {}) {
@@ -3639,7 +3641,7 @@ async function buildMiniAppResultsSummary({
   session = {},
   demo = false,
   filters = {},
-  clusterCount = 3,
+  clusterCount = MINI_APP_RESULT_GROUP_COUNT,
   createdAt = new Date().toISOString(),
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
@@ -6949,6 +6951,7 @@ function telegramMiniAppHtml() {
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
     const QUESTION_RETRY_DELAY_MS = 4000;
     const DRAFT_AUTOSAVE_DELAY_MS = 700;
+    const RESULT_GROUP_COUNT = 2;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
     const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
     const readShowUnansweredFirst = () => {
@@ -7003,7 +7006,7 @@ function telegramMiniAppHtml() {
       resultsSessionSlug: '',
       resultsDemoData: readDemoResults(),
       resultVisibleCounts: { consensus: 5, divisive: 5 },
-      resultClusterCount: 3,
+      resultClusterCount: RESULT_GROUP_COUNT,
       resultSectionsOpen: {
         filters: false,
         consensus: false,
@@ -7269,7 +7272,7 @@ function telegramMiniAppHtml() {
     const currentResultsCacheKey = () => [
       state.resultsDemoData ? 'demo' : 'live',
       state.resultsSessionSlug || '',
-      String(state.resultClusterCount || 3),
+      String(RESULT_GROUP_COUNT),
       state.resultsDemoData ? '' : resultFilterCacheKey(),
     ].join('|');
     const restoreCachedResults = () => {
@@ -8949,20 +8952,20 @@ function telegramMiniAppHtml() {
       el.resultClusterControls.innerHTML = '';
       el.resultGroupChart.innerHTML = '';
       el.groupAnalysisSection.hidden = true;
-      const participantCount = Number(state.resultsData?.participantCount || state.resultsData?.counts?.uniqueParticipants || 0) || 0;
       if (state.resultsData?.groupView?.enabled === false) {
         el.resultGroupsSection.hidden = true;
         return;
       }
       el.resultGroupsSection.hidden = false;
-      if (participantCount >= 2) renderResultClusterControls();
-      if (!groups.length) {
+      state.resultClusterCount = RESULT_GROUP_COUNT;
+      const visibleGroups = groups.slice(0, RESULT_GROUP_COUNT);
+      if (!visibleGroups.length) {
         appendEmptyResult(el.resultGroups, 'Not enough participant response data for groups yet.');
         return;
       }
-      renderResultGroupChart(groups);
+      renderResultGroupChart(visibleGroups);
       el.groupAnalysisSection.hidden = false;
-      groups.forEach((group) => {
+      visibleGroups.forEach((group) => {
         const analyze = document.createElement('button');
         analyze.type = 'button';
         analyze.className = 'secondary';
@@ -9116,36 +9119,12 @@ function telegramMiniAppHtml() {
       return ['#1f7ae0', '#f59e0b', '#12b569', '#b8a2ff', '#ff443d', '#2cc3ff'][index % 6];
     }
     function resultClusterOptionCounts() {
-      const participantCount = Number(state.resultsData?.participantCount || state.resultsData?.counts?.uniqueParticipants || 0) || 0;
-      const maxCount = Math.min(5, Math.floor(participantCount || 0));
-      if (maxCount < 2) return [];
-      if (state.resultClusterCount > maxCount) state.resultClusterCount = maxCount;
-      if (state.resultClusterCount < 2) state.resultClusterCount = 2;
-      return Array.from({ length: maxCount - 1 }, (_, index) => index + 2);
+      state.resultClusterCount = RESULT_GROUP_COUNT;
+      return [];
     }
     function renderResultClusterControls() {
       el.resultClusterControls.innerHTML = '';
-      const counts = resultClusterOptionCounts();
-      if (!counts.length) return;
-      const label = document.createElement('span');
-      label.className = 'filterSummary';
-      label.textContent = 'Clusters';
-      el.resultClusterControls.appendChild(label);
-      counts.forEach((count) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'secondary';
-        if (state.resultClusterCount === count) button.classList.add('active');
-        button.textContent = String(count);
-        button.onclick = () => {
-          state.resultClusterCount = count;
-          state.groupAnalysisById = {};
-          stopGroupAnalysisProgressTimer();
-          restoreCachedResults();
-          loadResults({ force: true });
-        };
-        el.resultClusterControls.appendChild(button);
-      });
+      resultClusterOptionCounts();
     }
     function renderResultGroupChart(groups) {
       el.resultGroupChart.innerHTML = '';
@@ -10629,7 +10608,8 @@ function telegramMiniAppHtml() {
         const resultsUrl = new URL('/telegram/mini-app/api/results', location.origin);
         resultsUrl.searchParams.set('launch', launch);
         resultsUrl.searchParams.set('sessionSlug', state.resultsSessionSlug);
-        resultsUrl.searchParams.set('clusters', String(state.resultClusterCount));
+        state.resultClusterCount = RESULT_GROUP_COUNT;
+        resultsUrl.searchParams.set('clusters', String(RESULT_GROUP_COUNT));
         if (state.resultsDemoData) resultsUrl.searchParams.set('demo', '1');
         if (!state.resultsDemoData && activeResultFilterCount() > 0) {
           resultsUrl.searchParams.set('filters', JSON.stringify(resultFilterPayload()));
@@ -11035,7 +11015,7 @@ function telegramMiniAppHtml() {
             sessionSlug: state.resultsSessionSlug,
             groupId,
             demo: state.resultsDemoData,
-            clusterCount: state.resultClusterCount,
+            clusterCount: RESULT_GROUP_COUNT,
             filters: state.resultsDemoData ? {} : resultFilterPayload(),
           }),
         });

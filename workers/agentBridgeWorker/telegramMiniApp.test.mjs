@@ -393,9 +393,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="toggleGroupAnalysisSection"/);
   assert.match(html, /id="resultGroupsSection"[\s\S]*id="groupAnalysisSection"/);
   assert.match(html, /function renderResultGroups\(groups\)[\s\S]*el\.resultClusterControls\.innerHTML = '';[\s\S]*el\.resultGroupChart\.innerHTML = '';[\s\S]*el\.groupAnalysisSection\.hidden = true;/);
-  assert.match(html, /const participantCount = Number\(state\.resultsData\?\.participantCount \|\| state\.resultsData\?\.counts\?\.uniqueParticipants \|\| 0\) \|\| 0;/);
   assert.match(html, /if \(state\.resultsData\?\.groupView\?\.enabled === false\) \{[\s\S]*el\.resultGroupsSection\.hidden = true;[\s\S]*return;[\s\S]*\}/);
-  assert.match(html, /if \(participantCount >= 2\) renderResultClusterControls\(\);[\s\S]*if \(!groups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(groups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;/);
+  assert.match(html, /const RESULT_GROUP_COUNT = 2;/);
+  assert.match(html, /const visibleGroups = groups\.slice\(0, RESULT_GROUP_COUNT\);[\s\S]*if \(!visibleGroups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(visibleGroups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;[\s\S]*visibleGroups\.forEach/);
   assert.match(html, /function appendLoadingResult\(mount, message\)/);
   assert.match(html, /if \(state\.resultsLoading === true && !topicMap\) \{[\s\S]*appendLoadingResult\(el\.topicMapChart, 'Loading topic map\.\.\.'\);[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /resultsCache: new Map\(\)/);
@@ -407,8 +407,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultGroups"/);
   assert.match(html, /Analyze ' \+ group\.label/);
   assert.match(html, /Analyzing ' \+ group\.label \+ '\.\.\. ' \+ elapsedSeconds \+ 's elapsed'/);
-  assert.match(html, /function resultClusterOptionCounts\(\)[\s\S]*Math\.min\(5, Math\.floor\(participantCount \|\| 0\)\)/);
-  assert.match(html, /Array\.from\(\{ length: maxCount - 1 \}, \(_, index\) => index \+ 2\)/);
+  assert.match(html, /function resultClusterOptionCounts\(\)[\s\S]*state\.resultClusterCount = RESULT_GROUP_COUNT;[\s\S]*return \[\];/);
+  assert.equal(html.includes("label.textContent = 'Clusters';"), false);
   assert.match(html, /className = 'resultRow groupAnalysisResult'/);
   assert.match(html, /categoryId === 'contribution_role' && selected\.has\('other'\)/);
   assert.match(html, /fieldLabel\.textContent = 'Other role'/);
@@ -2992,7 +2992,7 @@ test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo togg
   assert.match(html, /setResultSectionOpen\('topicMap', el\.topicMapSection, el\.toggleTopicMapSection\);/);
   assert.match(html, /id="moreConsensusResults"/);
   assert.match(html, /id="moreDivisiveResults"/);
-  assert.match(html, /resultsUrl\.searchParams\.set\('clusters', String\(state\.resultClusterCount\)\)/);
+  assert.match(html, /resultsUrl\.searchParams\.set\('clusters', String\(RESULT_GROUP_COUNT\)\)/);
   assert.equal(html.includes('/telegram/mini-app/api/results-image'), false);
   assert.equal(html.includes('id="renderConsensusImage"'), false);
   assert.equal(html.includes('id="renderGroupImage"'), false);
