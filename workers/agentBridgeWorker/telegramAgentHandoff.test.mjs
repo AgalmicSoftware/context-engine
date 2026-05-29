@@ -1976,6 +1976,7 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
             prompt: 'Should Agent Village organizers publish a daily recap?',
             questionType: 'binary',
             tags: ['event'],
+            geoRefs: [{ geoId: 'edge-node-1', label: 'Agent Village recap' }],
           },
           {
             prompt: 'Should the demo prioritize organizer feedback?',
@@ -2004,6 +2005,16 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   const sourcedQuestion = questions.questions.find((question) => (
     question.prompt === 'Should Agent Village organizers publish a daily recap?'
   ));
+  const geoFilteredResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&tags=geo:edge-node-1&relevanceMode=filter'),
+    env,
+  });
+  const geoFiltered = await jsonBody(geoFilteredResponse);
+  const backlinkResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest(`/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(body.created[0].questionId)}`),
+    env,
+  });
+  const backlink = await jsonBody(backlinkResponse);
   const emptyResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions/create', {
       method: 'POST',
@@ -2036,19 +2047,62 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(body.created.length, 3);
   assert.equal(body.skipped.length, 0);
   assert.equal(body.created[0].references[0].url, sourceUrl);
+  assert.equal(body.created[0].geoRefs[0].geoId, 'edge-node-1');
+  assert.equal(body.created[0].tags.includes('geo:edge-node-1'), true);
   assert.equal(body.created[0].tags.includes('src:example-com'), true);
   assert.equal(proposedRecords.length, 3);
   assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
   assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
   assert.equal(proposedRecords.every((record) => record.actionMetadata.endpoint === '/telegram/agent/api/questions/create'), true);
   assert.equal(proposedRecords[0].references[0].url, sourceUrl);
+  assert.equal(proposedRecords[0].geoRefs[0].geoId, 'edge-node-1');
   assert.equal(sourcedQuestion.references[0].url, sourceUrl);
+  assert.equal(sourcedQuestion.geoRefs[0].geoId, 'edge-node-1');
   assert.equal(sourcedQuestion.tags.includes('src:example-com'), true);
+  assert.equal(sourcedQuestion.tags.includes('geo:edge-node-1'), true);
+  assert.equal(geoFilteredResponse.status, 200);
+  assert.deepEqual(geoFiltered.questions.map((question) => question.questionId), [body.created[0].questionId]);
+  assert.equal(backlinkResponse.status, 200);
+  assert.equal(backlink.backlink.questionId, body.created[0].questionId);
+  assert.equal(backlink.backlink.geoRefs[0].geoId, 'edge-node-1');
+  assert.equal(backlink.note.includes('does not call Geo'), true);
   assert.equal(JSON.stringify(body).includes('ceagt_'), false);
+  assert.equal(JSON.stringify(backlink).includes('EDGEOS'), false);
   assert.equal(emptyResponse.status, 400);
   assert.equal((await jsonBody(emptyResponse)).reason, 'questions_create_batch_required');
   assert.equal(oversizedResponse.status, 400);
   assert.equal((await jsonBody(oversizedResponse)).reason, 'questions_create_batch_too_large');
+});
+
+test('Telegram agent geo backlinks handle bytes32 question ids without secret false positives', async () => {
+  const questionId = `0x${'a'.repeat(64)}`;
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId,
+        questionType: 'binary',
+        prompt: 'Should a Geo-linked node use CE follow-up questions?',
+        geoRefs: [{ geoId: 'edge-node-bytes32' }],
+      },
+    ]),
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest(`/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(questionId)}`),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.backlink.questionId, questionId);
+  assert.equal(body.backlink.questionQuery.questionId, questionId);
+  assert.equal(body.backlink.questionEndpoint.includes(questionId), false);
+  assert.equal(body.backlink.geoRefs[0].geoId, 'edge-node-bytes32');
 });
 
 test('Telegram agent can propose Cloudflare-only groups for user approval', async () => {

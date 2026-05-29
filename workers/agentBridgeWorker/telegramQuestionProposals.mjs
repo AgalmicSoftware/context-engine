@@ -8,6 +8,9 @@ const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
 const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice']);
 const MAX_QUESTION_TAGS = 10;
 const MAX_QUESTION_TAG_LENGTH = 48;
+const MAX_QUESTION_GEO_REFS = 10;
+const MAX_QUESTION_GEO_ID_LENGTH = 96;
+const MAX_QUESTION_GEO_LABEL_LENGTH = 160;
 const TAG_STOP_WORDS = new Set([
   'about',
   'after',
@@ -160,6 +163,8 @@ function questionSourceTags(question = {}) {
     metadata.questionTags,
     payload.tags,
     payload.questionTags,
+    geoTagsFromRefs(firstString(question.geoId, metadata.geoId, payload.geoId)),
+    geoTagsFromRefs(question.geoRefs || question.geoIds || metadata.geoRefs || metadata.geoIds || payload.geoRefs || payload.geoIds),
   ];
 }
 
@@ -269,6 +274,41 @@ export function normalizeQuestionReferences(value = []) {
   return references.slice(0, 5);
 }
 
+export function normalizeGeoId(value = '') {
+  return safeString(value)
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Za-z0-9:_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, MAX_QUESTION_GEO_ID_LENGTH);
+}
+
+export function normalizeQuestionGeoRefs(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\n,;|]+/);
+  const seen = new Set();
+  const refs = [];
+  source.forEach((entry) => {
+    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? entry
+      : { geoId: entry };
+    const geoId = normalizeGeoId(firstString(raw.geoId, raw.id, raw.nodeId, raw.value));
+    if (!geoId || seen.has(geoId)) return;
+    seen.add(geoId);
+    const ref = { geoId };
+    const label = safeString(raw.label || raw.title || raw.name).replace(/\s+/g, ' ').slice(0, MAX_QUESTION_GEO_LABEL_LENGTH);
+    if (label) ref.label = label;
+    const url = normalizeReferenceUrl(raw.url || raw.href);
+    if (url) ref.url = url;
+    refs.push(ref);
+  });
+  return refs.slice(0, MAX_QUESTION_GEO_REFS);
+}
+
+export function geoTagsFromRefs(value = []) {
+  return normalizeQuestionGeoRefs(value).map((ref) => `geo:${normalizeQuestionTag(ref.geoId)}`).filter(Boolean);
+}
+
 function proposedQuestionPrefix(sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${PROPOSED_QUESTION_KV_PREFIX}${slug}:` : '';
@@ -299,6 +339,7 @@ function proposedRecordToQuestion(record = {}) {
   const questionType = normalizeQuestionType(record.questionType);
   const tags = normalizeQuestionTags(record.tags);
   const references = normalizeQuestionReferences(record.references);
+  const geoRefs = normalizeQuestionGeoRefs(record.geoRefs || record.geoIds || record.geoId);
   const question = {
     questionId,
     id: questionId,
@@ -316,6 +357,7 @@ function proposedRecordToQuestion(record = {}) {
   if (options.length) question.options = options;
   if (tags.length) question.tags = tags;
   if (references.length) question.references = references;
+  if (geoRefs.length) question.geoRefs = geoRefs;
   return question;
 }
 
@@ -328,6 +370,7 @@ export async function persistTelegramProposedQuestion({
   options = [],
   tags = [],
   references = [],
+  geoRefs = [],
   sessionContext = '',
   metadata = null,
   createdAt = null,
@@ -338,12 +381,16 @@ export async function persistTelegramProposedQuestion({
   const type = normalizeQuestionType(questionType);
   const normalizedOptions = normalizeOptions(options);
   const normalizedReferences = normalizeQuestionReferences(references);
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const normalizedSessionContext = normalizeSessionContext(sessionContext);
   const normalizedTags = inferQuestionTags({
     prompt: promptText,
     questionType: type,
     options: normalizedOptions,
-    explicitTags: tags,
+    explicitTags: [
+      ...geoTagsFromRefs(normalizedGeoRefs),
+      ...(Array.isArray(tags) ? tags : normalizeQuestionTags(tags)),
+    ],
     sessionContext: normalizedSessionContext,
   });
   const prefix = proposedQuestionPrefix(slug);
@@ -370,6 +417,7 @@ export async function persistTelegramProposedQuestion({
     options: normalizedOptions,
     tags: normalizedTags,
     references: normalizedReferences,
+    geoRefs: normalizedGeoRefs,
     sessionContext: normalizedSessionContext || null,
     source: 'telegram_question_proposal',
     status: 'active',
@@ -458,6 +506,8 @@ export const __test__telegramQuestionProposals = {
   inferQuestionTags,
   normalizeQuestionTag,
   normalizeQuestionReferences,
+  normalizeGeoId,
+  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
   normalizeQuestionType,
   normalizeSessionContext,

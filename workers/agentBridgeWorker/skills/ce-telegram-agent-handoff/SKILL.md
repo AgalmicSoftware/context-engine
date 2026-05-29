@@ -279,7 +279,7 @@ GET /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupCh
 POST /telegram/agent/api/questions
 ```
 
-Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped. Public question objects include normalized `tags`; use them when deciding relevance.
+Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped. Public question objects include normalized `tags` and, when present, `geoRefs`; use them when deciding relevance.
 
 For personalized question selection, send a POST body with preferences:
 
@@ -297,7 +297,7 @@ For personalized question selection, send a POST body with preferences:
 }
 ```
 
-The `GET` endpoint also accepts `tags=<tag-a>,<tag-b>` and `relevanceMode=filter` when the caller only wants tag matches. The default `rank` mode returns all questions sorted by inferred relevance. Use `relevanceMode: "filter"` only when the user wants unrelated questions hidden. Relevance is inferred from explicit question tags, prompt text, selected session metadata, and attended-session hints.
+The `GET` endpoint also accepts `tags=<tag-a>,<tag-b>` and `relevanceMode=filter` when the caller only wants tag matches. Use `tags=geo:<geoId>&relevanceMode=filter` to find questions already linked to a Geo node. The default `rank` mode returns all questions sorted by inferred relevance. Use `relevanceMode: "filter"` only when the user wants unrelated questions hidden. Relevance is inferred from explicit question tags, prompt text, selected session metadata, and attended-session hints.
 
 For queue-driven reads, `POST /telegram/agent/api/questions/next` supports `sponsoredFirst` and `includeSponsored` so admin-selected sponsored questions can be served before the general queue.
 
@@ -440,6 +440,58 @@ The worker validates and persists the approved questions, adds a host-derived
 the normal pose/surfacing flow later if the user wants them posted into a
 Telegram group. Never auto-create questions before the user approves the exact
 list.
+
+## Geo Digest And Geo-Linked Questions
+
+The CE worker does not call Geo/EDGE_OS, does not store an `EDGEOS_BEARER_TOKEN`,
+and does not fetch Geo node content. A Geo-capable agent should use its own Geo
+tools and credentials, then pass only public node references into CE.
+
+When a user mentions a topic that maps to a Geo node:
+
+1. Look up existing CE questions for that node:
+
+```http
+GET /telegram/agent/api/questions?sessionSlug=<slug>&tags=geo:<geoId>&relevanceMode=filter
+```
+
+2. If a matching answerable question exists, phrase the user's natural-language
+   input as an editable draft response and save it with
+   `POST /telegram/agent/api/preferences`.
+3. If no good question exists and the topic is worth discussion, draft a short
+   CE question, show the exact question to the user/admin, and only create it
+   after approval with `geoRefs`:
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "questions": [
+    {
+      "prompt": "Should Agent Village publish a daily recap?",
+      "questionType": "binary",
+      "tags": ["agent-village"],
+      "geoRefs": [
+        { "geoId": "edge-node-1", "label": "Agent Village recap" }
+      ]
+    }
+  ]
+}
+```
+
+The worker stores `geoRefs` on the proposed question and adds a normalized
+`geo:<geoId>` tag, so later lookups can use the tag filter above. To post a CE
+backlink into Geo, call:
+
+```http
+GET /telegram/agent/api/geo-backlink?sessionSlug=<slug>&questionId=<id>&geoId=<geoId>
+POST /telegram/agent/api/geo-backlink
+```
+
+This endpoint only returns a CE backlink payload. The agent must post that
+payload to Geo using its own Geo credentials. On Geo content upload, the agent
+may pre-generate a small set of discussion questions, ask for approval, create
+the approved CE questions with `geoRefs`, and post the returned CE backlink
+payload to the corresponding Geo node.
 
 ## Read Aggregate Results
 

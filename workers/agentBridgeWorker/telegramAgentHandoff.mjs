@@ -19,8 +19,10 @@ import { buildResultsImage } from './resultImage.mjs';
 import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import { validateTelegramMiniAppInitData } from './telegramMiniApp.mjs';
 import {
+  geoTagsFromRefs,
   inferQuestionTags,
   normalizeQuestionReferences,
+  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
   persistTelegramProposedQuestion,
   sessionContextFromPolicySession,
@@ -364,6 +366,9 @@ function inputFromRequest(request, body = {}) {
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
     view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
+    questionId: safeString(body.questionId || url.searchParams.get('questionId')),
+    geoId: safeString(body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId')),
+    geoRefs: Object.hasOwn(body, 'geoRefs') ? body.geoRefs : (body.geoIds || url.searchParams.get('geoRefs') || url.searchParams.get('geoIds')),
   };
 }
 
@@ -385,6 +390,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/results-image') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/geo-backlink') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/status') {
@@ -784,6 +792,9 @@ function publicAgentQuestion(question = {}, {
   const questionType = safeString(question.questionType || question.type || 'freeform') || 'freeform';
   const options = Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [];
   const references = locked || unavailable ? [] : normalizeQuestionReferences(question.references);
+  const geoRefs = locked || unavailable
+    ? []
+    : normalizeQuestionGeoRefs(question.geoRefs || question.geoIds || question.geoId);
   const tags = locked || unavailable
     ? []
     : inferQuestionTags({
@@ -807,6 +818,7 @@ function publicAgentQuestion(question = {}, {
     proposed: question.proposed === true,
     source: safeString(question.source),
     references,
+    geoRefs,
   };
 }
 
@@ -955,6 +967,10 @@ async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil
 async function handleQuestionsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
   const ranked = rankQuestionsByPreferences(questions, input, context);
+  const requestedQuestionId = safeString(input.questionId);
+  const responseQuestions = requestedQuestionId
+    ? ranked.questions.filter((question) => safeString(question.questionId) === requestedQuestionId)
+    : ranked.questions;
   return json({
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -962,7 +978,7 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     questionSource: loaded.source || '',
     questionSourceReason: loaded.reason || '',
     relevance: ranked.relevance,
-    questions: ranked.questions,
+    questions: responseQuestions,
   });
 }
 
@@ -2654,6 +2670,17 @@ function referencesForCreatedQuestion(question = {}, batchSourceUrl = '') {
   }]);
 }
 
+function geoRefsForCreatedQuestion(question = {}, input = {}) {
+  return normalizeQuestionGeoRefs(
+    question.geoRefs ||
+    question.geoIds ||
+    question.geoId ||
+    input.geoRefs ||
+    input.geoIds ||
+    input.geoId
+  );
+}
+
 async function handleCreateQuestionsRequest({
   env = {},
   context = {},
@@ -2679,9 +2706,11 @@ async function handleCreateQuestionsRequest({
       continue;
     }
     const references = referencesForCreatedQuestion(question, batchSourceUrl);
+    const geoRefs = geoRefsForCreatedQuestion(question, input);
     const questionSourceUrl = references.find((reference) => reference.type === 'url')?.url || '';
     const sourceTag = sourceTagForUrl(questionSourceUrl || batchSourceUrl);
     const tags = normalizeQuestionTags([
+      ...geoTagsFromRefs(geoRefs),
       ...(Array.isArray(question.tags) ? question.tags : normalizeQuestionTags(question.tags)),
       ...(sourceTag ? [sourceTag] : []),
     ]);
@@ -2696,6 +2725,7 @@ async function handleCreateQuestionsRequest({
         options: question.options,
         tags,
         references,
+        geoRefs,
         sessionContext: question.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
         metadata: {
           source: 'agent_handoff',
@@ -2719,6 +2749,7 @@ async function handleCreateQuestionsRequest({
       questionType: saved.record.questionType,
       tags: saved.record.tags,
       references: saved.record.references || [],
+      geoRefs: saved.record.geoRefs || [],
     });
   }
   const payload = {
@@ -2728,6 +2759,51 @@ async function handleCreateQuestionsRequest({
     skipped,
   };
   assertNoSecretShape(payload, 'Telegram questions/create response must not serialize secrets.');
+  return json(payload);
+}
+
+async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const questionId = safeString(input.questionId);
+  if (!questionId) {
+    return json({ ok: false, reason: 'question_id_required' }, { status: 400 });
+  }
+  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const question = questions.find((candidate) => safeString(candidate.questionId) === questionId);
+  if (!question) {
+    return json({
+      ok: false,
+      reason: 'question_not_found',
+      sessionSlug: context.session.sessionSlug,
+      questionId,
+    }, { status: 404 });
+  }
+  const requestedGeoRefs = normalizeQuestionGeoRefs(input.geoRefs || input.geoId);
+  const existingGeoRefs = normalizeQuestionGeoRefs(question.geoRefs);
+  const geoRefs = requestedGeoRefs.length ? requestedGeoRefs : existingGeoRefs;
+  const worker = agentBridgePublicUrl(env);
+  const questionEndpoint = `${worker}/telegram/agent/api/questions`;
+  const payload = {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    questionId: question.questionId,
+    geoRefs,
+    backlink: {
+      type: 'context-engine-question',
+      source: 'context-engine',
+      sessionSlug: context.session.sessionSlug,
+      questionId: question.questionId,
+      questionEndpoint,
+      questionQuery: {
+        sessionSlug: context.session.sessionSlug,
+        questionId: question.questionId,
+      },
+      prompt: safeString(question.prompt).slice(0, 500),
+      tags: normalizeQuestionTags(question.tags),
+      geoRefs,
+    },
+    note: 'Post backlink with the agent Geo credentials. The CE worker does not call Geo or store Geo tokens.',
+  };
+  assertNoSecretShape(payload, 'Telegram geo-backlink response must not serialize secrets.');
   return json(payload);
 }
 
@@ -3022,6 +3098,7 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/onboarding',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
+    '/telegram/agent/api/geo-backlink',
   ].includes(url.pathname);
   const context = await resolveHandoffContext({
     env,
@@ -3104,6 +3181,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/results-image' && request.method === 'GET') {
     return handleResultsImageRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/geo-backlink' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleGeoBacklinkRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });
