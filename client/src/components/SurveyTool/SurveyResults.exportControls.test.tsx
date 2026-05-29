@@ -737,6 +737,65 @@ describe('SurveyResults export/view controls', () => {
     }
   });
 
+  it('routes the rendered download button through the export controller path', () => {
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      filterState: {},
+      isResponsesCacheReady: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      exportAreaOpen: true,
+      exportType: 'json-questions-and-responses',
+      alertMessage: '',
+      aggregateQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+      responses: [],
+      sbtFilteredResponses: [],
+    };
+    subject.getExportBaseFileName = jest.fn(() => 'contextEngine_questionResults');
+    subject.generateResultsJSON = jest.fn(() => '{"ok":true}');
+
+    const originalCreateObjectURL = window.URL.createObjectURL;
+    const createObjectURLMock = jest.fn(() => 'blob:test-export');
+    window.URL.createObjectURL = createObjectURLMock as any;
+    const appendChildSpy = jest.spyOn(document.body, 'appendChild');
+    const removeChildSpy = jest.spyOn(document.body, 'removeChild');
+    const originalCreateElement = document.createElement.bind(document);
+    const anchor = originalCreateElement('a');
+    const anchorClickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any) => (
+      String(tagName).toLowerCase() === 'a' ? anchor : originalCreateElement(tagName)
+    )) as any);
+
+    renderSubjectTree(subject);
+    fireEvent.click(screen.getByRole('button', { name: 'Download' }));
+
+    expect(subject.generateResultsJSON).toHaveBeenCalledTimes(1);
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(createObjectURLMock).toHaveBeenCalledTimes(1);
+    expect(anchor.getAttribute('href')).toBe('blob:test-export');
+    expect(anchor.getAttribute('download')).toMatch(/^contextEngine_questionResults_.*\.json$/);
+    expect(anchorClickSpy).toHaveBeenCalledTimes(1);
+    expect(appendChildSpy).toHaveBeenCalledWith(anchor);
+    expect(removeChildSpy).toHaveBeenCalledWith(anchor);
+
+    createElementSpy.mockRestore();
+    anchorClickSpy.mockRestore();
+    removeChildSpy.mockRestore();
+    appendChildSpy.mockRestore();
+    if (originalCreateObjectURL) {
+      window.URL.createObjectURL = originalCreateObjectURL;
+    } else {
+      delete (window.URL as any).createObjectURL;
+    }
+  });
+
   it('downloads question-only csv exports through the active download path', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',

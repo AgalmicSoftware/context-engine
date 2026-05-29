@@ -147,9 +147,11 @@ import {
 import {
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsExportControlsDisplayDescriptor,
-  buildSurveyResultsExportDownloadPlan,
-  buildSurveyResultsExportGenerationPlan,
 } from './surveyResultsExportDisplayHelpers.js';
+import {
+  runSurveyResultsBrowserDownload,
+  runSurveyResultsExportController,
+} from './surveyResultsExportController.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
@@ -3123,57 +3125,23 @@ return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questi
 downloadCSV = (): void => {
 const { exportType } = this.state;
 const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
-let fileContent = '';
 const baseFileName = this.getExportBaseFileName(exportType);
-const generationPlan = buildSurveyResultsExportGenerationPlan({
+runSurveyResultsExportController({
   baseFileName,
+  downloadFile: runSurveyResultsBrowserDownload,
   exportType,
+  generators: {
+    'questions-csv': this.generateQuestionsCSV,
+    'questions-json': this.generateQuestionsJSON,
+    'questions-responses-csv': this.generateResponsesCSV,
+    'questions-responses-json': this.generateResultsJSON,
+  },
+  getCurrentAlertMessage: () => this.state.alertMessage,
+  onAlertMessage: (message) => {
+    this.setState(buildSurveyResultsAlertMessagePatch(message));
+  },
   timestamp,
 });
-
-if (generationPlan.status === 'invalid') {
-  this.setState(buildSurveyResultsAlertMessagePatch(generationPlan.alertMessage));
-  return;
-}
-
-switch (generationPlan.generatorKey) {
-  case 'questions-csv':
-    fileContent = this.generateQuestionsCSV();
-    break;
-  case 'questions-responses-csv':
-    fileContent = this.generateResponsesCSV();
-    break;
-  case 'questions-json':
-    fileContent = this.generateQuestionsJSON();
-    break;
-  case 'questions-responses-json':
-    fileContent = this.generateResultsJSON();
-    break;
-  default:
-    this.setState(buildSurveyResultsAlertMessagePatch('Invalid export type selected.'));
-    return;
-}
-
-const downloadPlan = buildSurveyResultsExportDownloadPlan({
-  fileContent,
-  generationPlan,
-});
-if (downloadPlan.status === 'empty') {
-  if (!this.state.alertMessage) {
-    this.setState(buildSurveyResultsAlertMessagePatch(downloadPlan.alertMessage));
-  }
-  return;
-}
-
-const blob = new Blob([downloadPlan.fileContent], { type: downloadPlan.mimeType });
-const url = window.URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.setAttribute('hidden', '');
-a.setAttribute('href', url);
-a.setAttribute('download', downloadPlan.filename);
-document.body.appendChild(a);
-a.click();
-document.body.removeChild(a);
 };
 
 handleExportTypeChange = (type: unknown): void => {
