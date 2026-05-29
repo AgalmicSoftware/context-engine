@@ -7926,8 +7926,15 @@ export class SurveyQuestions extends Component {
       });
       return;
     }
-    this._submitGuard = true;
-    this.encryptAndUpload();
+    runSurveyQuestionsSubmitController({
+      plan,
+      ports: {
+        dispatchSubmit: () => {
+          this._submitGuard = true;
+          this.encryptAndUpload();
+        },
+      },
+    });
   };
 
   getQuestionsJson = () => {
