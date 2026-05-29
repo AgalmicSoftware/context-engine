@@ -21,7 +21,12 @@ import {
   resolveSessionWorkerUrl,
   submitTelegramResponseOnChain,
 } from './onChainResponses.mjs';
-import { buildOpaqueActionId, createTelegramCallbackAction, parseOpaqueActionId } from './opaqueActions.mjs';
+import {
+  buildOpaqueActionId,
+  createRandomTelegramStartAction,
+  createTelegramCallbackAction,
+  parseOpaqueActionId,
+} from './opaqueActions.mjs';
 import {
   buildTelegramAgentSettingsEditState,
   buildTelegramAgentSettingsOverviewState,
@@ -43,6 +48,7 @@ import {
   telegramSubmitQueueEnabled,
 } from './telegramSubmitQueue.mjs';
 import { buildResultsImage } from './resultImage.mjs';
+import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import {
   listTelegramLightweightGroupMemberships,
   loadTelegramLightweightGroups,
@@ -63,9 +69,17 @@ import {
 } from './telegramAgentSettings.mjs';
 import { listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import {
+  addResponseExportAllowedAddress,
+  buildTelegramResponseExportArchive,
   canExportResponsesForTelegramUser,
   canManageResponseExportAllowlist,
+  listResponseExportAccess,
+  removeResponseExportAllowedAddress,
 } from './telegramResponseExport.mjs';
+import {
+  loadTelegramQuestionQueueConfig,
+  saveTelegramQuestionQueueConfig,
+} from './telegramQuestionQueue.mjs';
 import {
   analyzeParticipantResultGroup,
   buildLocalUrlQuestionCandidates,
@@ -92,6 +106,7 @@ import {
   normalizeGeneratedQuestionCandidates,
   bridgeOpenAiApiKey,
   withBridgeOpenAiApiKey,
+  writeResultsExposureOverride,
 } from './telegramCommands.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 import {
@@ -117,6 +132,12 @@ const DEFAULT_MINI_APP_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
+const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
+const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
+  published_questions: 'publishedQuestionsEnabled',
+  aggregate_results: 'aggregateResultsEnabled',
+  anonymized_groups: 'anonymizedGroupsEnabled',
+});
 const MINI_APP_DOCUMENT_IMAGE_TYPES = new Set(['png', 'jpg', 'jpeg', 'webp']);
 const MINI_APP_DOCUMENT_PREVIEW_TYPES = new Set(['pdf', ...MINI_APP_DOCUMENT_IMAGE_TYPES]);
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -184,6 +205,15 @@ function normalizePositiveInteger(value, fallback) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw <= 0) return fallback;
   return Math.floor(raw);
+}
+
+function normalizeResultBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (value === true || value === false) return value;
+  const normalized = lower(value);
+  if (['true', '1', 'yes', 'on', 'enabled'].includes(normalized)) return true;
+  if (['false', '0', 'no', 'off', 'disabled'].includes(normalized)) return false;
+  return fallback;
 }
 
 function normalizeMiniResultClusterCount(value, fallback = 3) {
@@ -470,6 +500,7 @@ async function buildMiniAppAdminState({
       { action: 'export_access', label: 'Manage permissions' },
       { action: 'results_settings', label: 'Results settings' },
       { action: 'question_queue', label: 'Question queue' },
+      { action: 'group_link', label: 'Add group link' },
       { action: 'export_allow', label: 'Add admin' },
       { action: 'export_revoke', label: 'Remove admin' },
     ],
@@ -2910,6 +2941,346 @@ function miniAppPolicySessionForContext(context = {}) {
     {};
 }
 
+function normalizeMiniAppEthAddress(value = '') {
+  const address = safeString(value).toLowerCase();
+  return /^0x[0-9a-f]{40}$/.test(address) ? address : '';
+}
+
+function miniAppAdminBotCommands(sessionSlug = '', address = '0x...') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const addr = safeString(address) || '0x...';
+  return {
+    exportAccess: `/export_access ${slug}`,
+    exportAllow: `/export_allow ${addr} ${slug}`,
+    exportRevoke: `/export_revoke ${addr} ${slug}`,
+    resultsSettings: 'Admin Actions -> Results Settings',
+    questionQueue: `/question_queue 1 3 4 ${slug}`,
+  };
+}
+
+function miniAppResultsExposureState(session = {}) {
+  const exposure = miniResultsExposurePolicy(session);
+  return {
+    metricsEnabled: exposure.metricsEnabled,
+    publishedQuestionsEnabled: exposure.publishedQuestionsEnabled,
+    aggregateResultsEnabled: exposure.aggregateResultsEnabled,
+    anonymizedGroupsEnabled: exposure.anonymizedGroupsEnabled,
+    minGroupSize: exposure.minGroupSize,
+  };
+}
+
+function telegramAddBotToGroupUrl(env = {}, payload = '') {
+  const username = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
+  const token = safeString(payload);
+  return username && token
+    ? `https://t.me/${username}?startgroup=${encodeURIComponent(token)}`
+    : '';
+}
+
+async function resolveMiniAppAdminContext({
+  request,
+  env = {},
+  body = {},
+  requireManage = true,
+  requireExport = false,
+} = {}) {
+  const context = await resolveMiniAppResultsContext({ request, env, body });
+  if (!context.ok) return context;
+  const normalized = miniAppTelegramPrincipal(context.auth);
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session: context.session,
+  }).catch((error) => ({
+    ok: false,
+    reason: safeString(error?.message || error) || 'response_export_admin_required',
+    accountAddress: '',
+  }));
+  const exporter = manager.ok
+    ? {
+      ok: true,
+      accountAddress: manager.accountAddress,
+      account: manager.account,
+      rootAdmin: manager.rootAdmin === true,
+    }
+    : await canExportResponsesForTelegramUser({
+      env,
+      normalized,
+      session: context.session,
+    }).catch((error) => ({
+      ok: false,
+      reason: safeString(error?.message || error) || 'response_export_address_not_allowed',
+      accountAddress: safeString(manager.accountAddress),
+    }));
+  if (requireManage && !manager.ok) {
+    return {
+      ok: false,
+      status: 403,
+      error: manager.reason || 'response_export_admin_required',
+      accountAddress: manager.accountAddress || exporter.accountAddress || '',
+    };
+  }
+  if (requireExport && !manager.ok && !exporter.ok) {
+    return {
+      ok: false,
+      status: 403,
+      error: exporter.reason || 'response_export_address_not_allowed',
+      accountAddress: exporter.accountAddress || manager.accountAddress || '',
+    };
+  }
+  return {
+    ...context,
+    normalized,
+    manager,
+    exporter,
+  };
+}
+
+async function miniAppAdminAccessPayload({
+  env = {},
+  session = {},
+  address = '',
+  result = null,
+} = {}) {
+  const access = await listResponseExportAccess({ env, session });
+  const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
+  return {
+    ok: true,
+    sessionSlug,
+    address: normalizeMiniAppEthAddress(address),
+    access: {
+      configuredAdmins: access.configuredAdmins,
+      additionalAdmins: access.additionalExporters,
+      allAdmins: access.allAllowedAddresses,
+    },
+    botCommands: miniAppAdminBotCommands(sessionSlug, address || '0x...'),
+    result,
+  };
+}
+
+async function handleAdminAccessRequest({
+  request,
+  env = {},
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  const url = new URL(request.url);
+  const rawAddress = safeString(body.address || url.searchParams.get('address'));
+  const operation = lower(body.operation || body.action || url.searchParams.get('operation') || url.searchParams.get('action'));
+  if (request.method === 'GET' || !operation) {
+    return json(await miniAppAdminAccessPayload({ env, session: context.session, address: rawAddress }));
+  }
+  const address = normalizeMiniAppEthAddress(rawAddress);
+  if (!address) return json({ ok: false, error: 'response_export_invalid_address' }, { status: 400 });
+  const result = operation === 'remove' || operation === 'revoke'
+    ? await removeResponseExportAllowedAddress({
+      env,
+      normalized: context.normalized,
+      session: context.session,
+      address,
+    })
+    : await addResponseExportAllowedAddress({
+      env,
+      normalized: context.normalized,
+      session: context.session,
+      address,
+    });
+  if (!result.ok) return json({ ok: false, error: result.reason || 'response_export_access_update_failed', result }, { status: 400 });
+  return json(await miniAppAdminAccessPayload({ env, session: context.session, address, result }));
+}
+
+async function handleAdminResultsSettingsRequest({
+  request,
+  env = {},
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  let result = null;
+  if (request.method === 'POST') {
+    const source = body.resultsExposure && typeof body.resultsExposure === 'object' && !Array.isArray(body.resultsExposure)
+      ? body.resultsExposure
+      : body;
+    const patch = {};
+    for (const field of Object.values(MINI_APP_RESULTS_EXPOSURE_FIELDS)) {
+      if (Object.hasOwn(source, field)) patch[field] = normalizeResultBoolean(source[field], field === 'aggregateResultsEnabled');
+    }
+    if (Object.hasOwn(source, 'minGroupSize')) {
+      patch.minGroupSize = normalizePositiveInteger(source.minGroupSize, context.session.resultsExposure?.minGroupSize || 2);
+    }
+    if (Object.keys(patch).length) {
+      result = await writeResultsExposureOverride({
+        env,
+        session: context.session,
+        patch,
+      });
+      if (!result.ok) return json({ ok: false, error: result.reason || 'results_exposure_update_failed' }, { status: 400 });
+      context.session = {
+        ...context.session,
+        resultsExposure: {
+          ...(context.session.resultsExposure || {}),
+          ...(result.resultsExposure || {}),
+        },
+      };
+    }
+  }
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    resultsExposure: miniAppResultsExposureState(context.session),
+    botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
+    result,
+  });
+}
+
+function miniAppQuestionPrompt(question = {}) {
+  return safeString(question.questionText || question.prompt || question.title || question.text || question.question);
+}
+
+function miniAppQuestionQueueCandidates(questions = []) {
+  return (Array.isArray(questions) ? questions : [])
+    .filter((question) => readQuestionId(question) && miniAppQuestionPrompt(question))
+    .map((question, index) => ({
+      questionId: readQuestionId(question),
+      ref: String(index + 1),
+      shortId: shortQuestionId(readQuestionId(question)),
+      prompt: miniAppQuestionPrompt(question),
+    }));
+}
+
+function resolveMiniAppQuestionQueueIds(value = [], candidates = []) {
+  const tokens = (Array.isArray(value) ? value : safeString(value).split(/[\n,;| ]+/))
+    .map(safeString)
+    .filter(Boolean);
+  const ids = [];
+  const skipped = [];
+  tokens.forEach((token) => {
+    const match = candidates.find((candidate) => (
+      token === candidate.ref ||
+      lower(token) === lower(candidate.questionId) ||
+      lower(token) === lower(candidate.shortId)
+    ));
+    if (!match) {
+      skipped.push(token);
+      return;
+    }
+    if (!ids.includes(match.questionId)) ids.push(match.questionId);
+  });
+  return { ids, skipped };
+}
+
+async function handleAdminQuestionQueueRequest({
+  request,
+  env = {},
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  const loaded = await loadQuestionsForSession(env, context.session.sessionSlug);
+  const candidates = miniAppQuestionQueueCandidates(loaded.questions);
+  let skipped = [];
+  let result = null;
+  if (request.method === 'POST') {
+    const clear = ['clear', 'reset', 'none'].includes(lower(body.operation || body.action));
+    const requested = clear ? { ids: [], skipped: [] } : resolveMiniAppQuestionQueueIds(
+      body.sponsoredQuestionIds || body.questionIds || body.refs || '',
+      candidates
+    );
+    skipped = requested.skipped;
+    if (!clear && !requested.ids.length) {
+      return json({ ok: false, error: 'question_queue_no_matching_questions', skipped, candidates }, { status: 400 });
+    }
+    result = await saveTelegramQuestionQueueConfig({
+      env,
+      sessionSlug: context.session.sessionSlug,
+      sponsoredQuestionIds: requested.ids,
+      updatedByTelegramUserId: context.auth.user?.telegramUserId,
+      updatedByAccountAddress: context.manager.accountAddress,
+    });
+    if (!result.ok) return json({ ok: false, error: result.reason || 'question_queue_save_failed' }, { status: 400 });
+  }
+  const config = result?.config || await loadTelegramQuestionQueueConfig({ env, sessionSlug: context.session.sessionSlug });
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    questionQueue: {
+      sponsoredQuestionIds: config.sponsoredQuestionIds || [],
+      source: config.source || '',
+    },
+    candidates,
+    skipped,
+    botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
+  });
+}
+
+async function handleAdminExportRequest({
+  request,
+  env = {},
+} = {}) {
+  const context = await resolveMiniAppAdminContext({ request, env, body: {}, requireManage: false, requireExport: true });
+  if (!context.ok) return json({ ok: false, error: context.error || 'response_export_access_denied' }, { status: context.status || 403 });
+  const archive = await buildTelegramResponseExportArchive({
+    env,
+    normalized: context.normalized,
+    session: context.session,
+  });
+  if (!archive.ok) return json({ ok: false, error: archive.reason || 'response_export_failed', archive }, { status: 400 });
+  return new Response(archive.document.bytes, {
+    status: 200,
+    headers: {
+      'content-type': archive.document.contentType || 'application/zip',
+      'cache-control': 'no-store',
+      'content-disposition': `attachment; filename="${archive.document.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+      'x-ce-export-payload-count': String(archive.exportedPayloadCount || 0),
+      'x-ce-export-submit-count': String(archive.submitRecordCount || 0),
+    },
+  });
+}
+
+async function handleAdminGroupLinkRequest({
+  request,
+  env = {},
+} = {}) {
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
+  if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
+  if (request.method !== 'POST') {
+    return json({
+      ok: true,
+      sessionSlug: context.session.sessionSlug,
+      link: '',
+      botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
+    });
+  }
+  const expiresAt = new Date(Date.now() + MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS * 1000).toISOString();
+  const start = createRandomTelegramStartAction({
+    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: {
+      sessionSlug: context.session.sessionSlug,
+      approvedByTelegramUserId: context.auth.user?.telegramUserId,
+      approvedByAccountAddress: context.manager.accountAddress,
+    },
+    createdAt: new Date().toISOString(),
+    expiresAt,
+  });
+  await persistActionRecord(env, start.deepLinkPayload, {
+    ...start.record,
+    deepLinkPayload: start.deepLinkPayload,
+    oneUse: true,
+  }, { ttlSeconds: MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS });
+  const link = telegramAddBotToGroupUrl(env, start.deepLinkPayload);
+  if (!link) return json({ ok: false, error: 'telegram_bot_username_missing' }, { status: 400 });
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    link,
+    expiresAt,
+    botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
+  });
+}
+
 function miniAppAuthoringPrincipal(context = {}) {
   const telegramUserId = safeString(context.auth?.user?.telegramUserId);
   const launchRef = context.launchRecord?.serverContextRef || {};
@@ -2947,6 +3318,7 @@ async function buildMiniAppResultsSummary({
   demo = false,
   filters = {},
   clusterCount = 3,
+  createdAt = new Date().toISOString(),
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug);
   const demoData = demo === true;
@@ -2996,6 +3368,27 @@ async function buildMiniAppResultsSummary({
       .map(miniResultQuestionRow)
     : [];
   const graph = buildParticipantGraph(records, questions, { clusterCount: resolvedClusterCount });
+  const rawTopicMap = await loadOrBuildTelegramTopicMap({
+    env,
+    session,
+    sessionSlug,
+    questions,
+    records,
+    demo: demoData,
+    variantKey: filteredLive.applied ? `filters:${JSON.stringify(normalizedFilters)}` : 'all',
+    generatedAt: createdAt,
+  });
+  const topicMap = exposure.aggregateResultsEnabled || demoData
+    ? rawTopicMap
+    : {
+      ...rawTopicMap,
+      availability: {
+        ...(rawTopicMap.availability || {}),
+        available: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      },
+      topics: [],
+    };
   const rawGroups = Array.isArray(graph.groups) ? graph.groups : [];
   const groupViewEnabled = exposure.anonymizedGroupsEnabled || demoData;
   const exposedGroups = groupViewEnabled
@@ -3051,6 +3444,13 @@ async function buildMiniAppResultsSummary({
       enabled: groupViewEnabled,
       groups: exposedGroups,
     },
+    topicMap: {
+      enabled: topicMap.availability.available,
+      counts: topicMap.counts,
+      cache: topicMap.cache,
+      topics: topicMap.availability.available ? topicMap.topics : [],
+      unavailableReason: topicMap.availability.available ? '' : topicMap.availability.reason,
+    },
   };
   return {
     ok: true,
@@ -3083,6 +3483,7 @@ async function buildMiniAppResultsSummary({
         : null,
     },
     groups: exposedGroups,
+    topicMap,
     publicSnapshot,
   };
 }
@@ -3101,7 +3502,7 @@ async function handleResultsRequest({
   if (!context.ok) {
     return json({ ok: false, error: context.error || 'results_unavailable' }, { status: context.status || 400 });
   }
-  const summary = await buildMiniAppResultsSummary({ env, session: context.session, demo, filters, clusterCount });
+  const summary = await buildMiniAppResultsSummary({ env, session: context.session, demo, filters, clusterCount, createdAt });
   if (request.method !== 'POST' || safeString(body.action || body.mode) !== 'analyze_group') {
     return json(summary);
   }
@@ -3227,7 +3628,10 @@ async function handleResultsImageRequest({
   env = {},
 } = {}) {
   const url = new URL(request.url);
-  const mode = lower(url.searchParams.get('mode')) === 'group' ? 'group' : 'consensus';
+  const modeParam = lower(url.searchParams.get('mode') || url.searchParams.get('view'));
+  const mode = ['group', 'topic', 'topic-map', 'topic_map'].includes(modeParam)
+    ? (modeParam === 'group' ? 'group' : 'topic-map')
+    : 'consensus';
   const resultSort = lower(url.searchParams.get('sort') || url.searchParams.get('variant')) === 'most_consensus'
     ? 'most_consensus'
     : 'most_difference';
@@ -3257,6 +3661,9 @@ async function handleResultsImageRequest({
   if (mode === 'consensus' && exposure.aggregateResultsEnabled !== true && !demo) {
     return json({ ok: false, error: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
   }
+  if (mode === 'topic-map' && exposure.aggregateResultsEnabled !== true && !demo) {
+    return json({ ok: false, error: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  }
   if (mode === 'group' && exposure.anonymizedGroupsEnabled !== true && !demo) {
     return json({ ok: false, error: 'level_4_anonymized_groups_admin_disabled' }, { status: 403 });
   }
@@ -3270,6 +3677,30 @@ async function handleResultsImageRequest({
       demo,
       participants: graph.participants,
       groups: graph.groups,
+    });
+  } else if (mode === 'topic-map') {
+    const topicMap = await loadOrBuildTelegramTopicMap({
+      env,
+      session: context.session,
+      sessionSlug: context.session.sessionSlug,
+      questions: imageQuestions,
+      records: imageRecords,
+      demo,
+      variantKey: Object.keys(filters || {}).length ? `filters:${JSON.stringify(filters)}` : 'all',
+    });
+    if (!topicMap.availability.available && !demo) {
+      return json({
+        ok: false,
+        error: topicMap.availability.reason || 'topic_map_not_enough_data',
+        topicMap,
+      }, { status: 409 });
+    }
+    image = buildResultsImage({
+      mode: 'topic-map',
+      sessionTitle: context.session.sessionName || context.session.sessionSlug,
+      responseCount: imageRecords.length,
+      demo,
+      topicMap,
     });
   } else {
     const binaryQuestions = consensusQuestionsForResults(imageQuestions);
@@ -5129,6 +5560,23 @@ function telegramMiniAppHtml() {
     .resultGroupChart text {
       font: 600 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
+    .resultTopicMap {
+      display: grid;
+      min-height: 240px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .resultTopicMap svg {
+      width: 100%;
+      height: auto;
+      min-height: 240px;
+      display: block;
+    }
+    .resultTopicMap text {
+      font: 650 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
     .documentItem, .adminCard, .activityCard {
       display: grid;
       gap: 4px;
@@ -5141,6 +5589,49 @@ function telegramMiniAppHtml() {
     }
     .documentItem strong, .adminCard strong, .activityCard strong { color: var(--text); }
     .documentItem span, .adminCard span, .activityCard span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .adminForm {
+      display: grid;
+      gap: 8px;
+      width: 100%;
+    }
+    .adminForm input[type="text"],
+    .adminForm input[type="number"],
+    .adminForm textarea {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      color: var(--text);
+      padding: 8px 10px;
+    }
+    .adminForm textarea {
+      min-height: 76px;
+      resize: vertical;
+    }
+    .adminForm label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .adminToggleRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 34px;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .adminCommand {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
     .documentPreviewButton {
       min-height: 0;
       border: 0;
@@ -5887,6 +6378,16 @@ function telegramMiniAppHtml() {
               </section>
             </div>
           </section>
+          <section class="resultSection collapsed" id="topicMapSection" aria-label="Topic map">
+            <button class="collapsibleHeader" id="toggleTopicMapSection" type="button" aria-expanded="false">
+              <span>Topic map</span>
+              <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+            <div class="collapsibleBody">
+              <div class="resultTopicMap" id="topicMapChart"></div>
+              <div class="filterSummary" id="topicMapSummary"></div>
+            </div>
+          </section>
         </div>
       </section>
       <section class="groupsPanel" id="groupsPanel" aria-label="Groups">
@@ -6103,6 +6604,7 @@ function telegramMiniAppHtml() {
         consensus: false,
         divisive: false,
         groups: false,
+        topicMap: false,
         groupAnalysis: false,
       },
       resultFilters: { selections: {}, details: {} },
@@ -6119,6 +6621,11 @@ function telegramMiniAppHtml() {
       documentsMessage: '',
       documentsSectionOpen: true,
       adminPanelMessage: '',
+      adminActiveAction: '',
+      adminAddress: '',
+      adminBusy: false,
+      adminData: null,
+      adminExportUrl: '',
       activityData: null,
       activityLoading: false,
       activityMessage: '',
@@ -6208,6 +6715,10 @@ function telegramMiniAppHtml() {
       toggleResultGroupsSection: document.getElementById('toggleResultGroupsSection'),
       resultClusterControls: document.getElementById('resultClusterControls'),
       resultGroupChart: document.getElementById('resultGroupChart'),
+      topicMapSection: document.getElementById('topicMapSection'),
+      toggleTopicMapSection: document.getElementById('toggleTopicMapSection'),
+      topicMapChart: document.getElementById('topicMapChart'),
+      topicMapSummary: document.getElementById('topicMapSummary'),
       groupAnalysisSection: document.getElementById('groupAnalysisSection'),
       toggleGroupAnalysisSection: document.getElementById('toggleGroupAnalysisSection'),
       resultsSummary: document.getElementById('resultsSummary'),
@@ -6308,6 +6819,7 @@ function telegramMiniAppHtml() {
       export_access: 'Manage permissions',
       results_settings: 'Results settings',
       question_queue: 'Question queue',
+      group_link: 'Add group link',
       export_allow: 'Add admin',
       export_revoke: 'Remove admin',
     };
@@ -8169,6 +8681,87 @@ function telegramMiniAppHtml() {
       });
       el.resultGroupChart.appendChild(svg);
     }
+    function renderTopicMap(topicMap) {
+      el.topicMapChart.innerHTML = '';
+      el.topicMapSummary.textContent = '';
+      const available = topicMap?.availability?.available === true;
+      if (!available) {
+        const reason = topicMap?.availability?.reason || 'not_enough_data';
+        appendEmptyResult(el.topicMapChart, reason === 'not_enough_responses'
+          ? 'Not enough responses for a topic map yet.'
+          : 'Not enough answered questions for a topic map yet.');
+        return;
+      }
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      const viewBox = topicMap.viewBox || { width: 720, height: 420 };
+      svg.setAttribute('viewBox', '0 0 ' + (viewBox.width || 720) + ' ' + (viewBox.height || 420));
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Topic map');
+      const make = (tag, attrs = {}) => {
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, String(value)));
+        return node;
+      };
+      const colors = [
+        ['rgba(92, 245, 180, 0.24)', '#5cf5b4'],
+        ['rgba(44, 195, 255, 0.22)', '#2cc3ff'],
+        ['rgba(255, 209, 102, 0.23)', '#ffd166'],
+        ['rgba(184, 162, 255, 0.22)', '#b8a2ff'],
+        ['rgba(255, 117, 102, 0.18)', '#ff7566'],
+      ];
+      svg.appendChild(make('rect', { x: 12, y: 12, width: (viewBox.width || 720) - 24, height: (viewBox.height || 420) - 24, rx: 16, fill: 'rgba(255,255,255,0.04)', stroke: 'rgba(255,255,255,0.12)' }));
+      (topicMap.topics || []).forEach((topic, index) => {
+        const color = colors[index % colors.length];
+        svg.appendChild(make('circle', {
+          cx: topic.x,
+          cy: topic.y,
+          r: topic.r,
+          fill: color[0],
+          stroke: color[1],
+          'stroke-width': 2,
+        }));
+        const label = make('text', {
+          x: topic.x,
+          y: topic.y - 8,
+          fill: '#eaf1ff',
+          'text-anchor': 'middle',
+        });
+        label.textContent = topic.label || ('Topic ' + (index + 1));
+        svg.appendChild(label);
+        const counts = make('text', {
+          x: topic.x,
+          y: topic.y + 14,
+          fill: 'rgba(234,241,255,0.68)',
+          'text-anchor': 'middle',
+        });
+        counts.textContent = (topic.questionCount || 0) + ' q / ' + (topic.responseCount || 0) + ' r';
+        svg.appendChild(counts);
+        (topic.questions || []).forEach((question) => {
+          svg.appendChild(make('circle', {
+            cx: question.x,
+            cy: question.y,
+            r: question.r || 8,
+            fill: '#f8faff',
+            stroke: color[1],
+            'stroke-width': 1.5,
+          }));
+          const qLabel = make('text', {
+            x: question.x,
+            y: question.y + 4,
+            fill: '#07101f',
+            'text-anchor': 'middle',
+          });
+          qLabel.textContent = question.label || '';
+          svg.appendChild(qLabel);
+        });
+      });
+      el.topicMapChart.appendChild(svg);
+      const cache = topicMap.cache?.status ? ' | ' + topicMap.cache.status : '';
+      el.topicMapSummary.textContent = (topicMap.counts?.topics || 0) + ' topics | ' +
+        (topicMap.counts?.answeredQuestions || 0) + ' answered questions | ' +
+        (topicMap.counts?.responses || 0) + ' responses' + cache;
+    }
     function renderResults() {
       const sessions = ensureResultsSessionSlug();
       const currentSession = sessions.find((session) => session.sessionSlug === state.resultsSessionSlug) || {};
@@ -8201,11 +8794,13 @@ function telegramMiniAppHtml() {
       setResultSectionOpen('consensus', el.consensusSection, el.toggleConsensusSection);
       setResultSectionOpen('divisive', el.divisiveSection, el.toggleDivisiveSection);
       setResultSectionOpen('groups', el.resultGroupsSection, el.toggleResultGroupsSection);
+      setResultSectionOpen('topicMap', el.topicMapSection, el.toggleTopicMapSection);
       setResultSectionOpen('groupAnalysis', el.groupAnalysisSection, el.toggleGroupAnalysisSection);
       renderResultFilterControls();
       renderResultRows(el.consensusResults, consensusRows, 'No binary question responses yet.', 'consensus', state.resultVisibleCounts.consensus, el.moreConsensusResults);
       renderResultRows(el.divisiveResults, divisiveRows, 'No divisive binary question responses yet.', 'divisive', state.resultVisibleCounts.divisive, el.moreDivisiveResults);
       renderResultGroups(state.resultsData?.groups || []);
+      renderTopicMap(state.resultsData?.topicMap || null);
     }
     function normalizeAdminActions(adminActions = []) {
       const source = Array.isArray(adminActions) && adminActions.length ? adminActions : DEFAULT_ADMIN_ACTIONS;
@@ -8223,6 +8818,348 @@ function telegramMiniAppHtml() {
         };
       }).filter(Boolean);
       return normalized.length ? normalized : DEFAULT_ADMIN_ACTIONS;
+    }
+    function activeAdminSessionSlug() {
+      return state.data?.admin?.sessionSlug || state.data?.session?.sessionSlug || state.resultsSessionSlug || '';
+    }
+    async function loadAdminData(action, { force = false } = {}) {
+      const sessionSlug = activeAdminSessionSlug();
+      if (!sessionSlug || (state.adminBusy && !force)) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      let path = '';
+      if (action === 'export_access' || action === 'export_allow' || action === 'export_revoke') path = '/telegram/mini-app/api/admin/access';
+      else if (action === 'results_settings') path = '/telegram/mini-app/api/admin/results-settings';
+      else if (action === 'question_queue') path = '/telegram/mini-app/api/admin/question-queue';
+      else if (action === 'group_link') path = '/telegram/mini-app/api/admin/group-link';
+      if (!path) {
+        state.adminBusy = false;
+        renderAdmin();
+        return;
+      }
+      try {
+        const url = new URL(path, location.origin);
+        url.searchParams.set('launch', launch);
+        url.searchParams.set('sessionSlug', sessionSlug);
+        const response = await fetch(url.pathname + url.search, { headers: headers() });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not load admin action: ' + (body.error || 'admin_action_failed');
+        } else {
+          state.adminData = body;
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not load admin action. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    async function submitAdminAccess(operation) {
+      const sessionSlug = activeAdminSessionSlug();
+      const address = String(state.adminAddress || '').trim();
+      if (!sessionSlug || !address) {
+        state.adminPanelMessage = 'Paste an address first.';
+        renderAdmin();
+        return;
+      }
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      try {
+        const response = await fetch('/telegram/mini-app/api/admin/access', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, sessionSlug, operation, address }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not update permissions: ' + (body.error || 'admin_access_update_failed');
+        } else {
+          state.adminData = body;
+          state.adminPanelMessage = operation === 'remove' ? 'Admin removed.' : 'Admin added.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not update permissions. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    async function submitAdminResultsSettings() {
+      const sessionSlug = activeAdminSessionSlug();
+      const settings = state.adminData?.resultsExposure || {};
+      if (!sessionSlug) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      try {
+        const response = await fetch('/telegram/mini-app/api/admin/results-settings', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, sessionSlug, resultsExposure: settings }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not save results settings: ' + (body.error || 'results_settings_save_failed');
+        } else {
+          state.adminData = body;
+          state.adminPanelMessage = 'Results settings saved.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not save results settings. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    async function submitAdminQuestionQueue(clear = false) {
+      const sessionSlug = activeAdminSessionSlug();
+      if (!sessionSlug) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      try {
+        const response = await fetch('/telegram/mini-app/api/admin/question-queue', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({
+            launch,
+            sessionSlug,
+            operation: clear ? 'clear' : 'set',
+            refs: clear ? [] : state.adminQuestionQueueRefs,
+          }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not save question queue: ' + (body.error || 'question_queue_save_failed');
+        } else {
+          state.adminData = body;
+          state.adminQuestionQueueRefs = (body.questionQueue?.sponsoredQuestionIds || []).join(' ');
+          state.adminPanelMessage = clear ? 'Question queue cleared.' : 'Question queue saved.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not save question queue. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    async function downloadAdminExport() {
+      const sessionSlug = activeAdminSessionSlug();
+      if (!sessionSlug) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = 'Preparing export...';
+      renderAdmin();
+      try {
+        const url = new URL('/telegram/mini-app/api/admin/export', location.origin);
+        url.searchParams.set('launch', launch);
+        url.searchParams.set('sessionSlug', sessionSlug);
+        const response = await fetch(url.pathname + url.search, { headers: headers() });
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          state.adminPanelMessage = 'Could not export data: ' + (body.error || 'response_export_failed');
+        } else {
+          const blob = await response.blob();
+          const href = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = href;
+          link.download = 'context-engine-' + sessionSlug + '-responses.zip';
+          link.click();
+          window.setTimeout(() => URL.revokeObjectURL(href), 5000);
+          state.adminPanelMessage = 'Export ready.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not export data. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    async function createAdminGroupLink() {
+      const sessionSlug = activeAdminSessionSlug();
+      if (!sessionSlug) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      try {
+        const response = await fetch('/telegram/mini-app/api/admin/group-link', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, sessionSlug }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not create group link: ' + (body.error || 'group_link_failed');
+        } else {
+          state.adminData = body;
+          state.adminPanelMessage = 'Group invite link created.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not create group link. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
+    function appendAdminActionPanel(sessionSlug) {
+      const action = state.adminActiveAction;
+      if (!action) return;
+      const panel = document.createElement('div');
+      panel.className = 'adminCard adminForm';
+      const heading = document.createElement('strong');
+      heading.textContent = ADMIN_ACTION_LABELS[action] || action;
+      panel.appendChild(heading);
+      if (state.adminBusy) {
+        const busy = document.createElement('span');
+        busy.textContent = 'Loading...';
+        panel.appendChild(busy);
+      }
+      if (action === 'export_all') {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary';
+        button.disabled = state.adminBusy;
+        button.textContent = state.adminBusy ? 'Preparing...' : 'Download response export';
+        button.onclick = downloadAdminExport;
+        const command = document.createElement('div');
+        command.className = 'adminCommand';
+        command.textContent = 'Bot command: /export_all ' + sessionSlug;
+        panel.append(button, command);
+      } else if (['export_access', 'export_allow', 'export_revoke'].includes(action)) {
+        const access = state.adminData?.access || {};
+        const inputLabel = document.createElement('label');
+        const inputText = document.createElement('span');
+        inputText.textContent = 'Wallet address';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.placeholder = '0x...';
+        input.value = state.adminAddress || '';
+        input.oninput = () => {
+          state.adminAddress = input.value;
+        };
+        inputLabel.append(inputText, input);
+        const row = document.createElement('div');
+        row.className = 'resultActions';
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'secondary';
+        add.disabled = state.adminBusy;
+        add.textContent = 'Add admin';
+        add.onclick = () => submitAdminAccess('add');
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'secondary';
+        remove.disabled = state.adminBusy;
+        remove.textContent = 'Remove admin';
+        remove.onclick = () => submitAdminAccess('remove');
+        row.append(add, remove);
+        const list = document.createElement('span');
+        const configured = (access.configuredAdmins || []).map(shortQuestionLabel).join(', ') || 'None';
+        const added = (access.additionalAdmins || []).map((entry) => shortQuestionLabel(entry.address || entry)).join(', ') || 'None';
+        list.textContent = 'Configured admins: ' + configured + ' | Added admins: ' + added;
+        const commands = document.createElement('div');
+        commands.className = 'adminCommand';
+        const address = state.adminAddress || '0x...';
+        commands.textContent = 'Bot commands: /export_allow ' + address + ' ' + sessionSlug + ' | /export_revoke ' + address + ' ' + sessionSlug;
+        panel.append(inputLabel, row, list, commands);
+      } else if (action === 'results_settings') {
+        const settings = state.adminData?.resultsExposure || {};
+        [
+          ['publishedQuestionsEnabled', 'Published questions visible'],
+          ['aggregateResultsEnabled', 'Aggregate results visible'],
+          ['anonymizedGroupsEnabled', 'Anonymized groups visible'],
+        ].forEach(([key, labelText]) => {
+          const row = document.createElement('label');
+          row.className = 'adminToggleRow';
+          const label = document.createElement('span');
+          label.textContent = labelText;
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.checked = settings[key] === true;
+          input.onchange = () => {
+            state.adminData.resultsExposure = state.adminData.resultsExposure || {};
+            state.adminData.resultsExposure[key] = input.checked;
+          };
+          row.append(label, input);
+          panel.appendChild(row);
+        });
+        const minLabel = document.createElement('label');
+        const minText = document.createElement('span');
+        minText.textContent = 'Minimum group size';
+        const minInput = document.createElement('input');
+        minInput.type = 'number';
+        minInput.min = '1';
+        minInput.max = '50';
+        minInput.value = String(settings.minGroupSize || 2);
+        minInput.oninput = () => {
+          state.adminData.resultsExposure = state.adminData.resultsExposure || {};
+          state.adminData.resultsExposure.minGroupSize = minInput.value;
+        };
+        minLabel.append(minText, minInput);
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'secondary';
+        save.disabled = state.adminBusy;
+        save.textContent = 'Save results settings';
+        save.onclick = submitAdminResultsSettings;
+        panel.append(minLabel, save);
+      } else if (action === 'question_queue') {
+        const queue = state.adminData?.questionQueue || {};
+        if (state.adminQuestionQueueRefs === undefined) {
+          state.adminQuestionQueueRefs = (queue.sponsoredQuestionIds || []).join(' ');
+        }
+        const label = document.createElement('label');
+        const labelText = document.createElement('span');
+        labelText.textContent = 'Sponsored question refs';
+        const input = document.createElement('textarea');
+        input.placeholder = '1 3 4';
+        input.value = state.adminQuestionQueueRefs || '';
+        input.oninput = () => {
+          state.adminQuestionQueueRefs = input.value;
+        };
+        label.append(labelText, input);
+        const row = document.createElement('div');
+        row.className = 'resultActions';
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'secondary';
+        save.disabled = state.adminBusy;
+        save.textContent = 'Save queue';
+        save.onclick = () => submitAdminQuestionQueue(false);
+        const clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'secondary';
+        clear.disabled = state.adminBusy;
+        clear.textContent = 'Clear queue';
+        clear.onclick = () => submitAdminQuestionQueue(true);
+        row.append(save, clear);
+        const candidates = document.createElement('span');
+        candidates.textContent = (state.adminData?.candidates || []).slice(0, 8)
+          .map((candidate) => candidate.ref + '. ' + candidate.prompt)
+          .join(' | ') || 'No questions loaded yet.';
+        const command = document.createElement('div');
+        command.className = 'adminCommand';
+        command.textContent = 'Bot command: /question_queue 1 3 4';
+        panel.append(label, row, candidates, command);
+      } else if (action === 'group_link') {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'secondary';
+        button.disabled = state.adminBusy;
+        button.textContent = state.adminData?.link ? 'Create another link' : 'Create add-bot-to-group link';
+        button.onclick = createAdminGroupLink;
+        panel.appendChild(button);
+        if (state.adminData?.link) {
+          const link = document.createElement('a');
+          link.href = state.adminData.link;
+          link.textContent = state.adminData.link;
+          link.target = '_blank';
+          link.rel = 'noreferrer';
+          panel.appendChild(link);
+        }
+      }
+      if (state.adminPanelMessage) {
+        const note = document.createElement('span');
+        note.textContent = state.adminPanelMessage;
+        panel.appendChild(note);
+      }
+      el.adminActions.appendChild(panel);
     }
     function renderAdmin() {
       const admin = state.data?.admin || {};
@@ -8244,35 +9181,30 @@ function telegramMiniAppHtml() {
       el.adminActions.innerHTML = '';
       const sessionSlug = admin.sessionSlug || state.data?.session?.sessionSlug || '';
       const adminActions = normalizeAdminActions(admin.actions);
-      const adminInstruction = (action) => ({
-        export_all: 'Use /export_all ' + sessionSlug + ' in the bot to export all responses.',
-        export_access: 'Use /export_access ' + sessionSlug + ' in the bot to review export access.',
-        results_settings: 'Open Admin Actions in the bot, then choose Results Settings for this session.',
-        question_queue: 'Use /question_queue 1 3 4 in the bot to set sponsored questions for this session.',
-        export_allow: 'Use /export_allow 0x... ' + sessionSlug + ' in the bot to add an export admin.',
-        export_revoke: 'Use /export_revoke 0x... ' + sessionSlug + ' in the bot to remove an export admin.',
-      })[action.action] || ('Use the bot Admin Actions screen for ' + (action.label || action.action) + '.');
       adminActions.forEach((action) => {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'secondary';
+        if (state.adminActiveAction === action.action) button.classList.add('active');
         button.dataset.action = action.action;
         button.textContent = action.label || action.action;
         button.setAttribute('aria-label', action.label || action.action);
         button.onclick = () => {
-          state.adminPanelMessage = adminInstruction(action);
+          const nextAction = ['export_allow', 'export_revoke'].includes(action.action) ? 'export_access' : action.action;
+          if (state.adminActiveAction !== nextAction) state.adminQuestionQueueRefs = undefined;
+          state.adminActiveAction = nextAction;
+          state.adminData = null;
+          state.adminPanelMessage = '';
+          if (state.adminActiveAction === 'export_all') {
+            renderAdmin();
+          } else {
+            loadAdminData(state.adminActiveAction, { force: true });
+          }
           renderAdmin();
         };
         el.adminActions.appendChild(button);
       });
-      if (state.adminPanelMessage) {
-        const note = document.createElement('div');
-        note.className = 'adminCard';
-        const text = document.createElement('span');
-        text.textContent = state.adminPanelMessage;
-        note.appendChild(text);
-        el.adminActions.appendChild(note);
-      }
+      appendAdminActionPanel(sessionSlug);
     }
     function shortQuestionLabel(value) {
       const text = String(value || '').trim();
@@ -9730,6 +10662,10 @@ function telegramMiniAppHtml() {
       state.resultSectionsOpen.groups = !state.resultSectionsOpen.groups;
       renderResults();
     };
+    el.toggleTopicMapSection.onclick = () => {
+      state.resultSectionsOpen.topicMap = !state.resultSectionsOpen.topicMap;
+      renderResults();
+    };
     el.toggleGroupAnalysisSection.onclick = () => {
       state.resultSectionsOpen.groupAnalysis = !state.resultSectionsOpen.groupAnalysis;
       renderResults();
@@ -9916,6 +10852,21 @@ export async function handleTelegramMiniAppRequest({
   }
   if (url.pathname === '/telegram/mini-app/api/activity' && request.method === 'GET') {
     return handleActivityRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/admin/access' && ['GET', 'POST'].includes(request.method)) {
+    return handleAdminAccessRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/admin/results-settings' && ['GET', 'POST'].includes(request.method)) {
+    return handleAdminResultsSettingsRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/admin/question-queue' && ['GET', 'POST'].includes(request.method)) {
+    return handleAdminQuestionQueueRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/admin/export' && request.method === 'GET') {
+    return handleAdminExportRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/mini-app/api/admin/group-link' && ['GET', 'POST'].includes(request.method)) {
+    return handleAdminGroupLinkRequest({ request, env });
   }
   if (url.pathname === '/telegram/mini-app/api/results-image' && request.method === 'GET') {
     return handleResultsImageRequest({ request, env });

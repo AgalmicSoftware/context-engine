@@ -13,6 +13,8 @@ const PILL_BG = [249, 251, 255, 255];
 const SOFT_GREEN = [229, 248, 236, 255];
 const SOFT_BLUE = [232, 243, 255, 255];
 const SOFT_YELLOW = [255, 247, 226, 255];
+const SOFT_PURPLE = [243, 236, 255, 255];
+const SOFT_RED = [255, 238, 236, 255];
 const AGREE_GREEN = [18, 181, 105, 255];
 const UNSURE_YELLOW = [245, 181, 0, 255];
 const DISAGREE_RED = [255, 68, 61, 255];
@@ -21,6 +23,13 @@ const GROUP_COLORS = Object.freeze([
   [255, 159, 28, 255],
   [22, 163, 74, 255],
   [168, 85, 247, 255],
+]);
+const TOPIC_COLORS = Object.freeze([
+  { fill: SOFT_GREEN, stroke: AGREE_GREEN },
+  { fill: SOFT_BLUE, stroke: BLUE },
+  { fill: SOFT_YELLOW, stroke: ORANGE },
+  { fill: SOFT_PURPLE, stroke: GROUP_COLORS[3] },
+  { fill: SOFT_RED, stroke: DISAGREE_RED },
 ]);
 
 const FONT = Object.freeze({
@@ -500,6 +509,126 @@ function drawParticipantGraph(pixels, width, participants = [], groups = []) {
   });
 }
 
+function demoTopicMap() {
+  return {
+    availability: { available: true },
+    counts: { responses: 24, topics: 4 },
+    topics: [
+      {
+        label: 'Onboarding',
+        x: 360,
+        y: 210,
+        r: 96,
+        questionCount: 3,
+        responseCount: 8,
+        questions: [
+          { label: 'Q1', x: 350, y: 154, r: 13, responseCount: 4 },
+          { label: 'Q2', x: 416, y: 213, r: 12, responseCount: 3 },
+          { label: 'Q3', x: 331, y: 261, r: 10, responseCount: 1 },
+        ],
+      },
+      {
+        label: 'Privacy',
+        x: 205,
+        y: 165,
+        r: 82,
+        questionCount: 2,
+        responseCount: 6,
+        questions: [
+          { label: 'Q4', x: 188, y: 118, r: 12, responseCount: 3 },
+          { label: 'Q5', x: 243, y: 190, r: 12, responseCount: 3 },
+        ],
+      },
+      {
+        label: 'Agent UX',
+        x: 515,
+        y: 165,
+        r: 78,
+        questionCount: 2,
+        responseCount: 5,
+        questions: [
+          { label: 'Q6', x: 500, y: 120, r: 12, responseCount: 3 },
+          { label: 'Q7', x: 553, y: 188, r: 10, responseCount: 2 },
+        ],
+      },
+      {
+        label: 'Results',
+        x: 360,
+        y: 325,
+        r: 74,
+        questionCount: 2,
+        responseCount: 5,
+        questions: [
+          { label: 'Q8', x: 335, y: 283, r: 11, responseCount: 2 },
+          { label: 'Q9', x: 399, y: 342, r: 12, responseCount: 3 },
+        ],
+      },
+    ],
+  };
+}
+
+function drawTopicCircle(pixels, width, topic = {}, index = 0) {
+  const palette = TOPIC_COLORS[index % TOPIC_COLORS.length];
+  const x = Math.round(Number(topic.x || 0));
+  const y = Math.round(Number(topic.y || 0));
+  const r = Math.max(30, Math.round(Number(topic.r || 60)));
+  fillCircle(pixels, width, x, y, r, palette.fill);
+  strokeCircle(pixels, width, x, y, r, palette.stroke);
+  const label = String(topic.label || `Topic ${index + 1}`).slice(0, 18);
+  const labelScale = label.length > 12 ? 2 : 3;
+  drawText(
+    pixels,
+    width,
+    label,
+    x - Math.round(textPixelWidth(label, labelScale) / 2),
+    y - 18,
+    labelScale,
+    BLACK
+  );
+  const countText = `${Number(topic.questionCount || 0)} Q / ${Number(topic.responseCount || 0)} R`;
+  drawText(pixels, width, countText, x - Math.round(textPixelWidth(countText, 2) / 2), y + 12, 2, SLATE);
+  (Array.isArray(topic.questions) ? topic.questions : []).slice(0, 6).forEach((question) => {
+    const qx = Math.round(Number(question.x || x));
+    const qy = Math.round(Number(question.y || y));
+    const qr = Math.max(6, Math.round(Number(question.r || 9)));
+    fillCircle(pixels, width, qx, qy, qr, WHITE);
+    strokeCircle(pixels, width, qx, qy, qr, palette.stroke);
+    const qLabel = String(question.label || '').slice(0, 3);
+    if (qLabel) drawText(pixels, width, qLabel, qx - 11, qy - 7, 1, BLACK);
+  });
+}
+
+function drawTopicMap(pixels, width, topicMap = {}) {
+  const source = topicMap?.availability?.available ? topicMap : demoTopicMap();
+  if (topicMap?.availability && topicMap.availability.available === false) {
+    drawText(pixels, width, 'NOT ENOUGH DATA FOR TOPIC MAP', 80, 260, 3, BLACK);
+    drawText(pixels, width, 'NEEDS ANSWERED QUESTIONS AND RESPONSES', 80, 304, 2, SLATE);
+    return;
+  }
+  drawText(pixels, width, 'ANSWERED QUESTION TOPICS', 58, 140, 2, SLATE);
+  const frameX = 58;
+  const frameY = 172;
+  const frameW = WIDTH - 116;
+  const frameH = 430;
+  fillRoundRect(pixels, width, frameX, frameY, frameW, frameH, 12, WHITE);
+  strokeRect(pixels, width, frameX, frameY, frameW, frameH, CARD_BORDER);
+  const sx = frameW / 720;
+  const sy = frameH / 420;
+  const scaledTopics = (Array.isArray(source.topics) ? source.topics : []).slice(0, 8).map((topic) => ({
+    ...topic,
+    x: frameX + Math.round(Number(topic.x || 0) * sx),
+    y: frameY + Math.round(Number(topic.y || 0) * sy),
+    r: Math.round(Number(topic.r || 60) * Math.min(sx, sy) * 0.88),
+    questions: (Array.isArray(topic.questions) ? topic.questions : []).map((question) => ({
+      ...question,
+      x: frameX + Math.round(Number(question.x || topic.x || 0) * sx),
+      y: frameY + Math.round(Number(question.y || topic.y || 0) * sy),
+      r: Math.round(Number(question.r || 9) * Math.min(sx, sy)),
+    })),
+  }));
+  scaledTopics.forEach((topic, index) => drawTopicCircle(pixels, width, topic, index));
+}
+
 function adler32(bytes) {
   let a = 1;
   let b = 0;
@@ -659,13 +788,14 @@ export function buildResultsImage({
   beeswarmRows = [],
   participants = [],
   groups = [],
+  topicMap = null,
 } = {}) {
   const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
   fillRect(pixels, WIDTH, 0, 0, WIDTH, HEIGHT, LIGHT_BG);
   fillRoundRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, 14, WHITE);
   strokeRect(pixels, WIDTH, 18, 18, WIDTH - 36, HEIGHT - 36, CARD_BORDER);
   drawResultsHeader(pixels, WIDTH, {
-    title: title || (mode === 'group' ? 'PARTICIPANTS' : 'CONSENSUS'),
+    title: title || (mode === 'group' ? 'PARTICIPANTS' : (mode === 'topic-map' ? 'TOPIC MAP' : 'CONSENSUS')),
     sessionTitle,
     responseCount,
     demo,
@@ -673,6 +803,8 @@ export function buildResultsImage({
 
   if (mode === 'group') {
     drawParticipantGraph(pixels, WIDTH, participants, groups);
+  } else if (mode === 'topic-map') {
+    drawTopicMap(pixels, WIDTH, topicMap || {});
   } else {
     drawBeeswarm(pixels, WIDTH, beeswarmRows);
   }
@@ -680,7 +812,7 @@ export function buildResultsImage({
 
   return {
     bytes: encodePng(pixels, WIDTH, HEIGHT),
-    filename: `context-engine-${mode === 'group' ? 'group' : 'consensus'}-results.png`,
+    filename: `context-engine-${mode === 'group' ? 'group' : (mode === 'topic-map' ? 'topic-map' : 'consensus')}-results.png`,
     contentType: 'image/png',
   };
 }

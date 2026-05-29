@@ -18,6 +18,7 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   const adminStatus = getAgentApiCapability('agent.telegram.admin.status');
   const queuePlan = getAgentApiCapability('agent.telegram.question_queue.plan');
   const queueApply = getAgentApiCapability('agent.telegram.question_queue.apply');
+  const topicMap = getAgentApiCapability('agent.telegram.results.topic_map');
 
   assert.equal(groupCapabilities.every((capability) => capability.groupSafe === true), true);
   assert.equal(groupCapabilities.some((capability) => capability.id === 'agent.actions.list'), true);
@@ -41,6 +42,9 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   assert.equal(queueApply.path, '/telegram/agent/api/question-queue/apply');
   assert.equal(queueApply.requiredFields.includes('approved or approvalText'), true);
   assert.equal(queueApply.groupSafe, false);
+  assert.equal(topicMap.path, '/telegram/agent/api/results');
+  assert.equal(topicMap.requiredFields.includes('sessionSlug'), true);
+  assert.equal(topicMap.groupSafe, false);
 });
 
 test('canonical request envelopes include catalog metadata and required field gaps', () => {

@@ -286,11 +286,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="adminPanel"[^>]*aria-label="Admin actions"/);
   assert.match(html, /id="closeAdmin"[^>]*aria-label="Close admin actions"/);
   assert.match(html, /el\.showAdmin\.onclick = \(\) => \{[\s\S]*state\.sessionsPanelOpen = false;[\s\S]*renderSessionPicker\(\);[\s\S]*renderAdmin\(\);[\s\S]*setPanelOpen\(el\.adminPanel, el\.showAdmin, true\);/);
-  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
+  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*group_link: 'Add group link'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
   assert.match(html, /function normalizeAdminActions\(adminActions = \[\]\)/);
+  assert.match(html, /function appendAdminActionPanel\(sessionSlug\)/);
+  assert.match(html, /\/telegram\/mini-app\/api\/admin\/access/);
+  assert.match(html, /\/telegram\/mini-app\/api\/admin\/results-settings/);
+  assert.match(html, /\/telegram\/mini-app\/api\/admin\/question-queue/);
   assert.match(html, /typeof action === 'string'/);
   assert.match(html, /button\.dataset\.action = action\.action;/);
-  assert.match(html, /Use \/export_allow 0x\.\.\. ' \+ sessionSlug/);
+  assert.match(html, /Bot commands: \/export_allow ' \+ address \+ ' ' \+ sessionSlug/);
   assert.match(toolMenu, /id="showActivity"[^>]*aria-label="Activity"[\s\S]*<span>Activity<\/span>/);
   assert.match(html, /id="activityPanel"[^>]*aria-label="Activity"/);
   assert.match(html, /id="closeActivity"[^>]*aria-label="Close activity"/);
@@ -1146,6 +1150,7 @@ test('Mini App exposes admin state only for configured export admin managed wall
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_allow'), true);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_revoke'), true);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('question_queue'), true);
+  assert.equal(adminState.admin.actions.map((action) => action.action).includes('group_link'), true);
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_all').label, 'Export data');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_access').label, 'Manage permissions');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'question_queue').label, 'Question queue');
@@ -1154,7 +1159,7 @@ test('Mini App exposes admin state only for configured export admin managed wall
   assert.equal(guestState.admin.reason, 'response_export_admin_required');
 });
 
-test('Mini App exposes export-only admin panel for added response exporters', async () => {
+test('Mini App treats dynamically added response addresses as admin-capable in the Mini App', async () => {
   const createdAt = '2026-05-25T12:00:00.000Z';
   const rootSecret = 'test-root-secret-for-mini-exporter';
   const exporterAccount = await deriveTelegramResponseExportAccount({
@@ -1186,9 +1191,104 @@ test('Mini App exposes export-only admin panel for added response exporters', as
   });
 
   assert.equal(state.admin.available, true);
-  assert.equal(state.admin.canManage, false);
+  assert.equal(state.admin.canManage, true);
   assert.equal(state.admin.accountAddress, exporterAccount.accountAddress.toLowerCase());
-  assert.deepEqual(state.admin.actions.map((action) => action.action), ['export_all']);
+  assert.equal(state.admin.actions.map((action) => action.action).includes('export_access'), true);
+  assert.equal(state.admin.actions.map((action) => action.action).includes('results_settings'), true);
+});
+
+test('Mini App admin endpoints manage permissions, results settings, queue, and group invite links', async () => {
+  const createdAt = '2026-05-25T12:00:00.000Z';
+  const rootSecret = 'test-root-secret-for-mini-admin-endpoints';
+  const adminAccount = await deriveTelegramResponseExportAccount({
+    env: { DEMO_SIGNER_ROOT_SECRET: rootSecret },
+    normalized: { telegramUserId: 'preview-user', user: { telegramUserId: 'preview-user' } },
+    createdAt,
+  });
+  const kv = new MemoryKv();
+  const env = {
+    AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: rootSecret,
+    TELEGRAM_BOT_USERNAME: 'contextengineer_bot',
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: adminAccount.accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q1', prompt: 'Should alpha start with sponsored questions?', questionType: 'agree_unsure_disagree' },
+      { questionId: 'q2', prompt: 'Should results be visible by default?', questionType: 'agree_unsure_disagree' },
+    ]),
+  };
+  const addedAddress = '0x2222222222222222222222222222222222222222';
+
+  const accessResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/admin/access?sessionSlug=alpha', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ operation: 'add', address: addedAddress }),
+    }),
+    env,
+  });
+  const accessBody = await accessResponse.json();
+  assert.equal(accessResponse.status, 200);
+  assert.equal(accessBody.ok, true);
+  assert.equal(accessBody.access.additionalAdmins.some((entry) => entry.address === addedAddress), true);
+  assert.equal(accessBody.botCommands.exportAllow, `/export_allow ${addedAddress} alpha`);
+
+  const settingsResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/admin/results-settings?sessionSlug=alpha', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        resultsExposure: {
+          aggregateResultsEnabled: false,
+          anonymizedGroupsEnabled: true,
+          minGroupSize: 3,
+        },
+      }),
+    }),
+    env,
+  });
+  const settingsBody = await settingsResponse.json();
+  assert.equal(settingsResponse.status, 200);
+  assert.equal(settingsBody.ok, true);
+  assert.equal(settingsBody.resultsExposure.aggregateResultsEnabled, false);
+  assert.equal(settingsBody.resultsExposure.anonymizedGroupsEnabled, true);
+  assert.equal(settingsBody.resultsExposure.minGroupSize, 3);
+
+  const queueResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/admin/question-queue?sessionSlug=alpha', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refs: '1 2' }),
+    }),
+    env,
+  });
+  const queueBody = await queueResponse.json();
+  assert.equal(queueResponse.status, 200);
+  assert.deepEqual(queueBody.questionQueue.sponsoredQuestionIds, ['q1', 'q2']);
+  assert.equal(queueBody.candidates.length, 2);
+
+  const linkResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/admin/group-link?sessionSlug=alpha', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({}),
+    }),
+    env,
+  });
+  const linkBody = await linkResponse.json();
+  assert.equal(linkResponse.status, 200);
+  assert.equal(linkBody.ok, true);
+  assert.match(linkBody.link, /^https:\/\/t\.me\/contextengineer_bot\?startgroup=cetg_/);
 });
 
 test('Mini App documents endpoint lists fixture docs and stores lightweight uploads', async () => {
@@ -1979,6 +2079,17 @@ test('Mini App results endpoint summarizes consensus, divisive questions, groups
   assert.equal(body.questions.divisive[0].questionId, 'q-divisive');
   assert.equal(body.questions.divisive[0].counts.Disagree, 1);
   assert.equal(body.groups.length > 0, true);
+  assert.equal(body.topicMap.availability.available, true);
+  assert.equal(body.topicMap.counts.answeredQuestions, 2);
+  assert.equal(body.topicMap.topics.length > 0, true);
+  assert.equal(body.publicSnapshot.topicMap.enabled, true);
+
+  const cachedResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results?sessionSlug=alpha&clusters=2'),
+    env,
+  });
+  const cachedBody = await cachedResponse.json();
+  assert.equal(cachedBody.topicMap.cache.status, 'hit');
 
   const analysisResponse = await handleTelegramMiniAppRequest({
     request: new Request('https://bridge.example/telegram/mini-app/api/results', {
@@ -2066,6 +2177,8 @@ test('Mini App results hides level 4 group views unless an admin enables anonymi
   assert.equal(body.groupView.reason, 'level_4_anonymized_groups_admin_disabled');
   assert.deepEqual(body.groups, []);
   assert.equal(body.publicSnapshot.aggregateResults.consensus.length > 0, true);
+  assert.equal(body.topicMap.availability.available, true);
+  assert.equal(body.publicSnapshot.topicMap.enabled, true);
   assert.equal(body.publicSnapshot.anonymizedGroups.enabled, false);
   assert.equal(body.viewLevels.find((level) => level.key === 'aggregate_results').enabled, true);
   assert.equal(body.viewLevels.find((level) => level.key === 'anonymized_groups').status, 'admin_can_enable');
@@ -2576,6 +2689,10 @@ test('Mini App exposes Cloudflare-managed group UX, collapsible cards, demo togg
   assert.match(html, /\/telegram\/mini-app\/api\/questions\/add/);
   assert.match(html, /id="resultGroupChart"/);
   assert.match(html, /id="resultClusterControls"/);
+  assert.match(html, /id="topicMapSection"[^>]*aria-label="Topic map"/);
+  assert.match(html, /id="topicMapChart"/);
+  assert.match(html, /function renderTopicMap\(topicMap\)/);
+  assert.match(html, /setResultSectionOpen\('topicMap', el\.topicMapSection, el\.toggleTopicMapSection\);/);
   assert.match(html, /id="moreConsensusResults"/);
   assert.match(html, /id="moreDivisiveResults"/);
   assert.match(html, /resultsUrl\.searchParams\.set\('clusters', String\(state\.resultClusterCount\)\)/);
@@ -3215,6 +3332,15 @@ test('Mini App group and image routes enforce Telegram-only and results exposure
 
   assert.equal(imageResponse.status, 403);
   assert.equal(imageBody.error, 'level_3_aggregate_results_admin_disabled');
+
+  const topicImageResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=topic-map'),
+    env: aggregateDisabledEnv,
+  });
+  const topicImageBody = await topicImageResponse.json();
+
+  assert.equal(topicImageResponse.status, 403);
+  assert.equal(topicImageBody.error, 'level_3_aggregate_results_admin_disabled');
 });
 
 test('Mini App results demo data and image endpoint render PNG previews', async () => {
@@ -3291,6 +3417,16 @@ test('Mini App results demo data and image endpoint render PNG previews', async 
   assert.equal(consensusImageResponse.status, 200);
   assert.equal(consensusImageResponse.headers.get('content-type'), 'image/png');
   assert.deepEqual(Array.from(consensusBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
+
+  const topicImageResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/results-image?sessionSlug=alpha&mode=topic-map&demo=1'),
+    env,
+  });
+  const topicBytes = new Uint8Array(await topicImageResponse.arrayBuffer());
+
+  assert.equal(topicImageResponse.status, 200);
+  assert.equal(topicImageResponse.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(topicBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 });
 
 test('Mini App live results can filter by saved lightweight group details', async () => {

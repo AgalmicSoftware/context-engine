@@ -3,10 +3,13 @@ import {
   buildTelegramCommandResponse,
   loadQuestionsForSession,
   loadSessionPolicy,
+  loadSubmittedResultRecords,
   persistAnswerDraft,
   readGroupSessionBinding,
   readPrivateSessionBinding,
 } from './telegramCommands.mjs';
+import { buildResultsImage } from './resultImage.mjs';
+import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import {
   inferQuestionTags,
   normalizeQuestionTags,
@@ -215,6 +218,8 @@ function inputFromRequest(request, body = {}) {
     sponsoredQuestions: Object.hasOwn(body, 'sponsoredQuestions') ? body.sponsoredQuestions : url.searchParams.get('sponsoredQuestions'),
     operation: safeString(body.operation || url.searchParams.get('operation')),
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
+    view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
+    demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
   };
 }
 
@@ -227,6 +232,12 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/actions') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/results') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/results-image') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/status') {
@@ -1623,6 +1634,125 @@ async function handleActionsRequest({
   });
 }
 
+function agentBoolean(value) {
+  if (typeof value === 'boolean') return value;
+  return ['1', 'true', 'yes', 'on', 'demo'].includes(lower(value));
+}
+
+function aggregateResultsEnabledForAgent(session = {}) {
+  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+    ? session.resultsExposure
+    : {};
+  return exposure.aggregateResultsEnabled !== false;
+}
+
+async function buildAgentTopicMap({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
+  const loaded = await loadQuestionsForSession(env, sessionSlug);
+  const questions = Array.isArray(loaded.questions) ? loaded.questions : [];
+  const records = await loadSubmittedResultRecords(env, sessionSlug);
+  const demo = agentBoolean(input.demo);
+  const sourceQuestions = demo ? [
+    { questionId: 'demo-topic-q-1', prompt: 'Should onboarding optimize for one-click agent setup?', tags: ['onboarding'] },
+    { questionId: 'demo-topic-q-2', prompt: 'Should admins sponsor organizer-priority questions first?', tags: ['question-cadence'] },
+    { questionId: 'demo-topic-q-3', prompt: 'Should topic maps hide raw response text by default?', tags: ['privacy'] },
+    { questionId: 'demo-topic-q-4', prompt: 'Should agents draft answers from natural language context?', tags: ['agent-workflow'] },
+  ] : questions;
+  const sourceRecords = demo ? sourceQuestions.flatMap((question, questionIndex) => (
+    Array.from({ length: 4 }, (_, participantIndex) => ({
+      telegramUserId: `demo-user-${participantIndex + 1}`,
+      questionId: question.questionId,
+      label: ['Agree', 'Unsure', 'Disagree', 'Agree'][(questionIndex + participantIndex) % 4],
+      createdAt: `demo-topic-${questionIndex}-${participantIndex}`,
+    }))
+  )) : records;
+  const topicMap = await loadOrBuildTelegramTopicMap({
+    env,
+    session: context.session,
+    sessionSlug,
+    questions: sourceQuestions,
+    records: sourceRecords,
+    demo,
+    variantKey: 'agent',
+  });
+  return {
+    sessionSlug,
+    records,
+    sourceRecords,
+    topicMap,
+    demo,
+  };
+}
+
+async function handleResultsRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const view = lower(input.view || 'topic-map');
+  if (!['topic-map', 'topic', 'topic_map'].includes(view)) {
+    return json({ ok: false, reason: 'unsupported_results_view', supportedViews: ['topic-map'] }, { status: 400 });
+  }
+  if (!agentBoolean(input.demo) && !aggregateResultsEnabledForAgent(context.session)) {
+    return json({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  }
+  const built = await buildAgentTopicMap({ env, context, input });
+  const body = {
+    ok: true,
+    sessionSlug: built.sessionSlug,
+    view: 'topic-map',
+    demo: built.demo,
+    counts: built.topicMap.counts,
+    available: built.topicMap.availability.available,
+    unavailableReason: built.topicMap.availability.available ? '' : built.topicMap.availability.reason,
+    topicMap: built.topicMap,
+  };
+  assertNoSecretShape(body, 'Telegram agent results response must not serialize secrets.');
+  return json(body, { status: 200 });
+}
+
+async function handleResultsImageRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const view = lower(input.view || 'topic-map');
+  if (!['topic-map', 'topic', 'topic_map'].includes(view)) {
+    return json({ ok: false, reason: 'unsupported_results_view', supportedViews: ['topic-map'] }, { status: 400 });
+  }
+  if (!agentBoolean(input.demo) && !aggregateResultsEnabledForAgent(context.session)) {
+    return json({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }, { status: 403 });
+  }
+  const built = await buildAgentTopicMap({ env, context, input });
+  if (!built.topicMap.availability.available && !built.demo) {
+    return json({
+      ok: false,
+      reason: built.topicMap.availability.reason || 'topic_map_not_enough_data',
+      sessionSlug: built.sessionSlug,
+      view: 'topic-map',
+    }, { status: 409 });
+  }
+  const image = buildResultsImage({
+    mode: 'topic-map',
+    sessionTitle: context.session.sessionName || context.session.sessionSlug,
+    responseCount: built.sourceRecords.length,
+    demo: built.demo,
+    topicMap: built.topicMap,
+  });
+  return new Response(image.bytes, {
+    status: 200,
+    headers: {
+      'content-type': image.contentType,
+      'cache-control': 'no-store',
+      'content-disposition': `inline; filename="${image.filename.replace(/[^A-Za-z0-9_.-]/g, '_')}"`,
+    },
+  });
+}
+
 function normalizePreferenceEntries(input = {}) {
   const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
     ? input.preferences
@@ -1910,6 +2040,8 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
     '/telegram/agent/api/question-queue/apply',
+    '/telegram/agent/api/results',
+    '/telegram/agent/api/results-image',
   ].includes(url.pathname);
   const context = await resolveHandoffContext({
     env,
@@ -1945,6 +2077,12 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/actions' && request.method === 'GET') {
     return handleActionsRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/results' && (request.method === 'GET' || request.method === 'POST')) {
+    return handleResultsRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/results-image' && request.method === 'GET') {
+    return handleResultsImageRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });

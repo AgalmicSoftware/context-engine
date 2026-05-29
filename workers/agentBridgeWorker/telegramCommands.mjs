@@ -33,6 +33,7 @@ import {
 import { assertNoSecretShape } from './redaction.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
 import { buildResultsImage } from './resultImage.mjs';
+import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
 import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
 import {
   evaluateSponsoredResourceEligibility,
@@ -5665,6 +5666,15 @@ async function buildResultsModeButtons({
       seed: `results|group|${sessionSlug}`,
       createdAt,
     }),
+    await makeCallbackButton({
+      env,
+      label: 'Topic Map',
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_RESULTS,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      serverContextRef: { sessionSlug, resultMode: 'topic' },
+      seed: `results|topic|${sessionSlug}`,
+      createdAt,
+    }),
   ]];
 }
 
@@ -5685,8 +5695,9 @@ async function buildResultsOptionsResponse({
     '',
     'Consensus: highlights questions with the most disagreement across responses.',
     'Group: shows participant answer patterns by question using P1, P2, etc.',
+    'Topic map: circles view of answered question topics.',
     '',
-    '/results [ consensus | group ]',
+    '/results [ consensus | group | topic ]',
   ];
   return reply({
     chatId: normalized.chat.chatId,
@@ -5743,7 +5754,7 @@ async function buildResultsResponse({
       createdAt,
     });
   }
-  if (!['consensus', 'group', 'group_analysis'].includes(mode)) {
+  if (!['consensus', 'group', 'group_analysis', 'topic', 'topic-map', 'topic_map'].includes(mode)) {
     return buildResultsOptionsResponse({
       normalized,
       command,
@@ -5756,6 +5767,79 @@ async function buildResultsResponse({
   const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
   const questions = Array.isArray(loadedQuestions.questions) ? loadedQuestions.questions : [];
   const records = await loadSubmittedResultRecords(env, resolved.session.sessionSlug);
+  if (['topic', 'topic-map', 'topic_map'].includes(mode)) {
+    const demo = ['demo', 'preview'].includes(lower(args[1] || ''));
+    const imageQuestions = demo ? demoDifferenceRows(questions, { includeFallbackPrompts: true }).map((row, index) => ({
+      questionId: `demo-topic-q-${index + 1}`,
+      prompt: row.prompt,
+      tags: index % 2 === 0 ? ['organizer-outcomes'] : ['agent-workflow'],
+    })) : questions;
+    const imageRecords = demo ? imageQuestions.flatMap((question, questionIndex) => (
+      Array.from({ length: 4 }, (_, participantIndex) => ({
+        telegramUserId: `demo-user-${participantIndex + 1}`,
+        questionId: question.questionId,
+        label: ['Agree', 'Unsure', 'Disagree', 'Agree'][(questionIndex + participantIndex) % 4],
+        createdAt: `demo-topic-${questionIndex}-${participantIndex}`,
+      }))
+    )) : records;
+    const topicMap = await loadOrBuildTelegramTopicMap({
+      env,
+      session: resolved.session,
+      sessionSlug: resolved.session.sessionSlug,
+      questions: imageQuestions,
+      records: imageRecords,
+      demo,
+      generatedAt: createdAt,
+    });
+    if (!topicMap.availability.available && !demo) {
+      return reply({
+        chatId: normalized.chat.chatId,
+        text: [
+          'Topic map is not available yet.',
+          `Session: ${resolved.session.sessionSlug}`,
+          'Needs at least two answered questions and two responses.',
+          'Use the Mini App demo data toggle to preview the layout.',
+        ].join('\n'),
+        screen: 'results_topic_map_unavailable',
+        command,
+        normalized,
+        extra: {
+          sessionSlug: resolved.session.sessionSlug,
+          resultMode: 'topic',
+          reason: topicMap.availability.reason,
+        },
+      });
+    }
+    const image = buildResultsImage({
+      mode: 'topic-map',
+      sessionTitle: resolved.session.sessionName || resolved.session.sessionSlug,
+      responseCount: imageRecords.length,
+      demo,
+      topicMap,
+    });
+    const lines = [
+      demo ? 'Topic map (demo data)' : 'Topic map',
+      `Session: ${resolved.session.sessionSlug}`,
+      demo ? 'Demo mode preview.' : `Responses: ${records.length}`,
+      `${topicMap.counts.topics} topics from ${topicMap.counts.answeredQuestions} answered questions.`,
+    ];
+    return reply({
+      method: 'sendPhoto',
+      chatId: normalized.chat.chatId,
+      text: lines.join('\n'),
+      photo: image,
+      screen: 'results_topic_map',
+      command,
+      normalized,
+      extra: {
+        sessionSlug: resolved.session.sessionSlug,
+        resultMode: 'topic',
+        responseCount: records.length,
+        demo,
+        topicCount: topicMap.counts.topics,
+      },
+    });
+  }
   if (mode === 'group_analysis') {
     const liveGraph = buildParticipantGraph(records, questions);
     const hasEnoughLiveGraph = records.length >= 4 && liveGraph.participantCount >= 2 && liveGraph.questionCount >= 2;
@@ -6092,7 +6176,7 @@ async function buildExportAccessResponse({
       'Configured admins:',
       formatExportAddressList(access.configuredAdmins),
       '',
-      'Additional exporters:',
+      'Additional admins/exporters:',
       formatExportAddressList(access.additionalExporters, { includeMetadata: true }),
       '',
       `Add: /export_allow 0x... ${resolved.session.sessionSlug}`,
@@ -9214,4 +9298,5 @@ export {
   summarizeQuestionResults,
   SUBMIT_REQUEST_KV_PREFIX,
   telegramVisibleSessions,
+  writeResultsExposureOverride,
 };

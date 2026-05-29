@@ -155,6 +155,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /POST \/telegram\/agent\/api\/questions\/next/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue/);
   assert.match(source, /GET \/telegram\/agent\/api\/admin\/status/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
   assert.match(source, /\/question_queue 1 3 4/);
@@ -419,6 +421,56 @@ test('Telegram agent can read active questions and draft preferences after group
   )), true);
   assert.equal(JSON.stringify(actions).includes('Other user draft'), false);
   assert.equal(JSON.stringify(actions).includes('agent-test-token'), false);
+});
+
+test('Telegram agent can read and render topic-map results without raw response records', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
+      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+    ]),
+  });
+  let counter = 0;
+  for (const [questionId, telegramUserId, label] of [
+    ['q-onboarding', '42', 'Agree'],
+    ['q-onboarding', '43', 'Agree'],
+    ['q-privacy', '42', 'Disagree'],
+    ['q-privacy', '43', 'Agree'],
+  ]) {
+    counter += 1;
+    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug: 'alpha',
+      telegramUserId,
+      questionId,
+      answer: { label, value: String(label).toLowerCase() },
+      createdAt: `2026-05-08T12:02:0${counter}.000Z`,
+    }));
+  }
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=topic-map'),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.view, 'topic-map');
+  assert.equal(body.available, true);
+  assert.equal(body.topicMap.counts.answeredQuestions, 2);
+  assert.equal(body.topicMap.topics.length, 2);
+  assert.equal(JSON.stringify(body).includes('telegramUserId'), false);
+  assert.equal(JSON.stringify(body).includes('direct_submitted'), false);
+
+  const imageResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results-image?sessionSlug=alpha&telegramUserId=42&view=topic-map'),
+    env,
+  });
+  const imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
+  assert.equal(imageResponse.status, 200);
+  assert.equal(imageResponse.headers.get('content-type'), 'image/png');
+  assert.deepEqual(Array.from(imageBytes.slice(0, 8)), [137, 80, 78, 71, 13, 10, 26, 10]);
 });
 
 test('Telegram agent can rank or filter questions by preference-derived tags', async () => {

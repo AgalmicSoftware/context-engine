@@ -173,13 +173,16 @@ export async function canManageResponseExportAllowlist({
   createdAt = null,
 } = {}) {
   const account = await deriveTelegramResponseExportAccount({ env, normalized, createdAt });
-  const admins = configuredResponseExportAdminAddresses(env, session);
+  const access = await listResponseExportAccess({ env, session });
+  const admins = access.allAllowedAddresses;
+  const configuredAdmins = access.configuredAdmins;
   const accountAddress = normalizeAddress(account.accountAddress);
   return {
     ok: !!accountAddress && admins.includes(accountAddress),
     account,
     accountAddress,
     adminCount: admins.length,
+    rootAdmin: configuredAdmins.includes(accountAddress),
     reason: admins.length ? 'response_export_admin_required' : 'response_export_admin_allowlist_empty',
   };
 }

@@ -127,3 +127,46 @@ test('participant result image draws connected group outlines below a white head
   assert.deepEqual(pixelAt(decoded, 85, 598), [31, 119, 214, 255]);
   assert.deepEqual(pixelAt(decoded, 539, 598), [255, 159, 28, 255]);
 });
+
+test('topic map result image renders aggregate topic circles', () => {
+  const image = buildResultsImage({
+    mode: 'topic-map',
+    sessionTitle: 'telegram-demo-4',
+    responseCount: 8,
+    topicMap: {
+      availability: { available: true },
+      counts: { topics: 2, answeredQuestions: 3, responses: 8 },
+      topics: [
+        {
+          label: 'Onboarding',
+          x: 360,
+          y: 210,
+          r: 96,
+          questionCount: 2,
+          responseCount: 5,
+          questions: [
+            { label: 'Q1', x: 330, y: 170, r: 12, responseCount: 3 },
+            { label: 'Q2', x: 398, y: 236, r: 10, responseCount: 2 },
+          ],
+        },
+        {
+          label: 'Privacy',
+          x: 205,
+          y: 165,
+          r: 78,
+          questionCount: 1,
+          responseCount: 3,
+          questions: [
+            { label: 'Q3', x: 205, y: 118, r: 11, responseCount: 3 },
+          ],
+        },
+      ],
+    },
+  });
+  const decoded = decodeStoredPng(image);
+
+  assert.equal(image.filename, 'context-engine-topic-map-results.png');
+  assert.equal(image.contentType, 'image/png');
+  assert.deepEqual(pixelAt(decoded, 24, 24), [255, 255, 255, 255]);
+  assert.deepEqual(pixelAt(decoded, 540, 455), [229, 248, 236, 255]);
+});
