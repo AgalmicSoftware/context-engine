@@ -145,6 +145,7 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  runSessionWizardRegisterStepController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
@@ -3679,35 +3680,37 @@ const SessionWizard = ({
         if (err?.message) throw err;
       }
 
-      setRegisterTxs([]);
-      setStatus('Registering session on-chain…');
       const gateSelectionsSnapshot = buildGateSelectionsSnapshot();
       const effectiveSessionFields = sessionFieldsOverride !== undefined
         ? (sessionFieldsOverride || {})
         : pendingOnChainFields;
-      const result = await registerSessionOnChain({
-        providerLike: provider,
-        chainId: registryChainIdValue,
-        registryAddress,
-        slug: registrySlug,
-        sessionId: sessionIdHexValue,
-        sessionChainId: Number(draft.networkChainId || 0),
-        metadataURI: effectiveMetadataUrl,
-        encryptedMetadataURI: '',
-        gateSelections: gateSelectionsSnapshot,
-        sessionFields: effectiveSessionFields,
-        gasLimitOverride: manualGasLimit,
-        gasPriceGwei: manualGasPriceGwei,
-        maxFeePerGasGwei: manualMaxFeePerGasGwei,
-        maxPriorityFeePerGasGwei: manualMaxPriorityFeePerGasGwei,
-        onTxHash: (entry) => {
-          setRegisterTxs((prev) => [...prev, entry]);
+      await runSessionWizardRegisterStepController({
+        input: {
+          registerArgs: {
+            providerLike: provider,
+            chainId: registryChainIdValue,
+            registryAddress,
+            slug: registrySlug,
+            sessionId: sessionIdHexValue,
+            sessionChainId: Number(draft.networkChainId || 0),
+            metadataURI: effectiveMetadataUrl,
+            encryptedMetadataURI: '',
+            gateSelections: gateSelectionsSnapshot,
+            sessionFields: effectiveSessionFields,
+            gasLimitOverride: manualGasLimit,
+            gasPriceGwei: manualGasPriceGwei,
+            maxFeePerGasGwei: manualMaxFeePerGasGwei,
+            maxPriorityFeePerGasGwei: manualMaxPriorityFeePerGasGwei,
+          },
+        },
+        ports: {
+          registerSessionOnChain,
+        },
+        callbacks: {
+          setRegisterTxs,
+          setStatus,
         },
       });
-      if (result?.txs?.length) {
-        setRegisterTxs(result.txs);
-      }
-      setStatus('Session registered on-chain.');
       const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionIdHexValue) || sessionIdHexValue;
       setSessionUrl(buildSessionUrl({ slug: registrySlug }));
       const adminLink = buildAdminUrl({

@@ -1,4 +1,5 @@
 import {
+  runSessionWizardRegisterStepController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
@@ -388,5 +389,138 @@ describe('runSessionWizardPublishCompletionController', () => {
     expect(setPublishedPendingSbtLinks).not.toHaveBeenCalled();
     expect(clearPendingSbtDrafts).not.toHaveBeenCalled();
     expect(setPublishStep).not.toHaveBeenCalled();
+  });
+});
+
+describe('runSessionWizardRegisterStepController', () => {
+  const registerArgs = {
+    providerLike: { kind: 'provider' },
+    chainId: 84532,
+    registryAddress: '0x0000000000000000000000000000000000000abc',
+    slug: 'writers-room',
+    sessionId: '0x00000000000000000000000000000001',
+    sessionChainId: 11155420,
+    metadataURI: 'ar://metadata-tx',
+    encryptedMetadataURI: '',
+    gateSelections: [{ gateId: 'gate-a', sbtAddresses: ['0x00000000000000000000000000000000000000aa'] }],
+    sessionFields: {
+      name: 'Writers Room',
+      workerUrl: 'https://worker.example.test',
+    },
+    gasLimitOverride: '1200000',
+    gasPriceGwei: '',
+    maxFeePerGasGwei: '2',
+    maxPriorityFeePerGasGwei: '1',
+  };
+
+  it('pins register payload shape and status/tx callback order around the injected port', async () => {
+    const events: string[] = [];
+    const txEntry = { action: 'createSession', hash: '0xaaa' };
+    const finalTxs = [{ action: 'createSession', hash: '0xbbb' }];
+    const registerSessionOnChain = jest.fn(async (args) => {
+      events.push('registerSessionOnChain');
+      expect(Object.keys(args)).toEqual([
+        'providerLike',
+        'chainId',
+        'registryAddress',
+        'slug',
+        'sessionId',
+        'sessionChainId',
+        'metadataURI',
+        'encryptedMetadataURI',
+        'gateSelections',
+        'sessionFields',
+        'gasLimitOverride',
+        'gasPriceGwei',
+        'maxFeePerGasGwei',
+        'maxPriorityFeePerGasGwei',
+        'onTxHash',
+      ]);
+      expect(args).toMatchObject(registerArgs);
+      args.onTxHash(txEntry);
+      return { txs: finalTxs };
+    });
+    const setRegisterTxs = jest.fn((value) => {
+      if (typeof value === 'function') {
+        events.push('setRegisterTxs:update');
+        expect(value([])).toEqual([txEntry]);
+        return;
+      }
+      events.push(`setRegisterTxs:${JSON.stringify(value)}`);
+    });
+    const setStatus = jest.fn((status) => {
+      events.push(`setStatus:${status}`);
+    });
+
+    await expect(runSessionWizardRegisterStepController({
+      input: {
+        registerArgs,
+      },
+      ports: {
+        registerSessionOnChain,
+      },
+      callbacks: {
+        setRegisterTxs,
+        setStatus,
+      },
+    })).resolves.toEqual({
+      status: 'completed',
+      registerResult: { txs: finalTxs },
+    });
+
+    expect(events).toEqual([
+      'setRegisterTxs:[]',
+      'setStatus:Registering session on-chain…',
+      'registerSessionOnChain',
+      'setRegisterTxs:update',
+      'setRegisterTxs:[{"action":"createSession","hash":"0xbbb"}]',
+      'setStatus:Session registered on-chain.',
+    ]);
+  });
+
+  it('does not replace tx state when the register port returns no final tx list', async () => {
+    const setRegisterTxs = jest.fn();
+    const onChainTx = { action: 'createSession', hash: '0xccc' };
+
+    await runSessionWizardRegisterStepController({
+      input: {
+        registerArgs,
+      },
+      ports: {
+        registerSessionOnChain: jest.fn(async (args) => {
+          args.onTxHash(onChainTx);
+          return { txs: [] };
+        }),
+      },
+      callbacks: {
+        setRegisterTxs,
+        setStatus: jest.fn(),
+      },
+    });
+
+    expect(setRegisterTxs).toHaveBeenCalledTimes(2);
+    expect(setRegisterTxs).toHaveBeenNthCalledWith(1, []);
+    expect(typeof setRegisterTxs.mock.calls[1][0]).toBe('function');
+  });
+
+  it('preserves thrown register errors and stops success callbacks', async () => {
+    const error = new Error('registry write reverted');
+    const setStatus = jest.fn();
+
+    await expect(runSessionWizardRegisterStepController({
+      input: {
+        registerArgs,
+      },
+      ports: {
+        registerSessionOnChain: jest.fn().mockRejectedValue(error),
+      },
+      callbacks: {
+        setRegisterTxs: jest.fn(),
+        setStatus,
+      },
+    })).rejects.toBe(error);
+
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith('Registering session on-chain…');
   });
 });
