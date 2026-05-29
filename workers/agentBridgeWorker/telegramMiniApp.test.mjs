@@ -1003,7 +1003,7 @@ test('Mini App session picker honors the Telegram session created-after cutoff',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
-      defaultSessionSlug: 'old-alpha',
+      defaultSessionSlug: 'new-beta',
       sessions: [
         {
           sessionSlug: 'old-alpha',
