@@ -64,44 +64,16 @@ export const DEFAULT_TELEGRAM_GROUP_CATEGORIES = Object.freeze([
   },
   {
     categoryId: 'events_attended',
-    label: 'Events attended',
-    description: 'Optional Edge event attendance context for aggregate comparisons.',
+    label: 'Attendance',
+    description: 'Optional Edge attendance context for aggregate comparisons.',
     selectionMode: 'multi',
     options: [
-      { optionId: 'opening_weekend', label: 'Opening weekend' },
-      { optionId: 'ai_governance', label: 'AI governance' },
-      { optionId: 'frontier_tech', label: 'Frontier tech' },
-      { optionId: 'community_programming', label: 'Community programming' },
-      { optionId: 'demo_day', label: 'Demo day' },
-      { optionId: 'other', label: 'Other' },
-    ],
-  },
-  {
-    categoryId: 'time_in_crypto',
-    label: 'Time in crypto',
-    description: 'Optional tenure bucket for aggregate comparisons.',
-    selectionMode: 'single',
-    options: [
-      { optionId: 'new_this_year', label: 'New this year' },
-      { optionId: 'one_to_three_years', label: '1-3 years' },
-      { optionId: 'three_to_seven_years', label: '3-7 years' },
-      { optionId: 'seven_plus_years', label: '7+ years' },
-      { optionId: 'not_crypto_focused', label: 'Not crypto-focused' },
-      { optionId: 'prefer_not_to_say', label: 'Prefer not to say' },
-    ],
-  },
-  {
-    categoryId: 'primary_focus',
-    label: 'Primary focus',
-    description: 'Optional work focus for aggregate comparisons.',
-    selectionMode: 'single',
-    options: [
-      { optionId: 'research', label: 'Research' },
-      { optionId: 'governance', label: 'Governance' },
-      { optionId: 'infra', label: 'Infrastructure' },
-      { optionId: 'social', label: 'Social' },
-      { optionId: 'art', label: 'Art' },
-      { optionId: 'other', label: 'Other' },
+      { optionId: 'week_1', label: 'Week 1' },
+      { optionId: 'week_2', label: 'Week 2' },
+      { optionId: 'week_3', label: 'Week 3' },
+      { optionId: 'week_4', label: 'Week 4' },
+      { optionId: 'entire_month', label: 'Entire Month' },
+      { optionId: 'attended_previous_edge_events', label: 'Attended Previous Edge Events' },
     ],
   },
   {
@@ -361,21 +333,32 @@ export function normalizeTelegramGroupSelections(selections = {}, categories = [
 export function normalizeTelegramGroupDetails(details = {}, categories = [], selections = {}) {
   const categoryIds = new Set((Array.isArray(categories) ? categories : []).map((category) => category.categoryId));
   const source = details && typeof details === 'object' && !Array.isArray(details) ? details : {};
+  const normalized = {};
   const countrySource = source.country_relationship && typeof source.country_relationship === 'object' && !Array.isArray(source.country_relationship)
     ? source.country_relationship
     : {};
   const countrySelections = new Set(Array.isArray(selections.country_relationship) ? selections.country_relationship : []);
-  if (!categoryIds.has('country_relationship') || !countrySelections.size) return {};
-  const country = {};
-  if (countrySelections.has('live_in')) {
-    const value = safeString(countrySource.live_in_country || countrySource.liveInCountry || countrySource.liveIn || '').slice(0, 80);
-    if (value) country.live_in_country = value;
+  if (categoryIds.has('country_relationship') && countrySelections.size) {
+    const country = {};
+    if (countrySelections.has('live_in')) {
+      const value = safeString(countrySource.live_in_country || countrySource.liveInCountry || countrySource.liveIn || '').slice(0, 80);
+      if (value) country.live_in_country = value;
+    }
+    if (countrySelections.has('citizen_of')) {
+      const value = safeString(countrySource.citizen_of_country || countrySource.citizenOfCountry || countrySource.citizenOf || '').slice(0, 80);
+      if (value) country.citizen_of_country = value;
+    }
+    if (Object.keys(country).length) normalized.country_relationship = country;
   }
-  if (countrySelections.has('citizen_of')) {
-    const value = safeString(countrySource.citizen_of_country || countrySource.citizenOfCountry || countrySource.citizenOf || '').slice(0, 80);
-    if (value) country.citizen_of_country = value;
+  const roleSource = source.contribution_role && typeof source.contribution_role === 'object' && !Array.isArray(source.contribution_role)
+    ? source.contribution_role
+    : {};
+  const roleSelections = new Set(Array.isArray(selections.contribution_role) ? selections.contribution_role : []);
+  if (categoryIds.has('contribution_role') && roleSelections.has('other')) {
+    const otherText = safeString(roleSource.other_text || roleSource.otherText || roleSource.other || '').slice(0, 80);
+    if (otherText) normalized.contribution_role = { other_text: otherText };
   }
-  return Object.keys(country).length ? { country_relationship: country } : {};
+  return normalized;
 }
 
 async function listKvRecordsByPrefix(env = {}, prefix = '', {

@@ -117,6 +117,10 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
     prompt: 'Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?',
   },
   {
+    id: 'attendance_context_opt_in',
+    prompt: 'Can CE associate your Edge attendance buckets with your answers, but not your identity?',
+  },
+  {
     id: 'draft_responses',
     prompt: 'Can your agent draft question responses for you based on your activity and user file?',
   },
@@ -599,6 +603,9 @@ function onboardingAnswersFromSettings(settings = {}) {
       profileFields.has('non_identifying_demographics'),
     demographic_link_opt_in: settings.demographicLinkOptIn === true ||
       uses.has('link_demographics_research'),
+    attendance_context_opt_in: settings.attendanceLinkOptIn === true ||
+      uses.has('link_attendance_context') ||
+      profileFields.has('edge_attendance'),
     draft_responses: uses.has('draft_answers'),
     draft_divergence_research: settings.draftDivergenceOptIn === true ||
       uses.has('research_draft_divergence'),
@@ -646,6 +653,10 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
     allowedProfileFields.push('edge_bio_keywords', 'age_bucket', 'country', 'region');
     allowedUses.push('link_demographics_research');
   }
+  if (answers.attendance_context_opt_in === true) {
+    allowedProfileFields.push('edge_attendance');
+    allowedUses.push('link_attendance_context');
+  }
   if (answers.draft_responses === true) {
     allowedUses.push('draft_answers');
   }
@@ -659,6 +670,7 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
     allowedProfileFields: [...new Set(allowedProfileFields)],
     allowedUses: [...new Set(allowedUses)],
     demographicLinkOptIn: answers.demographic_link_opt_in === true,
+    attendanceLinkOptIn: answers.attendance_context_opt_in === true,
     draftDivergenceOptIn: answers.draft_divergence_research === true,
     approvalMode: {
       answers: answers.draft_responses === true ? 'draft_for_review' : 'manual_review',
@@ -691,6 +703,7 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
       allowedUses: Array.isArray(settings.allowedUses) ? settings.allowedUses : [],
       topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
       demographicLinkOptIn: settings.demographicLinkOptIn === true,
+      attendanceLinkOptIn: settings.attendanceLinkOptIn === true,
       draftDivergenceOptIn: settings.draftDivergenceOptIn === true,
       approvalMode: settings.approvalMode || {},
       agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes === true,

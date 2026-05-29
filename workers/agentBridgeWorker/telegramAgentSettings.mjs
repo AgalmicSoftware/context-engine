@@ -142,6 +142,7 @@ export function defaultTelegramAgentSettings(env = {}) {
     allowedUses: normalizeStringList(source.allowedUses),
     topicPreferences: normalizeTopicPreferences(source.topicPreferences || source.topics),
     demographicLinkOptIn: normalizeBoolean(source.demographicLinkOptIn, false),
+    attendanceLinkOptIn: normalizeBoolean(source.attendanceLinkOptIn, false),
     draftDivergenceOptIn: normalizeBoolean(source.draftDivergenceOptIn, false),
     approvalMode: normalizeApprovalMode(source.approvalMode),
     dailyDigestOptIn: normalizeBoolean(source.dailyDigestOptIn, false),
@@ -187,6 +188,11 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
     const normalized = normalizeBoolean(input.demographicLinkOptIn, null);
     if (normalized === null) return { ok: false, reason: 'demographic_link_opt_in_invalid' };
     patch.demographicLinkOptIn = normalized;
+  }
+  if (Object.hasOwn(input, 'attendanceLinkOptIn')) {
+    const normalized = normalizeBoolean(input.attendanceLinkOptIn, null);
+    if (normalized === null) return { ok: false, reason: 'attendance_link_opt_in_invalid' };
+    patch.attendanceLinkOptIn = normalized;
   }
   if (Object.hasOwn(input, 'draftDivergenceOptIn')) {
     const normalized = normalizeBoolean(input.draftDivergenceOptIn, null);
@@ -251,6 +257,7 @@ export async function loadTelegramAgentSettings({
     allowedUses: normalizeStringList(settings.allowedUses || defaults.allowedUses),
     topicPreferences: normalizeTopicPreferences(settings.topicPreferences || defaults.topicPreferences),
     demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, defaults.demographicLinkOptIn),
+    attendanceLinkOptIn: normalizeBoolean(settings.attendanceLinkOptIn, defaults.attendanceLinkOptIn),
     draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, defaults.draftDivergenceOptIn),
     approvalMode: normalizeApprovalMode(settings.approvalMode || defaults.approvalMode),
     dailyDigestOptIn: normalizeBoolean(settings.dailyDigestOptIn, defaults.dailyDigestOptIn),

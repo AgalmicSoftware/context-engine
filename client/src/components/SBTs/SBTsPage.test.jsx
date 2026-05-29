@@ -508,9 +508,9 @@ describe('SBTsPage auto-feature flag', () => {
         telegramBuckets={{
           categories: [
             {
-              categoryId: 'primary_focus',
-              label: 'Primary focus',
-              options: [{ optionId: 'governance', label: 'Governance' }],
+              categoryId: 'events_attended',
+              label: 'Attendance',
+              options: [{ optionId: 'week_1', label: 'Week 1' }],
             },
             {
               categoryId: 'region',
@@ -519,7 +519,7 @@ describe('SBTsPage auto-feature flag', () => {
             },
           ],
           selections: {
-            primary_focus: ['governance'],
+            events_attended: ['week_1'],
             region: ['north_america'],
           },
         }}
@@ -527,7 +527,7 @@ describe('SBTsPage auto-feature flag', () => {
     );
 
     expect(screen.getByTestId('ce-session-telegram-buckets')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-telegram-bucket-primary_focus')).toHaveTextContent('Governance');
+    expect(screen.getByTestId('ce-session-telegram-bucket-events_attended')).toHaveTextContent('Week 1');
     expect(screen.getByTestId('ce-session-telegram-bucket-region')).toHaveTextContent('North America');
   });
 

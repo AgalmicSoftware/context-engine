@@ -313,11 +313,15 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsPanel"[^>]*aria-label="Results"/);
   assert.match(html, /id="resultsTitleSession"/);
+  assert.match(html, /id="resultsLoadingSpinner"[^>]*aria-label="Loading results"[^>]*hidden/);
   assert.match(html, /\.resultsTitleSession \{[\s\S]*opacity: 0\.5;/);
   assert.match(html, /class="resultsTitleRow"[\s\S]*id="showResultFilters"[^>]*aria-label="Filter results"/);
   assert.match(html, /el\.showResultFilters\.onclick = \(\) => \{[\s\S]*const open = state\.resultSectionsOpen\.filters !== true;[\s\S]*state\.resultSectionsOpen\.filters = open;[\s\S]*if \(open\) scrollPanelIntoView\(el\.resultFilters\);/);
   assert.equal(html.includes("state.resultsData.sessionName + ' | ' +"), false);
   assert.match(html, /el\.resultsSummary\.textContent = state\.resultsData\.responseCount \+ ' responses \| ' \+/);
+  assert.equal(html.includes('Loading results...'), false);
+  assert.match(html, /' participants' \+ filterText \+ ' \| ' \+/);
+  assert.match(html, /' binary questions' \+ demoQuestionText/);
   assert.equal(html.includes('id="refreshResults"'), false);
   assert.equal(html.includes('id="resultsSessionOptions"'), false);
   assert.match(html, /id="closeResults"[^>]*aria-label="Close results"/);
@@ -355,6 +359,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="closeSettings"[^>]*aria-label="Close settings"/);
   assert.match(html, /id="topicPreferences"/);
   assert.match(html, /id="demographicLinkOptIn"/);
+  assert.match(html, /id="attendanceLinkOptIn"/);
   assert.match(html, /id="draftDivergenceOptIn"/);
   assert.match(html, /bindPanelClose\(el\.closeResults, el\.resultsPanel, el\.showResults\);/);
   assert.equal(html.includes('state.resultSectionsOpen.panel'), false);
@@ -373,6 +378,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultGroupsSection"[\s\S]*id="groupAnalysisSection"/);
   assert.match(html, /function renderResultGroups\(groups\)[\s\S]*el\.resultClusterControls\.innerHTML = '';[\s\S]*el\.resultGroupChart\.innerHTML = '';[\s\S]*el\.groupAnalysisSection\.hidden = true;/);
   assert.match(html, /const participantCount = Number\(state\.resultsData\?\.participantCount \|\| state\.resultsData\?\.counts\?\.uniqueParticipants \|\| 0\) \|\| 0;/);
+  assert.match(html, /if \(state\.resultsData\?\.groupView\?\.enabled === false\) \{[\s\S]*el\.resultGroupsSection\.hidden = true;[\s\S]*return;[\s\S]*\}/);
   assert.match(html, /if \(participantCount >= 2\) renderResultClusterControls\(\);[\s\S]*if \(!groups\.length\) \{[\s\S]*appendEmptyResult\(el\.resultGroups, 'Not enough participant response data for groups yet\.'\);[\s\S]*return;[\s\S]*\}[\s\S]*renderResultGroupChart\(groups\);[\s\S]*el\.groupAnalysisSection\.hidden = false;/);
   assert.match(html, /resultsCache: new Map\(\)/);
   assert.match(html, /function loadResults\(\{ force = false \} = \{\}\) \{[\s\S]*const cacheKey = currentResultsCacheKey\(\);[\s\S]*state\.resultsCache\.set\(cacheKey, nextData\);/);
@@ -386,6 +392,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function resultClusterOptionCounts\(\)[\s\S]*Math\.min\(5, Math\.floor\(participantCount \|\| 0\)\)/);
   assert.match(html, /Array\.from\(\{ length: maxCount - 1 \}, \(_, index\) => index \+ 2\)/);
   assert.match(html, /className = 'resultRow groupAnalysisResult'/);
+  assert.match(html, /categoryId === 'contribution_role' && selected\.has\('other'\)/);
+  assert.match(html, /fieldLabel\.textContent = 'Other role'/);
+  assert.match(html, /save\.textContent = 'Save'/);
   assert.match(html, /font-size: 14px;/);
   assert.match(html, /function startGroupAnalysisProgressTimer\(\)/);
   assert.match(html, /state\.resultSectionsOpen\.groups = true;[\s\S]*state\.resultSectionsOpen\.groupAnalysis = true;[\s\S]*renderResults\(\);[\s\S]*scrollPanelIntoView\(el\.groupAnalysisSection\);/);
@@ -1559,6 +1568,7 @@ test('Mini App settings accepts show-unanswered-first with true default', () => 
     agentAutoApplyQuestionVotes: true,
     topicPreferences: 'AI futures, governance',
     demographicLinkOptIn: 'yes',
+    attendanceLinkOptIn: 'on',
     draftDivergenceOptIn: true,
   });
   assert.equal(defaultState.ok, true);
@@ -1566,18 +1576,21 @@ test('Mini App settings accepts show-unanswered-first with true default', () => 
   assert.equal(defaultState.publicSummary.agentAutoApplyQuestionVotes, true);
   assert.deepEqual(defaultState.publicSummary.topicPreferences, ['ai-futures', 'governance']);
   assert.equal(defaultState.publicSummary.demographicLinkOptIn, true);
+  assert.equal(defaultState.publicSummary.attendanceLinkOptIn, true);
   assert.equal(defaultState.publicSummary.draftDivergenceOptIn, true);
 
   const disabled = __test__telegramMiniApp.normalizeAgentSettingsInput({
     showUnansweredFirst: 'false',
     agentAutoApplyQuestionVotes: 'off',
     demographicLinkOptIn: 'off',
+    attendanceLinkOptIn: 'no',
     draftDivergenceOptIn: 'no',
   });
   assert.equal(disabled.ok, true);
   assert.equal(disabled.publicSummary.showUnansweredFirst, false);
   assert.equal(disabled.publicSummary.agentAutoApplyQuestionVotes, false);
   assert.equal(disabled.publicSummary.demographicLinkOptIn, false);
+  assert.equal(disabled.publicSummary.attendanceLinkOptIn, false);
   assert.equal(disabled.publicSummary.draftDivergenceOptIn, false);
 
   const invalid = __test__telegramMiniApp.normalizeAgentSettingsInput({
@@ -1591,6 +1604,12 @@ test('Mini App settings accepts show-unanswered-first with true default', () => 
   });
   assert.equal(invalidOptIn.ok, false);
   assert.equal(invalidOptIn.reason, 'draft_divergence_opt_in_invalid');
+
+  const invalidAttendance = __test__telegramMiniApp.normalizeAgentSettingsInput({
+    attendanceLinkOptIn: 'sometimes',
+  });
+  assert.equal(invalidAttendance.ok, false);
+  assert.equal(invalidAttendance.reason, 'attendance_link_opt_in_invalid');
 });
 
 test('Mini App state pre-populates previously saved answers and exposes them in settings', async () => {
@@ -3027,6 +3046,18 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   assert.equal(state.groups.enabled, true);
   assert.equal(state.groups.sessionSlug, 'alpha');
   assert.equal(state.groups.categories.some((category) => category.categoryId === 'age_bucket'), true);
+  const attendance = state.groups.categories.find((category) => category.categoryId === 'events_attended');
+  assert.equal(attendance.label, 'Attendance');
+  assert.deepEqual(attendance.options.map((option) => option.optionId), [
+    'week_1',
+    'week_2',
+    'week_3',
+    'week_4',
+    'entire_month',
+    'attended_previous_edge_events',
+  ]);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'time_in_crypto'), false);
+  assert.equal(state.groups.categories.some((category) => category.categoryId === 'primary_focus'), false);
   assert.equal(state.groups.categories.some((category) => category.categoryId === 'demo_track'), true);
   assert.equal(state.groups.categories.some((category) => (
     category.categoryId === 'contribution_role' &&
@@ -3043,12 +3074,17 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
           age_bucket: ['25_34'],
           ai_tribe: ['e_acc', 'pause_ai'],
           country_relationship: ['live_in', 'citizen_of'],
+          contribution_role: ['other'],
+          events_attended: ['week_1', 'attended_previous_edge_events'],
           missing_category: ['ignored'],
         },
         details: {
           country_relationship: {
             live_in_country: 'United States',
             citizen_of_country: 'Canada',
+          },
+          contribution_role: {
+            other_text: 'Facilitator',
           },
         },
       }),
@@ -3062,10 +3098,13 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   assert.deepEqual(saved.groups.selections.age_bucket, ['25_34']);
   assert.deepEqual(saved.groups.selections.ai_tribe, ['e_acc']);
   assert.deepEqual(saved.groups.selections.country_relationship, ['live_in', 'citizen_of']);
+  assert.deepEqual(saved.groups.selections.contribution_role, ['other']);
+  assert.deepEqual(saved.groups.selections.events_attended, ['week_1', 'attended_previous_edge_events']);
   assert.deepEqual(saved.groups.details.country_relationship, {
     live_in_country: 'United States',
     citizen_of_country: 'Canada',
   });
+  assert.deepEqual(saved.groups.details.contribution_role, { other_text: 'Facilitator' });
   assert.equal(saved.groups.selections.missing_category, undefined);
 
   const getResponse = await handleTelegramMiniAppRequest({
@@ -3080,6 +3119,7 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
     live_in_country: 'United States',
     citizen_of_country: 'Canada',
   });
+  assert.deepEqual(loaded.groups.details.contribution_role, { other_text: 'Facilitator' });
 });
 
 test('Mini App add question endpoint persists Telegram-only proposed questions', async () => {

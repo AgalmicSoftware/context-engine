@@ -5636,6 +5636,7 @@ function telegramMiniAppHtml() {
       color: var(--muted);
       overflow-wrap: anywhere;
     }
+    .resultsLoadingSpinner[hidden] { display: none; }
     .resultsTitleRow .headerIconButton,
     .resultsTitleRow .headerIconButton.active,
     .resultsTitleRow .headerIconButton:active {
@@ -5699,7 +5700,8 @@ function telegramMiniAppHtml() {
     .groupActionsTop {
       justify-content: flex-start;
     }
-    .groupCountryDetails {
+    .groupCountryDetails,
+    .groupOtherDetails {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 8px;
@@ -6605,7 +6607,7 @@ function telegramMiniAppHtml() {
       <section class="resultsPanel" id="resultsPanel" aria-label="Results">
         <div class="resultsHeader">
           <div class="resultsTitleRow">
-            <div class="sectionTitle resultsTitle">Results <span class="resultsTitleSession" id="resultsTitleSession"></span></div>
+            <div class="sectionTitle resultsTitle">Results <span class="inlineSpinner resultsLoadingSpinner" id="resultsLoadingSpinner" aria-label="Loading results" hidden></span><span class="resultsTitleSession" id="resultsTitleSession"></span></div>
             <button class="iconButton headerIconButton filterButton" id="showResultFilters" type="button" aria-label="Filter results" aria-expanded="false" title="Filter results">
               <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
                 <path d="M3 5h18l-7 8v5l-4 2v-7L3 5z"></path>
@@ -6809,6 +6811,10 @@ function telegramMiniAppHtml() {
           <span>Link demographics</span>
         </label>
         <label class="toggle">
+          <input id="attendanceLinkOptIn" type="checkbox">
+          <span>Share attendance buckets</span>
+        </label>
+        <label class="toggle">
           <input id="draftDivergenceOptIn" type="checkbox">
           <span>Draft edit research</span>
         </label>
@@ -7004,6 +7010,7 @@ function telegramMiniAppHtml() {
       resultsPanelBody: document.getElementById('resultsPanelBody'),
       closeResults: document.getElementById('closeResults'),
       resultsTitleSession: document.getElementById('resultsTitleSession'),
+      resultsLoadingSpinner: document.getElementById('resultsLoadingSpinner'),
       showResultFilters: document.getElementById('showResultFilters'),
       resultFilters: document.getElementById('resultFilters'),
       toggleResultFilters: document.getElementById('toggleResultFilters'),
@@ -7081,6 +7088,7 @@ function telegramMiniAppHtml() {
       draftStyle: document.getElementById('draftStyle'),
       topicPreferences: document.getElementById('topicPreferences'),
       demographicLinkOptIn: document.getElementById('demographicLinkOptIn'),
+      attendanceLinkOptIn: document.getElementById('attendanceLinkOptIn'),
       draftDivergenceOptIn: document.getElementById('draftDivergenceOptIn'),
       demoDataResults: document.getElementById('demoDataResults'),
       agentAutoApplyQuestionVotes: document.getElementById('agentAutoApplyQuestionVotes'),
@@ -8833,9 +8841,10 @@ function telegramMiniAppHtml() {
       el.groupAnalysisSection.hidden = true;
       const participantCount = Number(state.resultsData?.participantCount || state.resultsData?.counts?.uniqueParticipants || 0) || 0;
       if (state.resultsData?.groupView?.enabled === false) {
-        appendEmptyResult(el.resultGroups, 'Anonymized group view is level 4 and needs admin enablement.');
+        el.resultGroupsSection.hidden = true;
         return;
       }
+      el.resultGroupsSection.hidden = false;
       if (participantCount >= 2) renderResultClusterControls();
       if (!groups.length) {
         appendEmptyResult(el.resultGroups, 'Not enough participant response data for groups yet.');
@@ -9169,22 +9178,23 @@ function telegramMiniAppHtml() {
       const sessions = ensureResultsSessionSlug();
       const currentSession = sessions.find((session) => session.sessionSlug === state.resultsSessionSlug) || {};
       el.resultsTitleSession.textContent = currentSession.sessionName || state.resultsSessionSlug || '';
-      if (state.resultsLoading) {
-        el.resultsSummary.textContent = 'Loading results...';
-      } else if (!state.resultsSessionSlug) {
+      if (el.resultsLoadingSpinner) el.resultsLoadingSpinner.hidden = state.resultsLoading !== true;
+      if (!state.resultsSessionSlug) {
         el.resultsSummary.textContent = 'Select a session to view results.';
       } else if (state.resultsData?.ok === false) {
         el.resultsSummary.textContent = 'Could not load results: ' + (state.resultsData.error || 'results_unavailable');
       } else if (state.resultsData) {
         const filterText = state.resultsData.filters?.applied
-          ? ' | filtered to ' + state.resultsData.filters.matchedParticipants + ' participants' +
-            (state.resultsData.filters.suppressed ? ' (hidden below minimum group size)' : '')
+          ? ' (Filtered: ' + state.resultsData.filters.matchedParticipants +
+            (state.resultsData.filters.suppressed ? ', hidden below minimum group size' : '') + ')'
           : '';
+        const demoQuestionText = state.resultsData.demo ? ' (Demo Data)' : '';
         el.resultsSummary.textContent = state.resultsData.responseCount + ' responses | ' +
-          state.resultsData.participantCount + ' participants | ' +
-          state.resultsData.binaryQuestionCount + ' binary questions' +
-          filterText +
+          state.resultsData.participantCount + ' participants' + filterText + ' | ' +
+          state.resultsData.binaryQuestionCount + ' binary questions' + demoQuestionText +
           (state.resultsLoadError ? ' | refresh failed: ' + state.resultsLoadError : '');
+      } else if (state.resultsLoading) {
+        el.resultsSummary.textContent = '';
       } else {
         el.resultsSummary.textContent = 'Open results for the selected session.';
       }
@@ -9938,6 +9948,32 @@ function telegramMiniAppHtml() {
           if (selected.has('citizen_of')) renderCountrySelect('citizen_of_country', 'Citizen of country');
           options.appendChild(countryDetails);
         }
+        if (categoryId === 'contribution_role' && selected.has('other')) {
+          const otherDetails = document.createElement('div');
+          otherDetails.className = 'groupOtherDetails';
+          const fieldWrap = document.createElement('label');
+          fieldWrap.className = 'field';
+          const fieldLabel = document.createElement('span');
+          fieldLabel.textContent = 'Other role';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = details.contribution_role?.other_text || '';
+          input.placeholder = 'Describe your role';
+          input.oninput = () => {
+            state.groupsSaveMessage = '';
+            state.groupDetails.contribution_role = state.groupDetails.contribution_role || { ...(details.contribution_role || {}) };
+            state.groupDetails.contribution_role.other_text = input.value;
+          };
+          const save = document.createElement('button');
+          save.type = 'button';
+          save.className = 'secondary';
+          save.textContent = 'Save';
+          save.disabled = state.groupsSaving || state.groupsLoading || !state.groupsSessionSlug;
+          save.onclick = () => saveGroups();
+          fieldWrap.append(fieldLabel, input);
+          otherDetails.append(fieldWrap, save);
+          options.appendChild(otherDetails);
+        }
         section.append(header, options);
         el.groupCategories.appendChild(section);
       });
@@ -10154,6 +10190,9 @@ function telegramMiniAppHtml() {
       if (el.demographicLinkOptIn) {
         el.demographicLinkOptIn.checked = values.demographicLinkOptIn === true;
       }
+      if (el.attendanceLinkOptIn) {
+        el.attendanceLinkOptIn.checked = values.attendanceLinkOptIn === true;
+      }
       if (el.draftDivergenceOptIn) {
         el.draftDivergenceOptIn.checked = values.draftDivergenceOptIn === true;
       }
@@ -10346,6 +10385,7 @@ function telegramMiniAppHtml() {
             draftStyle: el.draftStyle.value,
             topicPreferences: el.topicPreferences ? el.topicPreferences.value : '',
             demographicLinkOptIn: el.demographicLinkOptIn ? el.demographicLinkOptIn.checked : false,
+            attendanceLinkOptIn: el.attendanceLinkOptIn ? el.attendanceLinkOptIn.checked : false,
             draftDivergenceOptIn: el.draftDivergenceOptIn ? el.draftDivergenceOptIn.checked : false,
             agentAutoApplyQuestionVotes: el.agentAutoApplyQuestionVotes ? el.agentAutoApplyQuestionVotes.checked : false,
           },

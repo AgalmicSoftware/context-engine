@@ -229,6 +229,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
   assert.match(source, /demographicLinkOptIn/);
+  assert.match(source, /attendanceLinkOptIn/);
+  assert.match(source, /Attended\s+Previous Edge Events/);
   assert.match(source, /draftDivergenceOptIn/);
   assert.match(source, /topicPreferences/);
   assert.match(source, /Interactive Client Report/);
@@ -446,12 +448,14 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   const first = await jsonBody(firstResponse);
   assert.equal(firstResponse.status, 200);
   assert.equal(first.completed, false);
-  assert.equal(first.questions.length, 7);
+  assert.equal(first.questions.length, 8);
   assert.equal(first.answers.preference_tailoring, false);
   assert.equal(first.answers.demographic_link_opt_in, false);
+  assert.equal(first.answers.attendance_context_opt_in, false);
   assert.equal(first.answers.draft_divergence_research, false);
   assert.equal(first.settings.agentAutoApplyQuestionVotes, false);
   assert.equal(first.settings.dailyDigestOptIn, false);
+  assert.equal(first.settings.attendanceLinkOptIn, false);
   assert.deepEqual(first.settings.topicPreferences, []);
 
   const saveResponse = await handleTelegramAgentHandoffRequest({
@@ -466,6 +470,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
           preference_tailoring: true,
           demographics_research: false,
           demographic_link_opt_in: true,
+          attendance_context_opt_in: true,
           draft_responses: true,
           draft_divergence_research: true,
           auto_apply_question_votes: true,
@@ -482,6 +487,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(saved.answers.preference_tailoring, true);
   assert.equal(saved.answers.draft_responses, true);
   assert.equal(saved.answers.demographic_link_opt_in, true);
+  assert.equal(saved.answers.attendance_context_opt_in, true);
   assert.equal(saved.answers.draft_divergence_research, true);
   assert.equal(saved.answers.auto_apply_question_votes, true);
   assert.deepEqual(saved.settings.topicPreferences, ['ai-futures', 'governance']);
@@ -489,11 +495,14 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(saved.settings.allowedProfileFields.includes('edge_bio_keywords'), true);
   assert.equal(saved.settings.allowedProfileFields.includes('age_bucket'), true);
   assert.equal(saved.settings.allowedProfileFields.includes('country'), true);
+  assert.equal(saved.settings.allowedProfileFields.includes('edge_attendance'), true);
   assert.equal(saved.settings.allowedUses.includes('rank_questions'), true);
   assert.equal(saved.settings.allowedUses.includes('link_demographics_research'), true);
+  assert.equal(saved.settings.allowedUses.includes('link_attendance_context'), true);
   assert.equal(saved.settings.allowedUses.includes('draft_answers'), true);
   assert.equal(saved.settings.allowedUses.includes('research_draft_divergence'), true);
   assert.equal(saved.settings.demographicLinkOptIn, true);
+  assert.equal(saved.settings.attendanceLinkOptIn, true);
   assert.equal(saved.settings.draftDivergenceOptIn, true);
   assert.equal(saved.settings.agentAutoApplyQuestionVotes, true);
   assert.equal(saved.settings.dailyDigestOptIn, true);
@@ -647,7 +656,8 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   assert.equal(body.accountAddress, accountAddress);
   assert.equal(body.workerUrl, 'https://session-worker.example');
   assert.equal(body.buckets.sessionSlug, 'alpha');
-  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'primary_focus'), true);
+  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'events_attended' && category.label === 'Attendance'), true);
+  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'primary_focus'), false);
   assert.equal(JSON.stringify(body).includes(issued.token), false);
   assert.deepEqual(fetchCalls.map((call) => call.url), [
     'https://session-worker.example/auth/nonce',

@@ -295,10 +295,11 @@ these settings:
 ```json
 {
   "topicPreferences": ["ai-futures", "edge-city"],
-  "allowedProfileFields": ["interests", "sessionsAttended", "roles", "edge_bio_keywords", "age_bucket", "country", "region"],
-  "allowedUses": ["rank_questions", "draft_answers", "recommend_votes", "suggest_groups", "link_demographics_research", "research_draft_divergence"],
+  "allowedProfileFields": ["interests", "sessions_attended", "roles", "edge_bio_keywords", "age_bucket", "country", "region", "edge_attendance"],
+  "allowedUses": ["rank_questions", "draft_answers", "recommend_votes", "suggest_groups", "link_demographics_research", "link_attendance_context", "research_draft_divergence"],
   "forbiddenFields": ["private_notes", "age", "citizenship", "raw_geo_private_data"],
   "demographicLinkOptIn": false,
+  "attendanceLinkOptIn": false,
   "draftDivergenceOptIn": false,
   "approvalMode": {
     "answers": "draft_for_review",
@@ -310,14 +311,18 @@ these settings:
 
 The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
 digest integrations. It also stores `topicPreferences`,
-`demographicLinkOptIn`, and `draftDivergenceOptIn`. Demographic linking is
-default-off; only when the user opts in may the agent link otherwise anonymous
-responses to approved aggregate buckets such as Edge Bio keywords, age bucket,
-country, or region. Draft-divergence research is also default-off; unless the
-user opts in, do not send agent-drafted answers to the worker as durable
-research records. A Mini App launch may still carry an editable prefill draft
-for review, but that is a short-lived launch artifact rather than a
-draft-divergence research record.
+`demographicLinkOptIn`, `attendanceLinkOptIn`, and `draftDivergenceOptIn`.
+Demographic linking is default-off; only when the user opts in may the agent
+link otherwise anonymous responses to approved aggregate buckets such as Edge
+Bio keywords, age bucket, country, or region. Attendance linking is also
+default-off; only when the user opts in may the agent pass Edge attendance
+buckets such as Week 1, Week 2, Week 3, Week 4, Entire Month, or Attended
+Previous Edge Events to CE. These attendance buckets are associated with the
+user's answers for aggregate analysis, not published as the user's identity.
+Draft-divergence research is also default-off; unless the user opts in, do not
+send agent-drafted answers to the worker as durable research records. A Mini
+App launch may still carry an editable prefill draft for review, but that is a
+short-lived launch artifact rather than a draft-divergence research record.
 
 Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
 
@@ -353,7 +358,7 @@ For personalized question selection, send a POST body with preferences:
   "preferences": {
     "tags": ["ai", "governance"],
     "interests": ["funding"],
-    "sessionsAttended": ["edge-city-ai-salon"]
+    "attendance": ["week_1", "attended_previous_edge_events"]
   }
 }
 ```
@@ -1077,18 +1082,19 @@ answers with `POST /telegram/agent/api/onboarding`:
 1. Can your agent pass preference info to CE to tailor which questions you see?
 2. Can your agent share non-identifying demographics for research only, never published in connection to you?
 3. Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?
-4. Can your agent draft question responses for you based on your activity and user file?
-5. Can CE store agent-drafted answers and final sent answers to study where people edit drafts?
-6. Can your agent upvote questions it thinks you will find relevant?
-7. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
+4. Can CE associate your Edge attendance buckets with your answers, but not your identity?
+5. Can your agent draft question responses for you based on your activity and user file?
+6. Can CE store agent-drafted answers and final sent answers to study where people edit drafts?
+7. Can your agent upvote questions it thinks you will find relevant?
+8. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
 
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
-`topicPreferences`, `demographicLinkOptIn`, `draftDivergenceOptIn`,
+`topicPreferences`, `demographicLinkOptIn`, `attendanceLinkOptIn`, `draftDivergenceOptIn`,
 `agentAutoApplyQuestionVotes`, and `dailyDigestOptIn`. Auto-apply votes remain
-off unless the user says yes to question 6. The demographic-link and
-draft-divergence settings remain off unless explicitly enabled. The digest flag
-is stored for Phase 2 and should not be treated as an active delivery
-subscription yet.
+off unless the user says yes to question 7. The demographic-link,
+attendance-link, and draft-divergence settings remain off unless explicitly
+enabled. The digest flag is stored for Phase 2 and should not be treated as an
+active delivery subscription yet.
 
 ## Changelog
 

@@ -1029,11 +1029,23 @@ export function buildTelegramAgentSettingsOverviewState({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
+    topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+    demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
+    attendanceLinkOptIn: normalizeBoolean(settings.attendanceLinkOptIn, false),
+    draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, false),
   });
   return buildTelegramScreenState('agent_settings_overview', {
     sessionSlug: safeString(sessionSlug),
     settings: normalizedSettings,
-    editableFields: ['draftStyle', 'showUnansweredFirst', 'agentAutoApplyQuestionVotes'],
+    editableFields: [
+      'draftStyle',
+      'showUnansweredFirst',
+      'agentAutoApplyQuestionVotes',
+      'topicPreferences',
+      'demographicLinkOptIn',
+      'attendanceLinkOptIn',
+      'draftDivergenceOptIn',
+    ],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.read',
       body: {
@@ -1054,6 +1066,10 @@ export function buildTelegramAgentSettingsEditState({
     draftStyle: normalizeDraftStyle(settings.draftStyle),
     showUnansweredFirst: normalizeBoolean(settings.showUnansweredFirst, true),
     agentAutoApplyQuestionVotes: normalizeBoolean(settings.agentAutoApplyQuestionVotes, false),
+    topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+    demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, false),
+    attendanceLinkOptIn: normalizeBoolean(settings.attendanceLinkOptIn, false),
+    draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, false),
   });
   return buildTelegramScreenState('agent_settings_edit', {
     preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
@@ -1074,6 +1090,26 @@ export function buildTelegramAgentSettingsEditState({
     label: 'Allow agents to auto-apply question votes',
     input: 'toggle',
     value: current.agentAutoApplyQuestionVotes,
+  }, {
+    field: 'topicPreferences',
+    label: 'Topics',
+    input: 'textarea',
+    value: current.topicPreferences,
+  }, {
+    field: 'demographicLinkOptIn',
+    label: 'Link demographics',
+    input: 'toggle',
+    value: current.demographicLinkOptIn,
+  }, {
+    field: 'attendanceLinkOptIn',
+    label: 'Share attendance buckets',
+    input: 'toggle',
+    value: current.attendanceLinkOptIn,
+  }, {
+    field: 'draftDivergenceOptIn',
+    label: 'Draft edit research',
+    input: 'toggle',
+    value: current.draftDivergenceOptIn,
   }],
     canonicalApiRequest: canonicalAgentRequest({
       capabilityId: 'agent.settings.update',

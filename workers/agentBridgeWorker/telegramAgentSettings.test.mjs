@@ -16,6 +16,7 @@ test('default Telegram agent settings include question cadence preferences', () 
   const defaults = defaultTelegramAgentSettings({});
   assert.equal(defaults.questionsPerBatch, 3);
   assert.equal(defaults.digestFrequency, 'weekly');
+  assert.equal(defaults.attendanceLinkOptIn, false);
 });
 
 test('settings patch accepts and clamps questionsPerBatch', () => {
@@ -48,6 +49,18 @@ test('settings patch validates digestFrequency', () => {
   });
 });
 
+test('settings patch validates attendance sharing opt-in', () => {
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ attendanceLinkOptIn: 'yes' }), {
+    ok: true,
+    patch: { attendanceLinkOptIn: true },
+    publicSummary: { attendanceLinkOptIn: true },
+  });
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ attendanceLinkOptIn: 'sometimes' }), {
+    ok: false,
+    reason: 'attendance_link_opt_in_invalid',
+  });
+});
+
 test('loadTelegramAgentSettings returns stored question cadence preferences', async () => {
   const sessionSlug = 'ee-26-organizers';
   const telegramUserId = '42';
@@ -60,6 +73,7 @@ test('loadTelegramAgentSettings returns stored question cadence preferences', as
     settings: {
       questionsPerBatch: 6,
       digestFrequency: 'few_per_week',
+      attendanceLinkOptIn: true,
     },
   };
   const env = {
@@ -74,4 +88,5 @@ test('loadTelegramAgentSettings returns stored question cadence preferences', as
   const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
   assert.equal(settings.questionsPerBatch, 6);
   assert.equal(settings.digestFrequency, 'few_per_week');
+  assert.equal(settings.attendanceLinkOptIn, true);
 });
