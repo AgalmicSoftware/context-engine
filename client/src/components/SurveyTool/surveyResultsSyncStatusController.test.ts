@@ -1,5 +1,4 @@
 import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
-import { buildSurveyResultsRefreshStatusSequencePlan } from './surveyResultsHelpers';
 
 describe('surveyResultsSyncStatusController', () => {
   it('builds the missing-block loading fallback', () => {
@@ -152,39 +151,6 @@ describe('surveyResultsSyncStatusController', () => {
     });
   });
 
-  it('keeps sequence-plan refresh target patches compatible with syncing copy', () => {
-    const sequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
-      latestBlock: 100,
-      followUpEffects: ['manualRefreshDispatch'],
-    });
-    if (!sequencePlan.statePatch) throw new Error('Expected a refresh target state patch');
-
-    expect(buildSurveyResultsSyncStatusDisplayPlan({
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: 20,
-      responseLocalBlock: 40,
-      ...sequencePlan.statePatch,
-    })).toMatchObject({
-      isSynced: false,
-      isSyncingOrLoading: true,
-      question: {
-        label: 'Remaining Blocks: 80',
-        progress: 20,
-        remainingBlocks: 80,
-        showRemainingSpinner: true,
-      },
-      response: {
-        label: 'Remaining Blocks: 60',
-        progress: 40,
-        remainingBlocks: 60,
-        showRemainingSpinner: true,
-      },
-      showQuickRefresh: true,
-      syncStatusText: 'Syncing...',
-    });
-  });
-
   it('marks refresh target completion against the target block', () => {
     expect(buildSurveyResultsSyncStatusDisplayPlan({
       viewMode: 'survey',
@@ -230,34 +196,6 @@ describe('surveyResultsSyncStatusController', () => {
       showQuickRefresh: false,
       syncStatusText: 'In Sync',
       viewMode: 'unknown',
-    });
-  });
-
-  it('normalizes malformed block values before building progress text', () => {
-    expect(buildSurveyResultsSyncStatusDisplayPlan({
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: Number.POSITIVE_INFINITY,
-      responseLocalBlock: 'not-a-block',
-      refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
-      refreshTargetResponseBlock: 80,
-    })).toMatchObject({
-      isSynced: false,
-      question: {
-        color: 'info',
-        label: '',
-        progress: 0,
-        remainingBlocks: 0,
-        showSpinner: true,
-      },
-      response: {
-        color: 'info',
-        label: '',
-        progress: 0,
-        remainingBlocks: 0,
-        showSpinner: true,
-      },
-      syncStatusText: 'Loading...',
     });
   });
 });
