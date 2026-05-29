@@ -167,13 +167,16 @@ import {
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
+  mergeGeneratedSessionResultsAnalysisArtifacts,
   normalizeGeneratedSessionResultsAnalysisArtifact,
   renderSessionResultsHtmlReport,
+  SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
   SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   shortenSessionResultsAddress,
   type SessionResultsAnalysisResponseInput,
+  type SessionResultsAnalysisSectionKey,
   type SessionResultsExportFormat,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
@@ -613,6 +616,24 @@ const HTML_REPORT_ANALYSIS_SECTION_KEYS: SurveyResultsHtmlReportSectionKey[] = [
   'riskMatrix',
   'atlas',
 ];
+const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<Record<SurveyResultsHtmlReportSectionKey, SessionResultsAnalysisSectionKey>> = {
+  argumentMap: 'argumentMap',
+  atlas: 'atlas',
+  report: 'breakdown',
+  riskMatrix: 'riskMatrix',
+};
+const HTML_REPORT_ANALYSIS_SECTION_LABELS: Record<SessionResultsAnalysisSectionKey, string> = {
+  argumentMap: 'Argument Map',
+  atlas: 'Atlas Nodes',
+  breakdown: 'Breakdown',
+  riskMatrix: 'Risk Matrix',
+};
+const HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS: Record<SessionResultsAnalysisSectionKey, number> = {
+  argumentMap: 6000,
+  atlas: 7000,
+  breakdown: 5000,
+  riskMatrix: 6500,
+};
 export const SURVEY_RESULTS_CLICKABLE_ICON_STYLE: React.CSSProperties = {
   cursor: 'pointer',
 };
@@ -1226,6 +1247,7 @@ class SurveyResults extends Component<any, any> {
       htmlReportAnalysisError: '',
       htmlReportAnalysisArtifact: null,
       htmlReportAnalysisInputSignature: '',
+      htmlReportAnalysisProgress: '',
       htmlReportDemoMode: false,
     };
 
@@ -3518,12 +3540,143 @@ Object.entries(aggregator).forEach(([questionId, responsesArray]) => {
 return rows;
 }
 
+getSessionResultsAnalysisSafeLabel = (value: unknown): string => {
+const text = String(value || '').replace(/\s+/g, ' ').trim();
+if (!text) return '';
+if (/^0x/i.test(text) || /0x[a-fA-F0-9]{6,}/.test(text)) return '';
+return text;
+}
+
+getSessionResultsAnalysisSbtEntryLabel = (entry: unknown): string => {
+const record = toSurveyResultsRecord(entry);
+const direct = this.getSessionResultsAnalysisSafeLabel(
+  record.label || record.name || record.title || record.sessionName || record.group || record.slug
+);
+if (direct) return direct;
+const address = String(record.address || record.sbtAddress || (typeof entry === 'string' ? entry : '') || '').trim();
+if (!address) return '';
+const resolved = resolveSbtDisplayLabelForSurveyResults({
+  address,
+  chainId: this.getHtmlReportChainId(),
+  fallback: 'short',
+  preferredSlug: this.getEffectiveSlug() || '',
+});
+return this.getSessionResultsAnalysisSafeLabel(resolved);
+}
+
+getSessionResultsAnalysisSegmentDimensionsForExport = () => {
+const dimensions: unknown[] = [];
+const questions = this.getHtmlReportQuestionsForExport();
+
+const buildValues = (
+  counts: Map<string, { count: number; label: string; source?: string }>
+) => Array.from(counts.values())
+  .filter((value) => value.label)
+  .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label))
+  .map((value) => ({
+    count: value.count,
+    id: value.label,
+    label: value.label,
+    ...(value.source ? { source: value.source } : {}),
+  }));
+
+const tagCounts = new Map<string, { count: number; label: string; source?: string }>();
+questions.forEach((question) => {
+  const responseCount = Math.max(1, Number(question.responseCount || 0));
+  (Array.isArray(question.tags) ? question.tags : []).forEach((tag) => {
+    const label = this.getSessionResultsAnalysisSafeLabel(tag);
+    if (!label) return;
+    const key = label.toLowerCase();
+    const prev = tagCounts.get(key) || { count: 0, label, source: 'questionTags' };
+    prev.count += responseCount;
+    tagCounts.set(key, prev);
+  });
+});
+const tagValues = buildValues(tagCounts);
+if (tagValues.length > 0) {
+  dimensions.push({
+    id: 'question_tags',
+    label: 'Question Tags',
+    source: 'questionTags',
+    values: tagValues,
+  });
+}
+
+const sbtFilter = toSurveyResultsRecord(toSurveyResultsRecord(this.state.filterState).sbtFilter);
+const sbtCounts = new Map<string, { count: number; label: string; source?: string }>();
+const addSbtFilterEntries = (entries: unknown, prefix: string): void => {
+  if (!Array.isArray(entries)) return;
+  entries.forEach((entry) => {
+    const label = this.getSessionResultsAnalysisSbtEntryLabel(entry);
+    if (!label) return;
+    const fullLabel = `${prefix}: ${label}`;
+    const key = fullLabel.toLowerCase();
+    const prev = sbtCounts.get(key) || { count: 0, label: fullLabel, source: 'sbtFilter' };
+    prev.count += 1;
+    sbtCounts.set(key, prev);
+  });
+};
+addSbtFilterEntries(sbtFilter.selectedSBTGroups, 'Include');
+addSbtFilterEntries(sbtFilter.selectedSBTGroupsResponder, 'Responder include');
+addSbtFilterEntries(sbtFilter.selectedSBTGroupsCreator, 'Creator include');
+addSbtFilterEntries(sbtFilter.excludedSBTGroups, 'Exclude');
+addSbtFilterEntries(sbtFilter.excludedSBTGroupsResponder, 'Responder exclude');
+addSbtFilterEntries(sbtFilter.excludedSBTGroupsCreator, 'Creator exclude');
+if (sbtFilter.onlyVerifiedHumans) {
+  sbtCounts.set('verified_humans', {
+    count: this.getHtmlReportParticipantCount() || 1,
+    label: 'Verified humans',
+    source: 'sbtFilter',
+  });
+}
+const sbtValues = buildValues(sbtCounts);
+if (sbtValues.length > 0) {
+  dimensions.push({
+    id: 'active_sbt_filters',
+    label: 'Active SBT Filters',
+    source: 'sbtFilter',
+    values: sbtValues,
+  });
+}
+
+const gateCounts = new Map<string, { count: number; label: string; source?: string }>();
+const networkQuestions = this.getNetworkQuestionsForCurrentContext() as Record<string, SurveyResultsQuestionWithEncryption | undefined>;
+questions.forEach((question) => {
+  const questionId = String(question.id || '').trim();
+  const questionRecord = networkQuestions[questionId.toLowerCase()] || networkQuestions[questionId] || null;
+  const gates = this.getQuestionEncryptionGates(questionRecord);
+  gates.forEach((gate) => {
+    normalizeGateSbtEntries(gate).forEach((entry) => {
+      const label = this.getSessionResultsAnalysisSafeLabel(entry.label)
+        || this.getSessionResultsAnalysisSbtEntryLabel({ address: entry.address });
+      if (!label) return;
+      const key = label.toLowerCase();
+      const prev = gateCounts.get(key) || { count: 0, label, source: 'responseGates' };
+      prev.count += Math.max(1, Number(question.responseCount || 0));
+      gateCounts.set(key, prev);
+    });
+  });
+});
+const gateValues = buildValues(gateCounts);
+if (gateValues.length > 0) {
+  dimensions.push({
+    id: 'response_gates',
+    label: 'Response Gates',
+    source: 'responseGates',
+    values: gateValues,
+  });
+}
+
+return dimensions;
+}
+
 buildSessionResultsAnalysisPayloadForAi = () => {
 const sessionSlug = this.getEffectiveSlug() || '';
 const sessionName = String(this.props.sessionName || this.state.surveyTitle || sessionSlug || 'Session').trim();
 const built = buildSessionResultsAnalysisAiPayload({
   questions: this.getHtmlReportQuestionsForExport(),
   responses: this.getSessionResultsAnalysisResponsesForExport(),
+  segmentDimensions: this.getSessionResultsAnalysisSegmentDimensionsForExport(),
   session: {
     name: sessionName,
     slug: sessionSlug,
@@ -3704,6 +3857,26 @@ canDownloadHtmlReport = (
   !this.state.htmlReportAnalysisGenerating
 );
 
+getHtmlReportAnalysisSectionsToGenerate = (
+  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
+): SessionResultsAnalysisSectionKey[] => {
+const keys = new Set<SessionResultsAnalysisSectionKey>();
+Object.entries(sections).forEach(([sectionKey, selected]) => {
+  if (!selected) return;
+  const analysisKey = HTML_REPORT_SECTION_TO_ANALYSIS_SECTION[sectionKey as SurveyResultsHtmlReportSectionKey];
+  if (analysisKey) keys.add(analysisKey);
+});
+return SESSION_RESULTS_ANALYSIS_SECTION_KEYS.filter((key) => keys.has(key));
+}
+
+doesHtmlReportAnalysisArtifactCoverSections = (
+  artifact: SessionResultsGeneratedAnalysisArtifact | null,
+  sections: readonly SessionResultsAnalysisSectionKey[]
+): boolean => (
+  !!artifact &&
+  sections.every((section) => !!artifact.sections?.[section]?.available)
+);
+
 openHtmlReportExportModal = (): void => {
 const snapshot = this.buildSessionResultsHtmlReportSnapshot();
 this.setState({
@@ -3787,11 +3960,22 @@ if (!eligibility.eligible) {
 }
 
 const cached = this.readSessionResultsAnalysisArtifactFromCache(inputSignature);
-if (cached) {
+const sectionsToGenerate = this.getHtmlReportAnalysisSectionsToGenerate();
+const currentArtifact = this.getHtmlReportAnalysisArtifact();
+let artifact: SessionResultsGeneratedAnalysisArtifact | null = (
+  currentArtifact?.inputSignature === inputSignature ? currentArtifact : null
+) || cached || null;
+
+if (sectionsToGenerate.length === 0) {
+  sectionsToGenerate.push(...SESSION_RESULTS_ANALYSIS_SECTION_KEYS);
+}
+
+if (this.doesHtmlReportAnalysisArtifactCoverSections(artifact, sectionsToGenerate)) {
   this.setState({
-    htmlReportAnalysisArtifact: cached,
+    htmlReportAnalysisArtifact: artifact,
     htmlReportAnalysisError: '',
     htmlReportAnalysisInputSignature: inputSignature,
+    htmlReportAnalysisProgress: '',
   });
   return;
 }
@@ -3800,31 +3984,57 @@ this.setState({
   htmlReportAnalysisGenerating: true,
   htmlReportAnalysisError: '',
   htmlReportAnalysisInputSignature: inputSignature,
+  htmlReportAnalysisProgress: '',
 });
 
 try {
-  const prompt = buildSessionResultsAnalysisPrompt(aiPayload);
-  const rawOutput = await callAI(prompt, {
-    sessionSlug: this.getEffectiveSlug() || '',
-    thinking: true,
-  });
-  const artifact = normalizeGeneratedSessionResultsAnalysisArtifact({
-    generatedAt: new Date().toISOString(),
-    inputSignature,
-    participants,
-    rawOutput,
-  });
-  await this.writeSessionResultsAnalysisArtifactToCache(artifact);
+  const missingSections = sectionsToGenerate.filter((section) => !artifact?.sections?.[section]?.available);
+  for (let index = 0; index < missingSections.length; index += 1) {
+    const section = missingSections[index];
+    const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
+    this.setState({
+      htmlReportAnalysisProgress: `Generating ${label} (${index + 1}/${missingSections.length})`,
+    });
+    const prompt = buildSessionResultsAnalysisPrompt(aiPayload, section);
+    const rawOutput = await callAI(prompt, {
+      maxTokens: HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS[section],
+      response_format: { type: 'json_object' },
+      sessionSlug: this.getEffectiveSlug() || '',
+      taskType: 'analysis',
+      thinking: true,
+    });
+    const sectionArtifact = normalizeGeneratedSessionResultsAnalysisArtifact({
+      generatedAt: new Date().toISOString(),
+      inputSignature,
+      participants,
+      rawOutput,
+    });
+    artifact = mergeGeneratedSessionResultsAnalysisArtifacts({
+      base: artifact || normalizeGeneratedSessionResultsAnalysisArtifact({
+        generatedAt: new Date().toISOString(),
+        inputSignature,
+        participants,
+        rawOutput: {},
+      }),
+      next: sectionArtifact,
+      sections: [section],
+    });
+    if (artifact) {
+      await this.writeSessionResultsAnalysisArtifactToCache(artifact);
+    }
+  }
   this.setState({
     htmlReportAnalysisArtifact: artifact,
     htmlReportAnalysisGenerating: false,
     htmlReportAnalysisError: '',
+    htmlReportAnalysisProgress: '',
   });
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
   this.setState({
     htmlReportAnalysisGenerating: false,
     htmlReportAnalysisError: 'Unable to generate analysis views right now. Check AI settings and try again.',
+    htmlReportAnalysisProgress: '',
   });
 }
 }
@@ -5371,7 +5581,7 @@ return (
           data-testid="ce-surveyresults-html-report-generate-analysis"
         >
           {this.state.htmlReportAnalysisGenerating
-            ? 'Generating Analysis Views...'
+            ? this.state.htmlReportAnalysisProgress || 'Generating Analysis Views...'
             : isDemoMode
               ? 'Refresh Demo Analysis'
               : 'Generate Analysis Views'}
