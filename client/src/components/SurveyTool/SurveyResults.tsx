@@ -2308,7 +2308,7 @@ class SurveyResults extends Component<any, any> {
     if (viewKey === 'breakdown') {
       return (
         <Suspense fallback={<LazyFallback label="Loading Breakdown..." minHeight="30vh" />}>
-          <DemoAnalysisWorkspace />
+          <DemoAnalysisWorkspace sessionSlug={activeSlug} />
         </Suspense>
       );
     }

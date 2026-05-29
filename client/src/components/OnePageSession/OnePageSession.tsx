@@ -2686,7 +2686,7 @@ class OnePageSession extends Component<any, any> {
                   )}
                   {isDemoSlug && resultsViewMode === 'analysis' && (
                     <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
-                      <DemoAnalysisWorkspace />
+                      <DemoAnalysisWorkspace sessionSlug={slug} />
                     </Suspense>
                   )}
                   {isDemoSlug && resultsViewMode === 'debateAtlas' && (
