@@ -215,6 +215,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /GET \/telegram\/agent\/api\/admin\/status/);
   assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
   assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
+  assert.match(source, /POST \/telegram\/agent\/api\/mini-app-launch/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
   assert.match(source, /\/question_queue 1 3 4/);
@@ -686,6 +687,82 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   assert.equal(hit.cached, true);
   assert.equal(hit.cacheLayer, 'kv');
   assert.equal(hit.value.clusters[0].long, 'Builders want more prototypes and fewer panels.');
+});
+
+test('Telegram agent can mint a Mini App question-series launch link', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    TELEGRAM_BOT_USERNAME: 'contextengineer_bot',
+    AGENT_BRIDGE_MINIAPP_SHORT_NAME: 'contextengineer',
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  assert.equal(issued.ok, true);
+  const readOnly = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'34'.repeat(20)}`,
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+    createdAt: '2026-12-01T12:01:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/mini-app-launch', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        questionIds: ['q-freeform', 'q-binary'],
+        skippedQuestionIds: ['q-binary'],
+        draftAnswersByQuestionId: {
+          'q-freeform': { text: 'Drafted answer for review' },
+        },
+      }),
+    }),
+    env,
+  });
+
+  const body = await jsonBody(response);
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.match(body.link, /^https:\/\/t\.me\/contextengineer_bot\/contextengineer\?startapp=cecb_/);
+  assert.deepEqual(body.questionIds, ['q-freeform', 'q-binary']);
+  assert.equal(body.prefilledDraftCount, 1);
+  const stored = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${body.launch}`));
+  assert.equal(stored.miniAppLaunch, true);
+  assert.equal(stored.action, 'submit_response');
+  assert.deepEqual(stored.serverContextRef.questionSeries.questionIds, ['q-freeform', 'q-binary']);
+  assert.deepEqual(stored.serverContextRef.questionSeries.skippedQuestionIds, ['q-binary']);
+  assert.deepEqual(stored.serverContextRef.questionSeries.draftAnswersByQuestionId['q-freeform'], {
+    text: 'Drafted answer for review',
+  });
+  assert.equal(JSON.stringify(stored).includes(issued.token), false);
+
+  const deniedResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/mini-app-launch', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${readOnly.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ sessionSlug: 'alpha', questionIds: ['q-freeform'] }),
+    }),
+    env,
+  });
+  const denied = await jsonBody(deniedResponse);
+  assert.equal(deniedResponse.status, 403);
+  assert.equal(denied.requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS);
 });
 
 test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user and session', async () => {

@@ -457,7 +457,11 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /\.submitButton \{[\s\S]*border-color: rgba\(255, 255, 255, 0\.82\);[\s\S]*background: transparent;[\s\S]*color: var\(--text\);/);
   assert.match(html, /\.submitButton\.submittedCheck \{[\s\S]*border-color: var\(--ok\);[\s\S]*background: transparent;[\s\S]*color: var\(--ok\);/);
   assert.match(html, /const shouldShowAnswerActions = \(question\) => \{/);
-  assert.match(html, /actions\.hidden = !shouldShowAnswerActions\(question\);/);
+  assert.match(html, /actions\.hidden = !\(shouldShowAnswerActions\(question\) \|\| seriesModeEnabled\(\)\);/);
+  assert.match(html, /const questionSeriesState = \(\) => state\.data\?\.questionSeries \|\| \{\};/);
+  assert.match(html, /function renderQuestionStack\(\)[\s\S]*const questions = orderedQuestions\(\);/);
+  assert.match(html, /skip\.textContent = 'Skip';/);
+  assert.match(html, /advanceSeriesQuestion\(question, \{ skip: true \}\);/);
   assert.equal(html.includes('Save Draft'), false);
   assert.equal(html.includes('saveDraftButton'), false);
   assert.match(html, /const DRAFT_AUTOSAVE_DELAY_MS = 700;/);
@@ -1609,6 +1613,60 @@ test('Mini App state pre-populates previously saved answers and exposes them in 
     value: 'agree',
     comments: 'Saved context',
   });
+});
+
+test('Mini App launch question series applies ordering skips and prefilled drafts', async () => {
+  const kv = new MemoryKv();
+  const launch = 'cecb_series1234';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionSeries: {
+        questionIds: ['q-second', 'q-first', 'q-third'],
+        skippedQuestionIds: ['q-first'],
+        draftAnswersByQuestionId: {
+          'q-second': { text: 'Drafted answer from the agent' },
+        },
+      },
+    },
+  }));
+
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        { sessionSlug: 'alpha', questionId: 'q-first', questionType: 'freeform', prompt: 'First prompt' },
+        { sessionSlug: 'alpha', questionId: 'q-second', questionType: 'freeform', prompt: 'Second prompt' },
+        { sessionSlug: 'alpha', questionId: 'q-third', questionType: 'freeform', prompt: 'Third prompt' },
+      ]),
+    },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(state.ok, true);
+  assert.equal(state.questionSeries.enabled, true);
+  assert.equal(state.questionSeries.questionCount, 3);
+  assert.equal(state.questionSeries.skippedQuestionCount, 1);
+  assert.deepEqual(state.questions.map((question) => question.prompt), ['Second prompt', 'Third prompt']);
+  assert.equal(state.activeQuestionKey, state.questions[0].questionKey);
+  assert.deepEqual(state.prefilledDraftAnswersByQuestionKey[state.questions[0].questionKey], {
+    text: 'Drafted answer from the agent',
+  });
+  assert.equal(JSON.stringify(state).includes('q-first'), false);
+  assert.equal(JSON.stringify(state).includes('q-second'), false);
+  assert.equal(JSON.stringify(state).includes('q-third'), false);
 });
 
 test('Mini App draft save endpoint returns draft metadata and reloads saved draft state', async () => {

@@ -754,11 +754,109 @@ async function resolveLaunchRecord(env = {}, launch = '') {
   return readActionRecord(env, parsed.actionId);
 }
 
+function normalizeMiniAppQuestionIdList(value = []) {
+  const source = Array.isArray(value)
+    ? value
+    : safeString(value).split(/[\s,;|]+/);
+  return source
+    .map((entry) => safeString(entry && typeof entry === 'object' ? (entry.questionId || entry.id || entry.key) : entry))
+    .filter(Boolean)
+    .filter((entry, index, values) => values.findIndex((candidate) => lower(candidate) === lower(entry)) === index)
+    .slice(0, 50);
+}
+
+function normalizeMiniAppPrefilledDraftAnswer(value = {}) {
+  if (typeof value === 'string') {
+    const text = normalizeText(value, 4000);
+    return text ? { text } : null;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const draft = {};
+  const text = normalizeText(value.text || value.answer || value.value || '', 4000);
+  const comments = normalizeText(value.comments || value.additionalComments || '', 1000);
+  const rawValue = safeString(value.value || value.answerValue || '');
+  if (text) draft.text = text;
+  if (rawValue) draft.value = rawValue.slice(0, 1000);
+  if (comments) draft.comments = comments;
+  if (Array.isArray(value.values) || Array.isArray(value.selectedValues)) {
+    const values = (Array.isArray(value.values) ? value.values : value.selectedValues)
+      .map(safeString)
+      .filter(Boolean)
+      .slice(0, 20);
+    if (values.length) draft.values = values;
+  }
+  return Object.keys(draft).length ? draft : null;
+}
+
+function normalizeMiniAppPrefilledDraftsByQuestionId(value = {}) {
+  const out = new Map();
+  if (Array.isArray(value)) {
+    value.forEach((entry) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return;
+      const questionId = safeString(entry.questionId || entry.id || entry.key);
+      const draft = normalizeMiniAppPrefilledDraftAnswer(entry.draft || entry.answer || entry);
+      if (questionId && draft) out.set(lower(questionId), draft);
+    });
+    return out;
+  }
+  if (!value || typeof value !== 'object') return out;
+  Object.entries(value).forEach(([questionId, draftValue]) => {
+    const draft = normalizeMiniAppPrefilledDraftAnswer(draftValue);
+    if (safeString(questionId) && draft) out.set(lower(questionId), draft);
+  });
+  return out;
+}
+
+function miniAppLaunchSeriesRef(record = {}) {
+  const ref = record?.serverContextRef || {};
+  const series = ref.questionSeries && typeof ref.questionSeries === 'object' && !Array.isArray(ref.questionSeries)
+    ? ref.questionSeries
+    : {};
+  const questionIds = normalizeMiniAppQuestionIdList(
+    series.questionIds ||
+    series.orderedQuestionIds ||
+    ref.questionIds ||
+    ref.orderedQuestionIds ||
+    ref.questionIdList ||
+    (ref.questionId ? [ref.questionId] : [])
+  );
+  const skippedQuestionIds = normalizeMiniAppQuestionIdList(
+    series.skippedQuestionIds ||
+    series.skipQuestionIds ||
+    ref.skippedQuestionIds ||
+    ref.skipQuestionIds
+  );
+  const draftsByQuestionId = normalizeMiniAppPrefilledDraftsByQuestionId(
+    series.draftAnswersByQuestionId ||
+    series.prefilledDraftsByQuestionId ||
+    series.draftsByQuestionId ||
+    ref.draftAnswersByQuestionId ||
+    ref.prefilledDraftsByQuestionId ||
+    ref.draftsByQuestionId ||
+    ref.drafts
+  );
+  const singleDraft = normalizeMiniAppPrefilledDraftAnswer(ref.prefilledDraft || ref.draftAnswer || ref.draft);
+  if (singleDraft && ref.questionId) draftsByQuestionId.set(lower(ref.questionId), singleDraft);
+  return {
+    enabled: Boolean(
+      series.enabled === true ||
+      questionIds.length > 1 ||
+      Array.isArray(ref.questionIds) ||
+      Array.isArray(ref.orderedQuestionIds) ||
+      Array.isArray(series.questionIds) ||
+      Array.isArray(series.orderedQuestionIds)
+    ),
+    questionIds,
+    skippedQuestionIds,
+    draftsByQuestionId,
+  };
+}
+
 function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   const launchRef = launchRecord?.serverContextRef || {};
   const launchSessionSlug = sanitizeSessionSlug(launchRef.sessionSlug);
   const questionSessionSlug = sanitizeSessionSlug(questionRef.sessionSlug);
-  const launchQuestionId = safeString(launchRef.questionId);
+  const launchQuestionIds = miniAppLaunchSeriesRef(launchRecord).questionIds;
   const questionId = safeString(questionRef.questionId);
   if (launchRecord?.miniAppLaunch !== true || launchRecord?.lane !== TELEGRAM_CHAT_LANES.MINI_APP) return false;
   if (![TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE].includes(launchRecord.action)) {
@@ -766,7 +864,7 @@ function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   }
   if (launchRef.sessionPicker !== true && (!launchSessionSlug || !questionSessionSlug || launchSessionSlug !== questionSessionSlug)) return false;
   if (launchRef.sessionPicker === true && !questionSessionSlug) return false;
-  if (launchQuestionId && questionId && lower(launchQuestionId) !== lower(questionId)) return false;
+  if (launchQuestionIds.length && questionId && !launchQuestionIds.some((candidate) => lower(candidate) === lower(questionId))) return false;
   return true;
 }
 
@@ -1550,7 +1648,8 @@ async function buildMiniAppState({
     };
   }
   const sessionSlug = effectiveSelectedSessionSlugs[0] || launchSessionSlug(launchRecord, env);
-  const launchQuestionId = safeString(launchRecord?.serverContextRef?.questionId);
+  const launchSeries = miniAppLaunchSeriesRef(launchRecord);
+  const launchQuestionId = launchSeries.questionIds[0] || safeString(launchRecord?.serverContextRef?.questionId);
   const loadedEntries = await Promise.all(effectiveSelectedSessionSlugs.map(async (slug) => ({
     sessionSlug: slug,
     session: linkedSessionBySlug.get(slug) || { sessionSlug: slug },
@@ -1569,7 +1668,20 @@ async function buildMiniAppState({
       createdAt,
     })));
   }));
-  const allQuestions = questionGroups.flat();
+  const loadedQuestions = questionGroups.flat();
+  const loadedQuestionsById = new Map();
+  loadedQuestions.forEach((question) => {
+    if (question?.questionId) loadedQuestionsById.set(lower(question.questionId), question);
+  });
+  const skippedLaunchQuestionIds = new Set(launchSeries.skippedQuestionIds.map(lower));
+  const seriesSourceQuestions = launchSeries.enabled
+    ? launchSeries.questionIds
+      .map((questionId) => loadedQuestionsById.get(lower(questionId)))
+      .filter(Boolean)
+    : [];
+  const allQuestions = seriesSourceQuestions.length
+    ? seriesSourceQuestions.filter((question) => !skippedLaunchQuestionIds.has(lower(question.questionId)))
+    : loadedQuestions;
   const questions = pagedMiniAppQuestions(allQuestions, requestedQuestionLimit);
   const availableQuestionCount = allQuestions.filter((question) => question?.canAnswer).length;
   const unavailableQuestionCount = allQuestions.filter((question) => question?.payloadUnavailable === true).length;
@@ -1577,7 +1689,10 @@ async function buildMiniAppState({
   const discoveredQuestionCount = loadedEntries.reduce((sum, entry) => (
     sum + (Number(entry.loaded.discoveredCount || entry.loaded.indexedQuestionCount || entry.loaded.questions?.length || 0) || 0)
   ), 0) || allQuestions.length;
-  const activeQuestionKey = questions.find((question) => question.activeFromLaunch)?.questionKey ||
+  const activeQuestionKey = (seriesSourceQuestions.length
+    ? questions.find((question) => question.canAnswer)?.questionKey || questions[0]?.questionKey
+    : '') ||
+    questions.find((question) => question.activeFromLaunch)?.questionKey ||
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
     '';
@@ -1596,6 +1711,11 @@ async function buildMiniAppState({
     sessionSlug,
     questions,
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
+  });
+  const prefilledDraftAnswersByQuestionKey = {};
+  questions.forEach((question) => {
+    const draft = launchSeries.draftsByQuestionId.get(lower(question.questionId));
+    if (draft && question.questionKey) prefilledDraftAnswersByQuestionKey[question.questionKey] = draft;
   });
   await applyMiniAppQuestionVoteSummaries({
     env,
@@ -1634,6 +1754,11 @@ async function buildMiniAppState({
   const sourceOk = loadedEntries.every((entry) => entry.loaded.ok !== false);
   const sourceReasons = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.reason)).filter(Boolean))];
   const sourceNames = [...new Set(loadedEntries.map((entry) => safeString(entry.loaded.source)).filter(Boolean))];
+  const questionSeriesKeys = seriesSourceQuestions
+    .filter((question) => !skippedLaunchQuestionIds.has(lower(question.questionId)))
+    .map((question) => question.questionKey)
+    .filter(Boolean);
+  const questionSeriesActiveIndex = Math.max(0, questionSeriesKeys.indexOf(activeQuestionKey));
   return {
     ok: true,
     app: 'ce-telegram-mini-app',
@@ -1655,6 +1780,19 @@ async function buildMiniAppState({
     submittedAnswers: submittedAnswerState.submittedAnswers,
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
     draftAnswersByQuestionKey: savedDraftState.draftAnswersByQuestionKey,
+    prefilledDraftAnswersByQuestionKey,
+    questionSeries: {
+      enabled: Boolean(seriesSourceQuestions.length),
+      questionCount: seriesSourceQuestions.length,
+      questionKeys: questionSeriesKeys,
+      activeIndex: questionSeriesActiveIndex,
+      currentQuestionKey: activeQuestionKey,
+      skippedQuestionKeys: seriesSourceQuestions
+        .filter((question) => skippedLaunchQuestionIds.has(lower(question.questionId)))
+        .map((question) => question.questionKey)
+        .filter(Boolean),
+      skippedQuestionCount: skippedLaunchQuestionIds.size,
+    },
     activeQuestionKey,
     questionCount: allQuestions.length,
     loadedQuestionCount: questions.length,
@@ -6729,6 +6867,8 @@ function telegramMiniAppHtml() {
       expandedQuestionKeys: new Set(),
       highlightedQuestionKey: '',
       highlightScrollDone: false,
+      seriesActiveIndex: 0,
+      seriesSkippedKeys: new Set(),
       sessionsPanelOpen: false,
       questionLimit: 0,
       loadedOnce: false,
@@ -7041,7 +7181,7 @@ function telegramMiniAppHtml() {
     const refreshQuestionActionControls = (question, sourceElement) => {
       const card = sourceElement?.closest?.('.card');
       const actions = card?.querySelector?.('.cardActions');
-      const visible = shouldShowAnswerActions(question);
+      const visible = shouldShowAnswerActions(question) || seriesModeEnabled();
       if (actions) actions.hidden = !visible;
       const button = card?.querySelector?.('.submitButton');
       applySubmitButtonState(button, question);
@@ -7081,6 +7221,44 @@ function telegramMiniAppHtml() {
       if (state.submittedAnswerKeys.has(question?.questionKey)) return true;
       if (state.savedDraftKeys.has(question?.questionKey)) return true;
       return false;
+    };
+    const questionSeriesState = () => state.data?.questionSeries || {};
+    const questionSeriesKeys = () => {
+      const series = questionSeriesState();
+      return Array.isArray(series.questionKeys) ? series.questionKeys.filter(Boolean) : [];
+    };
+    const seriesModeEnabled = () => questionSeriesState().enabled === true && questionSeriesKeys().length > 0;
+    const currentSeriesQuestionKey = () => {
+      const keys = questionSeriesKeys();
+      if (!keys.length) return '';
+      let index = Math.max(0, Math.min(keys.length - 1, Number(state.seriesActiveIndex || 0)));
+      while (
+        index < keys.length - 1 &&
+        (state.seriesSkippedKeys.has(keys[index]) || state.submittedAnswerKeys.has(keys[index]))
+      ) {
+        index += 1;
+      }
+      state.seriesActiveIndex = index;
+      return keys[index] || '';
+    };
+    const advanceSeriesQuestion = (question, { skip = false, renderNow = true } = {}) => {
+      if (!seriesModeEnabled() || !question?.questionKey) return false;
+      const keys = questionSeriesKeys();
+      const currentIndex = Math.max(0, keys.indexOf(question.questionKey));
+      if (skip) state.seriesSkippedKeys.add(question.questionKey);
+      const nextIndex = keys.findIndex((key, index) => (
+        index > currentIndex &&
+        !state.seriesSkippedKeys.has(key) &&
+        !state.submittedAnswerKeys.has(key)
+      ));
+      if (nextIndex >= 0) {
+        state.seriesActiveIndex = nextIndex;
+        state.activeKey = keys[nextIndex];
+        const nextQuestion = (state.data?.questions || []).find((entry) => entry.questionKey === keys[nextIndex]);
+        if (nextQuestion) expandQuestion(nextQuestion);
+      }
+      if (renderNow) render();
+      return nextIndex >= 0;
     };
     const normalizePopularQuestionLimit = (value) => {
       const parsed = Number.parseInt(String(value || ''), 10);
@@ -7231,6 +7409,12 @@ function telegramMiniAppHtml() {
     };
     const orderedQuestions = () => {
       const questions = filteredQuestionEntries();
+      if (seriesModeEnabled()) {
+        const activeSeriesKey = currentSeriesQuestionKey();
+        return questions
+          .map((entry) => entry.question)
+          .filter((question) => question.questionKey === activeSeriesKey);
+      }
       if (state.popularQuestionsOnly) {
         return questions.map((entry) => entry.question);
       }
@@ -7641,7 +7825,18 @@ function telegramMiniAppHtml() {
       }
       const actions = document.createElement('div');
       actions.className = 'cardActions';
-      actions.hidden = !shouldShowAnswerActions(question);
+      actions.hidden = !(shouldShowAnswerActions(question) || seriesModeEnabled());
+      if (seriesModeEnabled()) {
+        const skip = document.createElement('button');
+        skip.type = 'button';
+        skip.className = 'secondary';
+        skip.textContent = 'Skip';
+        skip.onclick = (event) => {
+          event.stopPropagation();
+          advanceSeriesQuestion(question, { skip: true });
+        };
+        actions.appendChild(skip);
+      }
       const submit = document.createElement('button');
       submit.type = 'button';
       submit.className = 'primary submitButton';
@@ -10004,6 +10199,7 @@ function telegramMiniAppHtml() {
           state.data.savedDrafts = state.data.savedDrafts.filter((draft) => draft.questionKey !== question.questionKey);
         }
         if (state.data?.draftAnswersByQuestionKey) delete state.data.draftAnswersByQuestionKey[question.questionKey];
+        advanceSeriesQuestion(question, { renderNow: false });
       } else {
         if (!suppressStatus) setStatus('Draft saved.', 'ok');
         state.submitDraftsMessage = '';
@@ -10631,7 +10827,17 @@ function telegramMiniAppHtml() {
           state.drafts[questionKey] = { ...(draft || {}) };
         }
       });
+      const prefilledDrafts = body.prefilledDraftAnswersByQuestionKey || {};
+      Object.entries(prefilledDrafts).forEach(([questionKey, draft]) => {
+        if (!answerHasContent(state.drafts[questionKey])) {
+          state.drafts[questionKey] = { ...(draft || {}) };
+        }
+      });
       const questions = Array.isArray(body.questions) ? body.questions : [];
+      if (body.questionSeries?.enabled === true && !state.loadedOnce) {
+        state.seriesActiveIndex = Number(body.questionSeries.activeIndex || 0) || 0;
+        state.seriesSkippedKeys = new Set((body.questionSeries.skippedQuestionKeys || []).filter(Boolean));
+      }
       const launchQuestion = questions.find((question) => question.activeFromLaunch === true && question.questionKey);
       if (launchQuestion && !state.loadedOnce) {
         state.highlightedQuestionKey = launchQuestion.questionKey;

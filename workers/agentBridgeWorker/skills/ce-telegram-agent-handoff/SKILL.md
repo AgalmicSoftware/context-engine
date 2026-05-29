@@ -124,9 +124,10 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Draft responses, show the proposed answers, and ask for confirmation.
 7. Save confirmed drafts with `POST <Worker>/telegram/agent/api/preferences`; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
-8. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
-9. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
-10. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
+8. When you have a reviewed sequence of questions, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
+9. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
+10. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
+11. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
 
@@ -373,6 +374,35 @@ POST /telegram/agent/api/preferences
 ```
 
 The response reports `draftCount` and `skipped`. Send the user to the Mini App for review after drafts are saved.
+
+## Mini App Question Links
+
+After the user confirms drafted answers, create a Mini App launch link when the
+next step should be editable review inside Telegram:
+
+```http
+POST /telegram/agent/api/mini-app-launch
+```
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "questionIds": ["q-freeform", "q-binary"],
+  "skippedQuestionIds": [],
+  "draftAnswersByQuestionId": {
+    "q-freeform": { "text": "Editable draft answer." },
+    "q-binary": { "value": "agree", "comments": "Optional rationale." }
+  }
+}
+```
+
+The worker resolves the question references against the token-bound session,
+stores an expiring Mini App launch record, and returns `link`, usually in the
+`https://t.me/<bot>/<mini-app-short-name>?startapp=<payload>` form. Send that
+link to the user. The Mini App opens the ordered series, pre-fills each draft
+without marking it as submitted, lets the user edit manually, use microphone
+dictation/transcription in the WebView, submit, or skip to the next question.
+The CE worker does not silently submit these answers.
 
 ## Review Activity
 
@@ -905,3 +935,5 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   agent-summarized URLs with durable `references` citations.
 - Agents can read active tag counts through `/telegram/agent/api/tags` before
   creating new question tags.
+- Agents can create Mini App question-series launch links with editable
+  prefilled drafts through `/telegram/agent/api/mini-app-launch`.

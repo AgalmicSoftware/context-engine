@@ -314,6 +314,25 @@ const CAPABILITIES = Object.freeze([
     ],
   }),
   freezeEntry({
+    id: 'agent.telegram.mini_app_launch.create',
+    category: 'launcher',
+    label: 'Create Mini App Question Link',
+    canonicalActionId: 'agent.telegram.mini_app_launch.create',
+    method: 'POST',
+    path: '/telegram/agent/api/mini-app-launch',
+    handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
+    requiredFields: ['sessionSlug', 'questionIds'],
+    optionalFields: ['skippedQuestionIds', 'draftAnswersByQuestionId'],
+    safeTelegramLanes: [
+      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      TELEGRAM_CHAT_LANES.MINI_APP,
+    ],
+    groupSafe: false,
+    notes: [
+      'Mints an expiring Mini App launch record for an ordered question series with editable prefilled drafts.',
+    ],
+  }),
+  freezeEntry({
     id: 'agent.telegram.results.topic_map',
     category: 'results',
     label: 'Read Telegram Topic Map Results',

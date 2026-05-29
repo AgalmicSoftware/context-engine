@@ -1,5 +1,6 @@
 import {
   AGENT_BRIDGE_EVENT_TYPES,
+  TELEGRAM_BRIDGE_ACTIONS,
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
 import {
@@ -9,6 +10,7 @@ import {
   loadSubmittedResultRecords,
   mintTelegramGroupApprovalLink,
   parseAgentOnboardingStartParam,
+  persistActionRecord,
   persistAnswerDraft,
   readGroupSessionBinding,
   readPrivateSessionBinding,
@@ -34,7 +36,7 @@ import {
   evaluateTelegramGroupSessionAccessForEnv,
 } from './telegramGroupApprovals.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
-import { buildOpaqueActionId } from './opaqueActions.mjs';
+import { buildOpaqueActionId, createRandomTelegramCallbackAction } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import {
   loadTelegramLightweightGroups,
@@ -443,6 +445,11 @@ function inputFromRequest(request, body = {}) {
     includeSponsored: Object.hasOwn(body, 'includeSponsored') ? body.includeSponsored : url.searchParams.get('includeSponsored'),
     sponsoredFirst: Object.hasOwn(body, 'sponsoredFirst') ? body.sponsoredFirst : url.searchParams.get('sponsoredFirst'),
     questionIds: Object.hasOwn(body, 'questionIds') ? body.questionIds : url.searchParams.get('questionIds'),
+    orderedQuestionIds: Object.hasOwn(body, 'orderedQuestionIds') ? body.orderedQuestionIds : url.searchParams.get('orderedQuestionIds'),
+    skippedQuestionIds: Object.hasOwn(body, 'skippedQuestionIds') ? body.skippedQuestionIds : url.searchParams.get('skippedQuestionIds'),
+    questionSeries: Object.hasOwn(body, 'questionSeries') ? body.questionSeries : undefined,
+    draftAnswersByQuestionId: Object.hasOwn(body, 'draftAnswersByQuestionId') ? body.draftAnswersByQuestionId : undefined,
+    prefilledDraftsByQuestionId: Object.hasOwn(body, 'prefilledDraftsByQuestionId') ? body.prefilledDraftsByQuestionId : undefined,
     sponsoredQuestionIds: Object.hasOwn(body, 'sponsoredQuestionIds') ? body.sponsoredQuestionIds : url.searchParams.get('sponsoredQuestionIds'),
     sponsoredQuestions: Object.hasOwn(body, 'sponsoredQuestions') ? body.sponsoredQuestions : url.searchParams.get('sponsoredQuestions'),
     operation: safeString(body.operation || url.searchParams.get('operation')),
@@ -480,6 +487,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   }
   if (pathname === '/telegram/agent/api/actions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/mini-app-launch') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
   if (pathname === '/telegram/agent/api/results') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
@@ -2641,6 +2651,138 @@ async function handleActionsRequest({
   });
 }
 
+function directLinkMiniAppShortName(env = {}) {
+  return safeString(
+    env.AGENT_BRIDGE_MINIAPP_SHORT_NAME ||
+    env.AGENT_BRIDGE_MINI_APP_SHORT_NAME ||
+    env.TELEGRAM_MINIAPP_SHORT_NAME ||
+    env.TELEGRAM_MINI_APP_SHORT_NAME
+  ).replace(/^@+/, '');
+}
+
+function directLinkMiniAppUrl(env = {}, launch = '') {
+  const botUsername = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
+  const shortName = directLinkMiniAppShortName(env);
+  const payload = safeString(launch);
+  if (botUsername && shortName && payload) {
+    return `https://t.me/${botUsername}/${shortName}?startapp=${encodeURIComponent(payload)}`;
+  }
+  const publicUrl = safeString(env.AGENT_BRIDGE_PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+  if (!publicUrl || !payload) return '';
+  return `${publicUrl}/telegram/mini-app?launch=${encodeURIComponent(payload)}`;
+}
+
+function normalizeMiniAppLaunchQuestionIds(input = {}, questions = []) {
+  const source = input.questionSeries?.questionIds ||
+    input.questionSeries?.orderedQuestionIds ||
+    input.orderedQuestionIds ||
+    input.questionIds ||
+    input.ids ||
+    input.questionId;
+  const refs = normalizeQuestionQueueRefs(source);
+  const ids = [];
+  const skipped = [];
+  refs.forEach((ref) => {
+    const question = findQuestionQueueCandidate(questions, ref) || findQuestionQueueCandidateByText(questions, ref);
+    const questionId = safeString(question?.questionId);
+    if (!questionId) {
+      skipped.push(ref);
+      return;
+    }
+    if (!ids.some((existing) => lower(existing) === lower(questionId))) ids.push(questionId);
+  });
+  return { ids, skipped };
+}
+
+function normalizeMiniAppLaunchDrafts(input = {}, questionIds = []) {
+  const source = input.questionSeries?.draftAnswersByQuestionId ||
+    input.questionSeries?.prefilledDraftsByQuestionId ||
+    input.questionSeries?.draftsByQuestionId ||
+    input.draftAnswersByQuestionId ||
+    input.prefilledDraftsByQuestionId ||
+    {};
+  const allowed = new Set(questionIds.map(lower));
+  const out = {};
+  if (source && typeof source === 'object' && !Array.isArray(source)) {
+    Object.entries(source).forEach(([questionId, draft]) => {
+      if (!allowed.has(lower(questionId))) return;
+      if (typeof draft === 'string') {
+        const text = safeString(draft).slice(0, 4000);
+        if (text) out[questionId] = { text };
+        return;
+      }
+      if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return;
+      const text = safeString(draft.text || draft.answer || draft.value).slice(0, 4000);
+      const comments = safeString(draft.comments || draft.additionalComments).slice(0, 1000);
+      const value = safeString(draft.value || draft.answerValue).slice(0, 1000);
+      const values = Array.isArray(draft.values || draft.selectedValues)
+        ? (draft.values || draft.selectedValues).map(safeString).filter(Boolean).slice(0, 20)
+        : [];
+      const normalized = {};
+      if (text) normalized.text = text;
+      if (comments) normalized.comments = comments;
+      if (value) normalized.value = value;
+      if (values.length) normalized.values = values;
+      if (Object.keys(normalized).length) out[questionId] = normalized;
+    });
+  }
+  return out;
+}
+
+async function handleMiniAppLaunchRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const resolved = normalizeMiniAppLaunchQuestionIds(input, questions);
+  if (!resolved.ids.length) {
+    return json({
+      ok: false,
+      reason: 'mini_app_launch_questions_required',
+      skipped: resolved.skipped,
+    }, { status: 400 });
+  }
+  const skipIds = new Set(normalizeQuestionQueueRefs(input.questionSeries?.skippedQuestionIds || input.skippedQuestionIds).map(lower));
+  const skippedQuestionIds = resolved.ids.filter((questionId) => skipIds.has(lower(questionId)));
+  const draftAnswersByQuestionId = normalizeMiniAppLaunchDrafts(input, resolved.ids);
+  const callback = createRandomTelegramCallbackAction({
+    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+    lane: TELEGRAM_CHAT_LANES.MINI_APP,
+    serverContextRef: {
+      sessionSlug: context.session.sessionSlug,
+      questionId: resolved.ids[0],
+      questionSeries: {
+        questionIds: resolved.ids,
+        skippedQuestionIds,
+        draftAnswersByQuestionId,
+      },
+    },
+  });
+  const record = {
+    ...callback.record,
+    callbackData: callback.callbackData,
+    miniAppLaunch: true,
+  };
+  assertNoSecretShape(record, 'Telegram Mini App launch records must not serialize secrets.');
+  const stored = await persistActionRecord(env, callback.callbackData, record);
+  if (!stored.ok) return json({ ok: false, reason: stored.reason || 'action_record_unavailable' }, { status: 503 });
+  const link = directLinkMiniAppUrl(env, callback.callbackData);
+  return json({
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    launch: callback.callbackData,
+    link,
+    directLink: link,
+    questionIds: resolved.ids,
+    skipped: resolved.skipped,
+    skippedQuestionCount: skippedQuestionIds.length,
+    prefilledDraftCount: Object.keys(draftAnswersByQuestionId).length,
+    instructions: 'Send link to the user. The Mini App opens the ordered question series with editable prefilled drafts and local skip controls.',
+  });
+}
+
 function agentBoolean(value) {
   if (typeof value === 'boolean') return value;
   return ['1', 'true', 'yes', 'on', 'demo'].includes(lower(value));
@@ -3550,6 +3692,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/actions' && request.method === 'GET') {
     return handleActionsRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/mini-app-launch' && request.method === 'POST') {
+    return handleMiniAppLaunchRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/results' && (request.method === 'GET' || request.method === 'POST')) {
     return handleResultsRequest({ env, context, input });
