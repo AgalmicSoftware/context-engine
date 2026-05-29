@@ -916,7 +916,7 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
 });
 
-test('Telegram agent tags endpoint returns active tag counts without question text', async () => {
+test('Telegram agent tags endpoint returns active tag counts and falls back to the default session', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -966,12 +966,8 @@ test('Telegram agent tags endpoint returns active tag counts without question te
   assert.equal(JSON.stringify(body).includes('organizers need a recap'), false);
   assert.equal(JSON.stringify(body).includes('agent-test-token'), false);
   assert.equal(unknownResponse.status, 200);
-  assert.deepEqual(unknown, {
-    ok: true,
-    sessionSlug: 'missing-session',
-    tags: [],
-    total: 0,
-  });
+  assert.equal(unknown.sessionSlug, 'alpha');
+  assert.equal(unknown.tags.find((entry) => entry.tag === 'shared')?.count, 2);
 });
 
 test('Telegram agent handoff rejects group calls from sessions with a different approved chat', async () => {
