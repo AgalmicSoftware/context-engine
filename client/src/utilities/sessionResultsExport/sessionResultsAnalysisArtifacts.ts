@@ -7,6 +7,25 @@ export const SESSION_RESULTS_ANALYSIS_MINIMUMS = Object.freeze({
   responses: 3,
 });
 
+export const SESSION_RESULTS_ANALYSIS_SECTION_KEYS = Object.freeze([
+  'breakdown',
+  'argumentMap',
+  'riskMatrix',
+  'atlas',
+] as const);
+
+export const SESSION_RESULTS_ANALYSIS_INPUT_LIMITS = Object.freeze({
+  maxOptionsPerQuestion: 12,
+  maxQuestionPromptChars: 900,
+  maxQuestions: 80,
+  maxResponseAdditionalChars: 900,
+  maxResponseAnswerChars: 1400,
+  maxResponses: 420,
+  maxSegmentDimensions: 12,
+  maxSegmentValuesPerDimension: 60,
+  maxTagsPerQuestion: 16,
+});
+
 const ETH_ADDRESS_TEXT_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
 const REDACTED_ADDRESS_PLACEHOLDER = '[redacted-address]';
 const SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS = [
@@ -26,6 +45,8 @@ export type SessionResultsAnalysisQuestionInput = {
   tags?: string[];
   type?: string;
 };
+
+export type SessionResultsAnalysisSectionKey = typeof SESSION_RESULTS_ANALYSIS_SECTION_KEYS[number];
 
 export type SessionResultsAnalysisResponseInput = {
   additional?: unknown;
@@ -57,6 +78,7 @@ export type SessionResultsAnalysisAiPayload = {
     questions: number;
     responses: number;
   };
+  inputLimits: typeof SESSION_RESULTS_ANALYSIS_INPUT_LIMITS;
   questions: SessionResultsAnalysisQuestionInput[];
   responses: SessionResultsAnalysisAiResponse[];
   segmentDimensions: SessionResultsAnalysisSegmentDimension[];
@@ -147,6 +169,13 @@ const normalizeAiText = (value: unknown): string => (
   normalizeText(value).replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER)
 );
 
+const truncateAiText = (value: unknown, maxLength: number): string => {
+  const text = normalizeAiText(value);
+  const limit = Math.max(0, Number(maxLength) || 0);
+  if (!limit || text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 15)).trimEnd()} [truncated]`;
+};
+
 const toPlainRecord = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -207,7 +236,7 @@ const normalizeSegmentDimension = (
   return {
     id,
     label,
-    values,
+    values: values.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxSegmentValuesPerDimension),
     ...(isSafeAnalysisLabel(record.source) ? { source: normalizeAiText(record.source) } : {}),
   };
 };
@@ -218,7 +247,7 @@ const normalizeAnalysisSegmentDimensions = (
   toArray(value)
     .map(normalizeSegmentDimension)
     .filter(Boolean) as SessionResultsAnalysisSegmentDimension[]
-);
+).slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxSegmentDimensions);
 
 const shouldDropAnalysisOutputKey = (key: string): boolean => (
   SENSITIVE_ANALYSIS_OUTPUT_KEY_PATTERNS.some((pattern) => pattern.test(key))
@@ -311,17 +340,27 @@ export const buildSessionResultsAnalysisAiPayload = ({
     return participant;
   };
 
-  const normalizedQuestions = questions.map((question) => ({
+  const normalizedQuestions = questions.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestions).map((question) => ({
     id: normalizeAiText(question?.id),
-    options: Array.isArray(question?.options) ? question.options.map(normalizeAiText).filter(Boolean) : [],
-    prompt: normalizeAiText(question?.prompt),
-    tags: Array.isArray(question?.tags) ? question.tags.map(normalizeAiText).filter(Boolean) : [],
+    options: Array.isArray(question?.options)
+      ? question.options
+        .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxOptionsPerQuestion)
+        .map((option) => truncateAiText(option, 140))
+        .filter(Boolean)
+      : [],
+    prompt: truncateAiText(question?.prompt, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars),
+    tags: Array.isArray(question?.tags)
+      ? question.tags
+        .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxTagsPerQuestion)
+        .map((tag) => truncateAiText(tag, 120))
+        .filter(Boolean)
+      : [],
     type: normalizeAiText(question?.type),
   })).filter((question) => question.id || question.prompt);
 
-  const normalizedResponses = responses.map((response) => {
-    const answer = getResponseText(response?.answer);
-    const additional = getResponseText(response?.additional);
+  const normalizedResponses = responses.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses).map((response) => {
+    const answer = truncateAiText(getResponseText(response?.answer), SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAnswerChars);
+    const additional = truncateAiText(getResponseText(response?.additional), SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponseAdditionalChars);
     if (!answer && !additional) return null;
     const participant = getParticipant(response?.participantAddress);
     return {
@@ -342,6 +381,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
         questions: normalizedQuestions.length,
         responses: normalizedResponses.length,
       },
+      inputLimits: SESSION_RESULTS_ANALYSIS_INPUT_LIMITS,
       questions: normalizedQuestions,
       responses: normalizedResponses,
       segmentDimensions: normalizedSegmentDimensions,
@@ -379,22 +419,60 @@ export const evaluateSessionResultsAnalysisEligibility = (
   };
 };
 
-export const buildSessionResultsAnalysisPrompt = (
-  payload: SessionResultsAnalysisAiPayload
-): string => `You are generating Context Engine session analysis artifacts.
+const SESSION_RESULTS_SECTION_PROMPTS: Record<SessionResultsAnalysisSectionKey, {
+  description: string;
+  jsonShape: string;
+  outputKey: SessionResultsAnalysisSectionKey;
+}> = {
+  breakdown: {
+    description: 'Breakdown: infer dataset-specific comparison/filter dimensions and concise thematic groups.',
+    outputKey: 'breakdown',
+    jsonShape: `{
+  "breakdown": {
+    "summary": { "overview": "short neutral synthesis" },
+    "dimensions": [{ "id": "sbt_groups", "label": "SBT / Groups", "source": "sbt", "values": [{ "id": "builders", "label": "Builders", "count": 3 }] }],
+    "groups": [{ "id": "group_1", "label": "theme", "summary": "paraphrased summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }]
+  }
+}`,
+  },
+  argumentMap: {
+    description: 'Argument Map: identify debates, claims, stances, and supporting/opposing relationships.',
+    outputKey: 'argumentMap',
+    jsonShape: `{
+  "argumentMap": {
+    "debates": [{ "id": "debate_1", "title": "debate title", "claims": [{ "id": "claim_1", "label": "paraphrased claim", "stance": "support|oppose|mixed", "participantIds": ["participant_001"], "questionIds": ["q1"] }] }]
+  }
+}`,
+  },
+  riskMatrix: {
+    description: 'Risk Matrix: infer a custom per-session risk taxonomy, likelihood/impact values, and paraphrased evidence.',
+    outputKey: 'riskMatrix',
+    jsonShape: `{
+  "riskMatrix": {
+    "categories": [{ "id": "risk_1", "label": "custom category", "description": "why it matters" }],
+    "heatmap": { "risk_1": { "likelihood": "low|medium|high", "impact": "low|medium|high" } },
+    "comments": [{ "id": "risk_comment_1", "categoryId": "risk_1", "summary": "paraphrased evidence", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
+    "scenarioLinks": []
+  }
+}`,
+  },
+  atlas: {
+    description: 'Atlas Nodes: create explorable conceptual nodes and labeled edges from the session discussion.',
+    outputKey: 'atlas',
+    jsonShape: `{
+  "atlas": {
+    "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
+    "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }]
+  }
+}`,
+  },
+};
 
-Return only valid JSON. Do not include markdown fences.
+const isSessionResultsAnalysisSectionKey = (value: unknown): value is SessionResultsAnalysisSectionKey => (
+  (SESSION_RESULTS_ANALYSIS_SECTION_KEYS as readonly string[]).includes(String(value || ''))
+);
 
-Privacy rules:
-- The input uses synthetic participant IDs only. Never invent or request wallet addresses.
-- If segmentDimensions is non-empty, use those dataset-specific dimensions for Breakdown comparison/filter controls. They may represent SBTs, gates, groups, tags, or other non-address cohort labels.
-- Do not use demo-only dimensions such as Era, Region, Country, Gender, Affiliation, or Atlas Category unless those exact dimensions are present in segmentDimensions.
-- Never put wallet addresses or contract addresses in generated segment labels, ids, summaries, or participant references.
-- You may reason from raw answer text, but your summaries must paraphrase instead of quoting identifiable freeform responses.
-- Keep participant references as synthetic IDs such as participant_001.
-
-Generate this JSON shape:
-{
+const buildAllSectionsJsonShape = (): string => `{
   "breakdown": {
     "summary": { "overview": "short neutral synthesis" },
     "dimensions": [{ "id": "sbt_groups", "label": "SBT / Groups", "source": "sbt", "values": [{ "id": "builders", "label": "Builders", "count": 3 }] }],
@@ -413,10 +491,45 @@ Generate this JSON shape:
     "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
     "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }]
   }
-}
+}`;
+
+export const buildSessionResultsAnalysisPrompt = (
+  payload: SessionResultsAnalysisAiPayload,
+  section: SessionResultsAnalysisSectionKey | 'all' = 'all'
+): string => {
+  const sectionConfig = isSessionResultsAnalysisSectionKey(section)
+    ? SESSION_RESULTS_SECTION_PROMPTS[section]
+    : null;
+  const sectionLine = sectionConfig
+    ? `Generate only this result view: ${sectionConfig.description}`
+    : 'Generate all Context Engine session analysis result views.';
+  const outputInstruction = sectionConfig
+    ? `Return exactly one top-level "${sectionConfig.outputKey}" object. Do not include other result-view keys.`
+    : 'Return all top-level result-view objects shown below.';
+  const jsonShape = sectionConfig ? sectionConfig.jsonShape : buildAllSectionsJsonShape();
+
+  return `You are generating Context Engine session analysis artifacts.
+
+Return only valid JSON. Do not include markdown fences.
+
+${sectionLine}
+${outputInstruction}
+
+Privacy rules:
+- The input uses synthetic participant IDs only. Never invent or request wallet addresses.
+- If segmentDimensions is non-empty, use those dataset-specific dimensions for Breakdown comparison/filter controls. They may represent SBTs, gates, groups, tags, or other non-address cohort labels.
+- Do not use demo-only dimensions such as Era, Region, Country, Gender, Affiliation, or Atlas Category unless those exact dimensions are present in segmentDimensions.
+- Never put wallet addresses or contract addresses in generated segment labels, ids, summaries, or participant references.
+- You may reason from raw answer text, but your summaries must paraphrase instead of quoting identifiable freeform responses.
+- Keep participant references as synthetic IDs such as participant_001.
+- The input is capped by inputLimits to protect context windows. Work only from included data and mention uncertainty in summaries when the visible sample is thin.
+
+Generate this JSON shape:
+${jsonShape}
 
 Session input:
 ${JSON.stringify(payload, null, 2)}`;
+};
 
 const parseJsonObject = (raw: unknown): Record<string, unknown> => {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
@@ -516,6 +629,45 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
         scenarioLinks,
         ...(categories.length || comments.length ? {} : { reason: 'AI generation did not return risk matrix data.' }),
       },
+    },
+    source: 'ai-generated',
+    version: SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
+  };
+};
+
+export const mergeGeneratedSessionResultsAnalysisArtifacts = ({
+  base = null,
+  next = null,
+  sections = SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
+}: {
+  base?: SessionResultsGeneratedAnalysisArtifact | null;
+  next?: SessionResultsGeneratedAnalysisArtifact | null;
+  sections?: readonly SessionResultsAnalysisSectionKey[];
+} = {}): SessionResultsGeneratedAnalysisArtifact | null => {
+  if (!base) return next || null;
+  if (!next) return base;
+
+  const nextSectionSet = new Set<SessionResultsAnalysisSectionKey>(
+    (Array.isArray(sections) ? sections : [])
+      .filter(isSessionResultsAnalysisSectionKey)
+  );
+
+  const shouldUseNext = (key: SessionResultsAnalysisSectionKey): boolean => (
+    nextSectionSet.has(key)
+  );
+
+  return {
+    ...base,
+    generatedAt: next.generatedAt || base.generatedAt,
+    inputSignature: next.inputSignature || base.inputSignature,
+    kind: SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND,
+    model: [base.model, next.model].filter(Boolean).join('+') || undefined,
+    participants: base.participants.length ? base.participants : next.participants,
+    sections: {
+      argumentMap: shouldUseNext('argumentMap') ? next.sections.argumentMap : base.sections.argumentMap,
+      atlas: shouldUseNext('atlas') ? next.sections.atlas : base.sections.atlas,
+      breakdown: shouldUseNext('breakdown') ? next.sections.breakdown : base.sections.breakdown,
+      riskMatrix: shouldUseNext('riskMatrix') ? next.sections.riskMatrix : base.sections.riskMatrix,
     },
     source: 'ai-generated',
     version: SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
