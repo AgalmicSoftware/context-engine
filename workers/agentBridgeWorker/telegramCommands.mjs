@@ -6542,22 +6542,23 @@ async function buildResultsOptionsResponse({
   normalized,
   command,
   env,
+  session = null,
   sessionSlug = '',
-  intro = 'Choose a results view.',
+  intro = '',
   createdAt = null,
 } = {}) {
+  const label = sessionLabel(session || { sessionSlug });
   const lines = [
     'Results',
     '',
-    sessionSlug ? `Selected session: ${sessionSlug}` : 'Selected session: none',
+    sessionSlug ? `Selected session: ${label}` : 'Selected session: none',
     '',
-    intro,
-    '',
+    ...(intro ? [intro, ''] : []),
     'Consensus: highlights questions with the most disagreement across responses.',
-    'Group: shows participant answer patterns by question using P1, P2, etc.',
-    'Topic map: circles view of answered question topics.',
     '',
-    '/results [ consensus | group | topic ]',
+    'Group: Response clusters across questions.',
+    '',
+    'Topic Map',
   ];
   return reply({
     chatId: normalized.chat.chatId,
@@ -6568,7 +6569,7 @@ async function buildResultsOptionsResponse({
     screen: 'results_options',
     command,
     normalized,
-    extra: { sessionSlug },
+    extra: { sessionSlug, sessionName: label },
   });
 }
 
@@ -6610,6 +6611,7 @@ async function buildResultsResponse({
       normalized,
       command,
       env,
+      session: resolved.session,
       sessionSlug: resolved.session.sessionSlug,
       createdAt,
     });
@@ -6619,8 +6621,9 @@ async function buildResultsResponse({
       normalized,
       command,
       env,
+      session: resolved.session,
       sessionSlug: resolved.session.sessionSlug,
-      intro: `Unknown results view "${modeArg}". Choose one of these options.`,
+      intro: `Unknown results view "${modeArg}".`,
       createdAt,
     });
   }

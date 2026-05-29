@@ -2222,11 +2222,12 @@ test('/results without arguments explains available result views', async () => {
   assert.equal(result.screen, 'results_options');
   assert.equal(result.response.method, 'sendMessage');
   assert.match(result.response.text, /^Results/);
-  assert.match(result.response.text, /Selected session: alpha/);
+  assert.match(result.response.text, /Selected session: Alpha Session/);
+  assert.equal(result.response.text.includes('Choose a results view'), false);
   assert.match(result.response.text, /Consensus: highlights questions with the most disagreement/);
-  assert.match(result.response.text, /Group: shows participant answer patterns/);
-  assert.match(result.response.text, /Topic map: circles view/);
-  assert.match(result.response.text, /\/results \[ consensus \| group \| topic \]/);
+  assert.match(result.response.text, /Consensus:[\s\S]*\n\nGroup: Response clusters across questions\.[\s\S]*\n\nTopic Map/);
+  assert.equal(result.response.text.includes('Topic map: circles view'), false);
+  assert.equal(result.response.text.includes('/results [ consensus | group | topic ]'), false);
   assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Consensus', 'Group', 'Topic Map']);
 });
 
