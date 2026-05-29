@@ -21,7 +21,7 @@ export type SurveyQuestionsSubmitControllerResult = {
   path: string;
   plan: SurveyQuestionsPrimarySubmitPlan;
   reason: string;
-  status: 'inert' | 'unhandled';
+  status: 'inert' | 'navigated' | 'unhandled';
 };
 
 export type RunSurveyQuestionsSubmitControllerArgs = {
@@ -31,6 +31,7 @@ export type RunSurveyQuestionsSubmitControllerArgs = {
 
 export const runSurveyQuestionsSubmitController = ({
   plan,
+  ports = {},
 }: RunSurveyQuestionsSubmitControllerArgs): SurveyQuestionsSubmitControllerResult => {
   if (plan.action === 'inert') {
     return {
@@ -39,6 +40,20 @@ export const runSurveyQuestionsSubmitController = ({
       plan,
       reason: plan.reason,
       status: 'inert',
+    };
+  }
+
+  if (plan.action === 'navigate') {
+    const path = plan.path || '';
+    if (typeof ports.navigateToResponse === 'function') {
+      ports.navigateToResponse(path, plan);
+    }
+    return {
+      action: plan.action,
+      path,
+      plan,
+      reason: plan.reason,
+      status: 'navigated',
     };
   }
 
