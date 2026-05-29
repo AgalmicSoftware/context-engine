@@ -12,16 +12,19 @@ import {
   persistTelegramUserSessionBinding,
   SUBMIT_REQUEST_KV_PREFIX,
 } from './telegramCommands.mjs';
+import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { submitRequestUserKvKey } from './telegramSubmitQueue.mjs';
 
 class MemoryKv {
   constructor() {
     this.store = new Map();
+    this.options = new Map();
   }
 
-  async put(key, value) {
+  async put(key, value, options = null) {
     this.store.set(key, value);
+    this.options.set(key, options);
   }
 
   async get(key) {
@@ -348,6 +351,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="closeAddQuestion"[^>]*aria-label="Close add question"/);
   assert.match(html, /id="closeFilter"[^>]*aria-label="Close filters"/);
   assert.match(html, /id="closeSettings"[^>]*aria-label="Close settings"/);
+  assert.match(html, /id="topicPreferences"/);
+  assert.match(html, /id="demographicLinkOptIn"/);
+  assert.match(html, /id="draftDivergenceOptIn"/);
   assert.match(html, /bindPanelClose\(el\.closeResults, el\.resultsPanel, el\.showResults\);/);
   assert.equal(html.includes('state.resultSectionsOpen.panel'), false);
   assert.match(html, /if \(el\.showDocuments\) \{/);
@@ -1549,24 +1555,40 @@ test('Mini App settings accepts show-unanswered-first with true default', () => 
   const defaultState = __test__telegramMiniApp.normalizeAgentSettingsInput({
     showUnansweredFirst: true,
     agentAutoApplyQuestionVotes: true,
+    topicPreferences: 'AI futures, governance',
+    demographicLinkOptIn: 'yes',
+    draftDivergenceOptIn: true,
   });
   assert.equal(defaultState.ok, true);
   assert.equal(defaultState.publicSummary.showUnansweredFirst, true);
   assert.equal(defaultState.publicSummary.agentAutoApplyQuestionVotes, true);
+  assert.deepEqual(defaultState.publicSummary.topicPreferences, ['ai-futures', 'governance']);
+  assert.equal(defaultState.publicSummary.demographicLinkOptIn, true);
+  assert.equal(defaultState.publicSummary.draftDivergenceOptIn, true);
 
   const disabled = __test__telegramMiniApp.normalizeAgentSettingsInput({
     showUnansweredFirst: 'false',
     agentAutoApplyQuestionVotes: 'off',
+    demographicLinkOptIn: 'off',
+    draftDivergenceOptIn: 'no',
   });
   assert.equal(disabled.ok, true);
   assert.equal(disabled.publicSummary.showUnansweredFirst, false);
   assert.equal(disabled.publicSummary.agentAutoApplyQuestionVotes, false);
+  assert.equal(disabled.publicSummary.demographicLinkOptIn, false);
+  assert.equal(disabled.publicSummary.draftDivergenceOptIn, false);
 
   const invalid = __test__telegramMiniApp.normalizeAgentSettingsInput({
     agentAutoApplyQuestionVotes: 'maybe',
   });
   assert.equal(invalid.ok, false);
   assert.equal(invalid.reason, 'agent_auto_apply_question_votes_invalid');
+
+  const invalidOptIn = __test__telegramMiniApp.normalizeAgentSettingsInput({
+    draftDivergenceOptIn: 'sometimes',
+  });
+  assert.equal(invalidOptIn.ok, false);
+  assert.equal(invalidOptIn.reason, 'draft_divergence_opt_in_invalid');
 });
 
 test('Mini App state pre-populates previously saved answers and exposes them in settings', async () => {
@@ -1724,6 +1746,113 @@ test('Mini App draft save endpoint returns draft metadata and reloads saved draf
   assert.deepEqual(after.draftAnswersByQuestionKey[after.questions[0].questionKey], {
     value: 'disagree',
     comments: 'Needs work',
+  });
+});
+
+test('Mini App stores draft divergence only after explicit opt in', async () => {
+  const kv = new MemoryKv();
+  const botToken = '123456:test-token';
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const initData = signInitData({
+    auth_date: String(nowSeconds),
+    query_id: 'mini-divergence-query',
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
+  const launch = 'cecb_divergence123';
+  const questionId = 'q-divergence';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'submit_response',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: {
+      sessionSlug: 'alpha',
+      questionSeries: {
+        questionIds: [questionId],
+        draftAnswersByQuestionId: {
+          [questionId]: { text: 'Agent-generated starting draft' },
+        },
+      },
+    },
+  }));
+  const env = {
+    AGENT_ACTION_KV: kv,
+    TELEGRAM_BOT_TOKEN: botToken,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId,
+      questionType: 'freeform',
+      prompt: 'What should the agent improve?',
+    }]),
+  };
+  const authHeaders = { 'x-telegram-init-data': initData };
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`, {
+      headers: authHeaders,
+    }),
+    env,
+  });
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+
+  async function submitAnswer(text) {
+    const response = await handleTelegramMiniAppRequest({
+      request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          launch,
+          questionKey,
+          answer: { text },
+          submit: true,
+        }),
+      }),
+      env,
+    });
+    return { response, body: await response.json() };
+  }
+
+  const optOut = await submitAnswer('Edited without research opt in');
+  assert.equal(optOut.response.status, 200);
+  assert.equal(optOut.body.ok, true);
+  assert.equal(optOut.body.draftDivergence.stored, false);
+  assert.equal(optOut.body.draftDivergence.reason, 'draft_divergence_opt_out');
+  assert.deepEqual(Array.from(kv.store.keys()).filter((key) => (
+    key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX)
+  )), []);
+
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    patch: { draftDivergenceOptIn: true },
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+
+  const optIn = await submitAnswer('Edited final answer after opt in');
+  assert.equal(optIn.response.status, 200);
+  assert.equal(optIn.body.ok, true);
+  assert.equal(optIn.body.draftDivergence.stored, true);
+  assert.equal(JSON.stringify(optIn.body).includes('telegram:mini-app-draft-divergence'), false);
+  const divergenceKeys = Array.from(kv.store.keys()).filter((key) => (
+    key.startsWith(__test__telegramMiniApp.MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX)
+  ));
+  assert.equal(divergenceKeys.length, 1);
+  assert.equal(kv.options.get(divergenceKeys[0]), null);
+  const record = JSON.parse(await kv.get(divergenceKeys[0]));
+  assert.equal(record.type, 'telegram_mini_app_draft_divergence');
+  assert.deepEqual(record.draftAnswer, { text: 'Agent-generated starting draft' });
+  assert.deepEqual(record.sentAnswer, {
+    questionType: 'freeform',
+    text: 'Edited final answer after opt in',
+    comments: '',
   });
 });
 

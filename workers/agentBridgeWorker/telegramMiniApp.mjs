@@ -124,6 +124,7 @@ const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
+const MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX = 'telegram:mini-app-draft-divergence:v1:';
 const MINI_APP_DOCUMENT_TTL_SECONDS = 180 * 24 * 60 * 60;
 const MINI_APP_DOCUMENT_MAX_BYTES = 1024 * 1024;
 const MINI_APP_DOCUMENT_URL_MAX_LENGTH = 2048;
@@ -2194,6 +2195,52 @@ async function persistSubmitRequest({
   };
 }
 
+function miniAppDraftDivergenceKey({
+  telegramUserId = '',
+  sessionSlug = '',
+  questionId = '',
+  createdAt = '',
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
+  const qid = questionIdSeedPart(questionId);
+  const fingerprint = stableFingerprint({ telegramUserId, sessionSlug, questionId, createdAt });
+  return slug && user && qid ? `${MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX}${slug}:${user}:${qid}:${fingerprint}` : '';
+}
+
+async function persistMiniAppDraftDivergence({
+  env = {},
+  auth = {},
+  questionRef = {},
+  draftAnswer = null,
+  sentAnswer = null,
+  createdAt = null,
+} = {}) {
+  const kv = env?.AGENT_ACTION_KV;
+  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  const sessionSlug = sanitizeSessionSlug(questionRef.sessionSlug);
+  const questionId = safeString(questionRef.questionId);
+  if (!telegramUserId || !sessionSlug || !questionId || !draftAnswer || !sentAnswer) {
+    return { ok: false, reason: 'draft_divergence_incomplete' };
+  }
+  const key = miniAppDraftDivergenceKey({ telegramUserId, sessionSlug, questionId, createdAt });
+  if (!key) return { ok: false, reason: 'draft_divergence_key_invalid' };
+  const record = {
+    type: 'telegram_mini_app_draft_divergence',
+    version: 1,
+    telegramUserId,
+    sessionSlug,
+    questionId,
+    draftAnswer,
+    sentAnswer,
+    createdAt,
+  };
+  assertNoSecretShape(record, 'Telegram Mini App draft-divergence records must not serialize secrets.');
+  await kv.put(key, JSON.stringify(record));
+  return { ok: true, stored: true };
+}
+
 async function persistSettingsUpdateRequest({
   env = {},
   auth = {},
@@ -2299,8 +2346,9 @@ async function handleDraftRequest({
   ) {
     return json({ ok: false, error: 'question_action_expired' }, { status: 404 });
   }
+  let launchRecord = null;
   if (auth.authMode === 'telegram') {
-    const launchRecord = await resolveLaunchRecord(env, launch);
+    launchRecord = await resolveLaunchRecord(env, launch);
     if (!launchRecord) {
       return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
     }
@@ -2350,6 +2398,32 @@ async function handleDraftRequest({
     }, { status: 503 });
   }
 
+  let draftDivergence = { stored: false, reason: body.submit === true ? 'draft_divergence_opt_out' : 'not_submitted' };
+  if (submitRequest?.ok === true && body.submit === true) {
+    const settings = await loadTelegramAgentSettings({
+      env,
+      sessionSlug: questionRef.sessionSlug,
+      telegramUserId: auth.user?.telegramUserId,
+    });
+    if (settings.draftDivergenceOptIn === true) {
+      const launchDraft = launchRecord
+        ? miniAppLaunchSeriesRef(launchRecord).draftsByQuestionId.get(lower(questionRef.questionId))
+        : null;
+      if (launchDraft) {
+        draftDivergence = await persistMiniAppDraftDivergence({
+          env,
+          auth,
+          questionRef,
+          draftAnswer: launchDraft,
+          sentAnswer: normalizedAnswer.answer,
+          createdAt,
+        });
+      } else {
+        draftDivergence = { stored: false, reason: 'launch_draft_missing' };
+      }
+    }
+  }
+
   return json({
     ok: true,
     status: submitRequest?.ok ? (submitRequest.status || 'submit_request_created') : 'draft_saved',
@@ -2361,6 +2435,7 @@ async function handleDraftRequest({
       submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
     },
     submitRequest,
+    draftDivergence,
   });
 }
 
@@ -5291,6 +5366,7 @@ function telegramMiniAppHtml() {
     }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .settingsPanel select,
+    .settingsPanel textarea,
     .documentsPanel select,
     .addQuestionPanel select,
     .groupCountrySelect {
@@ -5317,7 +5393,8 @@ function telegramMiniAppHtml() {
       align-items: end;
     }
     .settingsPanel {
-      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
       border-color: rgba(255, 209, 102, 0.52);
       background: rgba(92, 71, 31, 0.36);
     }
@@ -6723,6 +6800,18 @@ function telegramMiniAppHtml() {
           <label for="draftStyle">Draft style</label>
           <select id="draftStyle"></select>
         </div>
+        <div class="field">
+          <label for="topicPreferences">Topics</label>
+          <textarea id="topicPreferences" rows="2" placeholder="AI futures, governance, Edge City"></textarea>
+        </div>
+        <label class="toggle">
+          <input id="demographicLinkOptIn" type="checkbox">
+          <span>Link demographics</span>
+        </label>
+        <label class="toggle">
+          <input id="draftDivergenceOptIn" type="checkbox">
+          <span>Draft edit research</span>
+        </label>
         <label class="toggle">
           <input id="agentAutoApplyQuestionVotes" type="checkbox">
           <span>Agent auto-votes</span>
@@ -6990,6 +7079,9 @@ function telegramMiniAppHtml() {
       settingsPanel: document.getElementById('settingsPanel'),
       closeSettings: document.getElementById('closeSettings'),
       draftStyle: document.getElementById('draftStyle'),
+      topicPreferences: document.getElementById('topicPreferences'),
+      demographicLinkOptIn: document.getElementById('demographicLinkOptIn'),
+      draftDivergenceOptIn: document.getElementById('draftDivergenceOptIn'),
       demoDataResults: document.getElementById('demoDataResults'),
       agentAutoApplyQuestionVotes: document.getElementById('agentAutoApplyQuestionVotes'),
       saveSettings: document.getElementById('saveSettings'),
@@ -10055,6 +10147,15 @@ function telegramMiniAppHtml() {
       if (el.agentAutoApplyQuestionVotes) {
         el.agentAutoApplyQuestionVotes.checked = values.agentAutoApplyQuestionVotes === true;
       }
+      if (el.topicPreferences) {
+        el.topicPreferences.value = Array.isArray(values.topicPreferences) ? values.topicPreferences.join(', ') : '';
+      }
+      if (el.demographicLinkOptIn) {
+        el.demographicLinkOptIn.checked = values.demographicLinkOptIn === true;
+      }
+      if (el.draftDivergenceOptIn) {
+        el.draftDivergenceOptIn.checked = values.draftDivergenceOptIn === true;
+      }
       const submittedAnswers = Array.isArray(state.data?.submittedAnswers) ? state.data.submittedAnswers : [];
       const savedDrafts = Array.isArray(state.data?.savedDrafts) ? state.data.savedDrafts : [];
       el.savedDrafts.innerHTML = '';
@@ -10242,6 +10343,9 @@ function telegramMiniAppHtml() {
           sessionSlug: state.data?.session?.sessionSlug || '',
           settings: {
             draftStyle: el.draftStyle.value,
+            topicPreferences: el.topicPreferences ? el.topicPreferences.value : '',
+            demographicLinkOptIn: el.demographicLinkOptIn ? el.demographicLinkOptIn.checked : false,
+            draftDivergenceOptIn: el.draftDivergenceOptIn ? el.draftDivergenceOptIn.checked : false,
             agentAutoApplyQuestionVotes: el.agentAutoApplyQuestionVotes ? el.agentAutoApplyQuestionVotes.checked : false,
           },
         }),
@@ -11258,6 +11362,7 @@ export async function handleTelegramMiniAppRequest({
 
 export const __test__telegramMiniApp = {
   AGENT_REQUEST_KV_PREFIX,
+  MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX,
   MINI_APP_QUESTION_VOTE_KV_PREFIX,
   SUBMIT_REQUEST_KV_PREFIX,
   buildMiniAppState,

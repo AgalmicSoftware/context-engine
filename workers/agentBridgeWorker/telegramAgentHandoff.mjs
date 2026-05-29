@@ -100,8 +100,16 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
     prompt: 'Can your agent share non-identifying demographics for research only, never published in connection to you?',
   },
   {
+    id: 'demographic_link_opt_in',
+    prompt: 'Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?',
+  },
+  {
     id: 'draft_responses',
     prompt: 'Can your agent draft question responses for you based on your activity and user file?',
+  },
+  {
+    id: 'draft_divergence_research',
+    prompt: 'Can CE store agent-drafted answers and final sent answers to study where people edit drafts?',
   },
   {
     id: 'auto_apply_question_votes',
@@ -557,10 +565,24 @@ function onboardingAnswersFromSettings(settings = {}) {
       profileFields.has('roles'),
     demographics_research: uses.has('research_demographics') ||
       profileFields.has('non_identifying_demographics'),
+    demographic_link_opt_in: settings.demographicLinkOptIn === true ||
+      uses.has('link_demographics_research'),
     draft_responses: uses.has('draft_answers'),
+    draft_divergence_research: settings.draftDivergenceOptIn === true ||
+      uses.has('research_draft_divergence'),
     auto_apply_question_votes: settings.agentAutoApplyQuestionVotes === true,
     edge_daily_digest: settings.dailyDigestOptIn === true,
   };
+}
+
+function normalizeOnboardingTopicPreferences(input = {}, settings = {}) {
+  const source = input.topicPreferences ||
+    input.topics ||
+    input.interests ||
+    input.answers?.topic_preferences ||
+    settings.topicPreferences ||
+    [];
+  return normalizeQuestionTags(source).slice(0, 30);
 }
 
 function normalizeOnboardingAnswers(input = {}, settings = {}) {
@@ -588,15 +610,24 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
     allowedProfileFields.push('non_identifying_demographics');
     allowedUses.push('research_demographics');
   }
+  if (answers.demographic_link_opt_in === true) {
+    allowedProfileFields.push('edge_bio_keywords', 'age_bucket', 'country', 'region');
+    allowedUses.push('link_demographics_research');
+  }
   if (answers.draft_responses === true) {
     allowedUses.push('draft_answers');
+  }
+  if (answers.draft_divergence_research === true) {
+    allowedUses.push('research_draft_divergence');
   }
   if (answers.auto_apply_question_votes === true) {
     allowedUses.push('recommend_votes');
   }
   return {
-    allowedProfileFields,
-    allowedUses,
+    allowedProfileFields: [...new Set(allowedProfileFields)],
+    allowedUses: [...new Set(allowedUses)],
+    demographicLinkOptIn: answers.demographic_link_opt_in === true,
+    draftDivergenceOptIn: answers.draft_divergence_research === true,
     approvalMode: {
       answers: answers.draft_responses === true ? 'draft_for_review' : 'manual_review',
       questionVotes: answers.auto_apply_question_votes === true ? 'auto_apply' : 'suggest_for_review',
@@ -622,9 +653,13 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
     completedAt: safeString(settings.onboardingCompletedAt),
     questions,
     answers,
+    topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
     settings: {
       allowedProfileFields: Array.isArray(settings.allowedProfileFields) ? settings.allowedProfileFields : [],
       allowedUses: Array.isArray(settings.allowedUses) ? settings.allowedUses : [],
+      topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+      demographicLinkOptIn: settings.demographicLinkOptIn === true,
+      draftDivergenceOptIn: settings.draftDivergenceOptIn === true,
       approvalMode: settings.approvalMode || {},
       agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes === true,
       dailyDigestOptIn: settings.dailyDigestOptIn === true,
@@ -1486,7 +1521,10 @@ async function handleOnboardingRequest({
   }
   const completedAt = safeString(input.completedAt || input.createdAt) || new Date().toISOString();
   const answers = normalizeOnboardingAnswers(body, current);
-  const patch = settingsPatchFromOnboardingAnswers(answers, completedAt);
+  const patch = {
+    ...settingsPatchFromOnboardingAnswers(answers, completedAt),
+    topicPreferences: normalizeOnboardingTopicPreferences(body, current),
+  };
   const saved = await saveTelegramAgentSettingsPatch({
     env,
     sessionSlug,

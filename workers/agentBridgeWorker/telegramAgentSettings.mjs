@@ -73,6 +73,15 @@ function normalizeStringList(value = []) {
     .filter((entry, index, values) => values.indexOf(entry) === index);
 }
 
+function normalizeTopicPreferences(value = []) {
+  const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|#]+/);
+  return source
+    .map((entry) => lower(entry).replace(/&/g, ' and ').replace(/[^a-z0-9:]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64))
+    .filter(Boolean)
+    .filter((entry, index, values) => values.indexOf(entry) === index)
+    .slice(0, 30);
+}
+
 function normalizeApprovalMode(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const normalized = {};
@@ -112,6 +121,9 @@ export function defaultTelegramAgentSettings(env = {}) {
     agentAutoApplyQuestionVotes: normalizeBoolean(source.agentAutoApplyQuestionVotes, false),
     allowedProfileFields: normalizeStringList(source.allowedProfileFields),
     allowedUses: normalizeStringList(source.allowedUses),
+    topicPreferences: normalizeTopicPreferences(source.topicPreferences || source.topics),
+    demographicLinkOptIn: normalizeBoolean(source.demographicLinkOptIn, false),
+    draftDivergenceOptIn: normalizeBoolean(source.draftDivergenceOptIn, false),
     approvalMode: normalizeApprovalMode(source.approvalMode),
     dailyDigestOptIn: normalizeBoolean(source.dailyDigestOptIn, false),
     onboardingCompletedAt: normalizeIsoString(source.onboardingCompletedAt),
@@ -146,6 +158,19 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
   }
   if (Object.hasOwn(input, 'allowedUses')) {
     patch.allowedUses = normalizeStringList(input.allowedUses);
+  }
+  if (Object.hasOwn(input, 'topicPreferences') || Object.hasOwn(input, 'topics')) {
+    patch.topicPreferences = normalizeTopicPreferences(input.topicPreferences || input.topics);
+  }
+  if (Object.hasOwn(input, 'demographicLinkOptIn')) {
+    const normalized = normalizeBoolean(input.demographicLinkOptIn, null);
+    if (normalized === null) return { ok: false, reason: 'demographic_link_opt_in_invalid' };
+    patch.demographicLinkOptIn = normalized;
+  }
+  if (Object.hasOwn(input, 'draftDivergenceOptIn')) {
+    const normalized = normalizeBoolean(input.draftDivergenceOptIn, null);
+    if (normalized === null) return { ok: false, reason: 'draft_divergence_opt_in_invalid' };
+    patch.draftDivergenceOptIn = normalized;
   }
   if (Object.hasOwn(input, 'approvalMode')) {
     patch.approvalMode = normalizeApprovalMode(input.approvalMode);
@@ -191,6 +216,9 @@ export async function loadTelegramAgentSettings({
     ),
     allowedProfileFields: normalizeStringList(settings.allowedProfileFields || defaults.allowedProfileFields),
     allowedUses: normalizeStringList(settings.allowedUses || defaults.allowedUses),
+    topicPreferences: normalizeTopicPreferences(settings.topicPreferences || defaults.topicPreferences),
+    demographicLinkOptIn: normalizeBoolean(settings.demographicLinkOptIn, defaults.demographicLinkOptIn),
+    draftDivergenceOptIn: normalizeBoolean(settings.draftDivergenceOptIn, defaults.draftDivergenceOptIn),
     approvalMode: normalizeApprovalMode(settings.approvalMode || defaults.approvalMode),
     dailyDigestOptIn: normalizeBoolean(settings.dailyDigestOptIn, defaults.dailyDigestOptIn),
     onboardingCompletedAt: normalizeIsoString(settings.onboardingCompletedAt || defaults.onboardingCompletedAt),

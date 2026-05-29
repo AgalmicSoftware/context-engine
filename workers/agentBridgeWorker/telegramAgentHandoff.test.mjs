@@ -198,9 +198,12 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-05-28 \(v2\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-29 \(v3\)/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
+  assert.match(source, /demographicLinkOptIn/);
+  assert.match(source, /draftDivergenceOptIn/);
+  assert.match(source, /topicPreferences/);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
   assert.match(source, /Non-Telegram Agent Token Flow/);
   assert.match(source, /Install From Public Git/);
@@ -381,10 +384,13 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   const first = await jsonBody(firstResponse);
   assert.equal(firstResponse.status, 200);
   assert.equal(first.completed, false);
-  assert.equal(first.questions.length, 5);
+  assert.equal(first.questions.length, 7);
   assert.equal(first.answers.preference_tailoring, false);
+  assert.equal(first.answers.demographic_link_opt_in, false);
+  assert.equal(first.answers.draft_divergence_research, false);
   assert.equal(first.settings.agentAutoApplyQuestionVotes, false);
   assert.equal(first.settings.dailyDigestOptIn, false);
+  assert.deepEqual(first.settings.topicPreferences, []);
 
   const saveResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/onboarding', {
@@ -393,10 +399,13 @@ test('Telegram agent onboarding returns consent questions and persists first-run
       body: {
         sessionSlug: 'alpha',
         createdAt: '2026-05-08T12:05:00.000Z',
+        topicPreferences: ['AI Futures', 'Governance'],
         answers: {
           preference_tailoring: true,
           demographics_research: false,
+          demographic_link_opt_in: true,
           draft_responses: true,
+          draft_divergence_research: true,
           auto_apply_question_votes: true,
           edge_daily_digest: true,
         },
@@ -410,10 +419,20 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(saved.completedAt, '2026-05-08T12:05:00.000Z');
   assert.equal(saved.answers.preference_tailoring, true);
   assert.equal(saved.answers.draft_responses, true);
+  assert.equal(saved.answers.demographic_link_opt_in, true);
+  assert.equal(saved.answers.draft_divergence_research, true);
   assert.equal(saved.answers.auto_apply_question_votes, true);
+  assert.deepEqual(saved.settings.topicPreferences, ['ai-futures', 'governance']);
   assert.equal(saved.settings.allowedProfileFields.includes('interests'), true);
+  assert.equal(saved.settings.allowedProfileFields.includes('edge_bio_keywords'), true);
+  assert.equal(saved.settings.allowedProfileFields.includes('age_bucket'), true);
+  assert.equal(saved.settings.allowedProfileFields.includes('country'), true);
   assert.equal(saved.settings.allowedUses.includes('rank_questions'), true);
+  assert.equal(saved.settings.allowedUses.includes('link_demographics_research'), true);
   assert.equal(saved.settings.allowedUses.includes('draft_answers'), true);
+  assert.equal(saved.settings.allowedUses.includes('research_draft_divergence'), true);
+  assert.equal(saved.settings.demographicLinkOptIn, true);
+  assert.equal(saved.settings.draftDivergenceOptIn, true);
   assert.equal(saved.settings.agentAutoApplyQuestionVotes, true);
   assert.equal(saved.settings.dailyDigestOptIn, true);
 
@@ -427,7 +446,10 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(secondResponse.status, 200);
   assert.equal(second.completed, true);
   assert.equal(second.answers.preference_tailoring, true);
+  assert.equal(second.answers.demographic_link_opt_in, true);
+  assert.equal(second.answers.draft_divergence_research, true);
   assert.equal(second.answers.edge_daily_digest, true);
+  assert.deepEqual(second.topicPreferences, ['ai-futures', 'governance']);
   assert.equal(JSON.stringify(second).includes(issued.token), false);
 });
 

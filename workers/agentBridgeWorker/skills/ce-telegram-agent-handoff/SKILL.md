@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-28 (v2)
+**Skill version:** 2026-05-29 (v3)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
@@ -104,7 +104,7 @@ continuing.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
-- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until `2026-05-30T00:00:00Z`, then `ee-26-users`. Operators can hide the test session after smoke testing with `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER`; agents should not rely on `ee-26-test` being visible. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
+- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until `2026-05-30T00:00:00Z`, then `ee-26-users`. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on `ee-26-test` always being listed. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
 
 Worked `ceagt_` token smoke test:
 
@@ -238,16 +238,22 @@ GET /telegram/agent/api/onboarding?sessionSlug=<Session>
 POST /telegram/agent/api/onboarding
 ```
 
-`GET` returns five yes/no consent questions and any saved answers. `POST`
+`GET` returns the fixed first-run consent questions and any saved answers. `POST`
 persists the answers for the token-bound Telegram user and session. Defaults
 are privacy-preserving: all consent is off until the user explicitly answers.
-The current questions map to these settings:
+Ask the user what topics they want CE to prioritize, such as AI futures, Edge
+City, governance, infra, social, art, or sessions they attended. Persist those
+as `topicPreferences` in the onboarding POST body. The current questions map to
+these settings:
 
 ```json
 {
-  "allowedProfileFields": ["interests", "sessionsAttended", "roles"],
-  "allowedUses": ["rank_questions", "draft_answers", "recommend_votes", "suggest_groups"],
-  "forbiddenFields": ["private_notes", "age", "citizenship"],
+  "topicPreferences": ["ai-futures", "edge-city"],
+  "allowedProfileFields": ["interests", "sessionsAttended", "roles", "edge_bio_keywords", "age_bucket", "country", "region"],
+  "allowedUses": ["rank_questions", "draft_answers", "recommend_votes", "suggest_groups", "link_demographics_research", "research_draft_divergence"],
+  "forbiddenFields": ["private_notes", "age", "citizenship", "raw_geo_private_data"],
+  "demographicLinkOptIn": false,
+  "draftDivergenceOptIn": false,
   "approvalMode": {
     "answers": "draft_for_review",
     "questionVotes": "auto_apply_if_enabled",
@@ -257,7 +263,15 @@ The current questions map to these settings:
 ```
 
 The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
-digest integrations. In Phase 1 this flag is only stored and echoed back.
+digest integrations. It also stores `topicPreferences`,
+`demographicLinkOptIn`, and `draftDivergenceOptIn`. Demographic linking is
+default-off; only when the user opts in may the agent link otherwise anonymous
+responses to approved aggregate buckets such as Edge Bio keywords, age bucket,
+country, or region. Draft-divergence research is also default-off; unless the
+user opts in, do not send agent-drafted answers to the worker as durable
+research records. A Mini App launch may still carry an editable prefill draft
+for review, but that is a short-lived launch artifact rather than a
+draft-divergence research record.
 
 Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
 
@@ -903,16 +917,28 @@ answers with `POST /telegram/agent/api/onboarding`:
 
 1. Can your agent pass preference info to CE to tailor which questions you see?
 2. Can your agent share non-identifying demographics for research only, never published in connection to you?
-3. Can your agent draft question responses for you based on your activity and user file?
-4. Can your agent upvote questions it thinks you will find relevant?
-5. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
+3. Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?
+4. Can your agent draft question responses for you based on your activity and user file?
+5. Can CE store agent-drafted answers and final sent answers to study where people edit drafts?
+6. Can your agent upvote questions it thinks you will find relevant?
+7. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
 
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
+`topicPreferences`, `demographicLinkOptIn`, `draftDivergenceOptIn`,
 `agentAutoApplyQuestionVotes`, and `dailyDigestOptIn`. Auto-apply votes remain
-off unless the user says yes to question 4. The digest flag is stored for Phase
-2 and should not be treated as an active delivery subscription yet.
+off unless the user says yes to question 6. The demographic-link and
+draft-divergence settings remain off unless explicitly enabled. The digest flag
+is stored for Phase 2 and should not be treated as an active delivery
+subscription yet.
 
 ## Changelog
+
+### 2026-05-29 (v3)
+
+- First-run onboarding now stores topic preferences, explicit demographic-link
+  consent, and explicit draft-divergence research consent.
+- Mini App settings expose the same topic and opt-in controls; draft-divergence
+  records are only persisted after the user opts in.
 
 ### 2026-05-28 (v2)
 
