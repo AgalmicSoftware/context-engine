@@ -4337,6 +4337,8 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
 
   const binaryButtons = flattenButtons(binary.response.replyMarkup);
+  const onboardAgent = binaryButtons.find((button) => button.text === 'Onboard Agent');
+  assert.match(onboardAgent?.url || '', /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
   const agree = binaryButtons.find((button) => button.text === 'Agree');
   const disagree = binaryButtons.find((button) => button.text === 'Disagree');
   const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');

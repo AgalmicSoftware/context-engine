@@ -8285,10 +8285,17 @@ async function buildPoseQuestionResponse({
     seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
     createdAt,
   });
+  const agentOnboardingButton = normalized.chat.isPrivate ? null : await makeAgentOnboardingButton({
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    createdAt,
+  });
   const actionRows = [
     ...answerRows,
     [otherQuestionsButton],
     ...(miniAppButton ? [[miniAppButton]] : []),
+    ...(agentOnboardingButton ? [[agentOnboardingButton]] : []),
   ];
   return reply({
     method,
