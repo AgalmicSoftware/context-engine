@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,265 lines**
-  - `SurveyQuestions.tsx`: **9,190 lines**
+  - `SurveyQuestions.tsx`: **9,206 lines**
   - `SurveyQuestionsAuthoringPanel.tsx`: **57 lines**
   - `SurveyQuestionsJsonControls.tsx`: **143 lines**
   - `SurveyQuestionsJsonTree.tsx`: **121 lines**
@@ -17,8 +17,8 @@
   - `SurveyQuestionsSurveyAnswersView.tsx`: **56 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
-  - `surveyQuestionsSubmitController.ts`: **218 lines**
-  - `SurveyResults.tsx`: **4,899 lines**
+  - `surveyQuestionsSubmitController.ts`: **398 lines**
+  - `SurveyResults.tsx`: **4,903 lines**
   - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyResultsModalHeader.tsx`: **137 lines**
   - `SurveyResultsPanels.tsx`: **210 lines**
@@ -27,15 +27,16 @@
   - `surveyResultsExportController.ts`: **125 lines**
   - `SurveyResultsQuestionSummaryCard.tsx`: **108 lines**
   - `SurveyResultsIndividualResponsesList.tsx`: **84 lines**
-  - `SurveyResultsQuestionSummariesList.tsx`: **26 lines**
+  - `SurveyResultsQuestionSummariesList.tsx`: **44 lines**
   - `SurveyResultsSurveyViewModeToggle.tsx`: **43 lines**
   - `SurveyResultsStatusMessages.tsx`: **42 lines**
   - `surveyResultsFilterStatusController.ts`: **98 lines**
   - `surveyResultsSyncStatusController.ts`: **174 lines**
+  - `surveyResultsQuestionSummaryStatusController.ts`: **68 lines**
   - `surveyResultsSummaryModels.ts`: **205 lines**
   - `SurveyPileViewMode.tsx`: **2,787 lines**
   - `surveyQuestionsJsonDerivation.ts`: **131 lines**
-- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections plus primary-submit decision dispatch and submit completion/status handoff extracted while keeping submit execution, decrypt, cache, route construction, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, filter/status display-plan, and sync-status display-plan helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, polling/timers, manual refresh, network block reads, and export payload generation in the parent.
+- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections plus primary-submit decision dispatch, submit-start/status sequencing, stale-submit cleanup, and submit completion/status handoff extracted while keeping submit execution, decrypt, cache, route construction, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, filter/status display-plan, sync-status display-plan, and question-summary status helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, polling/timers, manual refresh, network block reads, and export payload generation in the parent.
 
 ## Current Runtime Hierarchy
 
@@ -53,7 +54,7 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyQuestionsSurveyAnswersView.tsx  [survey answer list display]
         -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
         -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
-        -> surveyQuestionsSubmitController.ts  [primary-submit plan dispatch + completion/status handoff]
+        -> surveyQuestionsSubmitController.ts  [primary-submit plan dispatch + submit-start/stale/completion status handoff]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
      -> SurveyResults.tsx  [survey/question results runtime]
         -> SurveyResultsModalHeader.tsx  [modal title, links, bookmark, sync/header presentation]
@@ -69,6 +70,7 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyResultsQuestionSummaryCard.tsx  [per-question summary card shell]
         -> SurveyResultsIndividualResponsesList.tsx  [individual response list/card shell]
         -> SurveyResultsQuestionSummariesList.tsx  [aggregate/question summary list shell]
+        -> surveyResultsQuestionSummaryStatusController.ts  [question-summary metadata + empty/error display plans]
         -> surveyResultsSummaryModels.ts  [pure freeform/multichoice summary view models]
 ```
 
@@ -79,7 +81,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyTool.tsx` | Route/mode shell | Functional component with hooks; chooses full vs pile mode, wires shared props/nonces downward, and uses a dual-mode export pattern (hooks runtime for production, legacy shim for tests) |
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
-| `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, route construction, cache/storage/worker/wallet interactions, and submission execution while delegating primary-submit inert/navigation/dispatch plan execution and post-submit completion/status state handoff to `surveyQuestionsSubmitController.ts` |
+| `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit computation, encryption/decrypt, route construction, cache/storage/worker/wallet interactions, and submission execution while delegating primary-submit inert/navigation/dispatch plan execution, pending-stat fallback normalization, submit-start/status sequencing, stale-submit cleanup, and post-submit completion/status state handoff to `surveyQuestionsSubmitController.ts` |
 | `SurveyQuestionsAuthoringPanel.tsx` | Editable question presentation | Renders the edit-mode question list shell, JSON/back-to-top controls, locked banner, submit node placement, and submitted-response fallback from explicit props while leaving submit, JSON generation, question rendering, and gate/decrypt behavior in `SurveyQuestions` |
 | `SurveyQuestionsJsonControls.tsx` | Bottom JSON controls view | Renders question/response/survey JSON toggles and copy panels from explicit props while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
 | `SurveyQuestionsJsonTree.tsx` | JSON tree display | Normalizes display-only JSON input into the existing tree row presentation while leaving JSON generation and copy side effects in `SurveyQuestions` |
@@ -89,9 +91,9 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyQuestionsSurveyAnswersView.tsx` | Survey answer list display | Matches submitted responses to the existing question-answer renderer from explicit props while leaving answer rendering and response state in `SurveyQuestions` |
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
-| `surveyQuestionsSubmitController.ts` | Primary-submit dispatch/status handoff | Runs already-built primary-submit plans through injected navigation and submit-dispatch ports, and applies injected submit completion/failure status callbacks in parent-defined order without owning pending-edit stats, route construction, submit execution, decrypt, cache, storage, worker, wallet, or JSON behavior |
+| `surveyQuestionsSubmitController.ts` | Primary-submit dispatch/status handoff | Runs already-built primary-submit plans through injected navigation and submit-dispatch ports, activates the submit guard before dispatch, normalizes parent-provided pending-stat fallbacks, applies submit-start/stale/completion/failure status callbacks in parent-defined order, and does not own pending-edit computation, route construction, submit execution, decrypt, cache, storage, worker, wallet, or JSON behavior |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
-| `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export payload generation, route/session state, polling/timers, manual refresh, network block reads, and result mutation behavior while delegating export orchestration to `surveyResultsExportController.ts`, filter/status display planning to `surveyResultsFilterStatusController.ts`, and sync-status progress display planning to `surveyResultsSyncStatusController.ts` |
+| `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export payload generation, route/session state, polling/timers, manual refresh, network block reads, and result mutation behavior while delegating export orchestration to `surveyResultsExportController.ts`, filter/status display planning to `surveyResultsFilterStatusController.ts`, sync-status progress display planning to `surveyResultsSyncStatusController.ts`, and question-summary metadata fallback planning to `surveyResultsQuestionSummaryStatusController.ts` |
 | `SurveyResultsModalHeader.tsx` | Results modal header presentation | Renders title, survey ID/document links, bookmark, demo-view controls, locked-response toggle slot, and sync-status slot from explicit props |
 | `SurveyResultsPanels.tsx` | Results panel presentation helpers | Renders sync-status progress panel and filter summary UI from explicit props while leaving display plans in controller helpers and handlers/state in `SurveyResults` |
 | `SurveyResultsStatusMessages.tsx` | Results status presentation | Renders alert and filter-loading states from explicit props while leaving alert/filter state in `SurveyResults` and display selection in `surveyResultsFilterStatusController.ts` |
@@ -102,9 +104,10 @@ SurveyTool.tsx  [top-level wrapper]
 | `surveyResultsExportController.ts` | Results export orchestration | Runs export generation/download plans, invokes injected content generators and browser download ports, and maps invalid/empty export alerts without owning export payload generation, route, cache, fetch, or decrypt behavior |
 | `surveyResultsFilterStatusController.ts` | Results filter/status display planning | Builds pure alert/loading and filtered-count display plans without owning filter state mutation, SBT/question filtering, cache, fetch, decrypt, route, or export behavior |
 | `surveyResultsSyncStatusController.ts` | Results sync-status display planning | Builds pure sync label/progress/color/spinner/quick-refresh visibility plans without owning polling, timers, manual refresh, cache, network block reads, fetch, decrypt, route, or export behavior |
-| `SurveyResultsQuestionSummaryCard.tsx` | Question summary card shell | Renders summary headers, metadata fallback, bookmark action, and selected summary body slots while leaving decrypt overrides and response rendering in `SurveyResults` |
+| `SurveyResultsQuestionSummaryCard.tsx` | Question summary card shell | Renders summary headers, metadata warning, bookmark action, and selected summary body slots while leaving fallback planning, decrypt overrides, and response rendering in `SurveyResults` |
 | `SurveyResultsIndividualResponsesList.tsx` | Individual response list presentation | Renders individual responder cards, links, toggles, and empty states while leaving response body/decrypt rendering in `SurveyResults` |
-| `SurveyResultsQuestionSummariesList.tsx` | Question summary list presentation | Renders aggregate/question summary list entries and no-results fallback from explicit props while leaving summary rendering in `SurveyResults` |
+| `SurveyResultsQuestionSummariesList.tsx` | Question summary list presentation | Renders aggregate/question summary list entries and no-results/error fallback from explicit props while leaving list display planning in `surveyResultsQuestionSummaryStatusController.ts` and summary rendering in `SurveyResults` |
+| `surveyResultsQuestionSummaryStatusController.ts` | Question-summary metadata/status display planning | Builds pure selected-question metadata fallback, summary-list empty state, error state, and inert/loading display plans without owning fetch, decrypt, cache, route, export, filters, or response rendering |
 | `surveyResultsSummaryModels.ts` | Pure result summary view models | Builds latest-response, freeform, and multichoice summary models without touching component state, cache, decrypt, export, or route behavior |
 
 ## Boundary Map

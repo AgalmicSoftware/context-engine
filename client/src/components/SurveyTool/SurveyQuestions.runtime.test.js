@@ -825,6 +825,33 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.submissionComplete).toBe(false);
   });
 
+  it('uses parent pending-count fallback before primary submit dispatch', () => {
+    const events = [];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+    });
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: true,
+      modifiedCount: 2,
+    };
+    subject.getPendingEditStats = undefined;
+    subject.encryptAndUpload = jest.fn(() => {
+      events.push(`encrypt:${subject._submitGuard ? 'guarded' : 'unguarded'}`);
+    });
+
+    subject.handlePrimarySubmitClick();
+
+    expect(events).toEqual(['encrypt:guarded']);
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(subject._submitGuard).toBe(true);
+  });
+
   it('builds Lit encryption options from recipients and wallet provider hooks', () => {
     const saveKey = jest.fn();
     const getKey = jest.fn();

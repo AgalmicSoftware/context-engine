@@ -1,6 +1,9 @@
 import {
+  resolveSurveyQuestionsSubmitPendingStats,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
+  runSurveyQuestionsStaleSubmitController,
+  runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
   type SurveyQuestionsSubmitCompletionPorts,
   type SurveyQuestionsSubmitControllerPorts,
@@ -10,6 +13,7 @@ import type {
 } from './surveyQuestionsTypes';
 
 const createPorts = (): Required<SurveyQuestionsSubmitControllerPorts> => ({
+  activateSubmitGuard: jest.fn(),
   dispatchSubmit: jest.fn(),
   navigateToResponse: jest.fn(),
 });
@@ -59,6 +63,7 @@ describe('surveyQuestionsSubmitController', () => {
       reason,
       status: 'inert',
     });
+    expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
   });
@@ -82,11 +87,39 @@ describe('surveyQuestionsSubmitController', () => {
     });
     expect(ports.navigateToResponse).toHaveBeenCalledTimes(1);
     expect(ports.navigateToResponse).toHaveBeenCalledWith(plan.path, plan);
+    expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
     expect(ports.dispatchSubmit).not.toHaveBeenCalled();
   });
 
-  it('dispatches submit plans through the injected submit port', () => {
+  it('keeps navigate plans unhandled and side-effect free when the navigation port is absent', () => {
+    const ports = {
+      activateSubmitGuard: jest.fn(),
+      dispatchSubmit: jest.fn(),
+    };
+    const plan: SurveyQuestionsPrimarySubmitPlan = {
+      action: 'navigate',
+      path: '/survey/0xsurvey/0xabc?session=edge%20session',
+      reason: 'completed_survey_response',
+    };
+
+    const result = runSurveyQuestionsSubmitController({ plan, ports });
+
+    expect(result).toEqual({
+      action: 'navigate',
+      path: plan.path,
+      plan,
+      reason: 'completed_survey_response',
+      status: 'unhandled',
+    });
+    expect(ports.activateSubmitGuard).not.toHaveBeenCalled();
+    expect(ports.dispatchSubmit).not.toHaveBeenCalled();
+  });
+
+  it('activates the submit guard before dispatching submit plans', () => {
+    const events: string[] = [];
     const ports = createPorts();
+    ports.activateSubmitGuard.mockImplementation(() => events.push('activate-submit-guard'));
+    ports.dispatchSubmit.mockImplementation(() => events.push('dispatch-submit'));
     const plan: SurveyQuestionsPrimarySubmitPlan = {
       action: 'submit',
       path: '',
@@ -102,9 +135,195 @@ describe('surveyQuestionsSubmitController', () => {
       reason: 'pending_edits',
       status: 'dispatched',
     });
+    expect(events).toEqual(['activate-submit-guard', 'dispatch-submit']);
+    expect(ports.activateSubmitGuard).toHaveBeenCalledTimes(1);
     expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
     expect(ports.dispatchSubmit).toHaveBeenCalledWith(plan);
     expect(ports.navigateToResponse).not.toHaveBeenCalled();
+  });
+
+  it('keeps submit dispatch unhandled and guard-free when the submit port is absent', () => {
+    const activateSubmitGuard = jest.fn();
+    const plan: SurveyQuestionsPrimarySubmitPlan = {
+      action: 'submit',
+      path: '',
+      reason: 'pending_edits',
+    };
+
+    const result = runSurveyQuestionsSubmitController({
+      plan,
+      ports: { activateSubmitGuard },
+    });
+
+    expect(result).toEqual({
+      action: 'submit',
+      path: '',
+      plan,
+      reason: 'pending_edits',
+      status: 'unhandled',
+    });
+    expect(activateSubmitGuard).not.toHaveBeenCalled();
+  });
+
+  it('starts submit attempts before applying submit-start state', () => {
+    const events: string[] = [];
+    const startSubmitAttempt = jest.fn(() => {
+      events.push('start-submit-attempt');
+      return 12;
+    });
+    const setSubmitStartState = jest.fn(() => events.push('set-submit-start-state'));
+
+    const result = runSurveyQuestionsSubmitStartController({
+      ports: { startSubmitAttempt, setSubmitStartState },
+    });
+
+    expect(events).toEqual(['start-submit-attempt', 'set-submit-start-state']);
+    expect(setSubmitStartState).toHaveBeenCalledWith(result.statePatch);
+    expect(result).toEqual({
+      outcome: 'started',
+      status: 'completed',
+      submitAttemptId: 12,
+      statePatch: {
+        isSubmitting: true,
+        submitProgress: 0,
+        currentStep: 1,
+        submissionError: '',
+      },
+    });
+  });
+
+  it('returns submit-start state without side effects when start ports are absent', () => {
+    const result = runSurveyQuestionsSubmitStartController();
+
+    expect(result).toEqual({
+      outcome: 'started',
+      status: 'completed',
+      submitAttemptId: 0,
+      statePatch: {
+        isSubmitting: true,
+        submitProgress: 0,
+        currentStep: 1,
+        submissionError: '',
+      },
+    });
+  });
+
+  it('runs stale submit cleanup only for the active async attempt', () => {
+    const events: string[] = [];
+    const ports = {
+      clearSubmitGuard: jest.fn(() => events.push('clear-submit-guard')),
+      canUpdateSubmitState: jest.fn(() => {
+        events.push('can-update-submit-state');
+        return true;
+      }),
+      isSubmitAttemptActive: jest.fn(() => {
+        events.push('is-submit-attempt-active');
+        return true;
+      }),
+      finishSubmitAttempt: jest.fn(() => events.push('finish-submit-attempt')),
+      setSubmitStaleState: jest.fn(() => events.push('set-submit-stale-state')),
+    };
+    const snapshot = { submitAttemptId: 13, mounted: true };
+
+    const result = runSurveyQuestionsStaleSubmitController({ snapshot, ports });
+
+    expect(events).toEqual([
+      'clear-submit-guard',
+      'can-update-submit-state',
+      'is-submit-attempt-active',
+      'finish-submit-attempt',
+      'set-submit-stale-state',
+    ]);
+    expect(ports.canUpdateSubmitState).toHaveBeenCalledWith(snapshot);
+    expect(ports.isSubmitAttemptActive).toHaveBeenCalledWith(13, snapshot);
+    expect(ports.finishSubmitAttempt).toHaveBeenCalledWith(13);
+    expect(ports.setSubmitStaleState).toHaveBeenCalledWith(result.statePatch);
+    expect(result).toEqual({
+      outcome: 'stale',
+      reason: 'active_attempt',
+      status: 'completed',
+      submitAttemptId: 13,
+      statePatch: {
+        isSubmitting: false,
+        submitProgress: 0,
+        currentStep: 0,
+      },
+    });
+  });
+
+  it('clears stale submit guard but skips status writes for inactive attempts', () => {
+    const events: string[] = [];
+    const ports = {
+      clearSubmitGuard: jest.fn(() => events.push('clear-submit-guard')),
+      canUpdateSubmitState: jest.fn(() => {
+        events.push('can-update-submit-state');
+        return true;
+      }),
+      isSubmitAttemptActive: jest.fn(() => {
+        events.push('is-submit-attempt-active');
+        return false;
+      }),
+      finishSubmitAttempt: jest.fn(() => events.push('finish-submit-attempt')),
+      setSubmitStaleState: jest.fn(() => events.push('set-submit-stale-state')),
+    };
+
+    const result = runSurveyQuestionsStaleSubmitController({
+      snapshot: { submitAttemptId: 14 },
+      ports,
+    });
+
+    expect(events).toEqual([
+      'clear-submit-guard',
+      'can-update-submit-state',
+      'is-submit-attempt-active',
+    ]);
+    expect(ports.finishSubmitAttempt).not.toHaveBeenCalled();
+    expect(ports.setSubmitStaleState).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      outcome: 'stale',
+      reason: 'inactive_attempt',
+      status: 'skipped',
+      submitAttemptId: 14,
+      statePatch: null,
+    });
+  });
+
+  it('keeps stale submit cleanup inert when ports are absent', () => {
+    expect(runSurveyQuestionsStaleSubmitController()).toEqual({
+      outcome: 'stale',
+      reason: 'snapshot_not_current',
+      status: 'skipped',
+      submitAttemptId: 0,
+      statePatch: null,
+    });
+  });
+
+  it('falls back to parent pending stats when no stats port is available', () => {
+    expect(resolveSurveyQuestionsSubmitPendingStats({
+      fallbackTotal: 5,
+      fallbackEncrypted: 2,
+    })).toEqual({ total: 5, encrypted: 2 });
+  });
+
+  it('falls back to parent pending stats when the stats port returns no data', () => {
+    expect(resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: () => null,
+      fallbackTotal: 4,
+      fallbackEncrypted: 1,
+    })).toEqual({ total: 4, encrypted: 1 });
+  });
+
+  it('uses injected pending stats when available', () => {
+    const getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 3 }));
+
+    const result = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats,
+      fallbackTotal: 5,
+      fallbackEncrypted: 2,
+    });
+
+    expect(result).toEqual({ total: 7, encrypted: 3 });
+    expect(getPendingEditStats).toHaveBeenCalledTimes(1);
   });
 
   it('runs success completion status callbacks in the current order', () => {
