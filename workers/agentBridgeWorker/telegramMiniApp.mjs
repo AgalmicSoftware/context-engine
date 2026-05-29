@@ -527,8 +527,6 @@ async function buildMiniAppAdminState({
       { action: 'results_settings', label: 'Results settings' },
       { action: 'question_queue', label: 'Question queue' },
       { action: 'group_link', label: 'Add group link' },
-      { action: 'export_allow', label: 'Add admin' },
-      { action: 'export_revoke', label: 'Remove admin' },
     ],
   };
 }
@@ -5926,6 +5924,23 @@ function telegramMiniAppHtml() {
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .adminAddressList {
+      display: grid;
+      gap: 5px;
+    }
+    .adminAddressButton {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      min-height: 34px;
+      padding: 7px 8px;
+      text-align: left;
+      overflow-wrap: anywhere;
+    }
     .documentPreviewButton {
       min-height: 0;
       border: 0;
@@ -7138,7 +7153,8 @@ function telegramMiniAppHtml() {
       export_allow: 'Add admin',
       export_revoke: 'Remove admin',
     };
-    const DEFAULT_ADMIN_ACTIONS = Object.keys(ADMIN_ACTION_LABELS).map((action) => ({
+    const DEFAULT_ADMIN_ACTION_IDS = ['export_all', 'export_access', 'results_settings', 'question_queue', 'group_link'];
+    const DEFAULT_ADMIN_ACTIONS = DEFAULT_ADMIN_ACTION_IDS.map((action) => ({
       action,
       label: ADMIN_ACTION_LABELS[action],
     }));
@@ -9216,17 +9232,22 @@ function telegramMiniAppHtml() {
     }
     function normalizeAdminActions(adminActions = []) {
       const source = Array.isArray(adminActions) && adminActions.length ? adminActions : DEFAULT_ADMIN_ACTIONS;
+      const seen = new Set();
       const normalized = source.map((action) => {
         const actionId = typeof action === 'string'
           ? action
           : String(action?.action || action?.id || '').trim();
         if (!actionId) return null;
+        const remappedAccessAction = ['export_allow', 'export_revoke'].includes(actionId);
+        const canonicalAction = remappedAccessAction ? 'export_access' : actionId;
+        if (seen.has(canonicalAction)) return null;
+        seen.add(canonicalAction);
         const label = typeof action === 'string'
-          ? ADMIN_ACTION_LABELS[actionId]
-          : (String(action?.label || '').trim() || ADMIN_ACTION_LABELS[actionId]);
+          ? ADMIN_ACTION_LABELS[canonicalAction]
+          : ((remappedAccessAction ? '' : String(action?.label || '').trim()) || ADMIN_ACTION_LABELS[canonicalAction]);
         return {
-          action: actionId,
-          label: label || actionId.replace(/_/g, ' '),
+          action: canonicalAction,
+          label: label || canonicalAction.replace(/_/g, ' '),
         };
       }).filter(Boolean);
       return normalized.length ? normalized : DEFAULT_ADMIN_ACTIONS;
@@ -9354,35 +9375,59 @@ function telegramMiniAppHtml() {
       state.adminBusy = false;
       renderAdmin();
     }
+    async function copyTextToClipboard(text) {
+      const value = String(text || '');
+      const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : null;
+      if (!value || !clipboard || typeof clipboard.writeText !== 'function') return false;
+      try {
+        await clipboard.writeText(value);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    async function copyAdminCommand(command, message) {
+      const copied = await copyTextToClipboard(command);
+      state.adminPanelMessage = copied
+        ? message
+        : 'Copy this command in the CE bot: ' + command;
+      renderAdmin();
+    }
+    async function copyAdminAddress(address) {
+      const value = String(address || '').trim();
+      if (!value) return;
+      state.adminAddress = value;
+      const copied = await copyTextToClipboard(value);
+      state.adminPanelMessage = copied
+        ? 'Address copied and pasted into the wallet address field.'
+        : 'Address pasted into the wallet address field.';
+      renderAdmin();
+    }
+    function adminAddressValue(entry) {
+      return String((entry && typeof entry === 'object' ? entry.address : entry) || '').trim();
+    }
+    function appendAdminAddressList(panel, title, entries = []) {
+      const values = (Array.isArray(entries) ? entries : []).map(adminAddressValue).filter(Boolean);
+      const list = document.createElement('div');
+      list.className = 'adminAddressList';
+      const heading = document.createElement('span');
+      heading.textContent = title + ': ' + (values.length ? 'tap an address to copy/fill' : 'None');
+      list.appendChild(heading);
+      values.forEach((value) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'adminAddressButton';
+        button.textContent = value;
+        button.title = value;
+        button.onclick = () => copyAdminAddress(value);
+        list.appendChild(button);
+      });
+      panel.appendChild(list);
+    }
     async function downloadAdminExport() {
       const sessionSlug = activeAdminSessionSlug();
       if (!sessionSlug) return;
-      state.adminBusy = true;
-      state.adminPanelMessage = 'Preparing export...';
-      renderAdmin();
-      try {
-        const url = new URL('/telegram/mini-app/api/admin/export', location.origin);
-        url.searchParams.set('launch', launch);
-        url.searchParams.set('sessionSlug', sessionSlug);
-        const response = await fetch(url.pathname + url.search, { headers: headers() });
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({}));
-          state.adminPanelMessage = 'Could not export data: ' + (body.error || 'response_export_failed');
-        } else {
-          const blob = await response.blob();
-          const href = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = href;
-          link.download = 'context-engine-' + sessionSlug + '-responses.zip';
-          link.click();
-          window.setTimeout(() => URL.revokeObjectURL(href), 5000);
-          state.adminPanelMessage = 'Export ready.';
-        }
-      } catch {
-        state.adminPanelMessage = 'Could not export data. Check connection and try again.';
-      }
-      state.adminBusy = false;
-      renderAdmin();
+      await copyAdminCommand('/export_all ' + sessionSlug, 'Export command copied. Paste it in the CE bot.');
     }
     async function createAdminGroupLink() {
       const sessionSlug = activeAdminSessionSlug();
@@ -9427,7 +9472,7 @@ function telegramMiniAppHtml() {
         button.type = 'button';
         button.className = 'secondary';
         button.disabled = state.adminBusy;
-        button.textContent = state.adminBusy ? 'Preparing...' : 'Download response export';
+        button.textContent = 'Copy export command';
         button.onclick = downloadAdminExport;
         const command = document.createElement('div');
         command.className = 'adminCommand';
@@ -9461,15 +9506,14 @@ function telegramMiniAppHtml() {
         remove.textContent = 'Remove admin';
         remove.onclick = () => submitAdminAccess('remove');
         row.append(add, remove);
-        const list = document.createElement('span');
-        const configured = (access.configuredAdmins || []).map(shortQuestionLabel).join(', ') || 'None';
-        const added = (access.additionalAdmins || []).map((entry) => shortQuestionLabel(entry.address || entry)).join(', ') || 'None';
-        list.textContent = 'Configured admins: ' + configured + ' | Added admins: ' + added;
         const commands = document.createElement('div');
         commands.className = 'adminCommand';
         const address = state.adminAddress || '0x...';
         commands.textContent = 'Bot commands: /export_allow ' + address + ' ' + sessionSlug + ' | /export_revoke ' + address + ' ' + sessionSlug;
-        panel.append(inputLabel, row, list, commands);
+        panel.append(inputLabel, row);
+        appendAdminAddressList(panel, 'Configured admins', access.configuredAdmins || []);
+        appendAdminAddressList(panel, 'Added admins', access.additionalAdmins || []);
+        panel.appendChild(commands);
       } else if (action === 'results_settings') {
         const settings = state.adminData?.resultsExposure || {};
         [
