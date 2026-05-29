@@ -315,9 +315,14 @@ test('parseTelegramCommandText handles mentions without accepting commands for a
 test('agent action menu is group-safe and persists only opaque launch records', async () => {
   const env = baseEnv();
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/actions'),
+    update: groupMessage('/agent'),
     env,
     now: '2026-05-08T12:00:00.000Z',
+  });
+  const removedActions = await buildTelegramCommandResponse({
+    update: groupMessage('/actions'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
   });
   const buttons = flattenButtons(result.response.replyMarkup);
   const settings = buttons.find((button) => button.text === 'Settings');
@@ -327,6 +332,8 @@ test('agent action menu is group-safe and persists only opaque launch records', 
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_action_menu');
+  assert.notEqual(removedActions.screen, 'agent_action_menu');
+  assert.equal(removedActions.response.text.includes('Agent Actions'), false);
   assert.match(result.response.text, /Account and settings inputs open in private chat or Mini App/);
   assert.equal(result.response.text.includes('Address:'), false);
   assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
@@ -337,6 +344,13 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
   assert.equal(settings.url.includes('alpha'), false);
   assert.equal(storedActionKeys.length >= 2, true);
+
+  const activity = await buildTelegramCommandResponse({
+    update: privateMessage('/activity'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  assert.equal(activity.screen, 'agent_activity');
 });
 
 test('agent create and settings commands route group inputs private and model canonical requests', async () => {

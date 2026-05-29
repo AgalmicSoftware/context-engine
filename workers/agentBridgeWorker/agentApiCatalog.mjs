@@ -40,7 +40,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: true,
-    botCommands: ['/actions', '/agent'],
+    botCommands: ['/agent'],
     miniAppRoutes: ['agent/actions'],
     notes: [
       'Group chat may show only action labels and private/Mini App launch controls.',
