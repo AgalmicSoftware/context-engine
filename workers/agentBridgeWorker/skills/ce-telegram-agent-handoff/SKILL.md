@@ -789,6 +789,17 @@ the agent scheduler until CE owns a dedicated notification service.
 
 Use tags within the current overall session to distinguish topics, events, tracks, or agent-originated themes. Do not create child sessions for this flow.
 
+### What Makes A Good Question
+
+- Use plain language with no jargon, so a newcomer and a specialist can both understand it.
+- Prefer discussion topics that expose disagreement, trade-offs, decision criteria, or evidence gaps.
+- Avoid questions whose answer is obvious, settled, or boring.
+- Make it interesting to specialists and/or the general public.
+- Keep it concise: one clear claim per question, not a double-barrelled bundle.
+- Prefer a debatable agree/disagree claim over a vague open prompt.
+
+Avoid leading or loaded framing, compound questions, insider acronyms, and anything already obviously true.
+
 Pose an existing active question:
 
 ```json
