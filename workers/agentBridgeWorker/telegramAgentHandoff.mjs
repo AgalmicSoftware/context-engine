@@ -695,14 +695,15 @@ async function resolveHandoffContext({
   input = {},
   auth = {},
   requireQuestionAuthoring = true,
+  ignoreSessionBinding = false,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const normalized = normalizeAgentTelegramContext(input);
   if (!normalized.user.telegramUserId) {
     return { ok: false, status: 400, reason: 'telegram_user_required' };
   }
-  const groupBinding = await readGroupSessionBinding(env, normalized);
-  const privateBinding = await readPrivateSessionBinding(env, normalized);
+  const groupBinding = ignoreSessionBinding ? null : await readGroupSessionBinding(env, normalized);
+  const privateBinding = ignoreSessionBinding ? null : await readPrivateSessionBinding(env, normalized);
   const sessionSlug = sanitizeSessionSlug(
     input.sessionSlug ||
     groupBinding?.sessionSlug ||
@@ -3030,11 +3031,20 @@ export async function handleTelegramAgentHandoffRequest({
   });
   if (!context.ok) {
     if (url.pathname === '/telegram/agent/api/tags' && context.status === 404) {
+      if (safeString(input.sessionSlug)) {
+        return json({
+          ok: false,
+          reason: 'session_not_found',
+          sessionSlug: context.sessionSlug || sanitizeSessionSlug(input.sessionSlug),
+          message: 'Unknown sessionSlug. Omit sessionSlug to use the current default session.',
+        }, { status: 404 });
+      }
       const fallbackContext = await resolveHandoffContext({
         env,
         input: { ...input, sessionSlug: '' },
         auth,
         requireQuestionAuthoring: false,
+        ignoreSessionBinding: true,
       });
       if (fallbackContext.ok) {
         return handleTagsRequest({ env, context: fallbackContext, waitUntil });

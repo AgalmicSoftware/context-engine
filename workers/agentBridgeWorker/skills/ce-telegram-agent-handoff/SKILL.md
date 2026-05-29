@@ -104,11 +104,12 @@ continuing.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId` and the token-bound session.
 - Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
+- Current Edge 2026 demo sessions are `ee-26-test`, `ee-26-organizers`, and `ee-26-users`. The worker default is scheduled as `ee-26-organizers` until May 30, 2026, then `ee-26-users`. For `ceagt_` tokens, prefer the `Session` value copied from Telegram install info.
 
 Worked `ceagt_` token smoke test:
 
 ```bash
-curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/questions?sessionSlug=telegram-demo-4" \
+curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/questions?sessionSlug=ee-26-organizers" \
   -H "Authorization: Bearer ceagt_REPLACE_WITH_USER_TOKEN"
 ```
 
@@ -286,7 +287,7 @@ For personalized question selection, send a POST body with preferences:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "relevanceMode": "rank",
   "preferences": {
     "tags": ["ai", "governance"],
@@ -317,7 +318,7 @@ The response is text-safe metadata only:
 ```json
 {
   "ok": true,
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "tags": [
     { "tag": "organizer-feedback", "count": 6 },
     { "tag": "src:example-org", "count": 3 }
@@ -332,6 +333,11 @@ URL-based question generation, future geographic/topic generation, and any
 agent-authored questions. It keeps the one-session-by-tags model navigable in
 the Mini App. See also "Tags Instead Of Child Sessions" below.
 
+If `sessionSlug` is omitted, the worker uses the current default session. If an
+agent sends an explicit unrecognized `sessionSlug`, treat the 404 as a typo or
+stale session name and ask the user/operator for the correct session rather
+than silently continuing.
+
 ## Preference Object
 
 Build preferences as drafts keyed by exact `questionId`:
@@ -340,7 +346,7 @@ Build preferences as drafts keyed by exact `questionId`:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "preferences": {
     "requireReview": true,
     "answersByQuestionId": {
@@ -381,7 +387,7 @@ With a `ceagt_` token, the worker scopes results to the token-bound Telegram use
 ```json
 {
   "type": "answer_draft",
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "questionId": "q-binary",
   "createdAt": "2026-05-28T12:00:00.000Z",
   "status": "draft_saved",
@@ -416,7 +422,7 @@ Example body:
 
 ```json
 {
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "sourceUrl": "https://example.org/source-note",
   "questions": [
     {
@@ -472,7 +478,7 @@ Example request:
 
 ```json
 {
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "queueKey": "daily-ai-governance",
   "criteria": {
     "tags": ["ai-governance"],
@@ -512,25 +518,26 @@ link:
 ```http
 POST /telegram/agent/api/group-approval-link
 Content-Type: application/json
-Authorization: Bearer <service token or scoped admin ceagt_ token>
+Authorization: Bearer <worker service token>
 
 {
   "telegramUserId": "123456789",
-  "sessionSlug": "telegram-demo-4"
+  "sessionSlug": "ee-26-organizers"
 }
 ```
 
 The caller must pass CE's session-admin gate. A normal `ceagt_` token does not
 include the `manage_group_approvals` scope by default; use the worker service
-token or an explicitly scoped admin token. The response contains a `url` to send
-to the Telegram group owner. The first group that opens it becomes approved for
-that session.
+token for this link endpoint. The response contains a `url` to send to the
+Telegram group owner. The first group that opens it becomes approved for that
+session. User-scoped admin tokens should use the normal in-group admin approval
+flow instead of minting group approval links directly.
 
 For a user-scoped `ceagt_` token, first check whether the user is an admin for
 the token-bound session:
 
 ```http
-GET /telegram/agent/api/admin/status?sessionSlug=telegram-demo-4
+GET /telegram/agent/api/admin/status?sessionSlug=ee-26-organizers
 ```
 
 If the response has `admin: true` and
@@ -541,7 +548,7 @@ confirm-before-write flow:
 Admins can also read aggregate bridge metrics:
 
 ```http
-GET /telegram/agent/api/admin/metrics?sessionSlug=telegram-demo-4
+GET /telegram/agent/api/admin/metrics?sessionSlug=ee-26-organizers
 ```
 
 This endpoint is admin-only and returns counts only: token mints, distinct
@@ -572,7 +579,7 @@ sponsored question in the same operation:
 
 ```json
 {
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "references": ["the question about food preference", "pizza"],
   "createQuestions": [
     {
@@ -587,7 +594,7 @@ Example apply after the admin has approved the exact plan:
 
 ```json
 {
-  "sessionSlug": "telegram-demo-4",
+  "sessionSlug": "ee-26-organizers",
   "references": ["the question about food preference", "pizza"],
   "createQuestions": [
     {
@@ -631,7 +638,7 @@ Pose an existing active question:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "questionId": "q-binary"
 }
 ```
@@ -642,7 +649,7 @@ Create and pose a new freeform question:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "prompt": "What should the group decide next?",
   "questionType": "freeform",
   "tags": ["governance", "agent-village"],
@@ -672,7 +679,7 @@ Example:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "preferences": {
     "interests": ["food", "governance"],
     "attendedSessions": ["agent-village"]
@@ -712,7 +719,7 @@ Example:
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "approvalText": "Approve q-pizza, but change q-budget to downvote.",
   "recommendations": [
     { "questionId": "q-pizza", "suggestedVote": "up" },
@@ -773,7 +780,7 @@ POST /telegram/agent/api/groups/propose
 {
   "telegramUserId": "42",
   "groupChatId": "-100123",
-  "sessionSlug": "telegram-demo-3",
+  "sessionSlug": "ee-26-organizers",
   "category": {
     "categoryId": "ai_tribe",
     "label": "AI tribe",

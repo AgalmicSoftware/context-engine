@@ -919,7 +919,7 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
 });
 
-test('Telegram agent tags endpoint returns active tag counts and falls back to the default session', async () => {
+test('Telegram agent tags endpoint returns active tag counts and rejects explicit unknown sessions', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -958,6 +958,11 @@ test('Telegram agent tags endpoint returns active tag counts and falls back to t
     env,
   });
   const unknown = await jsonBody(unknownResponse);
+  const defaultResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/tags?telegramUserId=42'),
+    env,
+  });
+  const defaultBody = await jsonBody(defaultResponse);
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
@@ -968,9 +973,12 @@ test('Telegram agent tags endpoint returns active tag counts and falls back to t
   assert.equal(body.tags.findIndex((entry) => entry.tag === 'alpha-topic') < body.tags.findIndex((entry) => entry.tag === 'shared'), true);
   assert.equal(JSON.stringify(body).includes('organizers need a recap'), false);
   assert.equal(JSON.stringify(body).includes('agent-test-token'), false);
-  assert.equal(unknownResponse.status, 200);
-  assert.equal(unknown.sessionSlug, 'alpha');
-  assert.equal(unknown.tags.find((entry) => entry.tag === 'shared')?.count, 2);
+  assert.equal(defaultResponse.status, 200);
+  assert.equal(defaultBody.sessionSlug, 'alpha');
+  assert.equal(defaultBody.tags.find((entry) => entry.tag === 'shared')?.count, 2);
+  assert.equal(unknownResponse.status, 404);
+  assert.equal(unknown.reason, 'session_not_found');
+  assert.equal(unknown.sessionSlug, 'missing-session');
 });
 
 test('Telegram agent handoff rejects group calls from sessions with a different approved chat', async () => {

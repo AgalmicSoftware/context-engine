@@ -725,11 +725,17 @@ OpenClaw-style agents can call:
 GET  /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
 POST /telegram/agent/api/questions
 POST /telegram/agent/api/questions/next
+GET  /telegram/agent/api/tags
+POST /telegram/agent/api/tags
+POST /telegram/agent/api/questions/create
 GET  /telegram/agent/api/admin/status
+GET  /telegram/agent/api/admin/metrics
 GET  /telegram/agent/api/question-queue
 POST /telegram/agent/api/question-queue
 POST /telegram/agent/api/question-queue/plan
 POST /telegram/agent/api/question-queue/apply
+POST /telegram/agent/api/group-approval-link
+POST /telegram/agent/api/group-approval-revoke
 GET  /telegram/agent/api/actions
 GET  /telegram/agent/api/results
 GET  /telegram/agent/api/results-image
@@ -747,6 +753,14 @@ question tags, prompt text, and attended-session hints. The default mode returns
 all questions ranked by relevance. Set `relevanceMode: "filter"` to return only
 questions with a positive relevance score. `questions/pose` accepts `tags` and
 `sessionContext` when an agent creates a new Telegram-only question.
+
+`GET /telegram/agent/api/tags` returns active tag counts without question text.
+If `sessionSlug` is omitted, the worker uses the current default session; an
+explicit unrecognized `sessionSlug` returns `404` so agents can ask for the
+correct session name instead of silently reading a different session. `POST
+/telegram/agent/api/questions/create` lets an agent create approved proposed
+questions in batch, attaching URL references and source-derived tags without
+posing them into a chat.
 
 `POST /telegram/agent/api/questions/next` is the queue-friendly cadence route.
 It accepts `criteria` / `preferences`, optional `questionTypes`, `queueKey`,
@@ -775,6 +789,16 @@ candidate questions. Agents must show that plan to the admin and call
 through `approved: true` or `approvalText`. Multiple existing references and
 multiple new questions are supported; apply appends by default and replaces the
 queue only when `replace: true` is supplied.
+
+`GET /telegram/agent/api/admin/metrics` returns admin-only aggregate counts for
+token mints, agent-created questions, submitted answer records, answer drafts,
+group proposals, distinct respondents, and registry session count. Submit
+metrics are counted from KV list metadata for current records, with a legacy
+body-read fallback, so large Telegram-only sessions avoid one KV read per
+response. `POST /telegram/agent/api/group-approval-link` and
+`/group-approval-revoke` are worker-service-token operator routes for managing
+approved Telegram groups; normal user-scoped admin tokens should use the
+in-group approval flow instead.
 
 `GET /telegram/agent/api/actions` returns mutation-oriented activity for the
 resolved user: agent-created answer drafts, pending vote recommendations,
