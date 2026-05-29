@@ -12,6 +12,7 @@ import {
   getPhotoAnalysisToggleBySourceId,
   getPhotoAnalysisBodyBySourceId,
   toggleCheckbox,
+  setInputValue,
   setAudioInputValue,
   addAdditionalPhoto,
   renderSubject,
@@ -25,7 +26,7 @@ import {
 describe('AudioSurveyGenerator input and question generation', () => {
   setupAudioSurveyGeneratorTestLifecycle();
 
-  it('toggles transcript mode placeholder text', () => {
+  it('shows transcript mode only when text input exists and toggles placeholder text', () => {
     act(() => {
       root.render(
         <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
@@ -59,7 +60,13 @@ describe('AudioSurveyGenerator input and question generation', () => {
   it('shows transcript mode when a URL source is typed', () => {
     act(() => {
       root.render(
-        <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+        <AudioSurveyGenerator
+          provider={{}}
+          network={{}}
+          account="0x123"
+          loginComplete
+          toggleLoginModal={jest.fn()}
+        />
       );
     });
 

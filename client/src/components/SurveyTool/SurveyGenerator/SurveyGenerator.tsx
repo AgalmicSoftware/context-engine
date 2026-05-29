@@ -1620,6 +1620,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   );
   const effectiveSurveyTitle = hasUploadedFileSources ? toStr(surveyTitle).trim() : '';
   const hasTypedUrlSource = toStr(additionalUrlInput).trim().length > 0;
+  const hasTranscriptModeInput = toStr(pastedText).trim().length > 0 || hasTypedUrlSource;
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0 || hasTypedUrlSource;
   const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
     ? docSaveSessionLabel
@@ -1638,6 +1639,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       setTranscriptMode(false);
       setAudioFile(null);
       setSummaryMd('');
+      setSummaryCollapsed(true);
     }
   }, [hasTranscriptModeInput, transcriptMode]);
 
@@ -1743,22 +1745,72 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                 </div>
               ) : null}
 
-              <div className={styles.textInputGroup}>
-                <AudioInput
-                  placeholder={
-                    transcriptMode ? 'Speak to capture transcript or Paste Text...' : 'Speak or type text here...'
-                  }
-                  recordingDisabled={transcriptMode}
-                  longFormMode={transcriptMode}
-                  showRecorderControlsInTextbox={transcriptMode}
-                  showRecordingTimerInTextbox={transcriptMode}
-                  enableDownloads={transcriptMode}
-                  updateFunction={(val: string) => setPastedText(val)}
-                  toggleEncryption={(bool: boolean) => setTextEncrypted(bool)}
-                  value={pastedText}
-                  encrypted={textEncrypted}
-                  hideEncryption={hideEncryption}
-                  style={SURVEY_GENERATOR_TEXT_INPUT_STYLE}
+          <div className={styles.textInputGroup}>
+            <AudioInput
+              placeholder={transcriptMode ? "Speak to capture transcript or Paste Text..." : "Speak or type text here..."}
+              recordingDisabled={transcriptMode}
+              longFormMode={transcriptMode}
+              showRecorderControlsInTextbox={transcriptMode}
+              showRecordingTimerInTextbox={transcriptMode}
+              enableDownloads={transcriptMode}
+              updateFunction={(val: string) => setPastedText(val)}
+              toggleEncryption={(bool: boolean) => setTextEncrypted(bool)}
+              value={pastedText}
+              encrypted={textEncrypted}
+              hideEncryption={hideEncryption}
+              style={SURVEY_GENERATOR_TEXT_INPUT_STYLE}
+            />
+          </div>
+
+          <div className={styles.addSourceControls}>
+            <div className={styles.urlInputContainer}>
+              <Input
+                type="url"
+                placeholder="Add URL"
+                value={additionalUrlInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  setAdditionalUrlInput(e.target.value);
+                  setImagePickerStatusText('');
+                  setImagePickerStatusTone('default');
+                }}
+                onKeyDown={handleUrlKeyDown}
+                className={styles.urlInputField}
+              />
+              <button
+                type="button"
+                className={styles.internalUrlAddBtn}
+                onClick={addAdditionalUrl}
+                disabled={!additionalUrlInput.trim()}
+                title="Add URL"
+              >
+                <FontAwesomeIcon icon={faPlus} />
+              </button>
+            </div>
+
+            {hasTranscriptModeInput && (
+              <div
+                className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
+                onClick={handleTranscriptModeToggle}
+                title="Enable Transcript Mode (Summary + Arweave Upload)"
+                data-testid="transcript-mode-toggle"
+              >
+                <FontAwesomeIcon
+                  icon={transcriptMode ? faCheckSquare : faSquare}
+                  className={styles.checkboxIcon}
+                />
+                <span>Transcript</span>
+              </div>
+            )}
+
+            {transcriptMode && (
+              <div
+                className={buildSurveyGeneratorTranscriptToggleClassName(styles, uploadSummaryToArweave)}
+                onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
+                title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
+              >
+                <FontAwesomeIcon
+                  icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
+                  className={styles.checkboxIcon}
                 />
               </div>
 

@@ -4099,8 +4099,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     padding: 0;
   }
 
-  .pileHologramToggle {
-    top: 14px;
+  .pileActionButtonGroup {
+    flex-direction: row;
+    gap: 16px;
+  }
+
+  .pileNav {
+    flex-direction: row;
+    gap: 12px;
+    order: 2;
+    margin-left: auto;
+    padding: 6px 16px;
+    border-radius: 50px;
+    min-width: auto;
   }
 
   .pileFooter {

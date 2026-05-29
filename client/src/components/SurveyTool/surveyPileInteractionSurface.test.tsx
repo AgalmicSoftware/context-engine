@@ -185,10 +185,16 @@ describe('surveyPileInteractionSurface', () => {
     expect(resolvePileFilterButtonStyle(false)).toEqual({});
     expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
     expect(resolvePileFilterIconStyle(false)).toEqual({});
-    expect(buildPileFilterButtonClassName(styles, true)).toBe(`${styles.actionButton} ${styles.actionButtonActive}`);
-    expect(buildPileActionsClassName(styles, true)).toBe(`${styles.pileActions} ${styles.pileActionsMenuEligible}`);
+    expect(buildPileFilterButtonClassName(styles, true)).toBe(
+      `${styles.actionButton} ${styles.actionButtonActive}`
+    );
+    expect(buildPileActionsClassName(styles, true)).toBe(
+      `${styles.pileActions} ${styles.pileActionsMenuEligible}`
+    );
     expect(buildPileActionsClassName(styles, false)).toBe(styles.pileActions);
-    expect(buildPileFooterClassName(styles, false)).toBe(`${styles.pileFooter} ${styles.pileFooterHidden}`);
+    expect(buildPileFooterClassName(styles, false)).toBe(
+      `${styles.pileFooter} ${styles.pileFooterHidden}`
+    );
     expect(buildPileSubmitButtonClassName(styles, true, true)).toBe(
       `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`,
     );
@@ -219,24 +225,20 @@ describe('surveyPileInteractionSurface', () => {
     );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
-    expect(
-      shouldCollapsePileActionsIntoMenu({
-        pileTopRailVisible: true,
-        showSubmitButton: true,
-        hasPendingPileChanges: true,
-        isSubmitting: false,
-        shouldHidePileSubmitButton: false,
-      }),
-    ).toBe(true);
-    expect(
-      shouldCollapsePileActionsIntoMenu({
-        pileTopRailVisible: true,
-        showSubmitButton: true,
-        hasPendingPileChanges: false,
-        isSubmitting: false,
-        shouldHidePileSubmitButton: true,
-      }),
-    ).toBe(false);
+    expect(shouldCollapsePileActionsIntoMenu({
+      pileTopRailVisible: true,
+      showSubmitButton: true,
+      hasPendingPileChanges: true,
+      isSubmitting: false,
+      shouldHidePileSubmitButton: false,
+    })).toBe(true);
+    expect(shouldCollapsePileActionsIntoMenu({
+      pileTopRailVisible: true,
+      showSubmitButton: true,
+      hasPendingPileChanges: false,
+      isSubmitting: false,
+      shouldHidePileSubmitButton: true,
+    })).toBe(false);
   });
 
   it('renders the gated empty panel before the generic empty copy when gating is active', () => {

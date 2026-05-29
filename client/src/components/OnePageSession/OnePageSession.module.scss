@@ -488,7 +488,8 @@
     max-width: 100%;
     width: 100%;
     justify-content: flex-start;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 6px 10px;
   }
 
@@ -851,15 +852,61 @@
 
   .documentsSectionHeader {
     gap: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMain {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
+    column-gap: 10px;
     flex: 1 1 220px;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderMain .sectionToggleIcon {
+    margin-right: 0;
+    margin-top: 0.1em;
+  }
+
+  .documentsSectionHeaderText {
+    display: grid;
+    grid-template-areas:
+      "title subtitle"
+      "actions actions";
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderTitleRow {
+    display: contents;
+  }
+
+  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
+    grid-area: title;
+  }
+
+  .documentsSectionHeaderText > .sectionHeaderSubtitle {
+    grid-area: subtitle;
+    justify-self: start;
+    font-size: 0.82em;
+    line-height: 1;
   }
 
   .documentsSectionHeaderMeta {
     align-items: center;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    grid-area: actions;
+    justify-self: end;
+    justify-content: flex-end;
     gap: 8px;
+    padding-right: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
@@ -975,15 +1022,61 @@
 
   .documentsSectionHeader {
     gap: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMain {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: flex-start;
+    column-gap: 10px;
     flex: 1 1 220px;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderMain .sectionToggleIcon {
+    margin-right: 0;
+    margin-top: 0.1em;
+  }
+
+  .documentsSectionHeaderText {
+    display: grid;
+    grid-template-areas:
+      "title subtitle"
+      "actions actions";
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 10px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .documentsSectionHeaderTitleRow {
+    display: contents;
+  }
+
+  .documentsSectionHeaderTitleRow .sectionHeaderTitle {
+    grid-area: title;
+  }
+
+  .documentsSectionHeaderText > .sectionHeaderSubtitle {
+    grid-area: subtitle;
+    justify-self: start;
+    font-size: 0.82em;
+    line-height: 1;
   }
 
   .documentsSectionHeaderMeta {
     align-items: center;
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    grid-area: actions;
+    justify-self: end;
+    justify-content: flex-end;
     gap: 8px;
+    padding-right: 10px;
+    width: 100%;
   }
 
   .documentsSectionHeaderMeta .sectionHeaderTooltip {
@@ -998,6 +1091,35 @@
     font-size: 0.78rem;
     min-height: 40px;
     padding: 8px 11px;
+  }
+
+  .pileHeaderRow {
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 12px;
+  }
+
+  .pileHeaderTitleWrap {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .pileHeaderTitle {
+    font-size: clamp(1.35rem, 4.2vw, 1.75rem);
+    opacity: 0.9;
+  }
+
+  .pileHeaderTooltip {
+    align-items: center;
+    justify-content: center;
+    display: inline-flex;
+    min-height: 42px;
+    min-width: 42px;
+    margin-left: 0;
+    margin-top: 0;
   }
 }
 
