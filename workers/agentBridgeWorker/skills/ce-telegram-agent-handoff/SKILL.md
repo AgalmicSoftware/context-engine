@@ -445,6 +445,51 @@ question or a structured `geoRefs` array. The worker forces the matching
 `/questions/next`, and `/digest` calls can surface questions relevant to public
 Geo nodes.
 
+## Writing CE Backlinks Into Geo
+
+CE never calls the Geo CLI or Geo/EdgeOS API and never stores an
+`EDGEOS_BEARER_TOKEN`. The agent owns Geo reads and writes with its own
+geo-esmeralda skill.
+
+When the agent generates or links a CE question for a public Geo node, ask CE for
+safe backlink text:
+
+```http
+GET /telegram/agent/api/geo-backlink?sessionSlug=<slug>&questionId=<id>&geoId=<geoId>
+```
+
+The response contains `questionUrl` and `suggestedComment`. Write that comment
+into Geo as a ContentItem using the geo-esmeralda CLI `create` verb, scoped to
+the narrowest event, venue, or track, with a stable `--client-request-id`. Do
+not change Geo schema and do not send Geo bearer tokens to CE.
+
+## Prompting At CE-Attached Geo Nodes
+
+When browsing Geo content, if a node has a CE backlink ContentItem, prompt the
+human to join Context Engine and help build the opinion map for that node unless
+they are in a temporary decline cooldown.
+
+Before prompting, check:
+
+```http
+GET /telegram/agent/api/ce-install-preference?telegramUserId=<id>
+```
+
+Only persist a decline when the user explicitly says they do not want to join or
+asks to stop being asked:
+
+```http
+POST /telegram/agent/api/ce-install-preference
+{"telegramUserId":"42","declined":true}
+```
+
+Do not treat silence, ignored prompts, or "not now" as a decline. A decline
+auto-expires after the admin-configured cooldown
+`AGENT_BRIDGE_CE_INSTALL_DECLINE_COOLDOWN_DAYS` (default 3 days). If the user
+later asks to join, onboard them immediately and clear the cooldown with
+`{"declined":false}`. If the user already has a `ceagt_` token, skip the install
+pitch and surface the node's CE question(s) to answer.
+
 ## Read Aggregate Results
 
 Use this endpoint when the user asks what themes are emerging in the session or
