@@ -1043,6 +1043,10 @@ async function withTelegramProposedQuestions(env = {}, sessionSlug = '', result 
   const questions = mergedSummary.questions;
   return {
     ...withSkippedMalformed(result, skippedMalformed + mergedSummary.skippedMalformed),
+    ok: result.ok !== false || questions.length > 0,
+    reason: result.ok === false && questions.length > 0
+      ? 'proposed_questions_loaded_with_source_warning'
+      : result.reason,
     questions,
     questionCount: questions.length,
     proposedQuestionCount: proposed.length,
@@ -1204,7 +1208,18 @@ async function loadTelegramOnlyCloudflareQuestions({
   fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(session.sessionSlug || session.slug);
-  const auth = await buildTelegramOnlyStorageAuth({ env, session, fetchImpl });
+  let auth = null;
+  try {
+    auth = await buildTelegramOnlyStorageAuth({ env, session, fetchImpl });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: 'telegram_only_cloudflare_questions_list_failed',
+      authReason: 'session_worker_auth_failed',
+      error: safeString(error?.message || error),
+      questions: [],
+    };
+  }
   if (!auth?.ok) {
     return {
       ok: false,

@@ -3243,6 +3243,47 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
   assert.equal(maxActiveReads, 3);
 });
 
+test('telegram_only storage auth failures still surface proposed questions', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'unit-deploy',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramOnly: true,
+        telegramBridgeEnabled: true,
+        telegramGroupOpenAccess: true,
+        sessionWorkerUrl: 'https://session.example',
+        workerSessionSlug: 'alpha',
+        questionSource: 'cloudflare_storage',
+        storageProfile: { backend: 'cloudflare' },
+      }],
+    }),
+    QUESTION_FETCH: async () => {
+      throw new Error('session auth unavailable');
+    },
+  });
+  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-proposed-ok', JSON.stringify({
+    version: 1,
+    questionId: 'q-proposed-ok',
+    sessionSlug: 'alpha',
+    questionType: 'binary',
+    prompt: 'Should proposed questions stay visible when storage auth fails?',
+    status: 'active',
+    createdAt: '2026-05-29T12:00:00.000Z',
+  }));
+
+  const loaded = await loadQuestionsForSession(env, 'alpha');
+
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.reason, 'proposed_questions_loaded_with_source_warning');
+  assert.equal(loaded.authReason, 'session_worker_auth_failed');
+  assert.equal(loaded.questionCount, 1);
+  assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-proposed-ok']);
+});
+
 test('/questions live_or_fixture does not show fixture questions when live loading is slow', async () => {
   __test__sessionQuestions.clearCaches();
   const waited = [];
