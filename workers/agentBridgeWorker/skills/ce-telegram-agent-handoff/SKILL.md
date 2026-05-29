@@ -164,6 +164,40 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 
 After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account, bind the Telegram user to the selected Telegram-only session, and render a private masked token screen with a copy button for full install info. From then on, use this skill's API calls with the token-bound `sessionSlug`. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
 
+## Prepopulated Deep Links On First Invocation
+
+When a user first asks CE about deliberation, governance, sensemaking, community
+discussion, or "what questions are there?", proactively offer a small labeled
+menu of deep-link sets.
+
+1. Seed topics from the user's authorized profile, bio, interests, and recent
+   activity. Use only fields the user allowed during onboarding consent.
+2. Choose matching tags and geoIDs from that context. For geoIDs, the agent uses
+   its own Geo tools; the CE worker does not call Geo.
+3. Fetch active questions with the existing tag-filtered question reads and the
+   geo-linked question flow. Respect `questionsPerBatch` from the user's
+   settings, defaulting to 3.
+4. Build one Mini App `startapp` link or private token-bound client link per
+   topic cluster using the link builders already described in "Mini App
+   Question Links" and "Interactive Client Report".
+5. Present the links as a short menu the user can choose from.
+
+Useful organizer/tester labels include:
+
+- "Participant Survey Topics"
+- "Index Network Questions" (`index`, `meetings`)
+- "Agent Village Experiment questions"
+
+Example shapes, using existing link builders only:
+
+```text
+https://t.me/contextengineer_bot/<mini-app-short-name>?startapp=<payload-from-mini-app-launch>
+https://contextengine.xyz/session/<session-slug>/questions/results?telegramToken=<urlencoded-ceagt-token>&agentBridgeUrl=<urlencoded-worker-url>
+```
+
+This flow composes existing tags, questions, geo-linked questions, Mini App
+launches, and client links. Do not invent a new CE endpoint for it.
+
 ## Non-Telegram Agent Token Flow
 
 Use this path when the user's assistant is not running inside the CE Telegram bot but the user wants it to act against CE on their behalf.
