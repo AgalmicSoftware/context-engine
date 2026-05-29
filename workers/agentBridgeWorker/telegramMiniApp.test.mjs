@@ -322,8 +322,9 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('id="resultsSessionOptions"'), false);
   assert.match(html, /id="closeResults"[^>]*aria-label="Close results"/);
   assert.equal(html.includes('id="resultViewLevels"'), false);
-  assert.match(html, /id="resultFilters"[^>]*aria-label="Result filters"/);
+  assert.match(html, /id="resultFilters"[^>]*aria-label="Result filters"[^>]*hidden/);
   assert.match(html, /id="toggleResultFilters"/);
+  assert.match(html, /<span>Filter Results<\/span>/);
   assert.match(html, /class="resultFilterHeader"[\s\S]*id="toggleResultFilters"[\s\S]*id="clearResultFilters"/);
   const resultsBodyStart = html.indexOf('<div class="resultsPanelBody" id="resultsPanelBody">');
   const resultFiltersStart = html.indexOf('<section class="resultFilters', resultsBodyStart);
@@ -335,6 +336,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="resultFilterOptions"/);
   assert.equal(html.includes('id="applyResultFilters"'), false);
   assert.match(html, /autoApplyResultFilters/);
+  assert.match(html, /if \(key === 'filters'\) section\.hidden = !open;/);
   assert.equal(html.includes('id="toggleResultsPanelBody"'), false);
   assert.match(html, /id="moreConsensusResults"/);
   assert.match(html, /id="moreDivisiveResults"/);

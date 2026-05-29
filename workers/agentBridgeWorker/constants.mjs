@@ -65,6 +65,7 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   LIST_SESSIONS: 'list_sessions',
   SELECT_QUESTION: 'select_question',
   POSE_QUESTION: 'pose_question',
+  START_MENU: 'start_menu',
   START_PRIVATE: 'start_private',
   AGENT_ACTION_MENU: 'agent_action_menu',
   AGENT_ONBOARDING: 'agent_onboarding',

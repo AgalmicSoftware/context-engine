@@ -311,6 +311,10 @@ function flattenButtons(replyMarkup) {
   return (replyMarkup?.inline_keyboard || []).flat();
 }
 
+function nonNavigationButtons(replyMarkup) {
+  return flattenButtons(replyMarkup).filter((button) => button.text !== 'Back to Start');
+}
+
 function launchFromButton(button = {}) {
   if (button.web_app?.url) return new URL(button.web_app.url).searchParams.get('launch') || '';
   if (button.url) return new URL(button.url).searchParams.get('start') || '';
@@ -831,7 +835,8 @@ test('/sessions paginates tall Telegram session lists', async () => {
   const loadNext = buttons.find((button) => button.text === 'Load Next');
   assert.match(first.response.text, /Sessions \(5\/6\)/);
   assert.equal(first.response.text.includes('- six (six)'), false);
-  assert.equal(buttons.filter((button) => button.callback_data).length, 6);
+  assert.equal(nonNavigationButtons(first.response.replyMarkup).filter((button) => button.callback_data).length, 6);
+  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
 
   const second = await buildTelegramCommandResponse({
     update: {
@@ -893,7 +898,8 @@ test('/sessions lists only Telegram-enabled sessions', async () => {
   assert.match(result.response.text, /- alpha \(Alpha Session\)/);
   assert.match(result.response.text, /- beta \(Beta Session\)/);
   assert.equal(result.response.text.includes('Gamma Session'), false);
-  assert.deepEqual(flattenButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
+  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), ['Alpha Session', 'Beta Session']);
+  assert.equal(flattenButtons(result.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
 });
 
 test('/sessions and /start honor the Cloudflare Telegram session created-after cutoff', async () => {
@@ -939,7 +945,7 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
   assert.match(sessions.response.text, /- old-alpha \(Old Alpha\)/);
   assert.match(sessions.response.text, /- new-beta \(New Beta\)/);
   assert.equal(sessions.response.text.includes('Missing Created At'), false);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), ['Old Alpha', 'New Beta']);
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), ['Old Alpha', 'New Beta']);
 
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -1003,7 +1009,7 @@ test('/sessions keeps the default visible when the cutoff is newer than its crea
   assert.match(sessions.response.text, /- new-non-default \(New Non Default\)/);
   assert.equal(sessions.response.text.includes('Old Non Default'), false);
   assert.equal(sessions.response.text.includes('E2E New Session'), false);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
     'Old Default',
     'New Non Default',
   ]);
@@ -1050,7 +1056,7 @@ test('/sessions keeps the default visible when cutoff metadata is missing', asyn
   assert.match(sessions.response.text, /- metadata-free-default \(Metadata Free Default\)/);
   assert.match(sessions.response.text, /- fresh-session \(Fresh Session\)/);
   assert.equal(sessions.response.text.includes('Metadata Free Other'), false);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
     'Metadata Free Default',
     'Fresh Session',
   ]);
@@ -1106,7 +1112,7 @@ test('/sessions can use the Edge 2026 cutoff to hide the test session', async ()
   assert.equal(sessions.response.text.includes('EE26 Test'), false);
   assert.match(sessions.response.text, /- ee-26-organizers \(EE26 Organizers\)/);
   assert.match(sessions.response.text, /- ee-26-users \(EE26 Users\)/);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+  assert.deepEqual(nonNavigationButtons(sessions.response.replyMarkup).map((button) => button.text), [
     'EE26 Organizers',
     'EE26 Users',
   ]);
@@ -1480,7 +1486,7 @@ test('/questions and callback dispatch list questions without leaking locked pro
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /^Questions \(2\/2\)\n\n1\. What should Alpha decide next\?/);
   assert.equal(callback.response.text.includes('Choose a question'), false);
-  assert.deepEqual(flattenButtons(callback.response.replyMarkup).map((button) => button.text), [
+  assert.deepEqual(nonNavigationButtons(callback.response.replyMarkup).map((button) => button.text), [
     'Pose 1',
     'Pose 2',
   ]);
@@ -1521,11 +1527,12 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
   assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
   assert.match(result.response.text, /2\. Encrypted question/);
   const buttons = flattenButtons(result.response.replyMarkup);
-  assert.equal(buttons.length, 2);
-  assert.deepEqual(buttons.map((button) => button.text), [
+  assert.equal(nonNavigationButtons(result.response.replyMarkup).length, 2);
+  assert.deepEqual(nonNavigationButtons(result.response.replyMarkup).map((button) => button.text), [
     'Pose 1',
     'Pose 2',
   ]);
+  assert.equal(buttons.some((button) => button.text === 'Back to Start'), true);
   for (const button of buttons) {
     assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
     assert.equal(button.callback_data.includes(publicQuestionId), false);
@@ -1556,8 +1563,11 @@ test('/questions assigns stable numbers that survive list reordering', async () 
   });
 
   assert.equal(firstList.ok, true);
-  assert.match(firstList.response.text, /1\. Alpha first question\? \(#1\)/);
-  assert.match(firstList.response.text, /2\. Alpha second question\? \(#2\)/);
+  assert.match(firstList.response.text, /1\. Alpha first question\?/);
+  assert.match(firstList.response.text, /2\. Alpha second question\?/);
+  assert.doesNotMatch(firstList.response.text, /\(#\d+\)/);
+  assert.match(firstList.response.text, /Alpha first question\?\n\n2\. Alpha second question\?/);
+  assert.equal(flattenButtons(firstList.response.replyMarkup).some((button) => button.text === 'Back to Start'), true);
 
   env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON = JSON.stringify([
     {
@@ -1593,9 +1603,10 @@ test('/questions assigns stable numbers that survive list reordering', async () 
     now: '2026-05-08T12:00:03.000Z',
   });
 
-  assert.match(reorderedList.response.text, /1\. Alpha second question\? \(#2\)/);
-  assert.match(reorderedList.response.text, /2\. Alpha new question\? \(#3\)/);
-  assert.match(reorderedList.response.text, /3\. Alpha first question\? \(#1\)/);
+  assert.match(reorderedList.response.text, /1\. Alpha second question\?/);
+  assert.match(reorderedList.response.text, /2\. Alpha new question\?/);
+  assert.match(reorderedList.response.text, /3\. Alpha first question\?/);
+  assert.doesNotMatch(reorderedList.response.text, /\(#\d+\)/);
   assert.equal(stablePose.ok, true);
   assert.match(stablePose.response.text, /Alpha second question\?/);
   assert.equal(stablePose.response.text.includes('Alpha new question?'), false);
@@ -3022,7 +3033,7 @@ test('/questions reads telegram_only preloaded policy questions without chain in
 
   assert.equal(result.ok, true);
   assert.equal(result.questionSourceReason, 'telegram_only_policy_questions_loaded');
-  assert.equal(result.response.text, 'Questions (1/1)\n\n1. Should this session avoid chain question indexing? (#1)');
+  assert.equal(result.response.text, 'Questions (1/1)\n\n1. Should this session avoid chain question indexing?');
   assert.equal(flattenButtons(result.response.replyMarkup)[0].text, 'Pose 1');
 });
 
@@ -3111,9 +3122,11 @@ test('/questions reads telegram_only Cloudflare question payloads concurrently',
   assert.equal(result.response.text, [
     'Questions (3/3)',
     '',
-    '1. Loaded q-storage-1 (#1)',
-    '2. Loaded q-storage-2 (#2)',
-    '3. Loaded q-storage-3 (#3)',
+    '1. Loaded q-storage-1',
+    '',
+    '2. Loaded q-storage-2',
+    '',
+    '3. Loaded q-storage-3',
   ].join('\n'));
   assert.equal(maxActiveReads, 3);
 });
@@ -3255,7 +3268,7 @@ test('group session binding makes later question and doc commands use the joined
   assert.equal(joined.response.text.includes('/attachments'), false);
   assert.equal(joined.response.text.includes('/me'), false);
   assert.equal(joined.response.text.includes('Use /questions'), false);
-  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next? (#1)');
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
   assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(posed.response.text.startsWith('Question for demo:'), false);
@@ -3320,7 +3333,7 @@ test('private session join makes later question commands use the selected sessio
   });
 
   assert.equal(joined.sessionSlug, 'demo');
-  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next? (#1)');
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
   assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
@@ -3607,7 +3620,7 @@ test('/sessions callback switches the group session used by later question comma
   const selectedUserBinding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(selectedUserBinding.sessionSlug, 'demo');
   assert.equal(selectedUserBinding.source, 'group_session_select');
-  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next? (#1)');
+  assert.equal(questions.response.text, 'Questions (1/1)\n\n1. What should Demo decide next?');
   assert.equal(flattenButtons(questions.response.replyMarkup)[0].text, 'Pose 1');
   assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
@@ -4604,6 +4617,7 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.match(result.response.text, /Account/);
   assert.match(result.response.text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/i);
   assert.doesNotMatch(result.response.text, /Chain:/);
+  assert.doesNotMatch(result.response.text, /Use \/questions/);
   assert.equal(result.response.parseMode, '');
   const addressButton = flattenButtons(result.response.replyMarkup)
     .find((button) => /^0x[0-9a-f]{40}$/i.test(button.text) || /address\//i.test(button.url || ''));
@@ -4614,6 +4628,26 @@ test('/me returns managed demo account metadata without the root secret', async 
   assert.equal(buttons.some((button) => button.text === 'View Questions'), true);
   assert.equal(buttons.some((button) => button.text === 'Onboard Agent'), true);
   assert.equal(buttons.some((button) => button.text === 'Activity'), true);
+  const backToStart = buttons.find((button) => button.text === 'Back to Start');
+  assert.match(backToStart?.callback_data || '', /^cecb_[a-z0-9]{10,48}$/);
+  const start = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9203,
+      callback_query: {
+        id: 'account-back-start',
+        data: backToStart.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 79,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  assert.equal(start.screen, 'setup_welcome');
+  assert.equal(start.response.method, 'editMessageText');
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 

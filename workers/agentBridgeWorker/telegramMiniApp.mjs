@@ -6618,10 +6618,10 @@ function telegramMiniAppHtml() {
         </div>
         <div class="resultsPanelBody" id="resultsPanelBody">
           <div class="filterSummary" id="resultsSummary"></div>
-          <section class="resultFilters collapsed" id="resultFilters" aria-label="Result filters">
+          <section class="resultFilters collapsed" id="resultFilters" aria-label="Result filters" hidden>
             <div class="resultFilterHeader">
               <button class="collapsibleHeader" id="toggleResultFilters" type="button" aria-expanded="false">
-                <span>Filter live results</span>
+                <span>Filter Results</span>
                 <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>
               </button>
               <button class="secondary" id="clearResultFilters" type="button">Clear</button>
@@ -8811,6 +8811,7 @@ function telegramMiniAppHtml() {
     }
     function setResultSectionOpen(key, section, toggle) {
       const open = state.resultSectionsOpen[key] === true;
+      if (key === 'filters') section.hidden = !open;
       section.classList.toggle('collapsed', !open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       const path = toggle.querySelector('path');

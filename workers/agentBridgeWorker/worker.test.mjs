@@ -1274,7 +1274,11 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   const questionButtons = flattenButtons(byCommand['/questions'].reply_markup);
 
   assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
-  assert.deepEqual(questionButtons.map((button) => button.text), ['Pose 1', 'Pose 2']);
+  assert.deepEqual(
+    questionButtons.filter((button) => button.text !== 'Back to Start').map((button) => button.text),
+    ['Pose 1', 'Pose 2']
+  );
+  assert.equal(questionButtons.some((button) => button.text === 'Back to Start'), true);
   assert.equal(questionButtons.some((button) => button.text === 'Open Mini App'), false);
   assert.equal(Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')), true);
   assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:action:')).length >= 12, true);

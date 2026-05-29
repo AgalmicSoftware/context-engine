@@ -985,14 +985,12 @@ function questionLoadIssueText(result = {}) {
 function questionListPromptLine(question = {}) {
   const displayIndex = Number(question.displayIndex) || 0;
   const prefix = displayIndex > 0 ? `${displayIndex}. ` : '';
-  const stableNumber = Number(question.stableQuestionNumber) || 0;
-  const stableSuffix = stableNumber > 0 ? ` (#${stableNumber})` : '';
-  if (question.payloadUnavailable === true) return `${prefix}Failed to load question prompt.${stableSuffix}`;
+  if (question.payloadUnavailable === true) return `${prefix}Failed to load question prompt.`;
   if (question.locked === true) {
     const visibility = lower(question.visibility);
-    return `${prefix}${visibility === 'lit_encrypted' ? 'Encrypted question' : 'Requires session access'}${stableSuffix}`;
+    return `${prefix}${visibility === 'lit_encrypted' ? 'Encrypted question' : 'Requires session access'}`;
   }
-  return `${prefix}${safeString(question.title) || 'Failed to load question prompt.'}${stableSuffix}`;
+  return `${prefix}${safeString(question.title) || 'Failed to load question prompt.'}`;
 }
 
 async function buildTelegramOnlyStorageAuth({
@@ -2833,6 +2831,29 @@ async function makeCallbackButton({
   };
 }
 
+async function makeBackToStartButton({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  seed = '',
+  createdAt = null,
+} = {}) {
+  return makeCallbackButton({
+    env,
+    label: 'Back to Start',
+    action: TELEGRAM_BRIDGE_ACTIONS.START_MENU,
+    lane: normalized.chat?.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: { sessionSlug: sanitizeSessionSlug(sessionSlug) },
+    seed: seed || `back_to_start|${sanitizeSessionSlug(sessionSlug) || 'default'}|${normalized.chat?.chatId || ''}|${normalized.user?.telegramUserId || ''}|${normalized.updateId || ''}`,
+    createdAt,
+  });
+}
+
+async function appendBackToStartRow(rows = [], options = {}) {
+  rows.push([await makeBackToStartButton(options)]);
+  return rows;
+}
+
 async function makeStartButton({
   env = {},
   botUsername = '',
@@ -3909,6 +3930,8 @@ async function buildHelpResponse({
   env,
   createdAt,
   waitUntil = null,
+  method = 'sendMessage',
+  messageId = '',
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const visibleSessions = await telegramVisibleSessionsForChat(policy, env, normalized);
@@ -4000,7 +4023,9 @@ async function buildHelpResponse({
   });
   if (adminActionsButton) keyboard.push([adminActionsButton]);
   return reply({
+    method,
     chatId: normalized.chat.chatId,
+    messageId,
     text: formatHelpText({
       showSessions: visibleSessions.length > 1,
       session: activeSession,
@@ -4049,6 +4074,12 @@ async function buildSessionsResponse({
       createdAt,
     })]);
   }
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    seed: `sessions|start|${offset}|${normalized.chat.chatId}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -4169,6 +4200,13 @@ async function buildAgentActionsResponse({
     botUsername: env.TELEGRAM_BOT_USERNAME,
   });
   if (miniAppButton) rows.push([miniAppButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug,
+    seed: `agent_actions|start|${sessionSlug}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -4251,6 +4289,13 @@ async function buildJoinResponse({
       createdAt,
       waitUntil,
     });
+    const backToStartButton = await makeBackToStartButton({
+      env,
+      normalized,
+      sessionSlug: resolved.session.sessionSlug,
+      seed: `private_join|start|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}`,
+      createdAt,
+    });
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -4280,6 +4325,8 @@ async function buildJoinResponse({
             seed: `private_join|me|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}`,
             createdAt,
           }),
+        ], [
+          backToStartButton,
         ]],
       },
       screen: accountState.screen,
@@ -4475,6 +4522,16 @@ async function buildQuestionsResponse({
       })]);
     }
   }
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    seed: `questions|start|${resolved.session.sessionSlug}|${offset}|${normalized.updateId}`,
+    createdAt,
+  });
+  const promptBody = promptLines.length
+    ? promptLines.join('\n\n')
+    : 'No questions are available.';
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -4482,7 +4539,7 @@ async function buildQuestionsResponse({
     text: [
       `Questions (${Math.min(offset + displayQuestions.length, state.questions.length)}/${state.questions.length})`,
       '',
-      ...(promptLines.length ? promptLines : ['No questions are available.']),
+      promptBody,
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
@@ -8507,6 +8564,13 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
   if (agentTokenButton) rows.push([agentTokenButton]);
   if (activityButton) rows.push([activityButton]);
   if (adminActionsButton) rows.push([adminActionsButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: agentTokenSession?.ok ? agentTokenSession.session.sessionSlug : policy.defaultSessionSlug,
+    seed: `me|start|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -8515,8 +8579,6 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
       'Account',
       `Address: ${addressDisplay}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
-      '',
-      'Use /questions.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: rows,
@@ -8562,6 +8624,7 @@ async function buildActivityResponse({
   sessionSlugOverride = '',
   method = 'sendMessage',
   messageId = '',
+  createdAt = null,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const sessionSlugs = await resolveActivitySessions({
@@ -8580,6 +8643,14 @@ async function buildActivityResponse({
   if (!normalized.chat?.isPrivate) {
     const counts = summarizeTelegramAgentActivityCounts(items);
     assertNoSecretShape(counts, 'Telegram group activity counts must not serialize secrets.');
+    const rows = [];
+    await appendBackToStartRow(rows, {
+      env,
+      normalized,
+      sessionSlug: sessionSlugs[0] || '',
+      seed: `activity|start|${sessionSlugs.join(',') || 'none'}|${normalized.updateId}`,
+      createdAt,
+    });
     return reply({
       method,
       chatId: normalized.chat.chatId,
@@ -8590,6 +8661,7 @@ async function buildActivityResponse({
         '',
         `${counts.drafts} drafts, ${counts.pendingVotes} pending vote suggestions, ${counts.voteDecisions} vote decisions, ${counts.proposedQuestions} proposed questions, ${counts.groupProposals} group suggestions.`,
       ].join('\n'),
+      replyMarkup: { inline_keyboard: rows },
       screen: 'agent_activity_counts',
       command,
       normalized,
@@ -8607,11 +8679,20 @@ async function buildActivityResponse({
     items.slice(0, 12).forEach((item) => lines.push(activityItemLine(item)));
   }
   assertNoSecretShape({ text: lines.join('\n') }, 'Telegram activity response must not serialize secrets.');
+  const rows = [];
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: sessionSlugs[0] || '',
+    seed: `activity|start|${sessionSlugs.join(',') || 'none'}|${normalized.updateId}`,
+    createdAt,
+  });
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
     text: lines.join('\n'),
+    replyMarkup: { inline_keyboard: rows },
     screen: 'agent_activity',
     command,
     normalized,
@@ -8726,6 +8807,13 @@ async function buildAgentTokenResponse({
   const rows = [];
   if (copyInfoButton) rows.push([copyInfoButton]);
   rows.push([accountButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug: resolved.session.sessionSlug,
+    seed: `agent_token|start|${resolved.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
   const bodyText = [
     'Agent Install Info',
     '',
@@ -9523,6 +9611,17 @@ async function buildCallbackResponse({
     }), callbackQueryId);
   }
   const sessionSlug = record.serverContextRef?.sessionSlug || '';
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.START_MENU) {
+    return attachCallbackQueryId(await buildHelpResponse({
+      normalized,
+      command: 'callback:start_menu',
+      env,
+      createdAt,
+      waitUntil,
+      method,
+      messageId,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {
     return attachCallbackQueryId(await buildAgentActionsResponse({
       normalized,
@@ -9787,6 +9886,7 @@ async function buildCallbackResponse({
       sessionSlugOverride: sessionSlug,
       method,
       messageId,
+      createdAt,
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
@@ -10096,6 +10196,7 @@ export async function buildTelegramCommandResponse({
       command: parsed.command,
       env,
       args: parsed.args,
+      createdAt,
     });
   }
   if ([COMMANDS.AGENT_TOKEN, COMMANDS.EXPORT_TOKEN].includes(parsed.command)) {
