@@ -57,7 +57,7 @@ than they need to be.
 ## User Stories
 
 - As a session operator, I can click `Export HTML Report` from session results
-  and choose an exported viewer, static single HTML file, or single-page PDF.
+  and choose an exported viewer, static single HTML file, or PDF report.
 - As a reviewer, I can open the exported file from disk and use a table of
   contents, section anchors, search, and node links to navigate the report.
 - As an auditor, I can see when the snapshot was created, which session/network
@@ -93,7 +93,7 @@ The action should open a lightweight confirmation modal before download:
 - Let the user choose an export format:
   - Exported viewer: self-contained interactive HTML with search/navigation.
   - Single HTML file: static, all-selected-sections-expanded HTML.
-  - Single-page PDF: PDF capture using a print-oriented single-page layout.
+  - PDF report: multi-page PDF capture using a print-oriented layout.
 - Let the user choose included sections with checkboxes.
 - Show privacy mode:
   - `Redacted` by default.
@@ -335,8 +335,8 @@ HTML string:
 - Include a search input for atlas nodes and argument claims.
 - Include a `Download Snapshot JSON` button generated inside the static report.
 - Support both interactive viewer HTML and static single-file HTML render modes.
-- Provide a PDF-oriented render mode whose visualizations and tables fit a
-  single-page capture path.
+- Provide a PDF-oriented render mode whose visualizations and tables paginate
+  cleanly across a long report capture path.
 - Include an artifact watermark showing the shortened downloader address.
 
 ## Proposed Implementation Slices
@@ -387,7 +387,7 @@ Component tests:
 - Download is disabled when no wallet is connected.
 - Selected unavailable analysis sections require `Generate Analysis Views`.
 - Clicking download calls the browser download helper with `.html` content or
-  the PDF helper for single-page PDF.
+  the PDF helper for the multi-page PDF report.
 
 Manual or Playwright smoke:
 
@@ -408,7 +408,7 @@ npm run lint
 ## Acceptance Criteria
 
 - A logged-in authorized user can export an interactive `.html` viewer, a static
-  single `.html` report, or a single-page `.pdf` report from a session results
+  single `.html` report, or a multi-page `.pdf` report from a session results
   view.
 - The file opens locally and remains navigable without network or wallet access.
 - The report includes all available v1 sections:
