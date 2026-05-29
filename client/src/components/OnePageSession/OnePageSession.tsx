@@ -44,7 +44,12 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import { CE_TELEGRAM_AGENT_BRIDGE_URL } from '../../variables/appConfig.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
+import {
+  exchangeTelegramSessionToken,
+  extractTelegramSessionToken,
+} from '../../utilities/worker/workerAuth.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import {
   buildAggregatorFromLocalCache,
@@ -109,6 +114,83 @@ const isTelegramOnlySessionConfig = (metadata: unknown) => {
     telegramConfig.only === true ||
     telegramConfig.mode === 'telegram_only'
   );
+};
+
+const TELEGRAM_LOGIN_QUERY_PARAMS = [
+  'telegramToken',
+  'ceTelegramToken',
+  'ceagt',
+  'agentToken',
+  'token',
+];
+
+const normalizeAgentBridgeUrl = (value: any = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    url.pathname = url.pathname
+      .replace(/\/telegram\/agent\/api\/client-login\/exchange\/?$/i, '')
+      .replace(/\/telegram\/agent\/api\/?$/i, '')
+      .replace(/\/+$/g, '');
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/+$/g, '');
+  } catch (_) {
+    return '';
+  }
+};
+
+const resolveTelegramAgentBridgeUrl = (sessionConfig: any = {}) => {
+  const config = toUnknownRecord(sessionConfig);
+  const telegram = toUnknownRecord(config.telegram);
+  if (typeof window !== 'undefined') {
+    try {
+      const url = new URL(window.location.href);
+      const queryUrl = normalizeAgentBridgeUrl(url.searchParams.get('agentBridgeUrl') || url.searchParams.get('bridge'));
+      if (queryUrl) return queryUrl;
+    } catch (_) {}
+    const globalUrl = normalizeAgentBridgeUrl((globalThis as any).CE_TELEGRAM_AGENT_BRIDGE_URL);
+    if (globalUrl) return globalUrl;
+  }
+  return normalizeAgentBridgeUrl(
+    config.agentBridgeWorkerUrl ||
+    config.telegramAgentBridgeUrl ||
+    config.agentBridgeUrl ||
+    telegram.agentBridgeUrl ||
+    telegram.worker ||
+    CE_TELEGRAM_AGENT_BRIDGE_URL
+  );
+};
+
+const readTelegramLoginInputFromUrl = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    const url = new URL(window.location.href);
+    for (const param of TELEGRAM_LOGIN_QUERY_PARAMS) {
+      const value = url.searchParams.get(param);
+      const token = extractTelegramSessionToken(value || '');
+      if (token) return token;
+    }
+  } catch (_) {}
+  return '';
+};
+
+const removeTelegramLoginInputFromUrl = () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const url = new URL(window.location.href);
+    let changed = false;
+    for (const param of TELEGRAM_LOGIN_QUERY_PARAMS) {
+      if (url.searchParams.has(param)) {
+        url.searchParams.delete(param);
+        changed = true;
+      }
+    }
+    if (changed) {
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  } catch (_) {}
 };
 
 const isPerfCountersEnabled = () => {
@@ -266,6 +348,10 @@ class OnePageSession extends Component<any, any> {
       pileSubmitRailVisible: false,
       corpusViewerLoadRequestNonce: 0,
       corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
+      telegramLoginInput: readTelegramLoginInputFromUrl(),
+      telegramLoginStatus: 'idle',
+      telegramLoginError: '',
+      telegramClientAuth: null,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -359,6 +445,9 @@ class OnePageSession extends Component<any, any> {
 
     // view-all handler
     this.handleViewAllQuestionsClick = this.handleViewAllQuestionsClick.bind(this);
+    this.handleTelegramLoginInputChange = this.handleTelegramLoginInputChange.bind(this);
+    this.handleTelegramLoginSubmit = this.handleTelegramLoginSubmit.bind(this);
+    this.tryTelegramTokenLogin = this.tryTelegramTokenLogin.bind(this);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -370,6 +459,74 @@ class OnePageSession extends Component<any, any> {
         result.catch((e: any) => { demoLog.warn('OnePageSession: callback', e); });
       }
     } catch (e) { demoLog.warn('OnePageSession: callback', e); }
+  }
+
+  hasTelegramClientAuth(sessionSlug: any = '') {
+    const auth = this.state.telegramClientAuth || {};
+    const slug = normalizeOnePageSessionSlug(sessionSlug || resolveEffectiveSlug(this.props));
+    const authSlug = normalizeOnePageSessionSlug(auth.sessionSlug || '');
+    return Boolean(auth.accountAddress && auth.workerToken && (!slug || !authSlug || slug === authSlug));
+  }
+
+  handleTelegramLoginInputChange(event: any) {
+    this.setState({
+      telegramLoginInput: event?.target?.value || '',
+      telegramLoginError: '',
+    });
+  }
+
+  async tryTelegramTokenLogin(inputValue: any = this.state.telegramLoginInput) {
+    const copiedToken = extractTelegramSessionToken(inputValue || '');
+    if (!copiedToken) {
+      this.setState({
+        telegramLoginStatus: 'error',
+        telegramLoginError: 'Paste the token or copied message from the Telegram bot.',
+      });
+      return null;
+    }
+    const sessionSlug = normalizeOnePageSessionSlug(resolveEffectiveSlug(this.props));
+    const sessionConfig = this.getResolvedSessionConfig({
+      slug: sessionSlug,
+      sessionName: this.props.sessionName,
+      questionsGenPrompt: this.props.questionsGenPrompt,
+      autoFeatureSBTsBySessionSlug: this.props.autoFeatureSBTsBySessionSlug,
+      autoFeatureSBTsWithFeaturedSbtTags: this.props.autoFeatureSBTsWithFeaturedSbtTags,
+      incomingSessionConfig: this.props.sessionConfig,
+      contracts: this.props.contracts,
+    });
+    this.setState({ telegramLoginStatus: 'loading', telegramLoginError: '' });
+    try {
+      const login = await exchangeTelegramSessionToken({
+        token: copiedToken,
+        sessionSlug,
+        agentBridgeUrl: resolveTelegramAgentBridgeUrl(sessionConfig),
+      });
+      this.setState({
+        telegramLoginStatus: 'ready',
+        telegramLoginError: '',
+        telegramLoginInput: '',
+        telegramClientAuth: {
+          accountAddress: login.accountAddress,
+          workerToken: login.workerToken || login.token,
+          sessionSlug: login.sessionSlug || sessionSlug,
+          workerUrl: login.workerUrl,
+          exp: login.exp,
+        },
+      });
+      removeTelegramLoginInputFromUrl();
+      return login;
+    } catch (error: any) {
+      this.setState({
+        telegramLoginStatus: 'error',
+        telegramLoginError: getErrorMessage(error, 'Telegram login failed.'),
+      });
+      return null;
+    }
+  }
+
+  handleTelegramLoginSubmit(event: any) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    this.tryTelegramTokenLogin();
   }
 
 
@@ -425,6 +582,10 @@ class OnePageSession extends Component<any, any> {
     } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
 
     this._aggregatorInputSig = this.buildAggregatorInputSignature(this.props, this.state);
+    if (this.state.telegramLoginInput) {
+      removeTelegramLoginInputFromUrl();
+      this.tryTelegramTokenLogin(this.state.telegramLoginInput);
+    }
   }
 
 
@@ -2122,8 +2283,12 @@ class OnePageSession extends Component<any, any> {
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
     const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
+    const telegramClientLoggedIn = telegramOnlySession && this.hasTelegramClientAuth(effectiveSlug);
+    const telegramClientAuth = telegramClientLoggedIn ? (this.state.telegramClientAuth || {}) : {};
+    const effectiveAccount = telegramClientAuth.accountAddress || this.props.account;
+    const effectiveLoginComplete = telegramClientLoggedIn || this.props.loginComplete;
 
-    if (telegramOnlySession) {
+    if (telegramOnlySession && !telegramClientLoggedIn) {
       return (
         <div className={styles.onePageDemoContainer}>
           <div className={styles.telegramOnlyShell}>
@@ -2138,9 +2303,48 @@ class OnePageSession extends Component<any, any> {
             >
               <strong>Telegram-only session</strong>
               <span>
-                This session is configured for Telegram bot and Mini App participation. Open it from the Telegram bot to answer questions or view Telegram-only results.
+                Paste the token copied from the Telegram bot to open the interactive report.
               </span>
             </Alert>
+            <form
+              className={styles.telegramTokenLoginForm}
+              onSubmit={this.handleTelegramLoginSubmit}
+              data-testid="ce-session-telegram-token-login"
+            >
+              <label className={styles.telegramTokenLoginLabel} htmlFor="ce-session-telegram-token-input">
+                Telegram bot token
+              </label>
+              <textarea
+                id="ce-session-telegram-token-input"
+                className={styles.telegramTokenLoginInput}
+                value={this.state.telegramLoginInput}
+                onChange={this.handleTelegramLoginInputChange}
+                placeholder="Paste the token or the full copied bot message"
+                rows={4}
+                autoComplete="off"
+                data-testid="ce-session-telegram-token-input"
+              />
+              {this.state.telegramLoginError ? (
+                <div className={styles.telegramTokenLoginError} role="alert">
+                  {this.state.telegramLoginError}
+                </div>
+              ) : null}
+              <button
+                type="submit"
+                className={styles.telegramTokenLoginButton}
+                disabled={this.state.telegramLoginStatus === 'loading'}
+                data-testid="ce-session-telegram-token-submit"
+              >
+                {this.state.telegramLoginStatus === 'loading' ? (
+                  <>
+                    <FontAwesomeIcon icon={faSpinner} spin />
+                    <span>Logging in...</span>
+                  </>
+                ) : (
+                  <span>Log in with Telegram Token</span>
+                )}
+              </button>
+            </form>
           </div>
         </div>
       );
@@ -2361,11 +2565,11 @@ class OnePageSession extends Component<any, any> {
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
                 minifiedMode="pile"
-                account={this.props.account}
+                account={effectiveAccount}
                 provider={this.props.provider}
                 network={this.props.network}
                 toggleLoginModal={this.props.toggleLoginModal}
-                loginComplete={this.props.loginComplete}
+                loginComplete={effectiveLoginComplete}
                 isSBTCacheReady={this.props.isSBTCacheReady}
                 isSurveyCacheReady={this.props.isSurveyCacheReady}
                 isQuestionCacheReady={this.props.isQuestionCacheReady}
@@ -2414,11 +2618,11 @@ class OnePageSession extends Component<any, any> {
               <MemoSurveyPage
                 miniMode={true}
                 hideEmbeddedDebugUi={true}
-                account={this.props.account}
+                account={effectiveAccount}
                 provider={this.props.provider}
                 network={this.props.network}
                 toggleLoginModal={this.props.toggleLoginModal}
-                loginComplete={this.props.loginComplete}
+                loginComplete={effectiveLoginComplete}
                 sessionInfo={sessionInfo}
                 sessionName={sessionName}
                 sessionHeader={sessionHeader}
@@ -2515,8 +2719,8 @@ class OnePageSession extends Component<any, any> {
                     key={`sbtspage:${slug || 'general'}`}
                     provider={this.props.provider}
                     network={this.props.network}
-                    account={this.props.account}
-                    loginComplete={this.props.loginComplete}
+                    account={effectiveAccount}
+                    loginComplete={effectiveLoginComplete}
                     toggleLoginModal={this.props.toggleLoginModal}
                     miniaturized={true}
                     hideMiniActionRow={true}
@@ -2697,10 +2901,10 @@ class OnePageSession extends Component<any, any> {
                       <PolisReport
                         onePageDemo={true}
                         miniMode={true}
-                        account={this.props.account}
+                        account={effectiveAccount}
                         provider={this.props.provider}
                         network={this.props.network}
-                        loginComplete={this.props.loginComplete}
+                        loginComplete={effectiveLoginComplete}
                         questionResponses={this.state.aggregatorData}
                         disclaimersActive={this.state.disclaimersActive}
                         filterState={this.state.filterState}
@@ -2730,7 +2934,7 @@ class OnePageSession extends Component<any, any> {
                     <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                       <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
 	                        <DebateMapAny
-	                          account={this.props.account}
+	                          account={effectiveAccount}
 	                          provider={this.props.provider}
 	                          network={this.props.network}
                           activeSessionSlug={slug}

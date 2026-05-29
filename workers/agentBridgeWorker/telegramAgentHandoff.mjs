@@ -72,6 +72,7 @@ import {
   SUBMITTED_RESULT_STATUSES,
   submitRequestSessionKvPrefix,
 } from './telegramSubmitQueue.mjs';
+import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
@@ -201,6 +202,58 @@ function jsonMiniAppOnboard(request, env, data, init = {}) {
       ...(init.headers || {}),
     },
   });
+}
+
+function clientLoginAllowedOrigins(env = {}) {
+  return [
+    ...safeString(env.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS).split(','),
+    ...miniAppOnboardAllowedOrigins(env),
+  ]
+    .map((entry) => safeString(entry).replace(/\/+$/, ''))
+    .filter(Boolean);
+}
+
+function isLocalClientOrigin(origin = '') {
+  try {
+    const parsed = new URL(origin);
+    return ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function clientLoginCorsHeaders(request, env = {}) {
+  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
+  if (!origin) return {};
+  const allowed = clientLoginAllowedOrigins(env);
+  if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
+    return null;
+  }
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-allow-headers': 'content-type',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
+
+function jsonClientLogin(request, env, data, init = {}) {
+  const cors = clientLoginCorsHeaders(request, env);
+  return json(data, {
+    ...init,
+    headers: {
+      ...(cors || {}),
+      ...(init.headers || {}),
+    },
+  });
+}
+
+function extractTelegramAgentToken(value = '') {
+  const raw = safeString(value);
+  if (!raw) return '';
+  const match = raw.match(/\bceagt_[A-Za-z0-9_-]{16,}\b/);
+  return safeString(match?.[0] || (/^ceagt_[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : ''));
 }
 
 async function readMiniAppOnboardInput(request) {
@@ -3041,6 +3094,113 @@ async function handleMiniAppOnboardRequest({
   return jsonMiniAppOnboard(request, env, response);
 }
 
+async function handleClientLoginExchangeRequest({
+  request,
+  env = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const cors = clientLoginCorsHeaders(request, env);
+  if (cors === null) {
+    return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
+  }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors || {} });
+  }
+  if (request.method !== 'POST') {
+    return jsonClientLogin(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const url = new URL(request.url);
+  const body = await readRequestJson(request);
+  const suppliedToken = extractTelegramAgentToken(
+    body.token ||
+    body.agentToken ||
+    body.telegramToken ||
+    url.searchParams.get('token') ||
+    url.searchParams.get('agentToken') ||
+    request.headers.get('authorization')
+  );
+  if (!suppliedToken) {
+    return jsonClientLogin(request, env, { ok: false, reason: 'agent_token_missing' }, { status: 401 });
+  }
+  if (suppliedToken === 'preview-user') {
+    return jsonClientLogin(request, env, { ok: false, reason: 'preview_user_not_allowed' }, { status: 401 });
+  }
+  const delegated = await loadTelegramAgentDelegationToken({ env, token: suppliedToken });
+  if (!delegated.ok) {
+    return jsonClientLogin(request, env, {
+      ok: false,
+      reason: delegated.reason || 'agent_token_invalid',
+      message: 'Open the Context Engine Telegram bot, tap Onboard Agent, and paste the copied install token again.',
+    }, { status: 401 });
+  }
+  const tokenSessionSlug = sanitizeSessionSlug(delegated.record.sessionSlug);
+  const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || url.searchParams.get('sessionSlug'));
+  if (requestedSessionSlug && tokenSessionSlug && requestedSessionSlug !== tokenSessionSlug) {
+    return jsonClientLogin(request, env, {
+      ok: false,
+      reason: 'agent_token_session_mismatch',
+      sessionSlug: requestedSessionSlug,
+    }, { status: 403 });
+  }
+  const context = await resolveHandoffContext({
+    env,
+    input: {
+      telegramUserId: safeString(delegated.record.telegramUserId),
+      username: safeString(delegated.record.username),
+      sessionSlug: requestedSessionSlug || tokenSessionSlug,
+    },
+    auth: {
+      authMode: 'telegram_agent_delegation_token',
+      delegation: delegated.record,
+    },
+    requireQuestionAuthoring: false,
+    ignoreSessionBinding: true,
+  });
+  if (!context.ok) {
+    return jsonClientLogin(request, env, {
+      ok: false,
+      reason: context.reason,
+      sessionSlug: context.sessionSlug || requestedSessionSlug || tokenSessionSlug,
+    }, { status: context.status || 400 });
+  }
+  const account = delegated.record.accountAddress
+    ? { accountAddress: delegated.record.accountAddress }
+    : await deriveManagedDemoAccount({
+      principal: context.normalized,
+      deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID,
+      rootSecret: env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || '',
+      createdAt: safeString(delegated.record.issuedAt),
+    });
+  const login = await authenticateSessionWorker({
+    env,
+    session: context.session,
+    account,
+    principal: context.normalized,
+    workerUrl: safeString(body.workerUrl || url.searchParams.get('workerUrl')),
+    fetchImpl,
+  });
+  if (!login.ok) {
+    return jsonClientLogin(request, env, {
+      ok: false,
+      reason: login.reason || 'session_worker_login_failed',
+      skipped: login.skipped === true,
+    }, { status: login.skipped ? 400 : 502 });
+  }
+  const payload = {
+    ok: true,
+    tokenType: 'session_worker_jwt',
+    sessionSlug: context.session.sessionSlug,
+    accountAddress: login.accountAddress,
+    workerUrl: login.workerUrl,
+    workerToken: login.token,
+    exp: login.exp,
+    expiresAt: login.exp ? new Date(Number(login.exp) * 1000).toISOString() : '',
+  };
+  const { workerToken: _workerToken, ...secretFree } = payload;
+  assertNoSecretShape(secretFree, 'Telegram client-login exchange metadata must not serialize bearer tokens.');
+  return jsonClientLogin(request, env, payload);
+}
+
 export async function handleTelegramAgentHandoffRequest({
   request,
   env = {},
@@ -3050,6 +3210,9 @@ export async function handleTelegramAgentHandoffRequest({
   const url = new URL(request.url);
   if (url.pathname === '/telegram/agent/api/miniapp/onboard') {
     return handleMiniAppOnboardRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/agent/api/client-login/exchange') {
+    return handleClientLoginExchangeRequest({ request, env, fetchImpl });
   }
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
     const payload = skillVersionPayload(env);

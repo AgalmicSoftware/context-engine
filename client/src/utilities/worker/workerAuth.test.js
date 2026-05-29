@@ -3,6 +3,8 @@ import {
   buildSignedBootstrapAdminAuth,
   clearAllWorkerSessionTokens,
   __test__workerAuthTokenCache,
+  exchangeTelegramSessionToken,
+  extractTelegramSessionToken,
   fetchWorkerWithAuth,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
@@ -246,6 +248,90 @@ describe('workerAuth token cache envelopes', () => {
       token: 'token-1',
       legacy: false,
     }));
+  });
+});
+
+describe('workerAuth Telegram token login', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
+
+  it('extracts a ceagt token from either a bare token or copied bot message', () => {
+    const token = `ceagt_${'A'.repeat(32)}`;
+
+    expect(extractTelegramSessionToken(token)).toBe(token);
+    expect(extractTelegramSessionToken(`Context Engine install info\nAuthorization: Bearer ${token}\n/session edge`)).toBe(token);
+    expect(extractTelegramSessionToken('preview-user')).toBe('');
+    expect(extractTelegramSessionToken('not a token')).toBe('');
+  });
+
+  it('exchanges a copied bot token and reuses the worker JWT without wallet auth', async () => {
+    const token = `ceagt_${'B'.repeat(32)}`;
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const fetchImpl = jest.fn(async (url, init = {}) => {
+      expect(String(url)).toBe('https://bridge.example/telegram/agent/api/client-login/exchange');
+      expect(JSON.parse(init.body)).toEqual({
+        token,
+        sessionSlug: 'edge',
+      });
+      return jsonResp(200, {
+        ok: true,
+        workerToken: 'worker-jwt-1',
+        exp,
+        workerUrl: 'https://session-worker.example',
+        sessionSlug: 'edge',
+        accountAddress: TEST_ADDRESS,
+      });
+    });
+
+    const exchanged = await exchangeTelegramSessionToken({
+      tokenInput: `Paste this into Claude Code:\n${token}`,
+      sessionSlug: 'edge',
+      agentBridgeUrl: 'https://bridge.example/telegram/agent/api/client-login/exchange',
+      fetchImpl,
+    });
+
+    expect(exchanged.accountAddress).toBe(TEST_ADDRESS);
+    expect(exchanged.workerUrl).toBe('https://session-worker.example');
+
+    const tokenCacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
+      workerUrl: 'https://session-worker.example',
+      slug: 'edge',
+      address: TEST_ADDRESS,
+    });
+    expect(JSON.parse(localStorage.getItem(tokenCacheKey))).toEqual(expect.objectContaining({
+      token: 'worker-jwt-1',
+      sessionSlug: 'edge',
+      address: TEST_ADDRESS,
+      expiresAt: exp,
+    }));
+    expect(JSON.parse(localStorage.getItem(
+      __test__workerAuthTokenCache.buildTelegramWorkerLoginKey({ slug: 'edge' })
+    ))).toEqual(expect.objectContaining({
+      sessionSlug: 'edge',
+      workerUrl: 'https://session-worker.example',
+      address: TEST_ADDRESS,
+    }));
+
+    const mockStore = require('../../store.js').default;
+    mockStore.getState.mockReturnValue({
+      profile: {
+        account: '',
+        provider: '',
+        network: { id: 84532 },
+      },
+      sessionState: {},
+    });
+    const headers = await getWorkerAuthHeaders({
+      sessionSlug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    });
+
+    expect(headers).toEqual({
+      Authorization: 'Bearer worker-jwt-1',
+      'X-Group-Slug': 'edge',
+    });
   });
 });
 

@@ -243,7 +243,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('shows a Telegram-only notice instead of the web session UI', async () => {
+  it('shows the Telegram token login for Telegram-only sessions', async () => {
     render(<OnePageSession
       {...buildProps()}
       sessionConfig={{
@@ -256,6 +256,13 @@ describe('OnePageSession view gating', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
       /Telegram-only session/i
     );
+    expect(screen.getByTestId('ce-session-telegram-token-login')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-telegram-token-input')).toHaveAttribute(
+      'placeholder',
+      expect.stringMatching(/copied bot message/i)
+    );
+    expect(screen.queryByText(/Connect wallet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/passkey/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
     expect(mockSurveyPage).not.toHaveBeenCalled();
   });

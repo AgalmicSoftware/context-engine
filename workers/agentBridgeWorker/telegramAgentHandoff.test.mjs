@@ -504,6 +504,111 @@ test('Mini App onboarding endpoint rejects disallowed origins and invalid initDa
   assert.equal((await jsonBody(invalidResponse)).reason, 'miniapp_initdata_invalid');
 });
 
+test('Telegram client login exchanges copied ceagt token for a worker JWT', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+  });
+  const accountAddress = await managedAccountAddressForTelegramUser(env, '42');
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    fetchCalls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/client-login/exchange', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        token: `Install info:\nAuthorization: Bearer ${issued.token}`,
+      }),
+    }),
+    env,
+    fetchImpl,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('access-control-allow-origin'), 'https://client.example');
+  assert.equal(body.ok, true);
+  assert.equal(body.tokenType, 'session_worker_jwt');
+  assert.equal(body.workerToken, 'worker-jwt-1');
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.accountAddress, accountAddress);
+  assert.equal(body.workerUrl, 'https://session-worker.example');
+  assert.equal(JSON.stringify(body).includes(issued.token), false);
+  assert.deepEqual(fetchCalls.map((call) => call.url), [
+    'https://session-worker.example/auth/nonce',
+    'https://session-worker.example/auth/login',
+  ]);
+});
+
+test('Telegram client login rejects preview-user and session-mismatched tokens', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress: await managedAccountAddressForTelegramUser(env, '42'),
+  });
+
+  const previewResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/client-login/exchange', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionSlug: 'alpha', token: 'preview-user' }),
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('preview-user must not reach worker auth');
+    },
+  });
+  const mismatchResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/client-login/exchange', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionSlug: 'beta', token: issued.token }),
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('mismatched token must not reach worker auth');
+    },
+  });
+
+  assert.equal(previewResponse.status, 401);
+  assert.equal((await jsonBody(previewResponse)).reason, 'agent_token_missing');
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal((await jsonBody(mismatchResponse)).reason, 'agent_token_session_mismatch');
+});
+
 test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user and session', async () => {
   const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const issued = await createTelegramAgentDelegationToken({

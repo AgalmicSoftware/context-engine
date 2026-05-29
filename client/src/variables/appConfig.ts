@@ -33,6 +33,10 @@ export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv(
   'REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT',
   true
 );
+export const CE_TELEGRAM_AGENT_BRIDGE_URL = readPublicEnv(
+  'REACT_APP_CE_TELEGRAM_AGENT_BRIDGE_URL',
+  'https://ce-agent-bridge-worker.agalmic.workers.dev'
+);
 // Porto passkey session-key mode (true = silent tx/message signing)
 export const PORTO_SESSION_KEY_ENABLED = readPublicBoolEnv(
   'REACT_APP_PORTO_SESSION_KEY_ENABLED',

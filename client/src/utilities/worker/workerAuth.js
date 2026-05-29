@@ -32,6 +32,7 @@ import {
 const accountLog = createLogger('account');
 
 const STORAGE_PREFIX = 'ce:workerToken:v1';
+const TELEGRAM_WORKER_LOGIN_PREFIX = 'ce:telegramWorkerLogin:v1';
 const TOKEN_SKEW_SECONDS = 30;
 const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const NONCE_MISMATCH_ERROR = 'nonce mismatch or expired';
@@ -328,6 +329,151 @@ const buildTokenCacheKey = ({ workerUrl, slug, address }) => {
     return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}:${normalizedAddress}`;
   }
   return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}`;
+};
+
+const buildTelegramWorkerLoginKey = ({ slug }) => (
+  `${TELEGRAM_WORKER_LOGIN_PREFIX}:${normalizeSessionSlug(slug)}`
+);
+
+const readTelegramWorkerLogin = ({ slug, workerUrl } = {}) => {
+  if (typeof window === 'undefined') return null;
+  const normalizedSlug = normalizeSessionSlug(slug);
+  if (!normalizedSlug) return null;
+  let login = null;
+  try {
+    login = JSON.parse(localStorage.getItem(buildTelegramWorkerLoginKey({ slug: normalizedSlug })) || 'null');
+  } catch {
+    login = null;
+  }
+  const address = normalizeAddress(login?.address);
+  const cachedWorkerUrl = normalizeWorkerUrl(login?.workerUrl || workerUrl);
+  if (!address || !cachedWorkerUrl) return null;
+  const requestedWorkerUrl = normalizeWorkerUrl(workerUrl || cachedWorkerUrl);
+  if (requestedWorkerUrl && cachedWorkerUrl && requestedWorkerUrl !== cachedWorkerUrl) return null;
+  const storageKey = buildTokenCacheKey({
+    workerUrl: cachedWorkerUrl,
+    slug: normalizedSlug,
+    address,
+  });
+  const cached = readScopedTokenCache(storageKey, {
+    workerUrl: cachedWorkerUrl,
+    sessionSlug: normalizedSlug,
+    address,
+  });
+  if (!cached?.token) return null;
+  return {
+    token: cached.token,
+    exp: cached.exp,
+    workerUrl: cachedWorkerUrl,
+    sessionSlug: normalizedSlug,
+    address,
+    storageKey,
+  };
+};
+
+const writeTelegramWorkerLogin = ({
+  workerUrl,
+  sessionSlug,
+  address,
+} = {}) => {
+  if (typeof window === 'undefined') return;
+  const normalizedSlug = normalizeSessionSlug(sessionSlug);
+  const normalizedAddress = normalizeAddress(address);
+  const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
+  if (!normalizedSlug || !normalizedAddress || !normalizedWorkerUrl) return;
+  try {
+    localStorage.setItem(buildTelegramWorkerLoginKey({ slug: normalizedSlug }), JSON.stringify({
+      v: 1,
+      sessionSlug: normalizedSlug,
+      workerUrl: normalizedWorkerUrl,
+      address: normalizedAddress,
+      updatedAt: Date.now(),
+    }));
+  } catch (_) {}
+};
+
+const clearTelegramWorkerLogin = ({ slug } = {}) => {
+  if (typeof window === 'undefined') return;
+  const normalizedSlug = normalizeSessionSlug(slug);
+  if (!normalizedSlug) return;
+  try {
+    localStorage.removeItem(buildTelegramWorkerLoginKey({ slug: normalizedSlug }));
+  } catch (_) {}
+};
+
+const normalizeAgentBridgeUrl = (value = '') => {
+  const raw = toStr(value).trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    url.pathname = url.pathname
+      .replace(/\/telegram\/agent\/api\/client-login\/exchange\/?$/i, '')
+      .replace(/\/telegram\/agent\/api\/?$/i, '')
+      .replace(/\/+$/g, '');
+    url.search = '';
+    url.hash = '';
+    return url.toString().replace(/\/+$/g, '');
+  } catch (_) {
+    return '';
+  }
+};
+
+export const extractTelegramSessionToken = (value = '') => {
+  const raw = toStr(value).trim();
+  if (!raw) return '';
+  const match = raw.match(/\bceagt_[A-Za-z0-9_-]{16,}\b/);
+  if (match) return match[0];
+  return /^ceagt_[A-Za-z0-9_-]{16,}$/.test(raw) ? raw : '';
+};
+
+export const exchangeTelegramSessionToken = async ({
+  token,
+  tokenInput,
+  sessionSlug,
+  agentBridgeUrl,
+  fetchImpl = fetch,
+} = {}) => {
+  const copiedToken = extractTelegramSessionToken(token || tokenInput);
+  const slug = normalizeSessionSlug(sessionSlug);
+  const bridgeUrl = normalizeAgentBridgeUrl(agentBridgeUrl);
+  if (!copiedToken) throw new Error('Paste the Telegram bot token or copied install message.');
+  if (!slug) throw new Error('Session slug is required.');
+  if (!bridgeUrl) throw new Error('Telegram agent bridge URL is required.');
+  const response = await fetchImpl(`${bridgeUrl}/telegram/agent/api/client-login/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: copiedToken, sessionSlug: slug }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data?.ok !== true) {
+    throw new Error(data?.message || data?.reason || `Telegram login failed (${response.status}).`);
+  }
+  const workerToken = toStr(data.workerToken || data.token).trim();
+  const workerUrl = normalizeWorkerUrl(data.workerUrl);
+  const address = normalizeAddress(data.accountAddress);
+  if (!workerToken || !workerUrl || !address) {
+    throw new Error('Telegram login response was missing worker credentials.');
+  }
+  const effectiveSlug = normalizeSessionSlug(data.sessionSlug || slug);
+  const storageKey = buildTokenCacheKey({ workerUrl, slug: effectiveSlug, address });
+  writeTokenCache(storageKey, buildTokenCacheEnvelope({
+    token: workerToken,
+    exp: Number(data.exp || 0),
+    workerUrl,
+    sessionSlug: effectiveSlug,
+    address,
+  }));
+  writeTelegramWorkerLogin({
+    workerUrl,
+    sessionSlug: effectiveSlug,
+    address,
+  });
+  return {
+    ...data,
+    sessionSlug: effectiveSlug,
+    accountAddress: address,
+    workerUrl,
+  };
 };
 
 const resolveWorkerTokenRequestContext = async ({
@@ -839,6 +985,9 @@ export const clearWorkerSessionToken = ({
     const storageKey = toStr(resolvedRequest?.storageKey).trim();
     if (!storageKey) return;
     clearTokenCache(storageKey);
+    if (resolvedRequest?.telegramWorkerLogin) {
+      clearTelegramWorkerLogin({ slug: resolvedRequest.slug || resolvedRequest.sessionSlug });
+    }
   };
   return clearToken();
 };
@@ -848,7 +997,7 @@ export const clearAllWorkerSessionTokens = () => {
   if (typeof window === 'undefined') return;
   try {
     Object.keys(localStorage).forEach((key) => {
-      if (key.startsWith(`${STORAGE_PREFIX}:`)) {
+      if (key.startsWith(`${STORAGE_PREFIX}:`) || key.startsWith(`${TELEGRAM_WORKER_LOGIN_PREFIX}:`)) {
         localStorage.removeItem(key);
       }
     });
@@ -862,6 +1011,25 @@ const getWorkerAuthHeadersWithMeta = async ({
   workerUrl,
   allowDemoFallback,
 } = {}) => {
+  const telegramLogin = readTelegramWorkerLogin({
+    slug: sessionSlug || sessionConfig?.slug,
+    workerUrl,
+  });
+  if (telegramLogin?.token) {
+    return {
+      headers: {
+        Authorization: `Bearer ${telegramLogin.token}`,
+        ...(telegramLogin.sessionSlug ? { 'X-Group-Slug': telegramLogin.sessionSlug } : {}),
+      },
+      requestContext: {
+        telegramWorkerLogin: true,
+        slug: telegramLogin.sessionSlug,
+        address: telegramLogin.address,
+        resolvedWorkerUrl: telegramLogin.workerUrl,
+        storageKey: telegramLogin.storageKey,
+      },
+    };
+  }
   const resolvedRequest = await resolveWorkerTokenRequestContext({
     sessionSlug,
     sessionConfig,
@@ -1237,6 +1405,8 @@ export const workerAuthUtils = {
   buildSiweMessage,
   buildSignedBootstrapAdminAuth,
   buildSignedAdminActionAuth,
+  extractTelegramSessionToken,
+  exchangeTelegramSessionToken,
   getWorkerSessionToken,
   getWorkerAuthHeaders,
   clearWorkerSessionToken,
@@ -1247,5 +1417,7 @@ export const workerAuthUtils = {
 export const __test__workerAuthTokenCache = {
   buildTokenCacheEnvelope,
   buildTokenCacheKey,
+  buildTelegramWorkerLoginKey,
+  readTelegramWorkerLogin,
   normalizeTokenCacheEntry,
 };
