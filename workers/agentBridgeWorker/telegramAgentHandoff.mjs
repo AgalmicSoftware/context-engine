@@ -7,6 +7,7 @@ import {
   buildParticipantGraph,
   buildTelegramCommandResponse,
   clearAdminDefaultSessionOverride,
+  clearAgentSkillUpdateFlag,
   consensusQuestionsForResults,
   loadQuestionsForSession,
   loadSessionPolicy,
@@ -17,9 +18,11 @@ import {
   persistAnswerDraft,
   persistLatestMiniAppLaunchPointer,
   readGroupSessionBinding,
+  readAgentSkillUpdateFlag,
   readPrivateSessionBinding,
   resolveAgentTokenSession,
   summarizeQuestionResults,
+  writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -84,7 +87,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-28 (v2)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v4)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -193,6 +196,19 @@ function skillVersionPayload(env = {}) {
     skillUrl,
     changelogUrl: `${skillUrl}#changelog`,
   };
+}
+
+async function skillVersionPayloadWithFlag(env = {}) {
+  const base = skillVersionPayload(env);
+  const flag = await readAgentSkillUpdateFlag(env);
+  const payload = {
+    ...base,
+    updateAvailable: flag.updateAvailable === true,
+    latestVersion: flag.latestVersion || base.version,
+    updateNote: flag.note || '',
+  };
+  assertNoSecretShape(payload, 'Telegram agent skill-version response must not serialize secrets.');
+  return payload;
 }
 
 function miniAppOnboardAllowedOrigins(env = {}) {
@@ -528,6 +544,9 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/admin/default-session') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/admin/skill-update') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (pathname === '/telegram/agent/api/onboarding') {
@@ -1127,15 +1146,20 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
   const responseQuestions = requestedQuestionId
     ? ranked.questions.filter((question) => safeString(question.questionId) === requestedQuestionId)
     : ranked.questions;
-  return json({
+  const flag = await readAgentSkillUpdateFlag(env);
+  const body = {
     ok: true,
     sessionSlug: context.session.sessionSlug,
     permissionMode: context.permission.mode,
     questionSource: loaded.source || '',
     questionSourceReason: loaded.reason || '',
     relevance: ranked.relevance,
+    skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    skillUpdateAvailable: flag.updateAvailable === true,
     questions: responseQuestions,
-  });
+  };
+  assertNoSecretShape(body, 'Telegram questions response must not serialize secrets.');
+  return json(body);
 }
 
 async function handleTagsRequest({ env = {}, context = {}, waitUntil = null } = {}) {
@@ -1619,6 +1643,90 @@ async function handleAdminDefaultSessionRequest({
   }
 
   return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
+}
+
+async function handleAdminSkillUpdateRequest({
+  env = {},
+  context = {},
+  input = {},
+  method = 'GET',
+} = {}) {
+  const methodName = safeString(method).toUpperCase();
+  if (methodName === 'GET') {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: true });
+    if (!admin.ok) {
+      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
+      return json(payload, { status: admin.status || 403 });
+    }
+    const flag = await readAgentSkillUpdateFlag(env);
+    const payload = {
+      ok: true,
+      updateAvailable: flag.updateAvailable === true,
+      latestVersion: flag.latestVersion || CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+      updateNote: flag.note || '',
+      version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    };
+    assertNoSecretShape(payload, 'Telegram admin skill-update status must not serialize secrets.');
+    return json(payload);
+  }
+
+  if (methodName === 'POST') {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    if (!admin.ok) {
+      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
+      return json(payload, { status: admin.status || 403 });
+    }
+    const written = await writeAgentSkillUpdateFlag({
+      env,
+      latestVersion: input.latestVersion || CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+      note: input.note || input.updateNote || '',
+      accountAddress: admin.manager?.accountAddress || '',
+      createdAt: input.createdAt || null,
+    });
+    if (!written.ok) {
+      const payload = { ok: false, reason: written.reason || 'agent_skill_update_write_failed' };
+      assertNoSecretShape(payload, 'Telegram admin skill-update write failure must not serialize secrets.');
+      return json(payload, { status: 500 });
+    }
+    const payload = {
+      ok: true,
+      updateAvailable: true,
+      latestVersion: written.latestVersion || CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+      version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    };
+    assertNoSecretShape(payload, 'Telegram admin skill-update set response must not serialize secrets.');
+    return json(payload);
+  }
+
+  if (methodName === 'DELETE') {
+    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    if (!admin.ok) {
+      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
+      return json(payload, { status: admin.status || 403 });
+    }
+    const cleared = await clearAgentSkillUpdateFlag(env);
+    if (!cleared.ok) {
+      const payload = { ok: false, reason: cleared.reason || 'agent_skill_update_clear_failed' };
+      assertNoSecretShape(payload, 'Telegram admin skill-update clear failure must not serialize secrets.');
+      return json(payload, { status: 500 });
+    }
+    const payload = {
+      ok: true,
+      updateAvailable: false,
+      cleared: true,
+      latestVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+      version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
+    };
+    assertNoSecretShape(payload, 'Telegram admin skill-update clear response must not serialize secrets.');
+    return json(payload);
+  }
+
+  const payload = { ok: false, reason: 'method_not_allowed' };
+  assertNoSecretShape(payload, 'Telegram admin skill-update method response must not serialize secrets.');
+  return json(payload, { status: 405 });
 }
 
 async function handleOnboardingRequest({
@@ -4049,8 +4157,7 @@ export async function handleTelegramAgentHandoffRequest({
     return handleResultViewCacheHttpRequest({ request, env });
   }
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
-    const payload = skillVersionPayload(env);
-    assertNoSecretShape(payload, 'Telegram agent skill-version response must not serialize secrets.');
+    const payload = await skillVersionPayloadWithFlag(env);
     return json(payload);
   }
 
@@ -4087,6 +4194,7 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/admin/status',
     '/telegram/agent/api/admin/metrics',
     '/telegram/agent/api/admin/default-session',
+    '/telegram/agent/api/admin/skill-update',
     '/telegram/agent/api/tags',
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
@@ -4146,6 +4254,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/admin/default-session') {
     return handleAdminDefaultSessionRequest({ env, context, input, method: request.method });
+  }
+  if (url.pathname === '/telegram/agent/api/admin/skill-update') {
+    return handleAdminSkillUpdateRequest({ env, context, input, method: request.method });
   }
   if (url.pathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
     return handleOnboardingRequest({ env, context, input, body, method: request.method });
@@ -4211,6 +4322,7 @@ export async function handleTelegramAgentHandoffRequest({
 }
 
 export const __test__telegramAgentHandoff = {
+  CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
   authenticateAgentHandoff,
   normalizeAgentTelegramContext,
   normalizeDraftForQuestion,
@@ -4220,4 +4332,6 @@ export const __test__telegramAgentHandoff = {
   publicAgentQuestion,
   rankQuestionsByPreferences,
   safeJsonParse,
+  skillVersionPayload,
+  skillVersionPayloadWithFlag,
 };

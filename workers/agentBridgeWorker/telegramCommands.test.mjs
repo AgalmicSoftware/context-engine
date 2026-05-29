@@ -4,13 +4,16 @@ import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
   clearAdminDefaultSessionOverride,
+  clearAgentSkillUpdateFlag,
   dispatchTelegramCommandResponse,
   fetchUrlQuestionSource,
   handleTelegramWebhookUpdate,
   loadSubmittedResultRecords,
   loadSessionPolicy,
   parseTelegramCommandText,
+  readAgentSkillUpdateFlag,
   readAdminDefaultSessionOverride,
+  writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
@@ -1134,6 +1137,31 @@ test('admin default-session override writes a durable KV record', async () => {
   assert.equal(read.updatedBy, '0xabab...abab');
   assert.equal(putCall.options?.expirationTtl, undefined);
   assert.equal(putCall.options?.expiration, undefined);
+});
+
+test('agent skill-update flag writes a durable KV record', async () => {
+  const kv = new MemoryKv();
+  const env = baseEnv({ AGENT_ACTION_KV: kv });
+  const written = await writeAgentSkillUpdateFlag({
+    env,
+    latestVersion: '2026-05-30 (v4)',
+    note: 'Refresh before answering.',
+    accountAddress: `0x${'cd'.repeat(20)}`,
+    createdAt: '2026-05-30T00:00:00.000Z',
+  });
+  const read = await readAgentSkillUpdateFlag(env);
+  const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
+  const cleared = await clearAgentSkillUpdateFlag(env);
+
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v4)' });
+  assert.equal(read.updateAvailable, true);
+  assert.equal(read.latestVersion, '2026-05-30 (v4)');
+  assert.equal(read.note, 'Refresh before answering.');
+  assert.equal(read.updatedBy, '0xcdcd...cdcd');
+  assert.equal(putCall.options?.expirationTtl, undefined);
+  assert.equal(putCall.options?.expiration, undefined);
+  assert.deepEqual(cleared, { ok: true });
+  assert.deepEqual(await readAgentSkillUpdateFlag(env), {});
 });
 
 test('loadSessionPolicy applies a valid admin default-session pin', async () => {

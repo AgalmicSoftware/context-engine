@@ -2,7 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHmac } from 'node:crypto';
-import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
+import {
+  handleTelegramAgentHandoffRequest,
+  __test__telegramAgentHandoff,
+} from './telegramAgentHandoff.mjs';
 import {
   buildTelegramAgentActivityMetadata,
   listTelegramAgentActivity,
@@ -222,7 +225,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-05-29 \(v3\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-30 \(v4\)/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
   assert.match(source, /demographicLinkOptIn/);
@@ -244,13 +247,26 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue/);
   assert.match(source, /GET \/telegram\/agent\/api\/admin\/status/);
   assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=groups/);
   assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
   assert.match(source, /POST \/telegram\/agent\/api\/mini-app-launch/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
   assert.match(source, /\/question_queue 1 3 4/);
   assert.match(source, /allowedProfileFields/);
+  assert.match(source, /skillUpdateAvailable/);
+  assert.match(source, /questionsPerBatch/);
   assert.match(source, /do not submit answers unless a separate user-approved submit path is set in the user's CE settings/);
+});
+
+test('Telegram agent handoff skill version constant matches SKILL.md header', () => {
+  const source = readFileSync(
+    new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url),
+    'utf8',
+  );
+  const match = source.match(/^\*\*Skill version:\*\*\s*(.+)$/m);
+  assert.ok(match);
+  assert.equal(match[1], __test__telegramAgentHandoff.CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION);
 });
 
 test('Telegram agent handoff exposes unauthenticated skill version metadata', async () => {
@@ -265,10 +281,29 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-05-28 (v2)');
+  assert.equal(body.version, '2026-05-30 (v4)');
   assert.equal(body.skill, 'ce-telegram-agent-handoff');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
+  assert.equal(body.updateAvailable, false);
+  assert.equal(body.latestVersion, '2026-05-30 (v4)');
+  assert.equal(body.updateNote, '');
+});
+
+test('Telegram agent skill-version payload includes admin update flag', async () => {
+  const env = baseEnv();
+  await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
+    version: 1,
+    updateAvailable: true,
+    latestVersion: '2026-05-30 (v4)',
+    note: 'Refresh before answering.',
+    updatedAt: '2026-05-30T00:00:00.000Z',
+  }));
+
+  const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
+  assert.equal(payload.updateAvailable, true);
+  assert.equal(payload.latestVersion, '2026-05-30 (v4)');
+  assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
 test('Telegram agent handoff requires the configured token', async () => {
@@ -1193,6 +1228,8 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
+  assert.equal(questions.skillVersion, '2026-05-30 (v4)');
+  assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/preferences', {
@@ -2438,6 +2475,103 @@ test('Telegram admin default-session endpoint exposes delegated status and servi
   assert.equal(deleted.cleared, true);
   assert.equal(deleted.effectiveDefaultSessionSlug, 'alpha');
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:admin-default-session:v1'), null);
+});
+
+test('Telegram admin skill-update endpoint exposes status and service-token mutations', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+  });
+  const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'admin',
+    sessionSlug: 'alpha',
+    accountAddress: adminAddress,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+
+  const initialStatusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const initialStatus = await jsonBody(initialStatusResponse);
+  const delegatedPostResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update', {
+      method: 'POST',
+      token: issued.token,
+      body: { sessionSlug: 'alpha' },
+    }),
+    env,
+  });
+  const delegatedPost = await jsonBody(delegatedPostResponse);
+  const setResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        sessionSlug: 'alpha',
+        latestVersion: '2026-05-30 (v4)',
+        note: 'Refresh before answering.',
+      },
+    }),
+    env,
+  });
+  const set = await jsonBody(setResponse);
+  const flaggedStatusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const flaggedStatus = await jsonBody(flaggedStatusResponse);
+  const deleteResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update?telegramUserId=42&sessionSlug=alpha', {
+      method: 'DELETE',
+    }),
+    env,
+  });
+  const deleted = await jsonBody(deleteResponse);
+  const clearedStatusResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/admin/skill-update?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const clearedStatus = await jsonBody(clearedStatusResponse);
+
+  assert.equal(initialStatusResponse.status, 200);
+  assert.equal(initialStatus.ok, true);
+  assert.equal(initialStatus.updateAvailable, false);
+  assert.equal(initialStatus.version, '2026-05-30 (v4)');
+  assert.equal(delegatedPostResponse.status, 403);
+  assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
+  assert.equal(setResponse.status, 200);
+  assert.equal(set.ok, true);
+  assert.equal(set.updateAvailable, true);
+  assert.equal(set.latestVersion, '2026-05-30 (v4)');
+  assert.equal(flaggedStatusResponse.status, 200);
+  assert.equal(flaggedStatus.updateAvailable, true);
+  assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');
+  assert.equal(deleteResponse.status, 200);
+  assert.equal(deleted.ok, true);
+  assert.equal(deleted.cleared, true);
+  assert.equal(clearedStatusResponse.status, 200);
+  assert.equal(clearedStatus.updateAvailable, false);
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:agent-skill-update:v1'), null);
 });
 
 test('Telegram agent can recommend and auto-apply question importance votes with research metadata', async () => {

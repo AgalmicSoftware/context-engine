@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-29 (v3)
+**Skill version:** 2026-05-30 (v4)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
 
@@ -99,10 +99,12 @@ error, check the worker's current skill version:
 GET /telegram/agent/api/skill-version
 ```
 
-Compare the returned `version` with the `Skill version` line above. If the
-worker is newer, re-run the install command using the configured `CE_SKILL_REF`
-raw GitHub URL and review the changelog at the bottom of this file before
-continuing.
+Compare the returned `version` with the `Skill version` line above. The
+endpoint also returns `updateAvailable`, `latestVersion`, and `updateNote`.
+Normal question reads include `skillVersion` and `skillUpdateAvailable` too. If
+`skillUpdateAvailable` is true or the worker reports a newer version than this
+file's header, re-run the install command using the configured `CE_SKILL_REF`
+raw GitHub URL, then re-read the changelog before continuing.
 
 ## Preconditions
 
@@ -1089,6 +1091,13 @@ is stored for Phase 2 and should not be treated as an active delivery
 subscription yet.
 
 ## Changelog
+
+### 2026-05-30 (v4)
+
+- Added guidance for meaningful answer comments, question batch size and digest cadence preferences, and good question-generation heuristics.
+- Documented first-invocation deep-link menus and Geo-node install lookup fallback.
+- Added anonymized result views for consensus, difference, and k-anonymized groups, including group-image-first analysis guidance.
+- Normal question reads and `/skill-version` now expose skill version/update signals, with an admin flag for announcing new skill updates.
 
 ### 2026-05-29 (v3)
 
