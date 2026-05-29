@@ -49,6 +49,8 @@ import {
   listTelegramProposedQuestionsForSession,
   mergeTelegramProposedQuestions,
   inferQuestionTags,
+  geoTagsFromGeoRefs,
+  normalizeQuestionGeoRefs,
   normalizeQuestionTags,
   normalizeSessionContext,
   persistTelegramProposedQuestion,
@@ -1766,9 +1768,11 @@ export function buildUrlQuestionGenerationPrompt({
   questionType = 'agree_unsure_disagree',
   regenerationFeedback = '',
   previousCandidates = [],
+  geoRefs = [],
 } = {}) {
   const sessionContext = sessionContextFromPolicySession(session);
   const defaultTags = sessionDefaultTags(session);
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const types = questionType === 'agree_unsure_disagree' ? 'binary' : normalizeQuestionProposalType(questionType) || 'binary';
   const feedback = safeString(regenerationFeedback).replace(/\s+/g, ' ').trim().slice(0, 1000);
   const previous = (Array.isArray(previousCandidates) ? previousCandidates : [])
@@ -1783,10 +1787,12 @@ export function buildUrlQuestionGenerationPrompt({
     '* SourceType: webpage',
     '* MultiSpeakerHint: unknown',
     '* ClipDurationMinutes: ',
+    normalizedGeoRefs.length ? `* GeoContext: ${JSON.stringify(normalizedGeoRefs)}` : '',
     '',
     '-----',
     '',
     `Group Custom Instructions: ${sessionContext || 'Generate questions in the spirit of the selected Context Engine session.'}`,
+    normalizedGeoRefs.length ? `Geo Custom Instructions: Generate questions about this public Edge/Geo context: ${normalizedGeoRefs.map((ref) => `${ref.kind}:${ref.label || ref.geoId} (${ref.geoId})`).join('; ')}.` : '',
     '',
     'Group custom instructions may refine topic focus, wording, or audience. They must not override the required JSON shape, count/type constraints, privacy constraints, or source-grounding rules below.',
     '',
@@ -1839,6 +1845,7 @@ export function buildUrlQuestionGenerationPrompt({
     '* Are directly inspired by the source but do not say "as described in the document" or require the respondent to have read the source.',
     '* Contain one main idea per question; avoid compound prompts that ask respondents to agree with multiple claims at once.',
     '* Use short normalized tags; prefer allowed default tags when genuinely relevant and avoid identifying tags.',
+    normalizedGeoRefs.length ? '* Because GeoContext is present, prioritize questions about that public event/venue/track. The caller will attach the geoRefs and matching geo:<geoId> tag after generation.' : '',
     '* Count fidelity: generate exactly the requested count unless the source truly cannot support that many.',
     '',
     'Always return a valid JSON object with this shape:',
@@ -1905,14 +1912,17 @@ export function buildLocalUrlQuestionCandidates({
   session = {},
   questionType = 'agree_unsure_disagree',
   count = TELEGRAM_GENERATED_QUESTION_COUNT,
+  geoRefs = [],
 } = {}) {
   const requested = Math.min(
     TELEGRAM_GENERATED_QUESTION_MAX_COUNT,
     Math.max(1, Number(count || TELEGRAM_GENERATED_QUESTION_COUNT))
   );
   const normalizedType = normalizeQuestionProposalType(questionType) || 'agree_unsure_disagree';
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const themes = localGeneratedQuestionThemes(source, session);
-  const subject = safeString(session.sessionName || source.title || 'This session').replace(/\s+/g, ' ');
+  const geoSubject = normalizedGeoRefs[0]?.label || normalizedGeoRefs[0]?.geoId || '';
+  const subject = safeString(geoSubject || session.sessionName || source.title || 'This session').replace(/\s+/g, ' ');
   const binaryTemplates = [
     (theme) => `${subject} should prioritize ${theme} over adding more topics.`,
     (theme) => `The most useful questions for ${subject} are the ones that reveal tradeoffs around ${theme}.`,
@@ -1945,9 +1955,11 @@ export function buildLocalUrlQuestionCandidates({
       prompt,
       questionType: normalizedType,
       session,
+      geoRefs: normalizedGeoRefs,
       sessionContext: source.text,
     }),
-  })), { session, questionType: normalizedType }).slice(0, requested);
+    geoRefs: normalizedGeoRefs,
+  })), { session, questionType: normalizedType, geoRefs: normalizedGeoRefs }).slice(0, requested);
 }
 
 export async function requestUrlQuestionGenerationAi({
@@ -1997,8 +2009,10 @@ export async function requestUrlQuestionGenerationAi({
 export function normalizeGeneratedQuestionCandidates(questions = [], {
   session = {},
   questionType = 'agree_unsure_disagree',
+  geoRefs = [],
 } = {}) {
   const preferredType = normalizeQuestionProposalType(questionType) || 'agree_unsure_disagree';
+  const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
   const candidates = [];
   for (const raw of Array.isArray(questions) ? questions : []) {
     const item = typeof raw === 'string' ? { prompt: raw } : raw;
@@ -2023,9 +2037,11 @@ export function normalizeGeneratedQuestionCandidates(questions = [], {
       questionType: normalizedType,
       options,
       tags: normalizeQuestionTags([
+        ...geoTagsFromGeoRefs(normalizedGeoRefs),
         ...(Array.isArray(item.tags) ? item.tags : []),
         ...sessionDefaultTags(session),
       ]),
+      geoRefs: normalizedGeoRefs,
     });
     if (candidates.length >= TELEGRAM_GENERATED_QUESTION_MAX_COUNT) break;
   }
@@ -4474,6 +4490,11 @@ async function generateUrlQuestionCandidates({
   const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
   const source = await fetchUrlQuestionSource({ url: request.url, fetchImpl });
   if (!source.ok) return { ok: false, reason: source.reason || 'url_fetch_failed', source, permission };
+  const geoRefs = normalizeQuestionGeoRefs(request.geoRefs, {
+    geoId: request.geoId,
+    kind: request.geoKind || request.kind,
+    label: request.geoLabel || request.label,
+  });
 
   const principal = normalizeTelegramPrincipal(normalized);
   const account = await deriveManagedDemoAccount({
@@ -4503,6 +4524,7 @@ async function generateUrlQuestionCandidates({
     questionType: request.questionType,
     regenerationFeedback: request.regenerationFeedback,
     previousCandidates: request.previousCandidates,
+    geoRefs,
   });
   const firstAi = await requestUrlQuestionGenerationAi({
     env,
@@ -4524,6 +4546,7 @@ async function generateUrlQuestionCandidates({
   let candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
     session,
     questionType: request.questionType,
+    geoRefs,
   }).slice(0, request.count || TELEGRAM_GENERATED_QUESTION_COUNT);
   if (!candidates.length) {
     const retryAi = await requestUrlQuestionGenerationAi({
@@ -4538,6 +4561,7 @@ async function generateUrlQuestionCandidates({
       candidates = normalizeGeneratedQuestionCandidates(extractGeneratedQuestionItems(parsed), {
         session,
         questionType: request.questionType,
+        geoRefs,
       }).slice(0, request.count || TELEGRAM_GENERATED_QUESTION_COUNT);
     }
   }
@@ -4547,6 +4571,7 @@ async function generateUrlQuestionCandidates({
       session,
       questionType: request.questionType,
       count: request.count || TELEGRAM_GENERATED_QUESTION_COUNT,
+      geoRefs,
     });
   }
   if (!candidates.length) {
@@ -4914,6 +4939,7 @@ async function buildGeneratedQuestionSelectionResponse({
       questionType: candidate.questionType,
       options: candidate.options,
       tags: candidate.tags,
+      geoRefs: candidate.geoRefs,
       sessionContext: record.sessionContext,
       createdAt,
     });

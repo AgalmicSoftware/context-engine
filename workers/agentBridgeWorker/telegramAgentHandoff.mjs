@@ -85,8 +85,10 @@ const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX = 'telegram:lightweight-group-proposal:';
 const ADMIN_METRICS_CACHE_KV_PREFIX = 'telegram:admin-metrics-cache:v1:';
+const CE_INSTALL_DECLINED_KV_PREFIX = 'telegram:ce-install-declined:v1:';
 const ADMIN_METRICS_CACHE_TTL_SECONDS = 60;
 const ADMIN_METRICS_SUBMIT_ENTRY_LIMIT = 100000;
+const DEFAULT_CE_INSTALL_DECLINE_COOLDOWN_DAYS = 3;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -258,6 +260,29 @@ function kvKeySafePart(value = '') {
   return `${safe || 'ref'}_${stableFingerprint(text)}`;
 }
 
+function positiveNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function ceInstallDeclineCooldownDays(env = {}) {
+  return Math.min(365, positiveNumber(
+    env.AGENT_BRIDGE_CE_INSTALL_DECLINE_COOLDOWN_DAYS,
+    DEFAULT_CE_INSTALL_DECLINE_COOLDOWN_DAYS
+  ));
+}
+
+function ceInstallDeclinedKey(telegramUserId = '') {
+  const user = kvKeySafePart(telegramUserId);
+  return user ? `${CE_INSTALL_DECLINED_KV_PREFIX}${user}` : '';
+}
+
+function isoAfterDays(now = null, days = DEFAULT_CE_INSTALL_DECLINE_COOLDOWN_DAYS) {
+  const start = safeString(now) ? new Date(now) : new Date();
+  const startMs = Number.isFinite(start.getTime()) ? start.getTime() : Date.now();
+  return new Date(startMs + Math.max(1, days) * 24 * 60 * 60 * 1000).toISOString();
+}
+
 function titleAnswer(value = '') {
   const normalized = lower(value);
   if (normalized === 'agree' || normalized === 'yes' || normalized === 'true') return 'Agree';
@@ -352,8 +377,10 @@ function inputFromRequest(request, body = {}) {
     chatId: safeString(body.chatId || url.searchParams.get('chatId')),
     groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
+    questionId: safeString(body.questionId || body.id || url.searchParams.get('questionId') || url.searchParams.get('id')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
     interests: body.interests || url.searchParams.get('interests'),
+    geoId: safeString(body.geoId || url.searchParams.get('geoId')),
     geoIds: body.geoIds || body.geoId || url.searchParams.get('geoIds') || url.searchParams.get('geoId'),
     attendedGeoEvents: body.attendedGeoEvents || url.searchParams.get('attendedGeoEvents'),
     sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
@@ -371,6 +398,10 @@ function inputFromRequest(request, body = {}) {
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
     view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
+    limit: Object.hasOwn(body, 'limit') ? body.limit : url.searchParams.get('limit'),
+    declined: Object.hasOwn(body, 'declined') ? body.declined : url.searchParams.get('declined'),
+    createdAt: safeString(body.createdAt || url.searchParams.get('createdAt')),
+    now: safeString(body.now || url.searchParams.get('now')),
   };
 }
 
@@ -387,6 +418,15 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   }
   if (pathname === '/telegram/agent/api/actions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/geo-backlink') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/digest') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
+  }
+  if (pathname === '/telegram/agent/api/ce-install-preference') {
+    return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
   if (pathname === '/telegram/agent/api/results') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
@@ -1068,6 +1108,130 @@ function emptyTagsResponse(sessionSlug = '') {
     total: 0,
   };
   assertNoSecretShape(payload, 'Telegram empty tags response must not serialize secrets.');
+  return json(payload);
+}
+
+function canonicalQuestionUrl(env = {}, {
+  sessionSlug = '',
+  questionId = '',
+  geoId = '',
+} = {}) {
+  const url = new URL(`${agentBridgePublicUrl(env)}/telegram/mini-app`);
+  if (sessionSlug) url.searchParams.set('sessionSlug', sessionSlug);
+  if (questionId) url.searchParams.set('questionId', questionId);
+  if (geoId) url.searchParams.set('geoId', geoId);
+  return url.toString();
+}
+
+async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const geoId = normalizeGeoId(input.geoId);
+  const questionId = safeString(input.questionId || input.id);
+  if (!geoId) return json({ ok: false, reason: 'geo_id_required' }, { status: 400 });
+  if (!questionId) return json({ ok: false, reason: 'question_id_required' }, { status: 400 });
+  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const question = questions.find((entry) => safeString(entry.questionId) === questionId);
+  if (!question || question.answerable !== true) {
+    return json({
+      ok: false,
+      reason: 'question_not_found',
+      sessionSlug: context.session.sessionSlug,
+      questionId,
+      geoId,
+    }, { status: 404 });
+  }
+  const questionUrl = canonicalQuestionUrl(env, {
+    sessionSlug: context.session.sessionSlug,
+    questionId,
+    geoId,
+  });
+  const suggestedComment = [
+    'Context Engine question for this Geo node:',
+    question.prompt,
+    'Open the link to join the session, answer, and help build the opinion map.',
+    questionUrl,
+  ].join(' ');
+  const payload = {
+    ok: true,
+    sessionSlug: context.session.sessionSlug,
+    questionId,
+    geoId,
+    questionUrl,
+    suggestedComment: suggestedComment.slice(0, 700),
+  };
+  assertNoSecretShape(payload, 'Telegram Geo backlink response must not serialize secrets.');
+  return json(payload);
+}
+
+async function readCeInstallDeclineRecord(env = {}, telegramUserId = '', now = null) {
+  const key = ceInstallDeclinedKey(telegramUserId);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const record = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  assertNoSecretShape(record, 'CE install decline preference records must not serialize secrets.');
+  const untilMs = Date.parse(safeString(record.declinedUntil));
+  const nowMs = safeString(now) ? Date.parse(safeString(now)) : Date.now();
+  if (!Number.isFinite(untilMs) || untilMs <= (Number.isFinite(nowMs) ? nowMs : Date.now())) {
+    if (typeof env.AGENT_ACTION_KV.delete === 'function') {
+      await env.AGENT_ACTION_KV.delete(key).catch(() => {});
+    }
+    return null;
+  }
+  return record;
+}
+
+async function handleCeInstallPreferenceRequest({
+  env = {},
+  auth = {},
+  input = {},
+  method = 'GET',
+} = {}) {
+  const telegramUserId = safeString(input.telegramUserId || auth.delegation?.telegramUserId);
+  if (!telegramUserId) {
+    return json({ ok: false, reason: 'telegram_user_required' }, { status: 400 });
+  }
+  const key = ceInstallDeclinedKey(telegramUserId);
+  if (!key || !env?.AGENT_ACTION_KV) {
+    return json({ ok: false, reason: 'ce_install_preference_storage_unavailable' }, { status: 503 });
+  }
+  const cooldownDays = ceInstallDeclineCooldownDays(env);
+  const createdAt = safeString(input.createdAt) || new Date().toISOString();
+  if (safeString(method).toUpperCase() === 'POST') {
+    const declined = normalizeBoolean(input.declined, false);
+    if (declined) {
+      if (typeof env.AGENT_ACTION_KV.put !== 'function') {
+        return json({ ok: false, reason: 'ce_install_preference_storage_unavailable' }, { status: 503 });
+      }
+      const declinedUntil = isoAfterDays(createdAt, cooldownDays);
+      const record = {
+        declined: true,
+        telegramUserId,
+        updatedAt: createdAt,
+        declinedUntil,
+      };
+      assertNoSecretShape(record, 'CE install decline preference records must not serialize secrets.');
+      await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+        expirationTtl: Math.max(1, Math.floor(cooldownDays * 24 * 60 * 60)),
+      });
+      const payload = { ok: true, telegramUserId, declined: true, declinedUntil, cooldownDays };
+      assertNoSecretShape(payload, 'CE install preference response must not serialize secrets.');
+      return json(payload);
+    }
+    if (typeof env.AGENT_ACTION_KV.delete === 'function') {
+      await env.AGENT_ACTION_KV.delete(key);
+    }
+    const payload = { ok: true, telegramUserId, declined: false, declinedUntil: '', cooldownDays };
+    assertNoSecretShape(payload, 'CE install preference response must not serialize secrets.');
+    return json(payload);
+  }
+  const record = await readCeInstallDeclineRecord(env, telegramUserId, input.now || null);
+  const payload = {
+    ok: true,
+    telegramUserId,
+    declined: record?.declined === true,
+    declinedUntil: record?.declinedUntil || '',
+    cooldownDays,
+  };
+  assertNoSecretShape(payload, 'CE install preference response must not serialize secrets.');
   return json(payload);
 }
 
@@ -2448,6 +2612,110 @@ async function handleActionsRequest({
   });
 }
 
+function normalizeDigestLimit(value = null) {
+  const parsed = Number(value);
+  return Math.max(1, Math.min(5, Number.isFinite(parsed) ? Math.floor(parsed) : 3));
+}
+
+function selectDigestQuestions({
+  questions = [],
+  rankedQuestions = [],
+  sponsoredQuestionIds = [],
+  limit = 3,
+} = {}) {
+  const sponsoredIds = normalizeQuestionQueueRefs(sponsoredQuestionIds);
+  const answerable = (Array.isArray(questions) ? questions : [])
+    .filter((question) => question?.answerable === true);
+  const rankedAnswerable = (Array.isArray(rankedQuestions) ? rankedQuestions : [])
+    .filter((question) => question?.answerable === true);
+  const byId = new Map(answerable.map((question) => [safeString(question.questionId || question.id), question]));
+  const rankedById = new Map(rankedAnswerable.map((question) => [safeString(question.questionId || question.id), question]));
+  const selected = [];
+  const seen = new Set();
+  sponsoredIds.forEach((questionId) => {
+    const question = byId.get(questionId);
+    if (!question || seen.has(questionId)) return;
+    selected.push({ ...(rankedById.get(questionId) || question), sponsored: true, digestReason: 'admin_sponsored' });
+    seen.add(questionId);
+  });
+  rankedAnswerable.forEach((question) => {
+    const questionId = safeString(question.questionId || question.id);
+    if (!questionId || seen.has(questionId)) return;
+    selected.push({ ...question, sponsored: false, digestReason: 'preference_ranked' });
+    seen.add(questionId);
+  });
+  return selected.slice(0, normalizeDigestLimit(limit));
+}
+
+function pendingDigestItems(items = []) {
+  const source = Array.isArray(items) ? items : [];
+  return {
+    answerDrafts: source.filter((item) => (
+      item?.type === 'answer_draft' &&
+      safeString(item.pendingAction || 'review_draft') === 'review_draft'
+    )),
+    voteRecommendations: source.filter((item) => (
+      item?.type === 'question_vote_recommendation' &&
+      safeString(item.status || 'pending_review') === 'pending_review'
+    )),
+  };
+}
+
+async function handleDigestRequest({
+  env = {},
+  context = {},
+  input = {},
+  waitUntil = null,
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
+  const telegramUserId = safeString(context.normalized.user.telegramUserId);
+  const limit = normalizeDigestLimit(input.limit);
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const ranked = rankQuestionsByPreferences(questions, input, context);
+  const queueConfig = await loadTelegramQuestionQueueConfig({ env, sessionSlug });
+  const digestQuestions = selectDigestQuestions({
+    questions,
+    rankedQuestions: ranked.questions,
+    sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
+    limit
+  });
+  const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  const activityItems = await listTelegramAgentActivity({
+    env,
+    telegramUserId,
+    sessionSlugs: sessionSlug ? [sessionSlug] : [],
+    includeContent: false,
+    limit: 50,
+  });
+  const pending = pendingDigestItems(activityItems);
+  const payload = {
+    ok: true,
+    sessionSlug,
+    telegramUserId,
+    optedIn: settings.dailyDigestOptIn === true,
+    limit,
+    permissionMode: context.permission.mode,
+    questionSource: loaded.source || '',
+    questionSourceReason: loaded.reason || '',
+    relevance: ranked.relevance,
+    queueConfig: {
+      source: queueConfig.source || '',
+      sponsoredQuestionCount: Array.isArray(queueConfig.sponsoredQuestionIds)
+        ? queueConfig.sponsoredQuestionIds.length
+        : 0,
+    },
+    questions: digestQuestions,
+    pendingAnswerDrafts: pending.answerDrafts.slice(0, 10),
+    pendingVoteRecommendations: pending.voteRecommendations.slice(0, 10),
+    pending: {
+      answerDraftCount: pending.answerDrafts.length,
+      voteRecommendationCount: pending.voteRecommendations.length,
+    },
+  };
+  assertNoSecretShape(payload, 'Telegram agent digest response must not serialize secrets.');
+  return json(payload);
+}
+
 function agentBoolean(value) {
   if (typeof value === 'boolean') return value;
   return ['1', 'true', 'yes', 'on', 'demo'].includes(lower(value));
@@ -3097,6 +3365,9 @@ export async function handleTelegramAgentHandoffRequest({
       groupChatId: '',
     }
     : delegated.input;
+  if (url.pathname === '/telegram/agent/api/ce-install-preference' && ['GET', 'POST'].includes(request.method)) {
+    return handleCeInstallPreferenceRequest({ env, auth, input, method: request.method });
+  }
   const routeRequiresQuestionAuthoring = ![
     '/telegram/agent/api/admin/status',
     '/telegram/agent/api/admin/metrics',
@@ -3107,6 +3378,8 @@ export async function handleTelegramAgentHandoffRequest({
     '/telegram/agent/api/group-approval-link',
     '/telegram/agent/api/group-approval-revoke',
     '/telegram/agent/api/onboarding',
+    '/telegram/agent/api/geo-backlink',
+    '/telegram/agent/api/digest',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
   ].includes(url.pathname);
@@ -3149,6 +3422,12 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
     return handleOnboardingRequest({ env, context, input, body, method: request.method });
+  }
+  if (url.pathname === '/telegram/agent/api/geo-backlink' && request.method === 'GET') {
+    return handleGeoBacklinkRequest({ env, context, input, waitUntil });
+  }
+  if (url.pathname === '/telegram/agent/api/digest' && request.method === 'GET') {
+    return handleDigestRequest({ env, context, input, waitUntil });
   }
   if (url.pathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });

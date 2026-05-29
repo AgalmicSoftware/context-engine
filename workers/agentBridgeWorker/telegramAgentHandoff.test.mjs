@@ -202,6 +202,9 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
+  assert.match(source, /GET \/telegram\/agent\/api\/geo-backlink/);
+  assert.match(source, /POST \/telegram\/agent\/api\/ce-install-preference/);
+  assert.match(source, /GET \/telegram\/agent\/api\/digest/);
   assert.match(source, /Non-Telegram Agent Token Flow/);
   assert.match(source, /Install From Public Git/);
   assert.match(source, /raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine/);
@@ -358,6 +361,106 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(missingTokenResponse.status, 401);
   assert.equal(missingTokenBody.reason, 'agent_token_not_found');
   assert.equal(missingTokenBody.action, 'refresh_token_via_telegram');
+});
+
+test('Telegram agent CE install preference respects decline cooldown and token ownership', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_CE_INSTALL_DECLINE_COOLDOWN_DAYS: '2',
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+
+  const initialResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const initial = await jsonBody(initialResponse);
+  const declineResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        telegramUserId: '999',
+        declined: true,
+        createdAt: '2026-05-08T12:00:00.000Z',
+      },
+    }),
+    env,
+  });
+  const declined = await jsonBody(declineResponse);
+  const getResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference?sessionSlug=alpha&telegramUserId=999&now=2026-05-08T12:00:01.000Z', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const got = await jsonBody(getResponse);
+  const serviceGetOtherResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference?telegramUserId=999', {
+      token: 'agent-test-token',
+    }),
+    env: { ...env, AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' },
+  });
+  const serviceOther = await jsonBody(serviceGetOtherResponse);
+  await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference', {
+      method: 'POST',
+      token: 'agent-test-token',
+      body: {
+        telegramUserId: '43',
+        declined: true,
+        createdAt: '2026-05-01T00:00:00.000Z',
+      },
+    }),
+    env: { ...env, AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' },
+  });
+  const expiredResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference?telegramUserId=43&now=2026-05-08T12:00:00.000Z', {
+      token: 'agent-test-token',
+    }),
+    env: { ...env, AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' },
+  });
+  const expired = await jsonBody(expiredResponse);
+  const clearResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/ce-install-preference', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        declined: false,
+      },
+    }),
+    env,
+  });
+  const cleared = await jsonBody(clearResponse);
+
+  assert.equal(initialResponse.status, 200);
+  assert.equal(initial.declined, false);
+  assert.equal(declineResponse.status, 200);
+  assert.equal(declined.telegramUserId, '42');
+  assert.equal(declined.declined, true);
+  assert.equal(declined.cooldownDays, 2);
+  assert.equal(declined.declinedUntil, '2026-05-10T12:00:00.000Z');
+  assert.equal(getResponse.status, 200);
+  assert.equal(got.telegramUserId, '42');
+  assert.equal(got.declined, true);
+  assert.equal(serviceGetOtherResponse.status, 200);
+  assert.equal(serviceOther.telegramUserId, '999');
+  assert.equal(serviceOther.declined, false);
+  assert.equal(expiredResponse.status, 200);
+  assert.equal(expired.declined, false);
+  assert.equal(clearResponse.status, 200);
+  assert.equal(cleared.declined, false);
 });
 
 test('Telegram agent onboarding returns consent questions and persists first-run answers', async () => {
@@ -731,6 +834,140 @@ test('Telegram agent activity uses KV metadata for non-content one-to-one record
   assert.equal(contentItems.some((item) => item.content?.answerLabel === 'Agree'), true);
 });
 
+test('Telegram agent digest returns sponsored-first ranked questions and redacted pending activity', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_QUESTION_QUEUE_JSON: JSON.stringify({ alpha: ['q-sponsored'] }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-sponsored',
+        questionType: 'binary',
+        prompt: 'Should organizers sponsor baseline onboarding questions?',
+        tags: ['sponsored'],
+      },
+      {
+        questionId: 'q-geo',
+        questionType: 'binary',
+        prompt: 'Should the town hall host more agent demos?',
+        tags: ['venue-feedback'],
+        geoRefs: [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }],
+      },
+      {
+        questionId: 'q-other',
+        questionType: 'binary',
+        prompt: 'Should the schedule include longer breaks?',
+        tags: ['schedule'],
+      },
+    ]),
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'78'.repeat(20)}`,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  });
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    patch: { dailyDigestOptIn: true },
+    createdAt: '2026-05-08T12:00:01.000Z',
+  });
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:alpha:q-geo', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-geo',
+    answerLabel: 'Private draft answer should stay out of digest',
+    answerValue: 'Private draft answer should stay out of digest',
+    selectedAt: '2026-05-08T12:01:00.000Z',
+  }), {
+    metadata: buildTelegramAgentActivityMetadata({
+      type: 'answer_draft',
+      status: 'draft_saved',
+      createdAt: '2026-05-08T12:01:00.000Z',
+      pendingAction: 'review_draft',
+      sessionSlug: 'alpha',
+      questionId: 'q-geo',
+      telegramUserId: '42',
+    }),
+  });
+  await env.AGENT_ACTION_KV.put('telegram:agent-question-vote-recommendation:v1:alpha:42:req-1', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    requestId: 'req-1',
+    createdAt: '2026-05-08T12:02:00.000Z',
+    recommendations: [{
+      questionId: 'q-other',
+      prompt: 'Internal prompt text is not needed in the digest.',
+      suggestedVote: 'up',
+      reason: 'Looks relevant.',
+    }],
+  }));
+  await env.AGENT_ACTION_KV.put('telegram:answer-draft:99:alpha:q-other', JSON.stringify({
+    status: 'draft_saved',
+    telegramUserId: '99',
+    sessionSlug: 'alpha',
+    questionId: 'q-other',
+    answerLabel: 'Wrong user draft',
+    answerValue: 'Wrong user draft',
+    selectedAt: '2026-05-08T12:03:00.000Z',
+  }));
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/digest?sessionSlug=alpha&limit=2&geoIds=edge-town-hall&relevanceMode=filter', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+  const serialized = JSON.stringify(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.optedIn, true);
+  assert.equal(body.limit, 2);
+  assert.deepEqual(body.questions.map((question) => question.questionId), ['q-sponsored', 'q-geo']);
+  assert.equal(body.questions[0].sponsored, true);
+  assert.equal(body.questions[0].digestReason, 'admin_sponsored');
+  assert.equal(body.questions[1].digestReason, 'preference_ranked');
+  assert.deepEqual(body.questions[1].geoRefs, [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }]);
+  assert.deepEqual(body.relevance.geoIds, ['edge-town-hall']);
+  assert.equal(body.relevance.mode, 'filter');
+  assert.equal(body.pending.answerDraftCount, 1);
+  assert.equal(body.pending.voteRecommendationCount, 1);
+  assert.equal(body.pendingAnswerDrafts.length, 1);
+  assert.equal(body.pendingVoteRecommendations.length, 1);
+  assert.equal(serialized.includes('Private draft answer should stay out of digest'), false);
+  assert.equal(serialized.includes('Wrong user draft'), false);
+  assert.equal(serialized.includes(issued.token), false);
+});
+
+test('Telegram agent digest handles empty sessions and marks missing opt-in', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-unavailable', payloadUnavailable: true },
+    ]),
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/digest?sessionSlug=alpha&telegramUserId=42&limit=99'),
+    env,
+  });
+  const body = await jsonBody(response);
+  const serialized = JSON.stringify(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.optedIn, false);
+  assert.equal(body.limit, 5);
+  assert.deepEqual(body.questions, []);
+  assert.equal(body.pending.answerDraftCount, 0);
+  assert.equal(body.pending.voteRecommendationCount, 0);
+  assert.equal(serialized.includes('agent-test-token'), false);
+});
+
 test('Telegram agent can read active questions and draft preferences after group join', async () => {
   const env = baseEnv();
   await buildTelegramCommandResponse({
@@ -967,6 +1204,45 @@ test('Telegram agent ranks and returns geo-linked questions from geo preferences
   assert.equal(body.questions[0].tags.includes('geo:edge-town-hall'), true);
   assert.deepEqual(body.questions[0].geoRefs, [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }]);
   assert.equal(body.questions[0].relevance.matchedGeoIds.includes('edge-town-hall'), true);
+  assert.equal(serialized.includes('agent-test-token'), false);
+  assert.equal(serialized.includes('123456:test-token'), false);
+});
+
+test('Telegram agent geo backlink returns public-safe Mini App link text', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-geo',
+        questionType: 'binary',
+        prompt: 'Should the town hall venue host more agent demos?',
+        tags: ['venue-feedback'],
+        geoRefs: [{ geoId: 'edge-town-hall', kind: 'venue', label: 'Town Hall' }],
+      },
+    ]),
+  });
+  await buildTelegramCommandResponse({
+    update: groupMessage('/join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=q-geo&geoId=edge-town-hall'),
+    env,
+  });
+  const body = await jsonBody(response);
+  const parsedUrl = new URL(body.questionUrl);
+  const serialized = JSON.stringify(body);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.geoId, 'edge-town-hall');
+  assert.equal(parsedUrl.origin, 'https://bridge.example');
+  assert.equal(parsedUrl.pathname, '/telegram/mini-app');
+  assert.equal(parsedUrl.searchParams.get('sessionSlug'), 'alpha');
+  assert.equal(parsedUrl.searchParams.get('questionId'), 'q-geo');
+  assert.match(body.suggestedComment, /Should the town hall venue host more agent demos/);
   assert.equal(serialized.includes('agent-test-token'), false);
   assert.equal(serialized.includes('123456:test-token'), false);
 });
@@ -2024,6 +2300,9 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
           {
             prompt: 'Should the demo prioritize organizer feedback?',
             questionType: 'binary',
+            geoId: 'edge-organizer-hall',
+            geoKind: 'venue',
+            geoLabel: 'Organizer Hall',
           },
           {
             prompt: 'Which topics need a follow-up discussion?',
@@ -2045,8 +2324,24 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
     env,
   });
   const questions = await jsonBody(questionsResponse);
+  const geoResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        preferences: { geoIds: ['edge-organizer-hall'] },
+      },
+    }),
+    env,
+  });
+  const geoRanked = await jsonBody(geoResponse);
   const sourcedQuestion = questions.questions.find((question) => (
     question.prompt === 'Should Agent Village organizers publish a daily recap?'
+  ));
+  const geoQuestion = questions.questions.find((question) => (
+    question.prompt === 'Should the demo prioritize organizer feedback?'
   ));
   const emptyResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions/create', {
@@ -2081,6 +2376,8 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(body.skipped.length, 0);
   assert.equal(body.created[0].references[0].url, sourceUrl);
   assert.equal(body.created[0].tags.includes('src:example-com'), true);
+  assert.deepEqual(body.created[1].geoRefs, [{ geoId: 'edge-organizer-hall', kind: 'venue', label: 'Organizer Hall' }]);
+  assert.equal(body.created[1].tags.includes('geo:edge-organizer-hall'), true);
   assert.equal(proposedRecords.length, 3);
   assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
   assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
@@ -2088,6 +2385,9 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(proposedRecords[0].references[0].url, sourceUrl);
   assert.equal(sourcedQuestion.references[0].url, sourceUrl);
   assert.equal(sourcedQuestion.tags.includes('src:example-com'), true);
+  assert.deepEqual(geoQuestion.geoRefs, [{ geoId: 'edge-organizer-hall', kind: 'venue', label: 'Organizer Hall' }]);
+  assert.equal(geoResponse.status, 200);
+  assert.equal(geoRanked.questions[0].questionId, geoQuestion.questionId);
   assert.equal(JSON.stringify(body).includes('ceagt_'), false);
   assert.equal(emptyResponse.status, 400);
   assert.equal((await jsonBody(emptyResponse)).reason, 'questions_create_batch_required');

@@ -2922,6 +2922,9 @@ test('Mini App add question endpoint persists Telegram-only proposed questions',
         prompt: 'What should lunch be?',
         options: ['Pizza', 'Salad', 'Tacos'],
         tags: ['Food Preference', 'Edge City'],
+        geoId: 'edge-lunch-table',
+        geoKind: 'venue',
+        geoLabel: 'Lunch Table',
         sessionContext: 'Use the lunch planning context.',
       }),
     }),
@@ -2939,10 +2942,13 @@ test('Mini App add question endpoint persists Telegram-only proposed questions',
   assert.deepEqual(body.question.options, ['Pizza', 'Salad', 'Tacos']);
   assert.equal(body.question.tags.includes('food-preference'), true);
   assert.equal(body.question.tags.includes('edge-city'), true);
+  assert.equal(body.question.tags.includes('geo:edge-lunch-table'), true);
+  assert.deepEqual(body.question.geoRefs, [{ geoId: 'edge-lunch-table', kind: 'venue', label: 'Lunch Table' }]);
   const added = state.questions.find((question) => question.prompt === 'What should lunch be?');
   assert.equal(Boolean(added), true);
   assert.equal(added.tags.includes('food-preference'), true);
   assert.equal(added.tags.includes('edge-city'), true);
+  assert.deepEqual(added.geoRefs, [{ geoId: 'edge-lunch-table', kind: 'venue', label: 'Lunch Table' }]);
 });
 
 test('Mini App add question formatter uses session worker AI to shape dictation by question type', async () => {
@@ -3228,6 +3234,7 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
       assert.match(aiBody.messages[1].content, /numberOfSeedStatementsOrPrompts: 2/);
       assert.match(aiBody.messages[1].content, /Agent Village Brief/);
       assert.match(aiBody.messages[1].content, /Organizers are deciding how to run an agent village experiment/);
+      assert.match(aiBody.messages[1].content, /edge-main-stage/);
       return new Response(JSON.stringify({
         completion: JSON.stringify({
           surveyTitle: 'Agent Village Brief',
@@ -3264,6 +3271,9 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
         url: 'https://example.com/source',
         count: 2,
         questionType: 'agree_unsure_disagree',
+        geoId: 'edge-main-stage',
+        geoKind: 'venue',
+        geoLabel: 'Main Stage',
       }),
     }),
     env,
@@ -3278,6 +3288,8 @@ test('Mini App URL question generation endpoint returns AI candidate drafts', as
   assert.equal(body.candidates[0].questionType, 'agree_unsure_disagree');
   assert.equal(body.candidates[0].tags.includes('agent-village'), true);
   assert.equal(body.candidates[0].tags.includes('onboarding'), true);
+  assert.equal(body.candidates[0].tags.includes('geo:edge-main-stage'), true);
+  assert.deepEqual(body.candidates[0].geoRefs, [{ geoId: 'edge-main-stage', kind: 'venue', label: 'Main Stage' }]);
   assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/source', '/auth/nonce', '/auth/login', '/ai']);
 });
 

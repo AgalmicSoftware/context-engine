@@ -254,8 +254,9 @@ The current questions map to these settings:
 }
 ```
 
-The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
-digest integrations. In Phase 1 this flag is only stored and echoed back.
+The onboarding endpoint also persists `dailyDigestOptIn` for Edge daily digest
+integrations. If the user opts in, register this skill with the event or agent
+host's daily-digest cron tool. CE does not run its own digest cron.
 
 Do not infer or submit demographic group membership from private user data unless the user has explicitly allowed that field and that use. Prefer suggesting groups and linking the user to the Mini App Groups panel for approval.
 
@@ -270,6 +271,35 @@ Use this path when the user should become a CE participant by answering one CE q
 5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
 
 If the user is only in a one-on-one OpenClaw Telegram DM, send them a CE deep link or group link first. CE-owned inline response buttons cannot appear inside a normal private DM with another bot unless CE sends the message in a CE-accessible chat.
+
+## Edge Daily Digest
+
+CE is read-only in the Edge daily-digest flow. It does not add a Cloudflare cron
+trigger and does not push outbound events to EdgeOS, Geo, or any event host.
+
+During onboarding, ask the built-in daily-digest opt-in question and persist the
+answer with `/telegram/agent/api/onboarding`. If `dailyDigestOptIn` is true, use
+the agent host's own cronjob or scheduler tool to add this skill to that user's
+daily-digest invocation list.
+
+On each digest run, call:
+
+```http
+GET /telegram/agent/api/digest?sessionSlug=<slug>&limit=3
+```
+
+The endpoint accepts a `ceagt_` user token or service token. It returns up to
+three top questions by default, capped at five. Sponsored questions configured by
+session admins are listed first, then the remaining questions are ranked with
+the same preference and Geo relevance inputs used by `/questions` and
+`/questions/next`. You may pass `tags`, `geoIds`, `sessionsAttended`, and
+`relevanceMode` to tune the digest.
+
+The response includes `optedIn`, `questions`, `pendingAnswerDrafts`, and
+`pendingVoteRecommendations`. If `optedIn` is false, the endpoint still serves
+an on-demand digest, but the agent should not schedule recurring delivery until
+the user opts in. Route answer approval and submission through the Mini App or
+the normal user-approved submit path.
 
 ## Read Active Questions
 
@@ -425,7 +455,8 @@ Example body:
     {
       "prompt": "Should organizers publish a daily Agent Village recap?",
       "questionType": "binary",
-      "tags": ["organizer-feedback"]
+      "tags": ["organizer-feedback"],
+      "geoRefs": [{ "geoId": "edge-town-hall", "kind": "venue", "label": "Town Hall" }]
     }
   ]
 }
@@ -437,6 +468,57 @@ The worker validates and persists the approved questions, adds a host-derived
 the normal pose/surfacing flow later if the user wants them posted into a
 Telegram group. Never auto-create questions before the user approves the exact
 list.
+
+For Edge/Geo-originated questions, include `geoId`/`geoKind`/`geoLabel` on the
+question or a structured `geoRefs` array. The worker forces the matching
+`geo:<geoId>` tag and stores the structured ref so later `/questions`,
+`/questions/next`, and `/digest` calls can surface questions relevant to public
+Geo nodes.
+
+## Writing CE Backlinks Into Geo
+
+CE never calls the Geo CLI or Geo/EdgeOS API and never stores an
+`EDGEOS_BEARER_TOKEN`. The agent owns Geo reads and writes with its own
+geo-esmeralda skill.
+
+When the agent generates or links a CE question for a public Geo node, ask CE for
+safe backlink text:
+
+```http
+GET /telegram/agent/api/geo-backlink?sessionSlug=<slug>&questionId=<id>&geoId=<geoId>
+```
+
+The response contains `questionUrl` and `suggestedComment`. Write that comment
+into Geo as a ContentItem using the geo-esmeralda CLI `create` verb, scoped to
+the narrowest event, venue, or track, with a stable `--client-request-id`. Do
+not change Geo schema and do not send Geo bearer tokens to CE.
+
+## Prompting At CE-Attached Geo Nodes
+
+When browsing Geo content, if a node has a CE backlink ContentItem, prompt the
+human to join Context Engine and help build the opinion map for that node unless
+they are in a temporary decline cooldown.
+
+Before prompting, check:
+
+```http
+GET /telegram/agent/api/ce-install-preference?telegramUserId=<id>
+```
+
+Only persist a decline when the user explicitly says they do not want to join or
+asks to stop being asked:
+
+```http
+POST /telegram/agent/api/ce-install-preference
+{"telegramUserId":"42","declined":true}
+```
+
+Do not treat silence, ignored prompts, or "not now" as a decline. A decline
+auto-expires after the admin-configured cooldown
+`AGENT_BRIDGE_CE_INSTALL_DECLINE_COOLDOWN_DAYS` (default 3 days). If the user
+later asks to join, onboard them immediately and clear the cooldown with
+`{"declined":false}`. If the user already has a `ceagt_` token, skip the install
+pitch and surface the node's CE question(s) to answer.
 
 ## Read Aggregate Results
 
@@ -649,6 +731,9 @@ Create and pose a new freeform question:
   "prompt": "What should the group decide next?",
   "questionType": "freeform",
   "tags": ["governance", "agent-village"],
+  "geoId": "edge-town-hall",
+  "geoKind": "venue",
+  "geoLabel": "Town Hall",
   "sessionContext": "Short public context that helps CE format and tag the question."
 }
 ```
@@ -823,8 +908,9 @@ answers with `POST /telegram/agent/api/onboarding`:
 
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
 `agentAutoApplyQuestionVotes`, and `dailyDigestOptIn`. Auto-apply votes remain
-off unless the user says yes to question 4. The digest flag is stored for Phase
-2 and should not be treated as an active delivery subscription yet.
+off unless the user says yes to question 4. If the user says yes to question 5,
+register this skill with the agent host's daily-digest scheduler and call
+`GET /telegram/agent/api/digest` during each digest run.
 
 ## Changelog
 
@@ -843,6 +929,9 @@ off unless the user says yes to question 4. The digest flag is stored for Phase
   agent menu and `/activity` for recent activity.
 - The worker exposes `/telegram/agent/api/skill-version` so agents can check
   whether their installed skill is current.
+- The worker exposes `/telegram/agent/api/digest` so agent hosts can run their
+  own daily digest cron without CE adding a Cloudflare cron or outbound Edge
+  push.
 - Admin agents can read aggregate bridge metrics through
   `/telegram/agent/api/admin/metrics`.
 - Agents can create approved batches of proposed questions from
