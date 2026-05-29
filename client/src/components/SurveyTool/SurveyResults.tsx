@@ -148,6 +148,7 @@ import {
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
+import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -4794,33 +4795,17 @@ const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResu
     ]
   : [];
 
-// Compute a context-aware filtered questions count for display
-let displayedFilteredQuestionsCount;
-if (viewMode === 'survey') {
-  if (surveyViewMode === 'aggregate') {
-    displayedFilteredQuestionsCount = aggregatorEntriesCount || totalQuestionsCount;
-  } else {
-    // Individuals view does not change which questions belong to the survey
-    displayedFilteredQuestionsCount = totalQuestionsCount;
-  }
-} else {
-  // Questions view – use live count from QuestionFilter if available; otherwise fallback to visible aggregator keys
-  const fallbackLen = aggregatorEntriesCount;
-  displayedFilteredQuestionsCount =
-    (filteredQuestionsCount !== null && filteredQuestionsCount !== undefined)
-      ? filteredQuestionsCount
-      : fallbackLen;
-}
-const displayedTotalQuestionsCount = Math.max(0, Number(totalQuestionsCount) || 0);
-const displayedTotalResponsesCount = Math.max(0, Number(totalResponsesCount) || 0);
-const normalizedFilteredQuestionsCount = Math.min(
-  displayedTotalQuestionsCount,
-  Math.max(0, Number(displayedFilteredQuestionsCount) || 0)
-);
-const normalizedFilteredResponsesCount = Math.min(
-  displayedTotalResponsesCount,
-  Math.max(0, Number(filteredResponsesCount) || 0)
-);
+const filterSummaryDisplay = buildSurveyResultsFilterSummaryDisplayPlan({
+  aggregatorEntriesCount,
+  areSummaryCountsHydrated,
+  filteredQuestionsCount,
+  filteredResponsesCount,
+  filterLoading,
+  surveyViewMode,
+  totalQuestionsCount,
+  totalResponsesCount,
+  viewMode,
+});
 
 // Compact sync status display
 let syncStatusText = '';
@@ -4959,12 +4944,11 @@ return (
       )}
 
       {renderSurveyResultsFilterSummary({
-        displayedTotalQuestionsCount,
-        displayedTotalResponsesCount,
-        normalizedFilteredQuestionsCount,
-        normalizedFilteredResponsesCount,
-        filterLoading,
-        areSummaryCountsHydrated,
+        displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount,
+        displayedTotalResponsesCount: filterSummaryDisplay.displayedTotalResponsesCount,
+        normalizedFilteredQuestionsCount: filterSummaryDisplay.normalizedFilteredQuestionsCount,
+        normalizedFilteredResponsesCount: filterSummaryDisplay.normalizedFilteredResponsesCount,
+        showFilteredCountSpinner: filterSummaryDisplay.showFilteredCountSpinner,
       })}
 
 
