@@ -3517,8 +3517,10 @@ function sessionVisibleInTelegram(session = {}, {
   if (Number.isFinite(createdAfterMs)) {
     const createdAtMs = sessionCreatedAtMs(session);
     const defaultTelegramSession = slug && slug === sanitizeSessionSlug(defaultSessionSlug);
-    if (!Number.isFinite(createdAtMs) && !defaultTelegramSession) return false;
-    if (Number.isFinite(createdAtMs) && createdAtMs < createdAfterMs) return false;
+    if (!defaultTelegramSession) {
+      if (!Number.isFinite(createdAtMs)) return false;
+      if (createdAtMs < createdAfterMs) return false;
+    }
   }
   return session.telegramBridgeEnabled === true && session.telegramOnly === true;
 }

@@ -922,16 +922,16 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
   });
 
   const sessions = await buildTelegramCommandResponse({
-    update: groupMessage('/sessions'),
+    update: privateMessage('/sessions'),
     env,
     now: '2026-05-21T12:00:00.000Z',
   });
   assert.equal(sessions.ok, true);
-  assert.match(sessions.response.text, /Sessions \(1\/1\)/);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- old-alpha \(Old Alpha\)/);
   assert.match(sessions.response.text, /- new-beta \(New Beta\)/);
-  assert.equal(sessions.response.text.includes('Old Alpha'), false);
   assert.equal(sessions.response.text.includes('Missing Created At'), false);
-  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), ['New Beta']);
+  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), ['Old Alpha', 'New Beta']);
 
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -939,14 +939,113 @@ test('/sessions and /start honor the Cloudflare Telegram session created-after c
     now: '2026-05-21T12:00:01.000Z',
   });
   assert.equal(start.ok, true);
-  assert.match(start.response.text, /Session: New Beta/);
-  assert.equal(start.response.text.includes('/sessions'), false);
-  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
-  assert.equal(binding.sessionSlug, 'new-beta');
-  const miniApp = flattenButtons(start.response.replyMarkup).find((button) => button.text === 'Mini App');
-  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
-  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
-  assert.equal(record.serverContextRef.sessionSlug, 'new-beta');
+  assert.match(start.response.text, /\/sessions - choose session/);
+  const binding = await env.AGENT_ACTION_KV.get('telegram:private-session:42');
+  assert.equal(binding, null);
+});
+
+test('/sessions keeps the default visible when the cutoff is newer than its createdAt', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'old-default',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'old-default',
+          sessionName: 'Old Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-19T00:00:00.000Z',
+        },
+        {
+          sessionSlug: 'old-non-default',
+          sessionName: 'Old Non Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-19T12:00:00.000Z',
+        },
+        {
+          sessionSlug: 'new-non-default',
+          sessionName: 'New Non Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-20T00:00:00.000Z',
+        },
+        {
+          sessionSlug: 'e2e-new',
+          sessionName: 'E2E New Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-21T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: privateMessage('/sessions'),
+    env,
+    now: '2026-05-21T12:00:00.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- old-default \(Old Default\)/);
+  assert.match(sessions.response.text, /- new-non-default \(New Non Default\)/);
+  assert.equal(sessions.response.text.includes('Old Non Default'), false);
+  assert.equal(sessions.response.text.includes('E2E New Session'), false);
+  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'Old Default',
+    'New Non Default',
+  ]);
+});
+
+test('/sessions keeps the default visible when cutoff metadata is missing', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'metadata-free-default',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'metadata-free-default',
+          sessionName: 'Metadata Free Default',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'metadata-free-other',
+          sessionName: 'Metadata Free Other',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'fresh-session',
+          sessionName: 'Fresh Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          createdAt: '2026-05-21T00:00:00.000Z',
+        },
+      ],
+    }),
+  });
+
+  const sessions = await buildTelegramCommandResponse({
+    update: privateMessage('/sessions'),
+    env,
+    now: '2026-05-21T12:00:00.000Z',
+  });
+
+  assert.equal(sessions.ok, true);
+  assert.match(sessions.response.text, /Sessions \(2\/2\)/);
+  assert.match(sessions.response.text, /- metadata-free-default \(Metadata Free Default\)/);
+  assert.match(sessions.response.text, /- fresh-session \(Fresh Session\)/);
+  assert.equal(sessions.response.text.includes('Metadata Free Other'), false);
+  assert.deepEqual(flattenButtons(sessions.response.replyMarkup).map((button) => button.text), [
+    'Metadata Free Default',
+    'Fresh Session',
+  ]);
 });
 
 test('/sessions can use the Edge 2026 cutoff to hide the test session', async () => {
