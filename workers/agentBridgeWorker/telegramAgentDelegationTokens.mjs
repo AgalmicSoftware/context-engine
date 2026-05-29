@@ -126,7 +126,18 @@ export async function createTelegramAgentDelegationToken({
     ttlSeconds: normalizedTtl,
   };
   assertNoSecretShape(record, 'Telegram agent delegation token records must not serialize bearer tokens.');
-  await kv.put(tokenKvKey(tokenHash), JSON.stringify(record), { expirationTtl: normalizedTtl });
+  const metadata = {
+    v: 1,
+    t: 'agent_delegation_token',
+    sg: slug,
+    u: userId,
+    c: issuedAt,
+  };
+  assertNoSecretShape(metadata, 'Telegram agent delegation token metadata must not serialize secrets.');
+  await kv.put(tokenKvKey(tokenHash), JSON.stringify(record), {
+    expirationTtl: normalizedTtl,
+    metadata,
+  });
   return {
     ok: true,
     token,

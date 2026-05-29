@@ -286,6 +286,12 @@ export function normalizeSessionPolicy(input = {}) {
       input.requireTelegramGroupApproval
     ),
     docLibraryEnabled: session.docLibraryEnabled === true,
+    responseExportAllowedAddresses: Array.isArray(session.responseExportAllowedAddresses)
+      ? session.responseExportAllowedAddresses.slice()
+      : safeString(session.responseExportAllowedAddresses),
+    telegramResponseExportAllowedAddresses: Array.isArray(session.telegramResponseExportAllowedAddresses)
+      ? session.telegramResponseExportAllowedAddresses.slice()
+      : safeString(session.telegramResponseExportAllowedAddresses),
     questions: Array.isArray(session.questions)
       ? session.questions.slice()
       : (Array.isArray(session.telegramQuestions) ? session.telegramQuestions.slice() : []),
