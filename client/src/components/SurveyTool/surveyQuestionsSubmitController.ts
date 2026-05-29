@@ -1,10 +1,12 @@
 import type {
   SurveySubmitFailureStatePatch,
+  SurveySubmitStartStatePatch,
   SurveySubmitSuccessStatePatch,
   SurveyQuestionsPrimarySubmitPlan,
 } from './surveyQuestionsTypes.js';
 import {
   buildSubmitFailureState,
+  buildSubmitStartState,
   buildSubmitSuccessState,
 } from './surveyQuestionsTypes.js';
 import {
@@ -21,8 +23,19 @@ export type SurveyQuestionsSubmitDispatchPort = (
 ) => void;
 
 export type SurveyQuestionsSubmitControllerPorts = {
+  activateSubmitGuard?: () => void;
   navigateToResponse?: SurveyQuestionsSubmitNavigationPort;
   dispatchSubmit?: SurveyQuestionsSubmitDispatchPort;
+};
+
+export type SurveyQuestionsSubmitStartPorts = {
+  startSubmitAttempt?: () => unknown;
+  setSubmitStartState?: (statePatch: SurveySubmitStartStatePatch) => void;
+};
+
+export type SurveyQuestionsSubmitPendingStats = {
+  total: number;
+  encrypted: number;
 };
 
 export type SurveyQuestionsSubmitCompletionPorts = {
@@ -33,6 +46,20 @@ export type SurveyQuestionsSubmitCompletionPorts = {
     statePatch: SurveySubmitSuccessStatePatch,
     afterStateApplied?: () => void
   ) => void;
+};
+
+export type SurveyQuestionsSubmitStaleStatePatch = {
+  isSubmitting: false;
+  submitProgress: 0;
+  currentStep: 0;
+};
+
+export type SurveyQuestionsStaleSubmitPorts = {
+  clearSubmitGuard?: () => void;
+  canUpdateSubmitState?: (snapshot: unknown) => boolean;
+  isSubmitAttemptActive?: (submitAttemptId: number, snapshot: unknown) => boolean;
+  finishSubmitAttempt?: (submitAttemptId: number) => void;
+  setSubmitStaleState?: (statePatch: SurveyQuestionsSubmitStaleStatePatch) => void;
 };
 
 export type SurveyQuestionsSubmitControllerResult = {
@@ -46,6 +73,16 @@ export type SurveyQuestionsSubmitControllerResult = {
 export type RunSurveyQuestionsSubmitControllerArgs = {
   plan: SurveyQuestionsPrimarySubmitPlan;
   ports?: SurveyQuestionsSubmitControllerPorts;
+};
+
+export type RunSurveyQuestionsSubmitStartControllerArgs = {
+  ports?: SurveyQuestionsSubmitStartPorts;
+};
+
+export type ResolveSurveyQuestionsSubmitPendingStatsArgs = {
+  fallbackEncrypted?: unknown;
+  fallbackTotal?: unknown;
+  getPendingEditStats?: () => unknown;
 };
 
 export type RunSurveyQuestionsSubmitSuccessControllerArgs = {
@@ -67,6 +104,18 @@ export type RunSurveyQuestionsSubmitFailureControllerArgs = {
   ports?: SurveyQuestionsSubmitCompletionPorts;
 };
 
+export type RunSurveyQuestionsStaleSubmitControllerArgs = {
+  snapshot?: unknown;
+  ports?: SurveyQuestionsStaleSubmitPorts;
+};
+
+export type SurveyQuestionsSubmitStartControllerResult = {
+  outcome: 'started';
+  status: 'completed';
+  submitAttemptId: number;
+  statePatch: SurveySubmitStartStatePatch;
+};
+
 export type SurveyQuestionsSubmitSuccessControllerResult = {
   outcome: 'success';
   status: 'completed';
@@ -79,6 +128,14 @@ export type SurveyQuestionsSubmitFailureControllerResult = {
   status: 'completed';
   submitAttemptId: number;
   statePatch: SurveySubmitFailureStatePatch;
+};
+
+export type SurveyQuestionsStaleSubmitControllerResult = {
+  outcome: 'stale';
+  reason: 'active_attempt' | 'inactive_attempt' | 'missing_attempt' | 'snapshot_not_current';
+  status: 'completed' | 'skipped';
+  submitAttemptId: number;
+  statePatch: SurveyQuestionsSubmitStaleStatePatch | null;
 };
 
 const buildUnhandledResult = (
@@ -96,9 +153,42 @@ const normalizeSubmitAttemptId = (submitAttemptId: unknown): number => {
   return Number.isFinite(value) && value > 0 ? value : 0;
 };
 
+const normalizePendingStatCount = (
+  value: unknown,
+  fallback: unknown = 0
+): number => {
+  const fallbackValue = Number(fallback || 0);
+  const normalizedFallback = Number.isFinite(fallbackValue) ? fallbackValue : 0;
+  const numericValue = Number(value ?? normalizedFallback);
+  return Number.isFinite(numericValue) ? numericValue : normalizedFallback;
+};
+
+const readPendingStatCount = (
+  pendingStats: unknown,
+  key: 'total' | 'encrypted',
+  fallback: unknown
+): number => {
+  if (
+    pendingStats &&
+    typeof pendingStats === 'object' &&
+    Object.prototype.hasOwnProperty.call(pendingStats, key)
+  ) {
+    return normalizePendingStatCount(
+      (pendingStats as Partial<Record<'total' | 'encrypted', unknown>>)[key]
+    );
+  }
+  return normalizePendingStatCount(fallback);
+};
+
 const resolveSubmitFailureMessage = (error: unknown): string => (
   ((error as { message?: string } | null | undefined)?.message) || 'Submission failed.'
 );
+
+const buildSubmitStaleState = (): SurveyQuestionsSubmitStaleStatePatch => ({
+  isSubmitting: false,
+  submitProgress: 0,
+  currentStep: 0,
+});
 
 const runSubmitCompletionPrelude = (
   submitAttemptId: number,
@@ -108,6 +198,21 @@ const runSubmitCompletionPrelude = (
   if (submitAttemptId > 0) {
     ports.finishSubmitAttempt?.(submitAttemptId);
   }
+};
+
+export const resolveSurveyQuestionsSubmitPendingStats = ({
+  fallbackEncrypted = 0,
+  fallbackTotal = 0,
+  getPendingEditStats,
+}: ResolveSurveyQuestionsSubmitPendingStatsArgs = {}): SurveyQuestionsSubmitPendingStats => {
+  const pendingStats = typeof getPendingEditStats === 'function'
+    ? getPendingEditStats()
+    : null;
+
+  return {
+    total: readPendingStatCount(pendingStats, 'total', fallbackTotal),
+    encrypted: readPendingStatCount(pendingStats, 'encrypted', fallbackEncrypted),
+  };
 };
 
 export const runSurveyQuestionsSubmitController = ({
@@ -143,6 +248,7 @@ export const runSurveyQuestionsSubmitController = ({
     if (typeof ports.dispatchSubmit !== 'function') {
       return buildUnhandledResult(plan);
     }
+    ports.activateSubmitGuard?.();
     ports.dispatchSubmit(plan);
     return {
       action: plan.action,
@@ -154,6 +260,80 @@ export const runSurveyQuestionsSubmitController = ({
   }
 
   return buildUnhandledResult(plan);
+};
+
+export const runSurveyQuestionsSubmitStartController = ({
+  ports = {},
+}: RunSurveyQuestionsSubmitStartControllerArgs = {}): SurveyQuestionsSubmitStartControllerResult => {
+  const submitAttemptId = normalizeSubmitAttemptId(ports.startSubmitAttempt?.());
+  const statePatch = buildSubmitStartState();
+  ports.setSubmitStartState?.(statePatch);
+
+  return {
+    outcome: 'started',
+    status: 'completed',
+    submitAttemptId,
+    statePatch,
+  };
+};
+
+export const runSurveyQuestionsStaleSubmitController = ({
+  snapshot = null,
+  ports = {},
+}: RunSurveyQuestionsStaleSubmitControllerArgs = {}): SurveyQuestionsStaleSubmitControllerResult => {
+  ports.clearSubmitGuard?.();
+
+  const submitAttemptId = normalizeSubmitAttemptId(
+    (snapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId
+  );
+  const canUpdateSubmitState = typeof ports.canUpdateSubmitState === 'function'
+    ? !!ports.canUpdateSubmitState(snapshot)
+    : false;
+
+  if (!canUpdateSubmitState) {
+    return {
+      outcome: 'stale',
+      reason: 'snapshot_not_current',
+      status: 'skipped',
+      submitAttemptId,
+      statePatch: null,
+    };
+  }
+
+  if (submitAttemptId <= 0) {
+    return {
+      outcome: 'stale',
+      reason: 'missing_attempt',
+      status: 'skipped',
+      submitAttemptId,
+      statePatch: null,
+    };
+  }
+
+  const isSubmitAttemptActive = typeof ports.isSubmitAttemptActive === 'function'
+    ? !!ports.isSubmitAttemptActive(submitAttemptId, snapshot)
+    : false;
+  if (!isSubmitAttemptActive) {
+    return {
+      outcome: 'stale',
+      reason: 'inactive_attempt',
+      status: 'skipped',
+      submitAttemptId,
+      statePatch: null,
+    };
+  }
+
+  const statePatch = buildSubmitStaleState();
+  ports.finishSubmitAttempt?.(submitAttemptId);
+  ports.setSubmitStaleState?.(statePatch);
+
+  return {
+    outcome: 'stale',
+    reason: 'active_attempt',
+    status: 'completed',
+    submitAttemptId,
+    statePatch,
+  };
 };
 
 export const runSurveyQuestionsSubmitSuccessController = ({

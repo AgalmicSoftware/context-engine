@@ -477,8 +477,11 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import {
+  resolveSurveyQuestionsSubmitPendingStats,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
+  runSurveyQuestionsStaleSubmitController,
+  runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
 } from './surveyQuestionsSubmitController.js';
 import {
@@ -509,7 +512,6 @@ import {
   buildSubmitPreparationErrorState,
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
-  buildSubmitStartState,
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
@@ -6683,9 +6685,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
     if (inFlightPlan.action === 'inert') return;
 
-    const pendingStats =
-      (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
-      { total: this.state.modifiedCount || 0 };
+    const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+      getPendingEditStats: typeof this.getPendingEditStats === 'function'
+        ? () => this.getPendingEditStats()
+        : undefined,
+      fallbackTotal: this.state.modifiedCount || 0,
+    });
     const pendingEditCount = pendingStats.total;
     const planBase = {
       account: this.props.account,
@@ -6720,8 +6725,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     runSurveyQuestionsSubmitController({
       plan,
       ports: {
-        dispatchSubmit: () => {
+        activateSubmitGuard: () => {
           this._submitGuard = true;
+        },
+        dispatchSubmit: () => {
           this.encryptAndUpload();
         },
       },
@@ -8196,12 +8203,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.buildSubmitContextKey(snapshot) === this.buildSubmitContextKey()
   );
 
-  buildSubmitStaleState = () => ({
-    isSubmitting: false,
-    submitProgress: 0,
-    currentStep: 0,
-  });
-
   startSubmitAttempt = () => {
     const attemptId = (Number(this._submitAttemptSeq) || 0) + 1;
     this._submitAttemptSeq = attemptId;
@@ -8216,15 +8217,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   handleStaleSubmitContext = (snapshot = null) => {
-    this._submitGuard = false;
-    if (
-      this.canUpdateStateForAsyncSnapshot(snapshot) &&
-      Number(snapshot?.submitAttemptId || 0) > 0 &&
-      this._activeSubmitAttemptSeq === snapshot.submitAttemptId
-    ) {
-      this.finishSubmitAttempt(snapshot.submitAttemptId);
-      this.setState(this.buildSubmitStaleState());
-    }
+    runSurveyQuestionsStaleSubmitController({
+      snapshot,
+      ports: {
+        clearSubmitGuard: () => {
+          this._submitGuard = false;
+        },
+        canUpdateSubmitState: (currentSnapshot) => this.canUpdateStateForAsyncSnapshot(currentSnapshot),
+        isSubmitAttemptActive: (_submitAttemptId, currentSnapshot) => (
+          this._activeSubmitAttemptSeq ===
+          (currentSnapshot as { submitAttemptId?: unknown } | null | undefined)?.submitAttemptId
+        ),
+        finishSubmitAttempt: (submitAttemptId) => this.finishSubmitAttempt(submitAttemptId),
+        setSubmitStaleState: (statePatch) => this.setState(statePatch),
+      },
+    });
   };
 
   encryptAndUpload = async () => {
@@ -8256,8 +8263,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
 
       submitContext = this.buildSubmitContextSnapshot();
-      submitContext.submitAttemptId = this.startSubmitAttempt();
-      this.setState(buildSubmitStartState());
+      const startResult = runSurveyQuestionsSubmitStartController({
+        ports: {
+          startSubmitAttempt: () => this.startSubmitAttempt(),
+          setSubmitStartState: (statePatch) => this.setState(statePatch),
+        },
+      });
+      submitContext.submitAttemptId = startResult.submitAttemptId;
 
       const providerKind = cryptoUtils.getProviderKind(submitContext.provider);
 
@@ -8269,9 +8281,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       let activeSlice = this.state.surveysResponseState?.[surveyIndex] || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
 
       // Only encrypt when there are changed encrypted fields
-      const pendingStats =
-        (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
-        { total: this.state.modifiedCount || 0, encrypted: this.state.hasEncryptedChanges ? 1 : 0 };
+      const pendingStats = resolveSurveyQuestionsSubmitPendingStats({
+        getPendingEditStats: typeof this.getPendingEditStats === 'function'
+          ? () => this.getPendingEditStats()
+          : undefined,
+        fallbackTotal: this.state.modifiedCount || 0,
+        fallbackEncrypted: this.state.hasEncryptedChanges ? 1 : 0,
+      });
       const shouldEncrypt = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
 
       if (shouldEncrypt) {
