@@ -650,6 +650,20 @@ describe('OnePageSession results routing', () => {
     expect(screen.getByTestId('polis-report')).toBeInTheDocument();
   });
 
+  it('keeps selected results mode button glow inside the scroller gutter', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const tabletResultsBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (max-width: 1024px)',
+      '.resultsModeActionsScroller'
+    );
+
+    expect(scss).toMatch(/\.resultsModeActionsScroller\s*{[\s\S]*?padding-block:\s*6px;[\s\S]*?margin-block:\s*-6px;/);
+    expect(tabletResultsBlock).toContain('.resultsModeActionsScroller');
+    expect(tabletResultsBlock).toContain('overflow: visible;');
+    expect(tabletResultsBlock).toContain('padding: 6px 10px;');
+  });
+
   it('keeps DebateSelector out of debate map mode', async () => {
     const props = buildProps();
 

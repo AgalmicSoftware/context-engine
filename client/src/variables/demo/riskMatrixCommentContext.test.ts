@@ -1,5 +1,6 @@
 import {
   enrichRiskMatrixCommentRecord,
+  getRiskMatrixCorpusSourceCitationItems,
   getRiskMatrixCorpusSourceCitations,
   type RiskMatrixCorpusRef,
   type RiskMatrixHistoricalFigure,
@@ -127,7 +128,7 @@ describe('riskMatrixCommentContext', () => {
   });
 
   it('derives specific corpus-entry citations only when refs resolve to real corpus entries', () => {
-    const citations = getRiskMatrixCorpusSourceCitations([
+    const refs: RiskMatrixCorpusRef[] = [
       {
         corpusId: 'tweets',
         label: 'AI Discourse Tweets',
@@ -139,9 +140,15 @@ describe('riskMatrixCommentContext', () => {
         label: 'Cross-Corpus Debates',
         note: 'Who captures gains when automation moves faster than bargaining',
       },
-    ]);
+    ];
+    const citations = getRiskMatrixCorpusSourceCitations(refs);
+    const citationItems = getRiskMatrixCorpusSourceCitationItems(refs);
 
     expect(citations).toHaveLength(1);
     expect(citations[0]).toMatch(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i);
+    expect(citationItems).toEqual([{
+      label: expect.stringMatching(/^@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i),
+      url: 'https://x.com/PalisadeAI/status/1926084635903025621',
+    }]);
   });
 });

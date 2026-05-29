@@ -93,7 +93,8 @@ type ComparisonReportProps = {
   questions?: Question[];
   comparisonGroups?: ComparisonGroup[];
   questionTagsData?: QuestionTagsById;
-  onInspectQuestion: (questionId: string) => void;
+  selectedTagIDs?: string[];
+  onSelectedTagIDsChange?: (tagIDs: string[]) => void;
 };
 
 const Collapse = ({ isOpen, children }: CollapseProps) => (isOpen ? <div>{children}</div> : null);
@@ -238,13 +239,15 @@ const ComparisonReport = ({
   questions = [],
   comparisonGroups = [],
   questionTagsData = {},
-  onInspectQuestion,
+  selectedTagIDs: selectedTagIDsProp,
+  onSelectedTagIDsChange,
 }: ComparisonReportProps) => {
   const [consensusOpen, setConsensusOpen] = useState(true);
   const [divergenceOpen, setDivergenceOpen] = useState(true);
   const [beeswarmOpen, setBeeswarmOpen] = useState(true);
+  const [reportOpen, setReportOpen] = useState(true);
   const [showAllTags, setShowAllTags] = useState(false);
-  const [selectedTagIDs, setSelectedTagIDs] = useState<Set<string>>(new Set());
+  const [internalSelectedTagIDs, setInternalSelectedTagIDs] = useState<Set<string>>(new Set());
   const [hoveredContent, setHoveredContent] = useState<React.ReactNode | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [swarmWidth, setSwarmWidth] = useState(700);
@@ -301,6 +304,11 @@ const ComparisonReport = ({
     const tagIDs = tagInfo.displayTags.map((tag) => tag.tagID);
     return d3.scaleOrdinal<string | number, string>(d3.schemeTableau10).domain(tagIDs);
   }, [tagInfo.displayTags]);
+
+  const selectedTagIDs = useMemo(
+    () => new Set(Array.isArray(selectedTagIDsProp) ? selectedTagIDsProp : Array.from(internalSelectedTagIDs)),
+    [internalSelectedTagIDs, selectedTagIDsProp]
+  );
 
   const filteredRows = useMemo(() => {
     if (selectedTagIDs.size === 0) return analysisRows;
@@ -359,15 +367,19 @@ const ComparisonReport = ({
   );
 
   const handleTagChange = (tagID: string) => {
-    setSelectedTagIDs((previous) => {
-      const next = new Set(previous);
-      if (next.has(tagID)) {
-        next.delete(tagID);
-      } else {
-        next.add(tagID);
-      }
-      return next;
-    });
+    const next = new Set(selectedTagIDs);
+    if (next.has(tagID)) {
+      next.delete(tagID);
+    } else {
+      next.add(tagID);
+    }
+
+    if (onSelectedTagIDsChange) {
+      onSelectedTagIDsChange(Array.from(next));
+      return;
+    }
+
+    setInternalSelectedTagIDs(next);
   };
 
   const renderBeeswarmPlot = () => {
@@ -445,15 +457,11 @@ const ComparisonReport = ({
 
           return (
             <li key={`${type}:${item.questionId}:${item.responseText}`} className={styles.analysisListItem}>
-              <button
-                type="button"
-                className={styles.reportButtonReset}
-                onClick={() => onInspectQuestion(item.questionId)}
-              >
+              <div className={styles.reportAnalysisContent}>
                 <div className={styles.questionText}>{item.questionText}</div>
                 <ResponseLine responseText={item.responseText} />
                 <div className={styles.scoreVisualizerContainer}>{scoreElement}</div>
-              </button>
+              </div>
             </li>
           );
         })}
@@ -474,6 +482,7 @@ const ComparisonReport = ({
   }
 
   const tagsToDisplay = showAllTags ? tagInfo.displayTags : tagInfo.displayTags.slice(0, 10);
+  const comparisonSummary = `Comparing ${comparisonGroups.map((group) => group.name).join(', ')}`;
 
   return (
     <div
@@ -482,86 +491,104 @@ const ComparisonReport = ({
       ref={containerRef}
       onMouseMove={handleMouseMove}
     >
-      <h3 className={styles.mainReportTitle}>Comparison Report</h3>
-      <p data-testid="demo-analysis-report-summary" style={{ marginTop: '-0.25rem', marginBottom: '1rem', color: '#6c757d' }}>
-        Comparing {comparisonGroups.map((group) => group.name).join(', ')}
-      </p>
+      <button
+        type="button"
+        className={styles.reportCollapseHeader}
+        aria-expanded={reportOpen}
+        aria-controls="demo-analysis-comparison-report-body"
+        data-testid="demo-analysis-comparison-report-toggle"
+        onClick={() => setReportOpen((value) => !value)}
+      >
+        <span className={styles.reportCollapseCopy}>
+          <span className={styles.mainReportTitle}>Comparison Report</span>
+          <span className={styles.reportSummaryText} data-testid="demo-analysis-report-summary">
+            {comparisonSummary}
+          </span>
+        </span>
+        <FontAwesomeIcon className={styles.reportCollapseIcon} icon={reportOpen ? faCaretUp : faCaretDown} />
+      </button>
 
-      <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
-      <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
+      <Collapse isOpen={reportOpen}>
+        <div id="demo-analysis-comparison-report-body" className={styles.reportCollapseBody} data-testid="demo-analysis-comparison-report-body">
 
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
-            Similarity & Difference Spectrum
-          </h5>
-        </div>
-        <Collapse isOpen={beeswarmOpen}>
-          {tagInfo.displayTags.length > 0 && (
-            <div className={styles.reportTagFilter}>
-              <h6 className={styles.reportTagFilterHeader}>
-                <FontAwesomeIcon icon={faTags} />
-                Filter by Tag
-              </h6>
-              <div className={styles.reportTagFilterCheckboxes}>
-                {tagsToDisplay.map((tag) => (
-                  <label key={tag.tagID} className={styles.reportTagFilterCheckboxItem}>
-                    <input
-                      type="checkbox"
-                      checked={selectedTagIDs.has(tag.tagID)}
-                      onChange={() => handleTagChange(tag.tagID)}
-                    />
-                    {tag.tagName} ({tagInfo.tagCounts[tag.tagID]})
-                  </label>
-                ))}
-              </div>
-              {tagInfo.displayTags.length > 10 && (
-                <div className={styles.viewMoreContainer}>
-                  <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
-                    {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
-                  </button>
+          <ComparisonLegend groups={comparisonGroups} colorScale={groupColorScale} />
+          <TagLegend selectedTags={selectedTagsForLegend} colorScale={tagColorScale} />
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setBeeswarmOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={beeswarmOpen ? faCaretUp : faCaretDown} />
+                Similarity & Difference Spectrum
+              </h5>
+            </div>
+            <Collapse isOpen={beeswarmOpen}>
+              {tagInfo.displayTags.length > 0 && (
+                <div className={styles.reportTagFilter}>
+                  <h6 className={styles.reportTagFilterHeader}>
+                    <FontAwesomeIcon icon={faTags} />
+                    Filter by Tag
+                  </h6>
+                  <div className={styles.reportTagFilterCheckboxes}>
+                    {tagsToDisplay.map((tag) => (
+                      <label key={tag.tagID} className={styles.reportTagFilterCheckboxItem}>
+                        <input
+                          type="checkbox"
+                          checked={selectedTagIDs.has(tag.tagID)}
+                          onChange={() => handleTagChange(tag.tagID)}
+                        />
+                        {tag.tagName} ({tagInfo.tagCounts[tag.tagID]})
+                      </label>
+                    ))}
+                  </div>
+                  {tagInfo.displayTags.length > 10 && (
+                    <div className={styles.viewMoreContainer}>
+                      <button type="button" onClick={() => setShowAllTags((value) => !value)} className={styles.viewMoreButton}>
+                        {showAllTags ? 'Show Less' : `Show ${tagInfo.displayTags.length - 10} More Tags`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
+              {renderBeeswarmPlot()}
+            </Collapse>
+          </div>
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
+                Top Similar Items
+              </h5>
+            </div>
+            <Collapse isOpen={consensusOpen}>
+              {renderAnalysisList(analysisResults.topConsensus.slice(0, 5), 'Consensus')}
+            </Collapse>
+          </div>
+
+          <div className={styles.sectionCollapse}>
+            <div className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)}>
+              <h5 className={styles.sectionTitle}>
+                <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
+                Top Divergent Items
+              </h5>
+            </div>
+            <Collapse isOpen={divergenceOpen}>
+              {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
+            </Collapse>
+          </div>
+
+          {hoveredContent && (
+            <div
+              className={styles.beeTooltip}
+              data-testid="demo-analysis-beeswarm-tooltip"
+              style={{ left: tooltipPos.x, top: tooltipPos.y }}
+            >
+              {hoveredContent}
             </div>
           )}
-          {renderBeeswarmPlot()}
-        </Collapse>
-      </div>
 
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setConsensusOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={consensusOpen ? faCaretUp : faCaretDown} />
-            Top Similar Items
-          </h5>
         </div>
-        <Collapse isOpen={consensusOpen}>
-          {renderAnalysisList(analysisResults.topConsensus.slice(0, 5), 'Consensus')}
-        </Collapse>
-      </div>
-
-      <div className={styles.sectionCollapse}>
-        <div className={styles.sectionHeaderRow} onClick={() => setDivergenceOpen((value) => !value)}>
-          <h5 className={styles.sectionTitle}>
-            <FontAwesomeIcon icon={divergenceOpen ? faCaretUp : faCaretDown} />
-            Top Divergent Items
-          </h5>
-        </div>
-        <Collapse isOpen={divergenceOpen}>
-          {renderAnalysisList(analysisResults.topDivergence.slice(0, 5), 'Divergence')}
-        </Collapse>
-      </div>
-
-      {hoveredContent && (
-        <div
-          className={styles.beeTooltip}
-          data-testid="demo-analysis-beeswarm-tooltip"
-          style={{ left: tooltipPos.x, top: tooltipPos.y }}
-        >
-          {hoveredContent}
-        </div>
-      )}
+      </Collapse>
     </div>
   );
 };

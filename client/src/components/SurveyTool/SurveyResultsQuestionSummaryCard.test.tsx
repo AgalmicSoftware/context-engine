@@ -8,6 +8,9 @@ const styleMap = {
   aggregatorSummaryCard: 'aggregatorSummaryCard',
   biggerIcon: 'biggerIcon',
   headerLeft: 'headerLeft',
+  questionBookmarkButton: 'questionBookmarkButton',
+  questionBookmarkIcon: 'questionBookmarkIcon',
+  questionExpandIcon: 'questionExpandIcon',
   questionSummaryHeader: 'questionSummaryHeader',
   questionSummaryHeaderIcons: 'questionSummaryHeaderIcons',
   questionTitle: 'questionTitle',
@@ -55,7 +58,9 @@ describe('SurveyResultsQuestionSummaryCard', () => {
 
     const bookmark = container.querySelector('svg[data-icon="bookmark"]') as SVGSVGElement;
     expect(bookmark).toHaveAttribute('color', 'gold');
-    fireEvent.click(bookmark);
+    const bookmarkButton = screen.getByRole('button', { name: 'Remove bookmark' });
+    expect(bookmarkButton).toHaveClass('questionBookmarkButton');
+    fireEvent.click(bookmarkButton);
     expect(onToggleBookmark).toHaveBeenCalledTimes(1);
     expect(onToggleSummary).not.toHaveBeenCalled();
 

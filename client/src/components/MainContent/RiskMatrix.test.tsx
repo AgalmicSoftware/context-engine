@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -42,6 +44,19 @@ describe('RiskMatrix', () => {
 
     expect(container.firstChild).toHaveClass('container');
     expect(container.firstChild).toHaveClass('embedded');
+  });
+
+  it('keeps risk matrix headers readable in the dense grid', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'RiskMatrix.module.scss'), 'utf8');
+    render(<RiskMatrix />);
+
+    const infraHeader = screen.getByTestId('ce-risk-matrix-header-x-infra');
+
+    expect(scss).toMatch(/\.headerCell\s*{[\s\S]*?min-height:\s*72px;[\s\S]*?font-size:\s*0\.88rem;/);
+    expect(infraHeader.parentElement).toHaveStyle({
+      gridTemplateColumns: '122px repeat(10, minmax(104px, 1fr))',
+      gridTemplateRows: 'auto repeat(10, minmax(78px, auto))',
+    });
   });
 
   it('renders populated seeded cells and opens aggregated top-level notes', () => {
@@ -97,6 +112,9 @@ describe('RiskMatrix', () => {
     expect(screen.queryByText('Atlas-linked scenarios')).not.toBeInTheDocument();
     expect(screen.getByText('Audit-aware agents learn the shape of oversight')).toBeInTheDocument();
     expect(screen.getAllByText('Deceptive Alignment').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Medium confidence, 1-3 years')).toBeInTheDocument();
+    expect(screen.getByText('Medium confidence')).toBeInTheDocument();
+    expect(screen.getByText('1-3 years')).toBeInTheDocument();
     expect(screen.getByAltText(/alan turing portrait anchoring the audit-aware agents overlap/i)).toHaveAttribute(
       'src',
       '/historical-avatars/alanturing.jpg'
@@ -112,6 +130,15 @@ describe('RiskMatrix', () => {
 
     expect(screen.getAllByText(/Sources?:/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i).length).toBeGreaterThan(0);
+    const palisadeLinks = screen.getAllByRole('link', {
+      name: /@PalisadeAI — .*o3 model sabotaged a shutdown mechanism/i,
+    });
+    expect(palisadeLinks.length).toBeGreaterThan(0);
+    palisadeLinks.forEach((palisadeLink) => {
+      expect(palisadeLink).toHaveAttribute('href', 'https://x.com/PalisadeAI/status/1926084635903025621');
+      expect(palisadeLink).toHaveAttribute('target', '_blank');
+      expect(palisadeLink).toHaveAttribute('rel', 'noopener noreferrer');
+    });
     expect(screen.queryByText(/AI Discourse Tweets/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Cross-Corpus Debates/i)).not.toBeInTheDocument();
   });
@@ -218,9 +245,25 @@ describe('RiskMatrix', () => {
 
     fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-labor'));
 
-    expect(screen.getByText('Opportunities')).toBeInTheDocument();
-    expect(screen.getByText('Risks')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Opportunities/i })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Risks/i })).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId('ce-risk-matrix-comment-list-opportunity')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix-comment-list-risk')).toBeInTheDocument();
+  });
+
+  it('collapses individual aggregate note groups', () => {
+    render(<RiskMatrix />);
+
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-labor'));
+
+    const opportunitiesToggle = screen.getByRole('button', { name: /Opportunities/i });
+    expect(opportunitiesToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('ce-risk-matrix-comment-list-opportunity')).toBeInTheDocument();
+
+    fireEvent.click(opportunitiesToggle);
+
+    expect(opportunitiesToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('ce-risk-matrix-comment-list-opportunity')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-risk-matrix-comment-list-risk')).toBeInTheDocument();
   });
 

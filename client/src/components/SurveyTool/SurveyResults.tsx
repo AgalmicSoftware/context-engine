@@ -3514,6 +3514,7 @@ return {
     },
     breakdown: {
       available: true,
+      dimensions: [],
       groups,
       summary: {
         overview: 'Demo preview analysis generated locally from currently hydrated results.',
@@ -3721,6 +3722,7 @@ return buildRedactedSessionResultsSnapshot({
         surveyViewMode: this.state.surveyViewMode || '',
         viewMode: this.state.viewMode || '',
       },
+      dimensions: analysisArtifact?.sections.breakdown.dimensions || [],
       groups: analysisArtifact?.sections.breakdown.groups || [],
       representativeQuestions: [],
       questions,

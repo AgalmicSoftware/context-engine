@@ -393,6 +393,8 @@
 
 .resultsModeActionsScroller {
   min-width: 0;
+  padding-block: 6px;
+  margin-block: -6px;
 }
 
 .resultsModeActions {
@@ -462,7 +464,7 @@
     width: 100%;
     justify-content: flex-start;
     overflow: visible;
-    padding: 0 10px;
+    padding: 6px 10px;
   }
 
   .resultsModeActions {

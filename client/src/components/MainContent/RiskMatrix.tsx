@@ -3,11 +3,26 @@
 import React, { Component } from 'react';
 import { Modal } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faExternalLinkAlt, faNetworkWired } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './RiskMatrix.module.scss';
-import { getRiskMatrixAtlasScenariosForCell } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
-import { buildPublicRoute, buildPublicUrlPath } from '../../utilities/ui/publicUrl.js';
+import {
+  getRiskMatrixAtlasScenarioCountForCell,
+  getRiskMatrixAtlasScenariosForCell,
+} from '../../variables/demo/riskMatrixAtlasScenarioData.js';
+import seedComments from '../../variables/demo/riskMatrixSeedComments.json';
+import {
+  enrichRiskMatrixCommentRecord,
+  getRiskMatrixCorpusSourceCitationItems,
+  type RiskMatrixCorpusRef,
+  type RiskMatrixHistoricalFigure,
+} from '../../variables/demo/riskMatrixCommentContext';
+import {
+  buildAtlasNodeRoute,
+  buildPublicUrlPath,
+  readWindowLocationPath,
+} from '../../utilities/ui/publicUrl.js';
+import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
 
 export type RiskValence = 'opportunity' | 'risk';
 
@@ -62,6 +77,7 @@ type RiskMatrixState = {
   hoveredColIndex: number | null;
   hoveredSubRowIndex: number | null;
   hoveredSubColIndex: number | null;
+  openCommentGroups: Record<RiskValence, boolean>;
 };
 
 type RiskMatrixAtlasScenario = {
@@ -180,6 +196,98 @@ const formatSelectionTitle = (cellId = '') => {
   return `${catX} / ${subX} vs ${catY} / ${subY}`;
 };
 
+const parseSelectionStateFromCell = (cellId = '') => {
+  if (isAggregateCellId(cellId)) {
+    const [activeCategoryX, activeCategoryY] = cellId.split('_vs_');
+    if (!activeCategoryX || !activeCategoryY) return null;
+
+    return {
+      activeCategoryX,
+      activeCategoryY,
+      activeSubcategoryX: null,
+      activeSubcategoryY: null,
+    };
+  }
+
+  if (!isCanonicalCellId(cellId)) return null;
+
+  const [activeCategoryX, activeSubcategoryX, activeCategoryY, activeSubcategoryY] = cellId.split('.');
+  return {
+    activeCategoryX,
+    activeCategoryY,
+    activeSubcategoryX,
+    activeSubcategoryY,
+  };
+};
+
+const getCommentsForCellRecords = (
+  cellId: string,
+  comments: RiskCommentRecord[] = []
+): RiskCommentRecord[] => {
+  if (typeof cellId !== 'string' || !cellId) return [];
+
+  if (isAggregateCellId(cellId)) {
+    const [catX, catY] = cellId.split('_vs_');
+    if (!catX || !catY) return [];
+
+    return comments.filter(
+      (entry) => isCanonicalCellId(entry.cell)
+        && entry.cell.startsWith(`${catX}.`)
+        && entry.cell.includes(`.${catY}.`)
+    );
+  }
+
+  return comments.filter((entry) => entry.cell === cellId);
+};
+
+const hasRestoreState = (restoreState: RiskMatrixRestoreState | null | undefined) => (
+  Boolean(restoreState && typeof restoreState === 'object' && Object.keys(restoreState).length > 0)
+);
+
+const buildInitialRiskMatrixState = (
+  restoreState: RiskMatrixRestoreState | null | undefined
+): RiskMatrixState => {
+  const nextComments = Array.isArray(restoreState?.comments)
+    ? restoreState.comments.filter(isValidCommentRecord).map(normalizeCommentRecord).map(enrichRiskMatrixCommentRecord)
+    : INITIAL_COMMENTS;
+  const rawSelectedCellId = String(restoreState?.selectedCellId || '').trim();
+  const selectedCellId = (isAggregateCellId(rawSelectedCellId) || isCanonicalCellId(rawSelectedCellId))
+    ? rawSelectedCellId
+    : '';
+  const derivedSelectionState = parseSelectionStateFromCell(selectedCellId);
+  const nextValence = VALID_VALENCES.has(String(restoreState?.valence || ''))
+    ? (restoreState?.valence as RiskValence)
+    : DEFAULT_VALENCE;
+  const parsedIntensity = Number(restoreState?.intensity);
+  const nextIntensity = Number.isFinite(parsedIntensity) && parsedIntensity > 0
+    ? parsedIntensity
+    : DEFAULT_INTENSITY;
+  const modal = Boolean(restoreState?.modal && selectedCellId);
+
+  return {
+    comments: nextComments,
+    modal,
+    selectedCellId: modal ? selectedCellId : '',
+    existingComments: modal ? getCommentsForCellRecords(selectedCellId, nextComments) : [],
+    comment: typeof restoreState?.comment === 'string' ? restoreState.comment : '',
+    valence: nextValence,
+    intensity: nextIntensity,
+    heatmap: buildHeatmapFromComments(nextComments),
+    activeCategoryX: restoreState?.activeCategoryX ?? derivedSelectionState?.activeCategoryX ?? null,
+    activeCategoryY: restoreState?.activeCategoryY ?? derivedSelectionState?.activeCategoryY ?? null,
+    activeSubcategoryX: restoreState?.activeSubcategoryX ?? derivedSelectionState?.activeSubcategoryX ?? null,
+    activeSubcategoryY: restoreState?.activeSubcategoryY ?? derivedSelectionState?.activeSubcategoryY ?? null,
+    hoveredRowIndex: null,
+    hoveredColIndex: null,
+    hoveredSubRowIndex: null,
+    hoveredSubColIndex: null,
+    openCommentGroups: {
+      opportunity: true,
+      risk: true,
+    },
+  };
+};
+
 const resolveAtlasAssetPath = (value = '') => {
   const normalizedValue = String(value || '').trim();
   if (!normalizedValue) return '';
@@ -209,6 +317,15 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       valence: DEFAULT_VALENCE,
       intensity: DEFAULT_INTENSITY,
     });
+  };
+
+  toggleCommentGroup = (valence: RiskValence) => {
+    this.setState((previous) => ({
+      openCommentGroups: {
+        ...previous.openCommentGroups,
+        [valence]: !previous.openCommentGroups[valence],
+      },
+    }));
   };
 
   getCellValue = (catY: string, catX: string) => this.state.heatmap[`${catY}_${catX}`] || 0;
@@ -420,8 +537,8 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
           <div
             className={styles.gridContainer}
             style={{
-              gridTemplateColumns: `110px repeat(${numCategories}, minmax(88px, 1fr))`,
-              gridTemplateRows: `auto repeat(${numCategories}, minmax(72px, auto))`,
+              gridTemplateColumns: `122px repeat(${numCategories}, minmax(104px, 1fr))`,
+              gridTemplateRows: `auto repeat(${numCategories}, minmax(78px, auto))`,
             }}
           >
             <div className={clsx(styles.cell, styles.cornerCell)} style={{ gridColumn: 1, gridRow: 1 }}>
@@ -855,11 +972,14 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                         <span className={styles.atlasScenarioNodeLabel}>{scenario.atlasNodeLabel}</span>
                         <h4 className={styles.atlasScenarioTitle}>{scenario.title}</h4>
                         <p className={styles.atlasScenarioSummary}>{scenario.summary}</p>
-                        <p className={styles.atlasScenarioMetaLine}>
-                          {scenario.confidence} confidence
-                          <span aria-hidden="true"> • </span>
-                          {scenario.timeHorizon}
-                        </p>
+                        <div className={styles.atlasScenarioMetaLine} aria-label={`${scenario.confidence} confidence, ${scenario.timeHorizon}`}>
+                          <span className={styles.atlasScenarioMetaPill}>
+                            {scenario.confidence} confidence
+                          </span>
+                          <span className={styles.atlasScenarioMetaPill}>
+                            {scenario.timeHorizon}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <span className={clsx(
@@ -935,6 +1055,9 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
   ) => {
     if (!Array.isArray(entries) || entries.length === 0) return null;
 
+    const isOpen = this.state.openCommentGroups[valence] !== false;
+    const listId = `ce-risk-matrix-comment-list-${valence}`;
+
     return (
       <section
         className={clsx(
@@ -943,19 +1066,29 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
           valence === 'risk' && styles.commentSectionRisk
         )}
       >
-        <div className={styles.commentSectionHeader}>
-          <h4 className={styles.commentSectionTitle}>{title}</h4>
+        <button
+          type="button"
+          className={styles.commentSectionHeader}
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          onClick={() => this.toggleCommentGroup(valence)}
+        >
+          <span className={styles.commentSectionHeaderText}>
+            <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} className={styles.commentSectionChevron} />
+            <span className={styles.commentSectionTitle}>{title}</span>
+          </span>
           <span className={styles.commentSectionCount}>
             {entries.length} note{entries.length === 1 ? '' : 's'}
           </span>
-        </div>
-        <ul className={styles.commentList} data-testid={`ce-risk-matrix-comment-list-${valence}`}>
+        </button>
+        {isOpen && (
+          <ul id={listId} className={styles.commentList} data-testid={listId}>
           {entries.map((entry, index) => (
             (() => {
               const figureName = String(entry.historicalFigure?.name || '').trim();
               const figureAvatar = figureName ? getHistoricalFigureAvatarByName(figureName) : '';
               const corpusRefs = Array.isArray(entry.corpusRefs) ? entry.corpusRefs.filter(Boolean) : [];
-              const sourceCitations = getRiskMatrixCorpusSourceCitations(corpusRefs).slice(0, 2);
+              const sourceCitations = getRiskMatrixCorpusSourceCitationItems(corpusRefs).slice(0, 2);
 
               return (
                 <li
@@ -1011,14 +1144,31 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                   {sourceCitations.length > 0 && (
                     <div className={styles.commentReferenceLine}>
                       {sourceCitations.length > 1 ? 'Sources: ' : 'Source: '}
-                      {sourceCitations.join(' • ')}
+                      {sourceCitations.map((citation, citationIndex) => (
+                        <React.Fragment key={`${citation.label}-${citation.url || citationIndex}`}>
+                          {citationIndex > 0 && <span aria-hidden="true"> • </span>}
+                          {citation.url ? (
+                            <a
+                              className={styles.commentReferenceLink}
+                              href={citation.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {citation.label}
+                            </a>
+                          ) : (
+                            <span>{citation.label}</span>
+                          )}
+                        </React.Fragment>
+                      ))}
                     </div>
                   )}
                 </li>
               );
             })()
           ))}
-        </ul>
+          </ul>
+        )}
       </section>
     );
   };
