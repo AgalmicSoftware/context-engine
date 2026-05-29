@@ -63,6 +63,7 @@ import {
   saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
 import {
+  deleteTelegramGroupApproval,
   evaluateTelegramGroupSessionAccessForEnv,
   persistTelegramGroupApproval,
 } from './telegramGroupApprovals.mjs';
@@ -176,6 +177,7 @@ const COMMANDS = Object.freeze({
   QUESTION_QUEUE: '/question_queue',
   GROUP_ID: '/group_id',
   GROUP_LINK: '/group_link',
+  GROUP_REVOKE: '/group_revoke',
   ATTACHMENTS: '/attachments',
   DOCS: '/docs',
   ME: '/me',
@@ -208,6 +210,7 @@ const LEGACY_COMMAND_ALIASES = Object.freeze({
   '/ce_question_queue': COMMANDS.QUESTION_QUEUE,
   '/ce_group_id': COMMANDS.GROUP_ID,
   '/ce_group_link': COMMANDS.GROUP_LINK,
+  '/ce_group_revoke': COMMANDS.GROUP_REVOKE,
   '/ce_attachments': COMMANDS.ATTACHMENTS,
   '/ce_docs': COMMANDS.DOCS,
   '/ce_me': COMMANDS.ME,
@@ -6562,6 +6565,123 @@ async function buildTelegramGroupApprovalLinkResponse({
   });
 }
 
+function parseTelegramGroupRevokeArgs(args = [], normalized = {}) {
+  const first = safeString(args[0]);
+  const second = safeString(args[1]);
+  const currentGroupChatId = normalized.chat?.isPrivate ? '' : safeString(normalized.chat?.chatId);
+  const looksLikeChatId = (value) => /^-?\d+$/.test(safeString(value));
+  if (looksLikeChatId(first)) {
+    return { sessionSlug: second, chatId: first };
+  }
+  return {
+    sessionSlug: first,
+    chatId: looksLikeChatId(second) ? second : currentGroupChatId,
+  };
+}
+
+async function buildTelegramGroupApprovalRevokeResponse({
+  normalized,
+  command,
+  env,
+  args = [],
+  sessionSlugOverride = '',
+  chatIdOverride = '',
+  createdAt,
+  method = 'sendMessage',
+  messageId = '',
+} = {}) {
+  const parsed = parseTelegramGroupRevokeArgs(args, normalized);
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || parsed.sessionSlug,
+  });
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return errorReply({
+      normalized,
+      command,
+      reason: resolved.reason,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
+      method,
+      messageId,
+    });
+  }
+  const manager = await canManageResponseExportAllowlist({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
+  if (!manager.ok) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'Telegram group approval can only be revoked by a configured session admin.',
+        `Reason: ${manager.reason || 'response_export_admin_required'}.`,
+        manager.accountAddress ? `Account: ${shortAddress(manager.accountAddress)}` : '',
+      ].filter(Boolean).join('\n'),
+      screen: 'telegram_group_approval_revoke_denied',
+      command,
+      normalized,
+      extra: {
+        reason: manager.reason || 'response_export_admin_required',
+        accountAddress: manager.accountAddress || '',
+        sessionSlug: resolved.session.sessionSlug,
+      },
+    });
+  }
+  const chatId = safeString(chatIdOverride || parsed.chatId);
+  if (!chatId) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        `Revoke group approval for ${sessionLabel(resolved.session)}`,
+        '',
+        'Run this in the approved group:',
+        `/group_revoke ${resolved.session.sessionSlug}`,
+        '',
+        'Or run this in private chat with the group id:',
+        `/group_revoke ${resolved.session.sessionSlug} <telegram_group_id>`,
+      ].join('\n'),
+      screen: 'telegram_group_approval_revoke_needs_chat_id',
+      command,
+      normalized,
+      extra: { sessionSlug: resolved.session.sessionSlug },
+    });
+  }
+  const revoked = await deleteTelegramGroupApproval({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    chatId,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      `Telegram group approval ${revoked.revoked ? 'revoked' : 'was not present'} for ${sessionLabel(resolved.session)}.`,
+      `Session: ${resolved.session.sessionSlug}`,
+      `Group ID: ${chatId}`,
+    ].join('\n'),
+    screen: 'telegram_group_approval_revoked',
+    command,
+    normalized,
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      chatId,
+      revoked: revoked.revoked === true,
+      reason: revoked.ok ? '' : revoked.reason,
+    },
+  });
+}
+
 async function buildAdminActionsResponse({
   normalized,
   command,
@@ -6640,6 +6760,8 @@ async function buildAdminActionsResponse({
       `Session: ${sessionSlug}`,
       '',
       'Choose an admin action.',
+      '',
+      `Revoke group access: /group_revoke ${sessionSlug} <telegram_group_id>`,
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
     screen: 'admin_actions',
@@ -8923,6 +9045,16 @@ export async function buildTelegramCommandResponse({
       command: parsed.command,
       env,
       sessionSlugOverride: parsed.args[0] || '',
+      createdAt,
+      method: 'sendMessage',
+    });
+  }
+  if (parsed.command === COMMANDS.GROUP_REVOKE) {
+    return buildTelegramGroupApprovalRevokeResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      args: parsed.args,
       createdAt,
       method: 'sendMessage',
     });

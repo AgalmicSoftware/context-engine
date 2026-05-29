@@ -32,6 +32,10 @@ class MemoryKv {
     return this.store.get(key) || null;
   }
 
+  async delete(key) {
+    this.store.delete(key);
+  }
+
   async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
     const keys = Array.from(this.store.keys())
       .filter((key) => String(key).startsWith(prefix))
@@ -705,6 +709,57 @@ test('admin-generated group approval link approves the first Telegram group that
   assert.match(afterApproval.response.text, /- alpha \(Alpha Session\)/);
   assert.equal(reusedElsewhere.screen, 'telegram_group_approval_token_used');
   assert.equal((await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100999')), null);
+});
+
+test('admin can revoke a Telegram group approval and close access again', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
+  const env = baseEnv({
+    AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES: accountAddress,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+      }],
+    }),
+  });
+  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
+    version: 1,
+    type: 'telegram_group_approval',
+    sessionSlug: 'alpha',
+    sessionName: 'Alpha Session',
+    chatId: '-100123',
+    chatTitle: 'Alpha Lobby',
+    approvedAt: now,
+    approvedByTelegramUserId: '42',
+    approvedByAccountAddress: accountAddress.toLowerCase(),
+    approvalTokenId: 'admin_launch',
+  }));
+
+  const beforeRevoke = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now,
+  });
+  const revoked = await buildTelegramCommandResponse({
+    update: groupMessage('/group_revoke alpha'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const nonAdminJoin = await buildTelegramCommandResponse({
+    update: groupMessageFrom('/join alpha', { telegramUserId: 99, username: 'guest' }),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.match(beforeRevoke.response.text, /- alpha \(Alpha Session\)/);
+  assert.equal(revoked.screen, 'telegram_group_approval_revoked');
+  assert.match(revoked.response.text, /approval revoked/);
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
+  assert.equal(nonAdminJoin.screen, 'telegram_group_access_denied');
 });
 
 test('/sessions paginates tall Telegram session lists', async () => {

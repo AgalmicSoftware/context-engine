@@ -26,7 +26,10 @@ import {
 } from './telegramQuestionProposals.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
 import { resolveSessionInvocation } from './sessionPolicy.mjs';
-import { evaluateTelegramGroupSessionAccessForEnv } from './telegramGroupApprovals.mjs';
+import {
+  deleteTelegramGroupApproval,
+  evaluateTelegramGroupSessionAccessForEnv,
+} from './telegramGroupApprovals.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -269,6 +272,7 @@ function inputFromRequest(request, body = {}) {
     ...body,
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
     telegramUserId: safeString(body.telegramUserId || url.searchParams.get('telegramUserId')),
+    chatId: safeString(body.chatId || url.searchParams.get('chatId')),
     groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
@@ -317,7 +321,10 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/telegram/agent/api/question-queue/apply') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/group-approval-link') {
+  if (
+    pathname === '/telegram/agent/api/group-approval-link' ||
+    pathname === '/telegram/agent/api/group-approval-revoke'
+  ) {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS;
   }
   if (pathname === '/telegram/agent/api/question-votes/recommend') {
@@ -1230,6 +1237,48 @@ async function handleGroupApprovalLinkRequest({
   };
   assertNoSecretShape(response, 'Telegram group approval link response must not serialize secrets.');
   return json(response);
+}
+
+async function handleGroupApprovalRevokeRequest({
+  env = {},
+  context = {},
+  input = {},
+} = {}) {
+  const admin = await requireQuestionQueueAdmin({
+    env,
+    context,
+    input,
+    allowDelegatedAdmin: true,
+  });
+  if (!admin.ok) {
+    return json({
+      ok: false,
+      reason: 'group_approval_admin_required',
+      accountAddress: admin.accountAddress || '',
+    }, { status: admin.status || 403 });
+  }
+  const chatId = safeString(input.chatId || input.groupChatId);
+  if (!chatId) {
+    return json({
+      ok: false,
+      reason: 'telegram_group_chat_id_required',
+      sessionSlug: context.session.sessionSlug,
+    }, { status: 400 });
+  }
+  const revoked = await deleteTelegramGroupApproval({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    chatId,
+  });
+  const response = {
+    ok: revoked.ok === true,
+    sessionSlug: context.session.sessionSlug,
+    chatId,
+    revoked: revoked.revoked === true,
+    reason: revoked.ok ? '' : revoked.reason,
+  };
+  assertNoSecretShape(response, 'Telegram group approval revoke response must not serialize secrets.');
+  return json(response, { status: revoked.ok ? 200 : 400 });
 }
 
 function normalizeTelegramQuestionVote(value = '') {
@@ -2256,13 +2305,20 @@ export async function handleTelegramAgentHandoffRequest({
       sessionSlug: delegated.sessionSlug || '',
     }, { status: delegated.status || 403 });
   }
-  const input = delegated.input;
+  const input = url.pathname === '/telegram/agent/api/group-approval-revoke'
+    ? {
+      ...delegated.input,
+      chatId: safeString(delegated.input.chatId || delegated.input.groupChatId),
+      groupChatId: '',
+    }
+    : delegated.input;
   const routeRequiresQuestionAuthoring = ![
     '/telegram/agent/api/admin/status',
     '/telegram/agent/api/question-queue',
     '/telegram/agent/api/question-queue/plan',
     '/telegram/agent/api/question-queue/apply',
     '/telegram/agent/api/group-approval-link',
+    '/telegram/agent/api/group-approval-revoke',
     '/telegram/agent/api/results',
     '/telegram/agent/api/results-image',
   ].includes(url.pathname);
@@ -2291,6 +2347,9 @@ export async function handleTelegramAgentHandoffRequest({
   }
   if (url.pathname === '/telegram/agent/api/group-approval-link' && request.method === 'POST') {
     return handleGroupApprovalLinkRequest({ env, context, input });
+  }
+  if (url.pathname === '/telegram/agent/api/group-approval-revoke' && request.method === 'POST') {
+    return handleGroupApprovalRevokeRequest({ env, context, input });
   }
   if (url.pathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
     return handleNextQuestionRequest({ env, context, input, waitUntil });
