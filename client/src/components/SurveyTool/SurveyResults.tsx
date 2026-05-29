@@ -33,7 +33,6 @@ import {
   faArrowLeft,
   faArrowRight,
   faQuestionCircle,
-  faSpinner,
   faSearch,
   faExpand,
   faFilter,
@@ -149,6 +148,7 @@ import {
   buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
 import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
+import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -4503,148 +4503,8 @@ const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
 const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
 
-const netBlock = this.state.networkLatestBlock || 0;
-const { questionLocalBlock, responseLocalBlock, surveyLocalBlock } = this.state;
-const {
-  refreshTargetQuestionBlock,
-  refreshTargetResponseBlock,
-  refreshTargetSurveyBlock
-} = this.state;
-
-const clampedQuestionLocalBlock = Math.min(questionLocalBlock, netBlock);
-const clampedResponseLocalBlock = Math.min(responseLocalBlock, netBlock);
-const clampedSurveyLocalBlock = Math.min(surveyLocalBlock, netBlock);
-
-const clampedRefreshTargetQuestionBlock =
-  refreshTargetQuestionBlock > 0 ? Math.min(refreshTargetQuestionBlock, netBlock) : 0;
-const clampedRefreshTargetResponseBlock =
-  refreshTargetResponseBlock > 0 ? Math.min(refreshTargetResponseBlock, netBlock) : 0;
-const clampedRefreshTargetSurveyBlock =
-  refreshTargetSurveyBlock > 0 ? Math.min(refreshTargetSurveyBlock, netBlock) : 0;
-
-let questionDifference = 0;
-let questionBarText: React.ReactNode = '';
-let questionProgress = 0;
-let showQuestionSpinner = false;
-
-if (viewMode === 'questions') {
-  if (clampedQuestionLocalBlock === 0 || netBlock === 0) {
-    showQuestionSpinner = true;
-  } else if (
-    clampedRefreshTargetQuestionBlock > 0 &&
-    clampedQuestionLocalBlock >= clampedRefreshTargetQuestionBlock
-  ) {
-    questionProgress = 100;
-    questionBarText = `In Sync (Current: ${clampedQuestionLocalBlock} / Latest: ${clampedRefreshTargetQuestionBlock})`;
-  } else {
-    const denom =
-      clampedRefreshTargetQuestionBlock > 0 ? clampedRefreshTargetQuestionBlock : netBlock;
-    if (clampedRefreshTargetQuestionBlock === 0) {
-      if (clampedQuestionLocalBlock >= netBlock) {
-        questionProgress = 100;
-        questionBarText = `In Sync (Current: ${clampedQuestionLocalBlock} / Latest: ${netBlock})`;
-      } else {
-        questionDifference = netBlock - clampedQuestionLocalBlock;
-        questionBarText = `Remaining Blocks: ${questionDifference} (Current: ${clampedQuestionLocalBlock} / Latest: ${netBlock})`;
-        questionProgress = Math.floor((clampedQuestionLocalBlock / netBlock) * 100);
-      }
-    } else {
-      questionDifference = clampedRefreshTargetQuestionBlock - clampedQuestionLocalBlock;
-      questionBarText = (
-        <>
-          Remaining Blocks: {questionDifference}{' '}
-          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
-        </>
-      );
-      questionProgress = denom
-        ? Math.floor((clampedQuestionLocalBlock / denom) * 100)
-        : 0;
-    }
-  }
-}
-
-let showResponseSpinner = false;
-let responseBarText: React.ReactNode = '';
-let responseProgress = 0;
-let difference = 0;
-
-if (viewMode === 'survey') {
-  if (clampedSurveyLocalBlock === 0 || netBlock === 0) {
-    showResponseSpinner = true;
-  } else if (
-    clampedRefreshTargetSurveyBlock > 0 &&
-    clampedSurveyLocalBlock >= clampedRefreshTargetSurveyBlock
-  ) {
-    responseProgress = 100;
-    responseBarText = `In Sync (Current: ${clampedSurveyLocalBlock} / Latest: ${clampedRefreshTargetSurveyBlock})`;
-  } else {
-    const denom =
-      clampedRefreshTargetSurveyBlock > 0 ? clampedRefreshTargetSurveyBlock : netBlock;
-    if (clampedRefreshTargetSurveyBlock === 0) {
-      if (clampedSurveyLocalBlock >= netBlock) {
-        responseProgress = 100;
-        responseBarText = `In Sync (Current: ${clampedSurveyLocalBlock} / Latest: ${netBlock})`;
-      } else {
-        difference = netBlock - clampedSurveyLocalBlock;
-        responseBarText = `Remaining Blocks: ${difference} (Current: ${clampedSurveyLocalBlock} / Latest: ${netBlock})`;
-        responseProgress = Math.floor((clampedSurveyLocalBlock / netBlock) * 100);
-      }
-    } else {
-      difference = clampedRefreshTargetSurveyBlock - clampedSurveyLocalBlock;
-      responseBarText = (
-        <>
-          Remaining Blocks: {difference}{' '}
-          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
-        </>
-      );
-      responseProgress = denom
-        ? Math.floor((clampedSurveyLocalBlock / denom) * 100)
-        : 0;
-    }
-  }
-} else {
-  if (clampedResponseLocalBlock === 0 || netBlock === 0) {
-    showResponseSpinner = true;
-  } else if (
-    clampedRefreshTargetResponseBlock > 0 &&
-    clampedResponseLocalBlock >= clampedRefreshTargetResponseBlock
-  ) {
-    responseProgress = 100;
-    responseBarText = `In Sync (Current: ${clampedResponseLocalBlock} / Latest: ${clampedRefreshTargetResponseBlock})`;
-  } else {
-    const denom =
-      clampedRefreshTargetResponseBlock > 0 ? clampedRefreshTargetResponseBlock : netBlock;
-    if (clampedRefreshTargetResponseBlock === 0) {
-      if (clampedResponseLocalBlock >= netBlock) {
-        responseProgress = 100;
-        responseBarText = `In Sync (Current: ${clampedResponseLocalBlock} / Latest: ${netBlock})`;
-      } else {
-        difference = netBlock - clampedResponseLocalBlock;
-        responseBarText = `Remaining Blocks: ${difference} (Current: ${clampedResponseLocalBlock} / Latest: ${netBlock})`;
-        responseProgress = Math.floor((clampedResponseLocalBlock / netBlock) * 100);
-      }
-    } else {
-      difference = clampedRefreshTargetResponseBlock - clampedResponseLocalBlock;
-      responseBarText = (
-        <>
-          Remaining Blocks: {difference}{' '}
-          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
-        </>
-      );
-      responseProgress = denom
-        ? Math.floor((clampedResponseLocalBlock / denom) * 100)
-        : 0;
-    }
-  }
-}
-
-const questionColor = questionProgress < 100 ? 'info' : 'success';
-const responseColor = responseProgress < 100 ? 'info' : 'success';
-
 const currentViewModeForFilter = this.state.viewMode;
 const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.surveyId : null;
-
-const isSynced = (viewMode === 'questions' ? questionColor === 'success' && responseColor === 'success' : responseColor === 'success');
 
 const surveyIdAbbreviation = currentSurveyId
   ? getShortenedSurveyID(currentSurveyId, false, null, false)
@@ -4679,22 +4539,19 @@ const filterSummaryDisplay = buildSurveyResultsFilterSummaryDisplayPlan({
   viewMode,
 });
 
-// Compact sync status display
-let syncStatusText = '';
-let isSyncingOrLoading = true;
-
-if (showQuestionSpinner || showResponseSpinner) {
-  syncStatusText = 'Loading...';
-} else if (isSynced) {
-  syncStatusText = 'In Sync';
-  isSyncingOrLoading = false;
-} else {
-  syncStatusText = 'Syncing...';
-}
-const showLongSyncNotice =
-  isSyncingOrLoading &&
-  this._syncLoadingStartedAt !== null &&
-  Date.now() - this._syncLoadingStartedAt >= 15000;
+const syncStatusDisplay = buildSurveyResultsSyncStatusDisplayPlan({
+  networkLatestBlock: this.state.networkLatestBlock,
+  questionLocalBlock: this.state.questionLocalBlock,
+  refreshTargetQuestionBlock: this.state.refreshTargetQuestionBlock,
+  refreshTargetResponseBlock: this.state.refreshTargetResponseBlock,
+  refreshTargetSurveyBlock: this.state.refreshTargetSurveyBlock,
+  responseLocalBlock: this.state.responseLocalBlock,
+  showLongSyncNotice:
+    this._syncLoadingStartedAt !== null &&
+    Date.now() - this._syncLoadingStartedAt >= 15000,
+  surveyLocalBlock: this.state.surveyLocalBlock,
+  viewMode,
+});
 
 return (
   <Modal
@@ -4720,10 +4577,10 @@ return (
       surveyIdAbbreviation={surveyIdAbbreviation}
       surveyTitle={surveyTitle}
       syncStatusNode={renderSurveyResultsSyncStatusPanel({
-          isSynced,
-          isSyncingOrLoading,
-          syncStatusText,
-          showLongSyncNotice,
+          isSynced: syncStatusDisplay.isSynced,
+          isSyncingOrLoading: syncStatusDisplay.isSyncingOrLoading,
+          syncStatusText: syncStatusDisplay.syncStatusText,
+          showLongSyncNotice: syncStatusDisplay.showLongSyncNotice,
           syncDetailsOpen: !!this.state.syncDetailsOpen,
           syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
           onToggleSyncDetails: () =>
@@ -4732,17 +4589,21 @@ return (
               stateKey: 'syncDetailsOpen',
             })),
           onManualRefresh: () => this.handleManualRefresh(),
-          viewMode,
-          showQuestionSpinner,
-          questionProgress,
-          questionColor,
-          questionBarText,
-          showResponseSpinner,
-          responseProgress,
-          responseColor,
-          responseBarText,
+          viewMode: syncStatusDisplay.viewMode,
+          showQuickRefresh: syncStatusDisplay.showQuickRefresh,
+          showQuestionSpinner: syncStatusDisplay.question.showSpinner,
+          questionProgress: syncStatusDisplay.question.progress,
+          questionColor: syncStatusDisplay.question.color,
+          questionBarText: syncStatusDisplay.question.label,
+          showQuestionRemainingSpinner: syncStatusDisplay.question.showRemainingSpinner,
+          showResponseSpinner: syncStatusDisplay.response.showSpinner,
+          responseProgress: syncStatusDisplay.response.progress,
+          responseColor: syncStatusDisplay.response.color,
+          responseBarText: syncStatusDisplay.response.label,
+          showResponseRemainingSpinner: syncStatusDisplay.response.showRemainingSpinner,
           miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
           miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+          remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
         })}
       viewMode={viewMode}
     />
