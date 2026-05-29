@@ -929,7 +929,9 @@ describe('OnePageSession results routing', () => {
     expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
     expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
     expect(polisButton).toHaveAttribute('aria-pressed', 'false');
-    expect(mockDemoAnalysisWorkspace).toHaveBeenCalled();
+    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionSlug: 'demo' })
+    );
   });
 
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {

@@ -13,6 +13,7 @@ import DemographicSelector from './DemographicSelector';
 import QuestionBreakdownChart from './QuestionBreakdownChart';
 import WorldResultsMap from './WorldResultsMap';
 import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
+import { buildTagHref } from '../../SurveyTool/QuestionTagDropdown';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 type Question = {
@@ -72,6 +73,7 @@ type AnalysisData = {
 type DemoAnalysisWorkspaceProps = {
   demoData?: unknown;
   metadataByXid?: unknown;
+  sessionSlug?: string;
 };
 
 const getDemoAnalysisData = buildDemoAnalysisData as unknown as (demoData?: unknown, metadataByXid?: unknown) => AnalysisData;
@@ -86,6 +88,7 @@ const buildSuggestionSelectionKey = (questionId = '', segmentKeys: string[] = []
 const DemoAnalysisWorkspace = ({
   demoData = demoAnalysisData,
   metadataByXid = historicalFigureDemographics,
+  sessionSlug = '',
 }: DemoAnalysisWorkspaceProps) => {
   const analysisData = useMemo<AnalysisData>(
     () => getDemoAnalysisData(demoData, metadataByXid),
@@ -116,10 +119,6 @@ const DemoAnalysisWorkspace = ({
   const selectedQuestionTags = selectedQuestionId
     ? (analysisData.questionTagsData[selectedQuestionId] || [])
     : [];
-  const selectedReportTagIDSet = useMemo(
-    () => new Set(selectedReportTagIDs),
-    [selectedReportTagIDs]
-  );
   const activeSuggestionKey = useMemo(() => {
     if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
     return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
@@ -197,14 +196,6 @@ const DemoAnalysisWorkspace = ({
     handleSuggestionClick(candidateSuggestions[0]);
   };
 
-  const toggleReportTagFilter = (tagID: string) => {
-    setSelectedReportTagIDs((previous) => (
-      previous.includes(tagID)
-        ? previous.filter((value) => value !== tagID)
-        : [...previous, tagID]
-    ));
-  };
-
   return (
     <div className={styles.workspace} data-testid="demo-analysis-workspace">
       <DemographicSelector
@@ -242,21 +233,16 @@ const DemoAnalysisWorkspace = ({
                 ) : null}
                 {selectedQuestionTags.length > 0 ? (
                   <div className={styles.selectedQuestionGroundingPills} data-testid="demo-analysis-selected-question-tags">
-                    {selectedQuestionTags.map((tag) => {
-                      const isSelected = selectedReportTagIDSet.has(tag.tagID);
-                      return (
-                        <button
-                          key={tag.tagID}
-                          type="button"
-                          className={`${styles.selectedQuestionTagButton} ${isSelected ? styles.selectedQuestionTagButtonActive : ''}`}
-                          aria-pressed={isSelected}
-                          title="Toggle tag filter"
-                          onClick={() => toggleReportTagFilter(tag.tagID)}
-                        >
-                          {tag.tagName}
-                        </button>
-                      );
-                    })}
+                    {selectedQuestionTags.map((tag) => (
+                      <a
+                        key={tag.tagID}
+                        className={styles.selectedQuestionTagButton}
+                        href={buildTagHref(tag.tagName, '', sessionSlug)}
+                        title={`Open ${tag.tagName} tag page for this session`}
+                      >
+                        {tag.tagName}
+                      </a>
+                    ))}
                   </div>
                 ) : null}
               </div>

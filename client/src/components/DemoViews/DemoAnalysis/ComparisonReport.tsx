@@ -10,7 +10,6 @@ import {
 import {
   beeswarmByExtremity,
   buildComparisonReportRows,
-  getMinMaxAgreement,
 } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './ComparisonReport.module.scss';
 
@@ -29,6 +28,8 @@ type FlatResponse = {
   responseText: string;
   segmentKey: string;
   rate?: number;
+  totalVotes?: number;
+  participantCount?: number;
 };
 
 type QuestionTag = {
@@ -81,9 +82,14 @@ type TagLegendProps = {
   colorScale: ColorScale;
 };
 
-type RateVisualizerProps = {
-  groupRates: GroupRate[];
-  colorScale: ColorScale;
+type DistributionDataset = {
+  groupName: string;
+  segmentKey?: string;
+  meta: string;
+  rows: Array<{
+    responseText: string;
+    rate: number;
+  }>;
 };
 
 type BinaryResponseTone = 'agree' | 'unsure' | 'disagree';
@@ -105,6 +111,8 @@ const BINARY_RESPONSE_TONE_BY_LABEL: Record<string, BinaryResponseTone> = {
   disagree: 'disagree',
 };
 
+const RESPONSE_ORDER = ['Agree', 'Unsure', 'Disagree'];
+
 const getBinaryResponseTone = (responseText = ''): BinaryResponseTone | null => {
   const normalized = String(responseText || '').trim().toLowerCase();
   return BINARY_RESPONSE_TONE_BY_LABEL[normalized] || null;
@@ -114,6 +122,63 @@ const getResponsePillToneClassName = (tone: BinaryResponseTone) => {
   if (tone === 'agree') return styles.responsePillAgree;
   if (tone === 'disagree') return styles.responsePillDisagree;
   return styles.responsePillUnsure;
+};
+
+const getCandlestickSegmentClassName = (responseText = '') => {
+  const tone = getBinaryResponseTone(responseText);
+  if (tone === 'agree') return styles.analysisCandleSegmentAgree;
+  if (tone === 'disagree') return styles.analysisCandleSegmentDisagree;
+  if (tone === 'unsure') return styles.analysisCandleSegmentUnsure;
+  return styles.analysisCandleSegmentOther;
+};
+
+const getOrderedResponseTexts = (rows: FlatResponse[] = [], preferredResponseText = '') => {
+  const responseSet = new Set(
+    rows
+      .map((row) => String(row?.responseText || '').trim())
+      .filter(Boolean)
+  );
+  const preferred = String(preferredResponseText || '').trim();
+  if (preferred) responseSet.add(preferred);
+
+  return [
+    ...RESPONSE_ORDER.filter((responseText) => responseSet.has(responseText)),
+    ...Array.from(responseSet)
+      .filter((responseText) => !RESPONSE_ORDER.includes(responseText))
+      .sort((left, right) => left.localeCompare(right)),
+  ];
+};
+
+const formatDistributionMeta = (rows: FlatResponse[] = []) => {
+  const modeledResponseCount = rows.reduce(
+    (max, row) => Math.max(max, Number(row?.totalVotes || 0)),
+    0
+  );
+  const participantCount = rows.reduce(
+    (max, row) => Math.max(max, Number(row?.participantCount || 0)),
+    modeledResponseCount
+  );
+
+  if (modeledResponseCount > 0 && participantCount > 0) {
+    return `${participantCount} ${participantCount === 1 ? 'persona' : 'personas'} · ${modeledResponseCount} modeled responses`;
+  }
+  if (modeledResponseCount > 0) {
+    return `${modeledResponseCount} ${modeledResponseCount === 1 ? 'modeled response' : 'modeled responses'}`;
+  }
+  if (participantCount > 0) {
+    return `${participantCount} ${participantCount === 1 ? 'response' : 'responses'}`;
+  }
+  return '';
+};
+
+const dedupeAnalysisItemsByQuestion = (items: AnalysisRow[] = []) => {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const questionId = String(item?.questionId || '');
+    if (!questionId || seen.has(questionId)) return false;
+    seen.add(questionId);
+    return true;
+  });
 };
 
 type ResponseLineProps = {
@@ -183,56 +248,42 @@ const TagLegend = ({ selectedTags, colorScale }: TagLegendProps) => {
   );
 };
 
-const DivergenceVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
-  const { min, max } = getMinMaxAgreement(groupRates);
-  const minColor = colorScale(groupRates.findIndex((group) => group.groupName === min.groupName));
-  const maxColor = colorScale(groupRates.findIndex((group) => group.groupName === max.groupName));
-
-  return (
-    <div className={styles.divergenceVisualizer}>
-      <div className={styles.divergencePoint}>
-        <div className={styles.pointLabel}>Lowest Agreement</div>
-        <div className={styles.groupName} style={{ borderLeftColor: minColor }}>{min.groupName}</div>
-        <div className={styles.percentage}>{`${(min.rate * 100).toFixed(0)}%`}</div>
-        <div className={styles.visualBarContainer}>
-          <div className={styles.visualBar} style={{ width: `${min.rate * 100}%`, backgroundColor: minColor }} />
+const DistributionCandlesticks = ({ datasets }: { datasets: DistributionDataset[] }) => (
+  <div className={styles.analysisDistributionList}>
+    {datasets.map((dataset) => (
+      <div key={dataset.segmentKey || dataset.groupName} className={styles.analysisDistributionDataset}>
+        <div className={styles.analysisDistributionHeader}>
+          <span className={styles.analysisDistributionTitle}>{dataset.groupName}</span>
+          {dataset.meta ? (
+            <span className={styles.analysisDistributionMeta}>{dataset.meta}</span>
+          ) : null}
+        </div>
+        <div
+          className={styles.analysisCandlestick}
+          data-testid={`ce-demo-analysis-card-candlestick-${dataset.segmentKey || dataset.groupName}`}
+          aria-label={`${dataset.groupName} response distribution: ${dataset.rows.map((row) => `${row.responseText} ${(row.rate * 100).toFixed(0)}%`).join(', ')}.`}
+        >
+          {dataset.rows.map((row) => (
+            <span
+              key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}`}
+              className={`${styles.analysisCandleSegment} ${getCandlestickSegmentClassName(row.responseText)}`}
+              style={{ width: `${Math.max(0, Math.min(100, row.rate * 100))}%` }}
+              title={`${row.responseText}: ${(row.rate * 100).toFixed(0)}%`}
+            />
+          ))}
+        </div>
+        <div className={styles.analysisDistributionLegend}>
+          {dataset.rows.map((row) => (
+            <span key={`${dataset.segmentKey || dataset.groupName}:${row.responseText}:legend`} className={styles.analysisDistributionLegendItem}>
+              <span className={`${styles.analysisDistributionDot} ${getCandlestickSegmentClassName(row.responseText)}`} />
+              {row.responseText} {(row.rate * 100).toFixed(0)}%
+            </span>
+          ))}
         </div>
       </div>
-      <div className={styles.divergencePoint}>
-        <div className={styles.pointLabel}>Highest Agreement</div>
-        <div className={styles.groupName} style={{ borderLeftColor: maxColor }}>{max.groupName}</div>
-        <div className={styles.percentage}>{`${(max.rate * 100).toFixed(0)}%`}</div>
-        <div className={styles.visualBarContainer}>
-          <div className={styles.visualBar} style={{ width: `${max.rate * 100}%`, backgroundColor: maxColor }} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ConsensusVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
-  const sortedGroupRates = [...groupRates].sort((left, right) => right.rate - left.rate);
-
-  return (
-    <div className={styles.consensusVisualizer}>
-      <div className={styles.consensusBreakdown}>
-        {sortedGroupRates.map((group) => {
-          const originalIndex = groupRates.findIndex((entry) => entry.groupName === group.groupName);
-          const groupColor = colorScale(originalIndex);
-          return (
-            <div key={group.groupName} className={styles.consensusGroupItem}>
-              <div className={styles.groupName} style={{ borderLeftColor: groupColor }}>{group.groupName}</div>
-              <div className={styles.percentage}>{(group.rate * 100).toFixed(0)}%</div>
-              <div className={styles.visualBarContainer}>
-                <div className={styles.visualBar} style={{ width: `${group.rate * 100}%`, backgroundColor: groupColor }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+    ))}
+  </div>
+);
 
 const ComparisonReport = ({
   flatResponses = [],
@@ -382,6 +433,27 @@ const ComparisonReport = ({
     setInternalSelectedTagIDs(next);
   };
 
+  const buildDistributionDatasets = (item: AnalysisRow): DistributionDataset[] => {
+    const questionRows = flatResponses.filter((row) => String(row.questionId) === String(item.questionId));
+    const responseTexts = getOrderedResponseTexts(questionRows, item.responseText);
+
+    return comparisonGroups.map((group) => {
+      const groupRows = questionRows.filter((row) => row.segmentKey === group.segmentKey);
+      return {
+        groupName: group.name,
+        segmentKey: group.segmentKey,
+        meta: formatDistributionMeta(groupRows),
+        rows: responseTexts.map((responseText) => {
+          const matchingRow = groupRows.find((row) => row.responseText === responseText);
+          return {
+            responseText,
+            rate: Math.max(0, Math.min(1, Number(matchingRow?.rate || 0))),
+          };
+        }),
+      };
+    });
+  };
+
   const renderBeeswarmPlot = () => {
     if (comparisonGroups.length < 2) {
       return <p className={styles.noData}>Please select at least two demographic groups to compare.</p>;
@@ -446,25 +518,14 @@ const ComparisonReport = ({
 
     return (
       <ul className={styles.analysisList}>
-        {items.map((item) => {
-          const colorizedGroupRates = item.groupRates.map((groupRate, index) => ({
-            ...groupRate,
-            color: groupColorScale(index),
-          }));
-          const scoreElement = type === 'Consensus'
-            ? <ConsensusVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />
-            : <DivergenceVisualizer groupRates={colorizedGroupRates} colorScale={groupColorScale} />;
-
-          return (
-            <li key={`${type}:${item.questionId}:${item.responseText}`} className={styles.analysisListItem}>
-              <div className={styles.reportAnalysisContent}>
-                <div className={styles.questionText}>{item.questionText}</div>
-                <ResponseLine responseText={item.responseText} />
-                <div className={styles.scoreVisualizerContainer}>{scoreElement}</div>
-              </div>
-            </li>
-          );
-        })}
+        {dedupeAnalysisItemsByQuestion(items).map((item) => (
+          <li key={`${type}:${item.questionId}`} className={styles.analysisListItem}>
+            <div className={styles.reportAnalysisContent}>
+              <div className={styles.questionText}>{item.questionText}</div>
+              <DistributionCandlesticks datasets={buildDistributionDatasets(item)} />
+            </div>
+          </li>
+        ))}
       </ul>
     );
   };

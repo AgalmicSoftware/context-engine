@@ -39,7 +39,7 @@ describe('ComparisonReport', () => {
     global.ResizeObserver = originalResizeObserver;
   });
 
-  it('removes the redundant consensus line and renders styled binary response pills in report cards', () => {
+  it('renders report cards with candlestick distributions instead of response labels', () => {
     render(
       <ComparisonReport
         flatResponses={flatResponses}
@@ -49,10 +49,15 @@ describe('ComparisonReport', () => {
     );
 
     expect(screen.queryByText(/Consensus:\s*Minimum agreement of/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Response:/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Response: "Agree"')).not.toBeInTheDocument();
-    expect(screen.getAllByTestId('ce-demo-analysis-response-pill-card-agree').length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId('ce-demo-analysis-response-pill-card-unsure').length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId('ce-demo-analysis-response-pill-card-disagree').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('ce-demo-analysis-response-pill-card-agree')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-demo-analysis-response-pill-card-unsure')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-demo-analysis-response-pill-card-disagree')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(/ce-demo-analysis-card-candlestick-/).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Agree 90%/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Unsure 30%/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Disagree 60%/i).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /Should advanced AI systems be openly audited/i })).not.toBeInTheDocument();
   });
 
