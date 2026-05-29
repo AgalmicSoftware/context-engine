@@ -133,6 +133,7 @@ const MINI_APP_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:mini-app-transcribe-rate:v1
 const DEFAULT_MINI_APP_TRANSCRIBE_MAX_BYTES = 8 * 1024 * 1024;
 const DEFAULT_MINI_APP_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_MINI_APP_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
+const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
 const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -1895,6 +1896,48 @@ function audioFileExtension(file = {}) {
   return 'webm';
 }
 
+function bridgeOpenAiTranscribeUrl(env = {}) {
+  return safeString(env.AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL || env.OPENAI_TRANSCRIBE_URL) ||
+    DEFAULT_OPENAI_TRANSCRIBE_URL;
+}
+
+async function transcribeMiniAppAudioWithBridgeOpenAi({
+  env = {},
+  audio = null,
+  model = 'whisper-1',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const apiKey = bridgeOpenAiApiKey(env);
+  if (!apiKey) return { ok: false, reason: 'bridge_openai_key_missing', status: 503 };
+  if (!audio || typeof audio.arrayBuffer !== 'function') {
+    return { ok: false, reason: 'audio_file_required', status: 400 };
+  }
+  const upstream = new FormData();
+  upstream.append('file', audio, audio.name || `telegram-comment.${audioFileExtension(audio)}`);
+  upstream.append('model', safeString(model) || 'whisper-1');
+  const response = await fetchImpl(bridgeOpenAiTranscribeUrl(env), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: upstream,
+  }).catch((error) => ({
+    ok: false,
+    status: 502,
+    json: async () => ({ error: safeString(error?.message || error) || 'transcription_failed' }),
+  }));
+  const body = await response.json().catch(() => ({}));
+  if (!response?.ok) {
+    return {
+      ok: false,
+      reason: safeString(body?.error?.message || body?.error || body?.message || response?.status) || 'transcription_failed',
+      status: response?.status || 502,
+    };
+  }
+  const text = safeString(body?.text);
+  return text ? { ok: true, text } : { ok: false, reason: 'transcript_empty', status: 502 };
+}
+
 function positiveIntegerEnv(value = '', fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -2724,6 +2767,27 @@ async function handleTranscribeRequest({
     return json({ ok: false, error: eligibility.reason || 'session_ai_not_allowed' }, { status: 403 });
   }
 
+  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
+  const model = safeString(form.get('model') || env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
+  if (bridgeOpenAiApiKey(env)) {
+    const bridgeTranscription = await transcribeMiniAppAudioWithBridgeOpenAi({
+      env,
+      audio,
+      model,
+      fetchImpl,
+    });
+    if (!bridgeTranscription.ok) {
+      return json({
+        ok: false,
+        error: bridgeTranscription.reason || 'transcription_failed',
+      }, { status: bridgeTranscription.status || 502 });
+    }
+    return json({
+      ok: true,
+      text: bridgeTranscription.text,
+    });
+  }
+
   const workerUrl = resolveSessionWorkerUrl(env, resolved.session);
   if (!workerUrl) {
     return json({ ok: false, error: 'session_worker_url_missing' }, { status: 503 });
@@ -2737,7 +2801,6 @@ async function handleTranscribeRequest({
     lifecycle: 'account_created',
     createdAt,
   });
-  const fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch;
   const sessionAuth = await authenticateSessionWorker({
     env,
     session: resolved.session,
@@ -2752,11 +2815,8 @@ async function handleTranscribeRequest({
   }
 
   const upstream = new FormData();
-  const model = safeString(form.get('model') || env.AGENT_BRIDGE_TRANSCRIBE_MODEL || 'whisper-1') || 'whisper-1';
   upstream.append('file', audio, audio.name || `telegram-comment.${audioFileExtension(audio)}`);
   upstream.append('model', model);
-  const bridgeApiKey = bridgeOpenAiApiKey(env);
-  if (bridgeApiKey) upstream.append('apiKey', bridgeApiKey);
   const response = await fetchImpl(`${sessionAuth.workerUrl}/transcribe`, {
     method: 'POST',
     headers: {

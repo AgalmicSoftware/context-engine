@@ -2638,7 +2638,7 @@ test('Mini App search ranks questions through the session worker AI route when a
   assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/login', '/ai']);
 });
 
-test('Mini App transcribe endpoint forwards microphone audio through the session worker', async () => {
+test('Mini App transcribe endpoint uses bridge OpenAI key before session worker auth', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-transcribe';
   const env = {
@@ -2646,6 +2646,7 @@ test('Mini App transcribe endpoint forwards microphone audio through the session
     AGENT_BRIDGE_DEPLOYMENT_ID: 'test-deploy',
     DEMO_SIGNER_ROOT_SECRET: 'test-root-secret',
     AGENT_BRIDGE_OPENAI_API_KEY: 'sk-bridge-openai',
+    AGENT_BRIDGE_OPENAI_TRANSCRIBE_URL: 'https://api.openai.example/v1/audio/transcriptions',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
@@ -2675,33 +2676,10 @@ test('Mini App transcribe endpoint forwards microphone audio through the session
   env.AGENT_BRIDGE_FETCH = async (url, init = {}) => {
     const target = String(url);
     calls.push({ url: target, init });
-    if (target.endsWith('/auth/nonce')) {
-      const body = JSON.parse(init.body);
-      if (body.sessionSlug === 'alpha') {
-        return new Response(JSON.stringify({ error: 'sessionSlug does not match worker session.' }), {
-          status: 400,
-          headers: { 'content-type': 'application/json' },
-        });
-      }
-      assert.equal(body.sessionSlug, undefined);
-      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    if (target.endsWith('/auth/login')) {
-      const body = JSON.parse(init.body);
-      assert.equal(body.sessionSlug, undefined);
-      return new Response(JSON.stringify({ token: 'worker-token' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-    if (target.endsWith('/transcribe')) {
-      assert.equal(init.headers.Authorization, 'Bearer worker-token');
-      assert.equal(Object.hasOwn(init.headers, 'Origin'), false);
+    if (target === 'https://api.openai.example/v1/audio/transcriptions') {
+      assert.equal(init.headers.Authorization, 'Bearer sk-bridge-openai');
       assert.equal(init.body.get('model'), 'whisper-1');
-      assert.equal(init.body.get('apiKey'), 'sk-bridge-openai');
+      assert.equal(init.body.get('apiKey'), null);
       assert.equal(init.body.get('file').name, 'comment.webm');
       return new Response(JSON.stringify({ text: 'audio note' }), {
         status: 200,
@@ -2728,7 +2706,7 @@ test('Mini App transcribe endpoint forwards microphone audio through the session
 
   assert.equal(response.status, 200);
   assert.deepEqual(body, { ok: true, text: 'audio note' });
-  assert.deepEqual(calls.map((call) => new URL(call.url).pathname), ['/auth/nonce', '/auth/nonce', '/auth/login', '/transcribe']);
+  assert.deepEqual(calls.map((call) => call.url), ['https://api.openai.example/v1/audio/transcriptions']);
 });
 
 test('Mini App transcribe endpoint accepts session-scoped AI search dictation without a question key', async () => {
