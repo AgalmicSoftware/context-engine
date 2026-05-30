@@ -12,6 +12,7 @@ import {
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
   resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
   resolveSbtPageMiniMintState,
   resolveSbtPageMiniOpenMintButtonState,
@@ -102,6 +103,153 @@ describe('sbtPageActionDisplayHelpers', () => {
     })).toMatchObject({
       shouldRenderGroupPasswordJoin: false,
       shouldSuppressMintControls: true,
+    });
+  });
+
+  it('describes mini-card mint display and selected handler without invoking side effects', () => {
+    expect(resolveSbtPageMiniMintActionPlan({
+      isMintingActive: true,
+      miniMintable: false,
+    })).toEqual({
+      blockedReason: 'mini-mint-unavailable',
+      disabled: true,
+      handlerKind: 'none',
+      inertReason: 'hidden',
+      isInteractive: false,
+      labelKind: 'none',
+      shouldRenderMintArea: false,
+      viewKind: 'hidden',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasTokenMini: true,
+      isMintingActive: true,
+      miniMintable: true,
+    })).toMatchObject({
+      blockedReason: 'already-has-token',
+      shouldRenderMintArea: false,
+      viewKind: 'hidden',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      isMintingActive: false,
+      miniMintable: true,
+    })).toMatchObject({
+      blockedReason: 'mint-ended',
+      shouldRenderMintArea: false,
+      viewKind: 'hidden',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      isMintingActive: true,
+      miniMintable: true,
+    })).toMatchObject({
+      blockedReason: 'none',
+      disabled: false,
+      handlerKind: 'mini-mint',
+      inertReason: 'none',
+      isInteractive: true,
+      labelKind: 'status',
+      shouldRenderMintArea: true,
+      viewKind: 'open-mint-button',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      isMintingActive: true,
+      miniMintable: true,
+      miniOpenMintButtonState: { disabled: true },
+    })).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inertReason: 'disabled',
+      isInteractive: false,
+      viewKind: 'open-mint-button',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasInviteMint: true,
+      isMintingActive: true,
+      miniMintable: true,
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'show-password-input',
+      labelKind: 'join',
+      viewKind: 'invite-disclosure',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasInviteMint: true,
+      isMintingActive: true,
+      miniMintable: true,
+      miniPasswordJoinButtonState: { disabled: true },
+      showMiniPasswordInput: true,
+    })).toMatchObject({
+      disabled: true,
+      handlerKind: 'claim-with-invite-code',
+      inertReason: 'disabled',
+      labelKind: 'join',
+      viewKind: 'invite-input',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasGroupPasswordMint: true,
+      isMintingActive: true,
+      miniMintable: true,
+      showMiniPasswordInput: true,
+    })).toMatchObject({
+      handlerKind: 'mint-unlimited-with-group-password',
+      labelKind: 'join',
+      viewKind: 'group-password-input',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasPasswordMint: true,
+      isMintingActive: true,
+      miniManualClaimButtonState: { disabled: true },
+      miniMintable: true,
+      showMiniPasswordInput: true,
+    })).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inertReason: 'disabled',
+      labelKind: 'join',
+      viewKind: 'manual-password-start-input',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasPasswordMint: true,
+      isMintingActive: true,
+      miniMintable: true,
+      mintStep: 2,
+    })).toMatchObject({
+      handlerKind: 'mini-mint',
+      labelKind: 'finish',
+      viewKind: 'manual-password-finish-input',
+    });
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasPasswordMint: true,
+      isMintingActive: true,
+      miniMintable: true,
+      mintStep: 1,
+    })).toMatchObject({
+      handlerKind: 'none',
+      inertReason: 'status-only',
+      isInteractive: false,
+      labelKind: 'countdown',
+      viewKind: 'manual-claim-countdown',
+    });
+  });
+
+  it('re-opens mini-card mint display after a successful burn clears the joined mini state', () => {
+    const miniMintState = resolveSbtPageMiniMintState({
+      burningStatus: 'success',
+      mintingStatus: 'success',
+      nowSec: 100,
+      sbtInfo: { mintingEndTime: 0 },
+      userHasSBT: false,
+    });
+
+    expect(miniMintState.hasTokenMini).toBe(false);
+    expect(resolveSbtPageMiniMintActionPlan({
+      hasTokenMini: miniMintState.hasTokenMini,
+      isMintingActive: miniMintState.isMintingActive,
+      miniMintable: true,
+    })).toMatchObject({
+      blockedReason: 'none',
+      handlerKind: 'mini-mint',
+      shouldRenderMintArea: true,
+      viewKind: 'open-mint-button',
     });
   });
 
