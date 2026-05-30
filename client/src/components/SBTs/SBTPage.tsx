@@ -52,6 +52,7 @@ import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   runSbtPageBurnActionController,
+  runSbtPageMiniBurnActionController,
   runSbtPageMintActionController,
 } from './sbtPageActionController';
 import {
@@ -4649,6 +4650,10 @@ renderMintButton() {
           });
         }
       }
+      const miniBurnActionPlan = {
+        blockedReason: miniTokenActionDisplayState?.shouldRenderBurnButton ? 'none' : 'hidden',
+        shouldRenderMiniBurnButton: !!miniTokenActionDisplayState?.shouldRenderBurnButton,
+      };
 
       return (
         <SbtPageMiniCard
@@ -4706,7 +4711,14 @@ renderMintButton() {
           onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
           onImageError={imageErrorHandler}
           onManualPasswordInputChange={this.handleManualPasswordInputChange}
-          onMiniBurn={this.miniBurnHandler}
+          onMiniBurn={(event) => runSbtPageMiniBurnActionController({
+            disabled: !!miniBurnButtonState?.disabled,
+            event,
+            plan: miniBurnActionPlan,
+            ports: {
+              dispatchMiniBurn: this.miniBurnHandler,
+            },
+          })}
           onMiniMint={this.miniMintHandler}
           onMintUnlimitedWithGroupPassword={() => this.mintUnlimitedWithGroupPassword()}
           onShowMiniPasswordInput={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
