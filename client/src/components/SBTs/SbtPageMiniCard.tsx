@@ -11,6 +11,7 @@ import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
+import type { SbtPageMiniMintActionPlan } from './sbtPageActionDisplayHelpers';
 
 type SbtPagePendingContentState = {
   failureLabel?: string;
@@ -29,8 +30,6 @@ type SbtPageButtonState = {
   isPending?: boolean;
 };
 
-type SbtPageMiniMintFlowDisplayState = Record<string, boolean | undefined>;
-
 type SbtPageMiniActionFailureState = {
   showBurnFailedStatus?: boolean;
   showMintFailedStatus?: boolean;
@@ -48,9 +47,6 @@ type SbtPageMiniCardProps = {
   cardStyle?: React.CSSProperties;
   claimCountdown?: number | string;
   groupPasswordInput?: string;
-  hasGroupPasswordMint?: boolean;
-  hasInviteMint?: boolean;
-  hasPasswordMint?: boolean;
   hasTokenMini?: boolean;
   imageUrl: string;
   isMintingActive?: boolean;
@@ -66,11 +62,9 @@ type SbtPageMiniCardProps = {
   miniManualClaimButtonState: SbtPageButtonState;
   miniManualClaimFinishContentState: SbtPagePendingContentState;
   miniManualClaimStartContentState: SbtPagePendingContentState;
+  miniMintActionPlan: SbtPageMiniMintActionPlan;
   miniMintActionButtonClassName: string;
-  miniMintFlowDisplayState: SbtPageMiniMintFlowDisplayState;
-  miniMintable?: boolean;
   miniOpenMintButtonContentState: SbtPagePendingContentState;
-  miniOpenMintButtonState: SbtPageButtonState;
   miniPasswordControlInputStyle?: React.CSSProperties;
   miniPasswordJoinButtonState: SbtPageButtonState;
   miniPasswordJoinContentState: SbtPagePendingContentState;
@@ -117,9 +111,6 @@ const SbtPageMiniCard = ({
   cardStyle,
   claimCountdown = '',
   groupPasswordInput = '',
-  hasGroupPasswordMint = false,
-  hasInviteMint = false,
-  hasPasswordMint = false,
   hasTokenMini = false,
   imageUrl,
   isMintingActive = false,
@@ -135,11 +126,9 @@ const SbtPageMiniCard = ({
   miniManualClaimButtonState,
   miniManualClaimFinishContentState,
   miniManualClaimStartContentState,
+  miniMintActionPlan,
   miniMintActionButtonClassName,
-  miniMintFlowDisplayState,
-  miniMintable = false,
   miniOpenMintButtonContentState,
-  miniOpenMintButtonState,
   miniPasswordControlInputStyle,
   miniPasswordJoinButtonState,
   miniPasswordJoinContentState,
@@ -167,147 +156,123 @@ const SbtPageMiniCard = ({
 }: SbtPageMiniCardProps): React.ReactElement => {
   let miniMintArea: React.ReactNode = null;
 
-  if (!hasTokenMini) {
-    if (miniMintable) {
-      if (hasGroupPasswordMint) {
-        if (miniMintFlowDisplayState.shouldRenderGroupPasswordDisclosureButton) {
-          miniMintArea = (
-            <button
-              onClick={onShowMiniPasswordInput}
-              className={miniMintActionButtonClassName}
-              style={miniControlTopMarginStyle}
-            >
-              Join
-            </button>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderGroupPasswordInput) {
-          miniMintArea = (
-            <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
-              <input
-                type="password"
-                className={styles.miniPasswordInput}
-                value={groupPasswordInput || ''}
-                onChange={onGroupPasswordInputChange}
-                placeholder="Password"
-                disabled={miniPasswordJoinButtonState.isPending}
-                style={miniPasswordControlInputStyle}
-              />
-              <button
-                onClick={onMintUnlimitedWithGroupPassword}
-                disabled={miniPasswordJoinButtonState.disabled}
-                className={miniMintActionButtonClassName}
-              >
-                {renderPendingButtonContent(miniPasswordJoinContentState)}
-              </button>
-            </div>
-          );
-        }
-      } else if (hasInviteMint) {
-        if (miniMintFlowDisplayState.shouldRenderInviteDisclosureButton) {
-          miniMintArea = (
-            <button
-              onClick={onShowMiniPasswordInput}
-              className={miniMintActionButtonClassName}
-              style={miniControlTopMarginStyle}
-            >
-              Join
-            </button>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderInviteInput) {
-          miniMintArea = (
-            <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
-              <input
-                type="password"
-                className={styles.miniPasswordInput}
-                value={groupPasswordInput || ''}
-                onChange={onGroupPasswordInputChange}
-                placeholder="Invite Code"
-                disabled={miniPasswordJoinButtonState.isPending}
-                style={miniInviteInputStyle}
-              />
-              <button
-                onClick={onClaimWithInviteCode}
-                disabled={miniPasswordJoinButtonState.disabled}
-                className={miniMintActionButtonClassName}
-              >
-                {renderPendingButtonContent(miniPasswordJoinContentState)}
-              </button>
-            </div>
-          );
-        }
-      } else if (hasPasswordMint) {
-        if (miniMintFlowDisplayState.shouldRenderManualPasswordDisclosureButton) {
-          miniMintArea = (
-            <button
-              onClick={onShowMiniPasswordInput}
-              className={miniMintActionButtonClassName}
-              style={miniControlTopMarginStyle}
-            >
-              Join
-            </button>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderManualPasswordStartInput) {
-          miniMintArea = (
-            <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
-              <input
-                type="text"
-                className={styles.miniPasswordInput}
-                value={manualPasswordInput}
-                onChange={onManualPasswordInputChange}
-                placeholder="Password"
-                disabled={miniManualClaimButtonState.isPending}
-                style={miniPasswordControlInputStyle}
-              />
-              <button
-                onClick={onMiniMint}
-                disabled={miniManualClaimButtonState.disabled}
-                className={miniMintActionButtonClassName}
-              >
-                {renderPendingButtonContent(miniManualClaimStartContentState)}
-              </button>
-            </div>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderManualClaimCountdown) {
-          miniMintArea = (
-            <div className={styles.miniActionStatus} style={miniActionStatusStyle}>
-              Wait: {claimCountdown}s
-            </div>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderManualPasswordFinishInput) {
-          miniMintArea = (
-            <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
-              <input
-                type="text"
-                className={styles.miniPasswordInput}
-                value={manualPasswordInput}
-                onChange={onManualPasswordInputChange}
-                placeholder="Password"
-                disabled={miniManualClaimButtonState.isPending}
-              />
-              <button
-                onClick={onMiniMint}
-                disabled={miniManualClaimButtonState.disabled}
-                className={miniMintActionButtonClassName}
-              >
-                {renderPendingButtonContent(miniManualClaimFinishContentState)}
-              </button>
-            </div>
-          );
-        } else if (miniMintFlowDisplayState.shouldRenderManualClaimSuccess) {
-          miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{`${mintedLabel}!`}</div>;
-        }
-      } else if (miniMintFlowDisplayState.shouldRenderOpenMintButton) {
-        miniMintArea = (
+  if (!hasTokenMini && miniMintActionPlan.shouldRenderMintArea) {
+    if (
+      miniMintActionPlan.viewKind === 'group-password-disclosure' ||
+      miniMintActionPlan.viewKind === 'invite-disclosure' ||
+      miniMintActionPlan.viewKind === 'manual-password-disclosure'
+    ) {
+      miniMintArea = (
+        <button
+          onClick={onShowMiniPasswordInput}
+          className={miniMintActionButtonClassName}
+          style={miniControlTopMarginStyle}
+        >
+          Join
+        </button>
+      );
+    } else if (miniMintActionPlan.viewKind === 'group-password-input') {
+      miniMintArea = (
+        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
+          <input
+            type="password"
+            className={styles.miniPasswordInput}
+            value={groupPasswordInput || ''}
+            onChange={onGroupPasswordInputChange}
+            placeholder="Password"
+            disabled={miniPasswordJoinButtonState.isPending}
+            style={miniPasswordControlInputStyle}
+          />
+          <button
+            onClick={onMintUnlimitedWithGroupPassword}
+            disabled={miniMintActionPlan.disabled}
+            className={miniMintActionButtonClassName}
+          >
+            {renderPendingButtonContent(miniPasswordJoinContentState)}
+          </button>
+        </div>
+      );
+    } else if (miniMintActionPlan.viewKind === 'invite-input') {
+      miniMintArea = (
+        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
+          <input
+            type="password"
+            className={styles.miniPasswordInput}
+            value={groupPasswordInput || ''}
+            onChange={onGroupPasswordInputChange}
+            placeholder="Invite Code"
+            disabled={miniPasswordJoinButtonState.isPending}
+            style={miniInviteInputStyle}
+          />
+          <button
+            onClick={onClaimWithInviteCode}
+            disabled={miniMintActionPlan.disabled}
+            className={miniMintActionButtonClassName}
+          >
+            {renderPendingButtonContent(miniPasswordJoinContentState)}
+          </button>
+        </div>
+      );
+    } else if (miniMintActionPlan.viewKind === 'manual-password-start-input') {
+      miniMintArea = (
+        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
+          <input
+            type="text"
+            className={styles.miniPasswordInput}
+            value={manualPasswordInput}
+            onChange={onManualPasswordInputChange}
+            placeholder="Password"
+            disabled={miniManualClaimButtonState.isPending}
+            style={miniPasswordControlInputStyle}
+          />
           <button
             onClick={onMiniMint}
+            disabled={miniMintActionPlan.disabled}
             className={miniMintActionButtonClassName}
-            style={miniControlTopMarginStyle}
-            disabled={miniOpenMintButtonState.disabled}
           >
-            {renderPendingButtonContent(miniOpenMintButtonContentState)}
+            {renderPendingButtonContent(miniManualClaimStartContentState)}
           </button>
-        );
-      }
+        </div>
+      );
+    } else if (miniMintActionPlan.viewKind === 'manual-claim-countdown') {
+      miniMintArea = (
+        <div className={styles.miniActionStatus} style={miniActionStatusStyle}>
+          Wait: {claimCountdown}s
+        </div>
+      );
+    } else if (miniMintActionPlan.viewKind === 'manual-password-finish-input') {
+      miniMintArea = (
+        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
+          <input
+            type="text"
+            className={styles.miniPasswordInput}
+            value={manualPasswordInput}
+            onChange={onManualPasswordInputChange}
+            placeholder="Password"
+            disabled={miniManualClaimButtonState.isPending}
+          />
+          <button
+            onClick={onMiniMint}
+            disabled={miniMintActionPlan.disabled}
+            className={miniMintActionButtonClassName}
+          >
+            {renderPendingButtonContent(miniManualClaimFinishContentState)}
+          </button>
+        </div>
+      );
+    } else if (miniMintActionPlan.viewKind === 'manual-claim-success') {
+      miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{`${mintedLabel}!`}</div>;
+    } else if (miniMintActionPlan.viewKind === 'open-mint-button') {
+      miniMintArea = (
+        <button
+          onClick={onMiniMint}
+          className={miniMintActionButtonClassName}
+          style={miniControlTopMarginStyle}
+          disabled={miniMintActionPlan.disabled}
+        >
+          {renderPendingButtonContent(miniOpenMintButtonContentState)}
+        </button>
+      );
     }
   } else if (miniTokenActionDisplayState?.shouldRenderBurnedStatus) {
     miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{`${burnedLabel}!`}</div>;

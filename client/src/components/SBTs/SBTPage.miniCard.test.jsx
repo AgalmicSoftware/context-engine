@@ -155,6 +155,21 @@ describe('SBTPage mini-card', () => {
     expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
   });
 
+  it('passes the parent-derived mini mint action plan to the mini card', () => {
+    const { cardNode } = renderMiniCardNode();
+
+    expect(cardNode.props.miniMintActionPlan).toMatchObject({
+      blockedReason: 'none',
+      disabled: false,
+      handlerKind: 'mini-mint',
+      inertReason: 'none',
+      isInteractive: true,
+      labelKind: 'status',
+      shouldRenderMintArea: true,
+      viewKind: 'open-mint-button',
+    });
+  });
+
   it('includes the resolved session slug in mini-card navigation when one is available', () => {
     const { cardNode, sbtAddress } = renderMiniCardNode({ sessionSlug: 'edge-private' });
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);

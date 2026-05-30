@@ -192,6 +192,11 @@ type ResolveSbtPageMiniMintFlowDisplayStateArgs = {
   mintStep?: unknown;
   showMiniPasswordInput?: unknown;
 };
+type ResolveSbtPageMiniMintActionPlanArgs = ResolveSbtPageMiniMintFlowDisplayStateArgs & {
+  miniManualClaimButtonState?: { disabled?: unknown } | null;
+  miniOpenMintButtonState?: { disabled?: unknown } | null;
+  miniPasswordJoinButtonState?: { disabled?: unknown } | null;
+};
 type SbtPageMiniMintFlowDisplayState = {
   shouldRenderGroupPasswordDisclosureButton: boolean;
   shouldRenderGroupPasswordInput: boolean;
@@ -203,6 +208,52 @@ type SbtPageMiniMintFlowDisplayState = {
   shouldRenderManualPasswordFinishInput: boolean;
   shouldRenderManualPasswordStartInput: boolean;
   shouldRenderOpenMintButton: boolean;
+};
+export type SbtPageMiniMintActionBlockedReason =
+  | 'none'
+  | 'already-has-token'
+  | 'mini-mint-unavailable'
+  | 'mint-ended'
+  | 'no-visible-action';
+export type SbtPageMiniMintActionHandlerKind =
+  | 'none'
+  | 'claim-with-invite-code'
+  | 'mini-mint'
+  | 'mint-unlimited-with-group-password'
+  | 'show-password-input';
+export type SbtPageMiniMintActionInertReason =
+  | 'none'
+  | 'disabled'
+  | 'hidden'
+  | 'status-only';
+export type SbtPageMiniMintActionLabelKind =
+  | 'none'
+  | 'countdown'
+  | 'finish'
+  | 'join'
+  | 'minted'
+  | 'status';
+export type SbtPageMiniMintActionViewKind =
+  | 'hidden'
+  | 'group-password-disclosure'
+  | 'group-password-input'
+  | 'invite-disclosure'
+  | 'invite-input'
+  | 'manual-claim-countdown'
+  | 'manual-claim-success'
+  | 'manual-password-disclosure'
+  | 'manual-password-finish-input'
+  | 'manual-password-start-input'
+  | 'open-mint-button';
+export type SbtPageMiniMintActionPlan = {
+  blockedReason: SbtPageMiniMintActionBlockedReason;
+  disabled: boolean;
+  handlerKind: SbtPageMiniMintActionHandlerKind;
+  inertReason: SbtPageMiniMintActionInertReason;
+  isInteractive: boolean;
+  labelKind: SbtPageMiniMintActionLabelKind;
+  shouldRenderMintArea: boolean;
+  viewKind: SbtPageMiniMintActionViewKind;
 };
 type ResolveSbtPageMiniBurnButtonStateArgs = {
   burningStatus?: unknown;
@@ -363,6 +414,168 @@ export const resolveSbtPageMiniMintFlowDisplayState = ({
     shouldRenderManualPasswordStartInput: isManualPasswordFlow && step === 0 && inputVisible,
     shouldRenderOpenMintButton: canRenderMintFlow && !isGroupPasswordFlow && !isInviteFlow && !isManualPasswordFlow,
   };
+};
+
+const buildHiddenMiniMintActionPlan = (
+  blockedReason: SbtPageMiniMintActionBlockedReason
+): SbtPageMiniMintActionPlan => ({
+  blockedReason,
+  disabled: true,
+  handlerKind: 'none',
+  inertReason: 'hidden',
+  isInteractive: false,
+  labelKind: 'none',
+  shouldRenderMintArea: false,
+  viewKind: 'hidden',
+});
+
+const buildMiniMintActionPlan = ({
+  disabled = false,
+  handlerKind,
+  labelKind,
+  viewKind,
+}: {
+  disabled?: boolean;
+  handlerKind: Exclude<SbtPageMiniMintActionHandlerKind, 'none'>;
+  labelKind: Exclude<SbtPageMiniMintActionLabelKind, 'none'>;
+  viewKind: Exclude<SbtPageMiniMintActionViewKind, 'hidden'>;
+}): SbtPageMiniMintActionPlan => ({
+  blockedReason: 'none',
+  disabled,
+  handlerKind,
+  inertReason: disabled ? 'disabled' : 'none',
+  isInteractive: !disabled,
+  labelKind,
+  shouldRenderMintArea: true,
+  viewKind,
+});
+
+const buildMiniMintStatusActionPlan = ({
+  labelKind,
+  viewKind,
+}: {
+  labelKind: 'countdown' | 'minted';
+  viewKind: 'manual-claim-countdown' | 'manual-claim-success';
+}): SbtPageMiniMintActionPlan => ({
+  blockedReason: 'none',
+  disabled: false,
+  handlerKind: 'none',
+  inertReason: 'status-only',
+  isInteractive: false,
+  labelKind,
+  shouldRenderMintArea: true,
+  viewKind,
+});
+
+export const resolveSbtPageMiniMintActionPlan = ({
+  hasGroupPasswordMint = false,
+  hasInviteMint = false,
+  hasPasswordMint = false,
+  hasTokenMini = false,
+  isMintingActive = false,
+  miniManualClaimButtonState = null,
+  miniMintable = false,
+  miniOpenMintButtonState = null,
+  miniPasswordJoinButtonState = null,
+  mintStep = 0,
+  showMiniPasswordInput = false,
+}: ResolveSbtPageMiniMintActionPlanArgs = {}): SbtPageMiniMintActionPlan => {
+  if (hasTokenMini) {
+    return buildHiddenMiniMintActionPlan('already-has-token');
+  }
+  if (!miniMintable) {
+    return buildHiddenMiniMintActionPlan('mini-mint-unavailable');
+  }
+  if (!isMintingActive) {
+    return buildHiddenMiniMintActionPlan('mint-ended');
+  }
+
+  const flow = resolveSbtPageMiniMintFlowDisplayState({
+    hasGroupPasswordMint,
+    hasInviteMint,
+    hasPasswordMint,
+    hasTokenMini,
+    isMintingActive,
+    miniMintable,
+    mintStep,
+    showMiniPasswordInput,
+  });
+
+  if (flow.shouldRenderGroupPasswordDisclosureButton) {
+    return buildMiniMintActionPlan({
+      handlerKind: 'show-password-input',
+      labelKind: 'join',
+      viewKind: 'group-password-disclosure',
+    });
+  }
+  if (flow.shouldRenderGroupPasswordInput) {
+    return buildMiniMintActionPlan({
+      disabled: !!miniPasswordJoinButtonState?.disabled,
+      handlerKind: 'mint-unlimited-with-group-password',
+      labelKind: 'join',
+      viewKind: 'group-password-input',
+    });
+  }
+  if (flow.shouldRenderInviteDisclosureButton) {
+    return buildMiniMintActionPlan({
+      handlerKind: 'show-password-input',
+      labelKind: 'join',
+      viewKind: 'invite-disclosure',
+    });
+  }
+  if (flow.shouldRenderInviteInput) {
+    return buildMiniMintActionPlan({
+      disabled: !!miniPasswordJoinButtonState?.disabled,
+      handlerKind: 'claim-with-invite-code',
+      labelKind: 'join',
+      viewKind: 'invite-input',
+    });
+  }
+  if (flow.shouldRenderManualPasswordDisclosureButton) {
+    return buildMiniMintActionPlan({
+      handlerKind: 'show-password-input',
+      labelKind: 'join',
+      viewKind: 'manual-password-disclosure',
+    });
+  }
+  if (flow.shouldRenderManualPasswordStartInput) {
+    return buildMiniMintActionPlan({
+      disabled: !!miniManualClaimButtonState?.disabled,
+      handlerKind: 'mini-mint',
+      labelKind: 'join',
+      viewKind: 'manual-password-start-input',
+    });
+  }
+  if (flow.shouldRenderManualClaimCountdown) {
+    return buildMiniMintStatusActionPlan({
+      labelKind: 'countdown',
+      viewKind: 'manual-claim-countdown',
+    });
+  }
+  if (flow.shouldRenderManualPasswordFinishInput) {
+    return buildMiniMintActionPlan({
+      disabled: !!miniManualClaimButtonState?.disabled,
+      handlerKind: 'mini-mint',
+      labelKind: 'finish',
+      viewKind: 'manual-password-finish-input',
+    });
+  }
+  if (flow.shouldRenderManualClaimSuccess) {
+    return buildMiniMintStatusActionPlan({
+      labelKind: 'minted',
+      viewKind: 'manual-claim-success',
+    });
+  }
+  if (flow.shouldRenderOpenMintButton) {
+    return buildMiniMintActionPlan({
+      disabled: !!miniOpenMintButtonState?.disabled,
+      handlerKind: 'mini-mint',
+      labelKind: 'status',
+      viewKind: 'open-mint-button',
+    });
+  }
+
+  return buildHiddenMiniMintActionPlan('no-visible-action');
 };
 
 export const resolveSbtPageMiniBurnPermission = ({

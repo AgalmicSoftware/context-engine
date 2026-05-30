@@ -194,7 +194,7 @@ import {
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
   resolveSbtPageMiniControlDisplayState,
-  resolveSbtPageMiniMintFlowDisplayState,
+  resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintState,
   resolveSbtPageMiniOpenMintButtonState,
   resolveSbtPageMiniTokenActionDisplayState,
@@ -4616,13 +4616,16 @@ renderMintButton() {
         miniClassName: styles.miniButton,
         variantClassName: styles.burnButton,
       });
-      const miniMintFlowDisplayState = resolveSbtPageMiniMintFlowDisplayState({
+      const miniMintActionPlan = resolveSbtPageMiniMintActionPlan({
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
         hasInviteMint: this.state.hasInviteMint,
         hasPasswordMint: sbtInfo.hasPasswordMint,
         hasTokenMini,
         isMintingActive,
         miniMintable,
+        miniManualClaimButtonState,
+        miniOpenMintButtonState,
+        miniPasswordJoinButtonState,
         mintStep,
         showMiniPasswordInput: this.state.showMiniPasswordInput,
       });
@@ -4662,9 +4665,6 @@ renderMintButton() {
           cardStyle={resolveSbtPageInteractiveCursorStyle()}
           claimCountdown={claimCountdown}
           groupPasswordInput={this.state.groupPasswordInput || ''}
-          hasGroupPasswordMint={this.state.hasGroupPasswordMint}
-          hasInviteMint={this.state.hasInviteMint}
-          hasPasswordMint={sbtInfo.hasPasswordMint}
           hasTokenMini={hasTokenMini}
           imageUrl={imageUrl}
           isMintingActive={isMintingActive}
@@ -4680,11 +4680,9 @@ renderMintButton() {
           miniManualClaimButtonState={miniManualClaimButtonState}
           miniManualClaimFinishContentState={miniManualClaimFinishContentState}
           miniManualClaimStartContentState={miniManualClaimStartContentState}
+          miniMintActionPlan={miniMintActionPlan}
           miniMintActionButtonClassName={miniMintActionButtonClassName}
-          miniMintFlowDisplayState={miniMintFlowDisplayState}
-          miniMintable={miniMintable}
           miniOpenMintButtonContentState={miniOpenMintButtonContentState}
-          miniOpenMintButtonState={miniOpenMintButtonState}
           miniPasswordControlInputStyle={miniPasswordControlDisplayState.inputStyle}
           miniPasswordJoinButtonState={miniPasswordJoinButtonState}
           miniPasswordJoinContentState={miniPasswordJoinContentState}
