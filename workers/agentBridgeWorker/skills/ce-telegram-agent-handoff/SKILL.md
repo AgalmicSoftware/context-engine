@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v16)
+**Skill version:** 2026-05-30 (v17)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -137,8 +137,8 @@ After the user taps `Start`, Telegram should land directly on the private
 agent install screen. Ask the user to tap `Copy Agent Info` and paste the copied
 install info into their agent or Claude Code. Treat any paste containing a
 `ceagt_...` token plus worker/skill URLs as Context Engine onboarding install
-info, even if the first line is compact such as `CE agent: Bearer auth`. Do
-not ask for the user's Telegram handle, Telegram id, or group chat id: the
+info, even if the first line says `Bearer; no IDs; GET /telegram/agent/api/questions`.
+Do not ask for the user's Telegram handle, Telegram id, or group chat id: the
 `ceagt_...` token identifies the user and the worker infers `telegramUserId`.
 Omit `groupChatId` unless a later action is explicitly tied to a Telegram group
 and the group id is already known from Telegram context. Do not call the CE
@@ -432,6 +432,27 @@ POST /telegram/agent/api/questions
 ```
 
 Use only questions where `answerable` is `true`. Locked or unavailable questions may be listed without prompt text and must be skipped. Public question objects include normalized `tags` and, when present, `geoRefs`; use them when deciding relevance.
+
+### Present Questions To Humans
+
+When showing questions in chat or an agent UI, do not dump raw fields. Use a
+short card with the endpoint result translated into human language:
+
+```text
+Q<number>. <short readable title if obvious>
+<question prompt without wrapping quotes>
+
+Type: <binary | rating | freeform | single choice | multiple choice>
+Tags: ethics · safety · methodology
+Answer options: Agree / Unsure / Disagree
+```
+
+Use the stable CE question number when present; otherwise use the list order.
+Keep the full prompt visible, leave a blank line between questions, and omit
+internal ids unless the user asks. Do not lead with raw labels like
+`Question (binary, proposed)` as the main title. For binary CE questions, show
+the user's choices as `Agree`, `Unsure`, and `Disagree` unless the question
+itself clearly asks for yes/no wording.
 
 For personalized question selection, send a POST body with preferences:
 
@@ -1206,6 +1227,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v17)
+
+- Made copied install info point agents at the full `/telegram/agent/api/questions` route and added a human-facing question card format so agents present questions cleanly instead of dumping raw fields.
 
 ### 2026-05-30 (v16)
 
