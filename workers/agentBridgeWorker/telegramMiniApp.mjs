@@ -137,6 +137,7 @@ const DEFAULT_OPENAI_TRANSCRIBE_URL = 'https://api.openai.com/v1/audio/transcrip
 const MINI_APP_URL_QUESTION_COUNT = 5;
 const MINI_APP_URL_QUESTION_MAX_COUNT = 20;
 const MINI_APP_RESULT_GROUP_COUNT = 2;
+const MINI_APP_LAUNCH_RECOVERY_MESSAGE = 'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
 const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
@@ -1544,6 +1545,7 @@ async function buildMiniAppState({
       ok: false,
       httpStatus: 404,
       error: 'mini_app_launch_invalid',
+      message: MINI_APP_LAUNCH_RECOVERY_MESSAGE,
       app: 'ce-telegram-mini-app',
       auth: authSummary,
       launch: {
@@ -1551,6 +1553,7 @@ async function buildMiniAppState({
         launch,
         reason: 'launch_action_missing_or_expired',
       },
+      launchRecovery: miniAppLaunchRecovery(env),
       session: {
         sessionSlug: '',
         title: '',
@@ -3311,6 +3314,15 @@ function telegramAddBotToGroupUrl(env = {}, payload = '') {
   return username && token
     ? `https://t.me/${username}?startgroup=${encodeURIComponent(token)}`
     : '';
+}
+
+function miniAppLaunchRecovery(env = {}) {
+  const username = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
+  return {
+    command: '/start',
+    message: MINI_APP_LAUNCH_RECOVERY_MESSAGE,
+    botUrl: username ? `https://t.me/${username}` : '',
+  };
 }
 
 async function resolveMiniAppAdminContext({
@@ -6888,6 +6900,10 @@ function telegramMiniAppHtml() {
             <input id="filterUnansweredFirst" type="checkbox" checked>
             <span>Show un-answered questions first</span>
           </label>
+          <label class="toggle">
+            <input id="filterAnsweredOnly" type="checkbox">
+            <span>Only answered questions</span>
+          </label>
           <div class="topPopularFilter" aria-label="Top popular questions">
             <div class="topPopularInline">
               <label class="toggle">
@@ -6992,9 +7008,11 @@ function telegramMiniAppHtml() {
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
     const QUESTION_RETRY_DELAY_MS = 4000;
     const DRAFT_AUTOSAVE_DELAY_MS = 700;
+    const ANSWER_CHANGE_SUBMIT_GUARD_MS = 900;
     const RESULT_GROUP_COUNT = 2;
     const SHOW_UNANSWERED_STORAGE_KEY = 'ce:telegram-mini-app:show-unanswered-first';
     const DEMO_RESULTS_STORAGE_KEY = 'ce:telegram-mini-app:demo-results:v2';
+    const MINI_APP_LAUNCH_RECOVERY_MESSAGE = ${JSON.stringify(MINI_APP_LAUNCH_RECOVERY_MESSAGE)};
     const readShowUnansweredFirst = () => {
       try { return window.localStorage.getItem(SHOW_UNANSWERED_STORAGE_KEY) !== 'false'; } catch { return true; }
     };
@@ -7030,9 +7048,12 @@ function telegramMiniAppHtml() {
       savedDraftKeys: new Set(),
       submittedAnswerKeys: new Set(),
       submittedAnswersByQuestionKey: new Map(),
+      answerChangedAtByQuestionKey: new Map(),
+      answerSubmitGuardTimers: new Map(),
       submitDraftsBusy: false,
       submitDraftsMessage: '',
       showUnansweredFirst: readShowUnansweredFirst(),
+      answeredQuestionsOnly: false,
       popularQuestionsOnly: false,
       popularQuestionLimit: POPULAR_QUESTION_LIMIT_DEFAULT,
       selectedQuestionTypes: new Set(),
@@ -7211,6 +7232,7 @@ function telegramMiniAppHtml() {
       filterPanel: document.getElementById('filterPanel'),
       closeFilter: document.getElementById('closeFilter'),
       filterUnansweredFirst: document.getElementById('filterUnansweredFirst'),
+      filterAnsweredOnly: document.getElementById('filterAnsweredOnly'),
       filterTopPopular: document.getElementById('filterTopPopular'),
       filterTopPopularLimit: document.getElementById('filterTopPopularLimit'),
       decrementTopPopular: document.getElementById('decrementTopPopular'),
@@ -7295,6 +7317,12 @@ function telegramMiniAppHtml() {
       const out = json ? { 'content-type': 'application/json' } : {};
       if (tg && tg.initData) out['x-telegram-init-data'] = tg.initData;
       return out;
+    };
+    const userFacingErrorMessage = (body = {}, fallback = 'Something went wrong.') => {
+      if (body?.error === 'mini_app_launch_invalid') {
+        return body.message || body.launchRecovery?.message || MINI_APP_LAUNCH_RECOVERY_MESSAGE;
+      }
+      return body?.message || body?.error || fallback;
     };
     const selectedSessionQuery = () => Array.from(state.selectedSessionSlugs).filter(Boolean).join(',');
     const selectedResultsSessions = () => {
@@ -7402,16 +7430,35 @@ function telegramMiniAppHtml() {
       if (!submittedAnswer?.answer) return false;
       return normalizeAnswerForCompare(answerPayload(question)) === normalizeAnswerForCompare(submittedAnswer.answer);
     };
+    const answerChangeGuardActive = (question) => {
+      const changedAt = Number(state.answerChangedAtByQuestionKey.get(question?.questionKey) || 0);
+      return changedAt > 0 && Date.now() - changedAt < ANSWER_CHANGE_SUBMIT_GUARD_MS;
+    };
+    const cardsForQuestion = (question, sourceElement = null) => {
+      const sourceCard = sourceElement?.closest?.('.card');
+      if (sourceCard) return [sourceCard];
+      const key = question?.questionKey || '';
+      if (!key) return [];
+      return Array.from(el.questionStack?.querySelectorAll?.('.card') || [])
+        .filter((card) => card.dataset?.questionKey === key);
+    };
     const applySubmitButtonState = (button, question, { busy = false } = {}) => {
       if (!button) return;
       const submittedCurrentAnswer = !busy && currentAnswerMatchesSubmitted(question);
+      const guarded = !busy && !submittedCurrentAnswer && answerChangeGuardActive(question);
       button.classList.toggle('submittedCheck', submittedCurrentAnswer);
-      button.disabled = busy || !question?.canAnswer || submittedCurrentAnswer;
+      button.disabled = busy || !question?.canAnswer || submittedCurrentAnswer || guarded;
       button.setAttribute('aria-busy', busy ? 'true' : 'false');
       if (submittedCurrentAnswer) {
         button.innerHTML = CHECK_ICON;
         button.setAttribute('aria-label', 'Submitted');
         button.title = 'Submitted';
+        return;
+      }
+      if (guarded) {
+        button.textContent = 'Review';
+        button.setAttribute('aria-label', 'Review answer before submitting');
+        button.title = 'Review answer before submitting';
         return;
       }
       button.textContent = busy ? 'Submitting...' : 'Submit';
@@ -7425,14 +7472,27 @@ function telegramMiniAppHtml() {
       return !currentAnswerMatchesSubmitted(question);
     };
     const refreshQuestionActionControls = (question, sourceElement) => {
-      const card = sourceElement?.closest?.('.card');
-      const actions = card?.querySelector?.('.cardActions');
       const visible = shouldShowAnswerActions(question) || seriesModeEnabled();
-      if (actions) actions.hidden = !visible;
-      const button = card?.querySelector?.('.submitButton');
-      applySubmitButtonState(button, question);
+      cardsForQuestion(question, sourceElement).forEach((card) => {
+        const actions = card?.querySelector?.('.cardActions');
+        if (actions) actions.hidden = !visible;
+        const button = card?.querySelector?.('.submitButton');
+        applySubmitButtonState(button, question);
+      });
     };
     const refreshQuestionSubmitButton = refreshQuestionActionControls;
+    function markAnswerChanged(question) {
+      const key = question?.questionKey || '';
+      if (!key) return;
+      state.answerChangedAtByQuestionKey.set(key, Date.now());
+      const existing = state.answerSubmitGuardTimers.get(key);
+      if (existing) window.clearTimeout(existing);
+      const timer = window.setTimeout(() => {
+        state.answerSubmitGuardTimers.delete(key);
+        refreshQuestionActionControls(question);
+      }, ANSWER_CHANGE_SUBMIT_GUARD_MS);
+      state.answerSubmitGuardTimers.set(key, timer);
+    }
     const bumpDraftAutosaveVersion = (question) => {
       const key = question?.questionKey || '';
       if (!key) return 0;
@@ -7465,7 +7525,6 @@ function telegramMiniAppHtml() {
     };
     const questionAnswered = (question) => {
       if (state.submittedAnswerKeys.has(question?.questionKey)) return true;
-      if (state.savedDraftKeys.has(question?.questionKey)) return true;
       return false;
     };
     const questionSeriesState = () => state.data?.questionSeries || {};
@@ -7638,6 +7697,7 @@ function telegramMiniAppHtml() {
       return score;
     };
     const questionMatchesFilters = (question) => {
+      if (state.answeredQuestionsOnly && !questionAnswered(question)) return false;
       if (state.selectedQuestionTypes.size && !state.selectedQuestionTypes.has(questionTypeFilterValue(question))) return false;
       if (state.selectedQuestionTags.size) {
         const tags = new Set(questionTags(question));
@@ -7910,6 +7970,7 @@ function telegramMiniAppHtml() {
       activate(question);
       const draft = draftFor(question);
       draft.value = value;
+      markAnswerChanged(question);
       renderQuestionStack();
       scheduleDraftAutosave(question);
     }
@@ -7921,6 +7982,7 @@ function telegramMiniAppHtml() {
         ? (values.includes(option) ? [] : [option])
         : (values.includes(option) ? values.filter((value) => value !== option) : values.concat(option));
       draft.values = next;
+      markAnswerChanged(question);
       renderQuestionStack();
       scheduleDraftAutosave(question);
     }
@@ -7966,6 +8028,7 @@ function telegramMiniAppHtml() {
           activate(question);
           draft.value = Number(input.value);
           label.textContent = input.value;
+          markAnswerChanged(question);
           refreshQuestionSubmitButton(question, input);
           scheduleDraftAutosave(question);
           updateFooterControls();
@@ -7999,6 +8062,7 @@ function telegramMiniAppHtml() {
           }
           activate(question);
           draft.text = input.value;
+          markAnswerChanged(question);
           refreshQuestionSubmitButton(question, input);
           scheduleDraftAutosave(question);
           updateFooterControls();
@@ -8034,6 +8098,7 @@ function telegramMiniAppHtml() {
         }
         activate(question);
         draft.comments = comments.value;
+        markAnswerChanged(question);
         refreshQuestionSubmitButton(question, comments);
         scheduleDraftAutosave(question);
         updateFooterControls();
@@ -8090,6 +8155,7 @@ function telegramMiniAppHtml() {
       submit.onclick = (event) => {
         event.stopPropagation();
         if (currentAnswerMatchesSubmitted(question)) return;
+        if (answerChangeGuardActive(question)) return;
         sendAnswer(true, question, submit);
       };
       actions.appendChild(submit);
@@ -8151,6 +8217,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.text = textarea.value;
       activate(question);
+      markAnswerChanged(question);
       refreshQuestionSubmitButton(question, textarea);
       scheduleDraftAutosave(question);
       updateFooterControls();
@@ -8191,6 +8258,7 @@ function telegramMiniAppHtml() {
       textarea.value = base + prefix + text;
       draft.comments = textarea.value;
       activate(question);
+      markAnswerChanged(question);
       refreshQuestionSubmitButton(question, textarea);
       scheduleDraftAutosave(question);
       updateFooterControls();
@@ -8865,11 +8933,13 @@ function telegramMiniAppHtml() {
       return state.selectedQuestionTypes.size +
         state.selectedQuestionTags.size +
         (String(state.aiSearchQuery || '').trim() ? 1 : 0) +
+        (state.answeredQuestionsOnly ? 1 : 0) +
         (state.popularQuestionsOnly ? 1 : 0);
     }
     function clearQuestionFilters() {
       state.selectedQuestionTypes.clear();
       state.selectedQuestionTags.clear();
+      state.answeredQuestionsOnly = false;
       state.popularQuestionsOnly = false;
       state.popularQuestionLimit = POPULAR_QUESTION_LIMIT_DEFAULT;
       state.aiDraftQuery = '';
@@ -10231,6 +10301,7 @@ function telegramMiniAppHtml() {
     }
     function renderFilters() {
       el.filterUnansweredFirst.checked = state.showUnansweredFirst;
+      el.filterAnsweredOnly.checked = state.answeredQuestionsOnly === true;
       el.filterTopPopular.checked = state.popularQuestionsOnly === true;
       state.popularQuestionLimit = normalizePopularQuestionLimit(state.popularQuestionLimit);
       el.filterTopPopularLimit.value = String(state.popularQuestionLimit);
@@ -10318,6 +10389,7 @@ function telegramMiniAppHtml() {
       const total = questions.length;
       const shown = filteredQuestionEntries().length;
       const active = [];
+      if (state.answeredQuestionsOnly) active.push('answered only');
       if (state.popularQuestionsOnly) active.push('top ' + state.popularQuestionLimit + ' popular');
       if (state.selectedQuestionTypes.size) active.push(Array.from(state.selectedQuestionTypes).map(questionTypeLabel).join(', '));
       if (state.selectedQuestionTags.size) active.push(Array.from(state.selectedQuestionTags).map(questionTagLabel).join(', '));
@@ -10472,7 +10544,7 @@ function telegramMiniAppHtml() {
       }
       if (submit) setSubmitBusy(false, triggerButton, question);
       if (!response.ok || !body.ok) {
-        if (!suppressStatus) setStatus(body.message || body.error || 'Could not save answer.', 'error');
+        if (!suppressStatus) setStatus(userFacingErrorMessage(body, 'Could not save answer.'), 'error');
         return false;
       }
       if (
@@ -10614,7 +10686,7 @@ function telegramMiniAppHtml() {
         return;
       }
       if (!response.ok || !body.ok) {
-        setStatus(body.error || 'Could not clear drafts.', 'error');
+        setStatus(userFacingErrorMessage(body, 'Could not clear drafts.'), 'error');
         el.clearDrafts.disabled = false;
         return;
       }
@@ -11109,7 +11181,7 @@ function telegramMiniAppHtml() {
         return;
       }
       if (!response.ok || !body.ok) {
-        setStatus(body.error || 'Could not load Mini App.', 'error');
+        setStatus(userFacingErrorMessage(body, 'Could not load Mini App.'), 'error');
         clearQuestionRetry();
         return;
       }
@@ -11418,6 +11490,10 @@ function telegramMiniAppHtml() {
     el.filterUnansweredFirst.onchange = () => {
       state.showUnansweredFirst = el.filterUnansweredFirst.checked;
       writeShowUnansweredFirst(state.showUnansweredFirst);
+      render();
+    };
+    el.filterAnsweredOnly.onchange = () => {
+      state.answeredQuestionsOnly = el.filterAnsweredOnly.checked;
       render();
     };
     el.filterTopPopular.onchange = () => {

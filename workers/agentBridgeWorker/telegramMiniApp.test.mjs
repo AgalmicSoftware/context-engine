@@ -140,6 +140,32 @@ test('validateTelegramMiniAppInitData rejects tampered and expired init data', a
   assert.equal(expiredResult.reason, 'telegram_init_data_expired');
 });
 
+test('Mini App explains how to recover an expired launch', async () => {
+  const botToken = '123456:test-token';
+  const launch = 'cecb_1234567890';
+  const initData = signInitData({
+    auth_date: String(Math.floor(Date.now() / 1000)),
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, botToken);
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`, {
+      headers: { 'x-telegram-init-data': initData },
+    }),
+    env: {
+      AGENT_ACTION_KV: new MemoryKv(),
+      TELEGRAM_BOT_TOKEN: botToken,
+      TELEGRAM_BOT_USERNAME: 'contextengineer_bot',
+    },
+  });
+
+  assert.equal(state.ok, false);
+  assert.equal(state.error, 'mini_app_launch_invalid');
+  assert.equal(state.httpStatus, 404);
+  assert.match(state.message, /send \/start/);
+  assert.equal(state.launchRecovery.command, '/start');
+  assert.equal(state.launchRecovery.botUrl, 'https://t.me/contextengineer_bot');
+});
+
 test('Mini App renders agree-style controls in client order with client colors', () => {
   const html = __test__telegramMiniApp.telegramMiniAppHtml();
   const agreeIndex = html.indexOf("['agree', 'Agree']");
@@ -597,6 +623,21 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /refreshQuestionSubmitButton\(question, input\);/);
   assert.match(html, /refreshQuestionSubmitButton\(question, comments\);/);
   assert.match(html, /if \(currentAnswerMatchesSubmitted\(question\)\) return;/);
+  assert.match(html, /const ANSWER_CHANGE_SUBMIT_GUARD_MS = 900;/);
+  assert.match(html, /answerChangedAtByQuestionKey: new Map\(\)/);
+  assert.match(html, /function markAnswerChanged\(question\)/);
+  assert.match(html, /answerChangeGuardActive\(question\)/);
+  assert.match(html, /Review answer before submitting/);
+  assert.match(html, /if \(answerChangeGuardActive\(question\)\) return;/);
+  assert.match(html, /markAnswerChanged\(question\);[\s\S]*renderQuestionStack\(\);[\s\S]*scheduleDraftAutosave\(question\);/);
+  assert.equal(html.includes('state.savedDraftKeys.has(question?.questionKey)'), false);
+  assert.match(html, /id="filterAnsweredOnly"/);
+  assert.match(html, /state\.answeredQuestionsOnly && !questionAnswered\(question\)/);
+  assert.match(html, /state\.answeredQuestionsOnly = el\.filterAnsweredOnly\.checked;/);
+  assert.match(html, /answered only/);
+  assert.match(html, /MINI_APP_LAUNCH_RECOVERY_MESSAGE/);
+  assert.match(html, /const userFacingErrorMessage =/);
+  assert.match(html, /body\?\.error === 'mini_app_launch_invalid'/);
   assert.match(html, /const QUESTION_RETRY_DELAY_MS = 4000;/);
   assert.match(html, /SHOW_UNANSWERED_STORAGE_KEY/);
   assert.match(html, /function renderSessionPicker\(\)/);
