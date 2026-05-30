@@ -8,6 +8,11 @@ export type SbtPageBurnActionPlanLike = {
   shouldRenderBurnButton?: boolean;
 };
 
+export type SbtPageMiniBurnActionPlanLike = {
+  blockedReason?: unknown;
+  shouldRenderMiniBurnButton?: boolean;
+};
+
 export type SbtPageActionEventLike = {
   preventDefault?: () => void;
 };
@@ -19,6 +24,10 @@ export type SbtPageMintActionControllerPorts = {
 
 export type SbtPageBurnActionControllerPorts = {
   dispatchBurn?: CallableFunction;
+};
+
+export type SbtPageMiniBurnActionControllerPorts = {
+  dispatchMiniBurn?: CallableFunction;
 };
 
 export type RunSbtPageMintActionControllerArgs = {
@@ -35,6 +44,14 @@ export type RunSbtPageBurnActionControllerArgs = {
   event?: SbtPageActionEventLike | null;
   plan?: SbtPageBurnActionPlanLike | null;
   ports?: SbtPageBurnActionControllerPorts;
+};
+
+export type RunSbtPageMiniBurnActionControllerArgs = {
+  burnArgs?: unknown[];
+  disabled?: boolean;
+  event?: SbtPageActionEventLike | null;
+  plan?: SbtPageMiniBurnActionPlanLike | null;
+  ports?: SbtPageMiniBurnActionControllerPorts;
 };
 
 export type SbtPageActionControllerResult = {
@@ -148,6 +165,50 @@ export const runSbtPageBurnActionController = ({
   }
 
   ports.dispatchBurn();
+  return {
+    blockedReason: plan.blockedReason,
+    status: 'dispatched',
+  };
+};
+
+export const runSbtPageMiniBurnActionController = ({
+  burnArgs = [],
+  disabled = false,
+  event = null,
+  plan = null,
+  ports = {},
+}: RunSbtPageMiniBurnActionControllerArgs = {}): SbtPageActionControllerResult => {
+  preventDefault(event);
+
+  if (!plan?.shouldRenderMiniBurnButton) {
+    return {
+      blockedReason: plan?.blockedReason,
+      status: 'hidden',
+    };
+  }
+
+  if (isBlocked(plan.blockedReason)) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'blocked',
+    };
+  }
+
+  if (disabled) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'disabled',
+    };
+  }
+
+  if (typeof ports.dispatchMiniBurn !== 'function') {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'unhandled',
+    };
+  }
+
+  ports.dispatchMiniBurn(...burnArgs);
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',
