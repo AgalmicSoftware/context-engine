@@ -5317,6 +5317,14 @@ function telegramMiniAppHtml() {
       background: var(--settings-accent);
       border-color: var(--settings-accent);
     }
+    .draftsButton {
+      border-color: rgba(98, 255, 191, 0.45);
+      color: var(--accent);
+    }
+    .draftsButton.active {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
     .headerIconButton.filterButton.active,
     .headerIconButton.addQuestionButton.active,
     .sessionEditButton.sessionsButton.active {
@@ -5459,6 +5467,7 @@ function telegramMiniAppHtml() {
     .settingsPanel,
     .adminPanel,
     .activityPanel,
+    .draftsPanel,
     .documentsPanel,
     .addQuestionPanel,
     .groupsPanel,
@@ -5488,6 +5497,12 @@ function telegramMiniAppHtml() {
       align-items: stretch;
       border-color: rgba(44, 195, 255, 0.52);
       background: rgba(20, 70, 104, 0.28);
+    }
+    .draftsPanel {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: stretch;
+      border-color: rgba(98, 255, 191, 0.52);
+      background: rgba(24, 92, 71, 0.24);
     }
     .documentsPanel {
       grid-template-columns: minmax(0, 1fr);
@@ -5519,7 +5534,7 @@ function telegramMiniAppHtml() {
       border-color: rgba(98, 255, 191, 0.52);
       background: rgba(24, 92, 71, 0.28);
     }
-    .settingsPanel.open, .adminPanel.open, .activityPanel.open, .documentsPanel.open, .addQuestionPanel.open, .groupsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
+    .settingsPanel.open, .adminPanel.open, .activityPanel.open, .draftsPanel.open, .documentsPanel.open, .addQuestionPanel.open, .groupsPanel.open, .filterPanel.open, .resultsPanel.open { display: grid; }
     .resultsHeader {
       display: flex;
       align-items: center;
@@ -6567,7 +6582,7 @@ function telegramMiniAppHtml() {
     }
     @media (max-width: 760px) {
       .toolMenu { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .settingsPanel, .adminPanel, .activityPanel, .documentsPanel, .addQuestionPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
+      .settingsPanel, .adminPanel, .activityPanel, .draftsPanel, .documentsPanel, .addQuestionPanel, .groupsPanel, .filterPanel { grid-template-columns: 1fr; }
       .resultColumns { grid-template-columns: 1fr; }
       .filterSearchRow { grid-template-columns: minmax(0, 1fr) 44px auto; }
     }
@@ -6619,6 +6634,12 @@ function telegramMiniAppHtml() {
               <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
             </svg>
             <span>Settings</span>
+          </button>
+          <button class="iconButton draftsButton" id="showDrafts" type="button" aria-label="Drafts" aria-expanded="false" title="Drafts">
+            <svg class="filterIcon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <path d="M4 5h16"></path><path d="M4 12h16"></path><path d="M4 19h10"></path><path d="M17 17l2 2 3-5"></path>
+            </svg>
+            <span>Drafts</span>
           </button>
           <label class="iconButton resultsButton menuCheckbox" title="Demo data">
             <input id="demoDataResults" type="checkbox" aria-label="Demo data">
@@ -6674,6 +6695,19 @@ function telegramMiniAppHtml() {
         </div>
         <div class="filterSummary" id="activitySummary"></div>
         <div class="activityList" id="activityList"></div>
+      </section>
+      <section class="draftsPanel" id="draftsPanel" aria-label="Drafts">
+        <div class="resultsHeader">
+          <div class="sectionTitle">Drafts</div>
+          <button class="iconButton panelCloseButton" id="closeDrafts" type="button" aria-label="Close drafts" title="Close drafts">
+            <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div class="savedDrafts" id="savedDrafts"></div>
+        <div class="draftActions">
+          <button class="primary" id="submitDrafts" type="button">Submit drafts</button>
+          <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
+        </div>
       </section>
       <section class="documentsPanel" id="documentsPanel" aria-label="Documents">
         <div class="resultsHeader">
@@ -6922,11 +6956,6 @@ function telegramMiniAppHtml() {
           <span>Agent auto-votes</span>
         </label>
         <button class="primary" id="saveSettings" type="button">Save</button>
-        <div class="savedDrafts" id="savedDrafts"></div>
-        <div class="draftActions">
-          <button class="primary" id="submitDrafts" type="button">Submit drafts</button>
-          <button class="secondary" id="clearDrafts" type="button">Clear drafts</button>
-        </div>
       </section>
     </header>
     <section class="layout">
@@ -7099,6 +7128,9 @@ function telegramMiniAppHtml() {
       activitySummary: document.getElementById('activitySummary'),
       activityList: document.getElementById('activityList'),
       closeActivity: document.getElementById('closeActivity'),
+      showDrafts: document.getElementById('showDrafts'),
+      draftsPanel: document.getElementById('draftsPanel'),
+      closeDrafts: document.getElementById('closeDrafts'),
       sessionPicker: document.getElementById('sessionPicker'),
       sessionSummary: document.getElementById('sessionSummary'),
       sessionPickerBody: document.getElementById('sessionPickerBody'),
@@ -11228,6 +11260,11 @@ function telegramMiniAppHtml() {
       scrollPanelIntoView(el.activityPanel);
       loadActivity({ force: true });
     };
+    el.showDrafts.onclick = () => {
+      setPanelOpen(el.draftsPanel, el.showDrafts, true);
+      setToolMenuOpen(false);
+      scrollPanelIntoView(el.draftsPanel);
+    };
     el.showFilter.onclick = () => {
       setPanelOpen(el.filterPanel, el.showFilter, true);
       setToolMenuOpen(false);
@@ -11264,6 +11301,7 @@ function telegramMiniAppHtml() {
     bindPanelClose(el.closeDocuments, el.documentsPanel, el.showDocuments);
     bindPanelClose(el.closeAdmin, el.adminPanel, el.showAdmin);
     bindPanelClose(el.closeActivity, el.activityPanel, el.showActivity);
+    bindPanelClose(el.closeDrafts, el.draftsPanel, el.showDrafts);
     bindPanelClose(el.closeFilter, el.filterPanel, el.showFilter);
     bindPanelClose(el.closeSettings, el.settingsPanel, el.showSettings);
     bindPanelClose(el.closeGroups, el.groupsPanel, el.showGroups);

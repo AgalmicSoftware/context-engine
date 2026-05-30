@@ -189,6 +189,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(toolMenu.includes('<span>Add question</span>'), false);
   assert.equal(toolMenu.includes('<span>Filter</span>'), false);
   assert.match(toolMenu, /<span>Settings<\/span>/);
+  assert.match(toolMenu, /id="showDrafts"[^>]*aria-label="Drafts"[\s\S]*<span>Drafts<\/span>/);
   assert.match(toolMenu, /id="demoDataResults"[^>]*aria-label="Demo data"[\s\S]*<span>Demo data<\/span>/);
   assert.match(html, /\.menuButton\.active \{[\s\S]*color: var\(--accent\);[\s\S]*background: rgba\(98, 255, 191, 0\.12\);/);
   assert.match(html, /\.toolMenu \.iconButton \{[\s\S]*min-height: 64px;[\s\S]*font-size: 14px;[\s\S]*line-height: 1\.15;/);
@@ -201,6 +202,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="showAddQuestion"[^>]*aria-label="Add question"/);
   assert.match(html, /id="showResults"[^>]*aria-label="Results"/);
   assert.match(html, /id="showSettings"[^>]*aria-label="Settings"/);
+  assert.match(html, /id="draftsPanel"[^>]*aria-label="Drafts"/);
+  assert.match(html, /id="closeDrafts"[^>]*aria-label="Close drafts"/);
   assert.match(html, /id="filterPanel"[^>]*aria-label="Question filters"/);
   assert.match(html, /class="filterSubsection collapsed" id="questionTypeFilterSection"/);
   assert.match(html, /id="toggleQuestionTypeFilters"[^>]*aria-expanded="false"/);
@@ -515,6 +518,14 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /renderAnswerControls\(question, body, \{ showComments: true \}\);/);
   assert.match(html, /id="savedDrafts"/);
   assert.match(html, /Submitted responses/);
+  const settingsStart = html.indexOf('<section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">');
+  const settingsSection = settingsStart >= 0 ? html.slice(settingsStart, html.indexOf('</section>', settingsStart)) : '';
+  const draftsStart = html.indexOf('<section class="draftsPanel" id="draftsPanel" aria-label="Drafts">');
+  const draftsSection = draftsStart >= 0 ? html.slice(draftsStart, html.indexOf('</section>', draftsStart)) : '';
+  assert.equal(settingsSection.includes('id="savedDrafts"'), false);
+  assert.match(draftsSection, /id="savedDrafts"/);
+  assert.match(draftsSection, /id="submitDrafts"/);
+  assert.match(draftsSection, /id="clearDrafts"/);
   assert.equal(html.includes('Submitted answer: '), false);
   assert.equal(html.includes('.answerBadge'), false);
   assert.match(html, /el\.submitDrafts\.disabled = savedDrafts\.length === 0 \|\| state\.submitDraftsBusy;/);
@@ -1646,7 +1657,7 @@ test('Mini App settings accepts show-unanswered-first with true default', () => 
   assert.equal(invalidAttendance.reason, 'attendance_link_opt_in_invalid');
 });
 
-test('Mini App state pre-populates previously saved answers and exposes them in settings', async () => {
+test('Mini App state pre-populates previously saved answers and exposes them in drafts', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-previous';
   await persistAnswerDraft({
