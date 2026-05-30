@@ -9079,7 +9079,7 @@ async function buildAgentTokenResponse({
     createdAt,
   });
   const bodyText = [
-    'Press Copy Agent Info and paste to your agent',
+    'Press Copy Agent Info and paste to your agent or Claude',
     '',
     'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n');

@@ -4819,7 +4819,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.text, [
-    'Press Copy Agent Info and paste to your agent',
+    'Press Copy Agent Info and paste to your agent or Claude',
     '',
     'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n'));
@@ -4924,7 +4924,7 @@ test('private Onboard Agent callback renders the copy install screen on first ta
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-first-tap');
-  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
 });
@@ -5019,7 +5019,7 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude/);
   assert.doesNotMatch(result.response.text, /Session: Alpha Session/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
