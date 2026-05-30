@@ -1,6 +1,8 @@
 import {
   runUserPageAnalyzeActionController,
+  runUserPageBookmarkActionController,
   type UserPageAnalyzeActionControllerPorts,
+  type UserPageBookmarkActionControllerPorts,
 } from './userPageActionController';
 
 describe('userPageActionController', () => {
@@ -75,5 +77,78 @@ describe('userPageActionController', () => {
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
     expect(dispatchAnalyze).toHaveBeenCalledTimes(1);
     expect(dispatchAnalyze).toHaveBeenCalledWith(event);
+  });
+
+  it('does not dispatch hidden, blocked, disabled, or unhandled bookmark actions', () => {
+    const dispatchBookmark = jest.fn();
+
+    expect(runUserPageBookmarkActionController({
+      plan: {
+        blockedReason: 'owner-page',
+        shouldRenderBookmarkAction: false,
+      },
+      ports: { dispatchBookmark },
+    })).toEqual({
+      blockedReason: 'owner-page',
+      status: 'hidden',
+    });
+    expect(runUserPageBookmarkActionController({
+      plan: {
+        blockedReason: 'bookmark-unavailable',
+        shouldRenderBookmarkAction: true,
+      },
+      ports: { dispatchBookmark },
+    })).toEqual({
+      blockedReason: 'bookmark-unavailable',
+      status: 'blocked',
+    });
+    expect(runUserPageBookmarkActionController({
+      plan: {
+        blockedReason: 'none',
+        disabled: true,
+        shouldRenderBookmarkAction: true,
+      },
+      ports: { dispatchBookmark },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(runUserPageBookmarkActionController({
+      plan: {
+        blockedReason: 'none',
+        shouldRenderBookmarkAction: true,
+      },
+      ports: {},
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'unhandled',
+    });
+
+    expect(dispatchBookmark).not.toHaveBeenCalled();
+  });
+
+  it('dispatches bookmarks through the injected port with preserved args', () => {
+    const dispatchBookmark = jest.fn() satisfies UserPageBookmarkActionControllerPorts<[
+      { type: string },
+    ]>['dispatchBookmark'];
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(runUserPageBookmarkActionController({
+      bookmarkArgs: [event],
+      event,
+      plan: {
+        blockedReason: 'none',
+        disabled: false,
+        shouldRenderBookmarkAction: true,
+      },
+      ports: { dispatchBookmark },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(dispatchBookmark).toHaveBeenCalledTimes(1);
+    expect(dispatchBookmark).toHaveBeenCalledWith(event);
   });
 });
