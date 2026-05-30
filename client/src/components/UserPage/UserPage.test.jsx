@@ -197,6 +197,55 @@ const normalizeChildrenArray = (value) => (
   Array.isArray(value) ? value : [value].filter(Boolean)
 );
 
+describe('UserPage analyze action boundary', () => {
+  it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {
+    const instance = makeInstance();
+    instance.analyzeUser = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.analyzeButtonDisplayState.disabled).toBe(false);
+
+    const result = header.props.onAnalyzeUser(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).toHaveBeenCalledWith(event);
+  });
+
+  it('keeps disabled header analyze clicks inert before reaching analyze side effects', () => {
+    const instance = makeInstance({ isSBTCacheReady: false });
+    instance.analyzeUser = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.analyzeButtonDisplayState.disabled).toBe(true);
+
+    const result = header.props.onAnalyzeUser(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).not.toHaveBeenCalled();
+  });
+});
+
 describe('UserPage survey route boundaries', () => {
   it('keeps parent-owned survey href and open callbacks aligned with session and responder routes', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
