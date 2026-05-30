@@ -70,6 +70,31 @@ describe('sbtPageActionController', () => {
     expect(dispatchMint).toHaveBeenCalledWith(true, { sbtAddressOverride: '0xabc' });
   });
 
+  it('keeps each parent mint dispatch shape intact', () => {
+    const dispatchNoArgMint = jest.fn() satisfies SbtPageMintActionControllerPorts<[]>['dispatchMint'];
+    const dispatchInviteMint = jest.fn() satisfies SbtPageMintActionControllerPorts<[string]>['dispatchMint'];
+    const dispatchForcedMint = jest.fn() satisfies SbtPageMintActionControllerPorts<[boolean]>['dispatchMint'];
+
+    expect(runSbtPageMintActionController({
+      plan: { blockedReason: 'none', shouldRenderMintButton: true },
+      ports: { dispatchMint: dispatchNoArgMint },
+    }).status).toBe('dispatched');
+    expect(runSbtPageMintActionController({
+      mintArgs: ['invite-code'],
+      plan: { blockedReason: 'none', shouldRenderMintButton: true },
+      ports: { dispatchMint: dispatchInviteMint },
+    }).status).toBe('dispatched');
+    expect(runSbtPageMintActionController({
+      mintArgs: [true],
+      plan: { blockedReason: 'none', shouldRenderMintButton: true },
+      ports: { dispatchMint: dispatchForcedMint },
+    }).status).toBe('dispatched');
+
+    expect(dispatchNoArgMint).toHaveBeenCalledWith();
+    expect(dispatchInviteMint).toHaveBeenCalledWith('invite-code');
+    expect(dispatchForcedMint).toHaveBeenCalledWith(true);
+  });
+
   it('calls the burn port when enabled', () => {
     const dispatchBurn = jest.fn() satisfies SbtPageBurnActionControllerPorts['dispatchBurn'];
     const event = { preventDefault: jest.fn() };
