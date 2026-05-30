@@ -53,6 +53,7 @@ import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
+  runSbtPageMiniMintActionController,
   runSbtPageMintActionController,
 } from './sbtPageActionController';
 import {
@@ -4705,7 +4706,14 @@ renderMintButton() {
             event.preventDefault();
             window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
           }}
-          onClaimWithInviteCode={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+          onClaimWithInviteCode={(event) => runSbtPageMiniMintActionController({
+            event,
+            inviteCodeMintArgs: [this.state.groupPasswordInput],
+            plan: miniMintActionPlan,
+            ports: {
+              dispatchInviteCodeMint: this.claimWithInviteCode,
+            },
+          })}
           onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
           onImageError={imageErrorHandler}
           onManualPasswordInputChange={this.handleManualPasswordInputChange}
@@ -4717,9 +4725,27 @@ renderMintButton() {
               dispatchMiniBurn: this.miniBurnHandler,
             },
           })}
-          onMiniMint={this.miniMintHandler}
-          onMintUnlimitedWithGroupPassword={() => this.mintUnlimitedWithGroupPassword()}
-          onShowMiniPasswordInput={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
+          onMiniMint={(event) => runSbtPageMiniMintActionController({
+            event,
+            plan: miniMintActionPlan,
+            ports: {
+              dispatchMiniMint: this.miniMintHandler,
+            },
+          })}
+          onMintUnlimitedWithGroupPassword={(event) => runSbtPageMiniMintActionController({
+            event,
+            plan: miniMintActionPlan,
+            ports: {
+              dispatchGroupPasswordMint: this.mintUnlimitedWithGroupPassword,
+            },
+          })}
+          onShowMiniPasswordInput={(event) => runSbtPageMiniMintActionController({
+            event,
+            plan: miniMintActionPlan,
+            ports: {
+              dispatchShowPasswordInput: () => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true })),
+            },
+          })}
           sbtAddress={sbtAddressForDisplay}
           sbtName={sbtName}
           shouldRenderEndedIndicator={shouldRenderEndedIndicator}

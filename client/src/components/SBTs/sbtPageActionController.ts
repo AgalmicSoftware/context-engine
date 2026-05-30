@@ -13,6 +13,13 @@ export type SbtPageMiniBurnActionPlanLike = {
   shouldRenderMiniBurnButton?: boolean;
 };
 
+export type SbtPageMiniMintActionPlanLike = {
+  blockedReason?: unknown;
+  disabled?: boolean;
+  handlerKind?: unknown;
+  shouldRenderMintArea?: boolean;
+};
+
 export type SbtPageActionEventLike = {
   preventDefault?: () => void;
 };
@@ -36,6 +43,18 @@ export type SbtPageBurnActionControllerPorts = {
 
 export type SbtPageMiniBurnActionControllerPorts = {
   dispatchMiniBurn?: SbtPageNoArgActionDispatch;
+};
+
+export type SbtPageMiniMintActionControllerPorts<
+  MiniMintArgs extends readonly unknown[] = readonly unknown[],
+  GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
+  InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+> = {
+  dispatchGroupPasswordMint?: SbtPageActionDispatch<GroupPasswordMintArgs>;
+  dispatchInviteCodeMint?: SbtPageActionDispatch<InviteCodeMintArgs>;
+  dispatchMiniMint?: SbtPageActionDispatch<MiniMintArgs>;
+  dispatchShowPasswordInput?: SbtPageActionDispatch<ShowPasswordInputArgs>;
 };
 
 export type RunSbtPageMintActionControllerArgs<
@@ -62,6 +81,27 @@ export type RunSbtPageMiniBurnActionControllerArgs = {
   event?: SbtPageActionEventLike | null;
   plan?: SbtPageMiniBurnActionPlanLike | null;
   ports?: SbtPageMiniBurnActionControllerPorts;
+};
+
+export type RunSbtPageMiniMintActionControllerArgs<
+  MiniMintArgs extends readonly unknown[] = readonly unknown[],
+  GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
+  InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+> = {
+  disabled?: boolean;
+  event?: SbtPageActionEventLike | null;
+  groupPasswordMintArgs?: GroupPasswordMintArgs;
+  inviteCodeMintArgs?: InviteCodeMintArgs;
+  miniMintArgs?: MiniMintArgs;
+  plan?: SbtPageMiniMintActionPlanLike | null;
+  ports?: SbtPageMiniMintActionControllerPorts<
+    MiniMintArgs,
+    GroupPasswordMintArgs,
+    InviteCodeMintArgs,
+    ShowPasswordInputArgs
+  >;
+  showPasswordInputArgs?: ShowPasswordInputArgs;
 };
 
 export type SbtPageActionControllerResult = {
@@ -180,6 +220,111 @@ export const runSbtPageBurnActionController = ({
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',
+  };
+};
+
+export const runSbtPageMiniMintActionController = <
+  MiniMintArgs extends readonly unknown[] = readonly unknown[],
+  GroupPasswordMintArgs extends readonly unknown[] = readonly unknown[],
+  InviteCodeMintArgs extends readonly unknown[] = readonly unknown[],
+  ShowPasswordInputArgs extends readonly unknown[] = readonly unknown[]
+>({
+  disabled = false,
+  event = null,
+  groupPasswordMintArgs = [] as unknown as GroupPasswordMintArgs,
+  inviteCodeMintArgs = [] as unknown as InviteCodeMintArgs,
+  miniMintArgs = [] as unknown as MiniMintArgs,
+  plan = null,
+  ports = {},
+  showPasswordInputArgs = [] as unknown as ShowPasswordInputArgs,
+}: RunSbtPageMiniMintActionControllerArgs<
+  MiniMintArgs,
+  GroupPasswordMintArgs,
+  InviteCodeMintArgs,
+  ShowPasswordInputArgs
+> = {}): SbtPageActionControllerResult => {
+  preventDefault(event);
+
+  if (!plan?.shouldRenderMintArea) {
+    return {
+      blockedReason: plan?.blockedReason,
+      status: 'hidden',
+    };
+  }
+
+  if (isBlocked(plan.blockedReason)) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'blocked',
+    };
+  }
+
+  if (disabled || !!plan.disabled) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'disabled',
+    };
+  }
+
+  if (plan.handlerKind === 'show-password-input') {
+    if (typeof ports.dispatchShowPasswordInput !== 'function') {
+      return {
+        blockedReason: plan.blockedReason,
+        status: 'unhandled',
+      };
+    }
+    ports.dispatchShowPasswordInput(...showPasswordInputArgs);
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'dispatched',
+    };
+  }
+
+  if (plan.handlerKind === 'mint-unlimited-with-group-password') {
+    if (typeof ports.dispatchGroupPasswordMint !== 'function') {
+      return {
+        blockedReason: plan.blockedReason,
+        status: 'unhandled',
+      };
+    }
+    ports.dispatchGroupPasswordMint(...groupPasswordMintArgs);
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'dispatched',
+    };
+  }
+
+  if (plan.handlerKind === 'claim-with-invite-code') {
+    if (typeof ports.dispatchInviteCodeMint !== 'function') {
+      return {
+        blockedReason: plan.blockedReason,
+        status: 'unhandled',
+      };
+    }
+    ports.dispatchInviteCodeMint(...inviteCodeMintArgs);
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'dispatched',
+    };
+  }
+
+  if (plan.handlerKind === 'mini-mint') {
+    if (typeof ports.dispatchMiniMint !== 'function') {
+      return {
+        blockedReason: plan.blockedReason,
+        status: 'unhandled',
+      };
+    }
+    ports.dispatchMiniMint(...miniMintArgs);
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'dispatched',
+    };
+  }
+
+  return {
+    blockedReason: plan.blockedReason,
+    status: 'unhandled',
   };
 };
 

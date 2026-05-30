@@ -67,7 +67,7 @@ const nodeHasClassName = (node, className) => String(node?.props?.className || '
   .split(/\s+/)
   .includes(className);
 
-const renderMiniCardNode = (props = {}) => {
+const renderMiniCardNode = (props = {}, stateOverrides = {}, configureSubject = null) => {
   const sbtAddress = '0x00000000000000000000000000000000000000f1';
   const subject = createSubject({
     miniaturized: true,
@@ -92,13 +92,16 @@ const renderMiniCardNode = (props = {}) => {
     burningStatus: 'idle',
     hasGroupPasswordMint: false,
     hasInviteMint: false,
+    showMiniPasswordInput: false,
+    ...stateOverrides,
   };
+  if (typeof configureSubject === 'function') configureSubject(subject);
   const tree = subject.render();
   const cardNode = findElementInTree(
     tree,
     (element) => element?.type === SbtPageMiniCard
   );
-  return { cardNode, sbtAddress };
+  return { cardNode, sbtAddress, subject };
 };
 
 describe('SBTPage mini-card', () => {
@@ -168,6 +171,87 @@ describe('SBTPage mini-card', () => {
       shouldRenderMintArea: true,
       viewKind: 'open-mint-button',
     });
+  });
+
+  it('routes mini-card mint clicks through the parent mini mint handler', () => {
+    const miniMintHandler = jest.fn();
+    const { cardNode } = renderMiniCardNode({}, {}, (subject) => {
+      subject.miniMintHandler = miniMintHandler;
+    });
+    const preventDefault = jest.fn();
+
+    cardNode.props.onMiniMint({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(miniMintHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not route disabled mini-card mint clicks to the parent handler', () => {
+    const miniMintHandler = jest.fn();
+    const { cardNode } = renderMiniCardNode({}, { mintingStatus: 'pending' }, (subject) => {
+      subject.miniMintHandler = miniMintHandler;
+    });
+    const preventDefault = jest.fn();
+
+    expect(cardNode.props.miniMintActionPlan).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inertReason: 'disabled',
+    });
+
+    cardNode.props.onMiniMint({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(miniMintHandler).not.toHaveBeenCalled();
+  });
+
+  it('routes mini-card invite and group-password mint clicks through parent handlers', () => {
+    const claimWithInviteCode = jest.fn();
+    const { cardNode: inviteCardNode } = renderMiniCardNode(
+      {},
+      {
+        groupPasswordInput: 'invite-code',
+        hasInviteMint: true,
+        showMiniPasswordInput: true,
+      },
+      (subject) => {
+        subject.claimWithInviteCode = claimWithInviteCode;
+      }
+    );
+
+    inviteCardNode.props.onClaimWithInviteCode({ preventDefault: jest.fn() });
+    expect(claimWithInviteCode).toHaveBeenCalledTimes(1);
+    expect(claimWithInviteCode).toHaveBeenCalledWith('invite-code');
+
+    const mintUnlimitedWithGroupPassword = jest.fn();
+    const { cardNode: groupPasswordCardNode } = renderMiniCardNode(
+      {},
+      {
+        groupPasswordInput: 'group-code',
+        hasGroupPasswordMint: true,
+        showMiniPasswordInput: true,
+      },
+      (subject) => {
+        subject.mintUnlimitedWithGroupPassword = mintUnlimitedWithGroupPassword;
+      }
+    );
+
+    groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword({ preventDefault: jest.fn() });
+    expect(mintUnlimitedWithGroupPassword).toHaveBeenCalledTimes(1);
+    expect(mintUnlimitedWithGroupPassword).toHaveBeenCalledWith();
+  });
+
+  it('routes mini-card disclosure clicks through the parent password input action', () => {
+    const { cardNode, subject } = renderMiniCardNode({}, {
+      hasInviteMint: true,
+      showMiniPasswordInput: false,
+    });
+    const preventDefault = jest.fn();
+
+    cardNode.props.onShowMiniPasswordInput({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(subject.state.showMiniPasswordInput).toBe(true);
   });
 
   it('includes the resolved session slug in mini-card navigation when one is available', () => {
