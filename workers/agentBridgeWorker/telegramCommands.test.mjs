@@ -1182,7 +1182,7 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const env = baseEnv({ AGENT_ACTION_KV: kv });
   const written = await writeAgentSkillUpdateFlag({
     env,
-    latestVersion: '2026-05-30 (v9)',
+    latestVersion: '2026-05-30 (v11)',
     note: 'Refresh before answering.',
     accountAddress: `0x${'cd'.repeat(20)}`,
     createdAt: '2026-05-30T00:00:00.000Z',
@@ -1191,9 +1191,9 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
   const cleared = await clearAgentSkillUpdateFlag(env);
 
-  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v9)' });
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v11)' });
   assert.equal(read.updateAvailable, true);
-  assert.equal(read.latestVersion, '2026-05-30 (v9)');
+  assert.equal(read.latestVersion, '2026-05-30 (v11)');
   assert.equal(read.note, 'Refresh before answering.');
   assert.equal(read.updatedBy, '0xcdcd...cdcd');
   assert.equal(putCall.options?.expirationTtl, undefined);
@@ -4819,7 +4819,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.text, [
-    'Press Copy Agent Info and paste to your agent or Claude',
+    'Press Copy Agent Info and paste to your agent or Claude Code',
     '',
     'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n'));
@@ -4828,7 +4828,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   const copyInfo = copyInfoButton?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(copyInfo, /CE onboarding; no echo\./);
+  assert.match(copyInfo, /agent\+ClaudeCode:noids/);
   assert.match(copyInfo, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
   assert.match(copyInfo, /https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
@@ -4924,7 +4924,7 @@ test('private Onboard Agent callback renders the copy install screen on first ta
   assert.equal(result.screen, 'agent_token');
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-first-tap');
-  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude Code/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);
 });
@@ -5019,7 +5019,7 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'agent_token');
-  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude/);
+  assert.match(result.response.text, /Press Copy Agent Info and paste to your agent or Claude Code/);
   assert.doesNotMatch(result.response.text, /Session: Alpha Session/);
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(result.response.text.includes(token), false);

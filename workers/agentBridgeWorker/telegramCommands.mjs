@@ -459,11 +459,12 @@ function buildAgentInstallCopyInfo({
   skillUrl = '',
 } = {}) {
   const compactSkillUrl = compactGithubRawUrl(skillUrl);
-  const intro = 'Below is the information you need to install Context Engine - connect to worker and perform onboarding for your human, asking their preferences.';
+  const intro = 'Below is the information you need to install Context Engine in your agent or Claude Code - connect to worker and perform onboarding for your human, asking their preferences. The ceagt token identifies the Telegram user; do not ask for a handle, Telegram id, or group chat id.';
   const candidates = [
     `${intro}\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
-    `Install CE; connect worker and ask preferences.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
-    `CE onboarding; no echo.\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `Install CE in your agent or Claude Code; no Telegram id needed.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `agent+ClaudeCode:noids\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `agent or Claude Code\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
@@ -9079,7 +9080,7 @@ async function buildAgentTokenResponse({
     createdAt,
   });
   const bodyText = [
-    'Press Copy Agent Info and paste to your agent or Claude',
+    'Press Copy Agent Info and paste to your agent or Claude Code',
     '',
     'Context Engine will ask questions, draft responses, and create a privacy-preserving opinion map',
   ].join('\n');

@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v9)
+**Skill version:** 2026-05-30 (v11)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -87,13 +87,17 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 ```
 
 After the user taps `Start`, Telegram should land directly on the private
-agent install screen. Ask the user to tap `Copy Agent Info` and paste
-the copied install info back into Claude Code. Treat any paste containing a
+agent install screen. Ask the user to tap `Copy Agent Info` and paste the copied
+install info into their agent or Claude Code. Treat any paste containing a
 `ceagt_...` token plus worker/skill URLs as Context Engine onboarding install
-info, even if the first line is compact. Do not call the CE worker until the
-pasted install info provides a `ceagt_...` token, worker URL, and skill URL
-(either as `token=...` / `worker=...` / `skill=...` fields or line-separated
-values). Never echo the token back to the user.
+info, even if the first line is compact such as `agent+ClaudeCode:noids`. Do
+not ask for the user's Telegram handle, Telegram id, or group chat id: the
+`ceagt_...` token identifies the user and the worker infers `telegramUserId`.
+Omit `groupChatId` unless a later action is explicitly tied to a Telegram group
+and the group id is already known from Telegram context. Do not call the CE
+worker until the pasted install info provides a `ceagt_...` token, worker URL,
+and skill URL (either as `token=...` / `worker=...` / `skill=...` fields or
+line-separated values). Never echo the token back to the user.
 
 ## Staying Up To Date
 
@@ -117,8 +121,8 @@ raw GitHub URL, then re-read the changelog before continuing.
 - Use either a worker service token or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
 - For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
-- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
-- Include `groupChatId` when the agent is acting from a Telegram group. If omitted, the user must already have a private session binding that came from CE bot deep-link onboarding or a joined group.
+- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`; never ask the user for a Telegram handle/id just to use a `ceagt_...` token. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
+- Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal Claude Code / external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
 - Current Edge 2026 demo sessions may include the default `Research Questions (Demo)` session for organizers plus participant sessions. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on older sessions always being listed. A `ceagt_` token follows the user's selected session. To switch sessions, send `sessionSlug=<existing-slug>` on a worker call; CE validates the slug and pins it for later omitted-slug calls.
 
@@ -134,8 +138,8 @@ curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api
 Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
 
 1. Ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
-2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session` field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
-3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
+2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
+3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
 4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Draft responses, show the proposed answers, and ask for confirmation.
@@ -222,7 +226,7 @@ Use this path when the user's assistant is not running inside the CE Telegram bo
 2. The user taps `Onboard Agent`, then `Copy Agent Info`. `/me` also links to account details and activity after onboarding.
 3. The user copies the install info into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
-5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; the worker infers the Telegram account and current session. To switch, pass `sessionSlug=<existing-slug>` once; omitted-slug calls stay on that pinned session until the user changes it again.
+5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; do not ask the user for a Telegram handle/id or group chat id. The worker infers the Telegram account and current session, and omitted group context means private-agent mode. To switch, pass `sessionSlug=<existing-slug>` once; omitted-slug calls stay on that pinned session until the user changes it again.
 
 Default token scope permits:
 
@@ -263,6 +267,7 @@ With `ceagt_...` tokens:
 - omit `sessionSlug` to use the user's selected session or the current worker default;
 - include `sessionSlug` in the query string or JSON body only when the user wants to switch to a specific existing session;
 - omit `telegramUserId` by default, because the worker infers it from the token;
+- omit `groupChatId` by default, because copied-token onboarding is private-agent context; include it only when Telegram context already provided the numeric group id for a group-scoped action;
 - do not send the token as a URL query parameter, request body field, prompt
   transcript, log line, or shared note;
 - do not call export, raw-response, wallet/private-key, or broad admin endpoints
@@ -367,14 +372,15 @@ Use this path when the user should become a CE participant by answering one CE q
 2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session. If the session uses an approved Telegram group allowlist or `telegramGroupApprovalRequired`, the group must be approved first. A participant can run `/group_id` in that group and send the numeric chat id to a session admin, or a configured session admin can generate a one-use Add Bot To Group link with `/group_link <session>` and send that link to the group owner.
 3. Ask the user to answer any visible CE bot question by tapping a CE inline response button.
 4. After the tap, CE can bind `telegramUserId` to the group/session, derive or recover the CE-managed Telegram EVM account, and mark the user as an approved participant for worker calls.
-5. From then on, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug`. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
+5. From then on, in this Telegram-group button flow only, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug` captured by Telegram. Do not ask for these identifiers during copied-token Claude Code onboarding. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
 
 If the user is only in a one-on-one OpenClaw Telegram DM, send them a CE deep link or group link first. CE-owned inline response buttons cannot appear inside a normal private DM with another bot unless CE sends the message in a CE-accessible chat.
 
 ## Read Active Questions
 
 ```http
-GET /telegram/agent/api/questions?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
+GET /telegram/agent/api/questions
+GET /telegram/agent/api/questions?sessionSlug=<slug>
 POST /telegram/agent/api/questions
 ```
 
@@ -384,8 +390,6 @@ For personalized question selection, send a POST body with preferences:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "relevanceMode": "rank",
   "preferences": {
@@ -443,8 +447,6 @@ Build preferences as drafts keyed by exact `questionId`:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "preferences": {
     "requireReview": true,
@@ -963,8 +965,6 @@ Pose an existing active question:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "questionId": "q-binary"
 }
@@ -974,8 +974,6 @@ Create and pose a new freeform question:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "prompt": "What should the group decide next?",
   "questionType": "freeform",
@@ -1004,8 +1002,6 @@ Example:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "preferences": {
     "interests": ["food", "governance"],
@@ -1044,8 +1040,6 @@ Example:
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "approvalText": "Approve q-pizza, but change q-budget to downvote.",
   "recommendations": [
@@ -1094,7 +1088,8 @@ as submitted until the user approves them.
 Read available group categories and current selections:
 
 ```http
-GET /telegram/agent/api/groups?sessionSlug=<slug>&telegramUserId=<id>&groupChatId=<chat>
+GET /telegram/agent/api/groups
+GET /telegram/agent/api/groups?sessionSlug=<slug>
 ```
 
 Propose or create a group category, while leaving membership to the user:
@@ -1105,8 +1100,6 @@ POST /telegram/agent/api/groups/propose
 
 ```json
 {
-  "telegramUserId": "42",
-  "groupChatId": "-100123",
   "sessionSlug": "ee-26-organizers",
   "category": {
     "categoryId": "ai_tribe",
@@ -1166,6 +1159,14 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v11)
+
+- Clarified Claude Code install handling further: copied user-scoped agent info does not require a Telegram handle, Telegram id, or group chat id.
+
+### 2026-05-30 (v10)
+
+- Clarified Claude Code install handling: copied `ceagt_...` install info is enough, and agents should not ask for a Telegram handle or id.
 
 ### 2026-05-30 (v9)
 
