@@ -437,4 +437,49 @@ describe('sbtPageActionDisplayHelpers', () => {
       showPasswordGen: true,
     });
   });
+
+  it('keeps action feedback display passive across success, missing hash, and error states', () => {
+    expect(resolveSbtPageActionFeedbackState({
+      lastMintTxHash: '0xmint',
+      mintingStatus: 'success',
+    })).toEqual({
+      showBurnSuccess: false,
+      showErrorTransactionHash: false,
+      showMintSuccess: true,
+      showTransactionError: false,
+    });
+    expect(resolveSbtPageActionFeedbackState({
+      lastBurnTxHash: '0xburn',
+      lastMintTxHash: '0xmint',
+      burningStatus: 'success',
+      mintingStatus: 'success',
+    })).toEqual({
+      showBurnSuccess: true,
+      showErrorTransactionHash: false,
+      showMintSuccess: false,
+      showTransactionError: false,
+    });
+    expect(resolveSbtPageActionFeedbackState({
+      lastMintTxHash: '',
+      mintingStatus: 'success',
+    })).toMatchObject({
+      showMintSuccess: false,
+    });
+    expect(resolveSbtPageActionFeedbackState({
+      error: new Error('Denied'),
+      mintingStatus: 'idle',
+      transactionHash: '0xerr',
+    })).toMatchObject({
+      showErrorTransactionHash: false,
+      showTransactionError: false,
+    });
+    expect(resolveSbtPageActionFeedbackState({
+      error: new Error('Denied'),
+      mintingStatus: 'failure',
+      transactionHash: '0xerr',
+    })).toMatchObject({
+      showErrorTransactionHash: true,
+      showTransactionError: true,
+    });
+  });
 });
