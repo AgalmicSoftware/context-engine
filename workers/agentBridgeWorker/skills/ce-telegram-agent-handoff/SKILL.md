@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v12)
+**Skill version:** 2026-05-30 (v13)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -18,19 +18,21 @@ If the user pasted copied CE agent install info containing `token=ceagt_...`,
 private user-scoped CE calls. Do not ask for a Telegram handle, Telegram user
 id, `telegramUserId`, group chat id, or `groupChatId`.
 
-For the copied-user-token flow:
+For the copied-user-token flow in Claude Code or any other low-context agent:
 
-- first call `GET <Worker>/telegram/agent/api/onboarding` with only
-  `Authorization: Bearer <token>`;
-- if onboarding preferences are incomplete, ask the shortest needed consent
-  questions in normal language and save them;
-- then call `GET <Worker>/telegram/agent/api/questions` with only the same
-  authorization header unless the user explicitly chooses another session;
+- do not run the full Edge-agent onboarding flow and do not ask for profile,
+  calendar, demographic, attendance, or Telegram identifiers up front;
+- first call `GET <Worker>/telegram/agent/api/questions` with only
+  `Authorization: Bearer <token>` unless the user explicitly chooses another
+  session;
 - immediately select the most relevant active questions and draft likely
   answers from the user's memory, current conversation, and consented context;
 - show the drafted answers and ask whether to submit, edit, or open them in the
   Mini App; if the user has already authorized direct answering, submit with
   `submit: true` and `humanApproved: true`;
+- call the onboarding/settings endpoints only when the user explicitly asks to
+  update CE preferences, or when the agent actually has authorized Edge profile
+  context and is doing the richer Edge-agent onboarding flow;
 - omit `sessionSlug` to use the user's selected session or the worker's current
   default session;
 - include `sessionSlug=<existing-slug>` only when intentionally switching or
@@ -1198,9 +1200,13 @@ runner handles delivery.
 
 ## Changelog
 
+### 2026-05-30 (v13)
+
+- Clarified that Claude Code and other low-context copied-token agents should skip full Edge-agent onboarding, fetch questions immediately, and draft answers from available memory/conversation unless the user explicitly asks to update settings.
+
 ### 2026-05-30 (v12)
 
-- Added a top-level copied-agent-info rule for Claude Code: user-scoped tokens already imply user identity and current/default session, so agents should fetch onboarding/questions and draft answers immediately without asking for Telegram ids.
+- Added a top-level copied-agent-info rule for Claude Code: user-scoped tokens already imply user identity and current/default session, so agents should fetch questions and draft answers immediately without asking for Telegram ids.
 
 ### 2026-05-30 (v11)
 
