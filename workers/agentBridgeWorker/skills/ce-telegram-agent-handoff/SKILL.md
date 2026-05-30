@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v14)
+**Skill version:** 2026-05-30 (v15)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -17,6 +17,11 @@ If the user pasted copied CE agent install info containing `token=ceagt_...`,
 `worker=...`, and `skill=...`, you already have enough information to make
 private user-scoped CE calls. Do not ask for a Telegram handle, Telegram user
 id, `telegramUserId`, group chat id, or `groupChatId`.
+
+The copied `ceagt_...` token is not optional context. Send it on every CE
+request as `Authorization: Bearer <token>`. Never make an unauthenticated
+question, draft, answer, vote, or results request when copied install info
+included a token. The worker uses that bearer token to infer the user identity.
 
 For the copied-user-token flow in Claude Code or any other low-context agent:
 
@@ -1199,6 +1204,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v15)
+
+- Made copied-agent instructions explicit that `ceagt_...` must be sent as `Authorization: Bearer <token>` on every CE request; no copied-token call should be unauthenticated or ask for Telegram identifiers.
 
 ### 2026-05-30 (v14)
 
