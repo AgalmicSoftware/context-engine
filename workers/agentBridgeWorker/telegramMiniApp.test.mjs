@@ -2190,6 +2190,55 @@ test('Mini App state hydrates submitted multichoice answers from serialized valu
   assert.equal(state.savedDrafts.length, 0);
 });
 
+test('Mini App state hydrates submitted multichoice object values', async () => {
+  const kv = new MemoryKv();
+  const questionId = 'q-multichoice-object-history';
+  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}multichoice-object-history`, JSON.stringify({
+    version: 1,
+    requestId: 'multichoice-object-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      label: 'Option A, Option C',
+      questionType: 'multichoice',
+      values: [{ label: 'Option A' }, { value: 'Option C' }],
+      comments: 'Native object values should hydrate for review.',
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'multichoice',
+        prompt: 'Which object options should be selected?',
+        options: ['Option A', 'Option B', 'Option C'],
+      }]),
+    },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+  assert.deepEqual(state.submittedAnswerKeys, [questionKey]);
+  assert.deepEqual(state.submittedAnswers[0].answer, {
+    values: ['Option A', 'Option C'],
+    comments: 'Native object values should hydrate for review.',
+  });
+});
+
 test('Mini App submitted answer hydration reads per-user indexes when global submit records are noisy', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-indexed-history';

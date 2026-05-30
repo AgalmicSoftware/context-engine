@@ -9782,12 +9782,9 @@ async function buildStartPayloadResponse({
         ].join('\n');
       }
       refreshed.screen = 'private_start_refreshed';
-      refreshed.extra = {
-        ...(refreshed.extra || {}),
-        startPayload: parsed.actionId,
-        active: false,
-        refreshed: true,
-      };
+      refreshed.startPayload = parsed.actionId;
+      refreshed.active = false;
+      refreshed.refreshed = true;
       return refreshed;
     }
     return reply({

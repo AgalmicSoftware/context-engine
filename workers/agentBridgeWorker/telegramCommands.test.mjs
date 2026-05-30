@@ -5308,6 +5308,9 @@ test('expired private start payload refreshes Mini App entry point', async () =>
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'private_start_refreshed');
+  assert.equal(result.startPayload, 'cecb_expired001');
+  assert.equal(result.active, false);
+  assert.equal(result.refreshed, true);
   assert.match(result.response.text, /refreshed the Mini App entry point/);
   const miniApp = flattenButtons(result.response.replyMarkup)
     .find((button) => button.text === 'Mini App');

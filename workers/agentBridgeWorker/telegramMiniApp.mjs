@@ -193,6 +193,32 @@ function firstAnswerValue(...values) {
   return values.find((value) => safeAnswerString(value) !== '');
 }
 
+function answerChoiceString(value) {
+  if (value === undefined || value === null) return '';
+  if (Array.isArray(value)) {
+    return value.map(answerChoiceString).filter(Boolean).join(', ');
+  }
+  if (typeof value === 'object') {
+    return safeAnswerString(firstAnswerValue(
+      value.label,
+      value.value,
+      value.text,
+      value.answer,
+      value.name,
+      value.id,
+    ));
+  }
+  return safeAnswerString(value);
+}
+
+function firstAnswerChoice(...values) {
+  for (const value of values) {
+    const text = answerChoiceString(value);
+    if (text) return text;
+  }
+  return '';
+}
+
 function safeJsonParse(value, fallback = null) {
   const text = safeString(value);
   if (!text) return fallback;
@@ -1395,10 +1421,10 @@ function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
   ));
   if (type === 'multichoice') {
     const values = Array.isArray(source.values)
-      ? source.values.map(safeAnswerString).filter(Boolean)
+      ? source.values.map(answerChoiceString).filter(Boolean)
       : Array.isArray(parsedSource.values)
-        ? parsedSource.values.map(safeAnswerString).filter(Boolean)
-        : [parsedSource.value || rawValue].map(safeAnswerString).filter(Boolean);
+        ? parsedSource.values.map(answerChoiceString).filter(Boolean)
+        : [firstAnswerChoice(parsedSource.value, source.value, source.answer, rawValue)].filter(Boolean);
     return { values, comments };
   }
   if (type === 'freeform') {
