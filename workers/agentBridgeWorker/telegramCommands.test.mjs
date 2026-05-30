@@ -5142,7 +5142,7 @@ test('/start includes a Mini App button that opens the session picker before a p
   assert.equal(record.serverContextRef.sessionSlug, undefined);
 });
 
-test('/start About button explains Context Engine and links the OSS repo', async () => {
+test('/start About button explains Context Engine and links the OSS repo and worker skill', async () => {
   const env = baseEnv();
   const start = await buildTelegramCommandResponse({
     update: privateMessage('/start'),
@@ -5169,8 +5169,11 @@ test('/start About button explains Context Engine and links the OSS repo', async
 
   assert.equal(result.screen, 'about_context_engine');
   assert.match(result.response.text, /privacy-preserving opinion maps/);
+  assert.match(result.response.text, /Worker skill: https:\/\/github\.com\/AgalmicSoftware\/context-engine\/blob\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   const repo = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Open OSS Repo');
   assert.equal(repo.url, 'https://github.com/AgalmicSoftware/context-engine/tree/edge-2026');
+  const skill = flattenButtons(result.response.replyMarkup).find((button) => button.text === 'Worker Skill.md');
+  assert.equal(skill.url, 'https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md');
 });
 
 test('/start auto-joins a single Telegram-only session and keeps the welcome screen minimal', async () => {

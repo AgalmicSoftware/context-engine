@@ -142,6 +142,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=18';
 const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/edge-2026';
+const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const TELEGRAM_SESSION_LIST_LIMIT = 5;
 const TELEGRAM_RESULTS_PAGE_SIZE = 3;
@@ -3799,6 +3800,9 @@ async function buildAboutResponse({
   const rows = [[{
     text: 'Open OSS Repo',
     url: CONTEXT_ENGINE_OSS_URL,
+  }, {
+    text: 'Worker Skill.md',
+    url: CONTEXT_ENGINE_WORKER_SKILL_URL,
   }]];
   await appendBackToStartRow(rows, {
     env,
@@ -3816,6 +3820,7 @@ async function buildAboutResponse({
       'Context Engine helps communities ask questions, draft responses, and create privacy-preserving opinion maps.',
       '',
       `Open source: ${CONTEXT_ENGINE_OSS_URL}`,
+      `Worker skill: ${CONTEXT_ENGINE_WORKER_SKILL_URL}`,
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
     screen: 'about_context_engine',
