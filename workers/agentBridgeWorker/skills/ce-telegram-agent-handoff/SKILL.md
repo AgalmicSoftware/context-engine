@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v18)
+**Skill version:** 2026-05-30 (v19)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -35,6 +35,10 @@ low-context agent:
   the first or most relevant one using the question-card format below and ask
   how the user wants to answer; do not ask whether to fetch questions, fetch
   the skill endpoint, or "do anything else" first;
+- in daily digests, late editions, recap messages, or "new questions were
+  added" summaries, do not make the primary call to action a deep link; show
+  the question text and answer choices directly, then ask the user to reply in
+  chat so you can save or submit the response through the CE API;
 - immediately select the most relevant active questions and draft likely
   answers from the user's memory, current conversation, and consented context;
 - show the drafted answers and ask whether to submit, edit, or open them in the
@@ -236,11 +240,11 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 
 After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account and render a private masked token screen with a copy button for full install info. Generic onboarding follows the live worker default session. Session-specific onboarding pins the named session. From then on, use this skill's API calls with the copied token; omit `sessionSlug` for the user's current/default session, or include an existing `sessionSlug` to switch and pin the user. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
 
-## Prepopulated Deep Links On First Invocation
+## Prepopulated Questions On First Invocation
 
 When a user first asks CE about deliberation, governance, sensemaking, community
 discussion, or "what questions are there?", proactively offer a small labeled
-menu of deep-link sets.
+menu of relevant questions they can answer directly in the agent chat.
 
 1. Seed topics from the user's authorized profile, bio, interests, and recent
    activity. Use only fields the user allowed during onboarding consent.
@@ -249,10 +253,14 @@ menu of deep-link sets.
 3. Fetch active questions with the existing tag-filtered question reads and the
    geo-linked question flow. Respect `questionsPerBatch` from the user's
    settings, defaulting to 3.
-4. Build one Mini App `startapp` link or private token-authenticated client link per
-   topic cluster using the link builders already described in "Mini App
-   Question Links" and "Interactive Client Report".
-5. Present the links as a short menu the user can choose from.
+4. Present each cluster as a short question list with answer choices and ask the
+   user which question they want to answer, or propose likely answers for
+   approval. Avoid link-only prompts like "Join the deliberation" or "Share your
+   perspective".
+5. Use Mini App or client links only as a secondary fallback after the user asks
+   to open Telegram/client review, and only when you have just created a
+   question-specific Mini App launch link or token-authenticated client link
+   with the endpoints below.
 
 Useful organizer/tester labels include:
 
@@ -260,7 +268,7 @@ Useful organizer/tester labels include:
 - "Index Network Questions" (`index`, `meetings`)
 - "Agent Village Experiment questions"
 
-Example shapes, using existing link builders only:
+Optional fallback link shapes, using existing link builders only:
 
 ```text
 https://t.me/contextengineer_bot/<mini-app-short-name>?startapp=<payload-from-mini-app-launch>
@@ -268,7 +276,9 @@ https://contextengine.xyz/session/<session-slug>/questions/results?telegramToken
 ```
 
 This flow composes existing tags, questions, geo-linked questions, Mini App
-launches, and client links. Do not invent a new CE endpoint for it.
+launches, and client links. Do not invent a new CE endpoint for it. If a link
+does not open the exact relevant question or ordered question series, omit the
+link and continue the response flow directly in the agent chat.
 
 ## Non-Telegram Agent Token Flow
 
@@ -863,6 +873,15 @@ for the host agent. If the user opts into a digest, ask whether they prefer the
 morning or evening Edge brief and store `digestTimeOfDay` as `morning` or
 `night`.
 
+For daily digests, late editions, and new-question summaries, the first action
+should be answering in the agent chat, not opening a deep link. For each
+question, show the concise title, question text, and available choices, then ask
+for a direct reply such as "agree", "unsure", "disagree", an option name, or a
+short freeform answer. After the user replies, call
+`POST /telegram/agent/api/preferences`; include `submit: true` and
+`humanApproved: true` only when the reply clearly authorizes submission.
+Generate a Mini App link only when the user asks to review or edit in Telegram.
+
 When the user has elected to see one question every so often, prefer the
 next-question queue endpoint:
 
@@ -1237,6 +1256,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v19)
+
+- Made daily digests, late editions, and new-question summaries direct-answer first; deep links are now secondary fallback only when they open the exact question or the user asks for Mini App/client review.
 
 ### 2026-05-30 (v18)
 
