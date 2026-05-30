@@ -1182,7 +1182,7 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const env = baseEnv({ AGENT_ACTION_KV: kv });
   const written = await writeAgentSkillUpdateFlag({
     env,
-    latestVersion: '2026-05-30 (v11)',
+    latestVersion: '2026-05-30 (v12)',
     note: 'Refresh before answering.',
     accountAddress: `0x${'cd'.repeat(20)}`,
     createdAt: '2026-05-30T00:00:00.000Z',
@@ -1191,9 +1191,9 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
   const cleared = await clearAgentSkillUpdateFlag(env);
 
-  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v11)' });
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v12)' });
   assert.equal(read.updateAvailable, true);
-  assert.equal(read.latestVersion, '2026-05-30 (v11)');
+  assert.equal(read.latestVersion, '2026-05-30 (v12)');
   assert.equal(read.note, 'Refresh before answering.');
   assert.equal(read.updatedBy, '0xcdcd...cdcd');
   assert.equal(putCall.options?.expirationTtl, undefined);
