@@ -12,10 +12,22 @@ export type UserPageAnalyzeActionPlanLike = {
   shouldRenderAnalyzeAction?: boolean;
 };
 
+export type UserPageBookmarkActionPlanLike = {
+  blockedReason?: unknown;
+  disabled?: boolean;
+  shouldRenderBookmarkAction?: boolean;
+};
+
 export type UserPageAnalyzeActionControllerPorts<
   AnalyzeArgs extends readonly unknown[] = readonly unknown[]
 > = {
   dispatchAnalyze?: UserPageActionDispatch<AnalyzeArgs>;
+};
+
+export type UserPageBookmarkActionControllerPorts<
+  BookmarkArgs extends readonly unknown[] = readonly unknown[]
+> = {
+  dispatchBookmark?: UserPageActionDispatch<BookmarkArgs>;
 };
 
 export type RunUserPageAnalyzeActionControllerArgs<
@@ -25,6 +37,15 @@ export type RunUserPageAnalyzeActionControllerArgs<
   event?: UserPageActionEventLike | null;
   plan?: UserPageAnalyzeActionPlanLike | null;
   ports?: UserPageAnalyzeActionControllerPorts<AnalyzeArgs>;
+};
+
+export type RunUserPageBookmarkActionControllerArgs<
+  BookmarkArgs extends readonly unknown[] = readonly unknown[]
+> = {
+  bookmarkArgs?: BookmarkArgs;
+  event?: UserPageActionEventLike | null;
+  plan?: UserPageBookmarkActionPlanLike | null;
+  ports?: UserPageBookmarkActionControllerPorts<BookmarkArgs>;
 };
 
 export type UserPageActionControllerResult = {
@@ -81,6 +102,51 @@ export const runUserPageAnalyzeActionController = <
   }
 
   ports.dispatchAnalyze(...analyzeArgs);
+  return {
+    blockedReason: plan.blockedReason,
+    status: 'dispatched',
+  };
+};
+
+export const runUserPageBookmarkActionController = <
+  BookmarkArgs extends readonly unknown[] = readonly unknown[]
+>({
+  bookmarkArgs = [] as unknown as BookmarkArgs,
+  event = null,
+  plan = null,
+  ports = {},
+}: RunUserPageBookmarkActionControllerArgs<BookmarkArgs> = {}): UserPageActionControllerResult => {
+  preventDefault(event);
+
+  if (!plan?.shouldRenderBookmarkAction) {
+    return {
+      blockedReason: plan?.blockedReason,
+      status: 'hidden',
+    };
+  }
+
+  if (isBlocked(plan.blockedReason)) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'blocked',
+    };
+  }
+
+  if (plan.disabled) {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'disabled',
+    };
+  }
+
+  if (typeof ports.dispatchBookmark !== 'function') {
+    return {
+      blockedReason: plan.blockedReason,
+      status: 'unhandled',
+    };
+  }
+
+  ports.dispatchBookmark(...bookmarkArgs);
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',

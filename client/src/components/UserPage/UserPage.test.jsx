@@ -246,6 +246,62 @@ describe('UserPage analyze action boundary', () => {
   });
 });
 
+describe('UserPage bookmark action boundary', () => {
+  it('routes visible header bookmark clicks through the parent-owned bookmark handler', () => {
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress: '0x00000000000000000000000000000000000000aa',
+    });
+    instance.toggleBookmark = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.headerActionVisibility.showBookmarkButton).toBe(true);
+
+    const result = header.props.onBookmark(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).toHaveBeenCalledWith(event);
+  });
+
+  it('keeps hidden owner bookmark actions inert before reaching bookmark side effects', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: viewAddress,
+      viewAddress,
+    });
+    instance.toggleBookmark = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.headerActionVisibility.showBookmarkButton).toBe(false);
+
+    const result = header.props.onBookmark(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'hidden',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).not.toHaveBeenCalled();
+  });
+});
+
 describe('UserPage survey route boundaries', () => {
   it('keeps parent-owned survey href and open callbacks aligned with session and responder routes', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
