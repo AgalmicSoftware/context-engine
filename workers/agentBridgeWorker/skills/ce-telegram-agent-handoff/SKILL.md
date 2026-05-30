@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v15)
+**Skill version:** 2026-05-30 (v16)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -23,7 +23,8 @@ request as `Authorization: Bearer <token>`. Never make an unauthenticated
 question, draft, answer, vote, or results request when copied install info
 included a token. The worker uses that bearer token to infer the user identity.
 
-For the copied-user-token flow in Claude Code or any other low-context agent:
+For the copied-user-token flow in Claude Code, OpenClaw, Hermes, or any other
+low-context agent:
 
 - do not run the full Edge-agent onboarding flow and do not ask for profile,
   calendar, demographic, attendance, or Telegram identifiers up front;
@@ -50,11 +51,11 @@ For the copied-user-token flow in Claude Code or any other low-context agent:
 Service-token examples later in this skill are for operators/admin services and
 do not apply to a copied user-scoped `ceagt_...` token.
 
-Do not introduce this as a Telegram setup task. In Claude Code, after parsing
-the copied install info, proceed as "Context Engine is ready; I am fetching
-questions and drafting answers from what I know about you." Mention Telegram
-only if the user asks how the token was created or requests Telegram-specific
-actions.
+Do not introduce this as a Telegram setup task. In any low-context external
+agent, after parsing the copied install info, proceed as "Context Engine is
+ready; I am fetching questions and drafting answers from what I know about
+you." Mention Telegram only if the user asks how the token was created or
+requests Telegram-specific actions.
 
 ## What Context Engine Does
 
@@ -116,10 +117,11 @@ unavailable or has no command, fall back to the canonical public Git install
 command in this section. The CE worker never performs this lookup and never
 proxies Geo/EDGE_OS credentials.
 
-### Claude Code First Run
+### Copied-Token First Run
 
-If the user pastes the install command into Claude Code, install this skill and
-then tell the user to open this Telegram onboarding link:
+If the user pastes the install command into Claude Code, OpenClaw, Hermes, or
+another external agent, install this skill and then tell the user to open this
+Telegram onboarding link:
 
 ```text
 https://t.me/contextengineer_bot?start=agent_onboarding
@@ -135,7 +137,7 @@ After the user taps `Start`, Telegram should land directly on the private
 agent install screen. Ask the user to tap `Copy Agent Info` and paste the copied
 install info into their agent or Claude Code. Treat any paste containing a
 `ceagt_...` token plus worker/skill URLs as Context Engine onboarding install
-info, even if the first line is compact such as `agent+ClaudeCode:noids`. Do
+info, even if the first line is compact such as `CE agent: Bearer auth`. Do
 not ask for the user's Telegram handle, Telegram id, or group chat id: the
 `ceagt_...` token identifies the user and the worker infers `telegramUserId`.
 Omit `groupChatId` unless a later action is explicitly tied to a Telegram group
@@ -167,7 +169,7 @@ raw GitHub URL, then re-read the changelog before continuing.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
 - For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`; never ask the user for a Telegram handle/id just to use a `ceagt_...` token. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
-- Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal Claude Code / external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
+- Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal copied-token external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
 - Current Edge 2026 demo sessions may include the default `Research Questions (Demo)` session for organizers plus participant sessions. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on older sessions always being listed. A `ceagt_` token follows the user's selected session. To switch sessions, send `sessionSlug=<existing-slug>` on a worker call; CE validates the slug and pins it for later omitted-slug calls.
 
@@ -1204,6 +1206,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v16)
+
+- Made copied-agent install text host-neutral while preserving bearer-token, no-ID, fetch-questions-first instructions for Claude Code, OpenClaw, Hermes, and other HTTPS-capable agents.
 
 ### 2026-05-30 (v15)
 

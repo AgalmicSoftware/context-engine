@@ -248,7 +248,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-05-30 \(v15\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-30 \(v16\)/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
   assert.match(source, /demographicLinkOptIn/);
@@ -271,7 +271,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /Send it on every CE\s+request as `Authorization: Bearer <token>`/);
   assert.match(source, /Never make an unauthenticated\s+question, draft, answer, vote, or results request/);
   assert.match(source, /do not run the full Edge-agent onboarding flow/);
-  assert.match(source, /Context Engine is ready; I am fetching/);
+  assert.match(source, /Context Engine is\s+ready; I am fetching/);
   assert.match(source, /refresh_token_via_telegram/);
   assert.match(source, /POST \/telegram\/agent\/api\/questions\/next/);
   assert.match(source, /POST \/telegram\/agent\/api\/question-queue/);
@@ -291,6 +291,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /humanApproved: true/);
   assert.match(source, /digestTimeOfDay/);
   assert.match(source, /auto-fill[\s\S]*aggregate buckets/);
+  assert.match(source, /Copied-Token First Run/);
+  assert.match(source, /Claude Code, OpenClaw, Hermes/);
 });
 
 test('Telegram agent handoff skill version constant matches SKILL.md header', () => {
@@ -315,25 +317,25 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-05-30 (v15)');
+  assert.equal(body.version, '2026-05-30 (v16)');
   assert.equal(body.skill, 'ce-telegram-agent-handoff');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-05-30 (v15)');
+  assert.equal(body.latestVersion, '2026-05-30 (v16)');
   assert.equal(body.updateNote, '');
 });
 
 test('Telegram agent handoff serves a short skill redirect', async () => {
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/skill?v=15', { token: '' }),
+    request: agentRequest('/telegram/agent/api/skill?v=16', { token: '' }),
     env: baseEnv(),
   });
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
-  assert.match(location, /v=2026-05-30-v15-/);
+  assert.match(location, /v=2026-05-30-v16-/);
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -349,14 +351,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-05-30 (v15)',
+    latestVersion: '2026-05-30 (v16)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-05-30 (v15)');
+  assert.equal(payload.latestVersion, '2026-05-30 (v16)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -1549,7 +1551,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-05-30 (v15)');
+  assert.equal(questions.skillVersion, '2026-05-30 (v16)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -2885,7 +2887,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-05-30 (v15)',
+        latestVersion: '2026-05-30 (v16)',
         note: 'Refresh before answering.',
       },
     }),
@@ -2917,13 +2919,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-05-30 (v15)');
+  assert.equal(initialStatus.version, '2026-05-30 (v16)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-05-30 (v15)');
+  assert.equal(set.latestVersion, '2026-05-30 (v16)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');
