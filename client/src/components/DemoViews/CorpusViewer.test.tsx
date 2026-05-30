@@ -157,7 +157,11 @@ describe('CorpusViewer', () => {
       path.join(__dirname, 'DemoAnalysis', 'WorldResultsMap.tsx'),
       'utf8'
     );
-    const compactMapMobileBlock = extractMediaBlock(mapScss, '@media (max-width: 640px)', '.panel,');
+    const compactMapMobileBlock = extractMediaBlock(
+      mapScss,
+      '@media (max-width: 640px)',
+      '.mapFrameCompact {'
+    );
 
     expect(mobileBlock).toContain('.tabButton {');
     expect(mobileBlock).toContain('.tabBar {');

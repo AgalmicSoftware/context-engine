@@ -52,12 +52,14 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage',
+          'test:release:client':
+            'cd client && npm test -- --watchAll=false --runInBand',
           'typecheck:client': 'npm --prefix client run typecheck',
           'worker:bundle': 'node scripts/worker-bundle.mjs',
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:release':
-            'npm run lint && npm run typecheck:client && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run test:release:client && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );
