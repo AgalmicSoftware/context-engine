@@ -1182,7 +1182,7 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const env = baseEnv({ AGENT_ACTION_KV: kv });
   const written = await writeAgentSkillUpdateFlag({
     env,
-    latestVersion: '2026-05-30 (v17)',
+    latestVersion: '2026-05-30 (v18)',
     note: 'Refresh before answering.',
     accountAddress: `0x${'cd'.repeat(20)}`,
     createdAt: '2026-05-30T00:00:00.000Z',
@@ -1191,9 +1191,9 @@ test('agent skill-update flag writes a durable KV record', async () => {
   const putCall = kv.putCalls.find((call) => call.key === 'telegram:agent-skill-update:v1');
   const cleared = await clearAgentSkillUpdateFlag(env);
 
-  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v17)' });
+  assert.deepEqual(written, { ok: true, latestVersion: '2026-05-30 (v18)' });
   assert.equal(read.updateAvailable, true);
-  assert.equal(read.latestVersion, '2026-05-30 (v17)');
+  assert.equal(read.latestVersion, '2026-05-30 (v18)');
   assert.equal(read.note, 'Refresh before answering.');
   assert.equal(read.updatedBy, '0xcdcd...cdcd');
   assert.equal(putCall.options?.expirationTtl, undefined);
@@ -4828,12 +4828,12 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   const copyInfo = copyInfoButton?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(copyInfo, /^Bearer; no IDs; GET \/telegram\/agent\/api\/questions/);
+  assert.match(copyInfo, /^Bearer; GET \/telegram\/agent\/api\/questions; ask answer/);
   assert.doesNotMatch(copyInfo, /^CE Claude:/);
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=17/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=18/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);

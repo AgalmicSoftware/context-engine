@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v17)
+**Skill version:** 2026-05-30 (v18)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -31,6 +31,10 @@ low-context agent:
 - first call `GET <Worker>/telegram/agent/api/questions` with only
   `Authorization: Bearer <token>` unless the user explicitly chooses another
   session;
+- when that call returns one or more answerable questions, immediately surface
+  the first or most relevant one using the question-card format below and ask
+  how the user wants to answer; do not ask whether to fetch questions, fetch
+  the skill endpoint, or "do anything else" first;
 - immediately select the most relevant active questions and draft likely
   answers from the user's memory, current conversation, and consented context;
 - show the drafted answers and ask whether to submit, edit, or open them in the
@@ -137,7 +141,7 @@ After the user taps `Start`, Telegram should land directly on the private
 agent install screen. Ask the user to tap `Copy Agent Info` and paste the copied
 install info into their agent or Claude Code. Treat any paste containing a
 `ceagt_...` token plus worker/skill URLs as Context Engine onboarding install
-info, even if the first line says `Bearer; no IDs; GET /telegram/agent/api/questions`.
+info, including first lines like `Bearer; GET /telegram/agent/api/questions; ask answer`.
 Do not ask for the user's Telegram handle, Telegram id, or group chat id: the
 `ceagt_...` token identifies the user and the worker infers `telegramUserId`.
 Omit `groupChatId` unless a later action is explicitly tied to a Telegram group
@@ -189,13 +193,14 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
 4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
-6. Draft responses, show the proposed answers, and ask for confirmation.
-7. Save drafts with `POST <Worker>/telegram/agent/api/preferences`. If the user explicitly says to answer or choose an option on their behalf, include `submit: true` and `humanApproved: true`; this submits without requiring the Mini App.
-8. When the user wants editable Telegram review, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
-9. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
-10. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
-11. For an interactive report, give the user a private client auto-login link built from their copied `ceagt_` token.
-12. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
+6. Immediately show the first or most relevant answerable question and ask how the user wants to answer. Do not ask whether to surface it; surfacing it is the default action after a successful question read.
+7. Draft responses, show the proposed answers, and ask for confirmation.
+8. Save drafts with `POST <Worker>/telegram/agent/api/preferences`. If the user explicitly says to answer or choose an option on their behalf, include `submit: true` and `humanApproved: true`; this submits without requiring the Mini App.
+9. When the user wants editable Telegram review, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
+10. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
+11. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
+12. For an interactive report, give the user a private client auto-login link built from their copied `ceagt_` token.
+13. Use the suggest/review endpoints for votes and group suggestions. Prefer user approval unless the user has explicitly opted into auto-apply behavior.
 
 ## Onboarding Options
 
@@ -453,6 +458,11 @@ internal ids unless the user asks. Do not lead with raw labels like
 `Question (binary, proposed)` as the main title. For binary CE questions, show
 the user's choices as `Agree`, `Unsure`, and `Disagree` unless the question
 itself clearly asks for yes/no wording.
+
+After a successful question read, do not end with a generic prompt such as
+"Want me to do anything with this?" Instead, surface the first relevant
+answerable question and ask "How would you like to answer?" with the available
+choices or a freeform reply path.
 
 For personalized question selection, send a POST body with preferences:
 
@@ -1227,6 +1237,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v18)
+
+- Clarified that copied-token agents must automatically surface the first relevant answerable question after reading `/telegram/agent/api/questions`, instead of asking whether to do anything next.
 
 ### 2026-05-30 (v17)
 
