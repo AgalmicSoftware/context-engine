@@ -1,9 +1,11 @@
 import {
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
+  runSbtPageMiniMintActionController,
   runSbtPageMintActionController,
   type SbtPageBurnActionControllerPorts,
   type SbtPageMiniBurnActionControllerPorts,
+  type SbtPageMiniMintActionControllerPorts,
   type SbtPageMintActionControllerPorts,
 } from './sbtPageActionController';
 
@@ -178,6 +180,136 @@ describe('sbtPageActionController', () => {
       plan: { blockedReason: 'none', shouldRenderBurnButton: true },
       ports: { dispatchBurn: () => { throw error; } },
     })).toThrow(error);
+  });
+
+  it('does not dispatch hidden, blocked, disabled, or unhandled mini mint actions', () => {
+    const dispatchMiniMint = jest.fn();
+
+    expect(runSbtPageMiniMintActionController({
+      plan: {
+        blockedReason: 'mini-mint-unavailable',
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: false,
+      },
+      ports: { dispatchMiniMint },
+    })).toEqual({
+      blockedReason: 'mini-mint-unavailable',
+      status: 'hidden',
+    });
+    expect(runSbtPageMiniMintActionController({
+      plan: {
+        blockedReason: 'already-has-token',
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchMiniMint },
+    })).toEqual({
+      blockedReason: 'already-has-token',
+      status: 'blocked',
+    });
+    expect(runSbtPageMiniMintActionController({
+      plan: {
+        blockedReason: 'none',
+        disabled: true,
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchMiniMint },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(runSbtPageMiniMintActionController({
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: true,
+      },
+      ports: {},
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'unhandled',
+    });
+    expect(runSbtPageMiniMintActionController({
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'none',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchMiniMint },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'unhandled',
+    });
+    expect(dispatchMiniMint).not.toHaveBeenCalled();
+  });
+
+  it('dispatches mini mint handler kinds through the matching fake ports', () => {
+    const dispatchShowPasswordInput = jest.fn() satisfies SbtPageMiniMintActionControllerPorts<
+      [],
+      [],
+      [],
+      [boolean]
+    >['dispatchShowPasswordInput'];
+    const dispatchGroupPasswordMint = jest.fn() satisfies SbtPageMiniMintActionControllerPorts<
+      [],
+      [{ forceRefresh: boolean }]
+    >['dispatchGroupPasswordMint'];
+    const dispatchInviteCodeMint = jest.fn() satisfies SbtPageMiniMintActionControllerPorts<
+      [],
+      [],
+      [string]
+    >['dispatchInviteCodeMint'];
+    const dispatchMiniMint = jest.fn() satisfies SbtPageMiniMintActionControllerPorts<
+      [true],
+      [],
+      []
+    >['dispatchMiniMint'];
+    const event = { preventDefault: jest.fn() };
+
+    expect(runSbtPageMiniMintActionController({
+      event,
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'show-password-input',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchShowPasswordInput },
+      showPasswordInputArgs: [true],
+    }).status).toBe('dispatched');
+    expect(runSbtPageMiniMintActionController({
+      groupPasswordMintArgs: [{ forceRefresh: true }],
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'mint-unlimited-with-group-password',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchGroupPasswordMint },
+    }).status).toBe('dispatched');
+    expect(runSbtPageMiniMintActionController({
+      inviteCodeMintArgs: ['invite-code'],
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'claim-with-invite-code',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchInviteCodeMint },
+    }).status).toBe('dispatched');
+    expect(runSbtPageMiniMintActionController({
+      miniMintArgs: [true],
+      plan: {
+        blockedReason: 'none',
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: true,
+      },
+      ports: { dispatchMiniMint },
+    }).status).toBe('dispatched');
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(dispatchShowPasswordInput).toHaveBeenCalledWith(true);
+    expect(dispatchGroupPasswordMint).toHaveBeenCalledWith({ forceRefresh: true });
+    expect(dispatchInviteCodeMint).toHaveBeenCalledWith('invite-code');
+    expect(dispatchMiniMint).toHaveBeenCalledWith(true);
   });
 
   it('does not dispatch hidden, blocked, disabled, or unhandled mini burn actions', () => {
