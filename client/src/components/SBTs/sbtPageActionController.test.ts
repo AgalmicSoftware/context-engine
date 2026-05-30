@@ -1,5 +1,6 @@
 import {
   runSbtPageBurnActionController,
+  runSbtPageMiniBurnActionController,
   runSbtPageMintActionController,
 } from './sbtPageActionController';
 
@@ -145,6 +146,66 @@ describe('sbtPageActionController', () => {
     expect(() => runSbtPageBurnActionController({
       plan: { blockedReason: 'none', shouldRenderBurnButton: true },
       ports: { dispatchBurn: () => { throw error; } },
+    })).toThrow(error);
+  });
+
+  it('does not dispatch hidden, blocked, disabled, or unhandled mini burn actions', () => {
+    const dispatchMiniBurn = jest.fn();
+
+    expect(runSbtPageMiniBurnActionController({
+      plan: { blockedReason: 'missing-token', shouldRenderMiniBurnButton: false },
+      ports: { dispatchMiniBurn },
+    })).toEqual({
+      blockedReason: 'missing-token',
+      status: 'hidden',
+    });
+    expect(runSbtPageMiniBurnActionController({
+      plan: { blockedReason: 'owner-burn-disabled', shouldRenderMiniBurnButton: true },
+      ports: { dispatchMiniBurn },
+    })).toEqual({
+      blockedReason: 'owner-burn-disabled',
+      status: 'blocked',
+    });
+    expect(runSbtPageMiniBurnActionController({
+      disabled: true,
+      plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
+      ports: { dispatchMiniBurn },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(runSbtPageMiniBurnActionController({
+      plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
+      ports: {},
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'unhandled',
+    });
+    expect(dispatchMiniBurn).not.toHaveBeenCalled();
+  });
+
+  it('calls the mini burn port with the same args and propagates errors', () => {
+    const dispatchMiniBurn = jest.fn();
+    const event = { preventDefault: jest.fn() };
+
+    expect(runSbtPageMiniBurnActionController({
+      burnArgs: ['token-owner'],
+      event,
+      plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
+      ports: { dispatchMiniBurn },
+    })).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(dispatchMiniBurn).toHaveBeenCalledTimes(1);
+    expect(dispatchMiniBurn).toHaveBeenCalledWith('token-owner');
+
+    const error = new Error('mini burn failed');
+    expect(() => runSbtPageMiniBurnActionController({
+      plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
+      ports: { dispatchMiniBurn: () => { throw error; } },
     })).toThrow(error);
   });
 });
