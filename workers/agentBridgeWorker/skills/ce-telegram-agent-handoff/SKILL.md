@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v7)
+**Skill version:** 2026-05-30 (v8)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -334,10 +334,12 @@ digest integrations. It also stores `topicPreferences`,
 Demographic linking is default-off; only when the user opts in may the agent
 link otherwise anonymous responses to approved aggregate buckets such as Edge
 Bio keywords, age bucket, country, or region. Attendance linking is also
-default-off; only when the user opts in may the agent pass Edge attendance
-buckets such as Week 1, Week 2, Week 3, Week 4, Entire Month, or Attended
-Previous Edge Events to CE. These attendance buckets are associated with the
-user's answers for aggregate analysis, not published as the user's identity.
+default-off. Ask the user: "Can I ask you questions related to the events you
+attend at Edge?" Only when the user opts in may the agent use Edge attendance
+to select relevant questions and pass attendance buckets such as Week 1, Week
+2, Week 3, Week 4, Entire Month, or Attended Previous Edge Events to CE. These
+attendance buckets are associated with the user's answers for aggregate
+analysis, not published as the user's identity.
 Draft-divergence research is also default-off; unless the user opts in, do not
 send agent-drafted answers to the worker as durable research records. A Mini
 App launch may still carry an editable prefill draft for review, but that is a
@@ -1149,7 +1151,7 @@ answers with `POST /telegram/agent/api/onboarding`:
 1. Can your agent pass preference info to CE to tailor which questions you see?
 2. Can your agent share non-identifying demographics for research only, never published in connection to you?
 3. Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?
-4. Can CE associate your Edge attendance buckets with your answers, but not your identity?
+4. Can I ask you questions related to the events you attend at Edge?
 5. Can your agent draft question responses for you based on your activity and user file?
 6. Can CE store agent-drafted answers and final sent answers for research on how people edit drafts?
 7. Can your agent upvote questions it thinks you will find relevant?
@@ -1168,6 +1170,10 @@ enabled. The digest flag is stored for Phase 2 and should not be treated as an
 active delivery subscription yet.
 
 ## Changelog
+
+### 2026-05-30 (v8)
+
+- Reworded the Edge attendance permission around asking relevant event-related questions, while keeping attendance bucket sharing opt-in.
 
 ### 2026-05-30 (v7)
 

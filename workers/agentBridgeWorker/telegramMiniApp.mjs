@@ -6945,7 +6945,7 @@ function telegramMiniAppHtml() {
         </label>
         <label class="toggle">
           <input id="attendanceLinkOptIn" type="checkbox">
-          <span>Share attendance buckets</span>
+          <span>Ask about Edge events</span>
         </label>
         <label class="toggle">
           <input id="draftDivergenceOptIn" type="checkbox">
