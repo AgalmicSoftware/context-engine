@@ -84,6 +84,13 @@ function normalizeDigestFrequency(value = '') {
   return ['off', 'weekly', 'few_per_week', 'daily'].includes(frequency) ? frequency : 'weekly';
 }
 
+function normalizeDigestTimeOfDay(value = '', fallback = 'morning') {
+  const time = lower(value);
+  if (['morning', 'am', 'day'].includes(time)) return 'morning';
+  if (['night', 'evening', 'pm'].includes(time)) return 'night';
+  return fallback;
+}
+
 function normalizeStringList(value = []) {
   const source = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
   return source
@@ -148,6 +155,7 @@ export function defaultTelegramAgentSettings(env = {}) {
     dailyDigestOptIn: normalizeBoolean(source.dailyDigestOptIn, false),
     questionsPerBatch: normalizeQuestionsPerBatch(source.questionsPerBatch, 3),
     digestFrequency: normalizeDigestFrequency(source.digestFrequency),
+    digestTimeOfDay: normalizeDigestTimeOfDay(source.digestTimeOfDay),
     onboardingCompletedAt: normalizeIsoString(source.onboardingCompletedAt),
   };
   assertNoSecretShape(settings, 'Telegram agent settings defaults must not serialize secrets.');
@@ -219,6 +227,13 @@ export function normalizeTelegramAgentSettingsPatch(settings = {}) {
     }
     patch.digestFrequency = digestFrequency;
   }
+  if (Object.hasOwn(input, 'digestTimeOfDay')) {
+    const digestTime = lower(input.digestTimeOfDay);
+    if (!['morning', 'am', 'day', 'night', 'evening', 'pm'].includes(digestTime)) {
+      return { ok: false, reason: 'digest_time_of_day_invalid' };
+    }
+    patch.digestTimeOfDay = normalizeDigestTimeOfDay(digestTime);
+  }
   if (Object.hasOwn(input, 'onboardingCompletedAt')) {
     patch.onboardingCompletedAt = normalizeIsoString(input.onboardingCompletedAt);
   }
@@ -263,6 +278,7 @@ export async function loadTelegramAgentSettings({
     dailyDigestOptIn: normalizeBoolean(settings.dailyDigestOptIn, defaults.dailyDigestOptIn),
     questionsPerBatch: normalizeQuestionsPerBatch(settings.questionsPerBatch, defaults.questionsPerBatch),
     digestFrequency: normalizeDigestFrequency(settings.digestFrequency || defaults.digestFrequency),
+    digestTimeOfDay: normalizeDigestTimeOfDay(settings.digestTimeOfDay, defaults.digestTimeOfDay),
     onboardingCompletedAt: normalizeIsoString(settings.onboardingCompletedAt || defaults.onboardingCompletedAt),
   };
 }
@@ -309,6 +325,7 @@ export const __test__telegramAgentSettings = {
   TELEGRAM_AGENT_SETTINGS_KV_PREFIX,
   defaultTelegramAgentSettings,
   normalizeDigestFrequency,
+  normalizeDigestTimeOfDay,
   normalizeQuestionsPerBatch,
   normalizeTelegramAgentSettingsPatch,
   telegramAgentSettingsKey,

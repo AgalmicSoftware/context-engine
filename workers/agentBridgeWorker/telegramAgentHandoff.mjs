@@ -17,6 +17,7 @@ import {
   persistActionRecord,
   persistAnswerDraft,
   persistLatestMiniAppLaunchPointer,
+  persistTelegramSubmitRequest,
   persistTelegramUserSessionBinding,
   readGroupSessionBinding,
   readAgentSkillUpdateFlag,
@@ -92,7 +93,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v5)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v6)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -749,6 +750,19 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
   };
 }
 
+function normalizeOnboardingDigestTimeOfDay(input = {}, settings = {}) {
+  const raw = input.digestTimeOfDay ||
+    input.digestWindow ||
+    input.digestTime ||
+    input.answers?.digest_time_of_day ||
+    input.answers?.digestTimeOfDay ||
+    settings.digestTimeOfDay ||
+    'morning';
+  const value = lower(raw);
+  if (['night', 'evening', 'pm'].includes(value)) return 'night';
+  return 'morning';
+}
+
 function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
   const answers = onboardingAnswersFromSettings(settings);
   const questions = TELEGRAM_AGENT_ONBOARDING_QUESTIONS.map((question, index) => ({
@@ -774,6 +788,7 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
       approvalMode: settings.approvalMode || {},
       agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes === true,
       dailyDigestOptIn: settings.dailyDigestOptIn === true,
+      digestTimeOfDay: safeString(settings.digestTimeOfDay) || 'morning',
     },
   };
   assertNoSecretShape(payload, 'Telegram agent onboarding state must not serialize secrets.');
@@ -1879,6 +1894,9 @@ async function handleOnboardingRequest({
     topicPreferences: answers.preference_tailoring === true
       ? normalizeOnboardingTopicPreferences(body, current)
       : [],
+    digestTimeOfDay: answers.edge_daily_digest === true
+      ? normalizeOnboardingDigestTimeOfDay(body, current)
+      : (current.digestTimeOfDay || 'morning'),
   };
   const groupMembership = normalizeOnboardingGroupMembershipInput(body, answers);
   let savedGroups = null;
@@ -3706,13 +3724,34 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
   };
 }
 
+function directSubmitRequested(input = {}) {
+  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+    ? input.preferences
+    : {};
+  const submit = normalizeBoolean(firstValue(input.submit, input.submitAnswers, preferences.submit, preferences.submitAnswers), false);
+  const approved = normalizeBoolean(
+    firstValue(
+      input.humanApproved,
+      input.approved,
+      input.userApproved,
+      preferences.humanApproved,
+      preferences.approved,
+      preferences.userApproved
+    ),
+    false
+  );
+  return submit === true && approved === true;
+}
+
 async function handlePreferencesRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug, { waitUntil });
   const questions = (Array.isArray(loaded.questions) ? loaded.questions : [])
     .filter((question) => !questionIsLocked(question) && !questionIsUnavailable(question));
   const byId = new Map(questions.map((question) => [safeString(question.questionId || question.id), question]));
   const entries = normalizePreferenceEntries(input);
+  const shouldSubmit = directSubmitRequested(input);
   const drafts = [];
+  const submitted = [];
   const skipped = [];
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
@@ -3739,7 +3778,8 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
         source: 'agent_handoff',
         authMode: safeString(context.authMode),
         endpoint: '/telegram/agent/api/preferences',
-        reviewRequired: true,
+        reviewRequired: !shouldSubmit,
+        submitRequested: shouldSubmit,
       },
       createdAt: input.createdAt || null,
     });
@@ -3747,20 +3787,49 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       skipped.push({ questionId, reason: saved.reason || 'draft_save_failed' });
       continue;
     }
+    const draftRecord = { ...saved.draft, key: saved.key };
     drafts.push({ questionId, answerLabel: draft.label, controlType: draft.controlType });
+    if (shouldSubmit) {
+      const submit = await persistTelegramSubmitRequest({
+        env,
+        normalized: context.normalized,
+        draft: draftRecord,
+        sessionSlug: context.session.sessionSlug,
+        selectedQuestionId: questionId,
+        createdAt: input.createdAt || null,
+      });
+      if (!submit.ok) {
+        skipped.push({ questionId, reason: submit.reason || 'submit_request_failed' });
+        continue;
+      }
+      submitted.push({
+        questionId,
+        requestId: submit.requestId,
+        status: submit.status,
+        queued: submit.queued === true,
+        replayed: submit.replayed === true,
+      });
+    }
   }
-  return json({
+  const payload = {
     ok: true,
     sessionSlug: context.session.sessionSlug,
     draftCount: drafts.length,
+    submittedCount: submitted.length,
     skipped,
     drafts,
-    reviewRequired: true,
-    review: {
+    ...(shouldSubmit ? { submitted } : {}),
+    reviewRequired: !shouldSubmit,
+    review: shouldSubmit ? {
+      route: '/telegram/agent/api/preferences',
+      note: 'Human-approved answers were submitted without requiring Mini App finalization.',
+    } : {
       route: '/telegram/mini-app',
-      note: 'Drafted preferences are saved for user review. This endpoint does not submit answers.',
+      note: 'Drafted preferences are saved for user review. Add submit=true and humanApproved=true only when the user explicitly authorizes direct submission.',
     },
-  });
+  };
+  assertNoSecretShape(payload, 'Telegram agent preference response must not serialize secrets.');
+  return json(payload);
 }
 
 function normalizeCreateQuestionBatch(input = {}) {

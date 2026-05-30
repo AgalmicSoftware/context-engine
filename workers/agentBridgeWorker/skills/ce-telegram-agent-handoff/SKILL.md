@@ -5,9 +5,11 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v5)
+**Skill version:** 2026-05-30 (v6)
 
-Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, and posing questions; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
+Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
+
+**Token handling:** a pasted `ceagt_...` value is a private bearer credential. Extract it, store it only in the agent's local secret/auth context, and never repeat, summarize, echo, log, or include it in messages back to the user.
 
 ## What Context Engine Does
 
@@ -86,9 +88,12 @@ https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 
 After the user taps `Start`, Telegram should land directly on the private
 agent install screen. Ask the user to tap `Copy Agent Info` and paste
-the copied install info back into Claude Code. Do not call the CE worker until
-the pasted install info provides a `ceagt_...` token, worker URL, and skill URL
-(either as `worker=...` / `skill=...` fields or line-separated URLs).
+the copied install info back into Claude Code. Treat any paste containing a
+`ceagt_...` token plus worker/skill URLs as Context Engine onboarding install
+info, even if the first line is compact. Do not call the CE worker until the
+pasted install info provides a `ceagt_...` token, worker URL, and skill URL
+(either as `token=...` / `worker=...` / `skill=...` fields or line-separated
+values). Never echo the token back to the user.
 
 ## Staying Up To Date
 
@@ -129,13 +134,13 @@ curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api
 Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
 
 1. Ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
-2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session` field; that is expected.
+2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session` field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
 3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
 4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Draft responses, show the proposed answers, and ask for confirmation.
-7. Save confirmed drafts with `POST <Worker>/telegram/agent/api/preferences`; do not submit answers unless a separate user-approved submit path is set in the user's CE settings.
-8. When you have a reviewed sequence of questions, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
+7. Save drafts with `POST <Worker>/telegram/agent/api/preferences`. If the user explicitly says to answer or choose an option on their behalf, include `submit: true` and `humanApproved: true`; this submits without requiring the Mini App.
+8. When the user wants editable Telegram review, call `POST <Worker>/telegram/agent/api/mini-app-launch` to create a one-click Mini App link with the ordered questions and editable prefilled drafts.
 9. Check `GET <Worker>/telegram/agent/api/actions` to show pending drafts, vote suggestions, and prior agent actions.
 10. Check `GET <Worker>/telegram/agent/api/results?view=topic-map` when the user asks what the session is about or wants a graphical aggregate result.
 11. For an interactive report, give the user a private client auto-login link built from their copied `ceagt_` token.
@@ -389,7 +394,7 @@ The `GET` endpoint also accepts `tags=<tag-a>,<tag-b>` and `relevanceMode=filter
 
 For queue-driven reads, `POST /telegram/agent/api/questions/next` supports `sponsoredFirst` and `includeSponsored` so admin-selected sponsored questions can be served before the general queue.
 
-If the user is interacting in an OpenClaw DM, use this endpoint to fetch CE questions, then ask the user in natural language. Save their answer through `POST /telegram/agent/api/preferences` for CE Mini App review. Do not claim the response is submitted.
+If the user is interacting in an OpenClaw DM, use this endpoint to fetch CE questions, then ask the user in natural language. Save their answer through `POST /telegram/agent/api/preferences`. By default this creates a draft; when the user explicitly says "answer", "submit", "choose unsure", or otherwise authorizes an answer, set `submit: true` and `humanApproved: true` so CE records the response without requiring the Mini App.
 
 ## Tags: Reuse Before You Invent
 
@@ -473,7 +478,28 @@ Draft the preferences:
 POST /telegram/agent/api/preferences
 ```
 
-The response reports `draftCount` and `skipped`. Send the user to the Mini App for review after drafts are saved.
+The response reports `draftCount`, `submittedCount`, and `skipped`. By default
+it only saves drafts. To answer on the user's behalf after explicit approval,
+include both `submit: true` and `humanApproved: true` at the top level or inside
+`preferences`:
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "submit": true,
+  "humanApproved": true,
+  "preferences": {
+    "answersByQuestionId": {
+      "q-binary": { "value": "unsure", "comments": "The premise depends on how intervention is defined." }
+    }
+  }
+}
+```
+
+Use direct submit for commands like "choose unsure", "answer agree", or "submit
+that" when the user has clearly authorized the action. Use drafts when the user
+asks for suggestions, wants to review language, or has not clearly approved
+submission.
 
 ## Mini App Question Links
 
@@ -505,7 +531,14 @@ dictation/transcription in the WebView, submit, or skip to the next question.
 If WebView audio is unreliable, the user can send a native Telegram voice
 message in the private DM after opening a Mini App question link; the bot
 transcribes it through the session worker and appends it to the latest Mini App
-draft for review. The CE worker does not silently submit these answers.
+draft for review.
+
+The Mini App is an optional review path, not a required finalization step. If a
+review deep link opens `/start` or otherwise fails to launch the Mini App,
+continue in the agent chat: show the saved drafts from
+`GET /telegram/agent/api/actions`, ask what to submit, then call
+`POST /telegram/agent/api/preferences` with `submit: true` and
+`humanApproved: true` for approved answers.
 
 ## Review Activity
 
@@ -727,19 +760,22 @@ Store the user's preferred volume and cadence through the same onboarding/settin
 flow used for `draftStyle`, `topicPreferences`, and digest consent. The worker
 stores these values but does not schedule delivery; the host agent must respect
 `questionsPerBatch` when choosing how many questions to fetch and
-`digestFrequency` when deciding digest cadence and quiet hours.
+`digestFrequency` plus `digestTimeOfDay` when deciding digest cadence and quiet hours.
 
 ```json
 {
   "questionsPerBatch": 3,
-  "digestFrequency": "weekly"
+  "digestFrequency": "weekly",
+  "digestTimeOfDay": "morning"
 }
 ```
 
 `questionsPerBatch` is clamped from 1 to 10. `digestFrequency` is one of `off`,
 `weekly`, `few_per_week`, or `daily`. `dailyDigestOptIn` remains the simple
 Edge daily digest consent flag; `digestFrequency` is the finer-grained cadence
-preference for the host agent.
+preference for the host agent. If the user opts into a digest, ask whether they
+prefer questions in the morning or at night and store `digestTimeOfDay` as
+`morning` or `night`.
 
 When the user has elected to see one question every so often, prefer the
 next-question queue endpoint:
@@ -1109,19 +1145,29 @@ answers with `POST /telegram/agent/api/onboarding`:
 3. Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?
 4. Can CE associate your Edge attendance buckets with your answers, but not your identity?
 5. Can your agent draft question responses for you based on your activity and user file?
-6. Can CE store agent-drafted answers and final sent answers to study where people edit drafts?
+6. Can CE store agent-drafted answers and final sent answers for research on how people edit drafts?
 7. Can your agent upvote questions it thinks you will find relevant?
 8. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
 
+If the user says yes to the daily digest, also ask: "Do you prefer morning or
+night?" Persist the answer as `digestTimeOfDay: "morning"` or
+`digestTimeOfDay: "night"`.
+
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
 `topicPreferences`, `demographicLinkOptIn`, `attendanceLinkOptIn`, `draftDivergenceOptIn`,
-`agentAutoApplyQuestionVotes`, and `dailyDigestOptIn`. Auto-apply votes remain
+`agentAutoApplyQuestionVotes`, `dailyDigestOptIn`, and `digestTimeOfDay`. Auto-apply votes remain
 off unless the user says yes to question 7. The demographic-link,
 attendance-link, and draft-divergence settings remain off unless explicitly
 enabled. The digest flag is stored for Phase 2 and should not be treated as an
 active delivery subscription yet.
 
 ## Changelog
+
+### 2026-05-30 (v6)
+
+- Made agent onboarding paste parsing and token handling explicit; agents must never echo `ceagt_` tokens.
+- Documented direct human-approved answer submission with `submit: true` plus `humanApproved: true`; Mini App review is optional, not required.
+- Added morning/night digest preference guidance via `digestTimeOfDay` and clarified draft edit tracking is for research.
 
 ### 2026-05-30 (v5)
 

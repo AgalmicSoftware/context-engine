@@ -246,14 +246,14 @@ const CAPABILITIES = Object.freeze([
     path: '/telegram/agent/api/preferences',
     handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
     requiredFields: ['telegramUserId', 'sessionSlug', 'preferences.answersByQuestionId'],
-    optionalFields: ['groupChatId'],
+    optionalFields: ['groupChatId', 'submit', 'humanApproved'],
     safeTelegramLanes: [
       TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
     notes: [
-      'Writes drafts for user review only; it must not submit answers without explicit user approval.',
+      'Writes drafts by default. When the user explicitly authorizes the agent to answer on their behalf, submit=true plus humanApproved=true submits the same answers without requiring Mini App finalization.',
     ],
   }),
   freezeEntry({

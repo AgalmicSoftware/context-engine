@@ -16,6 +16,7 @@ test('default Telegram agent settings include question cadence preferences', () 
   const defaults = defaultTelegramAgentSettings({});
   assert.equal(defaults.questionsPerBatch, 3);
   assert.equal(defaults.digestFrequency, 'weekly');
+  assert.equal(defaults.digestTimeOfDay, 'morning');
   assert.equal(defaults.attendanceLinkOptIn, false);
 });
 
@@ -49,6 +50,20 @@ test('settings patch validates digestFrequency', () => {
   });
 });
 
+test('settings patch validates digestTimeOfDay', () => {
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ digestTimeOfDay: 'night' }), {
+    ok: true,
+    patch: { digestTimeOfDay: 'night' },
+    publicSummary: { digestTimeOfDay: 'night' },
+  });
+  assert.equal(normalizeTelegramAgentSettingsPatch({ digestTimeOfDay: 'pm' }).patch.digestTimeOfDay, 'night');
+  assert.equal(normalizeTelegramAgentSettingsPatch({ digestTimeOfDay: 'am' }).patch.digestTimeOfDay, 'morning');
+  assert.deepEqual(normalizeTelegramAgentSettingsPatch({ digestTimeOfDay: 'afternoon' }), {
+    ok: false,
+    reason: 'digest_time_of_day_invalid',
+  });
+});
+
 test('settings patch validates attendance sharing opt-in', () => {
   assert.deepEqual(normalizeTelegramAgentSettingsPatch({ attendanceLinkOptIn: 'yes' }), {
     ok: true,
@@ -73,6 +88,7 @@ test('loadTelegramAgentSettings returns stored question cadence preferences', as
     settings: {
       questionsPerBatch: 6,
       digestFrequency: 'few_per_week',
+      digestTimeOfDay: 'night',
       attendanceLinkOptIn: true,
     },
   };
@@ -88,5 +104,6 @@ test('loadTelegramAgentSettings returns stored question cadence preferences', as
   const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
   assert.equal(settings.questionsPerBatch, 6);
   assert.equal(settings.digestFrequency, 'few_per_week');
+  assert.equal(settings.digestTimeOfDay, 'night');
   assert.equal(settings.attendanceLinkOptIn, true);
 });

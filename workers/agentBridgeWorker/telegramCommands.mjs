@@ -463,7 +463,7 @@ function buildAgentInstallCopyInfo({
   const candidates = [
     `${intro}\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `Install CE; connect worker and ask preferences.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
-    `CE: onboard prefs.\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
+    `CE onboarding; no echo.\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
@@ -10835,6 +10835,7 @@ export {
   persistActionRecord,
   persistAnswerDraft,
   persistLatestMiniAppLaunchPointer,
+  persistTelegramSubmitRequest,
   persistTelegramUserSessionBinding,
   questionId,
   readActionRecord,
