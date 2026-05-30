@@ -2,6 +2,9 @@ import {
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
   runSbtPageMintActionController,
+  type SbtPageBurnActionControllerPorts,
+  type SbtPageMiniBurnActionControllerPorts,
+  type SbtPageMintActionControllerPorts,
 } from './sbtPageActionController';
 
 describe('sbtPageActionController', () => {
@@ -46,7 +49,10 @@ describe('sbtPageActionController', () => {
   });
 
   it('calls the mint port with the same args when enabled', () => {
-    const dispatchMint = jest.fn();
+    const dispatchMint = jest.fn() satisfies SbtPageMintActionControllerPorts<[
+      boolean,
+      { sbtAddressOverride: string },
+    ]>['dispatchMint'];
     const event = { preventDefault: jest.fn() };
 
     expect(runSbtPageMintActionController({
@@ -65,7 +71,7 @@ describe('sbtPageActionController', () => {
   });
 
   it('calls the burn port when enabled', () => {
-    const dispatchBurn = jest.fn();
+    const dispatchBurn = jest.fn() satisfies SbtPageBurnActionControllerPorts['dispatchBurn'];
     const event = { preventDefault: jest.fn() };
 
     expect(runSbtPageBurnActionController({
@@ -184,12 +190,11 @@ describe('sbtPageActionController', () => {
     expect(dispatchMiniBurn).not.toHaveBeenCalled();
   });
 
-  it('calls the mini burn port with the same args and propagates errors', () => {
-    const dispatchMiniBurn = jest.fn();
+  it('calls the mini burn port without args and propagates errors', () => {
+    const dispatchMiniBurn = jest.fn() satisfies SbtPageMiniBurnActionControllerPorts['dispatchMiniBurn'];
     const event = { preventDefault: jest.fn() };
 
     expect(runSbtPageMiniBurnActionController({
-      burnArgs: ['token-owner'],
       event,
       plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
       ports: { dispatchMiniBurn },
@@ -200,7 +205,7 @@ describe('sbtPageActionController', () => {
 
     expect(event.preventDefault).toHaveBeenCalledTimes(1);
     expect(dispatchMiniBurn).toHaveBeenCalledTimes(1);
-    expect(dispatchMiniBurn).toHaveBeenCalledWith('token-owner');
+    expect(dispatchMiniBurn).toHaveBeenCalledWith();
 
     const error = new Error('mini burn failed');
     expect(() => runSbtPageMiniBurnActionController({

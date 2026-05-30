@@ -17,26 +17,36 @@ export type SbtPageActionEventLike = {
   preventDefault?: () => void;
 };
 
-export type SbtPageMintActionControllerPorts = {
-  dispatchMint?: CallableFunction;
+export type SbtPageActionDispatch<Args extends readonly unknown[] = readonly unknown[]> = (
+  ...args: Args
+) => unknown;
+
+export type SbtPageNoArgActionDispatch = () => unknown;
+
+export type SbtPageMintActionControllerPorts<
+  MintArgs extends readonly unknown[] = readonly unknown[]
+> = {
+  dispatchMint?: SbtPageActionDispatch<MintArgs>;
   openMintTransaction?: () => unknown;
 };
 
 export type SbtPageBurnActionControllerPorts = {
-  dispatchBurn?: CallableFunction;
+  dispatchBurn?: SbtPageNoArgActionDispatch;
 };
 
 export type SbtPageMiniBurnActionControllerPorts = {
-  dispatchMiniBurn?: CallableFunction;
+  dispatchMiniBurn?: SbtPageNoArgActionDispatch;
 };
 
-export type RunSbtPageMintActionControllerArgs = {
+export type RunSbtPageMintActionControllerArgs<
+  MintArgs extends readonly unknown[] = readonly unknown[]
+> = {
   canOpenMintTx?: boolean;
   disabled?: boolean;
   event?: SbtPageActionEventLike | null;
-  mintArgs?: unknown[];
+  mintArgs?: MintArgs;
   plan?: SbtPageMintActionPlanLike | null;
-  ports?: SbtPageMintActionControllerPorts;
+  ports?: SbtPageMintActionControllerPorts<MintArgs>;
 };
 
 export type RunSbtPageBurnActionControllerArgs = {
@@ -47,7 +57,7 @@ export type RunSbtPageBurnActionControllerArgs = {
 };
 
 export type RunSbtPageMiniBurnActionControllerArgs = {
-  burnArgs?: unknown[];
+  burnArgs?: [];
   disabled?: boolean;
   event?: SbtPageActionEventLike | null;
   plan?: SbtPageMiniBurnActionPlanLike | null;
@@ -69,14 +79,16 @@ const preventDefault = (event?: SbtPageActionEventLike | null): void => {
   }
 };
 
-export const runSbtPageMintActionController = ({
+export const runSbtPageMintActionController = <
+  MintArgs extends readonly unknown[] = readonly unknown[]
+>({
   canOpenMintTx = false,
   disabled = false,
   event = null,
-  mintArgs = [],
+  mintArgs = [] as unknown as MintArgs,
   plan = null,
   ports = {},
-}: RunSbtPageMintActionControllerArgs = {}): SbtPageActionControllerResult => {
+}: RunSbtPageMintActionControllerArgs<MintArgs> = {}): SbtPageActionControllerResult => {
   preventDefault(event);
 
   if (!plan?.shouldRenderMintButton) {
