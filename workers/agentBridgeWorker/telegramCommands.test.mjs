@@ -4828,9 +4828,9 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   const copyInfo = copyInfoButton?.copy_text?.text || '';
   const token = copyInfo.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   assert.match(token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  assert.match(copyInfo, /agent\+ClaudeCode:noids/);
-  assert.match(copyInfo, /https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(copyInfo, /^token=ceagt_/);
+  assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
+  assert.match(copyInfo, /\nskill=https:\/\/github\.com\/AgalmicSoftware\/context-engine\/raw\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);

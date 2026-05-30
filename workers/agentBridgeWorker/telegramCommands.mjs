@@ -463,9 +463,9 @@ function buildAgentInstallCopyInfo({
   const candidates = [
     `${intro}\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `Install CE in your agent or Claude Code; no Telegram id needed.\ntoken=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
+    `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `agent+ClaudeCode:noids\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `agent or Claude Code\n${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
-    `token=${safeString(token)}\nworker=${safeString(workerUrl)}\nskill=${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(compactSkillUrl)}`,
     `${safeString(token)}\n${safeString(workerUrl)}\n${safeString(skillUrl)}`,
   ];
