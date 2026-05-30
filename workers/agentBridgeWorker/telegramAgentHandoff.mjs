@@ -93,7 +93,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v8)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v9)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -112,19 +112,11 @@ const RESULT_VIEW_CACHE_MAX_BYTES = 512 * 1024;
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
-    prompt: 'Can your agent pass preference info to CE to tailor which questions you see?',
-  },
-  {
-    id: 'demographics_research',
-    prompt: 'Can your agent share non-identifying demographics for research only, never published in connection to you?',
+    prompt: 'Can I pass preferences and calendar info to CE to surface relevant questions?',
   },
   {
     id: 'demographic_link_opt_in',
-    prompt: 'Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?',
-  },
-  {
-    id: 'attendance_context_opt_in',
-    prompt: 'Can I ask you questions related to the events you attend at Edge?',
+    prompt: 'Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?',
   },
   {
     id: 'draft_responses',
@@ -132,7 +124,7 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   },
   {
     id: 'draft_divergence_research',
-    prompt: 'Can CE store agent-drafted answers and final sent answers to study where people edit drafts?',
+    prompt: 'Can CE store agent-drafted answers and final sent answers for research?',
   },
   {
     id: 'auto_apply_question_votes',
@@ -140,7 +132,7 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   },
   {
     id: 'edge_daily_digest',
-    prompt: 'Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?',
+    prompt: 'Want CE questions in your morning or evening Edge brief?',
   },
 ]);
 
@@ -835,7 +827,7 @@ function onboardingGroupFollowUpQuestions({ answers = {}, groups = {} } = {}) {
   if ((answers.demographic_link_opt_in === true || answers.demographics_research === true) && !Array.isArray(selections.contribution_role)) {
     questions.push({
       categoryId: 'contribution_role',
-      prompt: 'What role best describes you for aggregate research: builder, researcher, founder/operator, investor, artist/designer, community host, or other?',
+      prompt: 'What role best describes you for research: builder, researcher, founder/operator, investor, artist/designer, community host, or other?',
     });
   }
   return questions;
@@ -846,13 +838,29 @@ function normalizeOnboardingAnswers(input = {}, settings = {}) {
     ? input.answers
     : input;
   const previous = onboardingAnswersFromSettings(settings);
-  return TELEGRAM_AGENT_ONBOARDING_QUESTIONS.reduce((answers, question) => {
-    answers[question.id] = normalizeBoolean(
+  const answers = TELEGRAM_AGENT_ONBOARDING_QUESTIONS.reduce((result, question) => {
+    result[question.id] = normalizeBoolean(
       Object.hasOwn(source, question.id) ? source[question.id] : undefined,
       previous[question.id] === true ? true : false
     );
-    return answers;
+    return result;
   }, {});
+  const combinedResearchLink = normalizeBoolean(
+    Object.hasOwn(source, 'demographic_link_opt_in') ? source.demographic_link_opt_in : undefined,
+    previous.demographic_link_opt_in === true ||
+      previous.demographics_research === true ||
+      previous.attendance_context_opt_in === true
+  );
+  answers.demographic_link_opt_in = combinedResearchLink;
+  answers.demographics_research = normalizeBoolean(
+    Object.hasOwn(source, 'demographics_research') ? source.demographics_research : undefined,
+    combinedResearchLink
+  );
+  answers.attendance_context_opt_in = normalizeBoolean(
+    Object.hasOwn(source, 'attendance_context_opt_in') ? source.attendance_context_opt_in : undefined,
+    combinedResearchLink
+  );
+  return answers;
 }
 
 function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {

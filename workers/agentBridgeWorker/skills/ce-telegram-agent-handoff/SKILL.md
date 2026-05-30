@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v8)
+**Skill version:** 2026-05-30 (v9)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -331,15 +331,13 @@ body. The current questions map to these settings:
 The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
 digest integrations. It also stores `topicPreferences`,
 `demographicLinkOptIn`, `attendanceLinkOptIn`, and `draftDivergenceOptIn`.
-Demographic linking is default-off; only when the user opts in may the agent
-link otherwise anonymous responses to approved aggregate buckets such as Edge
-Bio keywords, age bucket, country, or region. Attendance linking is also
-default-off. Ask the user: "Can I ask you questions related to the events you
-attend at Edge?" Only when the user opts in may the agent use Edge attendance
-to select relevant questions and pass attendance buckets such as Week 1, Week
-2, Week 3, Week 4, Entire Month, or Attended Previous Edge Events to CE. These
-attendance buckets are associated with the user's answers for aggregate
-analysis, not published as the user's identity.
+Demographic and attendance linking are default-off. Ask the user: "Can I link
+non-identifying information (demographics, attendance week) to your responses
+for research purposes?" Only when the user opts in may the agent link otherwise
+anonymous responses to approved buckets such as Edge Bio keywords, age bucket,
+country, region, Week 1, Week 2, Week 3, Week 4, Entire Month, or Attended
+Previous Edge Events. These buckets are associated with the user's answers for
+research and filtering, not published as the user's identity.
 Draft-divergence research is also default-off; unless the user opts in, do not
 send agent-drafted answers to the worker as durable research records. A Mini
 App launch may still carry an editable prefill draft for review, but that is a
@@ -356,7 +354,7 @@ coming, ask directly. For role, use authorized bio/profile text to choose from
 Include the chosen buckets under `groups.selections` in the onboarding POST.
 Positive consent writes aggregate bucket memberships such as attendance, age
 bucket, region, AI tribe, or role. Explain plainly: these buckets are
-associated with their answers for aggregate research and filtering, not
+associated with their answers for research and filtering, not
 published under their name. Do not infer or submit group membership from
 private user data unless the user has explicitly allowed that field and that
 use.
@@ -779,11 +777,11 @@ stores these values but does not schedule delivery; the host agent must respect
 ```
 
 `questionsPerBatch` is clamped from 1 to 10. `digestFrequency` is one of `off`,
-`weekly`, `few_per_week`, or `daily`. `dailyDigestOptIn` remains the simple
-Edge daily digest consent flag; `digestFrequency` is the finer-grained cadence
-preference for the host agent. If the user opts into a digest, ask whether they
-prefer questions in the morning or at night and store `digestTimeOfDay` as
-`morning` or `night`.
+`weekly`, `few_per_week`, or `daily`. `dailyDigestOptIn` remains the simple Edge
+brief consent flag; `digestFrequency` is the finer-grained cadence preference
+for the host agent. If the user opts into a digest, ask whether they prefer the
+morning or evening Edge brief and store `digestTimeOfDay` as `morning` or
+`night`.
 
 When the user has elected to see one question every so often, prefer the
 next-question queue endpoint:
@@ -1148,28 +1146,31 @@ user, call `GET /telegram/agent/api/onboarding`. If `completed` is false, ask
 the user this fixed series of yes/no consent questions and persist their
 answers with `POST /telegram/agent/api/onboarding`:
 
-1. Can your agent pass preference info to CE to tailor which questions you see?
-2. Can your agent share non-identifying demographics for research only, never published in connection to you?
-3. Can CE link your otherwise-anonymous responses to approved demographic buckets for aggregate research?
-4. Can I ask you questions related to the events you attend at Edge?
-5. Can your agent draft question responses for you based on your activity and user file?
-6. Can CE store agent-drafted answers and final sent answers for research on how people edit drafts?
-7. Can your agent upvote questions it thinks you will find relevant?
-8. Want your top 3 CE questions (from your activity + admin sponsored) in your Edge daily digest?
+1. Can I pass preferences and calendar info to CE to surface relevant questions?
+2. Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?
+3. Can your agent draft question responses for you based on your activity and user file?
+4. Can CE store agent-drafted answers and final sent answers for research?
+5. Can your agent upvote questions it thinks you will find relevant?
+6. Want CE questions in your morning or evening Edge brief?
 
-If the user says yes to the daily digest, also ask: "Do you prefer morning or
-night?" Persist the answer as `digestTimeOfDay: "morning"` or
+If the user says yes to the Edge brief, also ask: "Do you prefer the morning or
+evening Edge brief?" Persist the answer as `digestTimeOfDay: "morning"` or
 `digestTimeOfDay: "night"`.
 
 These answers map onto `allowedProfileFields`, `allowedUses`, `approvalMode`,
 `topicPreferences`, `demographicLinkOptIn`, `attendanceLinkOptIn`, `draftDivergenceOptIn`,
 `agentAutoApplyQuestionVotes`, `dailyDigestOptIn`, and `digestTimeOfDay`. Auto-apply votes remain
-off unless the user says yes to question 7. The demographic-link,
-attendance-link, and draft-divergence settings remain off unless explicitly
-enabled. The digest flag is stored for Phase 2 and should not be treated as an
-active delivery subscription yet.
+off unless the user says yes to question 5. Demographic-link, attendance-link,
+and draft-divergence settings remain off unless explicitly enabled. The digest
+flag stores morning/evening Edge brief preference; the host agent or digest
+runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v9)
+
+- Shortened first-run onboarding to six consent prompts, combining preferences with calendar context and demographics with attendance-week research linking.
+- Reworded the digest prompt around morning/evening Edge brief preference.
 
 ### 2026-05-30 (v8)
 
@@ -1178,7 +1179,7 @@ active delivery subscription yet.
 ### 2026-05-30 (v7)
 
 - Onboarding can auto-fill consented attendance and role buckets from authorized profile/bio context, and asks follow-up bucket questions when profile data is missing.
-- Clarified that agents should infer Edge weeks and role only after the user opts into those aggregate research buckets.
+- Clarified that agents should infer Edge weeks and role only after the user opts into those research buckets.
 
 ### 2026-05-30 (v6)
 

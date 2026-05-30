@@ -248,7 +248,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-05-30 \(v8\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-30 \(v9\)/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /## Changelog/);
   assert.match(source, /demographicLinkOptIn/);
@@ -310,12 +310,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-05-30 (v8)');
+  assert.equal(body.version, '2026-05-30 (v9)');
   assert.equal(body.skill, 'ce-telegram-agent-handoff');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-05-30 (v8)');
+  assert.equal(body.latestVersion, '2026-05-30 (v9)');
   assert.equal(body.updateNote, '');
 });
 
@@ -332,14 +332,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-05-30 (v8)',
+    latestVersion: '2026-05-30 (v9)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-05-30 (v8)');
+  assert.equal(payload.latestVersion, '2026-05-30 (v9)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -594,10 +594,14 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   const first = await jsonBody(firstResponse);
   assert.equal(firstResponse.status, 200);
   assert.equal(first.completed, false);
-  assert.equal(first.questions.length, 8);
+  assert.equal(first.questions.length, 6);
   assert.equal(
-    first.questions.find((question) => question.id === 'attendance_context_opt_in')?.prompt,
-    'Can I ask you questions related to the events you attend at Edge?'
+    first.questions.find((question) => question.id === 'preference_tailoring')?.prompt,
+    'Can I pass preferences and calendar info to CE to surface relevant questions?'
+  );
+  assert.equal(
+    first.questions.find((question) => question.id === 'demographic_link_opt_in')?.prompt,
+    'Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?'
   );
   assert.equal(first.answers.preference_tailoring, false);
   assert.equal(first.answers.demographic_link_opt_in, false);
@@ -621,9 +625,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
         digestTimeOfDay: 'night',
         answers: {
           preference_tailoring: true,
-          demographics_research: false,
           demographic_link_opt_in: true,
-          attendance_context_opt_in: true,
           draft_responses: true,
           draft_divergence_research: true,
           auto_apply_question_votes: true,
@@ -649,6 +651,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(saved.completedAt, '2026-05-08T12:05:00.000Z');
   assert.equal(saved.answers.preference_tailoring, true);
   assert.equal(saved.answers.draft_responses, true);
+  assert.equal(saved.answers.demographics_research, true);
   assert.equal(saved.answers.demographic_link_opt_in, true);
   assert.equal(saved.answers.attendance_context_opt_in, true);
   assert.equal(saved.answers.draft_divergence_research, true);
@@ -717,9 +720,7 @@ test('Telegram agent onboarding infers consented bucket groups from profile cont
         },
         answers: {
           preference_tailoring: true,
-          demographics_research: false,
           demographic_link_opt_in: true,
-          attendance_context_opt_in: true,
         },
       },
     }),
@@ -757,7 +758,6 @@ test('Telegram agent onboarding asks bucket follow-ups when profile lacks consen
         sessionSlug: 'alpha',
         answers: {
           demographic_link_opt_in: true,
-          attendance_context_opt_in: true,
         },
       },
     }),
@@ -794,9 +794,7 @@ test('Telegram agent onboarding keeps topic and bucket data opt-in', async () =>
         topicPreferences: ['AI Futures', 'Governance'],
         answers: {
           preference_tailoring: false,
-          demographics_research: false,
           demographic_link_opt_in: false,
-          attendance_context_opt_in: false,
         },
         groups: {
           selections: {
@@ -1534,7 +1532,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-05-30 (v8)');
+  assert.equal(questions.skillVersion, '2026-05-30 (v9)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -2870,7 +2868,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-05-30 (v8)',
+        latestVersion: '2026-05-30 (v9)',
         note: 'Refresh before answering.',
       },
     }),
@@ -2902,13 +2900,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-05-30 (v8)');
+  assert.equal(initialStatus.version, '2026-05-30 (v9)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-05-30 (v8)');
+  assert.equal(set.latestVersion, '2026-05-30 (v9)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');
