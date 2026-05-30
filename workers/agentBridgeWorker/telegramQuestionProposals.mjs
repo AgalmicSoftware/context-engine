@@ -4,6 +4,7 @@ import { buildTelegramAgentActivityMetadata } from './telegramAgentActivity.mjs'
 import { assignTelegramQuestionNumber } from './telegramQuestionNumbers.mjs';
 
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
+const PROPOSED_QUESTION_ID_PREFIX = 'ceq_';
 const DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
 const SUPPORTED_QUESTION_TYPES = new Set(['binary', 'freeform', 'rating', 'multichoice']);
 const MAX_QUESTION_TAGS = 10;
@@ -329,7 +330,7 @@ function questionIdFromPrompt({
     safeString(chatId),
     normalizePrompt(prompt),
   ].join('|');
-  return `telegram-proposed-${buildOpaqueActionId(seed)}`;
+  return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, '')}`;
 }
 
 function proposedRecordToQuestion(record = {}) {
@@ -559,6 +560,7 @@ export function mergeTelegramProposedQuestions(questions = [], proposedQuestions
 
 export const __test__telegramQuestionProposals = {
   PROPOSED_QUESTION_KV_PREFIX,
+  PROPOSED_QUESTION_ID_PREFIX,
   inferQuestionTags,
   normalizeQuestionTag,
   normalizeQuestionReferences,
@@ -568,6 +570,7 @@ export const __test__telegramQuestionProposals = {
   normalizeQuestionType,
   normalizeSessionContext,
   proposedQuestionPrefix,
+  questionIdFromPrompt,
   proposedRecordToQuestion,
   proposedRecordMalformedReason,
   sessionContextFromPolicySession,
