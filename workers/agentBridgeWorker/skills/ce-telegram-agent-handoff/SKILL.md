@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v6)
+**Skill version:** 2026-05-30 (v7)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -319,7 +319,7 @@ body. The current questions map to these settings:
     "selections": {
       "events_attended": ["week_1", "attended_previous_edge_events"],
       "region": ["north_america"],
-      "contribution_role": ["organizer"]
+      "contribution_role": ["community_host"]
     },
     "details": {
       "contribution_role": { "other": "community research" }
@@ -343,15 +343,21 @@ send agent-drafted answers to the worker as durable research records. A Mini
 App launch may still carry an editable prefill draft for review, but that is a
 short-lived launch artifact rather than a draft-divergence research record.
 
-When the user answers yes to demographic or attendance linking and provides
-explicit bucket choices, include those choices under `groups.selections` in the
-onboarding POST. Positive consent writes aggregate bucket memberships such as
-attendance, age bucket, region, AI tribe, or role. Explain plainly: these
-buckets are associated with their answers for aggregate research and filtering,
-not published under their name. Do not infer or submit demographic group
-membership from private user data unless the user has explicitly allowed that
-field and that use. Prefer suggesting groups and linking the user to the Mini
-App Groups panel for approval.
+When the user answers yes to demographic or attendance linking, auto-fill
+aggregate buckets from any profile fields the user authorized. For attendance,
+read Edge profile/activity for Week 1, Week 2, Week 3, Week 4, Entire Month,
+and previous Edge attendance; if the profile does not say which week they are
+coming, ask directly. For role, use authorized bio/profile text to choose from
+`builder`, `researcher`, `founder_operator`, `investor`, `artist_designer`,
+`community_host`, or `other`; map "organizer", "host", or "facilitator" to
+`community_host`. If the role is not clear from the profile, ask directly.
+Include the chosen buckets under `groups.selections` in the onboarding POST.
+Positive consent writes aggregate bucket memberships such as attendance, age
+bucket, region, AI tribe, or role. Explain plainly: these buckets are
+associated with their answers for aggregate research and filtering, not
+published under their name. Do not infer or submit group membership from
+private user data unless the user has explicitly allowed that field and that
+use.
 
 ### Group Question Onboarding
 
@@ -1162,6 +1168,11 @@ enabled. The digest flag is stored for Phase 2 and should not be treated as an
 active delivery subscription yet.
 
 ## Changelog
+
+### 2026-05-30 (v7)
+
+- Onboarding can auto-fill consented attendance and role buckets from authorized profile/bio context, and asks follow-up bucket questions when profile data is missing.
+- Clarified that agents should infer Edge weeks and role only after the user opts into those aggregate research buckets.
 
 ### 2026-05-30 (v6)
 

@@ -93,7 +93,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v6)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v7)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -634,6 +634,132 @@ function plainObject(value = {}) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+function collectProfileTextParts(value, depth = 0) {
+  if (depth > 3 || value === undefined || value === null) return [];
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const text = safeString(value);
+    return text ? [text.slice(0, 500)] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => collectProfileTextParts(entry, depth + 1)).slice(0, 40);
+  }
+  if (typeof value === 'object') {
+    return Object.entries(value)
+      .flatMap(([key, entry]) => [
+        ...(entry === true ? [safeString(key)] : []),
+        ...collectProfileTextParts(entry, depth + 1),
+      ])
+      .filter(Boolean)
+      .slice(0, 60);
+  }
+  return [];
+}
+
+function onboardingProfileSources(input = {}) {
+  const answers = plainObject(input.answers);
+  return [
+    input.profile,
+    input.edgeProfile,
+    input.userProfile,
+    input.authorizedProfile,
+    input.profileSummary,
+    input.bio,
+    input.userBio,
+    input.edgeBio,
+    answers.profile,
+    answers.edgeProfile,
+    answers.bio,
+  ];
+}
+
+function onboardingProfileText(input = {}) {
+  return onboardingProfileSources(input)
+    .flatMap((source) => collectProfileTextParts(source))
+    .join(' ')
+    .toLowerCase();
+}
+
+function explicitProfileRoleText(input = {}) {
+  const sources = onboardingProfileSources(input)
+    .filter((source) => source && typeof source === 'object' && !Array.isArray(source));
+  const values = [];
+  for (const source of sources) {
+    values.push(
+      source.role,
+      source.roles,
+      source.contributionRole,
+      source.contribution_role,
+      source.edgeRole,
+      source.edge_role
+    );
+  }
+  return collectProfileTextParts(values).join(', ').slice(0, 80);
+}
+
+function inferAttendanceSelectionsFromProfile(input = {}) {
+  const text = onboardingProfileText(input);
+  const selected = [];
+  if (/\b(?:week|wk|w)[\s_-]*1\b|\bfirst\s+week\b/.test(text)) selected.push('week_1');
+  if (/\b(?:week|wk|w)[\s_-]*2\b|\bsecond\s+week\b/.test(text)) selected.push('week_2');
+  if (/\b(?:week|wk|w)[\s_-]*3\b|\bthird\s+week\b/.test(text)) selected.push('week_3');
+  if (/\b(?:week|wk|w)[\s_-]*4\b|\bfourth\s+week\b/.test(text)) selected.push('week_4');
+  if (/\b(?:entire|whole|full)\s+month\b|\ball\s+(?:month|four|4)\b|\bmonth[-\s]*long\b/.test(text)) {
+    selected.push('entire_month');
+  }
+  if (/\bprevious\s+edge\b|\bpast\s+edge\b|\battended\s+edge\s+(?:before|previously)\b|\battended\s+previous\s+edge\b/.test(text)) {
+    selected.push('attended_previous_edge_events');
+  }
+  return [...new Set(selected)];
+}
+
+function inferContributionRoleSelectionsFromProfile(input = {}) {
+  const text = onboardingProfileText(input);
+  const selected = [];
+  if (/\b(?:researcher|research|scientist|academic|scholar)\b/.test(text)) selected.push('researcher');
+  if (/\b(?:builder|engineer|developer|hacker|protocol|infrastructure|infra)\b/.test(text)) selected.push('builder');
+  if (/\b(?:founder|operator|startup|operations|product)\b/.test(text)) selected.push('founder_operator');
+  if (/\b(?:investor|vc|venture|fund)\b/.test(text)) selected.push('investor');
+  if (/\b(?:artist|designer|creative)\b/.test(text)) selected.push('artist_designer');
+  if (/\b(?:community|host|organizer|organiser|facilitator|program\s+lead|event\s+lead)\b/.test(text)) selected.push('community_host');
+  if (!selected.length) {
+    const explicitRole = explicitProfileRoleText(input);
+    if (explicitRole) selected.push('other');
+  }
+  return [...new Set(selected)];
+}
+
+function inferOnboardingGroupMembershipInput(input = {}, allowedCategories = new Set()) {
+  const selections = {};
+  const details = {};
+  if (allowedCategories.has('events_attended')) {
+    const attendance = inferAttendanceSelectionsFromProfile(input);
+    if (attendance.length) selections.events_attended = attendance;
+  }
+  if (allowedCategories.has('contribution_role')) {
+    const roles = inferContributionRoleSelectionsFromProfile(input);
+    if (roles.length) {
+      selections.contribution_role = roles;
+      if (roles.includes('other')) {
+        const roleText = explicitProfileRoleText(input);
+        if (roleText) details.contribution_role = { other_text: roleText };
+      }
+    }
+  }
+  return { selections, details };
+}
+
+function mergeOnboardingSelections(...sources) {
+  const merged = {};
+  for (const source of sources) {
+    for (const [category, values] of Object.entries(source || {})) {
+      const entries = Array.isArray(values) ? values : [values];
+      const existing = Array.isArray(merged[category]) ? merged[category] : [];
+      merged[category] = [...new Set([...existing, ...entries.map(safeString).filter(Boolean)])].slice(0, 12);
+    }
+  }
+  return merged;
+}
+
 function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
   const groups = plainObject(input.groups);
   const rawSelections = plainObject(
@@ -655,6 +781,7 @@ function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
   if (answers.attendance_context_opt_in === true) {
     allowedCategories.add('events_attended');
   }
+  const inferred = inferOnboardingGroupMembershipInput(input, allowedCategories);
   const selections = {};
   for (const [categoryId, value] of Object.entries(rawSelections)) {
     const category = safeString(categoryId);
@@ -666,6 +793,7 @@ function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
       .slice(0, 12);
     if (normalized.length) selections[category] = [...new Set(normalized)];
   }
+  Object.assign(selections, mergeOnboardingSelections(inferred.selections, selections));
   const details = {};
   for (const [categoryId, value] of Object.entries(rawDetails)) {
     const category = safeString(categoryId);
@@ -684,11 +812,33 @@ function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
       if (detail) details[category] = detail;
     }
   }
+  for (const [category, value] of Object.entries(inferred.details || {})) {
+    if (!allowedCategories.has(category) || details[category]) continue;
+    details[category] = value;
+  }
   return { selections, details };
 }
 
 function hasOnboardingGroupMembership(input = {}) {
   return Object.keys(input.selections || {}).length > 0 || Object.keys(input.details || {}).length > 0;
+}
+
+function onboardingGroupFollowUpQuestions({ answers = {}, groups = {} } = {}) {
+  const selections = plainObject(groups.selections);
+  const questions = [];
+  if (answers.attendance_context_opt_in === true && !Array.isArray(selections.events_attended)) {
+    questions.push({
+      categoryId: 'events_attended',
+      prompt: 'Which Edge weeks are you attending: Week 1, Week 2, Week 3, Week 4, or Entire Month? Have you attended previous Edge events?',
+    });
+  }
+  if ((answers.demographic_link_opt_in === true || answers.demographics_research === true) && !Array.isArray(selections.contribution_role)) {
+    questions.push({
+      categoryId: 'contribution_role',
+      prompt: 'What role best describes you for aggregate research: builder, researcher, founder/operator, investor, artist/designer, community host, or other?',
+    });
+  }
+  return questions;
 }
 
 function normalizeOnboardingAnswers(input = {}, settings = {}) {
@@ -717,7 +867,7 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
     allowedUses.push('research_demographics');
   }
   if (answers.demographic_link_opt_in === true) {
-    allowedProfileFields.push('edge_bio_keywords', 'age_bucket', 'country', 'region');
+    allowedProfileFields.push('edge_bio_keywords', 'age_bucket', 'country', 'region', 'roles');
     allowedUses.push('link_demographics_research');
   }
   if (answers.attendance_context_opt_in === true) {
@@ -763,13 +913,14 @@ function normalizeOnboardingDigestTimeOfDay(input = {}, settings = {}) {
   return 'morning';
 }
 
-function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
+function publicOnboardingState({ sessionSlug = '', settings = {}, groups = null } = {}) {
   const answers = onboardingAnswersFromSettings(settings);
   const questions = TELEGRAM_AGENT_ONBOARDING_QUESTIONS.map((question, index) => ({
     ...question,
     order: index + 1,
     answer: answers[question.id] === true,
   }));
+  const groupFollowUpQuestions = onboardingGroupFollowUpQuestions({ answers, groups: groups || {} });
   const payload = {
     ok: true,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -778,6 +929,8 @@ function publicOnboardingState({ sessionSlug = '', settings = {} } = {}) {
     questions,
     answers,
     topicPreferences: Array.isArray(settings.topicPreferences) ? settings.topicPreferences : [],
+    ...(groups ? { groups } : {}),
+    ...(groupFollowUpQuestions.length ? { groupFollowUpQuestions } : {}),
     settings: {
       allowedProfileFields: Array.isArray(settings.allowedProfileFields) ? settings.allowedProfileFields : [],
       allowedUses: Array.isArray(settings.allowedUses) ? settings.allowedUses : [],
@@ -1885,7 +2038,13 @@ async function handleOnboardingRequest({
   const telegramUserId = context.normalized.user.telegramUserId;
   const current = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
   if (safeString(method).toUpperCase() !== 'POST') {
-    return json(publicOnboardingState({ sessionSlug, settings: current }));
+    const groups = await loadTelegramLightweightGroups({
+      env,
+      session: context.session,
+      telegramUserId,
+      accountAddress: context.delegation?.accountAddress || body.accountAddress || '',
+    });
+    return json(publicOnboardingState({ sessionSlug, settings: current, groups }));
   }
   const completedAt = safeString(input.completedAt || input.createdAt) || new Date().toISOString();
   const answers = normalizeOnboardingAnswers(body, current);
@@ -1925,8 +2084,11 @@ async function handleOnboardingRequest({
     }, { status: 400 });
   }
   const payload = {
-    ...publicOnboardingState({ sessionSlug, settings: saved.settings }),
-    ...(savedGroups?.ok ? { groups: savedGroups.groups } : {}),
+    ...publicOnboardingState({
+      sessionSlug,
+      settings: saved.settings,
+      groups: savedGroups?.ok ? savedGroups.groups : null,
+    }),
   };
   assertNoSecretShape(payload, 'Telegram agent onboarding save response must not serialize secrets.');
   return json(payload);
