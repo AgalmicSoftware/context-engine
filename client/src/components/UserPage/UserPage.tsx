@@ -173,7 +173,10 @@ import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
-import { runUserPageAnalyzeActionController } from './userPageActionController';
+import {
+  runUserPageAnalyzeActionController,
+  runUserPageBookmarkActionController,
+} from './userPageActionController';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
@@ -3890,6 +3893,11 @@ class UserPage extends Component<any, any> {
       showUsernamePen,
     } = headerPassiveDisplayState.profileEditVisibility;
     const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
+    const bookmarkActionPlan = {
+      blockedReason: 'none',
+      disabled: false,
+      shouldRenderBookmarkAction: headerActionVisibility.showBookmarkButton,
+    };
     const copyIconDisplayState = resolveUserPageCopyIconDisplayState({ copied });
     const bookmarkButtonDisplayState = resolveUserPageBookmarkButtonDisplayState({ bookmarked });
     const nicknameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
@@ -3967,7 +3975,12 @@ class UserPage extends Component<any, any> {
             plan: analyzeActionPlan,
             ports: { dispatchAnalyze: this.analyzeUser },
           })}
-          onBookmark={this.toggleBookmark}
+          onBookmark={(event) => runUserPageBookmarkActionController({
+            bookmarkArgs: [event],
+            event,
+            plan: bookmarkActionPlan,
+            ports: { dispatchBookmark: this.toggleBookmark },
+          })}
           onCollapseToggle={this.toggleCollapse}
           onCopyAddress={this.copyToClipboard}
           onNicknameBlur={this.saveNickname}
