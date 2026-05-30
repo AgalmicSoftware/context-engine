@@ -12,34 +12,10 @@ export type UserPageAnalyzeActionPlanLike = {
   shouldRenderAnalyzeAction?: boolean;
 };
 
-export type UserPageBookmarkActionPlanLike = {
-  blockedReason?: unknown;
-  disabled?: boolean;
-  shouldRenderBookmarkAction?: boolean;
-};
-
-export type UserPageCacheRefreshActionPlanLike = {
-  blockedReason?: unknown;
-  disabled?: boolean;
-  shouldRenderCacheRefreshAction?: boolean;
-};
-
 export type UserPageAnalyzeActionControllerPorts<
   AnalyzeArgs extends readonly unknown[] = readonly unknown[]
 > = {
   dispatchAnalyze?: UserPageActionDispatch<AnalyzeArgs>;
-};
-
-export type UserPageBookmarkActionControllerPorts<
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
-> = {
-  dispatchBookmark?: UserPageActionDispatch<BookmarkArgs>;
-};
-
-export type UserPageCacheRefreshActionControllerPorts<
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
-> = {
-  dispatchCacheRefresh?: UserPageActionDispatch<CacheRefreshArgs>;
 };
 
 export type RunUserPageAnalyzeActionControllerArgs<
@@ -49,24 +25,6 @@ export type RunUserPageAnalyzeActionControllerArgs<
   event?: UserPageActionEventLike | null;
   plan?: UserPageAnalyzeActionPlanLike | null;
   ports?: UserPageAnalyzeActionControllerPorts<AnalyzeArgs>;
-};
-
-export type RunUserPageBookmarkActionControllerArgs<
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
-> = {
-  bookmarkArgs?: BookmarkArgs;
-  event?: UserPageActionEventLike | null;
-  plan?: UserPageBookmarkActionPlanLike | null;
-  ports?: UserPageBookmarkActionControllerPorts<BookmarkArgs>;
-};
-
-export type RunUserPageCacheRefreshActionControllerArgs<
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
-> = {
-  cacheRefreshArgs?: CacheRefreshArgs;
-  event?: UserPageActionEventLike | null;
-  plan?: UserPageCacheRefreshActionPlanLike | null;
-  ports?: UserPageCacheRefreshActionControllerPorts<CacheRefreshArgs>;
 };
 
 export type UserPageActionControllerResult = {
@@ -123,96 +81,6 @@ export const runUserPageAnalyzeActionController = <
   }
 
   ports.dispatchAnalyze(...analyzeArgs);
-  return {
-    blockedReason: plan.blockedReason,
-    status: 'dispatched',
-  };
-};
-
-export const runUserPageBookmarkActionController = <
-  BookmarkArgs extends readonly unknown[] = readonly unknown[]
->({
-  bookmarkArgs = [] as unknown as BookmarkArgs,
-  event = null,
-  plan = null,
-  ports = {},
-}: RunUserPageBookmarkActionControllerArgs<BookmarkArgs> = {}): UserPageActionControllerResult => {
-  preventDefault(event);
-
-  if (!plan?.shouldRenderBookmarkAction) {
-    return {
-      blockedReason: plan?.blockedReason,
-      status: 'hidden',
-    };
-  }
-
-  if (isBlocked(plan.blockedReason)) {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'blocked',
-    };
-  }
-
-  if (plan.disabled) {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'disabled',
-    };
-  }
-
-  if (typeof ports.dispatchBookmark !== 'function') {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'unhandled',
-    };
-  }
-
-  ports.dispatchBookmark(...bookmarkArgs);
-  return {
-    blockedReason: plan.blockedReason,
-    status: 'dispatched',
-  };
-};
-
-export const runUserPageCacheRefreshActionController = <
-  CacheRefreshArgs extends readonly unknown[] = readonly unknown[]
->({
-  cacheRefreshArgs = [] as unknown as CacheRefreshArgs,
-  event = null,
-  plan = null,
-  ports = {},
-}: RunUserPageCacheRefreshActionControllerArgs<CacheRefreshArgs> = {}): UserPageActionControllerResult => {
-  preventDefault(event);
-
-  if (!plan?.shouldRenderCacheRefreshAction) {
-    return {
-      blockedReason: plan?.blockedReason,
-      status: 'hidden',
-    };
-  }
-
-  if (isBlocked(plan.blockedReason)) {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'blocked',
-    };
-  }
-
-  if (plan.disabled) {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'disabled',
-    };
-  }
-
-  if (typeof ports.dispatchCacheRefresh !== 'function') {
-    return {
-      blockedReason: plan.blockedReason,
-      status: 'unhandled',
-    };
-  }
-
-  ports.dispatchCacheRefresh(...cacheRefreshArgs);
   return {
     blockedReason: plan.blockedReason,
     status: 'dispatched',
