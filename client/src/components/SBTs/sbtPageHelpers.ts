@@ -194,6 +194,7 @@ export {
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
   resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
   resolveSbtPageMiniMintState,
   resolveSbtPageMiniOpenMintButtonState,
@@ -210,6 +211,7 @@ export {
   shouldRenderSbtPageMintButton,
 } from './sbtPageActionDisplayHelpers';
 export type {
+  SbtPageMiniMintActionPlan,
   SbtPageMintEndDisplayState,
 } from './sbtPageActionDisplayHelpers';
 export {

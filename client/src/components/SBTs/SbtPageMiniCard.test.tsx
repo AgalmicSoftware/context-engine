@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import type { SbtPageMiniMintActionPlan } from './sbtPageActionDisplayHelpers';
 
 jest.mock('../Shared/CETooltip', () => ({
   __esModule: true,
@@ -15,9 +16,6 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   cardStyle: { cursor: 'pointer' },
   claimCountdown: 12,
   groupPasswordInput: '',
-  hasGroupPasswordMint: false,
-  hasInviteMint: false,
-  hasPasswordMint: false,
   hasTokenMini: false,
   imageUrl: 'https://example.test/badge.png',
   isMintingActive: true,
@@ -33,11 +31,18 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   miniManualClaimButtonState: { disabled: false, isPending: false },
   miniManualClaimFinishContentState: { label: 'Finish', shouldRenderLabel: true },
   miniManualClaimStartContentState: { label: 'Join', shouldRenderLabel: true },
+  miniMintActionPlan: createMiniMintActionPlan({
+    blockedReason: 'mini-mint-unavailable',
+    disabled: true,
+    handlerKind: 'none',
+    inertReason: 'hidden',
+    isInteractive: false,
+    labelKind: 'none',
+    shouldRenderMintArea: false,
+    viewKind: 'hidden',
+  }),
   miniMintActionButtonClassName: 'mint-button',
-  miniMintFlowDisplayState: {},
-  miniMintable: true,
   miniOpenMintButtonContentState: { idleLabel: 'Join', shouldRenderIdleLabel: true },
-  miniOpenMintButtonState: { disabled: false },
   miniPasswordControlInputStyle: { maxWidth: '100px' },
   miniPasswordJoinButtonState: { disabled: false, isPending: false },
   miniPasswordJoinContentState: { label: 'Join', shouldRenderLabel: true },
@@ -65,6 +70,20 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 }) as React.ComponentProps<typeof SbtPageMiniCard>;
 
+const createMiniMintActionPlan = (
+  overrides: Partial<SbtPageMiniMintActionPlan> = {}
+): SbtPageMiniMintActionPlan => ({
+  blockedReason: 'none',
+  disabled: false,
+  handlerKind: 'mini-mint',
+  inertReason: 'none',
+  isInteractive: true,
+  labelKind: 'status',
+  shouldRenderMintArea: true,
+  viewKind: 'open-mint-button',
+  ...overrides,
+});
+
 describe('SbtPageMiniCard', () => {
   it('renders the passive card identity, image, address, and live status', () => {
     render(<SbtPageMiniCard {...createProps()} />);
@@ -84,8 +103,11 @@ describe('SbtPageMiniCard', () => {
     const { rerender } = render(
       <SbtPageMiniCard
         {...createProps({
-          hasGroupPasswordMint: true,
-          miniMintFlowDisplayState: { shouldRenderGroupPasswordDisclosureButton: true },
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'show-password-input',
+            labelKind: 'join',
+            viewKind: 'group-password-disclosure',
+          }),
           onShowMiniPasswordInput,
         })}
       />
@@ -97,8 +119,11 @@ describe('SbtPageMiniCard', () => {
       <SbtPageMiniCard
         {...createProps({
           groupPasswordInput: 'group-code',
-          hasGroupPasswordMint: true,
-          miniMintFlowDisplayState: { shouldRenderGroupPasswordInput: true },
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'mint-unlimited-with-group-password',
+            labelKind: 'join',
+            viewKind: 'group-password-input',
+          }),
           onMintUnlimitedWithGroupPassword,
         })}
       />
@@ -111,8 +136,11 @@ describe('SbtPageMiniCard', () => {
       <SbtPageMiniCard
         {...createProps({
           groupPasswordInput: 'invite-code',
-          hasInviteMint: true,
-          miniMintFlowDisplayState: { shouldRenderInviteInput: true },
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'claim-with-invite-code',
+            labelKind: 'join',
+            viewKind: 'invite-input',
+          }),
           onClaimWithInviteCode,
         })}
       />
@@ -127,10 +155,16 @@ describe('SbtPageMiniCard', () => {
     const { rerender } = render(
       <SbtPageMiniCard
         {...createProps({
-          hasPasswordMint: true,
           manualPasswordInput: 'manual-code',
           miniManualClaimButtonState: { disabled: true, isPending: false },
-          miniMintFlowDisplayState: { shouldRenderManualPasswordStartInput: true },
+          miniMintActionPlan: createMiniMintActionPlan({
+            disabled: true,
+            handlerKind: 'mini-mint',
+            inertReason: 'disabled',
+            isInteractive: false,
+            labelKind: 'join',
+            viewKind: 'manual-password-start-input',
+          }),
           onMiniMint,
         })}
       />
@@ -143,8 +177,13 @@ describe('SbtPageMiniCard', () => {
     rerender(
       <SbtPageMiniCard
         {...createProps({
-          hasPasswordMint: true,
-          miniMintFlowDisplayState: { shouldRenderManualClaimCountdown: true },
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'none',
+            inertReason: 'status-only',
+            isInteractive: false,
+            labelKind: 'countdown',
+            viewKind: 'manual-claim-countdown',
+          }),
         })}
       />
     );
