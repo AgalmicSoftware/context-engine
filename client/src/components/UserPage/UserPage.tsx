@@ -173,6 +173,7 @@ import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
+import { runUserPageAnalyzeActionController } from './userPageActionController';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
@@ -3772,6 +3773,11 @@ class UserPage extends Component<any, any> {
       walletLabel: t('walletLower'),
     });
     const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
+    const analyzeActionPlan = {
+      blockedReason: 'none',
+      disabled: analyzeButtonDisplayState.disabled,
+      shouldRenderAnalyzeAction: !minimized,
+    };
     const analysisCacheStatusState = resolveUserPageAnalysisCacheStatusState({
       analysisCachedAt,
       analysisServedFromCache,
@@ -3955,7 +3961,12 @@ class UserPage extends Component<any, any> {
           minimized={minimized}
           nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
           nicknameInput={this.state.nicknameInput || ''}
-          onAnalyzeUser={this.analyzeUser}
+          onAnalyzeUser={(event) => runUserPageAnalyzeActionController({
+            analyzeArgs: [event],
+            event,
+            plan: analyzeActionPlan,
+            ports: { dispatchAnalyze: this.analyzeUser },
+          })}
           onBookmark={this.toggleBookmark}
           onCollapseToggle={this.toggleCollapse}
           onCopyAddress={this.copyToClipboard}
