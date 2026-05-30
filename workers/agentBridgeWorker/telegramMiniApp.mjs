@@ -1381,21 +1381,33 @@ function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
     : {};
   const type = safeString(question.questionType || source.questionType || record.controlType);
   const rawValue = firstAnswerValue(source.value, source.answer, source.text, record.answerValue, record.answerLabel);
-  const comments = safeAnswerString(firstAnswerValue(source.comments, source.additionalComments, record.comments));
+  const parsedRawValue = safeJsonParse(safeString(rawValue), null);
+  const parsedSource = parsedRawValue && typeof parsedRawValue === 'object' && !Array.isArray(parsedRawValue)
+    ? parsedRawValue
+    : {};
+  const comments = safeAnswerString(firstAnswerValue(
+    source.comments,
+    source.additionalComments,
+    parsedSource.comments,
+    parsedSource.additionalComments,
+    record.comments,
+  ));
   if (type === 'multichoice') {
     const values = Array.isArray(source.values)
       ? source.values.map(safeAnswerString).filter(Boolean)
-      : [rawValue].map(safeAnswerString).filter(Boolean);
+      : Array.isArray(parsedSource.values)
+        ? parsedSource.values.map(safeAnswerString).filter(Boolean)
+        : [parsedSource.value || rawValue].map(safeAnswerString).filter(Boolean);
     return { values, comments };
   }
   if (type === 'freeform') {
-    return { text: safeAnswerString(firstAnswerValue(source.text, source.value, source.answer, record.answerValue, record.answerLabel)), comments };
+    return { text: safeAnswerString(firstAnswerValue(source.text, parsedSource.text, source.value, parsedSource.value, source.answer, record.answerValue, record.answerLabel)), comments };
   }
   if (type === 'rating') {
-    const value = Number(firstAnswerValue(source.value, source.rating, source.answer, record.answerValue, record.answerLabel));
+    const value = Number(firstAnswerValue(source.value, source.rating, parsedSource.value, parsedSource.rating, source.answer, record.answerValue, record.answerLabel));
     return { value: Number.isFinite(value) ? value : safeAnswerString(rawValue), comments };
   }
-  return { value: lower(rawValue), comments };
+  return { value: lower(firstAnswerValue(parsedSource.value, rawValue)), comments };
 }
 
 function miniAnswerFromSavedDraft(draft = {}, question = {}) {

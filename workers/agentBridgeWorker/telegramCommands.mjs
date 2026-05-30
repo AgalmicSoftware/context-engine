@@ -131,6 +131,7 @@ const MINI_APP_LATEST_LAUNCH_KV_PREFIX = 'telegram:mini-app-latest-launch:v1:';
 const DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:dm-voice-transcribe-rate:v1:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const GROUP_MINI_APP_LAUNCH_TTL_SECONDS = DEFAULT_GROUP_SESSION_TTL_SECONDS;
 const DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const QUESTION_GENERATION_BATCH_TTL_SECONDS = 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
@@ -3503,6 +3504,8 @@ async function makeMiniAppButton({
     ...callback.record,
     callbackData: callback.callbackData,
     miniAppLaunch: true,
+  }, {
+    ttlSeconds: privateChat ? DEFAULT_ACTION_TTL_SECONDS : GROUP_MINI_APP_LAUNCH_TTL_SECONDS,
   });
   if (!stored.ok) return null;
   const url = miniAppUrlForLaunch(env, callback.callbackData);
@@ -9406,7 +9409,7 @@ function isMiniAppLaunchRecord(record = {}) {
     ].includes(record.action);
 }
 
-function buildMiniAppStartResponse({
+async function buildMiniAppStartResponse({
   normalized,
   command,
   env,
@@ -9414,6 +9417,12 @@ function buildMiniAppStartResponse({
   launch = '',
 } = {}) {
   const sessionSlug = sanitizeSessionSlug(record.serverContextRef?.sessionSlug) || 'general';
+  let sessionDisplayName = sessionSlug;
+  if (sessionSlug && sessionSlug !== 'general') {
+    const policy = await loadSessionPolicy(env).catch(() => null);
+    const resolved = policy ? resolveSessionInvocation(policy, sessionSlug) : { ok: false };
+    sessionDisplayName = resolved.ok ? sessionLabel(resolved.session) : sessionSlug;
+  }
   const url = miniAppUrlForLaunch(env, launch);
   if (!normalized.chat.isPrivate) {
     return reply({
@@ -9446,7 +9455,9 @@ function buildMiniAppStartResponse({
   return reply({
     chatId: normalized.chat.chatId,
     text: [
-      `Open the Mini App for ${sessionSlug}.`,
+      sessionSlug === 'general'
+        ? 'Open the Mini App.'
+        : `Open the Mini App for ${sessionDisplayName}.`,
       '',
       'Use this private button for agent actions, settings, answers, and queued submissions.',
     ].join('\n'),
@@ -9750,6 +9761,30 @@ async function buildStartPayloadResponse({
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
+    if (normalized.chat?.isPrivate) {
+      const refreshed = await buildHelpResponse({
+        normalized,
+        command,
+        env,
+        createdAt,
+        waitUntil,
+      });
+      if (refreshed?.response?.text) {
+        refreshed.response.text = [
+          'That link expired, so I refreshed the Mini App entry point.',
+          '',
+          refreshed.response.text,
+        ].join('\n');
+      }
+      refreshed.screen = 'private_start_refreshed';
+      refreshed.extra = {
+        ...(refreshed.extra || {}),
+        startPayload: parsed.actionId,
+        active: false,
+        refreshed: true,
+      };
+      return refreshed;
+    }
     return reply({
       chatId: normalized.chat.chatId,
       text: [

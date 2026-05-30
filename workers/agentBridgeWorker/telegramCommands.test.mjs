@@ -5291,6 +5291,52 @@ test('group /start includes a Mini App deep link to the session picker', async (
   const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
   assert.equal(record.miniAppLaunch, true);
   assert.equal(record.serverContextRef.sessionPicker, true);
+  const putCall = env.AGENT_ACTION_KV.putCalls.find((call) => call.key === `telegram:action:${launch}`);
+  assert.equal(putCall?.options?.expirationTtl, 30 * 24 * 60 * 60);
+});
+
+test('expired private start payload refreshes Mini App entry point', async () => {
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/start cecb_expired001'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'private_start_refreshed');
+  assert.match(result.response.text, /refreshed the Mini App entry point/);
+  const miniApp = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Mini App');
+  assert.ok(miniApp?.web_app?.url);
+  const launch = new URL(miniApp.web_app.url).searchParams.get('launch');
+  const record = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${launch}`));
+  assert.equal(record.miniAppLaunch, true);
+  assert.equal(record.serverContextRef.sessionSlug, 'alpha');
+});
+
+test('Mini App start payload shows session name instead of slug', async () => {
+  const env = baseEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const launch = 'cecb_live000001';
+  await env.AGENT_ACTION_KV.put(`telegram:action:${launch}`, JSON.stringify({
+    action: 'view_questions',
+    lane: 'telegram_mini_app',
+    serverContextRef: { sessionSlug: 'alpha' },
+    callbackData: launch,
+    miniAppLaunch: true,
+    createdAt: '2026-05-08T12:00:00.000Z',
+  }));
+
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage(`/start ${launch}`),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'private_start');
+  assert.match(result.response.text, /Open the Mini App for Alpha Session\./);
+  assert.equal(result.response.text.includes('Open the Mini App for alpha.'), false);
 });
 
 test('dispatchTelegramCommandResponse uses mocked fetch and does not require real Telegram credentials', async () => {

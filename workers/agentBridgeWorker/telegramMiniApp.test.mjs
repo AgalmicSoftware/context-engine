@@ -2096,6 +2096,59 @@ test('Mini App state exposes submitted rating answers for hydration', async () =
   assert.deepEqual(state.draftAnswersByQuestionKey, {});
 });
 
+test('Mini App state hydrates submitted multichoice answers from serialized values', async () => {
+  const kv = new MemoryKv();
+  const questionId = 'q-multichoice-history';
+  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}multichoice-history`, JSON.stringify({
+    version: 1,
+    requestId: 'multichoice-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      label: 'Option B',
+      value: JSON.stringify({
+        questionType: 'multichoice',
+        values: ['Option B'],
+        comments: 'Only if facilitators can intervene transparently.',
+      }),
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'multichoice',
+        prompt: 'Which option should be selected?',
+        options: ['Option A', 'Option B', 'Option C'],
+      }]),
+    },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+  assert.deepEqual(state.submittedAnswerKeys, [questionKey]);
+  assert.equal(state.submittedAnswers[0].answerLabel, 'Option B');
+  assert.deepEqual(state.submittedAnswers[0].answer, {
+    values: ['Option B'],
+    comments: 'Only if facilitators can intervene transparently.',
+  });
+  assert.equal(state.savedDrafts.length, 0);
+});
+
 test('Mini App submitted answer hydration reads per-user indexes when global submit records are noisy', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-indexed-history';
