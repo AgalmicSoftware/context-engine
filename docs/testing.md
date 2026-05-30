@@ -23,6 +23,9 @@ This runs the canonical root gate (`npm run test:ci`), which includes wiring
 checks, the release-sanity gate, contract tests, client coverage, public-safe
 root Jest tests, public `sessionCorsWorker` module tests, Node-side tests, and
 cache guards.
+The release-sanity gate also runs the full client Jest suite without coverage
+before build or deploy verification proceeds, so failing component and style
+regression tests are caught before push/deploy instead of only in main CI.
 
 ### Client-Only Tests
 
