@@ -204,4 +204,39 @@ describe('SBTPage mini-card', () => {
     expect(preventDefault).not.toHaveBeenCalled();
     openSpy.mockRestore();
   });
+
+  it('routes mini-card burn clicks through the parent mini burn handler', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000f1',
+      miniaturized: true,
+      miniMintable: true,
+      SBTAddress: '0x00000000000000000000000000000000000000f1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 1,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      userHasSBT: true,
+      userIsSbtAdmin: false,
+      mintingStatus: 'idle',
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+    };
+    subject.miniBurnHandler = jest.fn();
+
+    const tree = subject.render();
+    const miniCardNode = findElementInTree(tree, (element) => element?.type === SbtPageMiniCard);
+
+    expect(miniCardNode).not.toBeNull();
+    miniCardNode.props.onMiniBurn({ preventDefault: jest.fn() });
+    expect(subject.miniBurnHandler).toHaveBeenCalledTimes(1);
+  });
 });

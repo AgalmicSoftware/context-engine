@@ -51,6 +51,11 @@ import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
+  runSbtPageBurnActionController,
+  runSbtPageMiniBurnActionController,
+  runSbtPageMintActionController,
+} from './sbtPageActionController';
+import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
   applySbtPageHistorySummaryFallback,
@@ -3904,7 +3909,14 @@ renderMintButton() {
           />
         </div>
         <button
-          onClick={() => this.mintUnlimitedWithGroupPassword()}
+          onClick={(event) => runSbtPageMintActionController({
+            disabled: passwordJoinButtonState.disabled,
+            event,
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: this.mintUnlimitedWithGroupPassword,
+            },
+          })}
           disabled={passwordJoinButtonState.disabled}
           className={mintActionButtonClassName}
         >
@@ -3929,7 +3941,15 @@ renderMintButton() {
           />
         </div>
         <button
-          onClick={() => this.claimWithInviteCode(this.state.groupPasswordInput)}
+          onClick={(event) => runSbtPageMintActionController({
+            disabled: passwordJoinButtonState.disabled,
+            event,
+            mintArgs: [this.state.groupPasswordInput],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: this.claimWithInviteCode,
+            },
+          })}
           disabled={passwordJoinButtonState.disabled}
           className={mintActionButtonClassName}
         >
@@ -3967,13 +3987,21 @@ renderMintButton() {
     return (
       <div>
         <button
-          onClick={() => {
-            if (canOpenMintTx) {
-              window.open(this.getExplorerLink(lastMintTxHash), '_blank', 'noopener,noreferrer');
-              return;
-            }
-            this.handleMint(true);
-          }}
+          onClick={(event) => runSbtPageMintActionController({
+            canOpenMintTx,
+            disabled,
+            event,
+            mintArgs: [true],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: this.handleMint,
+              openMintTransaction: () => window.open(
+                this.getExplorerLink(lastMintTxHash),
+                '_blank',
+                'noopener,noreferrer'
+              ),
+            },
+          })}
           disabled={disabled}
           className={mintActionButtonClassName}
           title={title}
@@ -4004,7 +4032,15 @@ renderMintButton() {
           />
         </div>
         <button
-          onClick={() => this.handleMint(true)}
+          onClick={(event) => runSbtPageMintActionController({
+            disabled: manualClaimButtonState.disabled,
+            event,
+            mintArgs: [true],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: this.handleMint,
+            },
+          })}
           disabled={manualClaimButtonState.disabled}
           className={mintActionButtonClassName}
         >
@@ -4034,7 +4070,15 @@ renderMintButton() {
           />
         </div>
         <button
-          onClick={() => this.handleMint(true)}
+          onClick={(event) => runSbtPageMintActionController({
+            disabled: manualClaimButtonState.disabled,
+            event,
+            mintArgs: [true],
+            plan: mintActionPlan,
+            ports: {
+              dispatchMint: this.handleMint,
+            },
+          })}
           disabled={manualClaimButtonState.disabled}
           className={mintActionButtonClassName}
         >
@@ -4057,7 +4101,7 @@ renderMintButton() {
     const { sbtInfo, userHasSBT, burningStatus } = this.state;
     if (!sbtInfo) return null;
 
-    const { shouldRenderBurnButton } = resolveSbtPageBurnActionPlan({
+    const burnActionPlan = resolveSbtPageBurnActionPlan({
       account: this.props.account,
       sbtInfo,
       userHasSBT,
@@ -4078,14 +4122,21 @@ renderMintButton() {
       variantClassName: styles.burnButton,
     });
 
-    if (!shouldRenderBurnButton) {
+    if (!burnActionPlan.shouldRenderBurnButton) {
       return null;
     }
 
     return (
       <div>
         <button
-          onClick={this.handleBurn}
+          onClick={(event) => runSbtPageBurnActionController({
+            disabled: burnStatusButtonState.disabled,
+            event,
+            plan: burnActionPlan,
+            ports: {
+              dispatchBurn: this.handleBurn,
+            },
+          })}
           disabled={burnStatusButtonState.disabled}
           className={burnActionButtonClassName}
         >
@@ -4599,6 +4650,10 @@ renderMintButton() {
           });
         }
       }
+      const miniBurnActionPlan = {
+        blockedReason: miniTokenActionDisplayState?.shouldRenderBurnButton ? 'none' : 'hidden',
+        shouldRenderMiniBurnButton: !!miniTokenActionDisplayState?.shouldRenderBurnButton,
+      };
 
       return (
         <SbtPageMiniCard
@@ -4656,7 +4711,14 @@ renderMintButton() {
           onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
           onImageError={imageErrorHandler}
           onManualPasswordInputChange={this.handleManualPasswordInputChange}
-          onMiniBurn={this.miniBurnHandler}
+          onMiniBurn={(event) => runSbtPageMiniBurnActionController({
+            disabled: !!miniBurnButtonState?.disabled,
+            event,
+            plan: miniBurnActionPlan,
+            ports: {
+              dispatchMiniBurn: this.miniBurnHandler,
+            },
+          })}
           onMiniMint={this.miniMintHandler}
           onMintUnlimitedWithGroupPassword={() => this.mintUnlimitedWithGroupPassword()}
           onShowMiniPasswordInput={() => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true }))}
