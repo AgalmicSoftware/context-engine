@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v13)
+**Skill version:** 2026-05-30 (v14)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -1199,6 +1199,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v14)
+
+- Shortened copied-agent skill links through the worker-hosted skill redirect and added a compact copied-text instruction so Claude Code sees "no IDs; fetch questions first" even before refreshing the full skill.
 
 ### 2026-05-30 (v13)
 

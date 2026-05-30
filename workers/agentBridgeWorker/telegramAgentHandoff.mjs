@@ -92,8 +92,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v13)';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=2026-05-30-v14';
+const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v14)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -211,6 +212,12 @@ async function skillVersionPayloadWithFlag(env = {}) {
   };
   assertNoSecretShape(payload, 'Telegram agent skill-version response must not serialize secrets.');
   return payload;
+}
+
+function skillRedirectResponse() {
+  const redirectUrl = new URL(DEFAULT_AGENT_RAW_SKILL_URL);
+  redirectUrl.searchParams.set('v', CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION.replace(/[^0-9A-Za-z_-]+/g, '-'));
+  return Response.redirect(redirectUrl.toString(), 302);
 }
 
 function miniAppOnboardAllowedOrigins(env = {}) {
@@ -4567,6 +4574,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
     const payload = await skillVersionPayloadWithFlag(env);
     return json(payload);
+  }
+  if (url.pathname === '/telegram/agent/api/skill' && request.method === 'GET') {
+    return skillRedirectResponse();
   }
 
   const auth = await authenticateAgentHandoff(request, env);
