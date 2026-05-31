@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-31 (v28)
+**Skill version:** 2026-05-31 (v29)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=28",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=29",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -1128,7 +1128,12 @@ SessionRegistry read and is not a count of worker-created sessions; and
 the submit-record TTL window. The worker reads submit status from KV list
 metadata for current records, with a legacy body-read fallback for older records.
 Env-level root admins receive global totals and a per-session breakdown; session
-admins receive only their current or target session.
+admins receive only their current or target session. When the worker has
+`AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` set, root-admin global metrics
+default to the sessions still visible after that cutoff, so smoke-test and demo
+sessions should not be pulled into normal analysis. Use
+`includeLegacySessions=1` only when the operator explicitly asks for a historical
+all-session sweep.
 
 ```http
 POST /telegram/agent/api/question-queue/plan
@@ -1407,6 +1412,11 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-31 (v29)
+
+- Admin metrics now respect the Telegram session cutoff by default, with an
+  explicit `includeLegacySessions=1` escape hatch for historical sweeps.
 
 ### 2026-05-31 (v28)
 

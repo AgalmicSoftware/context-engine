@@ -25,6 +25,7 @@ import {
   readPrivateSessionBinding,
   resolveAgentTokenSession,
   summarizeQuestionResults,
+  telegramVisibleSessions,
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
@@ -99,9 +100,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=28';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=29';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/bab463867b0c63ecc0958ae563938160ff84084b/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v28)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v29)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -599,6 +600,9 @@ function inputFromRequest(request, body = {}) {
     result: Object.hasOwn(body, 'result') ? body.result : undefined,
     cache: Object.hasOwn(body, 'cache') ? body.cache : undefined,
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
+    includeLegacySessions: Object.hasOwn(body, 'includeLegacySessions')
+      ? body.includeLegacySessions
+      : (body.includeLegacy || url.searchParams.get('includeLegacySessions') || url.searchParams.get('includeLegacy')),
     questionId: safeString(body.questionId || url.searchParams.get('questionId')),
     geoId: safeString(body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId')),
     geoRefs: Object.hasOwn(body, 'geoRefs') ? body.geoRefs : (body.geoIds || url.searchParams.get('geoRefs') || url.searchParams.get('geoIds')),
@@ -1206,6 +1210,19 @@ function publicSessionMetric(metric = {}) {
     out.groupProposals,
   ].some((count) => count > 0) ? 1 : 0;
   return out;
+}
+
+function telegramSessionCutoffConfigured(env = {}, policy = {}) {
+  return Boolean(safeString(
+    env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER ||
+    env.AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER ||
+    env.AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER ||
+    env.AGENT_BRIDGE_SESSION_CREATED_AFTER ||
+    policy.telegramSessionCreatedAfter ||
+    policy.telegramSessionsCreatedAfter ||
+    policy.telegramGroupCreatedAfter ||
+    policy.sessionCreatedAfter
+  ));
 }
 
 function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = 'GET') {
@@ -2421,11 +2438,20 @@ async function buildAdminMetricsSnapshot({
   env = {},
   scope = 'session',
   sessionSlug = '',
+  visibleSessionSlugs = null,
 } = {}) {
   const scopedSessionSlug = scope === 'session' ? sanitizeSessionSlug(sessionSlug) : '';
+  const visibleSlugSet = visibleSessionSlugs instanceof Set
+    ? visibleSessionSlugs
+    : (Array.isArray(visibleSessionSlugs)
+      ? new Set(visibleSessionSlugs.map(sanitizeSessionSlug).filter(Boolean))
+      : null);
   const inScope = (slug = '') => {
     const normalized = sanitizeSessionSlug(slug);
-    return scope !== 'session' || normalized === scopedSessionSlug;
+    if (!normalized) return false;
+    if (scope === 'session') return normalized === scopedSessionSlug;
+    if (visibleSlugSet) return visibleSlugSet.has(normalized);
+    return true;
   };
   const totals = emptyAdminMetricTotals();
   const perSession = new Map();
@@ -2569,23 +2595,47 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
   const rootAdmin = isRootResponseExportAdmin(env, manager.accountAddress);
   const scope = rootAdmin ? 'global' : 'session';
   const sessionSlug = context.session.sessionSlug;
-  const cacheKey = `${ADMIN_METRICS_CACHE_KV_PREFIX}${scope}:${scope === 'session' ? sessionSlug : 'all'}`;
+  const includeLegacySessions = normalizeBoolean(input.includeLegacySessions, false);
+  const cutoffConfigured = rootAdmin && telegramSessionCutoffConfigured(env, context.policy);
+  const visibleSessionSlugs = cutoffConfigured && !includeLegacySessions
+    ? new Set(telegramVisibleSessions(context.policy, env)
+      .map((session) => sanitizeSessionSlug(session.sessionSlug || session.slug))
+      .filter(Boolean))
+    : null;
+  const visibilityCachePart = scope === 'global' && cutoffConfigured
+    ? (includeLegacySessions ? 'legacy' : 'visible')
+    : 'all';
+  const cacheKey = `${ADMIN_METRICS_CACHE_KV_PREFIX}${scope}:${scope === 'session' ? sessionSlug : visibilityCachePart}`;
   const cached = await loadAdminMetricsCache(env, cacheKey);
   if (cached) return json(cached);
 
   const computedAt = new Date().toISOString();
-  const snapshot = await buildAdminMetricsSnapshot({ env, scope, sessionSlug });
+  const snapshot = await buildAdminMetricsSnapshot({
+    env,
+    scope,
+    sessionSlug,
+    visibleSessionSlugs,
+  });
+  const metricVisibility = scope === 'global' && cutoffConfigured
+    ? {
+      mode: includeLegacySessions ? 'all_sessions' : 'telegram_visible_sessions',
+      includeLegacySessions,
+      sessionSlugs: visibleSessionSlugs ? [...visibleSessionSlugs].sort() : [],
+    }
+    : { mode: scope === 'session' ? 'session' : 'all_sessions' };
   const payload = {
     ok: true,
     scope,
     ...(scope === 'session' ? { sessionSlug } : {}),
     computedAt,
     cached: false,
+    metricVisibility,
     definitions: {
       agentsOnboarded: 'Delegation-token mints observed by the worker; this is not a count of external skill installs.',
       registrySessionCount: 'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
       sessionsWithBridgeActivity: 'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
       draftEditMetrics: 'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
+      metricVisibility: 'When the Telegram session created-after cutoff is configured, root-admin global metrics default to currently visible Telegram sessions. Add includeLegacySessions=1 for a historical all-session sweep.',
       questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
     },
     totals: snapshot.totals,
