@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v22)
+**Skill version:** 2026-05-30 (v23)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -23,8 +23,9 @@ request as `Authorization: Bearer <token>`. Never make an unauthenticated
 question, draft, answer, vote, or results request when copied install info
 included a token. The worker uses that bearer token to infer the user identity.
 
-For the copied-user-token flow in Claude Code, OpenClaw, Hermes, or any other
-low-context agent:
+For Claude Code or any other low-context copied-user-token flow, including
+OpenClaw/Hermes when they only have pasted credentials and no authorized Edge
+profile/calendar/Telegram context:
 
 - do not run the full Edge-agent onboarding flow and do not ask for profile,
   calendar, demographic, attendance, or Telegram identifiers up front;
@@ -195,7 +196,7 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 
 1. If you are a Telegram-native Hermes agent and the user clicked a Geo/CE invite link, use the Trusted Geo / Hermes Invite Onboarding flow below to mint a `ceagt_...` token from the invite token plus the Telegram `from.id` you observed. Otherwise, ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
 2. Obtain the user-scoped `ceagt_...` token either from the invite-onboarding response or from copied bot install info. For copied install info, extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
-3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
+3. Choose the first action by agent context. In Claude Code or another low-context copied-token invocation, skip onboarding by default: do not ask for profile, calendar, demographic, attendance, Telegram id, or group chat fields; go straight to questions. In Hermes, OpenClaw, or another Edge-native agent that already has authorized profile/calendar/Telegram context, call `GET <Worker>/telegram/agent/api/onboarding` first when preferences, consent, attendance, digest timing, or group buckets are relevant. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If relevant consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
 4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Immediately show the first or most relevant answerable question and ask how the user wants to answer. Do not ask whether to surface it; surfacing it is the default action after a successful question read.
@@ -228,7 +229,7 @@ The Geo node can store fields like:
 {
   "contextEngineInviteToken": "<geo-link-token>",
   "contextEngineWorker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=22",
+  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=23",
   "sessionSlug": "agent-village-2026"
 }
 ```
@@ -249,9 +250,14 @@ If the invite token is valid, CE returns `token`, `worker`, `skillUrl`,
 `sessionSlug`, `expiresAt`, and the current onboarding state. Treat `token` as
 the user's private `ceagt_...` bearer credential: store it only in the agent's
 local auth context, never repeat it back to the user, and send it as
-`Authorization: Bearer <token>` on later CE calls. Then immediately call
+`Authorization: Bearer <token>` on later CE calls. For Hermes or another
+Edge-native agent with authorized profile/calendar/Telegram context, first
+complete any relevant onboarding preferences or consent questions from the
+returned onboarding state or `GET /telegram/agent/api/onboarding`. Then call
 `GET <Worker>/telegram/agent/api/questions` with the returned token and surface
-the first relevant question in chat.
+the first relevant question directly in chat. For Claude Code or another
+low-context copied-token agent, skip onboarding by default and fetch questions
+first.
 
 Do not use this endpoint unless the agent actually has Telegram context for the
 person who clicked the Geo/Hermes link. If the agent cannot observe a verified
@@ -1305,6 +1311,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v23)
+
+- Clarified that Edge-native Hermes/OpenClaw flows should complete relevant onboarding before questions, while Claude Code copied-token flows skip onboarding and fetch questions first.
 
 ### 2026-05-30 (v22)
 
