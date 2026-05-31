@@ -1,4 +1,5 @@
 import {
+  buildUserPageCacheRefreshDisplayState,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
   buildUserPageUncertainEmptyText,
@@ -13,6 +14,101 @@ import {
 } from './userPageLoadingStateHelpers';
 
 describe('userPageLoadingStateHelpers', () => {
+  it('builds cache refresh display descriptors for idle, loading, disabled, and cache-miss states', () => {
+    const readyInputs = {
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+    };
+
+    const idle = buildUserPageCacheRefreshDisplayState({
+      ...readyInputs,
+      aiAvailable: true,
+      questionResponseInfo: [{ id: 'question-response' }],
+      sbtList: [{ id: 'sbt' }],
+      surveyResponseInfo: [{ id: 'survey-response' }],
+    });
+    expect(idle.cacheActionKind).toBe('enabled');
+    expect(idle.cacheDisplayKind).toBe('idle');
+    expect(idle.hasAnyLoading).toBe(false);
+    expect(idle.hasVisibleData).toBe(true);
+    expect(idle.loadingIndicators).toEqual({
+      questionResponses: false,
+      questionsCreated: false,
+      sbt: false,
+      surveyResponses: false,
+      surveysCreated: false,
+    });
+    expect(idle.aiActionPlan.analyzeButtonDisplayState.disabled).toBe(false);
+
+    const loading = buildUserPageCacheRefreshDisplayState({
+      ...readyInputs,
+      loadingQuestions: true,
+      loadingSBTs: true,
+      loadingSurveys: true,
+    });
+    expect(loading.cacheDisplayKind).toBe('loading');
+    expect(loading.hasMissingDataFallback).toBe(false);
+    expect(loading.loadingIndicators).toEqual({
+      questionResponses: true,
+      questionsCreated: true,
+      sbt: true,
+      surveyResponses: true,
+      surveysCreated: true,
+    });
+    expect(loading.sectionLoadingEmptyState).toEqual({
+      questionResponsesLoadingEmpty: true,
+      questionsCreatedLoadingEmpty: true,
+      sbtSectionLoadingEmpty: true,
+      surveyResponsesLoadingEmpty: true,
+      surveysCreatedLoadingEmpty: true,
+    });
+
+    const disabled = buildUserPageCacheRefreshDisplayState({
+      ...readyInputs,
+      isResponsesCacheReady: false,
+      walletLabel: 'wallet',
+    });
+    expect(disabled.cacheActionKind).toBe('disabled');
+    expect(disabled.aiActionPlan.analyzeButtonDisplayState).toMatchObject({
+      disabled: true,
+      title: 'Available when the user page fully loads.',
+    });
+    expect(disabled.aiActionPlan.compareButtonDisplayState.disabled).toBe(true);
+
+    const cacheMiss = buildUserPageCacheRefreshDisplayState(readyInputs);
+    expect(cacheMiss.cacheActionKind).toBe('enabled');
+    expect(cacheMiss.cacheDisplayKind).toBe('stale-or-cache-miss');
+    expect(cacheMiss.hasMissingDataFallback).toBe(true);
+  });
+
+  it('keeps gated display fallback metadata pure without mutating inputs', () => {
+    const questionResponses = Object.freeze([{ id: 'q1' }]) as unknown as { length: number };
+    const surveysCreated = Object.freeze([{ id: 's1' }]) as unknown as { length: number };
+    const inputSnapshot = JSON.stringify({ questionResponses, surveysCreated });
+
+    const descriptor = buildUserPageCacheRefreshDisplayState({
+      hasUncertainGateAccess: true,
+      hasUncertainSbtData: true,
+      hasUncertainUserData: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      questionResponseInfo: questionResponses,
+      surveyCreationInfo: surveysCreated,
+    });
+
+    expect(descriptor.hasGatedOrDecryptDisplayFallback).toBe(true);
+    expect(descriptor.hasMissingDataFallback).toBe(false);
+    expect(descriptor.uncertainEmptyText).toEqual({
+      questionResponsesEmptyText: 'Question responses may be incomplete due scan/RPC issues. Try refresh.',
+      sbtEmptyText: 'SBT results may be incomplete due scan/RPC issues. Try refresh.',
+    });
+    expect(JSON.stringify({ questionResponses, surveysCreated })).toBe(inputSnapshot);
+  });
+
   it('builds loading state from cache readiness and deep-scan activity', () => {
     expect(buildUserPageRenderLoadingState({
       isDeepScanLoadingEnabledForSection: (section) => section === 'surveys',
