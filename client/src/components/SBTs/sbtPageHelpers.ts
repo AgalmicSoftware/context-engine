@@ -152,6 +152,7 @@ export {
   normalizeSbtPageCanonicalMetadataHref,
   resolveDisplayImageHref,
   resolveSbtPageTokenMetadataHref,
+  resolveSbtPageTokenMetadataLinkDisplayState,
 } from './sbtPageMediaHelpers';
 export {
   buildSbtPageSectionHeaderClassName,

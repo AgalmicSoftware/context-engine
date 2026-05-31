@@ -16,12 +16,19 @@ type SbtPageDisplayImageNextFallbackArgs = {
   maxIndex?: number;
   sourceKey?: string;
 };
+type ResolveSbtPageTokenMetadataLinkDisplayStateArgs = {
+  tokenUriRaw?: unknown;
+};
 export type SbtPageDisplayImageState = {
   sourceKey: string;
   candidates: string[];
   activeIndex: number;
   src: string;
   canRetry: boolean;
+};
+export type SbtPageTokenMetadataLinkDisplayState = {
+  href: string;
+  shouldRenderLink: boolean;
 };
 
 export const isSbtPageImageLikeUri = (uriRaw: unknown): boolean => {
@@ -144,4 +151,14 @@ export const resolveSbtPageTokenMetadataHref = (tokenUriRaw: unknown): string =>
     if (normalized) return normalized;
   }
   return '';
+};
+
+export const resolveSbtPageTokenMetadataLinkDisplayState = ({
+  tokenUriRaw = '',
+}: ResolveSbtPageTokenMetadataLinkDisplayStateArgs = {}): SbtPageTokenMetadataLinkDisplayState => {
+  const href = resolveSbtPageTokenMetadataHref(tokenUriRaw);
+  return {
+    href,
+    shouldRenderLink: !!href,
+  };
 };

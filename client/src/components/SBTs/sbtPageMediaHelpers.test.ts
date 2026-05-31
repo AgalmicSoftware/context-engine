@@ -7,6 +7,7 @@ import {
   normalizeSbtPageCanonicalMetadataHref,
   resolveDisplayImageHref,
   resolveSbtPageTokenMetadataHref,
+  resolveSbtPageTokenMetadataLinkDisplayState,
 } from './sbtPageMediaHelpers';
 
 type ArweaveRuntimeGlobals = typeof globalThis & {
@@ -86,6 +87,29 @@ describe('sbtPageMediaHelpers', () => {
       tokenURI: 'https://cdn.example.test/also-image.jpg',
       uri: 'https://cdn.example.test/banner.webp',
     }))}`)).toBe('');
+  });
+
+  it('describes token metadata link display state without mutating inputs', () => {
+    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
+    arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
+    const args = { tokenUriRaw: `ar://${txId}` };
+
+    expect(resolveSbtPageTokenMetadataLinkDisplayState(args)).toEqual({
+      href: `https://ar-io.dev/${txId}`,
+      shouldRenderLink: true,
+    });
+    expect(args).toEqual({ tokenUriRaw: `ar://${txId}` });
+    expect(resolveSbtPageTokenMetadataLinkDisplayState({
+      tokenUriRaw: 'https://cdn.example.test/preview.png',
+    })).toEqual({
+      href: '',
+      shouldRenderLink: false,
+    });
+    expect(resolveSbtPageTokenMetadataLinkDisplayState()).toEqual({
+      href: '',
+      shouldRenderLink: false,
+    });
   });
 
   it('builds display image candidates and falls back to the default image', () => {
