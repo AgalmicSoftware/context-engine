@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v24)
+**Skill version:** 2026-05-30 (v25)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -230,7 +230,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=24",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=25",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -519,6 +519,11 @@ Use only questions where `answerable` is `true`. Locked or unavailable questions
 
 ### Present Questions To Humans
 
+Present CE as native agent behavior, not as an API transcript. Do not tell the
+user "I fetched the API", mention HTTP statuses, or reference Geo-node metadata
+unless they ask for implementation details. Say "Here is a relevant question for
+you" and keep the conversation focused on the user's answer.
+
 When showing questions in chat or an agent UI, do not dump raw fields. Use a
 short card with the endpoint result translated into human language:
 
@@ -542,6 +547,14 @@ After a successful question read, do not end with a generic prompt such as
 "Want me to do anything with this?" Instead, surface the first relevant
 answerable question and ask "How would you like to answer?" with the available
 choices or a freeform reply path.
+
+Do not rely only on the worker's `relevance` ordering. Read the returned
+answerable questions, use the user's consented profile, current conversation,
+memory, interests, and attendance context in your own model, and pick the most
+subjectively relevant question from the batch. When helpful, include a suggested
+answer and short rationale the user can confirm or edit, e.g. "Given your recent
+work on programmable cryptography, I would suggest Agree because ... Does that
+sound right?"
 
 For personalized question selection, send a POST body with preferences:
 
@@ -645,8 +658,9 @@ POST /telegram/agent/api/preferences
 
 The response reports `draftCount`, `submittedCount`, and `skipped`. By default
 it only saves drafts. To answer on the user's behalf after explicit approval,
-include both `submit: true` and `humanApproved: true` at the top level or inside
-`preferences`:
+include both `submit: true` and `humanApproved: true`. The worker accepts them
+at the top level, inside a `preferences` object, or on an individual answer in a
+`preferences` array:
 
 ```json
 {
@@ -658,6 +672,23 @@ include both `submit: true` and `humanApproved: true` at the top level or inside
       "q-binary": { "value": "unsure", "comments": "The premise depends on how intervention is defined." }
     }
   }
+}
+```
+
+Equivalent per-answer direct-submit shape:
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "preferences": [
+    {
+      "questionId": "q-binary",
+      "answer": "unsure",
+      "comments": "The premise depends on how intervention is defined.",
+      "submit": true,
+      "humanApproved": true
+    }
+  ]
 }
 ```
 
@@ -1325,6 +1356,11 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v25)
+
+- Accepted per-answer `submit: true` plus `humanApproved: true` in agent preference arrays so chat agents can direct-submit approved answers even when they attach flags beside the answer.
+- Clarified that agents should choose relevant questions with their own consented context, suggest a response when useful, and present CE conversationally instead of exposing API internals.
 
 ### 2026-05-30 (v24)
 

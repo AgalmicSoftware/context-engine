@@ -92,9 +92,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=24';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=25';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v24)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v25)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -3920,6 +3920,19 @@ function normalizePreferenceEntries(input = {}) {
   const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
     ? input.preferences
     : input;
+  const preferenceArray = Array.isArray(input.preferences) ? input.preferences : [];
+  if (preferenceArray.length) {
+    return preferenceArray.map((entry) => {
+      const source = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : { answer: entry };
+      const nestedAnswer = source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer)
+        ? source.answer
+        : null;
+      return {
+        questionId: safeString(source.questionId || source.id),
+        answer: nestedAnswer ? { ...source, ...nestedAnswer } : source,
+      };
+    });
+  }
   const byId = preferences.answersByQuestionId || preferences.draftsByQuestionId || input.answersByQuestionId;
   if (byId && typeof byId === 'object' && !Array.isArray(byId)) {
     return Object.entries(byId).map(([questionId, answer]) => ({ questionId, answer }));
@@ -4007,10 +4020,11 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     .filter((question) => !questionIsLocked(question) && !questionIsUnavailable(question));
   const byId = new Map(questions.map((question) => [safeString(question.questionId || question.id), question]));
   const entries = normalizePreferenceEntries(input);
-  const shouldSubmit = directSubmitRequested(input);
+  const rootSubmitRequested = directSubmitRequested(input);
   const drafts = [];
   const submitted = [];
   const skipped = [];
+  let reviewRequired = false;
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
     const question = byId.get(questionId);
@@ -4023,6 +4037,8 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       skipped.push({ questionId, reason: 'answer_not_understood' });
       continue;
     }
+    const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);
+    if (!shouldSubmit) reviewRequired = true;
     const saved = await persistAnswerDraft({
       env,
       normalized: context.normalized,
@@ -4069,6 +4085,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       });
     }
   }
+  const finalReviewRequired = drafts.length > 0 ? reviewRequired : true;
   const payload = {
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -4076,11 +4093,14 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     submittedCount: submitted.length,
     skipped,
     drafts,
-    ...(shouldSubmit ? { submitted } : {}),
-    reviewRequired: !shouldSubmit,
-    review: shouldSubmit ? {
+    ...(submitted.length ? { submitted } : {}),
+    reviewRequired: finalReviewRequired,
+    review: !finalReviewRequired ? {
       route: '/telegram/agent/api/preferences',
       note: 'Human-approved answers were submitted without requiring Mini App finalization.',
+    } : submitted.length ? {
+      route: '/telegram/agent/api/preferences',
+      note: 'Human-approved answers were submitted; remaining drafts are saved for user review.',
     } : {
       route: '/telegram/mini-app',
       note: 'Drafted preferences are saved for user review. Add submit=true and humanApproved=true only when the user explicitly authorizes direct submission.',
