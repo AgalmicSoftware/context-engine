@@ -101,7 +101,7 @@ import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=29';
-const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/bab463867b0c63ecc0958ae563938160ff84084b/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/8eb9ef69ed9dd3e33113c642f65735ae42a635e1/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v29)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
