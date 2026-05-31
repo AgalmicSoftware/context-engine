@@ -149,6 +149,7 @@ export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponsePatch,
+  buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptSurveyBindings,
@@ -165,6 +166,8 @@ export {
 } from './userPageGateHelpers';
 export type {
   UserPageDecryptableResponseField,
+  UserPageEncryptedVisibilityDisplayState,
+  UserPageGateAccessStatusByResource,
   UserPageResponseDecryptSurveyBindings,
 } from './userPageGateHelpers';
 export {

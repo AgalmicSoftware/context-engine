@@ -27,6 +27,24 @@ type BuildUserPageResponseDecryptSurveyBindingsInput = {
   questionResponseInfo?: unknown;
   responseOverride?: unknown;
 };
+export type UserPageGateAccessStatusByResource = {
+  resourceKey: string;
+  status: string;
+};
+export type UserPageEncryptedVisibilityDisplayState = {
+  visible: boolean;
+  canDecryptOtherResponses: boolean;
+  uncertain: boolean;
+  pendingResourceKeys: string[];
+  uncertainResourceKey: string;
+};
+type BuildUserPageEncryptedVisibilityDisplayStateInput = {
+  encryptionAudience?: unknown;
+  resourceKey?: unknown;
+  statusByResource?: UserPageGateAccessStatusByResource[];
+  viewAddressLower?: unknown;
+  viewerAccount?: unknown;
+};
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
   value: unknown;
@@ -78,6 +96,82 @@ export const getUserPageGateResourceKeysToCheck = (resourceKey: unknown = 'defau
   const normalized = normalizeUserPageGateResourceKey(resourceKey);
   if (normalized === 'default') return ['default'];
   return [normalized, 'default'];
+};
+
+export const buildUserPageEncryptedVisibilityDisplayState = ({
+  encryptionAudience = 'gate',
+  resourceKey = 'default',
+  statusByResource = [],
+  viewAddressLower = '',
+  viewerAccount = '',
+}: BuildUserPageEncryptedVisibilityDisplayStateInput = {}): UserPageEncryptedVisibilityDisplayState => {
+  const viewerAccountLower = String(viewerAccount || '').trim().toLowerCase();
+  const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
+  if (isOwnProfileViewer) {
+    return {
+      visible: true,
+      canDecryptOtherResponses: true,
+      uncertain: false,
+      pendingResourceKeys: [],
+      uncertainResourceKey: '',
+    };
+  }
+
+  const normalizedAudience = String(encryptionAudience || '').trim().toLowerCase();
+  if (normalizedAudience === 'self') {
+    return {
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: false,
+      pendingResourceKeys: [],
+      uncertainResourceKey: '',
+    };
+  }
+
+  const normalizedStatuses = (
+    Array.isArray(statusByResource) && statusByResource.length
+      ? statusByResource
+      : getUserPageGateResourceKeysToCheck(resourceKey).map((key) => ({
+        resourceKey: key,
+        status: 'unknown',
+      }))
+  ).map((entry) => ({
+    resourceKey: normalizeUserPageGateResourceKey(entry?.resourceKey),
+    status: String(entry?.status || 'unknown') || 'unknown',
+  }));
+  const pendingResourceKeys = viewerAccountLower
+    ? normalizedStatuses.map((entry) => entry.resourceKey)
+    : [];
+
+  if (normalizedStatuses.some((entry) => entry.status === 'granted')) {
+    return {
+      visible: true,
+      canDecryptOtherResponses: true,
+      uncertain: false,
+      pendingResourceKeys,
+      uncertainResourceKey: '',
+    };
+  }
+
+  const terminalDeniedStatuses = new Set<string>(['denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
+  const hasUncertainStatus = normalizedStatuses.some((entry) => !terminalDeniedStatuses.has(entry.status));
+  if (!hasUncertainStatus) {
+    return {
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: false,
+      pendingResourceKeys,
+      uncertainResourceKey: '',
+    };
+  }
+
+  return {
+    visible: false,
+    canDecryptOtherResponses: false,
+    uncertain: true,
+    pendingResourceKeys,
+    uncertainResourceKey: normalizeUserPageGateResourceKey(resourceKey),
+  };
 };
 
 export const isUserPageEncryptedResponseField = (fieldObj: unknown = null): boolean => {

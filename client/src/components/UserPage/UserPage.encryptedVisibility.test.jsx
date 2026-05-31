@@ -286,6 +286,42 @@ describe('UserPage encrypted response visibility', () => {
     expect(instance.state.questionCreationInfo).toHaveLength(1);
   });
 
+  it('wires encrypted visibility descriptors into gate pending and uncertain state', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
+    instance._getResponseGateAccessStatus = jest.fn(({ resourceKey }) => (
+      resourceKey === 'questionResponses' ? 'unknown' : 'no-gate'
+    ));
+
+    const gateContext = instance._createGateAccessContext();
+    const result = instance._evaluateEncryptedVisibility({
+      resourceKey: 'questionResponses',
+      slug: 'Edge',
+      viewAddressLower: viewAddress,
+      encryptionAudience: 'gate',
+      gateContext,
+    });
+
+    expect(result).toEqual({
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: true,
+    });
+    expect(instance._getResponseGateAccessStatus).toHaveBeenCalledWith({
+      slug: 'Edge',
+      resourceKey: 'questionResponses',
+    });
+    expect(instance._getResponseGateAccessStatus).toHaveBeenCalledWith({
+      slug: 'Edge',
+      resourceKey: 'default',
+    });
+    expect(Array.from(gateContext.pendingKeys).sort()).toEqual([
+      'edge::default',
+      'edge::questionResponses',
+    ]);
+    expect(Array.from(gateContext.uncertainResources)).toEqual(['questionResponses']);
+  });
+
   it('uses the viewer-response source slug when evaluating encrypted question visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const otherAddress = '0x00000000000000000000000000000000000000cc';
