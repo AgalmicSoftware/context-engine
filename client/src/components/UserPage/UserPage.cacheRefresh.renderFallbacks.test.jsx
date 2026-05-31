@@ -3,12 +3,66 @@ import {
   cacheScripts,
   makeInstance,
   collectTreeNodes,
+  getNodeTypeName,
   treeHasText,
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
 
 describe('UserPage cache refresh render and SBT fallbacks', () => {
   setupUserPageCacheRefreshTestLifecycle();
+
+  it('wires cache display state into disabled header actions and loading indicators', () => {
+    const toDataUrlSpy = jest
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,');
+    try {
+      const instance = makeInstance({
+        isQuestionCacheReady: false,
+        isResponsesCacheReady: false,
+        isSBTCacheReady: false,
+        isSurveyCacheReady: false,
+      });
+      instance.state = {
+        ...instance.state,
+        aiAvailable: true,
+        isDeepScanning: false,
+        loadingQuestions: false,
+        loadingSBTs: false,
+        loadingSurveys: false,
+        questionCreationInfo: [],
+        questionResponseInfo: [],
+        sbtList: [],
+        selectedTab: 'questions',
+        surveyCreationInfo: [],
+        surveyResponseInfo: [],
+      };
+
+      const tree = instance.render();
+      const analyzeButton = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && treeHasText(node, 'Analyze')
+      )[0];
+      const compareButton = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && treeHasText(node, 'Compare')
+      )[0];
+      const loadingIndicators = collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+      );
+
+      expect(analyzeButton.props.disabled).toBe(true);
+      expect(analyzeButton.props.title).toBe('Available when the user page fully loads.');
+      expect(compareButton.props.disabled).toBe(true);
+      expect(compareButton.props.title).toBe('Available when the user page fully loads.');
+      expect(loadingIndicators).toHaveLength(3);
+      expect(treeHasText(tree, 'No question responses found.')).toBe(false);
+      expect(treeHasText(tree, 'No questions created.')).toBe(false);
+      expect(treeHasText(tree, 'No SBTs found.')).toBe(false);
+    } finally {
+      toDataUrlSpy.mockRestore();
+    }
+  });
 
   it('keeps survey/question loading active during deep scan by default', () => {
     const instance = makeInstance();
