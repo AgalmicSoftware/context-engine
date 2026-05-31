@@ -1,5 +1,6 @@
 import {
   E2E_TESTIDS,
+  act,
   fireEvent,
   mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
@@ -73,6 +74,51 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+  });
+
+  it('renders parent-derived register progress during manual metadata publish', async () => {
+    const manualMetadataUri = `ar://${'c'.repeat(43)}`;
+    let resolveRegister = () => {};
+    const registerPromise = new Promise((resolve) => {
+      resolveRegister = resolve;
+    });
+    mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Manual Metadata Progress Boundary Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    const progressCard = await screen.findByTestId('ce-wizard-publish-progress');
+    expect(progressCard).toHaveTextContent('Register On-chain');
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringContaining('Register On-chain')
+    );
+    expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRegister({ txs: [] });
+      await registerPromise;
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
   });
 
   it('passes manual metadata through the register boundary with pinned register args', async () => {

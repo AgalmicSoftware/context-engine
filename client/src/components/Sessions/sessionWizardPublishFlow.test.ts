@@ -9,6 +9,7 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
@@ -513,5 +514,47 @@ describe('sessionWizardPublishFlow', () => {
       totalSteps: 5,
       elapsedMs: 0,
     })).toBe(100);
+  });
+
+  it('describes publish progress display state without mutating plan steps', () => {
+    const publishSteps = ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'];
+    const displayState = resolveSessionWizardPublishProgressDisplayState({
+      elapsedMs: 1300,
+      publishBusy: true,
+      publishStep: 4,
+      publishSteps,
+      sbtsLabel: 'Groups',
+    });
+
+    expect(displayState).toEqual(expect.objectContaining({
+      activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressPercentRounded: Math.round(displayState.publishProgressPercent),
+      publishProgressSteps: [
+        { key: 'deploy-worker', label: 'Deploy Worker' },
+        { key: 'deploy-sbts', label: 'Deploy Groups' },
+        { key: 'upload-metadata', label: 'Upload Arweave' },
+        { key: 'register-session', label: 'Register On-chain' },
+        { key: 'done', label: 'Done' },
+      ],
+      showPublishProgress: true,
+    }));
+    expect(displayState.publishProgressPercent).toBeGreaterThan(60);
+    expect(displayState.publishProgressPercent).toBeLessThan(80);
+    expect(publishSteps).toEqual(['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done']);
+
+    expect(resolveSessionWizardPublishProgressDisplayState({
+      publishBusy: false,
+      publishStep: 0,
+      publishSteps: ['register-session', 'done'],
+    })).toEqual({
+      activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressPercent: 0,
+      publishProgressPercentRounded: 0,
+      publishProgressSteps: [
+        { key: 'register-session', label: 'Register On-chain' },
+        { key: 'done', label: 'Done' },
+      ],
+      showPublishProgress: false,
+    });
   });
 });
