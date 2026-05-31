@@ -2,6 +2,7 @@ import {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponsePatch,
+  buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptSurveyBindings,
@@ -44,6 +45,95 @@ describe('userPageGateHelpers', () => {
     expect(buildUserPageGatePendingKey({ slug: 'general' })).toBe('::default');
     expect(getUserPageGateResourceKeysToCheck(' response ')).toEqual(['response', 'default']);
     expect(getUserPageGateResourceKeysToCheck()).toEqual(['default']);
+  });
+
+  it('builds encrypted visibility display descriptors without mutating inputs', () => {
+    const statusByResource = [
+      { resourceKey: ' questionResponses ', status: 'unknown' },
+      { resourceKey: 'default', status: 'no-gate' },
+    ];
+    const originalStatusByResource = statusByResource.map((entry) => ({ ...entry }));
+
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience: 'gate',
+      resourceKey: ' questionResponses ',
+      statusByResource,
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000aa',
+    })).toEqual({
+      visible: true,
+      canDecryptOtherResponses: true,
+      uncertain: false,
+      pendingResourceKeys: [],
+      uncertainResourceKey: '',
+    });
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience: ' self ',
+      resourceKey: 'questionResponses',
+      statusByResource,
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: false,
+      pendingResourceKeys: [],
+      uncertainResourceKey: '',
+    });
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience: 'gate',
+      resourceKey: 'questionResponses',
+      statusByResource: [{ resourceKey: 'default', status: 'granted' }],
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      visible: true,
+      canDecryptOtherResponses: true,
+      uncertain: false,
+      pendingResourceKeys: ['default'],
+      uncertainResourceKey: '',
+    });
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience: 'gate',
+      resourceKey: 'questionResponses',
+      statusByResource: [
+        { resourceKey: 'questionResponses', status: 'denied' },
+        { resourceKey: 'default', status: 'no-gate' },
+      ],
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: false,
+      pendingResourceKeys: ['questionResponses', 'default'],
+      uncertainResourceKey: '',
+    });
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience: 'gate',
+      resourceKey: ' questionResponses ',
+      statusByResource,
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: true,
+      pendingResourceKeys: ['questionResponses', 'default'],
+      uncertainResourceKey: 'questionResponses',
+    });
+    expect(buildUserPageEncryptedVisibilityDisplayState({
+      resourceKey: 'surveyResponses',
+      viewAddressLower: '0x00000000000000000000000000000000000000aa',
+      viewerAccount: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      visible: false,
+      canDecryptOtherResponses: false,
+      uncertain: true,
+      pendingResourceKeys: ['surveyResponses', 'default'],
+      uncertainResourceKey: 'surveyResponses',
+    });
+    expect(statusByResource).toEqual(originalStatusByResource);
   });
 
   it('detects encrypted response fields and payload audiences', () => {

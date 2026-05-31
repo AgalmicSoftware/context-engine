@@ -48,6 +48,7 @@ import {
   buildUserPageDeriveTelemetrySnapshot,
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponsePatch,
+  buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageFullProfileModalStatePatch,
@@ -2137,13 +2138,18 @@ class UserPage extends Component<any, any> {
   }: EncryptedVisibilityInput = {}): EncryptedVisibilityResult => {
     const viewerAccountLower = String(this.props.account || '').trim().toLowerCase();
     const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
-    if (isOwnProfileViewer) {
-      return { visible: true, canDecryptOtherResponses: true };
-    }
-
     const normalizedAudience = String(encryptionAudience || '').trim().toLowerCase();
-    if (normalizedAudience === 'self') {
-      return { visible: false, canDecryptOtherResponses: false };
+    if (isOwnProfileViewer || normalizedAudience === 'self') {
+      const displayState = buildUserPageEncryptedVisibilityDisplayState({
+        encryptionAudience,
+        resourceKey,
+        viewAddressLower,
+        viewerAccount: this.props.account,
+      });
+      return {
+        visible: displayState.visible,
+        canDecryptOtherResponses: displayState.canDecryptOtherResponses,
+      };
     }
 
     const resourceKeysToCheck = getUserPageGateResourceKeysToCheck(resourceKey);
@@ -2151,24 +2157,26 @@ class UserPage extends Component<any, any> {
       resourceKey: key,
       status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
     }));
-    if (isGateAccessContext(gateContext) && viewerAccountLower) {
-      statusByResource.forEach((entry) => {
-        gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: entry.resourceKey }));
-      });
-    }
-    if (statusByResource.some((entry) => entry.status === 'granted')) {
-      return { visible: true, canDecryptOtherResponses: true };
-    }
-    const terminalDeniedStatuses = new Set<string>(['denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
-    const hasUncertainStatus = statusByResource.some((entry) => !terminalDeniedStatuses.has(entry.status));
-    if (!hasUncertainStatus) {
-      return { visible: false, canDecryptOtherResponses: false };
-    }
-
+    const displayState = buildUserPageEncryptedVisibilityDisplayState({
+      encryptionAudience,
+      resourceKey,
+      statusByResource,
+      viewAddressLower,
+      viewerAccount: this.props.account,
+    });
     if (isGateAccessContext(gateContext)) {
-      gateContext.uncertainResources.add(String(resourceKey || '').trim() || 'default');
+      displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
+        gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: pendingResourceKey }));
+      });
+      if (displayState.uncertainResourceKey) {
+        gateContext.uncertainResources.add(displayState.uncertainResourceKey);
+      }
     }
-    return { visible: false, canDecryptOtherResponses: false, uncertain: true };
+    return {
+      visible: displayState.visible,
+      canDecryptOtherResponses: displayState.canDecryptOtherResponses,
+      ...(displayState.uncertain ? { uncertain: true } : {}),
+    };
   };
 
   _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown => measureSync('ce.userPage.aggregateCacheData', () => {
