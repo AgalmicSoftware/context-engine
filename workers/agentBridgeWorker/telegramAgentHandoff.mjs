@@ -92,9 +92,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=23';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=24';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v23)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v24)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -478,11 +478,12 @@ function expectedAgentToken(env = {}) {
 function suppliedAgentToken(request) {
   const authorization = safeString(request.headers.get('authorization'));
   const bearer = authorization.match(/^Bearer\s+(.+)$/i);
-  return safeString(
+  const supplied = safeString(
     bearer?.[1] ||
     request.headers.get('x-ce-agent-token') ||
     request.headers.get('x-context-engine-agent-token')
   );
+  return extractTelegramAgentToken(supplied) || supplied;
 }
 
 function agentTokenRefreshError(reason = 'agent_token_invalid') {
@@ -490,8 +491,8 @@ function agentTokenRefreshError(reason = 'agent_token_invalid') {
     ok: false,
     status: 401,
     reason,
-    message: 'This Context Engine agent token is expired, revoked, or no longer available. Ask the user to open the Context Engine Telegram bot, run /start, tap Onboard Agent, and paste the copied install info into the agent.',
-    action: 'refresh_token_via_telegram',
+    message: 'This Context Engine agent token is expired, revoked, or no longer available. If you have a trusted Geo/Hermes invite, call /telegram/agent/api/invite/onboard again with the observed Telegram from.id and store the newly returned ceagt_ token as bearer auth. Otherwise ask the user to refresh through the Context Engine bot Onboard Agent flow.',
+    action: 'refresh_user_agent_token',
     telegramCommand: '/start',
     telegramButton: 'Onboard Agent',
   };
@@ -4554,9 +4555,12 @@ async function handleInviteOnboardRequest({
   const body = await readRequestJson(request);
   const inviteToken = safeString(
     body.inviteToken ||
+      body.contextEngineInviteToken ||
+      body.contextEngine?.inviteToken ||
       body.invite ||
       body.token ||
       url.searchParams.get('inviteToken') ||
+      url.searchParams.get('contextEngineInviteToken') ||
       url.searchParams.get('invite')
   );
   const invite = await resolveTrustedOnboardingInvite(env, inviteToken);

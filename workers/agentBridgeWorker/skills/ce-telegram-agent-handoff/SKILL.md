@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v23)
+**Skill version:** 2026-05-30 (v24)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -227,21 +227,28 @@ The Geo node can store fields like:
 
 ```json
 {
-  "contextEngineInviteToken": "<geo-link-token>",
-  "contextEngineWorker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=23",
-  "sessionSlug": "agent-village-2026"
+  "contextEngine": {
+    "inviteToken": "<geo-link-token>",
+    "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=24",
+    "sessionSlug": "agent-village-2026"
+  }
 }
 ```
+
+Keep the Geo node instructions short and point the agent at `contextEngine.skillUrl`
+as the source of truth. Do not paste a long copy of this onboarding procedure
+into the Geo node; stale hardcoded instructions can make agents fall back to the
+Telegram bot instead of using invite onboarding.
 
 ```http
 POST /telegram/agent/api/invite/onboard
 Content-Type: application/json
 
 {
-  "inviteToken": "<geo-link-token>",
+  "inviteToken": "<value from contextEngine.inviteToken>",
   "telegramUserId": "<telegram from.id observed by Hermes>",
-  "sessionSlug": "<optional existing session slug>",
+  "sessionSlug": "<value from contextEngine.sessionSlug>",
   "source": "geo:<optional-node-id>"
 }
 ```
@@ -249,8 +256,10 @@ Content-Type: application/json
 If the invite token is valid, CE returns `token`, `worker`, `skillUrl`,
 `sessionSlug`, `expiresAt`, and the current onboarding state. Treat `token` as
 the user's private `ceagt_...` bearer credential: store it only in the agent's
-local auth context, never repeat it back to the user, and send it as
-`Authorization: Bearer <token>` on later CE calls. For Hermes or another
+local auth context, never repeat it back to the user, and send the exact token
+string as `Authorization: Bearer <token>` on later CE calls to the same
+`contextEngine.worker`. Do not include quotes, angle brackets, Markdown, or
+the whole JSON response in the bearer header. For Hermes or another
 Edge-native agent with authorized profile/calendar/Telegram context, first
 complete any relevant onboarding preferences or consent questions from the
 returned onboarding state or `GET /telegram/agent/api/onboarding`. Then call
@@ -394,15 +403,14 @@ With `ceagt_...` tokens:
 
 If the worker returns `401` with `reason` equal to `agent_token_expired`,
 `agent_token_not_found`, `agent_token_inactive`, or another `agent_token_*`
-reason plus `action: "refresh_token_via_telegram"`, stop the CE action and ask
-the user to refresh the token in Telegram:
-
-1. Open the Context Engine bot.
-2. Run `/start`.
-3. Tap `Onboard Agent`.
-4. Paste the copied install info back into the trusted agent.
-
-Do not keep retrying an expired token.
+reason plus `action: "refresh_user_agent_token"`, refresh based on how the
+token was obtained. If this is a trusted Geo/Hermes invite flow and Hermes
+still has the invite token plus the observed Telegram `from.id`, call
+`POST /telegram/agent/api/invite/onboard` once more, replace the stored
+`ceagt_...` token with the newly returned token, and retry the CE request with
+that exact bearer token. If there is no trusted invite context, ask the user to
+refresh through the Context Engine Telegram bot's `Onboard Agent` flow. Do not
+keep retrying a missing, expired, or inactive token.
 
 Before using personal data, ask the user what may be used in this CE flow. The
 worker exposes a first-run onboarding endpoint for this:
@@ -464,6 +472,12 @@ Draft-divergence research is also default-off; unless the user opts in, do not
 send agent-drafted answers to the worker as durable research records. A Mini
 App launch may still carry an editable prefill draft for review, but that is a
 short-lived launch artifact rather than a draft-divergence research record.
+
+For a low-friction Hermes UX, the agent may offer a natural-language "accept
+all recommended onboarding permissions" option. That is not a separate API
+flag. If the user accepts, translate it into explicit onboarding answers and
+persist those normal fields; if the user declines or narrows consent, persist
+only the explicit allowed fields.
 
 When the user answers yes to demographic or attendance linking, auto-fill
 aggregate buckets from any profile fields the user authorized. For attendance,
@@ -1311,6 +1325,11 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v24)
+
+- Hardened trusted Geo/Hermes token handling so bearer headers may contain copied wrappers, invite onboarding can read nested `contextEngine.inviteToken`, and stale token errors direct agents back through invite refresh when available.
+- Updated Geo-node guidance to keep metadata concise, fetch the live skill URL as source of truth, store returned `ceagt_...` tokens in private auth context, and express "accept all" onboarding as normal explicit answers.
 
 ### 2026-05-30 (v23)
 
