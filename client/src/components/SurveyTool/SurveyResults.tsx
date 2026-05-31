@@ -152,7 +152,10 @@ import {
   buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
 import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
-import { buildSurveyResultsQuestionSummaryDisplayPlan } from './surveyResultsQuestionSummaryStatusController';
+import {
+  buildSurveyResultsQuestionListDisplayPlan,
+  buildSurveyResultsQuestionSummaryDisplayPlan,
+} from './surveyResultsQuestionSummaryStatusController';
 import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 import {
   runSurveyResultsBrowserDownload,
@@ -5666,6 +5669,10 @@ const exportControlsDisplay = buildSurveyResultsExportControlsDisplayDescriptor(
 });
 const aggregatorEntries = this.getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
 const aggregatorEntriesCount = aggregatorEntries.length;
+const questionListDisplay = buildSurveyResultsQuestionListDisplayPlan({
+  aggregatorEntriesCount,
+  filterLoading,
+});
 const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQuestions);
 const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
@@ -5811,14 +5818,14 @@ return (
           isOpen={!!this.state.activeQuestionToggles['__questionList__']}
           onToggle={() => this.toggleQuestionSummary('__questionList__')}
           questionTableNode={
-            aggregatorEntriesCount === 0 && !filterLoading
-              ? null
-              : this.renderQuestionIDsTable(
+            questionListDisplay.shouldRenderQuestionTable
+              ? this.renderQuestionIDsTable(
                 sbtFilteredAggregatorQuestionResponses,
                 preNetworkQuestions
               )
+              : null
           }
-          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          showEmptyState={questionListDisplay.showEmptyState}
           styleMap={styles}
           tableWrapperRef={this.questionIdTableRef}
           title=" View & Sort Questions"
@@ -5831,14 +5838,14 @@ return (
           isOpen={!!this.state.activeQuestionToggles['__questionList__']}
           onToggle={() => this.toggleQuestionSummary('__questionList__')}
           questionTableNode={
-            aggregatorEntriesCount === 0 && !filterLoading
-              ? null
-              : this.renderQuestionIDsTable(
+            questionListDisplay.shouldRenderQuestionTable
+              ? this.renderQuestionIDsTable(
                 sbtFilteredAggregatorQuestionResponses,
                 preNetworkQuestions
               )
+              : null
           }
-          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
+          showEmptyState={questionListDisplay.showEmptyState}
           styleMap={styles}
           title="View & Sort Questions"
           trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
