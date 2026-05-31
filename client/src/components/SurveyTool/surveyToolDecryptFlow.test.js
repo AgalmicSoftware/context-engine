@@ -7,6 +7,7 @@ import {
   buildFieldDecryptState,
   buildQuestionDecryptExecutionContext,
   buildQuestionDecryptFailureState,
+  buildQuestionFieldDecryptControlDisplayState,
   buildQuestionFieldDisplayState,
   buildQuestionDecryptStartState,
   buildQuestionResponseDisplayState,
@@ -143,6 +144,59 @@ describe('surveyToolDecryptFlow', () => {
       allowDecryptAdditional: false,
       isAnswerDecrypting: true,
       isAdditionalDecrypting: false,
+    });
+  });
+
+  it('builds question decrypt control display descriptors without invoking decrypt handlers', () => {
+    const input = Object.freeze({
+      actionLabel: 'Decrypt Comments',
+      allowDecrypt: false,
+      autoDecryptEnabled: false,
+      busy: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      isDecrypting: false,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      wrapperStyle: Object.freeze({ marginTop: '4px' }),
+    });
+
+    expect(buildQuestionFieldDecryptControlDisplayState(input)).toEqual({
+      actionLabel: 'Decrypt Comments',
+      autoDecryptEnabled: false,
+      busy: true,
+      disabled: true,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      title: 'Connect wallet to decrypt',
+      wrapperStyle: { marginTop: '4px' },
+    });
+    expect(buildQuestionFieldDecryptControlDisplayState({
+      ...input,
+      allowDecrypt: true,
+      isDecrypting: true,
+    })).toMatchObject({
+      disabled: true,
+      title: undefined,
+    });
+    expect(buildQuestionFieldDecryptControlDisplayState({
+      ...input,
+      allowDecrypt: true,
+      autoDecryptEnabled: true,
+      busy: false,
+      isDecrypting: false,
+    })).toMatchObject({
+      autoDecryptEnabled: true,
+      busy: false,
+      disabled: false,
+      title: undefined,
+    });
+    expect(input).toEqual({
+      actionLabel: 'Decrypt Comments',
+      allowDecrypt: false,
+      autoDecryptEnabled: false,
+      busy: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      isDecrypting: false,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      wrapperStyle: { marginTop: '4px' },
     });
   });
 

@@ -78,6 +78,7 @@ import {
   buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
   buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
   buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
+  buildQuestionFieldDecryptControlDisplayState as buildQuestionFieldDecryptControlDisplayStateHelper,
   buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
   buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
   buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
@@ -3457,18 +3458,25 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     busy,
     showBusySpinnerWhenAutoDecryptEnabled = false,
     wrapperStyle,
-  }) => (
-    <QuestionDecryptControl
-      autoDecryptEnabled={this.state.autoDecryptEnabled}
-      showBusySpinnerWhenAutoDecryptEnabled={showBusySpinnerWhenAutoDecryptEnabled}
-      onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
-      disabled={this.state.isDecrypting || !allowDecrypt}
-      title={!allowDecrypt ? decryptTooltip : undefined}
-      actionLabel={actionLabel}
-      busy={busy}
-      wrapperStyle={wrapperStyle}
-    />
-  );
+  }) => {
+    const displayState = buildQuestionFieldDecryptControlDisplayStateHelper({
+      actionLabel,
+      allowDecrypt,
+      autoDecryptEnabled: this.state.autoDecryptEnabled,
+      busy,
+      decryptTooltip,
+      isDecrypting: this.state.isDecrypting,
+      showBusySpinnerWhenAutoDecryptEnabled,
+      wrapperStyle,
+    });
+
+    return (
+      <QuestionDecryptControl
+        {...displayState}
+        onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
+      />
+    );
+  };
 
   renderFullQuestionMainContent = ({
     question,
