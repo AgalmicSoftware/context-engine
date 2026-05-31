@@ -83,6 +83,25 @@ export const buildQuestionRenderDisplayState = ({
   isAdditionalDecrypting: !!fieldDisplayState?.additionalDecryptState?.busy,
 });
 
+export const buildQuestionFieldDecryptControlDisplayState = ({
+  actionLabel = 'Decrypt Answer',
+  allowDecrypt = false,
+  autoDecryptEnabled = false,
+  busy = false,
+  decryptTooltip = 'Login to decrypt this encrypted field.',
+  isDecrypting = false,
+  showBusySpinnerWhenAutoDecryptEnabled = false,
+  wrapperStyle = undefined,
+} = {}) => ({
+  actionLabel,
+  autoDecryptEnabled: !!autoDecryptEnabled,
+  busy: !!busy,
+  disabled: !!isDecrypting || !allowDecrypt,
+  showBusySpinnerWhenAutoDecryptEnabled: !!showBusySpinnerWhenAutoDecryptEnabled,
+  title: !allowDecrypt ? decryptTooltip : undefined,
+  wrapperStyle,
+});
+
 export const buildAutoDecryptMaskedFieldSignature = (field = null) => {
   if (!field || typeof field !== 'object') return '';
   return [
