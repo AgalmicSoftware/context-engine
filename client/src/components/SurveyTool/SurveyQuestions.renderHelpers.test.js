@@ -474,6 +474,53 @@ describe('SurveyQuestions render helpers', () => {
     expect(subject.getResponseJson).not.toHaveBeenCalled();
   });
 
+  it('passes only expanded JSON payloads to bottom copy handlers', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    const surveyJson = { id: 'survey-1', questionIDs: ['q1'] };
+    subject.getSurveyJson = jest.fn(() => surveyJson);
+    subject.getResponseJson = jest.fn(() => ({ responses: [{ questionID: 'q1' }] }));
+    subject.copyJsonToClipboard = jest.fn();
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      displayAnswerMode: true,
+      parsedViewAddressAnswers: { responses: [] },
+      questionPool: [{ id: 'q1', type: 'freeform' }],
+      showSurveyJson: true,
+      showResponseJson: false,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+
+    expect(controls).not.toBeNull();
+    expect(controls.props.showSurveyJsonPanel).toBe(true);
+    expect(controls.props.showResponseJsonPanel).toBe(false);
+    expect(controls.props.surveyJson).toBe(surveyJson);
+    expect(controls.props.responseJson).toBeNull();
+    expect(subject.getSurveyJson).toHaveBeenCalledTimes(1);
+    expect(subject.getResponseJson).not.toHaveBeenCalled();
+
+    controls.props.onCopySurveyJson();
+
+    expect(subject.copyJsonToClipboard).toHaveBeenCalledWith(surveyJson, 'survey');
+  });
+
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
