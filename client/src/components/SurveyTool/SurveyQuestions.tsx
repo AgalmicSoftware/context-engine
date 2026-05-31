@@ -485,6 +485,7 @@ import {
   resolveSurveyQuestionsSubmitPendingStats,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
+  resolveSurveyQuestionsSubmittedResponseUrl,
   runSurveyQuestionsStaleSubmitController,
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
@@ -8372,30 +8373,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
 
       // 3. Compute responder URL for post-submit UI
-      let responseUrl;
       const submittedCacheSlug = normalizeSessionSlugValue(
         receipt?.__ceSubmissionGroupKey != null
           ? receipt.__ceSubmissionGroupKey
           : submitContext.effectiveDraftSlug
       );
-      try {
-        const accountLower = (submitContext.account || '').toLowerCase();
-        if (accountLower) {
-          if (submitContext.singleQuestionMode) {
-            const qLower = (submitContext.questionID || '').toLowerCase();
-            if (qLower) {
-              responseUrl = buildQuestionRoutePath(qLower, {
-                responderAddress: accountLower,
-                sessionSlug: submittedCacheSlug,
-              });
-            }
-          } else if (!submitContext.isStandalone) {
-            const sLower = (submitContext.surveyId || '').toLowerCase();
-            if (sLower) responseUrl = `/survey/${sLower}/${accountLower}${submittedCacheSlug ? `?session=${encodeURIComponent(submittedCacheSlug)}` : ''}`;
-          }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      responseUrl = responseUrl || window.location.pathname;
+      const responseUrl = resolveSurveyQuestionsSubmittedResponseUrl({
+        account: submitContext.account,
+        currentPathname: window.location.pathname,
+        isStandalone: submitContext.isStandalone,
+        logWarn: (message, error) => surveyLog.warn(message, error),
+        questionID: submitContext.questionID,
+        singleQuestionMode: submitContext.singleQuestionMode,
+        submissionSlug: submittedCacheSlug,
+        surveyId: submitContext.surveyId,
+      });
 
       // 4. UPDATE BASELINE & OPTIMISTIC STATE
       surveyLog.log("Setting new Baseline");
