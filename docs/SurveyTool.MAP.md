@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,265 lines**
-  - `SurveyQuestions.tsx`: **9,206 lines**
+  - `SurveyQuestions.tsx`: **9,188 lines**
   - `SurveyQuestionsAuthoringPanel.tsx`: **57 lines**
   - `SurveyQuestionsJsonControls.tsx`: **143 lines**
   - `SurveyQuestionsJsonTree.tsx`: **121 lines**
@@ -17,7 +17,8 @@
   - `SurveyQuestionsSurveyAnswersView.tsx`: **56 lines**
   - `SurveyQuestionsTopStrip.tsx`: **68 lines**
   - `SurveyQuestionsUserResponseNotice.tsx`: **86 lines**
-  - `surveyQuestionsSubmitController.ts`: **398 lines**
+  - `surveyQuestionsSubmitController.ts`: **449 lines**
+  - `surveyToolDecryptFlow.js`: **1,774 lines**
   - `SurveyResults.tsx`: **4,903 lines**
   - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyResultsModalHeader.tsx`: **137 lines**
@@ -36,7 +37,7 @@
   - `surveyResultsSummaryModels.ts`: **205 lines**
   - `SurveyPileViewMode.tsx`: **2,787 lines**
   - `surveyQuestionsJsonDerivation.ts`: **131 lines**
-- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections plus primary-submit decision dispatch, submit-start/status sequencing, stale-submit cleanup, and submit completion/status handoff extracted while keeping submit execution, decrypt, cache, route construction, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, filter/status display-plan, sync-status display-plan, and question-summary status helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, polling/timers, manual refresh, network block reads, and export payload generation in the parent.
+- Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `SurveyQuestions.tsx` now has passive JSON tree, submitted-response, survey-answer, and submit-footer display sections plus primary-submit decision dispatch, submitted-response URL planning, submit-start/status sequencing, stale-submit cleanup, submit completion/status handoff, and question-decrypt busy-token cleanup planning extracted while keeping submit execution, real decrypt execution, cache, live route/navigation state, and mutation behavior in the parent. `SurveyResults.tsx` now has passive display sections plus pure summary view-model, export orchestration, filter/status display-plan, sync-status display-plan, and question-summary status helpers extracted while keeping fetch, decrypt, cache, route, mutation behavior, polling/timers, manual refresh, network block reads, and export payload generation in the parent.
 
 ## Current Runtime Hierarchy
 
@@ -54,7 +55,8 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyQuestionsSurveyAnswersView.tsx  [survey answer list display]
         -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
         -> SurveyQuestionsUserResponseNotice.tsx  [existing-response notice actions]
-        -> surveyQuestionsSubmitController.ts  [primary-submit plan dispatch + submit-start/stale/completion status handoff]
+        -> surveyQuestionsSubmitController.ts  [primary-submit plan dispatch + submitted URL planning + submit-start/stale/completion status handoff]
+        -> surveyToolDecryptFlow.js  [decrypt planning, state builders, and busy-token cleanup helpers]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
      -> SurveyResults.tsx  [survey/question results runtime]
         -> SurveyResultsModalHeader.tsx  [modal title, links, bookmark, sync/header presentation]
@@ -81,7 +83,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyTool.tsx` | Route/mode shell | Functional component with hooks; chooses full vs pile mode, wires shared props/nonces downward, and uses a dual-mode export pattern (hooks runtime for production, legacy shim for tests) |
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
-| `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit computation, encryption/decrypt, route construction, cache/storage/worker/wallet interactions, and submission execution while delegating primary-submit inert/navigation/dispatch plan execution, pending-stat fallback normalization, submit-start/status sequencing, stale-submit cleanup, and post-submit completion/status state handoff to `surveyQuestionsSubmitController.ts` |
+| `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit computation, encryption/decrypt execution, live route/navigation state, cache/storage/worker/wallet interactions, and submission execution while delegating primary-submit inert/navigation/dispatch plan execution, pending-stat fallback normalization, submitted-response URL planning, submit-start/status sequencing, stale-submit cleanup, and post-submit completion/status state handoff to `surveyQuestionsSubmitController.ts`; delegates question-decrypt busy-token registration/ownership/cleanup planning to `surveyToolDecryptFlow.js` |
 | `SurveyQuestionsAuthoringPanel.tsx` | Editable question presentation | Renders the edit-mode question list shell, JSON/back-to-top controls, locked banner, submit node placement, and submitted-response fallback from explicit props while leaving submit, JSON generation, question rendering, and gate/decrypt behavior in `SurveyQuestions` |
 | `SurveyQuestionsJsonControls.tsx` | Bottom JSON controls view | Renders question/response/survey JSON toggles and copy panels from explicit props while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
 | `SurveyQuestionsJsonTree.tsx` | JSON tree display | Normalizes display-only JSON input into the existing tree row presentation while leaving JSON generation and copy side effects in `SurveyQuestions` |
@@ -91,7 +93,8 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyQuestionsSurveyAnswersView.tsx` | Survey answer list display | Matches submitted responses to the existing question-answer renderer from explicit props while leaving answer rendering and response state in `SurveyQuestions` |
 | `SurveyQuestionsTopStrip.tsx` | Route toggle + response notice strip | Renders the answer-mode toggle and existing-response notice from explicit props while leaving route state and response action handlers in `SurveyQuestions` |
 | `SurveyQuestionsUserResponseNotice.tsx` | Existing-response notice view | Renders the Start Fresh / Decrypt Edit / submitted-link / Exit Editing action cluster from explicit props while leaving response state and handlers in `SurveyQuestions` |
-| `surveyQuestionsSubmitController.ts` | Primary-submit dispatch/status handoff | Runs already-built primary-submit plans through injected navigation and submit-dispatch ports, activates the submit guard before dispatch, normalizes parent-provided pending-stat fallbacks, applies submit-start/stale/completion/failure status callbacks in parent-defined order, and does not own pending-edit computation, route construction, submit execution, decrypt, cache, storage, worker, wallet, or JSON behavior |
+| `surveyQuestionsSubmitController.ts` | Primary-submit dispatch/status handoff | Runs already-built primary-submit plans through injected navigation and submit-dispatch ports, activates the submit guard before dispatch, normalizes parent-provided pending-stat fallbacks, plans submitted-response URLs after a receipt, applies submit-start/stale/completion/failure status callbacks in parent-defined order, and does not own pending-edit computation, live route state, submit execution, decrypt, cache, storage, worker, wallet, or JSON behavior |
+| `surveyToolDecryptFlow.js` | Decrypt planning and state helpers | Builds decrypt display state, task keys, source baselines, success/failure/stale state patches, and question-decrypt busy-token ownership cleanup plans while `SurveyQuestions` keeps real decrypt invocation, wallet/provider behavior, cache, storage, and UI side effects parent-owned |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
 | `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt, cache polling, export payload generation, route/session state, polling/timers, manual refresh, network block reads, and result mutation behavior while delegating export orchestration to `surveyResultsExportController.ts`, filter/status display planning to `surveyResultsFilterStatusController.ts`, sync-status progress display planning to `surveyResultsSyncStatusController.ts`, and question-summary metadata fallback planning to `surveyResultsQuestionSummaryStatusController.ts` |
 | `SurveyResultsModalHeader.tsx` | Results modal header presentation | Renders title, survey ID/document links, bookmark, demo-view controls, locked-response toggle slot, and sync-status slot from explicit props |
@@ -263,6 +266,13 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - `filterChangedResponsesForSubmit` — mode-based response filtering (single-question, survey, standalone) with changed-set gating
   - `ensureIdentifierHash` — identifier hashing with hashIdentifier → isHexString → id fallback chain
   - `normalizeSubmitReceipt` — tx receipt normalization (ethers wait, string hash, object hash) with __ce metadata attachment
+- `surveyQuestionsSubmitController.ts`
+  - primary-submit inert/navigation/dispatch plan execution through injected ports
+  - submit-start/stale/success/failure status handoff with parent-owned side effects
+  - submitted-response URL planning for post-submit UI after receipt normalization
+- `surveyToolDecryptFlow.js`
+  - shared decrypt display, task-key, baseline/source, and state-patch helpers
+  - question-decrypt busy-token registration, ownership checks, and owned stale/failure cleanup planning
 - `surveyToolPostSubmitCacheController.ts`
   - pure post-submit cache write-through logic
   - `writeSubmittedResponsesToLocalCaches` — atomic cache writes for question and survey responses with recency gating, meta stamping, and survey merge
