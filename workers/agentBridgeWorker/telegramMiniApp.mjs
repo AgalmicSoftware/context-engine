@@ -67,6 +67,11 @@ import {
   normalizeTelegramAgentSettingsPatch,
   saveTelegramAgentSettingsPatch,
 } from './telegramAgentSettings.mjs';
+import {
+  DRAFT_EDIT_METRIC_KV_PREFIX,
+  answerFromStoredDraft,
+  persistDraftEditMetric,
+} from './telegramDraftEditMetrics.mjs';
 import { listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import {
   addResponseExportAllowedAddress,
@@ -125,7 +130,7 @@ const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const MINI_APP_DOCUMENT_KV_PREFIX = 'telegram:mini-app-document:v1:';
 const MINI_APP_DOCUMENT_BYTES_KV_PREFIX = 'telegram:mini-app-document-bytes:v1:';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
-const MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX = 'telegram:mini-app-draft-divergence:v1:';
+const MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX = DRAFT_EDIT_METRIC_KV_PREFIX;
 const MINI_APP_DOCUMENT_TTL_SECONDS = 180 * 24 * 60 * 60;
 const MINI_APP_DOCUMENT_MAX_BYTES = 1024 * 1024;
 const MINI_APP_DOCUMENT_URL_MAX_LENGTH = 2048;
@@ -2296,50 +2301,34 @@ async function persistSubmitRequest({
   };
 }
 
-function miniAppDraftDivergenceKey({
-  telegramUserId = '',
-  sessionSlug = '',
-  questionId = '',
-  createdAt = '',
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
-  const qid = questionIdSeedPart(questionId);
-  const fingerprint = stableFingerprint({ telegramUserId, sessionSlug, questionId, createdAt });
-  return slug && user && qid ? `${MINI_APP_DRAFT_DIVERGENCE_KV_PREFIX}${slug}:${user}:${qid}:${fingerprint}` : '';
-}
-
 async function persistMiniAppDraftDivergence({
   env = {},
   auth = {},
   questionRef = {},
   draftAnswer = null,
   sentAnswer = null,
+  finality = 'submitted',
   createdAt = null,
 } = {}) {
-  const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'action_kv_unavailable' };
-  const telegramUserId = safeString(auth.user?.telegramUserId);
-  const sessionSlug = sanitizeSessionSlug(questionRef.sessionSlug);
-  const questionId = safeString(questionRef.questionId);
-  if (!telegramUserId || !sessionSlug || !questionId || !draftAnswer || !sentAnswer) {
-    return { ok: false, reason: 'draft_divergence_incomplete' };
-  }
-  const key = miniAppDraftDivergenceKey({ telegramUserId, sessionSlug, questionId, createdAt });
-  if (!key) return { ok: false, reason: 'draft_divergence_key_invalid' };
-  const record = {
-    type: 'telegram_mini_app_draft_divergence',
-    version: 1,
-    telegramUserId,
-    sessionSlug,
-    questionId,
+  const metric = await persistDraftEditMetric({
+    env,
+    telegramUserId: auth.user?.telegramUserId,
+    sessionSlug: questionRef.sessionSlug,
+    questionId: questionRef.questionId,
+    questionType: questionRef.questionType,
     draftAnswer,
     sentAnswer,
+    source: 'mini_app',
+    finality,
     createdAt,
-  };
-  assertNoSecretShape(record, 'Telegram Mini App draft-divergence records must not serialize secrets.');
-  await kv.put(key, JSON.stringify(record));
-  return { ok: true, stored: true };
+  });
+  return metric.ok ? {
+    ok: true,
+    stored: metric.stored === true,
+    changed: metric.metrics?.changed === true,
+    answerChanged: metric.metrics?.answerChanged === true,
+    commentChanged: metric.metrics?.commentChanged === true,
+  } : { ok: false, stored: false, reason: metric.reason || 'draft_divergence_metric_failed' };
 }
 
 async function persistSettingsUpdateRequest({
@@ -2462,6 +2451,12 @@ async function handleDraftRequest({
     return json({ ok: false, error: normalizedAnswer.reason || 'answer_invalid' }, { status: 400 });
   }
   const normalized = miniAppTelegramPrincipal(auth);
+  const previousDraft = await readAnswerDraft({
+    env,
+    normalized,
+    sessionSlug: questionRef.sessionSlug,
+    selectedQuestionId: questionRef.questionId,
+  });
   const saved = await persistAnswerDraft({
     env,
     normalized,
@@ -2499,29 +2494,29 @@ async function handleDraftRequest({
     }, { status: 503 });
   }
 
-  let draftDivergence = { stored: false, reason: body.submit === true ? 'draft_divergence_opt_out' : 'not_submitted' };
-  if (submitRequest?.ok === true && body.submit === true) {
-    const settings = await loadTelegramAgentSettings({
-      env,
-      sessionSlug: questionRef.sessionSlug,
-      telegramUserId: auth.user?.telegramUserId,
-    });
-    if (settings.draftDivergenceOptIn === true) {
-      const launchDraft = launchRecord
-        ? miniAppLaunchSeriesRef(launchRecord).draftsByQuestionId.get(lower(questionRef.questionId))
-        : null;
-      if (launchDraft) {
-        draftDivergence = await persistMiniAppDraftDivergence({
-          env,
-          auth,
-          questionRef,
-          draftAnswer: launchDraft,
-          sentAnswer: normalizedAnswer.answer,
-          createdAt,
-        });
-      } else {
-        draftDivergence = { stored: false, reason: 'launch_draft_missing' };
-      }
+  let draftDivergence = { stored: false, reason: 'draft_divergence_opt_out' };
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug: questionRef.sessionSlug,
+    telegramUserId: auth.user?.telegramUserId,
+  });
+  if (settings.draftDivergenceOptIn === true) {
+    const launchDraft = launchRecord
+      ? miniAppLaunchSeriesRef(launchRecord).draftsByQuestionId.get(lower(questionRef.questionId))
+      : null;
+    const initialDraft = launchDraft || answerFromStoredDraft(previousDraft);
+    if (initialDraft) {
+      draftDivergence = await persistMiniAppDraftDivergence({
+        env,
+        auth,
+        questionRef,
+        draftAnswer: initialDraft,
+        sentAnswer: normalizedAnswer.answer,
+        finality: body.submit === true ? 'submitted' : 'draft_saved',
+        createdAt,
+      });
+    } else {
+      draftDivergence = { stored: false, reason: 'initial_draft_missing' };
     }
   }
 

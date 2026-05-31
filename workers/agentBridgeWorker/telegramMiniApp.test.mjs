@@ -1954,13 +1954,21 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
   assert.equal(divergenceKeys.length, 1);
   assert.equal(kv.options.get(divergenceKeys[0]), null);
   const record = JSON.parse(await kv.get(divergenceKeys[0]));
-  assert.equal(record.type, 'telegram_mini_app_draft_divergence');
-  assert.deepEqual(record.draftAnswer, { text: 'Agent-generated starting draft' });
-  assert.deepEqual(record.sentAnswer, {
-    questionType: 'freeform',
-    text: 'Edited final answer after opt in',
-    comments: '',
-  });
+  assert.equal(record.type, 'telegram_draft_edit_metric');
+  assert.equal(record.source, 'mini_app');
+  assert.equal(record.finality, 'submitted');
+  assert.equal(record.sessionSlug, 'alpha');
+  assert.equal(record.questionId, questionId);
+  assert.equal(record.metrics.questionType, 'freeform');
+  assert.equal(record.metrics.changed, true);
+  assert.equal(record.metrics.answerChanged, true);
+  assert.equal(record.metrics.draftTextLengthBucket, '1-80');
+  assert.equal(record.metrics.finalTextLengthBucket, '1-80');
+  assert.equal(Object.hasOwn(record, 'telegramUserId'), false);
+  assert.equal(Object.hasOwn(record, 'draftAnswer'), false);
+  assert.equal(Object.hasOwn(record, 'sentAnswer'), false);
+  assert.equal(JSON.stringify(record).includes('Agent-generated starting draft'), false);
+  assert.equal(JSON.stringify(record).includes('Edited final answer after opt in'), false);
 });
 
 test('Mini App clear drafts endpoint deletes saved draft answers for visible questions', async () => {

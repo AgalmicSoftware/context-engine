@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-31 (v27)
+**Skill version:** 2026-05-31 (v28)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=27",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=28",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -491,10 +491,12 @@ anonymous responses to approved buckets such as Edge Bio keywords, age bucket,
 country, region, Week 1, Week 2, Week 3, Week 4, Entire Month, or Attended
 Previous Edge Events. These buckets are associated with the user's answers for
 research and filtering, not published as the user's identity.
-Draft-divergence research is also default-off; unless the user opts in, do not
-send agent-drafted answers to the worker as durable research records. A Mini
-App launch may still carry an editable prefill draft for review, but that is a
-short-lived launch artifact rather than a draft-divergence research record.
+Draft-edit research is also default-off. Unless the user opts in, do not ask CE
+to record draft/edit research metrics. When opted in, CE stores
+privacy-preserving metrics comparing the initial draft to the saved or
+submitted answer: binary transitions, rating direction/delta, multichoice
+added/removed counts, and text/comment length buckets. CE does not store raw
+freeform text or raw comments in these research records.
 
 For a low-friction Hermes UX, the agent may offer a natural-language "accept
 all recommended onboarding permissions" option. That is not a separate API
@@ -719,6 +721,32 @@ Use direct submit for commands like "choose unsure", "answer agree", or "submit
 that" when the user has clearly authorized the action. Use drafts when the user
 asks for suggestions, wants to review language, or has not clearly approved
 submission.
+
+If the user enabled draft-edit research and you adjust an answer in chat, send
+the initial suggestion alongside the final answer so CE can calculate
+privacy-preserving edit metrics:
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "submit": true,
+  "humanApproved": true,
+  "preferences": [
+    {
+      "questionId": "q-binary",
+      "initialAnswer": { "value": "agree", "comments": "Initial agent guess." },
+      "answer": { "value": "unsure", "comments": "Final user-approved nuance." }
+    }
+  ]
+}
+```
+
+For answers previously saved as CE drafts, the worker can also compare the
+stored draft with the later saved or submitted answer. The response may include
+`draftEditMetrics` with `stored`, `changed`, `answerChanged`, and
+`commentChanged`; it never includes raw research text.
+If you use the `answersByQuestionId` object shape instead of the array shape,
+put parallel initial suggestions in `initialAnswersByQuestionId`.
 
 ## Mini App Question Links
 
@@ -1091,8 +1119,8 @@ GET /telegram/agent/api/admin/metrics?sessionSlug=ee-26-organizers
 
 This endpoint is admin-only and returns counts only: token mints, distinct
 onboarded Telegram users, bridge-created questions, rolling 30-day submitted
-answer records, answer drafts, group proposals, distinct respondents,
-registry-session count, and sessions with bridge KV activity. Measurement
+answer records, answer drafts, draft-edit metric records, group proposals,
+distinct respondents, registry-session count, and sessions with bridge KV activity. Measurement
 boundaries matter: `agentsOnboarded` means CE delegation-token mints, not
 external skill installs; `registrySessionCount` comes from the cached on-chain
 SessionRegistry read and is not a count of worker-created sessions; and
@@ -1362,7 +1390,7 @@ answers with `POST /telegram/agent/api/onboarding`:
 1. Can I pass preferences and calendar info to CE to surface relevant questions?
 2. Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?
 3. Can your agent draft question responses for you based on your activity and user file?
-4. Can CE store agent-drafted answers and final sent answers for research?
+4. Can CE store privacy-preserving draft-edit metrics for research?
 5. Can your agent upvote questions it thinks you will find relevant?
 6. Want CE questions in your morning or evening Edge brief?
 
@@ -1379,6 +1407,13 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-31 (v28)
+
+- Added opt-in draft-edit research metrics for agent, bot, and Mini App answer
+  flows, recording answer transitions and length buckets without raw freeform
+  text or comments.
+- Admin metrics now count draft-edit metric records per session.
 
 ### 2026-05-31 (v27)
 

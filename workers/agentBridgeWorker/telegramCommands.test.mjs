@@ -17,6 +17,8 @@ import {
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
+import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
+import { DRAFT_EDIT_METRIC_KV_PREFIX } from './telegramDraftEditMetrics.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   loadTelegramAgentDelegationToken,
@@ -4510,6 +4512,14 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(replayedSubmit.submitRequest.requestId, saved.submitRequest.requestId);
   assert.equal(replayedSubmit.submitRequest.replayed, true);
 
+  await saveTelegramAgentSettingsPatch({
+    env,
+    sessionSlug: 'alpha',
+    telegramUserId: '42',
+    patch: { draftDivergenceOptIn: true },
+    createdAt: '2026-05-08T12:00:05.000Z',
+  });
+
   const submitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
     .filter(([key]) => key.startsWith('telegram:submit-request:'))
     .map(([, value]) => JSON.parse(value));
@@ -4540,6 +4550,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(changedSubmitted.ok, true);
   assert.equal(changedSubmitted.submitRequestCreated, true);
   assert.equal(changedSubmitted.submitRequest.replayed, false);
+  assert.equal(changedSubmitted.draftEditMetric.stored, true);
   assert.notEqual(changedSubmitted.submitRequest.requestId, saved.submitRequest.requestId);
   assert.notEqual(changedSubmitted.submitRequest.idempotencyKey, saved.submitRequest.idempotencyKey);
   const changedSubmitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
@@ -4548,6 +4559,16 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.equal(changedSubmitRecords.length, 2);
   assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Agree'), true);
   assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Disagree'), true);
+  const draftEditRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith(DRAFT_EDIT_METRIC_KV_PREFIX))
+    .map(([, value]) => JSON.parse(value));
+  assert.equal(draftEditRecords.length, 1);
+  assert.equal(draftEditRecords[0].source, 'telegram_bot');
+  assert.equal(draftEditRecords[0].finality, 'submitted');
+  assert.equal(draftEditRecords[0].metrics.binaryFrom, 'agree');
+  assert.equal(draftEditRecords[0].metrics.binaryTo, 'disagree');
+  assert.equal(draftEditRecords[0].metrics.binaryTransition, 'opposite');
+  assert.equal(Object.hasOwn(draftEditRecords[0], 'telegramUserId'), false);
 
   const calls = [];
   const dispatched = await dispatchTelegramCommandResponse({

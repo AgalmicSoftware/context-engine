@@ -48,6 +48,11 @@ import {
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   writeTelegramAgentDelegationTokenUserPointer,
 } from './telegramAgentDelegationTokens.mjs';
+import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
+import {
+  answerFromStoredDraft,
+  persistDraftEditMetric,
+} from './telegramDraftEditMetrics.mjs';
 import {
   listTelegramProposedQuestionsForSessionWithSummary,
   mergeTelegramProposedQuestions,
@@ -8553,6 +8558,42 @@ async function buildPoseQuestionResponse({
   });
 }
 
+async function persistTelegramBotDraftEditMetric({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  questionType = '',
+  initialAnswer = null,
+  sentAnswer = null,
+  finality = 'submitted',
+  createdAt = null,
+} = {}) {
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug,
+    telegramUserId: normalized.user?.telegramUserId,
+  });
+  if (settings.draftDivergenceOptIn !== true) {
+    return { ok: true, stored: false, reason: 'draft_divergence_opt_out' };
+  }
+  if (!initialAnswer) {
+    return { ok: true, stored: false, reason: 'initial_draft_missing' };
+  }
+  return persistDraftEditMetric({
+    env,
+    telegramUserId: normalized.user?.telegramUserId,
+    sessionSlug,
+    questionId: selectedQuestionId,
+    questionType,
+    draftAnswer: initialAnswer,
+    sentAnswer,
+    source: 'telegram_bot',
+    finality,
+    createdAt,
+  });
+}
+
 async function buildAnswerDraftResponse({
   normalized,
   command,
@@ -8567,6 +8608,12 @@ async function buildAnswerDraftResponse({
   const answerLabel = safeString(ref.answerLabel);
   const answerValue = safeString(ref.answerValue || answerLabel);
   const controlType = safeString(ref.controlType);
+  const previousDraft = await readAnswerDraft({
+    env,
+    normalized,
+    sessionSlug,
+    selectedQuestionId,
+  });
   const saved = await persistAnswerDraft({
     env,
     normalized,
@@ -8608,6 +8655,19 @@ async function buildAnswerDraftResponse({
     })
     : null;
   const ok = saved.ok === true && submitted?.ok === true;
+  const draftEditMetric = ok
+    ? await persistTelegramBotDraftEditMetric({
+      env,
+      normalized,
+      sessionSlug,
+      selectedQuestionId,
+      questionType: controlType,
+      initialAnswer: answerFromStoredDraft(previousDraft),
+      sentAnswer: answerFromStoredDraft(saved.draft),
+      finality: 'submitted',
+      createdAt,
+    })
+    : null;
   return callbackOnly({
     normalized,
     command,
@@ -8629,6 +8689,10 @@ async function buildAnswerDraftResponse({
       submitRequest: submitted?.ok ? submitted : null,
       onChainSubmitted: submitted?.status === 'direct_submitted',
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      draftEditMetric: draftEditMetric ? {
+        stored: draftEditMetric.stored === true,
+        reason: draftEditMetric.reason || '',
+      } : null,
     },
   });
 }
@@ -8675,6 +8739,19 @@ async function buildSubmitDraftResponse({
     selectedQuestionId,
     createdAt,
   });
+  const draftEditMetric = submitted.ok
+    ? await persistTelegramBotDraftEditMetric({
+      env,
+      normalized,
+      sessionSlug,
+      selectedQuestionId,
+      questionType: draft.controlType,
+      initialAnswer: answerFromStoredDraft(draft),
+      sentAnswer: answerFromStoredDraft(draft),
+      finality: 'submitted',
+      createdAt,
+    })
+    : null;
   return callbackOnly({
     normalized,
     command,
@@ -8692,6 +8769,10 @@ async function buildSubmitDraftResponse({
       submitRequestCreated: submitted.ok === true,
       submitRequest: submitted.ok ? submitted : null,
       onChainSubmitted: submitted.status === 'direct_submitted',
+      draftEditMetric: draftEditMetric ? {
+        stored: draftEditMetric.stored === true,
+        reason: draftEditMetric.reason || '',
+      } : null,
     },
   });
 }

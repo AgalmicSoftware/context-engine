@@ -19,6 +19,7 @@ import {
   persistLatestMiniAppLaunchPointer,
   persistTelegramSubmitRequest,
   persistTelegramUserSessionBinding,
+  readAnswerDraft,
   readGroupSessionBinding,
   readAgentSkillUpdateFlag,
   readPrivateSessionBinding,
@@ -60,6 +61,12 @@ import {
   saveTelegramAgentSettingsPatch,
 } from './telegramAgentSettings.mjs';
 import {
+  DRAFT_EDIT_METRIC_KV_PREFIX,
+  answerFromAgentInitial,
+  answerFromStoredDraft,
+  persistDraftEditMetric,
+} from './telegramDraftEditMetrics.mjs';
+import {
   AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX,
   listTelegramAgentActivity,
 } from './telegramAgentActivity.mjs';
@@ -92,9 +99,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=27';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=28';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/13224bc617c927094245f2918c790ca6a4a96022/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v27)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v28)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -126,7 +133,7 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   },
   {
     id: 'draft_divergence_research',
-    prompt: 'Can CE store agent-drafted answers and final sent answers for research?',
+    prompt: 'Can CE store privacy-preserving draft-edit metrics for research?',
   },
   {
     id: 'auto_apply_question_votes',
@@ -1138,6 +1145,7 @@ function emptyAdminMetricTotals() {
     questionsCreated: 0,
     questionsAnswered: 0,
     answerDrafts: 0,
+    draftEditMetrics: 0,
     groupProposals: 0,
     sessionsWithBridgeActivity: 0,
     registrySessionCount: 0,
@@ -1181,6 +1189,7 @@ function publicSessionMetric(metric = {}) {
     questionsCreated: Number(metric.questionsCreated || 0),
     questionsAnswered: Number(metric.questionsAnswered || 0),
     answerDrafts: Number(metric.answerDrafts || 0),
+    draftEditMetrics: Number(metric.draftEditMetrics || 0),
     groupProposals: Number(metric.groupProposals || 0),
     sessionsWithBridgeActivity: 0,
     registrySessionCount: Number(metric.registrySessionCount || 0),
@@ -1193,6 +1202,7 @@ function publicSessionMetric(metric = {}) {
     out.questionsCreated,
     out.questionsAnswered,
     out.answerDrafts,
+    out.draftEditMetrics,
     out.groupProposals,
   ].some((count) => count > 0) ? 1 : 0;
   return out;
@@ -2463,6 +2473,15 @@ async function buildAdminMetricsSnapshot({
     incrementMetric(perSession, slug, 'answerDrafts');
   }
 
+  const draftEditEntries = await listMetricKvEntriesByPrefix(env, DRAFT_EDIT_METRIC_KV_PREFIX);
+  for (const entry of draftEditEntries) {
+    const slug = sessionFromSessionFirstKey(entry.key, DRAFT_EDIT_METRIC_KV_PREFIX);
+    if (!slug || !inScope(slug)) continue;
+    totals.draftEditMetrics += 1;
+    activitySessions.add(slug);
+    incrementMetric(perSession, slug, 'draftEditMetrics');
+  }
+
   const groupEntries = await listMetricKvEntriesByPrefix(env, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
   for (const entry of groupEntries) {
     const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
@@ -2566,6 +2585,7 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
       agentsOnboarded: 'Delegation-token mints observed by the worker; this is not a count of external skill installs.',
       registrySessionCount: 'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
       sessionsWithBridgeActivity: 'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
+      draftEditMetrics: 'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
       questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
     },
     totals: snapshot.totals,
@@ -3935,14 +3955,29 @@ function normalizePreferenceEntries(input = {}) {
   }
   const byId = preferences.answersByQuestionId || preferences.draftsByQuestionId || input.answersByQuestionId;
   if (byId && typeof byId === 'object' && !Array.isArray(byId)) {
-    return Object.entries(byId).map(([questionId, answer]) => ({ questionId, answer }));
+    const initialById = preferences.initialAnswersByQuestionId || preferences.initialDraftsByQuestionId ||
+      input.initialAnswersByQuestionId || input.initialDraftsByQuestionId || {};
+    return Object.entries(byId).map(([questionId, answer]) => {
+      const initialAnswer = initialById && typeof initialById === 'object' && !Array.isArray(initialById)
+        ? initialById[questionId]
+        : null;
+      if (!initialAnswer) return { questionId, answer };
+      const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : { value: answer };
+      return { questionId, answer: { ...source, initialAnswer } };
+    });
   }
   const drafts = preferences.answers || preferences.drafts || input.answers || input.drafts;
   if (Array.isArray(drafts)) {
-    return drafts.map((entry) => ({
-      questionId: safeString(entry?.questionId || entry?.id),
-      answer: entry,
-    }));
+    return drafts.map((entry) => {
+      const source = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : { answer: entry };
+      const nestedAnswer = source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer)
+        ? source.answer
+        : null;
+      return {
+        questionId: safeString(source.questionId || source.id),
+        answer: nestedAnswer ? { ...source, ...nestedAnswer } : source,
+      };
+    });
   }
   return [];
 }
@@ -4024,6 +4059,13 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   const drafts = [];
   const submitted = [];
   const skipped = [];
+  const draftEditMetrics = [];
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug: context.session.sessionSlug,
+    telegramUserId: context.normalized?.user?.telegramUserId,
+  });
+  const draftEditOptIn = settings.draftDivergenceOptIn === true;
   let reviewRequired = false;
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
@@ -4039,6 +4081,14 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     }
     const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);
     if (!shouldSubmit) reviewRequired = true;
+    const previousDraft = draftEditOptIn
+      ? await readAnswerDraft({
+        env,
+        normalized: context.normalized,
+        sessionSlug: context.session.sessionSlug,
+        selectedQuestionId: questionId,
+      })
+      : null;
     const saved = await persistAnswerDraft({
       env,
       normalized: context.normalized,
@@ -4063,6 +4113,37 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     }
     const draftRecord = { ...saved.draft, key: saved.key };
     drafts.push({ questionId, answerLabel: draft.label, controlType: draft.controlType });
+    if (draftEditOptIn) {
+      const initialAnswer = answerFromAgentInitial(entry.answer) || answerFromStoredDraft(previousDraft);
+      if (initialAnswer) {
+        const metric = await persistDraftEditMetric({
+          env,
+          telegramUserId: context.normalized?.user?.telegramUserId,
+          sessionSlug: context.session.sessionSlug,
+          questionId,
+          questionType: question.questionType,
+          draftAnswer: initialAnswer,
+          sentAnswer: draft.value,
+          source: 'agent_preferences',
+          finality: shouldSubmit ? 'submitted' : 'draft_saved',
+          createdAt: input.createdAt || null,
+        });
+        draftEditMetrics.push({
+          questionId,
+          stored: metric.stored === true,
+          reason: metric.reason || '',
+          changed: metric.metrics?.changed === true,
+          answerChanged: metric.metrics?.answerChanged === true,
+          commentChanged: metric.metrics?.commentChanged === true,
+        });
+      } else {
+        draftEditMetrics.push({
+          questionId,
+          stored: false,
+          reason: 'initial_draft_missing',
+        });
+      }
+    }
     if (shouldSubmit) {
       const submit = await persistTelegramSubmitRequest({
         env,
@@ -4094,6 +4175,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     skipped,
     drafts,
     ...(submitted.length ? { submitted } : {}),
+    ...(draftEditMetrics.length ? { draftEditMetrics } : {}),
     reviewRequired: finalReviewRequired,
     review: !finalReviewRequired ? {
       route: '/telegram/agent/api/preferences',
