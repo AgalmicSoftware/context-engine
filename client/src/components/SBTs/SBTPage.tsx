@@ -235,7 +235,7 @@ import {
   resolveSbtAddress,
   resolveSbtAddressString,
   resolveSbtChainId,
-  resolveSbtPageTokenMetadataHref,
+  resolveSbtPageTokenMetadataLinkDisplayState,
   sanitizeSbtPageMintedTokensOverride,
   shouldShowSbtPageScanProgress,
   shouldRunSbtPagePropListAutoMint,
@@ -4865,8 +4865,9 @@ renderMintButton() {
 
     const maxTokensDisplay = resolveSbtPageMaxTokensDisplay(sbtInfoForDetails.maxTokens);
 
-    const tokenUriRaw = sbtInfo?.tokenURI || sbtInfo?.tokenUri || '';
-    const tokenUriHref = resolveSbtPageTokenMetadataHref(tokenUriRaw);
+    const tokenMetadataLinkDisplayState = resolveSbtPageTokenMetadataLinkDisplayState({
+      tokenUriRaw: sbtInfo?.tokenURI || sbtInfo?.tokenUri || '',
+    });
     const { adminAddress, creatorAddress } = resolveSbtPageAdminCreatorAddresses(sbtInfo);
 
     const isInitialLoading = !countsReady && effectiveLoading;
@@ -5010,7 +5011,7 @@ renderMintButton() {
                 onImageError={imageErrorHandler}
                 onImageOpen={this.toggleFullImage}
                 showDescriptionLockIcon={identityPanelDisplayState.showDescriptionLockIcon}
-                tokenUriHref={tokenUriHref}
+                tokenUriHref={tokenMetadataLinkDisplayState.href}
               />
               <div className={styles.rightColumn}>
                 <SbtPageStatsSection

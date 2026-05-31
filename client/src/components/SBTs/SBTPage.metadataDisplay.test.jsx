@@ -236,6 +236,48 @@ describe('SBTPage metadata display', () => {
     expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
   });
 
+  it('passes resolved token metadata link display state to the identity panel', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const identityPanel = findElementInTree(
+      subject.render(),
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    expect(identityPanel?.props?.tokenUriHref).toBe('https://example.example.test/metadata/sbt.json');
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        ...subject.state.sbtInfo,
+        tokenURI: 'https://cdn.example.test/preview.png',
+      },
+    };
+    const imageOnlyIdentityPanel = findElementInTree(
+      subject.render(),
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    expect(imageOnlyIdentityPanel?.props?.tokenUriHref).toBe('');
+  });
+
   it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
     const subdomainGateway = 'https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net'; // intentional: real URL - tests allowlist enforcement
