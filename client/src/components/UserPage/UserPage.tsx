@@ -60,17 +60,15 @@ import {
   buildUserPageNoSbtVisibleTelemetryState,
   buildUserPageResponseDecryptSurveyBindings,
   buildUserPageResponseSectionDeriveSignature,
-  buildUserPageRenderLoadingState,
+  buildUserPageCacheRefreshDisplayState,
   buildUserPageCreatedQuestionWrapperClassName,
   buildUserPageHeaderBookmarkClassName,
   buildUserPageSbtSection,
   buildUserPageSbtSectionDeriveSignature,
-  buildUserPageSectionLoadingEmptyState,
   buildUserPageSelectedTabStatePatch,
   buildUserPageSurveyExpansionTogglePatch,
   buildUserPageTooltipTargetIds,
   buildUserPageUnifiedCacheAggregateMemoKey,
-  buildUserPageUncertainEmptyText,
   buildUserPageUncertaintyLoadingFlags,
   buildUserPageUserStatsMergePatch,
   buildUserPageUsernameChangeStatePatch,
@@ -124,7 +122,6 @@ import {
   resolveUserPageAnalysisSessionConfigForSlug,
   resolveUserPageAnalysisSessionFallback,
   resolveUserPageAddressDisplayState,
-  resolveUserPageAiActionPlan,
   resolveUserPageAiAvailabilityRefresh,
   resolveUserPageAvatarDisplayState,
   resolveUserPageBlockieSeed,
@@ -3747,17 +3744,13 @@ class UserPage extends Component<any, any> {
     const blockieUrl = generateBlockieDataUrl(blockieSeed, 8, 4);
 
     // --------- NEW: Readiness & spinner glue (defensive) ----------
-    const {
-      disabledByCache,
-      isQuestionLoadingAny,
-      isQuestionReady,
-      isSBTReady,
-      isSbtLoadingAny,
-      isSurveyLoadingAny,
-      isSurveyReady,
-      questionDeepScanLoadingActive,
-      surveyDeepScanLoadingActive,
-    } = buildUserPageRenderLoadingState({
+    const cacheRefreshDisplayState = buildUserPageCacheRefreshDisplayState({
+      aiAvailable: this.state.aiAvailable,
+      analyzing,
+      collapseOpen,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainSbtData: this.state.hasUncertainSbtData,
+      hasUncertainUserData: this.state.hasUncertainUserData,
       isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
       isDeepScanning,
       isQuestionCacheReady: this.props.isQuestionCacheReady,
@@ -3767,14 +3760,21 @@ class UserPage extends Component<any, any> {
       loadingQuestions,
       loadingSBTs,
       loadingSurveys,
-    });
-    const aiActionPlan = resolveUserPageAiActionPlan({
-      aiAvailable: this.state.aiAvailable,
-      analyzing,
-      collapseOpen,
-      disabledByCache,
+      questionCreationInfo,
+      questionResponseInfo,
+      sbtLabel: t('sbt'),
+      sbtList,
+      sbtsLowerLabel: t('sbtsLower'),
+      surveyCreationInfo,
+      surveyResponseInfo,
       walletLabel: t('walletLower'),
     });
+    const {
+      isQuestionLoadingAny,
+      isSbtLoadingAny,
+      isSurveyLoadingAny,
+    } = cacheRefreshDisplayState.loadingState;
+    const aiActionPlan = cacheRefreshDisplayState.aiActionPlan;
     const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
     const analyzeActionPlan = {
       blockedReason: 'none',
@@ -3802,31 +3802,11 @@ class UserPage extends Component<any, any> {
       surveysCreatedLoadingEmpty,
       questionResponsesLoadingEmpty,
       questionsCreatedLoadingEmpty,
-    } = buildUserPageSectionLoadingEmptyState({
-      isQuestionLoadingAny,
-      isQuestionReady,
-      isSbtLoadingAny,
-      isSurveyLoadingAny,
-      isSurveyReady,
-      loadingQuestions,
-      loadingSurveys,
-      questionCreationInfo,
-      questionDeepScanLoadingActive,
-      questionResponseInfo,
-      sbtList,
-      surveyCreationInfo,
-      surveyDeepScanLoadingActive,
-      surveyResponseInfo,
-    });
+    } = cacheRefreshDisplayState.sectionLoadingEmptyState;
     const {
       questionResponsesEmptyText,
       sbtEmptyText,
-    } = buildUserPageUncertainEmptyText({
-      hasUncertainSbtData: this.state.hasUncertainSbtData,
-      hasUncertainUserData: this.state.hasUncertainUserData,
-      sbtLabel: t('sbt'),
-      sbtsLowerLabel: t('sbtsLower'),
-    });
+    } = cacheRefreshDisplayState.uncertainEmptyText;
     const questionSectionDisplayState = resolveUserPageQuestionSectionDisplayState({
       questionCreationInfo,
       questionResponseInfo,

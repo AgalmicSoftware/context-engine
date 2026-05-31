@@ -186,6 +186,7 @@ export type {
   UserPageProfileEditVisibility,
 } from './userPageProfileDisplayHelpers';
 export {
+  buildUserPageCacheRefreshDisplayState,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
   buildUserPageUncertainEmptyText,
@@ -199,6 +200,7 @@ export {
   shouldRetryUserPageQuestionData,
 } from './userPageLoadingStateHelpers';
 export type {
+  BuildUserPageCacheRefreshDisplayStateArgs,
   BuildUserPageRenderLoadingStateArgs,
   BuildUserPageSectionLoadingEmptyStateArgs,
   BuildUserPageUncertainEmptyTextArgs,
@@ -213,6 +215,7 @@ export type {
   UserPageAiActionAvailability,
   UserPageAiActionPlan,
   UserPageAnalyzeButtonDisplayState,
+  UserPageCacheRefreshDisplayState,
   UserPageCompareButtonDisplayState,
   UserPageRenderLoadingState,
   UserPageSectionLoadingEmptyState,

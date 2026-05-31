@@ -100,6 +100,17 @@ export type ResolveUserPageAiActionPlanArgs = {
   walletLabel?: unknown;
 };
 
+export type BuildUserPageCacheRefreshDisplayStateArgs =
+  BuildUserPageRenderLoadingStateArgs &
+  BuildUserPageSectionLoadingEmptyStateArgs &
+  BuildUserPageUncertainEmptyTextArgs & {
+    aiAvailable?: unknown;
+    analyzing?: unknown;
+    collapseOpen?: unknown;
+    hasUncertainGateAccess?: unknown;
+    walletLabel?: unknown;
+  };
+
 export type ResolveUserPageSectionToggleDisplayStateArgs = {
   open?: unknown;
 };
@@ -154,6 +165,26 @@ export type UserPageAiActionPlan = {
   aiActionAvailability: UserPageAiActionAvailability;
   analyzeButtonDisplayState: UserPageAnalyzeButtonDisplayState;
   compareButtonDisplayState: UserPageCompareButtonDisplayState;
+};
+
+export type UserPageCacheRefreshDisplayState = {
+  aiActionPlan: UserPageAiActionPlan;
+  cacheActionKind: 'disabled' | 'enabled';
+  cacheDisplayKind: 'idle' | 'loading' | 'stale-or-cache-miss';
+  hasAnyLoading: boolean;
+  hasGatedOrDecryptDisplayFallback: boolean;
+  hasMissingDataFallback: boolean;
+  hasVisibleData: boolean;
+  loadingIndicators: {
+    questionResponses: boolean;
+    questionsCreated: boolean;
+    sbt: boolean;
+    surveyResponses: boolean;
+    surveysCreated: boolean;
+  };
+  loadingState: UserPageRenderLoadingState;
+  sectionLoadingEmptyState: UserPageSectionLoadingEmptyState;
+  uncertainEmptyText: UserPageUncertainEmptyText;
 };
 
 export type UserPageSectionToggleDisplayState = {
@@ -327,6 +358,115 @@ export const buildUserPageUncertainEmptyText = ({
     ? `${String(sbtLabel)} results may be incomplete due scan/RPC issues. Try refresh.`
     : `No ${String(sbtsLowerLabel)} found.`,
 });
+
+const readUserPageDisplayLength = (value: UserPageLengthLike | undefined): number => {
+  const length = Number(value?.length || 0);
+  return Number.isFinite(length) && length > 0 ? length : 0;
+};
+
+export const buildUserPageCacheRefreshDisplayState = ({
+  aiAvailable = null,
+  analyzing = false,
+  collapseOpen = false,
+  hasUncertainGateAccess = false,
+  hasUncertainSbtData = false,
+  hasUncertainUserData = false,
+  isDeepScanLoadingEnabledForSection = null,
+  isDeepScanning = false,
+  isQuestionCacheReady = false,
+  isResponsesCacheReady = false,
+  isSBTCacheReady = false,
+  isSurveyCacheReady = false,
+  loadingQuestions = false,
+  loadingSBTs = false,
+  loadingSurveys = false,
+  questionCreationInfo = [],
+  questionResponseInfo = [],
+  sbtLabel = 'SBT',
+  sbtList = [],
+  sbtsLowerLabel = 'SBTs',
+  surveyCreationInfo = [],
+  surveyResponseInfo = [],
+  walletLabel = 'wallet',
+}: BuildUserPageCacheRefreshDisplayStateArgs = {}): UserPageCacheRefreshDisplayState => {
+  const loadingState = buildUserPageRenderLoadingState({
+    isDeepScanLoadingEnabledForSection,
+    isDeepScanning,
+    isQuestionCacheReady,
+    isResponsesCacheReady,
+    isSBTCacheReady,
+    isSurveyCacheReady,
+    loadingQuestions,
+    loadingSBTs,
+    loadingSurveys,
+  });
+  const aiActionPlan = resolveUserPageAiActionPlan({
+    aiAvailable,
+    analyzing,
+    collapseOpen,
+    disabledByCache: loadingState.disabledByCache,
+    walletLabel,
+  });
+  const sectionLoadingEmptyState = buildUserPageSectionLoadingEmptyState({
+    isQuestionLoadingAny: loadingState.isQuestionLoadingAny,
+    isQuestionReady: loadingState.isQuestionReady,
+    isSbtLoadingAny: loadingState.isSbtLoadingAny,
+    isSurveyLoadingAny: loadingState.isSurveyLoadingAny,
+    isSurveyReady: loadingState.isSurveyReady,
+    loadingQuestions,
+    loadingSurveys,
+    questionCreationInfo,
+    questionDeepScanLoadingActive: loadingState.questionDeepScanLoadingActive,
+    questionResponseInfo,
+    sbtList,
+    surveyCreationInfo,
+    surveyDeepScanLoadingActive: loadingState.surveyDeepScanLoadingActive,
+    surveyResponseInfo,
+  });
+  const uncertainEmptyText = buildUserPageUncertainEmptyText({
+    hasUncertainSbtData,
+    hasUncertainUserData,
+    sbtLabel,
+    sbtsLowerLabel,
+  });
+  const hasAnyLoading = (
+    loadingState.isQuestionLoadingAny ||
+    loadingState.isSbtLoadingAny ||
+    loadingState.isSurveyLoadingAny
+  );
+  const hasVisibleData = [
+    questionCreationInfo,
+    questionResponseInfo,
+    sbtList,
+    surveyCreationInfo,
+    surveyResponseInfo,
+  ].some((value) => readUserPageDisplayLength(value) > 0);
+  const cacheDisplayKind = hasAnyLoading
+    ? 'loading'
+    : hasVisibleData
+      ? 'idle'
+      : 'stale-or-cache-miss';
+
+  return {
+    aiActionPlan,
+    cacheActionKind: loadingState.disabledByCache ? 'disabled' : 'enabled',
+    cacheDisplayKind,
+    hasAnyLoading,
+    hasGatedOrDecryptDisplayFallback: !!hasUncertainGateAccess || !!hasUncertainUserData,
+    hasMissingDataFallback: !hasAnyLoading && !hasVisibleData,
+    hasVisibleData,
+    loadingIndicators: {
+      questionResponses: loadingState.isQuestionLoadingAny,
+      questionsCreated: loadingState.isQuestionLoadingAny,
+      sbt: loadingState.isSbtLoadingAny,
+      surveyResponses: loadingState.isSurveyLoadingAny,
+      surveysCreated: loadingState.isSurveyLoadingAny,
+    },
+    loadingState,
+    sectionLoadingEmptyState,
+    uncertainEmptyText,
+  };
+};
 
 export const shouldRetryUserPageQuestionData = ({
   hasUncertainUserData = false,
