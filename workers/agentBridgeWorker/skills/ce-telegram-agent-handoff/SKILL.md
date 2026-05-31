@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v25)
+**Skill version:** 2026-05-30 (v26)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -166,10 +166,16 @@ GET /telegram/agent/api/skill-version
 
 Compare the returned `version` with the `Skill version` line above. The
 endpoint also returns `updateAvailable`, `latestVersion`, and `updateNote`.
-Normal question reads include `skillVersion` and `skillUpdateAvailable` too. If
-`skillUpdateAvailable` is true or the worker reports a newer version than this
-file's header, re-run the install command using the configured `CE_SKILL_REF`
-raw GitHub URL, then re-read the changelog before continuing.
+Normal question reads include `skillVersion` and `skillUpdateAvailable` too.
+
+Agents should cache or install this Markdown skill locally after the first
+fetch to avoid repeated startup latency. Key the cached copy by worker URL and
+skill version. Before future CE work, call `/telegram/agent/api/skill-version`;
+if `updateAvailable` is true, `latestVersion` is newer, or the returned
+`version` differs from the cached `Skill version` header, fetch the configured
+skill URL again, replace the cached copy, and re-read the changelog before
+continuing. Treat `skillVersion` and `skillUpdateAvailable` returned by question
+reads as the same stale-skill signal.
 
 ## Preconditions
 
@@ -230,16 +236,19 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=25",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=26",
     "sessionSlug": "agent-village-2026"
   }
 }
 ```
 
-Keep the Geo node instructions short and point the agent at `contextEngine.skillUrl`
-as the source of truth. Do not paste a long copy of this onboarding procedure
-into the Geo node; stale hardcoded instructions can make agents fall back to the
-Telegram bot instead of using invite onboarding.
+Keep the Geo node instructions short and point the agent at
+`contextEngine.skillUrl` as the source of truth. The skill URL is a Markdown
+instruction document URL, not a callable tool name. Fetch it once, save/cache it
+locally for this worker/version, and refresh it only when `/skill-version` or a
+question response says the cached copy is stale. Do not paste a long copy of
+this onboarding procedure into the Geo node; stale hardcoded instructions can
+make agents fall back to the Telegram bot instead of using invite onboarding.
 
 ```http
 POST /telegram/agent/api/invite/onboard
@@ -1356,6 +1365,11 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v26)
+
+- Clarified that Hermes and other Edge agents should cache or install the fetched Markdown skill locally, then refresh it only when `/skill-version` or question-response update fields indicate a newer or flagged skill.
+- Clarified that `contextEngine.skillUrl` is a Markdown instruction URL, not a callable tool name, so Geo-node instructions can stay short and point at the skill as source of truth.
 
 ### 2026-05-30 (v25)
 
