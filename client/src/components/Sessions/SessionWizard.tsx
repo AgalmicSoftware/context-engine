@@ -136,10 +136,10 @@ import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishExecutionPlan,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
-  getSessionWizardPublishProgressPercent,
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
@@ -339,6 +339,7 @@ export {
   buildSessionWizardPublishStepNumbers,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
   getSessionWizardPublishProgressPercent,
+  resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
@@ -4697,28 +4698,13 @@ const SessionWizard = ({
     hasManualMetadata,
     canUploadMetadataNow,
   });
-  const publishProgressSteps = publishProgressPlan.steps.map((key) => ({
-    key,
-    label: key === 'deploy-worker'
-      ? 'Deploy Worker'
-      : key === 'deploy-sbts'
-        ? `Deploy ${t('sbts')}`
-        : key === 'upload-metadata'
-          ? 'Upload Arweave'
-          : key === 'register-session'
-            ? 'Register On-chain'
-            : 'Done',
-  }));
-  const activePublishProgressStep = publishProgressSteps[
-    Math.max(0, Math.min((publishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
-  ] || publishProgressSteps[0] || null;
-  const publishProgressPercent = getSessionWizardPublishProgressPercent({
-    publishStep,
-    publishBusy,
-    totalSteps: publishProgressSteps.length,
+  const publishProgressDisplayState = resolveSessionWizardPublishProgressDisplayState({
     elapsedMs: publishStepElapsedMs,
+    publishBusy,
+    publishStep,
+    publishSteps: publishProgressPlan.steps,
+    sbtsLabel: t('sbts'),
   });
-  const publishProgressPercentRounded = Math.round(publishProgressPercent);
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
@@ -4925,12 +4911,12 @@ const SessionWizard = ({
           bundleFile={bundleFile}
           localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
           sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
-          showPublishProgress={publishBusy || publishStep > 0}
-          activePublishProgressStepLabel={activePublishProgressStep?.label || 'Preparing'}
-          publishProgressPercent={publishProgressPercent}
-          publishProgressPercentRounded={publishProgressPercentRounded}
+          showPublishProgress={publishProgressDisplayState.showPublishProgress}
+          activePublishProgressStepLabel={publishProgressDisplayState.activePublishProgressStepLabel}
+          publishProgressPercent={publishProgressDisplayState.publishProgressPercent}
+          publishProgressPercentRounded={publishProgressDisplayState.publishProgressPercentRounded}
           publishStep={publishStep}
-          publishProgressSteps={publishProgressSteps}
+          publishProgressSteps={publishProgressDisplayState.publishProgressSteps}
           uploadBlockedReason={uploadBlockedReason}
           hasManualMetadata={hasManualMetadata}
           hasUploadedMetadata={hasUploadedMetadata}
