@@ -3,10 +3,13 @@ import {
   applyDecryptedQuestionResponseValuesToContainer,
   applyDecryptedQuestionStateToSurveySlice,
   buildAutoDecryptMaskedFieldSignature,
+  buildClearedQuestionDecryptBusyTokens,
   buildDecryptTaskKey,
   buildFieldDecryptState,
+  buildQuestionDecryptBusyTokenRegistration,
   buildQuestionDecryptExecutionContext,
   buildQuestionDecryptFailureState,
+  buildQuestionDecryptOwnedClearState,
   buildQuestionFieldDecryptControlDisplayState,
   buildQuestionFieldDisplayState,
   buildQuestionDecryptStartState,
@@ -31,6 +34,7 @@ import {
   getQuestionFieldTaskKey,
   getQuestionFieldTaskKeys,
   getQuestionRatingEnvelopes,
+  hasQuestionDecryptBusy,
   hydrateLatestQuestionDecryptState,
   markQuestionFieldBusyMap,
   mergeLatestEncryptedQuestionFields,
@@ -38,6 +42,7 @@ import {
   mergeQuestionResponseOverrideIntoDecryptSlice,
   normalizeBulkDecryptedSliceForSurveyState,
   normalizeSingleQuestionViewedResponse,
+  ownsQuestionDecryptBusyTokens,
   parseEncryptedEnvelope,
   prepareQuestionDecryptAttempt,
   prepareSurveyDecryptAttempt,
@@ -292,6 +297,101 @@ describe('surveyToolDecryptFlow', () => {
         'q1:prompt': true,
       },
     });
+  });
+
+  it('plans owned question decrypt busy-token cleanup without clearing newer attempts', () => {
+    const registration = buildQuestionDecryptBusyTokenRegistration({
+      tokenSeq: 2,
+      busyTokens: { 'q1:prompt': 1 },
+      keysToMark: ['q1:answer', '', 'q1:additional'],
+    });
+
+    expect(registration).toEqual({
+      token: 3,
+      busyTokens: {
+        'q1:prompt': 1,
+        'q1:answer': 3,
+        'q1:additional': 3,
+      },
+    });
+    expect(hasQuestionDecryptBusy({ 'q1:answer': false, 'q1:additional': true })).toBe(true);
+    expect(hasQuestionDecryptBusy({ 'q1:answer': false })).toBe(false);
+    expect(ownsQuestionDecryptBusyTokens({
+      busyTokens: registration.busyTokens,
+      keysToCheck: ['q1:answer', 'q1:additional'],
+      token: 3,
+    })).toBe(true);
+    expect(ownsQuestionDecryptBusyTokens({
+      busyTokens: { ...registration.busyTokens, 'q1:answer': 4 },
+      keysToCheck: ['q1:answer', 'q1:additional'],
+      token: 3,
+    })).toBe(false);
+
+    const staleCleanup = buildQuestionDecryptOwnedClearState({
+      prevState: {
+        decryptingByKey: {
+          'q1:answer': true,
+          'q1:additional': true,
+          'q1:prompt': true,
+        },
+      },
+      questionId: 'Q1',
+      fieldToDecrypt: 'both',
+      token: 3,
+      busyTokens: { ...registration.busyTokens, 'q1:answer': 4 },
+      extraPatch: { submissionError: 'old failure' },
+    });
+
+    expect(staleCleanup).toEqual({
+      busyTokens: {
+        'q1:prompt': 1,
+        'q1:answer': 4,
+      },
+      statePatch: {
+        submissionError: 'old failure',
+        isDecrypting: true,
+        decryptingByKey: {
+          'q1:answer': true,
+          'q1:additional': false,
+          'q1:prompt': true,
+        },
+      },
+    });
+
+    expect(buildQuestionDecryptOwnedClearState({
+      prevState: { decryptingByKey: { 'q1:answer': true } },
+      questionId: 'Q1',
+      fieldToDecrypt: 'answer',
+      token: 3,
+      busyTokens: { 'q1:answer': 4 },
+      extraPatch: { submissionError: 'old failure' },
+    })).toEqual({
+      busyTokens: { 'q1:answer': 4 },
+      statePatch: null,
+    });
+
+    expect(buildQuestionDecryptOwnedClearState({
+      prevState: { decryptingByKey: { 'q1:answer': true } },
+      questionId: 'Q1',
+      fieldToDecrypt: 'answer',
+      token: null,
+      busyTokens: { 'q1:answer': 4 },
+      activeSurveyDecryptAttemptSeq: 9,
+      extraPatch: { submissionError: 'fallback failure' },
+    })).toEqual({
+      busyTokens: { 'q1:answer': 4 },
+      statePatch: {
+        submissionError: 'fallback failure',
+        isDecrypting: true,
+        decryptingByKey: { 'q1:answer': true },
+      },
+    });
+
+    expect(buildClearedQuestionDecryptBusyTokens({
+      busyTokens: { 'q1:answer': 4, 'q1:additional': 3 },
+      keysToClear: ['q1:answer', 'q1:additional'],
+      token: 3,
+    })).toEqual({ 'q1:answer': 4 });
   });
 
   it('decrypts rating envelopes and builds the shared execution context', async () => {

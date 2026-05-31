@@ -77,11 +77,14 @@ import {
   buildFieldDecryptState as buildFieldDecryptStateHelper,
   buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
   buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
+  buildQuestionDecryptOwnedClearState as buildQuestionDecryptOwnedClearStateHelper,
   buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
   buildQuestionFieldDecryptControlDisplayState as buildQuestionFieldDecryptControlDisplayStateHelper,
+  buildQuestionDecryptBusyTokenRegistration as buildQuestionDecryptBusyTokenRegistrationHelper,
   buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
   buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
   buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
+  buildClearedQuestionDecryptBusyTokens as buildClearedQuestionDecryptBusyTokensHelper,
   buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
   buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
   buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
@@ -110,6 +113,7 @@ import {
   carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
   normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
   normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
+  ownsQuestionDecryptBusyTokens as ownsQuestionDecryptBusyTokensHelper,
   parseEncryptedEnvelope as parseEncryptedEnvelopeHelper,
   prepareQuestionDecryptAttempt as prepareQuestionDecryptAttemptHelper,
   prepareSurveyDecryptAttempt as prepareSurveyDecryptAttemptHelper,
@@ -1130,42 +1134,31 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     isDecrypting: false,
   });
 
-  getQuestionDecryptBusyKeys = (questionId, fieldToDecrypt = 'both') => (
-    getQuestionFieldTaskKeysHelper(questionId, {
-      includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
-      includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
-    })
-  );
-
   registerQuestionDecryptBusyTokens = (keysToMark = []) => {
-    const token = (Number(this._questionDecryptBusyTokenSeq) || 0) + 1;
-    this._questionDecryptBusyTokenSeq = token;
-    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
-    keysToMark.forEach((key) => {
-      if (key) nextTokens[key] = token;
+    const result = buildQuestionDecryptBusyTokenRegistrationHelper({
+      tokenSeq: this._questionDecryptBusyTokenSeq,
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToMark,
     });
-    this._questionDecryptBusyTokens = nextTokens;
-    return token;
+    this._questionDecryptBusyTokenSeq = result.token;
+    this._questionDecryptBusyTokens = result.busyTokens;
+    return result.token;
   };
 
   clearQuestionDecryptBusyTokens = (keysToClear = [], token = null) => {
-    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
-    keysToClear.forEach((key) => {
-      if (!key) return;
-      if (token == null || nextTokens[key] === token) delete nextTokens[key];
+    this._questionDecryptBusyTokens = buildClearedQuestionDecryptBusyTokensHelper({
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToClear,
+      token,
     });
-    this._questionDecryptBusyTokens = nextTokens;
   };
 
-  ownsQuestionDecryptBusyTokens = (keysToCheck = [], token = null) => {
-    if (token == null) return true;
-    const keys = keysToCheck.filter(Boolean);
-    return keys.length > 0 && keys.every((key) => this._questionDecryptBusyTokens?.[key] === token);
-  };
-
-  hasQuestionDecryptBusy = (busyMap = {}) => (
-    Object.values(busyMap || {}).some(Boolean)
-  );
+  ownsQuestionDecryptBusyTokens = (keysToCheck = [], token = null) =>
+    ownsQuestionDecryptBusyTokensHelper({
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToCheck,
+      token,
+    });
 
   buildQuestionDecryptOwnedClearState = (
     prev,
@@ -1174,28 +1167,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     token = null,
     extraPatch = {},
   ) => {
-    const keysToClear = this.getQuestionDecryptBusyKeys(questionId, fieldToDecrypt)
-      .filter((key) => key && token != null && this._questionDecryptBusyTokens?.[key] === token);
-    if (keysToClear.length === 0) {
-      return token == null
-        ? {
-            ...extraPatch,
-            isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(prev?.decryptingByKey || {}),
-            decryptingByKey: prev?.decryptingByKey || {},
-          }
-        : null;
-    }
-
-    const decryptingByKey = { ...(prev?.decryptingByKey || {}) };
-    keysToClear.forEach((key) => {
-      decryptingByKey[key] = false;
+    const result = buildQuestionDecryptOwnedClearStateHelper({
+      prevState: prev,
+      questionId,
+      fieldToDecrypt,
+      token,
+      busyTokens: this._questionDecryptBusyTokens,
+      activeSurveyDecryptAttemptSeq: this._activeSurveyDecryptAttemptSeq,
+      extraPatch,
     });
-    this.clearQuestionDecryptBusyTokens(keysToClear, token);
-    return {
-      ...extraPatch,
-      isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(decryptingByKey),
-      decryptingByKey,
-    };
+    this._questionDecryptBusyTokens = result.busyTokens;
+    return result.statePatch;
   };
 
   buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both', token = null) => {

@@ -383,6 +383,99 @@ export const clearQuestionFieldBusyMap = (
   return cleared;
 };
 
+export const hasQuestionDecryptBusy = (busyMap = {}) => (
+  Object.values(busyMap || {}).some(Boolean)
+);
+
+export const buildQuestionDecryptBusyTokenRegistration = ({
+  tokenSeq = 0,
+  busyTokens = {},
+  keysToMark = [],
+} = {}) => {
+  const token = (Number(tokenSeq) || 0) + 1;
+  const nextBusyTokens = { ...(busyTokens || {}) };
+  keysToMark.forEach((key) => {
+    if (key) nextBusyTokens[key] = token;
+  });
+  return {
+    token,
+    busyTokens: nextBusyTokens,
+  };
+};
+
+export const buildClearedQuestionDecryptBusyTokens = ({
+  busyTokens = {},
+  keysToClear = [],
+  token = null,
+} = {}) => {
+  const nextBusyTokens = { ...(busyTokens || {}) };
+  keysToClear.forEach((key) => {
+    if (!key) return;
+    if (token == null || nextBusyTokens[key] === token) {
+      delete nextBusyTokens[key];
+    }
+  });
+  return nextBusyTokens;
+};
+
+export const ownsQuestionDecryptBusyTokens = ({
+  busyTokens = {},
+  keysToCheck = [],
+  token = null,
+} = {}) => {
+  if (token == null) return true;
+  const keys = keysToCheck.filter(Boolean);
+  return keys.length > 0 && keys.every((key) => busyTokens?.[key] === token);
+};
+
+export const buildQuestionDecryptOwnedClearState = ({
+  prevState = null,
+  questionId = '',
+  fieldToDecrypt = 'both',
+  token = null,
+  busyTokens = {},
+  activeSurveyDecryptAttemptSeq = 0,
+  extraPatch = {},
+} = {}) => {
+  const keysToClear = getQuestionFieldTaskKeys(questionId, {
+    includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
+    includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
+  }).filter((key) => key && token != null && busyTokens?.[key] === token);
+
+  if (keysToClear.length === 0) {
+    return {
+      busyTokens: { ...(busyTokens || {}) },
+      statePatch: token == null
+        ? {
+            ...extraPatch,
+            isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
+              hasQuestionDecryptBusy(prevState?.decryptingByKey || {}),
+            decryptingByKey: prevState?.decryptingByKey || {},
+          }
+        : null,
+    };
+  }
+
+  const decryptingByKey = { ...(prevState?.decryptingByKey || {}) };
+  keysToClear.forEach((key) => {
+    decryptingByKey[key] = false;
+  });
+
+  return {
+    busyTokens: buildClearedQuestionDecryptBusyTokens({
+      busyTokens,
+      keysToClear,
+      token,
+    }),
+    statePatch: {
+      ...extraPatch,
+      isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
+        hasQuestionDecryptBusy(decryptingByKey),
+      decryptingByKey,
+    },
+  };
+};
+
 export const getQuestionFieldDecryptSelection = (
   questionId,
   fieldToDecrypt = 'both',
