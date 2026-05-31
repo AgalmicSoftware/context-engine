@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v21)
+**Skill version:** 2026-05-30 (v22)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -221,13 +221,14 @@ the invite token is a low-privilege password, not an admin credential.
 For the Agent Village 2026 Geo node, the invite is configured for
 `sessionSlug: "agent-village-2026"`. Hermes should use the Telegram `from.id`
 it already observes in the chat; do not ask the user to type their Telegram id.
+Do not collect or send a Telegram username for this flow.
 The Geo node can store fields like:
 
 ```json
 {
   "contextEngineInviteToken": "<geo-link-token>",
   "contextEngineWorker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=21",
+  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=22",
   "sessionSlug": "agent-village-2026"
 }
 ```
@@ -239,7 +240,6 @@ Content-Type: application/json
 {
   "inviteToken": "<geo-link-token>",
   "telegramUserId": "<telegram from.id observed by Hermes>",
-  "username": "<optional Telegram username>",
   "sessionSlug": "<optional existing session slug>",
   "source": "geo:<optional-node-id>"
 }
@@ -1305,6 +1305,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v22)
+
+- Hardened trusted Geo/Hermes onboarding to use hash-only invite configuration and numeric Telegram ids only, without collecting Telegram usernames.
 
 ### 2026-05-30 (v21)
 
