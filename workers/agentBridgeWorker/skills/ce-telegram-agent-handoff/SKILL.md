@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v19)
+**Skill version:** 2026-05-30 (v20)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -173,8 +173,9 @@ raw GitHub URL, then re-read the changelog before continuing.
 ## Preconditions
 
 - The CE worker base URL is `https://ce-agent-bridge-worker.agalmic.workers.dev` for the current Edge City deployment. Operators may override this with `AGENT_BRIDGE_PUBLIC_URL`.
-- Use either a worker service token or a user-scoped agent token.
+- Use either a worker service token, a trusted Geo/Hermes invite onboarding token, or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
+- For a trusted Geo/Hermes invite, the agent receives an invite token from the Geo node/link and a verified Telegram user id from its own Telegram context, then calls `POST /telegram/agent/api/invite/onboard` to mint a user-scoped `ceagt_...` token. After that, use the returned `ceagt_...` token exactly like copied bot install info.
 - For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`; never ask the user for a Telegram handle/id just to use a `ceagt_...` token. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
 - Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal copied-token external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
@@ -192,8 +193,8 @@ curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api
 
 Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
 
-1. Ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
-2. The user pastes the copied install info into the agent. Extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
+1. If you are a Telegram-native Hermes agent and the user clicked a Geo/CE invite link, use the Trusted Geo / Hermes Invite Onboarding flow below to mint a `ceagt_...` token from the invite token plus the Telegram `from.id` you observed. Otherwise, ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
+2. Obtain the user-scoped `ceagt_...` token either from the invite-onboarding response or from copied bot install info. For copied install info, extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
 3. Call `GET <Worker>/telegram/agent/api/onboarding` with `Authorization: Bearer <token>`. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If the consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
 4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
 5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
@@ -209,6 +210,40 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 ## Onboarding Options
 
 The preferred low-friction path is a CE bot deep link. A group-question response remains available when the user should enter through a Telegram group that already has CE bot buttons.
+
+### Trusted Geo / Hermes Invite Onboarding
+
+Use this path when a Telegram-native Hermes agent surfaces a Context Engine
+onboarding link from a Geo node and can read the current Telegram user's numeric
+id from its own Telegram context. The Geo node/link supplies a CE invite token;
+the invite token is a low-privilege password, not an admin credential.
+
+```http
+POST /telegram/agent/api/invite/onboard
+Content-Type: application/json
+
+{
+  "inviteToken": "<geo-link-token>",
+  "telegramUserId": "<telegram from.id observed by Hermes>",
+  "username": "<optional Telegram username>",
+  "sessionSlug": "<optional existing session slug>",
+  "source": "geo:<optional-node-id>"
+}
+```
+
+If the invite token is valid, CE returns `token`, `worker`, `skillUrl`,
+`sessionSlug`, `expiresAt`, and the current onboarding state. Treat `token` as
+the user's private `ceagt_...` bearer credential: store it only in the agent's
+local auth context, never repeat it back to the user, and send it as
+`Authorization: Bearer <token>` on later CE calls. Then immediately call
+`GET <Worker>/telegram/agent/api/questions` with the returned token and surface
+the first relevant question in chat.
+
+Do not use this endpoint unless the agent actually has Telegram context for the
+person who clicked the Geo/Hermes link. If the agent cannot observe a verified
+Telegram user id, fall back to the CE bot or Mini App onboarding flows below.
+The invite only permits normal participant/user-token onboarding; it does not
+grant admin rights, response export, group approval, or permission management.
 
 ### Direct Link Mini App Onboarding
 
@@ -1256,6 +1291,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v20)
+
+- Added trusted Geo/Hermes invite onboarding: a Telegram-native agent can exchange a Geo invite token plus observed Telegram user id for a user-scoped `ceagt_...` token, then continue with the normal CE question flow.
 
 ### 2026-05-30 (v19)
 

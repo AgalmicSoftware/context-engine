@@ -92,9 +92,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=19';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=20';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v19)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-30 (v20)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -110,6 +110,7 @@ const RESULT_VIEW_GENERIC_MAX_ARRAY_ITEMS = 200;
 const RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS = 200;
 const RESULT_VIEW_GENERIC_MAX_DEPTH = 6;
 const RESULT_VIEW_CACHE_MAX_BYTES = 512 * 1024;
+const textEncoder = new TextEncoder();
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
@@ -168,6 +169,26 @@ function safeJsonParse(value, fallback = null) {
   }
 }
 
+function bytesToHex(bytes) {
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(input = '') {
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(String(input || '')));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function timingSafeEqualString(left = '', right = '') {
+  const a = safeString(left);
+  const b = safeString(right);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let index = 0; index < a.length; index += 1) {
+    diff |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
     ...init,
@@ -218,6 +239,68 @@ function skillRedirectResponse() {
   const redirectUrl = new URL(DEFAULT_AGENT_RAW_SKILL_URL);
   redirectUrl.searchParams.set('v', CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION.replace(/[^0-9A-Za-z_-]+/g, '-'));
   return Response.redirect(redirectUrl.toString(), 302);
+}
+
+function trustedOnboardingInviteValueList(value = '') {
+  const text = safeString(value);
+  if (!text) return [];
+  const parsed = safeJsonParse(text, null);
+  if (Array.isArray(parsed)) return parsed.map((item) => safeString(item)).filter(Boolean);
+  return text
+    .split(/[\n,]+/g)
+    .map((item) => safeString(item))
+    .filter(Boolean);
+}
+
+function trustedOnboardingInviteRecords(env = {}) {
+  const records = [];
+  const configured = safeJsonParse(env.AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON, null);
+  if (Array.isArray(configured)) {
+    for (const item of configured) {
+      if (typeof item === 'string') {
+        const value = safeString(item);
+        if (/^[0-9a-f]{64}$/i.test(value)) records.push({ tokenHash: value.toLowerCase() });
+      } else if (item && typeof item === 'object' && !Array.isArray(item)) {
+        records.push({
+          tokenHash: safeString(item.tokenHash || item.hash).toLowerCase(),
+          sessionSlug: sanitizeSessionSlug(item.sessionSlug || item.defaultSessionSlug || item.slug),
+          label: safeString(item.label || item.name).slice(0, 120),
+          source: safeString(item.source || item.geoId || item.geoRef).slice(0, 160),
+        });
+      }
+    }
+  }
+  for (const hash of trustedOnboardingInviteValueList(env.AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES)) {
+    records.push({ tokenHash: hash.toLowerCase() });
+  }
+  for (const token of trustedOnboardingInviteValueList(env.AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKENS)) {
+    records.push({ token });
+  }
+  return records.filter((record) => record.tokenHash || record.token);
+}
+
+async function resolveTrustedOnboardingInvite(env = {}, inviteToken = '') {
+  const supplied = safeString(inviteToken);
+  if (!supplied) return { ok: false, status: 400, reason: 'invite_token_required' };
+  const records = trustedOnboardingInviteRecords(env);
+  if (!records.length) return { ok: false, status: 503, reason: 'invite_onboarding_not_configured' };
+  const suppliedHash = await sha256Hex(supplied);
+  for (const record of records) {
+    const recordHash = /^[0-9a-f]{64}$/.test(safeString(record.tokenHash))
+      ? safeString(record.tokenHash).toLowerCase()
+      : (record.token ? await sha256Hex(record.token) : '');
+    if (recordHash && timingSafeEqualString(recordHash, suppliedHash)) {
+      return {
+        ok: true,
+        invite: {
+          sessionSlug: sanitizeSessionSlug(record.sessionSlug),
+          label: safeString(record.label),
+          source: safeString(record.source),
+        },
+      };
+    }
+  }
+  return { ok: false, status: 401, reason: 'invite_token_invalid' };
 }
 
 function miniAppOnboardAllowedOrigins(env = {}) {
@@ -4450,6 +4533,162 @@ async function handleMiniAppOnboardRequest({
   return jsonMiniAppOnboard(request, env, response);
 }
 
+async function handleInviteOnboardRequest({
+  request,
+  env = {},
+  createdAt = null,
+} = {}) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'access-control-allow-methods': 'POST, OPTIONS',
+        'access-control-allow-headers': 'content-type',
+      },
+    });
+  }
+  if (request.method !== 'POST') {
+    const payload = { ok: false, reason: 'method_not_allowed' };
+    assertNoSecretShape(payload, 'Telegram invite onboarding method response must not serialize secrets.');
+    return json(payload, { status: 405 });
+  }
+
+  const url = new URL(request.url);
+  const body = await readRequestJson(request);
+  const inviteToken = safeString(
+    body.inviteToken ||
+      body.invite ||
+      body.token ||
+      url.searchParams.get('inviteToken') ||
+      url.searchParams.get('invite')
+  );
+  const invite = await resolveTrustedOnboardingInvite(env, inviteToken);
+  if (!invite.ok) {
+    const payload = { ok: false, reason: invite.reason };
+    assertNoSecretShape(payload, 'Telegram invite onboarding denial must not serialize secrets.');
+    return json(payload, { status: invite.status || 401 });
+  }
+
+  const telegramUserId = safeString(body.telegramUserId || body.userId || body.telegram?.telegramUserId || body.telegram?.userId);
+  if (!telegramUserId) {
+    const payload = { ok: false, reason: 'telegram_user_required' };
+    assertNoSecretShape(payload, 'Telegram invite onboarding missing-user response must not serialize secrets.');
+    return json(payload, { status: 400 });
+  }
+
+  const policy = await loadSessionPolicy(env);
+  const username = safeString(body.username || body.telegram?.username);
+  const explicitSessionSlug = sanitizeSessionSlug(body.sessionSlug || body.defaultSessionSlug || body.slug || invite.invite.sessionSlug);
+  const normalized = {
+    type: 'telegram_mock_update',
+    updateId: safeString(body.updateId) || `invite-onboard-${Date.now()}`,
+    kind: 'trusted_invite_onboarding',
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    user: {
+      telegramUserId,
+      username,
+      languageCode: safeString(body.languageCode || body.telegram?.languageCode),
+    },
+    chat: {
+      chatId: telegramUserId,
+      chatType: 'private',
+      type: 'private',
+      isPrivate: true,
+    },
+  };
+  const resolved = await resolveAgentTokenSession({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug,
+  });
+  if (!resolved.ok) {
+    const payload = {
+      ok: false,
+      reason: resolved.reason || 'session_not_found',
+      sessionSlug: resolved.sessionSlug || explicitSessionSlug || '',
+    };
+    assertNoSecretShape(payload, 'Telegram invite onboarding session response must not serialize secrets.');
+    return json(payload, { status: 404 });
+  }
+
+  const account = await deriveManagedDemoAccount({
+    principal: normalized,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
+    createdAt,
+  });
+  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({ env, telegramUserId });
+  if (previousPointer.tokenHash) {
+    await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
+  }
+  if (explicitSessionSlug) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    await persistTelegramUserSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      source: 'trusted_invite_onboarding',
+      followDefault,
+    });
+  }
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId,
+    username,
+    sessionSlug: resolved.session.sessionSlug,
+    accountAddress: account.accountAddress,
+    ttlSeconds: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+    createdAt,
+  });
+  if (!issued.ok) {
+    const payload = { ok: false, reason: issued.reason || 'agent_token_create_failed' };
+    assertNoSecretShape(payload, 'Telegram invite onboarding token failure must not serialize secrets.');
+    return json(payload, { status: 500 });
+  }
+  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId,
+    tokenHash: issued.tokenHash,
+    issuedAt: issued.record?.issuedAt || createdAt,
+    createdAt,
+  });
+  if (!pointer.ok) {
+    const payload = { ok: false, reason: pointer.reason || 'agent_token_pointer_write_failed' };
+    assertNoSecretShape(payload, 'Telegram invite onboarding pointer failure must not serialize secrets.');
+    return json(payload, { status: 500 });
+  }
+
+  const settings = await loadTelegramAgentSettings({ env, sessionSlug: resolved.session.sessionSlug, telegramUserId });
+  const groups = await loadTelegramLightweightGroups({
+    env,
+    session: resolved.session,
+    telegramUserId,
+    accountAddress: account.accountAddress,
+  });
+  const response = {
+    ok: true,
+    token: issued.token,
+    worker: agentBridgePublicUrl(env),
+    skill: 'ce-telegram-agent-handoff',
+    skillUrl: agentSkillUrl(env),
+    sessionSlug: resolved.session.sessionSlug,
+    expiresAt: issued.record.expiresAt,
+    inviteLabel: invite.invite.label || '',
+    inviteSource: safeString(body.source || invite.invite.source).slice(0, 160),
+    onboarding: publicOnboardingState({
+      sessionSlug: resolved.session.sessionSlug,
+      settings,
+      groups,
+    }),
+  };
+  const { token: _token, ...secretFree } = response;
+  assertNoSecretShape(secretFree, 'Telegram invite onboarding token response metadata must not serialize secrets.');
+  return json(response);
+}
+
 async function handleClientLoginExchangeRequest({
   request,
   env = {},
@@ -4562,6 +4801,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const url = new URL(request.url);
+  if (url.pathname === '/telegram/agent/api/invite/onboard') {
+    return handleInviteOnboardRequest({ request, env });
+  }
   if (url.pathname === '/telegram/agent/api/miniapp/onboard') {
     return handleMiniAppOnboardRequest({ request, env });
   }

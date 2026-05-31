@@ -321,6 +321,8 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '200',
       AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY: '6',
       AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS: '2',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES: 'abc123',
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: '[{"tokenHash":"def456","sessionSlug":"alpha"}]',
     }),
   });
   const metadata = buildAgentBridgeWorkerUploadMetadata(config);
@@ -389,6 +391,14 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS' &&
     binding.text === '2'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES' &&
+    binding.text === 'abc123'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON' &&
+    binding.text === '[{"tokenHash":"def456","sessionSlug":"alpha"}]'
   )), true);
 });
 
