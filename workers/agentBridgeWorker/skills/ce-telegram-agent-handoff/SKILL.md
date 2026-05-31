@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v20)
+**Skill version:** 2026-05-30 (v21)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -217,6 +217,20 @@ Use this path when a Telegram-native Hermes agent surfaces a Context Engine
 onboarding link from a Geo node and can read the current Telegram user's numeric
 id from its own Telegram context. The Geo node/link supplies a CE invite token;
 the invite token is a low-privilege password, not an admin credential.
+
+For the Agent Village 2026 Geo node, the invite is configured for
+`sessionSlug: "agent-village-2026"`. Hermes should use the Telegram `from.id`
+it already observes in the chat; do not ask the user to type their Telegram id.
+The Geo node can store fields like:
+
+```json
+{
+  "contextEngineInviteToken": "<geo-link-token>",
+  "contextEngineWorker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
+  "contextEngineSkillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=21",
+  "sessionSlug": "agent-village-2026"
+}
+```
 
 ```http
 POST /telegram/agent/api/invite/onboard
@@ -1291,6 +1305,10 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-30 (v21)
+
+- Documented the Agent Village 2026 Geo invite shape and clarified that Hermes should onboard with the observed Telegram `from.id` into `agent-village-2026`.
 
 ### 2026-05-30 (v20)
 
