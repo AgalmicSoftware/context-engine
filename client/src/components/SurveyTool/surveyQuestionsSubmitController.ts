@@ -12,6 +12,7 @@ import {
 import {
   updateSubmittedSinceLastEdit,
 } from './surveyToolUtils.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 
 export type SurveyQuestionsSubmitNavigationPort = (
   path: string,
@@ -109,6 +110,17 @@ export type RunSurveyQuestionsStaleSubmitControllerArgs = {
   ports?: SurveyQuestionsStaleSubmitPorts;
 };
 
+export type ResolveSurveyQuestionsSubmittedResponseUrlArgs = {
+  account?: unknown;
+  currentPathname?: unknown;
+  isStandalone?: unknown;
+  logWarn?: (message: string, error: unknown) => void;
+  questionID?: unknown;
+  singleQuestionMode?: unknown;
+  submissionSlug?: unknown;
+  surveyId?: unknown;
+};
+
 export type SurveyQuestionsSubmitStartControllerResult = {
   outcome: 'started';
   status: 'completed';
@@ -184,6 +196,10 @@ const resolveSubmitFailureMessage = (error: unknown): string => (
   ((error as { message?: string } | null | undefined)?.message) || 'Submission failed.'
 );
 
+const lowerSubmitRouteValue = (value: unknown): string => (
+  ((value || '') as { toLowerCase: () => string }).toLowerCase()
+);
+
 const buildSubmitStaleState = (): SurveyQuestionsSubmitStaleStatePatch => ({
   isSubmitting: false,
   submitProgress: 0,
@@ -213,6 +229,41 @@ export const resolveSurveyQuestionsSubmitPendingStats = ({
     total: readPendingStatCount(pendingStats, 'total', fallbackTotal),
     encrypted: readPendingStatCount(pendingStats, 'encrypted', fallbackEncrypted),
   };
+};
+
+export const resolveSurveyQuestionsSubmittedResponseUrl = ({
+  account = '',
+  currentPathname = '',
+  isStandalone = false,
+  logWarn,
+  questionID = '',
+  singleQuestionMode = false,
+  submissionSlug = '',
+  surveyId = '',
+}: ResolveSurveyQuestionsSubmittedResponseUrlArgs = {}): string => {
+  let responseUrl = '';
+  try {
+    const accountLower = lowerSubmitRouteValue(account);
+    if (accountLower) {
+      if (singleQuestionMode) {
+        const qLower = lowerSubmitRouteValue(questionID);
+        if (qLower) {
+          responseUrl = buildQuestionRoutePath(qLower, {
+            responderAddress: accountLower,
+            sessionSlug: String(submissionSlug || ''),
+          });
+        }
+      } else if (!isStandalone) {
+        const sLower = lowerSubmitRouteValue(surveyId);
+        if (sLower) {
+          responseUrl = `/survey/${sLower}/${accountLower}${submissionSlug ? `?session=${encodeURIComponent(String(submissionSlug))}` : ''}`;
+        }
+      }
+    }
+  } catch (error) {
+    logWarn?.('SurveyTool: fallback', error);
+  }
+  return responseUrl || String(currentPathname || '');
 };
 
 export const runSurveyQuestionsSubmitController = ({
