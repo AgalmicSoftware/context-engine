@@ -25,6 +25,7 @@ import ConnectedSurveyResults, {
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
 import styles from './SurveyResults.module.scss';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -298,5 +299,35 @@ describe('SurveyResults display helpers', () => {
       left: '1px',
       backgroundColor: '#fff',
     });
+  });
+});
+
+describe('SurveyResults question-list display wiring', () => {
+  it('passes empty question-list display state without rendering the question table', () => {
+    const subject = createSubject({ isOpen: true });
+    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable');
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        __questionList__: true,
+      },
+      aggregatorQuestionResponses: {},
+      filterLoading: false,
+      sbtFilteredAggregatorQuestionResponses: {},
+      surveyViewMode: 'aggregate',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      viewMode: 'questions',
+    };
+
+    const questionListCard = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionListCard
+    );
+
+    expect(questionListCard?.props?.showEmptyState).toBe(true);
+    expect(questionListCard?.props?.questionTableNode).toBeNull();
+    expect(renderQuestionIDsTableSpy).not.toHaveBeenCalled();
   });
 });

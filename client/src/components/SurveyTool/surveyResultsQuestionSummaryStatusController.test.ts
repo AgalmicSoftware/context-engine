@@ -1,4 +1,5 @@
 import {
+  buildSurveyResultsQuestionListDisplayPlan,
   buildSurveyResultsQuestionSummariesListDisplayPlan,
   buildSurveyResultsQuestionSummaryDisplayPlan,
 } from './surveyResultsQuestionSummaryStatusController';
@@ -94,6 +95,37 @@ describe('surveyResultsQuestionSummaryStatusController', () => {
         isInert: true,
         showEmptyState: true,
         showSummaries: false,
+      });
+    });
+  });
+
+  describe('buildSurveyResultsQuestionListDisplayPlan', () => {
+    it('describes empty, loading, and populated question-list states without mutating inputs', () => {
+      const args = { aggregatorEntriesCount: 0, filterLoading: false };
+
+      expect(buildSurveyResultsQuestionListDisplayPlan(args)).toEqual({
+        isInert: true,
+        shouldRenderQuestionTable: false,
+        showEmptyState: true,
+      });
+      expect(args).toEqual({ aggregatorEntriesCount: 0, filterLoading: false });
+
+      expect(buildSurveyResultsQuestionListDisplayPlan({
+        aggregatorEntriesCount: 0,
+        filterLoading: true,
+      })).toEqual({
+        isInert: true,
+        shouldRenderQuestionTable: true,
+        showEmptyState: false,
+      });
+
+      expect(buildSurveyResultsQuestionListDisplayPlan({
+        aggregatorEntriesCount: 2,
+        filterLoading: false,
+      })).toEqual({
+        isInert: false,
+        shouldRenderQuestionTable: true,
+        showEmptyState: false,
       });
     });
   });
