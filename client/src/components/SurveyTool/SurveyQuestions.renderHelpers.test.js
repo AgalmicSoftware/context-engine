@@ -198,6 +198,87 @@ describe('SurveyQuestions render helpers', () => {
     expect(treeHasText(tree, '0')).toBe(true);
   });
 
+  it('wires question decrypt controls through display descriptors without moving decrypt execution', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.handleDecryptQuestionAnswer = jest.fn();
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: false,
+      isDecrypting: false,
+    };
+
+    const readyControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'answer',
+      allowDecrypt: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Answer',
+      busy: false,
+    });
+    expect(readyControl?.type).toBe(QuestionDecryptControl);
+    expect(readyControl?.props).toMatchObject({
+      actionLabel: 'Decrypt Answer',
+      autoDecryptEnabled: false,
+      busy: false,
+      disabled: false,
+      showBusySpinnerWhenAutoDecryptEnabled: false,
+      title: undefined,
+    });
+
+    readyControl.props.onClick();
+    expect(subject.handleDecryptQuestionAnswer).toHaveBeenCalledWith('Q1', 'answer');
+
+    subject.state = {
+      ...subject.state,
+      isDecrypting: true,
+    };
+    const busyControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'answer',
+      allowDecrypt: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Answer',
+      busy: true,
+    });
+    expect(busyControl?.props).toMatchObject({
+      busy: true,
+      disabled: true,
+      title: undefined,
+    });
+
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: true,
+      isDecrypting: false,
+    };
+    const autoDecryptControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'additional',
+      allowDecrypt: false,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Comments',
+      busy: true,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      wrapperStyle: { marginTop: '4px' },
+    });
+    expect(autoDecryptControl?.props).toMatchObject({
+      actionLabel: 'Decrypt Comments',
+      autoDecryptEnabled: true,
+      busy: true,
+      disabled: true,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      title: 'Connect wallet to decrypt',
+      wrapperStyle: { marginTop: '4px' },
+    });
+  });
+
   it('renders pile additional comments without the extra header and keeps the lock beside the field', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
