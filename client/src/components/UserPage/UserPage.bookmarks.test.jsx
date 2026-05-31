@@ -169,6 +169,50 @@ describe('UserPage bookmark cache controls', () => {
     }
   });
 
+  it('keeps bookmark dispatch active when content cache readiness is disabled', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress,
+      activeSessionSlug: 'session-cache',
+      isSurveyCacheReady: false,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+    });
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+      users: [],
+      filters: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+
+    try {
+      const tree = instance.render();
+      const bookmarkButtons = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user'
+      );
+
+      expect(bookmarkButtons).toHaveLength(1);
+      expect(bookmarkButtons[0].props.disabled).toBeUndefined();
+      expect(() => bookmarkButtons[0].props.onClick({ preventDefault: jest.fn() })).not.toThrow();
+
+      expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', { clone: false });
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', {
+        surveys: [],
+        questions: [],
+        users: [viewAddress],
+        filters: [],
+      });
+      expect(instance.state.bookmarked).toBe(true);
+    } finally {
+      peekSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
   it('falls back to the empty bookmarks slug when no session slug props are present', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const instance = makeInstance({
