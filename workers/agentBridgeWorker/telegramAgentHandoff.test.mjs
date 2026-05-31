@@ -349,7 +349,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/[0-9a-f]{40}\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
   assert.match(location, /v=2026-05-30-v26-/);
 });
 
