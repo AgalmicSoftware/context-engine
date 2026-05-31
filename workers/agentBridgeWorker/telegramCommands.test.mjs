@@ -5031,6 +5031,83 @@ test('/start agent_onboarding slug deep-link opens the private copy install scre
   assert.equal(binding.followDefault, true);
 });
 
+test('/start agent_onboarding opens Mini App when already onboarded', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const firstPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  const linkedAgain = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const buttons = flattenButtons(linkedAgain.response.replyMarkup);
+  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  const secondPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const stillLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+
+  assert.equal(firstLoaded.ok, true);
+  assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
+  assert.match(linkedAgain.response.text, /Context Engine is already enabled/);
+  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(JSON.stringify(linkedAgain).includes('ceagt_'), false);
+  assert.equal(secondPointer.tokenHash, firstPointer.tokenHash);
+  assert.equal(stillLoaded.ok, true);
+});
+
+test('private Onboard Agent callback opens Mini App when already onboarded', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const start = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env,
+    now,
+  });
+  const onboard = flattenButtons(start.response.replyMarkup)
+    .find((button) => button.text === 'Onboard Agent');
+
+  const result = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9205,
+      callback_query: {
+        id: 'onboard-existing-tap',
+        data: onboard.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 79,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const buttons = flattenButtons(result.response.replyMarkup);
+  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+
+  assert.equal(result.screen, 'agent_onboarded_mini_app');
+  assert.equal(result.response.method, 'editMessageText');
+  assert.equal(result.callbackQueryId, 'onboard-existing-tap');
+  assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(JSON.stringify(result).includes('ceagt_'), false);
+});
+
 test('/start agent_onboarding non-default slug pins the session', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const env = agentTokenEnv({

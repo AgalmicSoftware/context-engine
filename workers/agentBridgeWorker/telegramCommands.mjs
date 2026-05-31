@@ -3172,14 +3172,33 @@ async function buildAgentOnboardingStartResponse({
   env,
   sessionSlugOverride = '',
   createdAt,
+  method = 'sendMessage',
+  messageId = '',
 } = {}) {
   if (normalized.chat?.isPrivate) {
+    const pointer = await readTelegramAgentDelegationTokenUserPointer({
+      env,
+      telegramUserId: normalized.user.telegramUserId,
+    });
+    if (pointer.tokenHash) {
+      return buildAgentAlreadyOnboardedResponse({
+        normalized,
+        command,
+        env,
+        sessionSlugOverride,
+        createdAt,
+        method,
+        messageId,
+      });
+    }
     return buildAgentTokenResponse({
       normalized,
       command,
       env,
       sessionSlugOverride,
       createdAt,
+      method,
+      messageId,
     });
   }
   const button = await makePrivateStartActionButton({
@@ -3203,6 +3222,67 @@ async function buildAgentOnboardingStartResponse({
     screen: 'agent_onboarding_private_required',
     command,
     normalized,
+  });
+}
+
+async function buildAgentAlreadyOnboardedResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const resolved = await resolveAgentTokenSession({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  const sessionSlug = resolved.ok ? resolved.session.sessionSlug : sanitizeSessionSlug(sessionSlugOverride);
+  const miniAppButton = await makeMiniAppButton({
+    env,
+    label: 'Open Mini App',
+    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+    serverContextRef: sessionSlug ? { sessionSlug } : { sessionPicker: true },
+    seed: `agent_onboarded|mini_app|${sessionSlug || 'session_picker'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+    privateChat: true,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  const rows = [];
+  if (miniAppButton) rows.push([miniAppButton]);
+  await appendBackToStartRow(rows, {
+    env,
+    normalized,
+    sessionSlug,
+    seed: `agent_onboarded|start|${sessionSlug || 'default'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  const text = [
+    'Context Engine is already enabled.',
+    '',
+    miniAppButton
+      ? 'Open the Mini App to answer questions or manage settings.'
+      : 'Use /start to continue.',
+  ].join('\n');
+  assertNoSecretShape({ text }, 'Already-onboarded agent response must not serialize secrets.');
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text,
+    replyMarkup: rows.length ? { inline_keyboard: rows } : null,
+    screen: 'agent_onboarded_mini_app',
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      alreadyOnboarded: true,
+      miniAppAvailable: !!miniAppButton,
+    },
   });
 }
 
@@ -9849,7 +9929,7 @@ async function buildStartPayloadResponse({
     });
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
-    return buildAgentTokenResponse({
+    return buildAgentOnboardingStartResponse({
       normalized,
       command,
       env,
@@ -9893,7 +9973,7 @@ async function buildCallbackResponse({
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
     if (normalized.chat?.isPrivate && callbackMessageLooksLikeAgentOnboarding(message)) {
-      return attachCallbackQueryId(await buildAgentTokenResponse({
+      return attachCallbackQueryId(await buildAgentOnboardingStartResponse({
         normalized,
         command: 'callback:create_agent_token',
         env,
@@ -10201,7 +10281,7 @@ async function buildCallbackResponse({
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
-    return attachCallbackQueryId(await buildAgentTokenResponse({
+    return attachCallbackQueryId(await buildAgentOnboardingStartResponse({
       normalized,
       command: 'callback:create_agent_token',
       env,

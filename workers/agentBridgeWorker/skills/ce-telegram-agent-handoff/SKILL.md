@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-30 (v26)
+**Skill version:** 2026-05-31 (v27)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=26",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=27",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -249,6 +249,20 @@ locally for this worker/version, and refresh it only when `/skill-version` or a
 question response says the cached copy is stale. Do not paste a long copy of
 this onboarding procedure into the Geo node; stale hardcoded instructions can
 make agents fall back to the Telegram bot instead of using invite onboarding.
+
+When surfacing Context Engine from Geo, keep the user prompt brief: one short
+description plus a single action such as `Enable Context Engine`. A blue link,
+button, or quick reply with that label counts as the user's "yes" acknowledgment;
+do not require a second confirmation unless the user asks for more detail. After
+each onboarding answer, avoid recapping the full answer set. Acknowledge briefly,
+ask only the next needed question, then fetch and surface a relevant CE question.
+
+Keep post-submit confirmations short too. Do not lead with implementation
+details such as permissions, direct-submit mechanics, Mini App review bypasses,
+HTTP status, or API behavior. Do not restate every submitted answer unless the
+user asks for a receipt. Prefer one short sentence such as "Submitted those
+answers to Context Engine." Then add only the next useful action, e.g. "I'll
+surface the next relevant question in your morning brief."
 
 ```http
 POST /telegram/agent/api/invite/onboard
@@ -1365,6 +1379,12 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-31 (v27)
+
+- Clarified that Hermes should present Context Engine concisely from Geo, with an `Enable Context Engine` link/button serving as the user's affirmative acknowledgment.
+- Clarified that Edge agents should avoid long onboarding recaps and ask only the next needed preference or consent question.
+- Clarified that post-submit confirmations should be brief and conversational, avoiding API/Mini App mechanics or full answer recaps unless requested.
 
 ### 2026-05-30 (v26)
 
