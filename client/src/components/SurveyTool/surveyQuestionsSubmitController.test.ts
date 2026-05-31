@@ -1,5 +1,6 @@
 import {
   resolveSurveyQuestionsSubmitPendingStats,
+  resolveSurveyQuestionsSubmittedResponseUrl,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
   runSurveyQuestionsStaleSubmitController,
@@ -324,6 +325,48 @@ describe('surveyQuestionsSubmitController', () => {
 
     expect(result).toEqual({ total: 7, encrypted: 3 });
     expect(getPendingEditStats).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves submitted response URLs for single-question and survey success states', () => {
+    expect(resolveSurveyQuestionsSubmittedResponseUrl({
+      account: '0xABC',
+      currentPathname: '/questions',
+      questionID: 'Q1',
+      singleQuestionMode: true,
+      submissionSlug: 'edge',
+    })).toBe('/question/q1?session=edge&responder=0xabc');
+
+    expect(resolveSurveyQuestionsSubmittedResponseUrl({
+      account: '0xABC',
+      currentPathname: '/surveys',
+      singleQuestionMode: false,
+      submissionSlug: 'edge session',
+      surveyId: '0xSURVEY',
+    })).toBe('/survey/0xsurvey/0xabc?session=edge%20session');
+  });
+
+  it('keeps submitted response URL fallback behavior for standalone and malformed route inputs', () => {
+    const logWarn = jest.fn();
+
+    expect(resolveSurveyQuestionsSubmittedResponseUrl({
+      account: '0xABC',
+      currentPathname: '/standalone',
+      isStandalone: true,
+      logWarn,
+      singleQuestionMode: false,
+      surveyId: '0xSURVEY',
+    })).toBe('/standalone');
+    expect(logWarn).not.toHaveBeenCalled();
+
+    expect(resolveSurveyQuestionsSubmittedResponseUrl({
+      account: { address: '0xabc' },
+      currentPathname: '/fallback',
+      logWarn,
+      singleQuestionMode: false,
+      surveyId: '0xSURVEY',
+    })).toBe('/fallback');
+    expect(logWarn).toHaveBeenCalledTimes(1);
+    expect(logWarn).toHaveBeenCalledWith('SurveyTool: fallback', expect.any(TypeError));
   });
 
   it('runs success completion status callbacks in the current order', () => {
