@@ -447,3 +447,77 @@ export const getSessionWizardPublishProgressPercent = ({
   const eased = 1 - Math.pow(1 - ratio, 2);
   return Math.min(99, Math.max(base + (stepSize * 0.18), base + ((cap - base) * eased)));
 };
+
+export type SessionWizardPublishProgressStep = {
+  key: string;
+  label: string;
+};
+
+export type SessionWizardPublishProgressDisplayState = {
+  activePublishProgressStepLabel: string;
+  publishProgressPercent: number;
+  publishProgressPercentRounded: number;
+  publishProgressSteps: SessionWizardPublishProgressStep[];
+  showPublishProgress: boolean;
+};
+
+export const buildSessionWizardPublishProgressSteps = ({
+  publishSteps = [],
+  sbtsLabel = 'SBTs',
+}: {
+  publishSteps?: unknown[];
+  sbtsLabel?: unknown;
+} = {}): SessionWizardPublishProgressStep[] => {
+  const normalizedSbtLabel = toStr(sbtsLabel).trim() || 'SBTs';
+  return (Array.isArray(publishSteps) ? publishSteps : []).map((keyRaw) => {
+    const key = toStr(keyRaw).trim();
+    return {
+      key,
+      label: key === 'deploy-worker'
+        ? 'Deploy Worker'
+        : key === 'deploy-sbts'
+          ? `Deploy ${normalizedSbtLabel}`
+          : key === 'upload-metadata'
+            ? 'Upload Arweave'
+            : key === 'register-session'
+              ? 'Register On-chain'
+              : 'Done',
+    };
+  });
+};
+
+export const resolveSessionWizardPublishProgressDisplayState = ({
+  elapsedMs = 0,
+  publishBusy = false,
+  publishStep = 0,
+  publishSteps = [],
+  sbtsLabel = 'SBTs',
+}: {
+  elapsedMs?: number;
+  publishBusy?: boolean;
+  publishStep?: number;
+  publishSteps?: unknown[];
+  sbtsLabel?: unknown;
+} = {}): SessionWizardPublishProgressDisplayState => {
+  const publishProgressSteps = buildSessionWizardPublishProgressSteps({
+    publishSteps,
+    sbtsLabel,
+  });
+  const activePublishProgressStep = publishProgressSteps[
+    Math.max(0, Math.min((publishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
+  ] || publishProgressSteps[0] || null;
+  const publishProgressPercent = getSessionWizardPublishProgressPercent({
+    publishStep,
+    publishBusy,
+    totalSteps: publishProgressSteps.length,
+    elapsedMs,
+  });
+
+  return {
+    activePublishProgressStepLabel: activePublishProgressStep?.label || 'Preparing',
+    publishProgressPercent,
+    publishProgressPercentRounded: Math.round(publishProgressPercent),
+    publishProgressSteps,
+    showPublishProgress: !!publishBusy || Number(publishStep || 0) > 0,
+  };
+};
