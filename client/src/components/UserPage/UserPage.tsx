@@ -173,6 +173,7 @@ import UserPageSurveySection from './UserPageSurveySection';
 import {
   runUserPageAnalyzeActionController,
   runUserPageBookmarkActionController,
+  runUserPageCacheRefreshActionController,
 } from './userPageActionController';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
@@ -875,6 +876,18 @@ class UserPage extends Component<any, any> {
 
   stopSpinnerEventPropagation = (event: StoppableEvent): void => {
     event?.stopPropagation?.();
+  };
+
+  dispatchSbtDataRefresh = (addr: unknown, slug?: unknown): void => {
+    runUserPageCacheRefreshActionController({
+      cacheRefreshArgs: [addr, slug],
+      plan: {
+        blockedReason: 'none',
+        disabled: false,
+        shouldRenderCacheRefreshAction: true,
+      },
+      ports: { dispatchCacheRefresh: this.props.refreshSbtData },
+    });
   };
 
   handleManagedCacheUpdate = (event: ManagedCacheUpdateEvent = null): void => {
@@ -4090,7 +4103,7 @@ class UserPage extends Component<any, any> {
               ) : null}
               loginComplete={loginComplete}
               network={network}
-              onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+              onRefreshSbtData={this.dispatchSbtDataRefresh}
               provider={provider}
               sbtDisplayState={sbtDisplayState}
               sbtEmptyText={sbtEmptyText}
@@ -4131,7 +4144,7 @@ class UserPage extends Component<any, any> {
           loginComplete={loginComplete}
           mintedSbtsHeading={`${t('minted')} ${t('sbts')}`}
           network={network}
-          onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+          onRefreshSbtData={this.dispatchSbtDataRefresh}
           onStatsCollapseToggle={this.toggleCollapse}
           onToggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
           provider={provider}

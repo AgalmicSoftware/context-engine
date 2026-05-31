@@ -64,6 +64,21 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     }
   });
 
+  it('routes SBT refresh through the injected cache refresh boundary', () => {
+    const refreshSbtData = jest.fn();
+    const instance = makeInstance({ refreshSbtData });
+
+    instance.dispatchSbtDataRefresh('0x0000000000000000000000000000000000000abc', 'edge');
+
+    expect(refreshSbtData).toHaveBeenCalledTimes(1);
+    expect(refreshSbtData).toHaveBeenCalledWith('0x0000000000000000000000000000000000000abc', 'edge');
+
+    const inertInstance = makeInstance({ refreshSbtData: undefined });
+    expect(() => {
+      inertInstance.dispatchSbtDataRefresh('0x0000000000000000000000000000000000000abc', 'edge');
+    }).not.toThrow();
+  });
+
   it('keeps survey/question loading active during deep scan by default', () => {
     const instance = makeInstance();
     instance.state = {
