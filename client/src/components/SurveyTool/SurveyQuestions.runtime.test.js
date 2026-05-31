@@ -609,6 +609,48 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.decryptingByKey['q1:answer']).toBe(true);
   });
 
+  it('wires question decrypt stale cleanup through owned busy-token state', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const olderToken = subject.registerQuestionDecryptBusyTokens(['q1:answer']);
+    const newerToken = subject.registerQuestionDecryptBusyTokens(['q1:answer']);
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: { 'q1:answer': true },
+    };
+
+    expect(subject.buildQuestionDecryptFailureStateForAttempt(
+      subject.state,
+      'q1',
+      'answer',
+      'old decrypt failed',
+      olderToken,
+    )).toBeNull();
+    expect(subject._questionDecryptBusyTokens['q1:answer']).toBe(newerToken);
+    expect(subject.state.decryptingByKey['q1:answer']).toBe(true);
+
+    const ownedPatch = subject.buildQuestionDecryptFailureStateForAttempt(
+      subject.state,
+      'q1',
+      'answer',
+      'new decrypt failed',
+      newerToken,
+    );
+
+    expect(ownedPatch).toEqual({
+      submissionError: 'new decrypt failed',
+      isDecrypting: false,
+      decryptingByKey: { 'q1:answer': false },
+    });
+    expect(subject._questionDecryptBusyTokens['q1:answer']).toBeUndefined();
+  });
+
   it('does not apply stale full-survey decrypt results after the viewer account changes', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
