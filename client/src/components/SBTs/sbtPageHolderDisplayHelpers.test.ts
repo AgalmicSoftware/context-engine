@@ -5,6 +5,7 @@ import {
   shouldShowSbtPageScanProgress,
 } from './sbtPageHelpers';
 import {
+  resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderFilterItems,
   resolveSbtPageHolderLoadingState,
   resolveSbtPageHolderModalDisplayState,
@@ -229,6 +230,120 @@ describe('sbtPageHelpers holder display helpers', () => {
       showEmptyStateInModal: false,
       showHeaderCount: true,
       showSpinnerInModalBody: false,
+    });
+  });
+
+  it('builds the full holder display model for active scan and approximate count states', () => {
+    const resolveScanProgressSessionLabel = jest.fn(() => 'Edge Session');
+    const model = resolveSbtPageHolderDisplayModel({
+      countsLoaded: true,
+      filteredMintedUsers: [],
+      isScanActive: true,
+      loadingMintersBurners: false,
+      loadingMintedFilter: false,
+      mintedTokensOverride: '25',
+      netHolders: [],
+      scanProgress: {
+        scannedBlocks: 40,
+        totalBlocks: 80,
+      },
+      sbtScanInProgress: true,
+      showModal: true,
+      resolveScanProgressSessionLabel,
+    });
+
+    expect(resolveScanProgressSessionLabel).toHaveBeenCalledTimes(1);
+    expect(model).toMatchObject({
+      hasActiveScanProgress: true,
+      hasComputedHolders: false,
+      hasFilteredHolders: false,
+      holdersDisplayCount: '~25',
+      mintedTokensOverride: '25',
+      netMinted: '25',
+      shouldOverrideMinted: true,
+      showApproximateCountHint: false,
+      showEmptyStateInModal: false,
+      showScanProgress: true,
+      showScanProgressInModal: true,
+      showSpinnerInModalBody: true,
+      waitingForHolderDetails: true,
+    });
+    expect(model.scanProgressPct).toBe(50);
+    expect(model.scanProgressFillStyle).toEqual({ width: '50%' });
+    expect(model.scanProgressText).toBe('Scanning mint/burn history: 40 blocks remaining');
+    expect(model.scanProgressSessionText).toBe('Session: Edge Session');
+  });
+
+  it('builds settled empty and stale-filter holder display models without modal side effects', () => {
+    const emptyModel = resolveSbtPageHolderDisplayModel({
+      countsLoaded: false,
+      filteredMintedUsers: [],
+      isScanActive: false,
+      loadingMintersBurners: false,
+      loadingMintedFilter: false,
+      mintedTokensOverride: null,
+      netHolders: [],
+      scanProgress: null,
+      showModal: true,
+      resolveScanProgressSessionLabel: jest.fn(() => 'Unused'),
+    });
+
+    expect(emptyModel).toMatchObject({
+      countsReady: true,
+      holdersDisplayCount: '0',
+      holdersReady: true,
+      netMinted: '0',
+      showEmptyStateInModal: true,
+      showHeaderCount: true,
+      showScanProgress: false,
+      showSpinnerInModalBody: false,
+    });
+    expect(emptyModel.scanProgressText).toBeNull();
+    expect(emptyModel.scanProgressSessionText).toBeNull();
+
+    const staleFilteredModel = resolveSbtPageHolderDisplayModel({
+      countsLoaded: false,
+      filteredMintedUsers: ['0xFiltered'],
+      isScanActive: true,
+      loadingMintersBurners: true,
+      loadingMintedFilter: false,
+      mintedTokensOverride: null,
+      netHolders: [],
+      scanProgress: {
+        scannedBlocks: 10,
+        totalBlocks: 20,
+      },
+      showModal: true,
+    });
+
+    expect(staleFilteredModel).toMatchObject({
+      filteredMintedUsers: ['0xFiltered'],
+      hasComputedHolders: false,
+      hasFilteredHolders: true,
+      holderItemsForFilter: ['0xFiltered'],
+      keepStaleFilterRowsWhileRefreshing: true,
+      showEmptyStateInModal: false,
+      showScanProgress: true,
+    });
+
+    const burnedOutEstimateModel = resolveSbtPageHolderDisplayModel({
+      countsLoaded: false,
+      filteredMintedUsers: [],
+      loadingMintersBurners: false,
+      loadingMintedFilter: false,
+      mintedAddresses: ['0xBurnedHolder'],
+      mintedTokensOverride: '1',
+      netHolders: [],
+      scanProgress: null,
+      showModal: true,
+    });
+
+    expect(burnedOutEstimateModel).toMatchObject({
+      addressesAreResolving: false,
+      addressesNeedResolutionHint: false,
+      holdersDisplayCount: '~1',
+      showApproximateCountHint: true,
+      showSpinnerInModalBody: true,
     });
   });
 });
