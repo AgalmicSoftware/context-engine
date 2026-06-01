@@ -2,21 +2,18 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
-import { Alert } from 'reactstrap';
+import { faCopy, faCheck, faSpinner, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
-  getChainLabelById,
   getDemoSessionConfigBySlug,
   getSessionChainId,
   getSessionConfigBySlugOrDefault,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getChainBlockTimeMs } from '../../variables/chains.js';
-import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
-import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
@@ -38,18 +35,10 @@ import {
   upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import CETooltip from '../Shared/CETooltip';
-import {
-  renderSbtPageDocModal,
-  renderSbtPageFullImageModal,
-  renderSbtPageHolderModal,
-} from './SBTPageModals';
-import SbtPageIdentityPanel from './SbtPageIdentityPanel';
-import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageAdminActions from './SbtPageAdminActions';
+import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
-import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
@@ -130,7 +119,6 @@ import {
   buildSbtPageResolvedSessionSlugPatch,
   buildSbtPageSbtInfoPatch,
   buildSbtPageSessionSbtAddressesMemoState,
-  buildSbtPageSectionHeaderClassName,
   buildSbtPageLoadInfoStartLogContext,
   coerceSbtPageEpochSeconds,
   coerceSbtPageStringArrayValue,
@@ -163,25 +151,18 @@ import {
   resolveSbtPageSessionSlugFromInfo,
   resolveSbtPageActiveBlockTimeMs,
   resolveSbtPageActiveChainId,
-  resolveSbtPageActionFeedbackState,
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
-  resolveSbtPageAdminCreatorAddresses,
   resolveSbtPageAddressLinkState,
   resolveSbtPageBurnActionPlan,
   resolveSbtPageBurnStatusButtonState,
-  resolveSbtPageBurnAuthLabel,
-  resolveSbtPageBookmarkButtonDisplayState,
   resolveSbtPageCopyableErrorText,
   resolveSbtPageCopyIconState,
   resolveSbtPageEffectiveSessionSlug,
   resolveSbtPageFullViewShellState,
-  resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderScanActive,
   resolveSbtPageIdentityPanelDisplayState,
-  resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
-  resolveSbtPageMaxTokensDisplay,
   resolveSbtPageMetadataHydrationMode,
   resolveSbtPageManualClaimButtonState,
   resolveSbtPageMiniActionFailureState,
@@ -193,7 +174,6 @@ import {
   resolveSbtPageMiniMintState,
   resolveSbtPageMiniOpenMintButtonState,
   resolveSbtPageMiniTokenActionDisplayState,
-  resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageOpenMintButtonState,
@@ -201,14 +181,11 @@ import {
   resolveSbtPageOwnerLookupTokenCount,
   resolveSbtPagePasswordExportControlsState,
   resolveSbtPagePasswordExportSelection,
-  resolveSbtPagePasswordAlertState,
   resolveSbtPagePasswordGenerationButtonState,
   resolveSbtPagePasswordInventoryDisplayState,
   resolveSbtPagePasswordJoinButtonState,
   resolveSbtPagePendingButtonContentState,
-  resolveSbtPageQuestionIconStyle,
   resolveSbtPageRecoveryCacheChainId,
-  resolveSbtPageRefreshIndicatorStyle,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
   resolveSbtPageCachedGroupPasswordHash,
@@ -216,16 +193,13 @@ import {
   resolveSbtPageGroupPasswordMintState,
   resolveSbtPageSessionDisplayConfig,
   resolveSbtPageSessionDisplayLabel,
-  resolveSbtPageSectionToggleDisplayState,
   resolveSbtPageShouldRefreshCounts,
   resolveSbtPageStatusButtonContentState,
-  resolveSbtPageCopyErrorButtonStyle,
   resolveSbtPageUrlAutoMintIntent,
   resolveSbtPageUserAdminStatus,
   resolveSbtAddress,
   resolveSbtAddressString,
   resolveSbtChainId,
-  resolveSbtPageTokenMetadataLinkDisplayState,
   sanitizeSbtPageMintedTokensOverride,
   shouldRunSbtPagePropListAutoMint,
   shouldRunSbtPagePropPasswordAutoMint,
@@ -4364,6 +4338,7 @@ renderMintButton() {
       error,
       bookmarked,
       showModal,
+      showFullImage,
       mintedAddresses,
       burnedAddresses,
       countsLoaded,
@@ -4400,7 +4375,6 @@ renderMintButton() {
       unnamedLabel: `Unnamed ${t('sbt')}`,
     });
     const sbtNameText = identityPanelDisplayState.nameText;
-    const sbtDescriptionText = identityPanelDisplayState.descriptionText;
     const displayImageState = identityPanelDisplayState.displayImageState;
     const imageUrl = identityPanelDisplayState.imageUrl;
     const imageErrorHandler = displayImageState?.canRetry
@@ -4645,316 +4619,102 @@ renderMintButton() {
     if (fullViewShellState.shouldRenderError) {
       return <div className={styles.error}>Error: {error}</div>;
     }
-    const loadingScreen = (
-      <div className={styles.loadingPage}>
-        <img
-          src={contextEngineLoadingGif}
-          alt="Context Engine loading"
-          className={styles.loadingLogo}
-        />
-        <div className={styles.loadingTitle}>{`Loading ${t('sbt')} Details`}</div>
-      </div>
-    );
     if (fullViewShellState.shouldRenderLoading) {
-      return loadingScreen;
+      return renderSbtPageFullViewLoading({ sbtLabel: t('sbt') });
     }
-
-    let mintEndDisplay;
-    const mintEndState = resolveSbtPageMintEndDisplayState({ sbtInfo, nowMs: Date.now() });
-    if (mintEndState?.status === 'active') {
-      mintEndDisplay = (
-        <p>
-          <span className={styles.label}>{`${t('minting')} ends:`}</span>
-          <span>{mintCountdown || "Calculating..."}</span>
-        </p>
-      );
-    } else if (mintEndState?.status === 'expired') {
-      mintEndDisplay = (
-        <p>
-          <span className={styles.label}>{`${t('minting')} Expired`}</span>:
-          <span
-            className={styles.expiredTime}
-            id="mintExpiredTooltip"
-            style={resolveSbtPageInteractiveCursorStyle()}
-            onClick={() => this.copyToClipboard(mintEndState.unixTS.toString(), 'time')}
-          >
-            {mintEndState.fullMintEndDate}
-          </span>
-          <FontAwesomeIcon
-            icon={faQuestionCircle}
-            style={resolveSbtPageQuestionIconStyle()}
-            id="expiredTimeQuestionMark"
-          />
-          <CETooltip
-            placement="right"
-            target="expiredTimeQuestionMark"
-            delay={{ show: 0, hide: 2500 }}
-            className={styles.tooltipBubble}
-            innerClassName={styles.tooltipInner}
-          >
-            Click date to copy Unix timestamp: {mintEndState.unixTS}
-          </CETooltip>
-        </p>
-      );
-    } else if (mintEndState?.status === 'never') {
-      mintEndDisplay = (
-        <p>
-          <span className={styles.label}>{`${t('minting')} ends:`}</span>
-          <span><FontAwesomeIcon icon={faInfinity} /> Never</span>
-        </p>
-      );
-    }
-
-    const addressDisplay = getShortenedAddress(sbtAddressForDisplay, false);
-
     const netHolders = this.getMemoizedNetHoldersList(mintedAddresses, burnedAddresses);
     const scanProgress = this.getEffectiveHolderScanProgress();
-    const holderDisplayModel = resolveSbtPageHolderDisplayModel({
-      countsLoaded,
-      filteredMintedUsers: this.state.filteredMintedUsers,
-      isScanActive: this.isHolderScanActive(),
-      loadingMintersBurners,
-      loadingMintedFilter: this.state.loadingMintedFilter,
-      mintedAddresses,
-      mintedTokensOverride: this.state.mintedTokensOverride,
+    const filterNetwork = this.state.network || this.props.network || null;
+    return renderSbtPageFullView({
+      actionLabels: {
+        burn: t('burn'),
+        burnedLower: t('burnedLower'),
+        mint: t('mint'),
+        mintedLower: t('mintedLower'),
+        minting: t('minting'),
+      },
+      adminActions: this.renderAdminActions(),
+      callbacks: {
+        bookmarkSBT: this.bookmarkSBT,
+        closeDocModal: this.closeDocModal,
+        closeModal: this.closeModal,
+        copyErrorToClipboard: this.copyErrorToClipboard,
+        copyToClipboard: this.copyToClipboard,
+        getExplorerLink: this.getExplorerLink,
+        getExplorerUrl: this.getExplorerUrl,
+        handleModalFilteredMintedUsers: this.handleModalFilteredMintedUsers,
+        onBackToList: () => { window.location.href = sbtsListPath(); },
+        openMintedModal: this.openMintedModal,
+        renderAddressLink: this.renderAddressLink,
+        toggleActions: this.toggleActions,
+        toggleAdminSection: this.toggleAdminSection,
+        toggleFullImage: this.toggleFullImage,
+        toggleMoreDetails: this.toggleMoreDetails,
+        toggleStats: this.toggleStats,
+      },
+      defaultFeaturedSBTs: this.getSessionSBTAddresses(),
+      filterNetwork,
+      identityPanelDisplayState,
+      imageErrorHandler,
+      imageUrl,
+      isHolderScanActive: this.isHolderScanActive(),
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      mintedLabel: t('minted'),
       netHolders,
-      scanProgress,
-      sbtScanInProgress: this.props.sbtScanInProgress,
-      sbtScanPending: this.props.sbtScanPending,
-      showModal,
-      resolveScanProgressSessionLabel: (progress) => (
+      networkId: this.state.network?.id,
+      provider: this.props.provider,
+      relevantInfo: this.renderRelevantInfo(),
+      resolveScanProgressSessionLabel: (progress: { sessionLabel?: string; sessionSlug?: string } | null) => (
         progress?.sessionLabel ||
         this.getSessionDisplayLabel(progress?.sessionSlug || this.getEffectiveSessionSlug()) ||
         ''
       ),
-    });
-    const {
-      filteredMintedUsers,
-      hasComputedHolders,
-      hasFilteredHolders,
-      holdersDisplayCount,
-      holderItemsForFilter,
-      isInitialLoading,
-      isRefreshing,
-      mintedCountTitle,
-      netMinted,
-      scanProgressFillStyle,
-      scanProgressPct,
-      scanProgressSessionText,
-      scanProgressText,
-      showApproximateCountHint,
-      showCornerSpinner,
-      showEmptyStateInModal,
-      showHeaderCount,
-      showScanProgress,
-      showScanProgressInModal,
-      showSpinnerInModalBody,
-    } = holderDisplayModel;
-
-    const sbtInfoForDetails = sbtInfo as SbtPageInfoState;
-    const burnLabel = resolveSbtPageBurnAuthLabel(sbtInfoForDetails.burnAuth);
-
-    const maxTokensDisplay = resolveSbtPageMaxTokensDisplay(sbtInfoForDetails.maxTokens);
-
-    const tokenMetadataLinkDisplayState = resolveSbtPageTokenMetadataLinkDisplayState({
-      tokenUriRaw: sbtInfo?.tokenURI || sbtInfo?.tokenUri || '',
-    });
-    const { adminAddress, creatorAddress } = resolveSbtPageAdminCreatorAddresses(sbtInfo);
-    const filterNetwork = this.state.network || this.props.network || null;
-    const passwordAlertState = resolveSbtPagePasswordAlertState({
-      mintPassword,
+      sbtAddressForDisplay,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sbtInfo: sbtInfo as Record<string, unknown> | null,
+      sbtLabel: t('sbt'),
       sbtMintPassword: this.props.sbtMintPassword,
-      showPasswordAlert,
+      scanProgress,
+      sessionSlug: this.getEffectiveSessionSlug(),
+      state: {
+        bookmarked,
+        burnedAddresses,
+        burningStatus,
+        copiedAddress: this.state.copiedAddress,
+        copiedError: this.state.copiedError,
+        countsLoaded,
+        docModalBlobUrl,
+        docModalContent,
+        docModalError,
+        docModalLoading,
+        docModalName,
+        docModalOpen,
+        error,
+        filteredMintedUsers: this.state.filteredMintedUsers,
+        lastBurnTxHash,
+        lastMintTxHash,
+        loadingMintersBurners,
+        loadingMintedFilter: this.state.loadingMintedFilter,
+        mintCountdown,
+        mintedAddresses,
+        mintedTokensOverride: this.state.mintedTokensOverride,
+        mintingStatus,
+        mintPassword,
+        showActions,
+        showAdminSection,
+        showFullImage,
+        showModal,
+        showMoreDetails,
+        showPasswordAlert,
+        showStats,
+        transactionHash,
+        userIsSbtAdmin,
+      },
+      workerScanInProgress: this.props.sbtScanInProgress,
+      workerScanPending: this.props.sbtScanPending,
+      burnButton: this.renderBurnButton(),
+      mintButton: this.renderMintButton(),
     });
-    const actionFeedbackState = resolveSbtPageActionFeedbackState({
-      burningStatus,
-      error,
-      lastBurnTxHash,
-      lastMintTxHash,
-      mintingStatus,
-      transactionHash,
-    });
-    const contractCopyIconState = resolveSbtPageCopyIconState({
-      copiedAddress: this.state.copiedAddress,
-      targetKey: 'contract',
-    });
-    const errorCopyIconState = resolveSbtPageCopyIconState({
-      copied: this.state.copiedError,
-    });
-    const bookmarkButtonDisplayState = resolveSbtPageBookmarkButtonDisplayState({
-      bookmarked,
-    });
-    const statsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showStats });
-    const actionsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showActions });
-    const adminSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showAdminSection });
-    const moreDetailsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showMoreDetails });
-    const sectionHeaderClassName = buildSbtPageSectionHeaderClassName({
-      baseClassName: styles.sectionHeader,
-      roundedClassName: styles.roundedHeader,
-    });
-
-    return (
-      <div className={styles.sbtPage}>
-        <button onClick={() => window.location.href = sbtsListPath()} className={styles.backButton}>
-          <FontAwesomeIcon icon={faArrowLeft} /> {`${t('sbt')} list`}
-        </button>
-        {passwordAlertState.showDetectedPasswordAlert && (
-          <Alert color="info" className={styles.passwordAlert} fade={false}>
-            Password detected – click "start claim" to mint
-          </Alert>
-        )}
-        {sbtInfo ? (
-          <>
-            <div className={styles.sbtInfo}>
-              <SbtPageIdentityPanel
-                addressDisplay={addressDisplay}
-                bookmarkIconStyle={bookmarkButtonDisplayState.iconStyle}
-                contractCopyIconState={contractCopyIconState}
-                descriptionLockIconStyle={resolveSbtPageInlineLockIconStyle()}
-                descriptionText={sbtDescriptionText}
-                explorerUrl={this.getExplorerUrl(sbtAddressForDisplay)}
-                imageAlt={identityPanelDisplayState.imageAlt}
-                imageUrl={imageUrl}
-                nameText={identityPanelDisplayState.nameText}
-                onBookmark={this.bookmarkSBT}
-                onContractCopy={() => this.copyToClipboard(sbtAddressForDisplay, 'contract')}
-                onImageError={imageErrorHandler}
-                onImageOpen={this.toggleFullImage}
-                showDescriptionLockIcon={identityPanelDisplayState.showDescriptionLockIcon}
-                tokenUriHref={tokenMetadataLinkDisplayState.href}
-              />
-              <div className={styles.rightColumn}>
-                <SbtPageStatsSection
-                  adminAddressDisplay={this.renderAddressLink(adminAddress, 'admin')}
-                  burnLabel={burnLabel}
-                  creatorAddressDisplay={this.renderAddressLink(creatorAddress, 'creator')}
-                  isInitialLoading={isInitialLoading}
-                  isOpen={statsSectionToggleState.isOpen}
-                  isRefreshing={isRefreshing}
-                  maxTokensDisplay={maxTokensDisplay}
-                  mintedCountTitle={mintedCountTitle}
-                  mintedLabel={t('minted')}
-                  mintEndDisplay={mintEndDisplay}
-                  netMinted={netMinted}
-                  networkLabel={getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
-                  onOpenMintedModal={this.openMintedModal}
-                  onToggle={this.toggleStats}
-                  questionIconStyle={resolveSbtPageQuestionIconStyle()}
-                  refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
-                  scanProgressFillStyle={scanProgressFillStyle}
-                  scanProgressPct={scanProgressPct}
-                  scanProgressSessionText={scanProgressSessionText}
-                  scanProgressText={scanProgressText}
-                  sectionHeaderClassName={sectionHeaderClassName}
-                  shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
-                  shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
-                  showScanProgress={showScanProgress}
-                />
-                <SbtPageActionsSection
-                  actionFeedbackState={actionFeedbackState}
-                  burnButton={this.renderBurnButton()}
-                  burnLabel={t('burn')}
-                  burnSuccessHref={actionFeedbackState.showBurnSuccess ? this.getExplorerLink(lastBurnTxHash) : ''}
-                  burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
-                  burnedLowerLabel={t('burnedLower')}
-                  copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
-                  errorCopyIconState={errorCopyIconState}
-                  errorMessage={this.state.error}
-                  isOpen={actionsSectionToggleState.isOpen}
-                  mintButton={this.renderMintButton()}
-                  mintLabel={t('mint')}
-                  mintSuccessHref={actionFeedbackState.showMintSuccess ? this.getExplorerLink(lastMintTxHash) : ''}
-                  mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
-                  mintedLowerLabel={t('mintedLower')}
-                  onCopyError={this.copyErrorToClipboard}
-                  onToggle={this.toggleActions}
-                  sbtLabel={t('sbt')}
-                  sectionHeaderClassName={sectionHeaderClassName}
-                  shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
-                  shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
-                  transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? this.getExplorerLink(transactionHash) : ''}
-                  transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
-                />
-                {userIsSbtAdmin && (
-                  <div className={styles.adminSection}>
-                    <h2 className={sectionHeaderClassName} onClick={this.toggleAdminSection}>
-                      ADMIN{' '}
-                      {adminSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                      {adminSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                    </h2>
-                    {adminSectionToggleState.isOpen && (
-                      <div className={styles.adminContainer}>
-                        {this.renderAdminActions()}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className={styles.moreDetailsSection}>
-                  <h2 className={sectionHeaderClassName} onClick={this.toggleMoreDetails}>
-                    MORE{' '}
-                    {moreDetailsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                    {moreDetailsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                  </h2>
-                  {moreDetailsSectionToggleState.isOpen && this.renderRelevantInfo()}
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          !error && loadingScreen
-        )}
-
-        {renderSbtPageHolderModal({
-          isOpen: showModal,
-          onClose: this.closeModal,
-          showHeaderCount,
-          holdersDisplayCount,
-          showCornerSpinner,
-          holderItemsForFilter,
-          provider: this.props.provider,
-          network: filterNetwork,
-          sessionSlug: this.getEffectiveSessionSlug(),
-          defaultFeaturedSBTs: this.getSessionSBTAddresses(),
-          onFilter: this.handleModalFilteredMintedUsers,
-          isSBTCacheReady: this.props.isSBTCacheReady,
-          sbtCacheRevision: this.props.sbtCacheRevision,
-          loadingMintedFilter: this.state.loadingMintedFilter,
-          hasFilteredHolders,
-          hasComputedHolders,
-          showScanProgressInModal,
-          scanProgressText,
-          scanProgressSessionText,
-          scanProgressPct,
-          scanProgressFillStyle,
-          showEmptyStateInModal,
-          showApproximateCountHint,
-          showSpinnerInModalBody,
-          filteredMintedUsers,
-          copiedAddress: this.state.copiedAddress,
-          copyToClipboard: this.copyToClipboard,
-          getExplorerUrl: this.getExplorerUrl,
-        })}
-
-        {renderSbtPageFullImageModal({
-          isOpen: this.state.showFullImage,
-          onToggle: this.toggleFullImage,
-          shouldRenderImage: !!sbtInfo,
-          imageUrl,
-          alt: sbtNameText,
-          onImageError: imageErrorHandler,
-        })}
-
-        {renderSbtPageDocModal({
-          isOpen: docModalOpen,
-          onClose: this.closeDocModal,
-          loading: docModalLoading,
-          error: docModalError,
-          content: docModalContent,
-          name: docModalName,
-          blobUrl: docModalBlobUrl,
-        })}
-      </div>
-    );
   }
 }
 
