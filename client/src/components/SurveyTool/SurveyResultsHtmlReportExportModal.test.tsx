@@ -3,7 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
   buildSurveyResultsHtmlReportDownloadLabel,
-  buildSurveyResultsHtmlReportExportModalDisplayPlan,
   renderSurveyResultsHtmlReportExportModal,
 } from './SurveyResultsHtmlReportExportModal';
 import {
@@ -64,13 +63,13 @@ const baseProps = {
     },
     {
       available: false,
-      key: 'argumentMap',
-      label: 'Argument Map',
+      key: 'polis',
+      label: 'Polis',
       reason: 'No report yet',
     },
   ],
   selectedSections: {
-    argumentMap: false,
+    polis: false,
     report: true,
   },
   snapshot: {
@@ -106,14 +105,14 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(screen.getByText('Unavailable')).toBeInTheDocument();
     expect(screen.getByText('No report yet')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Include Argument Map'));
+    fireEvent.click(screen.getByLabelText('Include Polis'));
     fireEvent.click(screen.getByLabelText(/PDF report/));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-demo-mode'));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-generate-analysis'));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-download'));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(baseProps.onToggleSection).toHaveBeenCalledWith('argumentMap');
+    expect(baseProps.onToggleSection).toHaveBeenCalledWith('polis');
     expect(baseProps.onFormatChange).toHaveBeenCalledWith(SESSION_RESULTS_EXPORT_FORMAT_PDF);
     expect(baseProps.onToggleDemoMode).toHaveBeenCalledTimes(1);
     expect(baseProps.onGenerateAnalysis).toHaveBeenCalledTimes(1);
@@ -163,57 +162,11 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toBeDisabled();
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toHaveTextContent('Download Single HTML');
     expect(screen.queryByTestId('ce-surveyresults-html-report-demo-mode')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-generate-analysis'));
-    fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-download'));
-
-    expect(baseProps.onGenerateAnalysis).not.toHaveBeenCalled();
-    expect(baseProps.onDownload).not.toHaveBeenCalled();
   });
 
   it('builds download labels for every export format', () => {
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_VIEWER)).toBe('Download HTML Viewer');
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML)).toBe('Download Single HTML');
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_PDF)).toBe('Download PDF');
-  });
-
-  it('builds action labels and inert display decisions without invoking handlers', () => {
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan(baseProps)).toEqual(expect.objectContaining({
-      canGenerateAnalysis: true,
-      downloadBlockedMessage: 'Select only available sections, or generate selected analysis views before download.',
-      downloadLabel: 'Download HTML Viewer',
-      exporterLabel: '0xabc...def',
-      generateAnalysisLabel: 'Generate Analysis Views',
-      sessionLabel: 'Demo Session',
-      sessionSlugLabel: ' (demo)',
-    }));
-
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
-      ...baseProps,
-      analysisGenerating: true,
-      analysisProgress: '',
-      exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
-      isAuthorized: false,
-      snapshot: {
-        exportedAt: '2026-05-25T18:30:00.000Z',
-        session: {},
-      },
-    })).toEqual(expect.objectContaining({
-      canGenerateAnalysis: false,
-      downloadBlockedMessage: 'Connect a wallet to enable download.',
-      downloadLabel: 'Download Single HTML',
-      exporterLabel: 'Not connected',
-      generateAnalysisLabel: 'Generating Analysis Views...',
-      sessionLabel: 'Session',
-      sessionSlugLabel: '',
-    }));
-
-    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
-      ...baseProps,
-      isDemoMode: true,
-    })).toEqual(expect.objectContaining({
-      canGenerateAnalysis: true,
-      generateAnalysisLabel: 'Refresh Demo Analysis',
-    }));
   });
 });

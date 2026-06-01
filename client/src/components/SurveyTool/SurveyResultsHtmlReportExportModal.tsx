@@ -1,12 +1,15 @@
 import React from 'react';
 import {
   Alert,
+  Button,
   FormGroup,
   Input,
   Label,
   Modal,
   ModalBody,
+  ModalFooter,
   ModalHeader,
+  Table,
 } from 'reactstrap';
 
 import {
@@ -14,22 +17,20 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsExportFormat,
-  type SessionResultsHtmlSnapshot,
-  type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import { renderSurveyResultsHtmlReportActionControls } from './SurveyResultsHtmlReportActionControls';
-import SurveyResultsHtmlReportAnalysisControls from './SurveyResultsHtmlReportAnalysisControls';
-import SurveyResultsHtmlReportSectionTable, {
-  type SurveyResultsHtmlReportSectionRow,
-} from './SurveyResultsHtmlReportSectionTable';
-import type {
-  SurveyResultsHtmlReportAnalysisPayload,
-  SurveyResultsHtmlReportSectionKey,
-} from './surveyResultsExportDisplayHelpers';
 
-export type SurveyResultsHtmlReportExportModalDisplayProps = {
+type SurveyResultsRecord = Record<string, any>;
+
+type SurveyResultsHtmlReportSectionRow = {
+  available: boolean;
+  key: string;
+  label: string;
+  reason?: React.ReactNode;
+};
+
+type SurveyResultsHtmlReportExportModalProps = {
   analysisGenerating?: boolean;
-  analysisPayload: SurveyResultsHtmlReportAnalysisPayload;
+  analysisPayload: SurveyResultsRecord;
   analysisProgress?: string;
   canDownload?: boolean;
   exportFormat?: SessionResultsExportFormat;
@@ -39,24 +40,17 @@ export type SurveyResultsHtmlReportExportModalDisplayProps = {
   isDemoSession?: boolean;
   isOpen?: boolean;
   needsAnalysisGeneration?: boolean;
-  sectionRows: SurveyResultsHtmlReportSectionRow[];
-  selectedSections: SessionResultsSectionSelection;
-  snapshot: SessionResultsHtmlSnapshot;
-  styleMap: Record<string, string>;
-};
-
-export type SurveyResultsHtmlReportExecutionProps = {
   onClose: () => void;
   onDownload: () => void;
   onFormatChange: (format: SessionResultsExportFormat) => void;
   onGenerateAnalysis: () => void;
   onToggleDemoMode: () => void;
-  onToggleSection: (key: SurveyResultsHtmlReportSectionKey) => void;
+  onToggleSection: (key: any) => void;
+  sectionRows: SurveyResultsHtmlReportSectionRow[];
+  selectedSections: Record<string, unknown>;
+  snapshot: SurveyResultsRecord;
+  styleMap: Record<string, string>;
 };
-
-export type SurveyResultsHtmlReportExportModalProps =
-  SurveyResultsHtmlReportExportModalDisplayProps &
-  SurveyResultsHtmlReportExecutionProps;
 
 export const HTML_REPORT_EXPORT_FORMATS: readonly {
   description: string;
@@ -88,58 +82,6 @@ export const buildSurveyResultsHtmlReportDownloadLabel = (
   return 'Download HTML Viewer';
 };
 
-export type SurveyResultsHtmlReportExportModalDisplayPlanInput = {
-  analysisGenerating?: boolean;
-  analysisPayload?: SurveyResultsHtmlReportAnalysisPayload;
-  analysisProgress?: string;
-  exportFormat?: SessionResultsExportFormat;
-  isAuthorized?: boolean;
-  isDemoMode?: boolean;
-  snapshot?: Partial<SessionResultsHtmlSnapshot>;
-};
-
-export type SurveyResultsHtmlReportExportModalDisplayPlan = {
-  canGenerateAnalysis: boolean;
-  downloadBlockedMessage: string;
-  downloadLabel: string;
-  exporterLabel: string;
-  generateAnalysisLabel: string;
-  sessionLabel: string;
-  sessionSlugLabel: string;
-};
-
-export const buildSurveyResultsHtmlReportExportModalDisplayPlan = ({
-  analysisGenerating = false,
-  analysisPayload = {},
-  analysisProgress = '',
-  exportFormat = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-  isAuthorized = false,
-  isDemoMode = false,
-  snapshot = {},
-}: SurveyResultsHtmlReportExportModalDisplayPlanInput = {}): SurveyResultsHtmlReportExportModalDisplayPlan => {
-  const sessionSlug = snapshot?.session?.slug;
-
-  return {
-    canGenerateAnalysis: (
-      (isAuthorized || isDemoMode) &&
-      !!analysisPayload?.eligibility?.eligible &&
-      !analysisGenerating
-    ),
-    downloadBlockedMessage: isAuthorized
-      ? 'Select only available sections, or generate selected analysis views before download.'
-      : 'Connect a wallet to enable download.',
-    downloadLabel: buildSurveyResultsHtmlReportDownloadLabel(exportFormat),
-    exporterLabel: snapshot?.exportedBy?.displayAddress || 'Not connected',
-    generateAnalysisLabel: analysisGenerating
-      ? analysisProgress || 'Generating Analysis Views...'
-      : isDemoMode
-        ? 'Refresh Demo Analysis'
-        : 'Generate Analysis Views',
-    sessionLabel: snapshot?.session?.name || snapshot?.session?.slug || 'Session',
-    sessionSlugLabel: sessionSlug ? ` (${sessionSlug})` : '',
-  };
-};
-
 export const renderSurveyResultsHtmlReportExportModal = ({
   analysisGenerating = false,
   analysisPayload,
@@ -163,23 +105,13 @@ export const renderSurveyResultsHtmlReportExportModal = ({
   snapshot,
   styleMap,
 }: SurveyResultsHtmlReportExportModalProps): React.ReactNode => {
-  const {
-    canGenerateAnalysis,
-    downloadBlockedMessage,
-    downloadLabel,
-    exporterLabel,
-    generateAnalysisLabel,
-    sessionLabel,
-    sessionSlugLabel,
-  } = buildSurveyResultsHtmlReportExportModalDisplayPlan({
-    analysisGenerating,
-    analysisPayload,
-    analysisProgress,
-    exportFormat,
-    isAuthorized,
-    isDemoMode,
-    snapshot,
-  });
+  const canGenerateAnalysis =
+    (isAuthorized || isDemoMode) &&
+    !!analysisPayload?.eligibility?.eligible &&
+    !analysisGenerating;
+  const sessionLabel = snapshot?.session?.name || snapshot?.session?.slug || 'Session';
+  const exporterLabel = snapshot?.exportedBy?.displayAddress || 'Not connected';
+  const downloadLabel = buildSurveyResultsHtmlReportDownloadLabel(exportFormat);
 
   return (
     <Modal
@@ -194,7 +126,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
       <ModalBody className={styleMap.htmlReportModalBody}>
         <p>
           <strong>{sessionLabel}</strong>
-          {sessionSlugLabel}
+          {snapshot?.session?.slug ? ` (${snapshot.session.slug})` : ''}
         </p>
         <p>
           Export timestamp: <strong>{snapshot?.exportedAt}</strong>
@@ -244,20 +176,66 @@ export const renderSurveyResultsHtmlReportExportModal = ({
             </FormGroup>
           </div>
         )}
-        <SurveyResultsHtmlReportSectionTable
-          onToggleSection={onToggleSection}
-          sectionRows={sectionRows}
-          selectedSections={selectedSections}
-          styleMap={styleMap}
-        />
-        <SurveyResultsHtmlReportAnalysisControls
-          analysisPayload={analysisPayload}
-          canGenerateAnalysis={canGenerateAnalysis}
-          generateAnalysisLabel={generateAnalysisLabel}
-          htmlReportAnalysisError={htmlReportAnalysisError}
-          onGenerateAnalysis={onGenerateAnalysis}
-          styleMap={styleMap}
-        />
+        <Table size="sm" responsive className={styleMap.htmlReportSectionTable}>
+          <thead>
+            <tr>
+              <th scope="col">Include</th>
+              <th scope="col">Section</th>
+              <th scope="col">Availability</th>
+              <th scope="col">Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sectionRows.map((row) => (
+              <tr key={row.key}>
+                <td>
+                  <Input
+                    aria-label={`Include ${row.label}`}
+                    checked={!!selectedSections[row.key]}
+                    type="checkbox"
+                    onChange={() => onToggleSection(row.key)}
+                  />
+                </td>
+                <td>{row.label}</td>
+                <td>{row.available ? 'Available' : 'Unavailable'}</td>
+                <td>{row.reason}</td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+        <div className={styleMap.htmlReportOptionGroup}>
+          <h6>Analysis views</h6>
+          <p>
+            {analysisPayload?.eligibility?.counts?.responses} responses,
+            {' '}{analysisPayload?.eligibility?.counts?.participants} participants,
+            {' '}{analysisPayload?.eligibility?.counts?.questions} questions.
+            {' '}AI mode uses synthetic participant IDs.
+          </p>
+          {analysisPayload?.eligibility?.reasons?.length > 0 && (
+            <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
+              {analysisPayload.eligibility.reasons.join(' ')}
+            </Alert>
+          )}
+          {htmlReportAnalysisError && (
+            <Alert color="warning" fade={false} className={styleMap.htmlReportWarning}>
+              {htmlReportAnalysisError}
+            </Alert>
+          )}
+          <Button
+            type="button"
+            color="secondary"
+            onClick={onGenerateAnalysis}
+            disabled={!canGenerateAnalysis}
+            className={styleMap.htmlReportGenerateButton}
+            data-testid="ce-surveyresults-html-report-generate-analysis"
+          >
+            {analysisGenerating
+              ? analysisProgress || 'Generating Analysis Views...'
+              : isDemoMode
+                ? 'Refresh Demo Analysis'
+                : 'Generate Analysis Views'}
+          </Button>
+        </div>
         {needsAnalysisGeneration && (
           <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
             Selected analysis sections need generated data before download.
@@ -268,17 +246,30 @@ export const renderSurveyResultsHtmlReportExportModal = ({
         </Alert>
         {!canDownload && (
           <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
-            {downloadBlockedMessage}
+            {isAuthorized
+              ? 'Select only available sections, or generate selected analysis views before download.'
+              : 'Connect a wallet to enable download.'}
           </Alert>
         )}
       </ModalBody>
-      {renderSurveyResultsHtmlReportActionControls({
-        canDownload,
-        downloadLabel,
-        onClose,
-        onDownload,
-        styleMap,
-      })}
+      <ModalFooter className={styleMap.htmlReportModalFooter}>
+        <Button
+          color="secondary"
+          onClick={onClose}
+          className={styleMap.htmlReportCancelButton}
+        >
+          Cancel
+        </Button>
+        <Button
+          color="primary"
+          onClick={onDownload}
+          disabled={!canDownload}
+          className={styleMap.htmlReportDownloadButton}
+          data-testid="ce-surveyresults-html-report-download"
+        >
+          {downloadLabel}
+        </Button>
+      </ModalFooter>
     </Modal>
   );
 };

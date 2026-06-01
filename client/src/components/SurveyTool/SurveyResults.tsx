@@ -3,11 +3,8 @@
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import {
-  Alert,
   Button,
-  FormGroup,
   Label,
-  Input,
   Form,
   Card,
   CardHeader,
@@ -19,7 +16,6 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
-  Table,
   Collapse
 } from 'reactstrap';
 
@@ -166,7 +162,6 @@ import {
   renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
-  SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   shortenSessionResultsAddress,
   type SessionResultsAnalysisResponseInput,
@@ -179,6 +174,7 @@ import {
 } from '../../utilities/sessionResultsExport';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
+import { renderSurveyResultsHtmlReportExportModal } from './SurveyResultsHtmlReportExportModal';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
@@ -550,24 +546,6 @@ const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
-
-const HTML_REPORT_EXPORT_FORMATS: readonly { description: string; label: string; value: SessionResultsExportFormat }[] = Object.freeze([
-  {
-    description: 'Interactive local HTML',
-    label: 'Exported viewer',
-    value: SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-  },
-  {
-    description: 'Static local HTML',
-    label: 'Single HTML file',
-    value: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
-  },
-  {
-    description: 'Multi-page PDF report',
-    label: 'PDF report',
-    value: SESSION_RESULTS_EXPORT_FORMAT_PDF,
-  },
-]);
 
 const DEFAULT_HTML_REPORT_SELECTED_SECTIONS: Required<SessionResultsSectionSelection> = Object.freeze({
   argumentMap: false,
@@ -5316,177 +5294,30 @@ const isDemoSession = this.isHtmlReportDemoSession();
 const isDemoMode = this.isHtmlReportDemoModeActive();
 const needsAnalysisGeneration = this.needsHtmlReportAnalysisGeneration(snapshot, selectedSections);
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
-const canGenerateAnalysis =
-  (isAuthorized || isDemoMode) &&
-  analysisPayload.eligibility.eligible &&
-  !this.state.htmlReportAnalysisGenerating;
-const sessionLabel = snapshot.session.name || snapshot.session.slug || 'Session';
-const exporterLabel = snapshot.exportedBy?.displayAddress || 'Not connected';
-const downloadLabel = this.state.htmlReportExportFormat === SESSION_RESULTS_EXPORT_FORMAT_PDF
-  ? 'Download PDF'
-  : this.state.htmlReportExportFormat === SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML
-    ? 'Download Single HTML'
-    : 'Download HTML Viewer';
 
-return (
-  <Modal
-    isOpen={!!this.state.htmlReportModalOpen}
-    toggle={this.closeHtmlReportExportModal}
-    className={styles.htmlReportModal}
-    data-testid="ce-surveyresults-html-report-modal"
-  >
-    <ModalHeader toggle={this.closeHtmlReportExportModal} className={styles.htmlReportModalHeader}>
-      Export HTML Report
-    </ModalHeader>
-    <ModalBody className={styles.htmlReportModalBody}>
-      <p>
-        <strong>{sessionLabel}</strong>
-        {snapshot.session.slug ? ` (${snapshot.session.slug})` : ''}
-      </p>
-      <p>
-        Export timestamp: <strong>{snapshot.exportedAt}</strong>
-      </p>
-      <p>
-        Privacy mode: <strong>Redacted</strong>
-      </p>
-      <p>
-        Downloaded by: <strong>{exporterLabel}</strong>
-      </p>
-      {!isAuthorized && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          Connect a wallet to download authenticated exports.
-        </Alert>
-      )}
-      <div className={styles.htmlReportOptionGroup}>
-        <h6>Export format</h6>
-        {HTML_REPORT_EXPORT_FORMATS.map((formatOption) => (
-          <FormGroup check key={formatOption.value} className={styles.htmlReportOptionRow}>
-            <Input
-              id={`html-report-format-${formatOption.value}`}
-              type="radio"
-              checked={this.state.htmlReportExportFormat === formatOption.value}
-              onChange={() => this.handleHtmlReportFormatChange(formatOption.value)}
-            />
-            <Label check for={`html-report-format-${formatOption.value}`}>
-              <strong>{formatOption.label}</strong>
-              <small>{formatOption.description}</small>
-            </Label>
-          </FormGroup>
-        ))}
-      </div>
-      {isDemoSession && (
-        <div className={styles.htmlReportOptionGroup}>
-          <FormGroup check className={styles.htmlReportOptionRow}>
-            <Input
-              id="html-report-demo-mode"
-              type="checkbox"
-              checked={isDemoMode}
-              onChange={this.toggleHtmlReportDemoMode}
-              data-testid="ce-surveyresults-html-report-demo-mode"
-            />
-            <Label check for="html-report-demo-mode">
-              <strong>Demo preview mode</strong>
-              <small>Use local demo analysis sections without AI or wallet auth.</small>
-            </Label>
-          </FormGroup>
-        </div>
-      )}
-      <Table size="sm" responsive className={styles.htmlReportSectionTable}>
-        <thead>
-          <tr>
-            <th scope="col">Include</th>
-            <th scope="col">Section</th>
-            <th scope="col">Availability</th>
-            <th scope="col">Why</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sectionRows.map((row) => (
-            <tr key={row.key}>
-              <td>
-                <Input
-                  aria-label={`Include ${row.label}`}
-                  checked={!!selectedSections[row.key]}
-                  type="checkbox"
-                  onChange={() => this.toggleHtmlReportSection(row.key)}
-                />
-              </td>
-              <td>{row.label}</td>
-              <td>{row.available ? 'Available' : 'Unavailable'}</td>
-              <td>{row.reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <div className={styles.htmlReportOptionGroup}>
-        <h6>Analysis views</h6>
-        <p>
-          {analysisPayload.eligibility.counts.responses} responses,
-          {' '}{analysisPayload.eligibility.counts.participants} participants,
-          {' '}{analysisPayload.eligibility.counts.questions} questions.
-          {' '}AI mode uses synthetic participant IDs.
-        </p>
-        {analysisPayload.eligibility.reasons.length > 0 && (
-          <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-            {analysisPayload.eligibility.reasons.join(' ')}
-          </Alert>
-        )}
-        {this.state.htmlReportAnalysisError && (
-          <Alert color="warning" fade={false} className={styles.htmlReportWarning}>
-            {this.state.htmlReportAnalysisError}
-          </Alert>
-        )}
-        <Button
-          type="button"
-          color="secondary"
-          onClick={this.generateHtmlReportAnalysisViews}
-          disabled={!canGenerateAnalysis}
-          className={styles.htmlReportGenerateButton}
-          data-testid="ce-surveyresults-html-report-generate-analysis"
-        >
-          {this.state.htmlReportAnalysisGenerating
-            ? this.state.htmlReportAnalysisProgress || 'Generating Analysis Views...'
-            : isDemoMode
-              ? 'Refresh Demo Analysis'
-              : 'Generate Analysis Views'}
-        </Button>
-      </div>
-      {needsAnalysisGeneration && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          Selected analysis sections need generated data before download.
-        </Alert>
-      )}
-      <Alert color="warning" fade={false} className={styles.htmlReportWarning}>
-        Redacted exports omit raw response records, wallet addresses, encrypted payloads, and gated values by default.
-      </Alert>
-      {!canDownload && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          {isAuthorized
-            ? 'Select only available sections, or generate selected analysis views before download.'
-            : 'Connect a wallet to enable download.'}
-        </Alert>
-      )}
-    </ModalBody>
-    <ModalFooter className={styles.htmlReportModalFooter}>
-      <Button
-        color="secondary"
-        onClick={this.closeHtmlReportExportModal}
-        className={styles.htmlReportCancelButton}
-      >
-        Cancel
-      </Button>
-      <Button
-        color="primary"
-        onClick={this.downloadHtmlReport}
-        disabled={!canDownload}
-        className={styles.htmlReportDownloadButton}
-        data-testid="ce-surveyresults-html-report-download"
-      >
-        {downloadLabel}
-      </Button>
-    </ModalFooter>
-  </Modal>
-);
+return renderSurveyResultsHtmlReportExportModal({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  analysisPayload,
+  analysisProgress: this.state.htmlReportAnalysisProgress,
+  canDownload,
+  exportFormat: this.state.htmlReportExportFormat,
+  htmlReportAnalysisError: this.state.htmlReportAnalysisError,
+  isAuthorized,
+  isDemoMode,
+  isDemoSession,
+  isOpen: this.state.htmlReportModalOpen,
+  needsAnalysisGeneration,
+  onClose: this.closeHtmlReportExportModal,
+  onDownload: this.downloadHtmlReport,
+  onFormatChange: this.handleHtmlReportFormatChange,
+  onGenerateAnalysis: this.generateHtmlReportAnalysisViews,
+  onToggleDemoMode: this.toggleHtmlReportDemoMode,
+  onToggleSection: this.toggleHtmlReportSection,
+  sectionRows,
+  selectedSections,
+  snapshot,
+  styleMap: styles,
+});
 }
 
 render() {
