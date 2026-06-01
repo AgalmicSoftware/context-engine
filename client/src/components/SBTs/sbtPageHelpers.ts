@@ -254,6 +254,7 @@ export type {
   SbtPageInfoImageLike,
 } from './sbtPageMediaHelpers';
 export {
+  resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderFilterItems,
   resolveSbtPageHolderLoadingState,
   resolveSbtPageHolderModalDisplayState,
@@ -261,11 +262,13 @@ export {
   resolveSbtPageHoldersDisplayCount,
 } from './sbtPageHolderDisplayHelpers';
 export type {
+  ResolveSbtPageHolderDisplayModelArgs,
   ResolveSbtPageHolderFilterItemsArgs,
   ResolveSbtPageHolderLoadingStateArgs,
   ResolveSbtPageHolderModalDisplayStateArgs,
   ResolveSbtPageHolderResolutionStateArgs,
   ResolveSbtPageHoldersDisplayCountArgs,
+  SbtPageHolderDisplayModel,
   SbtPageHolderFilterItems,
   SbtPageHolderLoadingState,
   SbtPageHolderModalDisplayState,

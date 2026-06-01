@@ -149,7 +149,6 @@ import {
   getExplicitSbtPageSessionSlug,
   hasSbtPageAutoMintFlag,
   getNextDisplayImageFallbackState,
-  hasUsableSbtPageScanProgress,
   isActiveSbtPageScanProgress,
   isRecord,
   mergeSbtPageBurnEvidenceIntoPreservedHolderState,
@@ -177,12 +176,8 @@ import {
   resolveSbtPageCopyIconState,
   resolveSbtPageEffectiveSessionSlug,
   resolveSbtPageFullViewShellState,
-  resolveSbtPageHolderFilterItems,
-  resolveSbtPageHolderLoadingState,
-  resolveSbtPageHolderModalDisplayState,
-  resolveSbtPageHolderResolutionState,
+  resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderScanActive,
-  resolveSbtPageHoldersDisplayCount,
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
@@ -216,13 +211,9 @@ import {
   resolveSbtPageRefreshIndicatorStyle,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
-  resolveSbtPageRemainingBlocksCount,
   resolveSbtPageCachedGroupPasswordHash,
   resolveSbtPageChainMetadataReadNeeds,
   resolveSbtPageGroupPasswordMintState,
-  resolveSbtPageScanProgressDisplay,
-  resolveSbtPageScanProgressFillStyle,
-  resolveSbtPageScanProgressPercent,
   resolveSbtPageSessionDisplayConfig,
   resolveSbtPageSessionDisplayLabel,
   resolveSbtPageSectionToggleDisplayState,
@@ -236,7 +227,6 @@ import {
   resolveSbtChainId,
   resolveSbtPageTokenMetadataLinkDisplayState,
   sanitizeSbtPageMintedTokensOverride,
-  shouldShowSbtPageScanProgress,
   shouldRunSbtPagePropListAutoMint,
   shouldRunSbtPagePropPasswordAutoMint,
 } from './sbtPageHelpers';
@@ -4718,34 +4708,48 @@ renderMintButton() {
     const addressDisplay = getShortenedAddress(sbtAddressForDisplay, false);
 
     const netHolders = this.getMemoizedNetHoldersList(mintedAddresses, burnedAddresses);
-    // For the holders modal, treat any non-empty holders list as "ready" even if the
-    // latest refresh pass temporarily flips countsLoaded back to false.
-    const hasComputedHolders = netHolders.length > 0;
-    const hasFilteredHolders = this.state.filteredMintedUsers.length > 0;
-    const mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(this.state.mintedTokensOverride);
     const scanProgress = this.getEffectiveHolderScanProgress();
-    const hasScanProgress = hasUsableSbtPageScanProgress(scanProgress);
-    const hasActiveScanProgress = isActiveSbtPageScanProgress(scanProgress);
-    const isScanActive = this.isHolderScanActive();
-    const {
-      countsReady,
-      effectiveLoading,
-      holdersReady,
-      netMinted,
-      shouldOverrideMinted,
-      terminalEmptyHoldersState,
-    } = resolveSbtPageHolderLoadingState({
+    const holderDisplayModel = resolveSbtPageHolderDisplayModel({
       countsLoaded,
-      hasComputedHolders,
-      hasFilteredHolders,
-      isScanActive,
+      filteredMintedUsers: this.state.filteredMintedUsers,
+      isScanActive: this.isHolderScanActive(),
       loadingMintersBurners,
       loadingMintedFilter: this.state.loadingMintedFilter,
-      mintedTokensOverride,
-      netHoldersCount: netHolders.length,
+      mintedAddresses,
+      mintedTokensOverride: this.state.mintedTokensOverride,
+      netHolders,
+      scanProgress,
       sbtScanInProgress: this.props.sbtScanInProgress,
       sbtScanPending: this.props.sbtScanPending,
+      showModal,
+      resolveScanProgressSessionLabel: (progress) => (
+        progress?.sessionLabel ||
+        this.getSessionDisplayLabel(progress?.sessionSlug || this.getEffectiveSessionSlug()) ||
+        ''
+      ),
     });
+    const {
+      filteredMintedUsers,
+      hasComputedHolders,
+      hasFilteredHolders,
+      holdersDisplayCount,
+      holderItemsForFilter,
+      isInitialLoading,
+      isRefreshing,
+      mintedCountTitle,
+      netMinted,
+      scanProgressFillStyle,
+      scanProgressPct,
+      scanProgressSessionText,
+      scanProgressText,
+      showApproximateCountHint,
+      showCornerSpinner,
+      showEmptyStateInModal,
+      showHeaderCount,
+      showScanProgress,
+      showScanProgressInModal,
+      showSpinnerInModalBody,
+    } = holderDisplayModel;
 
     const sbtInfoForDetails = sbtInfo as SbtPageInfoState;
     const burnLabel = resolveSbtPageBurnAuthLabel(sbtInfoForDetails.burnAuth);
@@ -4756,87 +4760,6 @@ renderMintButton() {
       tokenUriRaw: sbtInfo?.tokenURI || sbtInfo?.tokenUri || '',
     });
     const { adminAddress, creatorAddress } = resolveSbtPageAdminCreatorAddresses(sbtInfo);
-
-    const isInitialLoading = !countsReady && effectiveLoading;
-
-    // 2. Refreshing: If we have data (netMinted > 0) AND we are loading, show Data + Small Spinner.
-    const isRefreshing = (!isInitialLoading) && effectiveLoading;
-    const rawRemainingBlocksCount = hasScanProgress
-      ? resolveSbtPageRemainingBlocksCount(scanProgress)
-      : 0;
-    const showScanProgress = shouldShowSbtPageScanProgress({
-      effectiveLoading,
-      hasActiveScanProgress,
-      rawRemainingBlocksCount,
-    });
-    const {
-      addressesAreResolving,
-    } = resolveSbtPageHolderResolutionState({
-      isRefreshing,
-      loadingMintersBurners,
-      loadingMintedFilter: this.state.loadingMintedFilter,
-      mintedAddresses,
-      mintedTokensOverride,
-      showScanProgress,
-    });
-    const holdersDisplayCount = resolveSbtPageHoldersDisplayCount({
-      mintedTokensOverride,
-      netHoldersCount: netHolders.length,
-      shouldOverrideMinted,
-    });
-    const {
-      remainingBlocksCount,
-      scanProgressSessionText,
-      scanProgressText,
-    } = resolveSbtPageScanProgressDisplay({
-      rawRemainingBlocksCount,
-      sessionLabel: showScanProgress
-        ? (scanProgress?.sessionLabel || this.getSessionDisplayLabel(scanProgress?.sessionSlug || this.getEffectiveSessionSlug()) || '')
-        : '',
-      showScanProgress,
-    });
-    const scanProgressPct = resolveSbtPageScanProgressPercent({
-      progress: scanProgress,
-      showScanProgress,
-    });
-    const scanProgressFillStyle = resolveSbtPageScanProgressFillStyle({
-      percent: scanProgressPct,
-    });
-    const {
-      filteredMintedUsers,
-      holderItemsForFilter,
-    } = resolveSbtPageHolderFilterItems({
-      filteredMintedUsers: this.state.filteredMintedUsers,
-      hasComputedHolders,
-      hasFilteredHolders,
-      isScanActive,
-      netHolders,
-    });
-
-    const {
-      mintedCountTitle,
-      showApproximateCountHint,
-      showCornerSpinner,
-      showEmptyStateInModal,
-      showHeaderCount,
-      showScanProgressInModal,
-      showSpinnerInModalBody,
-      waitingForHolderDetails,
-    } = resolveSbtPageHolderModalDisplayState({
-      addressesAreResolving,
-      hasActiveScanProgress,
-      hasComputedHolders,
-      hasFilteredHolders,
-      holdersReady,
-      isInitialLoading,
-      isRefreshing,
-      isScanActive,
-      loadingMintersBurners,
-      loadingMintedFilter: this.state.loadingMintedFilter,
-      shouldOverrideMinted,
-      showModal,
-      showScanProgress,
-    });
     const filterNetwork = this.state.network || this.props.network || null;
     const passwordAlertState = resolveSbtPagePasswordAlertState({
       mintPassword,
