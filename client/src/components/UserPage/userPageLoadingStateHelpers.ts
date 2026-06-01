@@ -111,9 +111,18 @@ export type BuildUserPageCacheRefreshDisplayStateArgs =
     walletLabel?: unknown;
   };
 
+export type ResolveUserPageCacheReadinessDisplayPlanArgs = {
+  disabledByCache?: unknown;
+  hasAnyLoading?: unknown;
+  hasVisibleData?: unknown;
+};
+
 export type ResolveUserPageSectionToggleDisplayStateArgs = {
   open?: unknown;
 };
+
+export type UserPageCacheActionKind = 'disabled' | 'enabled';
+export type UserPageCacheDisplayKind = 'idle' | 'loading' | 'stale-or-cache-miss';
 
 export type UserPageSectionLoadingEmptyState = {
   questionResponsesLoadingEmpty: boolean;
@@ -169,8 +178,8 @@ export type UserPageAiActionPlan = {
 
 export type UserPageCacheRefreshDisplayState = {
   aiActionPlan: UserPageAiActionPlan;
-  cacheActionKind: 'disabled' | 'enabled';
-  cacheDisplayKind: 'idle' | 'loading' | 'stale-or-cache-miss';
+  cacheActionKind: UserPageCacheActionKind;
+  cacheDisplayKind: UserPageCacheDisplayKind;
   hasAnyLoading: boolean;
   hasGatedOrDecryptDisplayFallback: boolean;
   hasMissingDataFallback: boolean;
@@ -185,6 +194,12 @@ export type UserPageCacheRefreshDisplayState = {
   loadingState: UserPageRenderLoadingState;
   sectionLoadingEmptyState: UserPageSectionLoadingEmptyState;
   uncertainEmptyText: UserPageUncertainEmptyText;
+};
+
+export type UserPageCacheReadinessDisplayPlan = {
+  cacheActionKind: UserPageCacheActionKind;
+  cacheDisplayKind: UserPageCacheDisplayKind;
+  hasMissingDataFallback: boolean;
 };
 
 export type UserPageSectionToggleDisplayState = {
@@ -364,6 +379,24 @@ const readUserPageDisplayLength = (value: UserPageLengthLike | undefined): numbe
   return Number.isFinite(length) && length > 0 ? length : 0;
 };
 
+export const resolveUserPageCacheReadinessDisplayPlan = ({
+  disabledByCache = false,
+  hasAnyLoading = false,
+  hasVisibleData = false,
+}: ResolveUserPageCacheReadinessDisplayPlanArgs = {}): UserPageCacheReadinessDisplayPlan => {
+  const isLoading = !!hasAnyLoading;
+  const hasData = !!hasVisibleData;
+  return {
+    cacheActionKind: disabledByCache ? 'disabled' : 'enabled',
+    cacheDisplayKind: isLoading
+      ? 'loading'
+      : hasData
+        ? 'idle'
+        : 'stale-or-cache-miss',
+    hasMissingDataFallback: !isLoading && !hasData,
+  };
+};
+
 export const buildUserPageCacheRefreshDisplayState = ({
   aiAvailable = null,
   analyzing = false,
@@ -441,19 +474,19 @@ export const buildUserPageCacheRefreshDisplayState = ({
     surveyCreationInfo,
     surveyResponseInfo,
   ].some((value) => readUserPageDisplayLength(value) > 0);
-  const cacheDisplayKind = hasAnyLoading
-    ? 'loading'
-    : hasVisibleData
-      ? 'idle'
-      : 'stale-or-cache-miss';
+  const cacheReadinessDisplayPlan = resolveUserPageCacheReadinessDisplayPlan({
+    disabledByCache: loadingState.disabledByCache,
+    hasAnyLoading,
+    hasVisibleData,
+  });
 
   return {
     aiActionPlan,
-    cacheActionKind: loadingState.disabledByCache ? 'disabled' : 'enabled',
-    cacheDisplayKind,
+    cacheActionKind: cacheReadinessDisplayPlan.cacheActionKind,
+    cacheDisplayKind: cacheReadinessDisplayPlan.cacheDisplayKind,
     hasAnyLoading,
     hasGatedOrDecryptDisplayFallback: !!hasUncertainGateAccess || !!hasUncertainUserData,
-    hasMissingDataFallback: !hasAnyLoading && !hasVisibleData,
+    hasMissingDataFallback: cacheReadinessDisplayPlan.hasMissingDataFallback,
     hasVisibleData,
     loadingIndicators: {
       questionResponses: loadingState.isQuestionLoadingAny,
