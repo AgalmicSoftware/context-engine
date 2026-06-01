@@ -52,7 +52,6 @@ import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   parseQuestionSessionIdFromSearch,
@@ -130,14 +129,7 @@ import {
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
 import {
-  SurveyResultsFreeformAggregatorSummary,
-  SurveyResultsMultichoiceAggregatorSummary,
-} from './SurveyResultsAggregatorSummaries';
-import {
-  buildSurveyResultsFreeformSummaryModel,
-  buildSurveyResultsMultichoiceSummaryModel,
   getSurveyResultsLatestResponsesByResponder,
-  resolveSurveyResultsSummaryQuestionType,
 } from './surveyResultsSummaryModels';
 import {
   renderSurveyResultsFilterSummary,
@@ -154,7 +146,7 @@ import {
 import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
 import {
   buildSurveyResultsQuestionListDisplayPlan,
-  buildSurveyResultsQuestionSummaryDisplayPlan,
+  getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
 import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 import {
@@ -191,7 +183,7 @@ import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
-import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
@@ -248,10 +240,6 @@ type SurveyResultsSummaryResponsePayload = SurveyResultsRecord & {
 type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
   response?: SurveyResultsSummaryResponsePayload | null;
   responder?: unknown;
-};
-type SurveyResultsViewableResponsesCountMemoValue = {
-  count: number;
-  questionType: string;
 };
 type SurveyResultsBookmarkCache = {
   questions: unknown[];
@@ -332,26 +320,6 @@ type SurveyResultsQuestionFilterHandle = {
 type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 type SurveyResultsAggregatorEntry = [string, unknown];
 type SurveyResultsStringifiedAggregator = Record<string, SurveyResultsRecord[]>;
-type SurveyResultsFreeformDisplayedResponse = {
-  additional: string;
-  responder: unknown;
-  value: unknown;
-};
-type SurveyResultsFreeformSummaryModel = {
-  blankCount: number;
-  displayedResponses: SurveyResultsFreeformDisplayedResponse[];
-  encryptedCount: number;
-  totalResponses: number;
-};
-type SurveyResultsMultichoiceSummaryOption = {
-  count: number;
-  key: string;
-  label: string;
-};
-type SurveyResultsMultichoiceSummaryModel = {
-  options: SurveyResultsMultichoiceSummaryOption[];
-  totalResponders: number;
-};
 type SurveyResultsResponseCardClassNames = {
   aggregatorContainerClassName: string;
   aggregatorFreeformAnswerClassName: string;
@@ -1092,15 +1060,6 @@ const getResponseQuestionType = (
 );
 
 
-/**
- * A single place to generate the DOM id used
- * by every question-card element.
- *  – always lower-cases the questionId
- *  – strips characters that are invalid in an HTML id
- */
-const getQuestionCardDomId = (questionId: string = ''): string =>
-  `questionCard-${questionId.toLowerCase()}`;
-
 class SurveyResults extends Component<any, any> {
   _syncLoadingStartedAt: number | null;
   _scrollMutationObserver: MutationObserver | null;
@@ -1136,7 +1095,6 @@ class SurveyResults extends Component<any, any> {
   _surveyModeSourcePayloadRefSignature: string;
   _surveyModeSourceCacheNonce: number;
   _individualResponsesAggregatorMemo: SurveyResultsIndividualResponsesAggregatorMemo;
-  _viewableResponsesCountMemo: WeakMap<SurveyResultsSummaryResponseRow[], SurveyResultsViewableResponsesCountMemoValue>;
   _resultsRefreshMicrotaskScheduled: boolean;
   _resultsRefreshFrameRequestId: number | null;
   _queuedResultsRefreshReasons: Set<string>;
@@ -1328,7 +1286,6 @@ class SurveyResults extends Component<any, any> {
       responsesRef: null,
       result: {},
     };
-    this._viewableResponsesCountMemo = new WeakMap();
     this._resultsRefreshMicrotaskScheduled = false;
     this._resultsRefreshFrameRequestId = null;
     this._queuedResultsRefreshReasons = new Set();
@@ -4493,39 +4450,6 @@ getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResults
   return next;
 };
 
-getMemoizedViewableResponsesCount = (responses: unknown, questionType: unknown = ''): number => {
-  const list = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
-  const normalizedQuestionType = String(questionType || '').toLowerCase();
-  const memo = this._viewableResponsesCountMemo as WeakMap<
-    SurveyResultsSummaryResponseRow[],
-    SurveyResultsViewableResponsesCountMemoValue
-  >;
-  const cached = memo.get(list);
-  if (cached && cached.questionType === normalizedQuestionType) {
-    return cached.count;
-  }
-  const count = this.getLatestResponsesByResponder(list).reduce((acc: number, row) => {
-    const parsedResponse = row?.response;
-    if (!parsedResponse || !parsedResponse.answer) {
-      return acc;
-    }
-    if (isFreeformBlankAnswer(normalizedQuestionType, parsedResponse)) {
-      return acc;
-    }
-    const isEncryptedPlaceholder =
-      parsedResponse.answer.encrypted === true &&
-      parsedResponse.answer.value === '*';
-    return isEncryptedPlaceholder ? acc : (acc + 1);
-  }, 0);
-  memo.set(list, {
-    questionType: normalizedQuestionType,
-    count,
-  });
-  return count;
-};
-
 getMemoizedAggregatorEntries = (aggregator: unknown): SurveyResultsAggregatorEntry[] => {
   const ref = (aggregator && typeof aggregator === 'object')
     ? aggregator as SurveyResultsRecord
@@ -4574,33 +4498,9 @@ getMemoizedPolisQuestionResponses = (
   return result;
 };
 
-resolveSummaryQuestionType = resolveSurveyResultsSummaryQuestionType;
-
 getLatestResponsesByResponder = getSurveyResultsLatestResponsesByResponder as (
   responses?: unknown
 ) => SurveyResultsSummaryResponseRow[];
-
-buildFreeformSummaryModel = buildSurveyResultsFreeformSummaryModel as (
-  responses?: unknown
-) => SurveyResultsFreeformSummaryModel;
-
-buildMultichoiceSummaryModel = buildSurveyResultsMultichoiceSummaryModel as (
-  responses?: unknown,
-  question?: SurveyResultsRecord | null
-) => SurveyResultsMultichoiceSummaryModel;
-
-renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
-  const summary = this.buildFreeformSummaryModel(responses);
-  return SurveyResultsFreeformAggregatorSummary({ summary });
-};
-
-renderMultichoiceAggregatorSummary = (
-  responses: unknown = [],
-  question: SurveyResultsRecord | null = null
-): React.ReactNode => {
-  const summary = this.buildMultichoiceSummaryModel(responses, question);
-  return SurveyResultsMultichoiceAggregatorSummary({ summary });
-};
 
 getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
   containerClassName: styles.surveyResultsResponseCard,
@@ -5076,71 +4976,34 @@ renderQuestionSummary = (
   responses: unknown,
   preNetworkQuestions: Record<string, SurveyResultsRecord>
 ): React.ReactNode => {
-  const domId = getQuestionCardDomId(questionId);
-  const lowerQId = questionId.toLowerCase();
-
   // Prefer preloaded per-render cache to avoid repeated localStorage hits.
   let networkQuestions = preNetworkQuestions;
   if (!networkQuestions) {
     networkQuestions = this.getNetworkQuestionsForCurrentContext();
   }
-  const question = networkQuestions[lowerQId];
-  const questionDisplay = buildSurveyResultsQuestionSummaryDisplayPlan({
-    question,
-    questionId,
-  });
-  const displayResponses = (Array.isArray(responses) ? responses : []).map((row: SurveyResultsAggregateRow) => {
-    const rowResponse = row?.response as SurveyResultsResponseRecord | null;
-    const key = this.getLockedResponseKey({
-      responder: row?.responder,
-      questionId,
-      surveyId: this.state.surveyId,
-      response: rowResponse,
-    });
-    return {
-      ...row,
-      response: this.applyDecryptedOverrideToResponse({
-        response: rowResponse,
-        key,
-      }),
-    };
-  });
-  const resolvedQuestionType = this.resolveSummaryQuestionType(question, displayResponses);
-  const viewableResponsesCount = this.getMemoizedViewableResponsesCount(displayResponses, resolvedQuestionType);
 
-const isActive = this.state.activeQuestionToggles[questionId];
-return (
-  <SurveyResultsQuestionSummaryCard
-    key={questionId}
-    bookmarked={this.state.bookmarkedQuestionIDs.includes(questionId)}
-    bookmarkIconStyle={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
-    domId={domId}
-    isActive={!!isActive}
-    metadataMissing={questionDisplay.metadataMissing}
-    metadataMissingStyle={SURVEY_RESULTS_METADATA_MISSING_STYLE}
-    onToggleBookmark={() => this.toggleQuestionBookmark(questionId)}
-    onToggleSummary={() => this.toggleQuestionSummary(questionId)}
-    questionPrompt={questionDisplay.questionPrompt as React.ReactNode}
-    renderDefaultSummary={() => (
-      <SingleQuestionResponse
-        aggregatorResponseMode={true}
-        question={question || this.getStableFallbackQuestion(questionId, 'summary')}
-        allResponses={displayResponses}
-        network={this.props.network}
-        activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionsCacheNonce={this.props.questionsCacheNonce}
-        sbtCacheRevision={this.props.sbtCacheRevision}
-        {...this.getSurveyResultsResponseCardProps()}
-      />
-    )}
-    renderFreeformSummary={() => this.renderFreeformAggregatorSummary(displayResponses)}
-    renderMultichoiceSummary={() => this.renderMultichoiceAggregatorSummary(displayResponses, question)}
-    resolvedQuestionType={resolvedQuestionType}
-    styleMap={styles}
-    viewableResponsesCount={viewableResponsesCount}
-  />
-);
+  return SurveyResultsQuestionSummary({
+    activeQuestionToggles: this.state.activeQuestionToggles,
+    activeSessionSlug: this.getEffectiveSlug(),
+    applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+    bookmarkedQuestionIDs: this.state.bookmarkedQuestionIDs,
+    bookmarkIconStyle: SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
+    getFallbackQuestion: this.getStableFallbackQuestion,
+    getLockedResponseKey: this.getLockedResponseKey,
+    getResponseCardProps: this.getSurveyResultsResponseCardProps,
+    metadataMissingStyle: SURVEY_RESULTS_METADATA_MISSING_STYLE,
+    network: this.props.network,
+    networkQuestions,
+    onToggleBookmark: this.toggleQuestionBookmark,
+    onToggleSummary: this.toggleQuestionSummary,
+    questionId,
+    questionResponsesNonce: this.props.questionResponsesNonce,
+    questionsCacheNonce: this.props.questionsCacheNonce,
+    responses,
+    sbtCacheRevision: this.props.sbtCacheRevision,
+    styleMap: styles,
+    surveyId: this.state.surveyId,
+  });
 };
 
 getStableFallbackQuestion = (
@@ -5278,7 +5141,7 @@ return out;
 
 
 scrollToQuestion = (questionId: unknown): void => {
-const domId = getQuestionCardDomId(questionId as string | undefined);
+const domId = getSurveyResultsQuestionCardDomId(questionId as string | undefined);
 const cleanupScrollWatcher = () => {
   if (this._scrollToQuestionRetryTimer) {
     clearTimeout(this._scrollToQuestionRetryTimer);
