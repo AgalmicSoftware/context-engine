@@ -46,8 +46,8 @@ import {
 } from './SBTPageModals';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageActionsSection from './SbtPageActionsSection';
+import SbtPageAdminActions from './SbtPageAdminActions';
 import SbtPageMiniCard from './SbtPageMiniCard';
-import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
@@ -186,7 +186,6 @@ import {
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInlineLockIconStyle,
   resolveSbtPageInteractiveCursorStyle,
-  resolveSbtPageItalicNoteStyle,
   resolveSbtPageMaxTokensDisplay,
   resolveSbtPageMetadataHydrationMode,
   resolveSbtPageManualClaimButtonState,
@@ -4209,6 +4208,39 @@ renderMintButton() {
     }));
   };
 
+  handlePasswordGenerationCountChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
+    if (this._isMounted) this.setState(buildSbtPagePasswordGenerationCountPatch({
+      value: event.target.value,
+    }));
+  };
+
+  handleAdminBurn = async (): Promise<void> => {
+    const { burnSearchResult } = this.state;
+    const burnSearchResultRecord = isRecord(burnSearchResult)
+      ? burnSearchResult as SbtPageBurnSearchResult
+      : null;
+
+    if (!burnSearchResult) {
+      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: "No token selected to burn" }));
+      return;
+    }
+    if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
+
+    const sbtAddressOriginalCaseForAdminBurn = resolveSbtAddressString(this.props.SBTAddress);
+    if (!sbtAddressOriginalCaseForAdminBurn) {
+      if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: `${t('sbt')} address not found for admin ${t('burnLower')}.` }));
+      return;
+    }
+
+    const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
+    await this.loadSBTInfo(true);
+    if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
+      resetBurnSearch: true,
+      txHash: tx.transactionHash,
+    }));
+    this.cacheTransactionHash(tx.transactionHash);
+  };
+
   renderAdminActions = (): React.ReactNode => {
     const { userIsSbtAdmin, sbtInfo, burnSearchInput, burnSearchResult, burningStatus, adminGeneratedPasswords, cachedPasswords, includePreviousPasswords, exportFormat, passwordGenerationCount } = this.state;
     if (!userIsSbtAdmin || !sbtInfo) return null;
@@ -4288,177 +4320,32 @@ renderMintButton() {
       targetKey: 'open-mint-url',
     });
 
-    return (
-      <div className={styles.adminActions}>
-        {openMintAutoJoinUrl && (
-          <SbtPageOpenMintUrlCard
-            copyIconState={openMintUrlCopyIconState}
-            onCopy={() => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url')}
-            openMintAutoJoinUrl={openMintAutoJoinUrl}
-          />
-        )}
-        {canAdminBurn && (
-          <div className={styles.adminBurnSection}>
-            <h4>{`${t('burn')} ${t('sbt')}`}</h4>
-            <div className={styles.burnInputGroup}>
-              <input
-                type="text"
-                value={burnSearchInput}
-                onChange={this.handleBurnSearchChange}
-                placeholder="Enter Address (0x...) or Token ID"
-                className={styles.input}
-              />
-              {burnSearchResultRecord && (
-                <div className={styles.burnSearchResult}>
-                  {Boolean(burnSearchResultRecord.tokenId) && (
-                    <p>Token ID: {String(burnSearchResultRecord.tokenId)}</p>
-                  )}
-                  {Boolean(burnSearchResultRecord.address) && (
-                    <p>Owner: {getShortenedAddress(burnSearchResultRecord.address, false)}</p>
-                  )}
-                </div>
-              )}
-              <button
-                onClick={async () => {
-                  if (!burnSearchResult) {
-                    if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: "No token selected to burn" }));
-                    return;
-                  }
-                  if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
-                  // Ensure sbtAddr (original case) is used for contract interaction
-                  const sbtAddressOriginalCaseForAdminBurn = resolveSbtAddressString(this.props.SBTAddress);
-
-                  if (!sbtAddressOriginalCaseForAdminBurn) {
-                    if (this._isMounted) this.setState(buildSbtPageBurnFailurePatch({ error: `${t('sbt')} address not found for admin ${t('burnLower')}.` }));
-                    return;
-                  }
-
-                  const tx = await contractScripts.burnToken(this.props.provider, sbtAddressOriginalCaseForAdminBurn, burnSearchResultRecord?.tokenId);
-                  await this.loadSBTInfo(true); // Force event fetch after admin burn
-                  if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({
-                    resetBurnSearch: true,
-                    txHash: tx.transactionHash,
-                  }));
-                  this.cacheTransactionHash(tx.transactionHash);
-                }}
-                className={styles.actionButton}
-                disabled={adminBurnStatusButtonState.disabled}
-              >
-                {adminBurnButtonContentState.shouldRenderIdleLabel && adminBurnButtonContentState.idleLabel}
-                {adminBurnButtonContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-                {adminBurnButtonContentState.shouldRenderSuccess && (
-                  <>{adminBurnButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
-                )}
-                {adminBurnButtonContentState.shouldRenderFailure && (
-                  <>{adminBurnButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {passwordInventoryDisplayState.shouldRenderPasswordGenerationSection && (
-          <div className={styles.inviteGenerationSection}>
-            <h4>Generate Additional Password Invites</h4>
-            <p>Since there's no max token limit, you can generate more password-based invites as admin.</p>
-            <div className={styles.inviteGenerationControls}>
-              <input
-                type="number"
-                value={passwordGenerationCount || ''}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                  if (this._isMounted) this.setState(buildSbtPagePasswordGenerationCountPatch({
-                    value: e.target.value,
-                  }));
-                }}
-                placeholder="Number of additional passwords"
-                className={styles.input}
-              />
-              <button
-                onClick={this.handleGenerateAdminInvites}
-                className={styles.actionButton}
-                disabled={passwordGenerationButtonState.disabled}
-              >
-                Generate Invites
-              </button>
-            </div>
-            {passwordInventoryDisplayState.shouldRenderGeneratedPasswordList ? (
-              <div className={styles.generatedPasswordsList}>
-                <h5>Generated Passwords (including cached):</h5>
-                <ul>
-                  {combinedPasswords.map((pw, idx) => (
-                    <li key={idx}>
-                      {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
-                    </li>
-                  ))}
-                </ul>
-                <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
-                <div className={styles.exportOptions}>
-                  {passwordExportControlsState.renderIncludePreviousCheckbox && (
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={passwordExportControlsState.effectiveIncludePreviousPasswordsChecked}
-                        onChange={this.handleIncludePreviousPasswordsChange}
-                      />
-                      Include previous passwords
-                    </label>
-                  )}
-                  {passwordExportControlsState.showCachedPasswordsIncludedNote && (
-                    <p style={resolveSbtPageItalicNoteStyle()}>All previously cached passwords are included.</p>
-                  )}
-                  <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
-                    <option value="json">JSON</option>
-                    <option value="csv">CSV</option>
-                  </select>
-                  <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        )}
-
-        {passwordInventoryDisplayState.shouldRenderPreviousPasswordsSection && (
-          <div className={styles.inviteGenerationSection}>
-            <h4>Previously Generated Password Invites</h4>
-            <p>{`These were previously cached or generated passwords from when the ${t('sbt')} was created:`}</p>
-            <ul>
-              {combinedPasswords.map((pw, idx) => (
-                <li key={idx}>
-                  {pw} - <a href={buildInviteLink(pw)} target="_blank" rel="noopener noreferrer">{buildInviteLink(pw)}</a>
-                </li>
-              ))}
-            </ul>
-            <div className={styles.exportOptions}>
-              {passwordExportControlsState.renderIncludePreviousCheckbox && (
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={passwordExportControlsState.effectiveIncludePreviousPasswordsChecked}
-                    onChange={this.handleIncludePreviousPasswordsChange}
-                  />
-                  Include previous passwords
-                </label>
-              )}
-              {passwordExportControlsState.showCachedPasswordsIncludedNote && (
-                <p style={resolveSbtPageItalicNoteStyle()}>All previously cached passwords are included.</p>
-              )}
-              <select value={exportFormat} onChange={this.handleExportFormatChange} className={styles.exportFormatSelect}>
-                <option value="json">JSON</option>
-                <option value="csv">CSV</option>
-              </select>
-              <button onClick={this.exportPasswords} className={styles.exportButton}>Export Passwords</button>
-            </div>
-          </div>
-        )}
-
-        {passwordInventoryDisplayState.shouldRenderNoMoreInvitesEmptyState && (
-          <div className={styles.inviteGenerationSection}>
-            <h4>No Additional Password Invites</h4>
-            <p>Max tokens are set, so all invites should have been created initially. No more invites can be generated, and there are no cached passwords found.</p>
-          </div>
-        )}
-      </div>
-    );
+    return SbtPageAdminActions({
+      adminBurnButtonContentState,
+      adminBurnStatusButtonState,
+      buildInviteLink,
+      burnLabel: t('burn'),
+      burnSearchInput,
+      burnSearchResultRecord,
+      canAdminBurn,
+      combinedPasswords,
+      exportFormat,
+      onAdminBurn: this.handleAdminBurn,
+      onBurnSearchChange: this.handleBurnSearchChange,
+      onCopyOpenMintUrl: () => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url'),
+      onExportFormatChange: this.handleExportFormatChange,
+      onExportPasswords: this.exportPasswords,
+      onGenerateAdminInvites: this.handleGenerateAdminInvites,
+      onIncludePreviousPasswordsChange: this.handleIncludePreviousPasswordsChange,
+      onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
+      openMintAutoJoinUrl,
+      openMintUrlCopyIconState,
+      passwordExportControlsState,
+      passwordGenerationButtonState,
+      passwordGenerationCount,
+      passwordInventoryDisplayState,
+      sbtLabel: t('sbt'),
+    });
   };
 
   copyErrorToClipboard = (): void => {

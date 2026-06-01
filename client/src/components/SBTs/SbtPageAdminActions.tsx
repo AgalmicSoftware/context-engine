@@ -9,12 +9,24 @@ import {
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
-import { buildSbtPagePasswordInviteLink } from './sbtPagePasswordExportHelpers';
-import type { SbtPageAdminActionDisplayPlan } from './sbtPageHelpers';
 
 type SbtPageCopyIconState = {
   shouldRenderCopiedIcon?: boolean;
   shouldRenderDefaultIcon?: boolean;
+};
+
+type SbtPageStatusButtonContentState = {
+  failureLabel?: React.ReactNode;
+  idleLabel?: React.ReactNode;
+  shouldRenderFailure?: boolean;
+  shouldRenderIdleLabel?: boolean;
+  shouldRenderPendingIcon?: boolean;
+  shouldRenderSuccess?: boolean;
+  successLabel?: React.ReactNode;
+};
+
+type SbtPageButtonState = {
+  disabled?: boolean;
 };
 
 type SbtPageBurnSearchResultRecord = {
@@ -22,20 +34,28 @@ type SbtPageBurnSearchResultRecord = {
   tokenId?: unknown;
 };
 
-type SbtPagePasswordInviteLinkContext = {
-  baseUrl: string;
-  demoPath: string;
-  encodeGroupPassword?: ((code: string) => string) | null;
-  isInvite: boolean;
-  sbtAddr: string;
-  sbtBasePathValue: string;
+type SbtPagePasswordExportControlsState = {
+  effectiveIncludePreviousPasswordsChecked?: boolean;
+  renderIncludePreviousCheckbox?: boolean;
+  showCachedPasswordsIncludedNote?: boolean;
+};
+
+type SbtPagePasswordInventoryDisplayState = {
+  shouldRenderGeneratedPasswordList?: boolean;
+  shouldRenderNoMoreInvitesEmptyState?: boolean;
+  shouldRenderPasswordGenerationSection?: boolean;
+  shouldRenderPreviousPasswordsSection?: boolean;
 };
 
 export type SbtPageAdminActionsProps = {
+  adminBurnButtonContentState: SbtPageStatusButtonContentState;
+  adminBurnStatusButtonState: SbtPageButtonState;
+  buildInviteLink: (code: string) => string;
   burnLabel: string;
   burnSearchInput: unknown;
   burnSearchResultRecord: SbtPageBurnSearchResultRecord | null;
-  displayPlan: SbtPageAdminActionDisplayPlan;
+  canAdminBurn: boolean;
+  combinedPasswords: unknown[];
   exportFormat: unknown;
   onAdminBurn: React.MouseEventHandler<HTMLButtonElement>;
   onBurnSearchChange: React.ChangeEventHandler<HTMLInputElement>;
@@ -47,27 +67,21 @@ export type SbtPageAdminActionsProps = {
   onPasswordGenerationCountChange: React.ChangeEventHandler<HTMLInputElement>;
   openMintAutoJoinUrl: string;
   openMintUrlCopyIconState: SbtPageCopyIconState;
-  passwordInviteLinkContext: SbtPagePasswordInviteLinkContext;
+  passwordExportControlsState: SbtPagePasswordExportControlsState;
+  passwordGenerationButtonState: SbtPageButtonState;
   passwordGenerationCount: unknown;
+  passwordInventoryDisplayState: SbtPagePasswordInventoryDisplayState;
   sbtLabel: string;
 };
 
-type SbtPagePasswordInviteRowsProps = {
-  combinedPasswords: string[];
-  passwordInviteLinkContext: SbtPagePasswordInviteLinkContext;
-};
-
 const SbtPagePasswordInviteRows = ({
+  buildInviteLink,
   combinedPasswords,
-  passwordInviteLinkContext,
-}: SbtPagePasswordInviteRowsProps): React.ReactElement => (
+}: Pick<SbtPageAdminActionsProps, 'buildInviteLink' | 'combinedPasswords'>): React.ReactElement => (
   <ul>
     {combinedPasswords.map((password, index) => {
       const passwordText = String(password);
-      const inviteLink = buildSbtPagePasswordInviteLink({
-        ...passwordInviteLinkContext,
-        code: passwordText,
-      });
+      const inviteLink = buildInviteLink(passwordText);
       return (
         <li key={index}>
           {passwordText} - <a href={inviteLink} target="_blank" rel="noopener noreferrer">{inviteLink}</a>
@@ -77,21 +91,20 @@ const SbtPagePasswordInviteRows = ({
   </ul>
 );
 
-type SbtPagePasswordExportControlsProps = {
-  exportFormat: unknown;
-  onExportFormatChange: React.ChangeEventHandler<HTMLSelectElement>;
-  onExportPasswords: React.MouseEventHandler<HTMLButtonElement>;
-  onIncludePreviousPasswordsChange: React.ChangeEventHandler<HTMLInputElement>;
-  passwordExportControlsState: SbtPageAdminActionDisplayPlan['passwordExportControlsState'];
-};
-
 const SbtPagePasswordExportControls = ({
   exportFormat,
   onExportFormatChange,
   onExportPasswords,
   onIncludePreviousPasswordsChange,
   passwordExportControlsState,
-}: SbtPagePasswordExportControlsProps): React.ReactElement => (
+}: Pick<
+  SbtPageAdminActionsProps,
+  | 'exportFormat'
+  | 'onExportFormatChange'
+  | 'onExportPasswords'
+  | 'onIncludePreviousPasswordsChange'
+  | 'passwordExportControlsState'
+>): React.ReactElement => (
   <div className={styles.exportOptions}>
     {passwordExportControlsState.renderIncludePreviousCheckbox && (
       <label>
@@ -121,18 +134,14 @@ const SbtPagePasswordExportControls = ({
 );
 
 const SbtPageAdminActions = ({
+  adminBurnButtonContentState,
+  adminBurnStatusButtonState,
+  buildInviteLink,
   burnLabel,
   burnSearchInput,
   burnSearchResultRecord,
-  displayPlan: {
-    adminBurnButtonContentState,
-    adminBurnStatusButtonState,
-    canAdminBurn,
-    combinedPasswords,
-    passwordExportControlsState,
-    passwordGenerationButtonState,
-    passwordInventoryDisplayState,
-  },
+  canAdminBurn,
+  combinedPasswords,
   exportFormat,
   onAdminBurn,
   onBurnSearchChange,
@@ -144,8 +153,10 @@ const SbtPageAdminActions = ({
   onPasswordGenerationCountChange,
   openMintAutoJoinUrl,
   openMintUrlCopyIconState,
-  passwordInviteLinkContext,
+  passwordExportControlsState,
+  passwordGenerationButtonState,
   passwordGenerationCount,
+  passwordInventoryDisplayState,
   sbtLabel,
 }: SbtPageAdminActionsProps): React.ReactElement => (
   <div className={styles.adminActions}>
@@ -221,8 +232,8 @@ const SbtPageAdminActions = ({
           <div className={styles.generatedPasswordsList}>
             <h5>Generated Passwords (including cached):</h5>
             {SbtPagePasswordInviteRows({
+              buildInviteLink,
               combinedPasswords,
-              passwordInviteLinkContext,
             })}
             <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
             {SbtPagePasswordExportControls({
@@ -242,8 +253,8 @@ const SbtPageAdminActions = ({
         <h4>Previously Generated Password Invites</h4>
         <p>{`These were previously cached or generated passwords from when the ${sbtLabel} was created:`}</p>
         {SbtPagePasswordInviteRows({
+          buildInviteLink,
           combinedPasswords,
-          passwordInviteLinkContext,
         })}
         {SbtPagePasswordExportControls({
           exportFormat,
