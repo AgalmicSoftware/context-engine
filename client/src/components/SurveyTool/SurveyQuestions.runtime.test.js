@@ -1,5 +1,6 @@
 import { SurveyQuestions } from './SurveyQuestions';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
 
 const createDeferred = () => {
   let resolve;
@@ -1174,5 +1175,404 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject._autoDecQueue).toHaveLength(1);
     expect(subject._autoDecQueue[0]).toMatchObject({ qid: 'q1', field: 'answer' });
     expect(subject.processAutoDecryptQueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies successful self decrypt results through parent state and draft callbacks', async () => {
+    const callbackRuns = [];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'ans-env' } },
+        additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'add-env' } },
+        importance: {},
+        conviction: {},
+      }],
+      editBaseline: null,
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') {
+        callbackRuns.push(callback);
+      }
+      return patch;
+    });
+    subject.resolveQuestionDecryptHandlingMode = jest.fn(() => ({
+      effectiveResponseOverride: null,
+      hasResponseOverride: false,
+      isViewedResponseMode: false,
+    }));
+    subject.prepareSelfQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineSlice: subject.state.surveysResponseState[0],
+      baselineForDecrypt: subject.state.surveysResponseState[0],
+      ratingEnvelopes: { q1: { importanceEncrypted: 'imp-env' } },
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer', 'q1:additional'],
+        clearMode: 'both',
+      },
+      chainId: 84532,
+      lit: { getKey: jest.fn() },
+      opts: { providerKind: 'mock' },
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn(async () => {
+      expect(subject.state.decryptingByKey).toEqual({
+        'q1:answer': true,
+        'q1:additional': true,
+      });
+      return {
+        decryptedStateSlice: {
+          answers: { q1: { value: 'clear answer', zkSalt: 'salt-a' } },
+          additionalComments: { q1: { value: 'clear notes', zkSalt: 'salt-b' } },
+        },
+        didUpdate: true,
+        decryptedImportance: 7,
+        decryptedConviction: 9,
+      };
+    });
+    subject.updateJsonPreview = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+
+    const result = await subject.handleDecryptQuestionAnswerInternal(
+      'q1',
+      'both',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    );
+    callbackRuns.forEach((callback) => callback());
+
+    expect(result).toBe(true);
+    expect(subject.prepareSelfQuestionDecryptState).toHaveBeenCalledWith(expect.objectContaining({
+      surveyIndex: 0,
+      questionId: 'q1',
+      fieldToDecrypt: 'both',
+      account: '0xabc',
+      sessionSlug: 'edge',
+    }));
+    expect(subject.finalizeQuestionDecryptAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      questionId: 'q1',
+      fieldToDecrypt: 'both',
+      account: '0xabc',
+      providerLike: subject.props.provider,
+      chainId: 84532,
+      opts: { providerKind: 'mock' },
+    }));
+    expect(subject.state.surveysResponseState[0]).toMatchObject({
+      answers: { q1: { value: 'clear answer', encrypted: true, zkSalt: 'salt-a' } },
+      additionalComments: { q1: { value: 'clear notes', encrypted: true, zkSalt: 'salt-b' } },
+      importance: { q1: 7 },
+      conviction: { q1: 9 },
+    });
+    expect(subject.state.decryptingByKey).toEqual({
+      'q1:answer': false,
+      'q1:additional': false,
+    });
+    expect(subject.updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('routes self decrypt failures through the owned busy-token fallback state', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'ans-env' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.resolveQuestionDecryptHandlingMode = jest.fn(() => ({
+      effectiveResponseOverride: null,
+      hasResponseOverride: false,
+      isViewedResponseMode: false,
+    }));
+    subject.prepareSelfQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineSlice: subject.state.surveysResponseState[0],
+      baselineForDecrypt: subject.state.surveysResponseState[0],
+      ratingEnvelopes: {},
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer'],
+        clearMode: 'answer',
+      },
+      chainId: 84532,
+      lit: null,
+      opts: {},
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn(async () => {
+      throw new Error('decrypt rejected');
+    });
+
+    const result = await subject.handleDecryptQuestionAnswerInternal(
+      'q1',
+      'answer',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    );
+
+    expect(result).toBe(false);
+    expect(subject.state.decryptingByKey).toEqual({ 'q1:answer': false });
+    expect(subject.state.isDecrypting).toBe(false);
+    expect(subject.state.submissionError).toBe('decrypt rejected');
+    expect(subject._questionDecryptBusyTokens['q1:answer']).toBeUndefined();
+  });
+
+  it('keeps viewed decrypt inert when login or response override is unavailable', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+    });
+    subject.prepareViewedQuestionDecryptState = jest.fn();
+    subject.setState = jest.fn();
+
+    await expect(subject.handleDecryptViewedResponseFieldInternal(
+      'q1',
+      'answer',
+      { responder: '0xdef', answer: { value: '*', encrypted: true } },
+      subject.buildDecryptContextSnapshot(),
+    )).resolves.toBe(false);
+
+    subject.props = {
+      ...subject.props,
+      account: '0xabc',
+      loginComplete: true,
+    };
+
+    await expect(subject.handleDecryptViewedResponseFieldInternal(
+      'q1',
+      'answer',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    )).resolves.toBe(false);
+
+    expect(subject.prepareViewedQuestionDecryptState).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+  });
+
+  it('tries masked prompt reload sources in order and restores the better payload', async () => {
+    const getQuestionDataSpy = jest
+      .spyOn(contractScripts, 'getQuestionData')
+      .mockImplementation(async (_provider, _qid, slug) => (
+        slug === 'preferred'
+          ? {
+              id: 'q1',
+              prompt: '[encrypted]',
+              promptDecrypted: false,
+              encryptedPrompt: 'old-env',
+            }
+          : {
+              id: 'q1',
+              prompt: 'Restored prompt',
+              promptDecrypted: true,
+              encryptedPrompt: 'new-env',
+            }
+      ));
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', prompt: '[encrypted]', promptDecrypted: false }],
+      pileQuestions: [],
+    };
+    subject.getQuestionFetchCandidateSlugs = jest.fn(() => ['preferred', 'fallback']);
+    subject.buildQuestionDecryptContext = jest.fn((slug) => ({
+      slug,
+      chainId: 84532,
+      litHooks: { getKey: jest.fn() },
+    }));
+    subject.cacheQuestionPayloadForSlug = jest.fn();
+    subject.applyQuestionPayloadToRenderedPools = jest.fn();
+
+    await expect(subject.fetchQuestionPayloadWithDeterministicContext(
+      'Q1',
+      { preferredSlug: 'preferred' },
+    )).resolves.toEqual({
+      promptReady: true,
+      bestQuestionData: expect.objectContaining({
+        id: 'q1',
+        prompt: 'Restored prompt',
+        promptDecrypted: true,
+      }),
+      bestSlug: 'fallback',
+    });
+
+    expect(getQuestionDataSpy.mock.calls.map((call) => call[2])).toEqual(['preferred', 'fallback']);
+    expect(subject.applyQuestionPayloadToRenderedPools).toHaveBeenCalledWith(
+      'q1',
+      expect.objectContaining({
+        prompt: 'Restored prompt',
+        promptDecrypted: true,
+      }),
+    );
+    expect(subject.cacheQuestionPayloadForSlug).toHaveBeenLastCalledWith(
+      'fallback',
+      'q1',
+      expect.objectContaining({
+        prompt: 'Restored prompt',
+        promptDecrypted: true,
+      }),
+    );
+  });
+
+  it('clears prompt reload busy state when source restoration fails', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.fetchQuestionPayloadWithDeterministicContext = jest.fn(async () => {
+      throw new Error('source unavailable');
+    });
+
+    await expect(subject.handleReloadMaskedPrompt('Q1')).resolves.toBe(false);
+
+    expect(subject.fetchQuestionPayloadWithDeterministicContext).toHaveBeenCalledWith(
+      'q1',
+      { preferredSlug: subject._getEffectiveDraftSlug() },
+    );
+    expect(subject.state.decryptingByKey).toEqual({ 'q1:prompt': false });
+  });
+
+  it('restores exit-editing state from the viewed response source before self or cache fallbacks', () => {
+    const callbacks = [];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      responderAddress: '0xdef',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'draft' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }],
+      parsedViewAddressAnswers: { answer: { value: 'viewed' } },
+      userAnswers: { answer: { value: 'self' } },
+      editBaseline: null,
+      submittedSinceLastEdit: true,
+    };
+    subject.buildSliceFromUserAnswers = jest.fn((source) => ({
+      answers: { q1: { value: source?.answer?.value || 'missing' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+    subject.buildSliceFromLocalCache = jest.fn(() => ({
+      answers: { q1: { value: 'cache' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
+    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+    subject.recalculateEditStats = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.updateJsonPreview = jest.fn();
+    subject.clearDraft = jest.fn();
+    subject.setState = jest.fn((patch, callback) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callbacks.push(callback);
+      return patch;
+    });
+
+    subject.handleExitEditing();
+    callbacks.forEach((callback) => callback());
+
+    expect(subject.buildSliceFromUserAnswers).toHaveBeenCalledTimes(1);
+    expect(subject.buildSliceFromUserAnswers).toHaveBeenCalledWith(subject.state.parsedViewAddressAnswers);
+    expect(subject.buildSliceFromLocalCache).not.toHaveBeenCalled();
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe('viewed');
+    expect(subject.state.editBaseline.answers.q1.value).toBe('viewed');
+    expect(subject.state).toEqual(expect.objectContaining({
+      isEditing: false,
+      displayAnswerMode: true,
+      submittedSinceLastEdit: false,
+      isDirty: false,
+      modifiedCount: 0,
+    }));
+    expect(subject.recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+    expect(subject.updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(subject.clearDraft).toHaveBeenCalledTimes(1);
   });
 });
