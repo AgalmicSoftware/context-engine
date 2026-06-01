@@ -31,6 +31,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import { SurveyResultsFreeformAggregatorSummary } from './SurveyResultsAggregatorSummaries';
+import { buildSurveyResultsFreeformSummaryModel } from './surveyResultsSummaryModels';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -634,9 +636,9 @@ describe('SurveyResults survey document URLs', () => {
 
 describe('SurveyResults freeform aggregator summary', () => {
   it('renders the empty freeform state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderFreeformAggregatorSummary([]);
+    const tree = SurveyResultsFreeformAggregatorSummary({
+      summary: buildSurveyResultsFreeformSummaryModel([]),
+    });
     const panel = findElement(
       tree,
       (element) => typeof element?.props?.className === 'string' && element.props.className.includes('surveyResultsAggregatorPanel')

@@ -31,11 +31,21 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+import {
+  buildSurveyResultsFreeformSummaryModel,
+  buildSurveyResultsMultichoiceSummaryModel,
+  resolveSurveyResultsSummaryQuestionType,
+} from './surveyResultsSummaryModels';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -188,12 +198,12 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
 
 describe('SurveyResults multichoice aggregator summary', () => {
   it('renders the empty multichoice state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderMultichoiceAggregatorSummary([], {
-      id: 'q1',
-      type: 'multichoice',
-      options: ['Alpha', 'Beta'],
+    const tree = SurveyResultsMultichoiceAggregatorSummary({
+      summary: buildSurveyResultsMultichoiceSummaryModel([], {
+          id: 'q1',
+          type: 'multichoice',
+          options: ['Alpha', 'Beta'],
+        }),
     });
     const panel = findElement(
       tree,
@@ -907,11 +917,9 @@ describe('SurveyResults demo results views', () => {
   });
 });
 
-describe('SurveyResults.resolveSummaryQuestionType', () => {
+describe('resolveSurveyResultsSummaryQuestionType', () => {
   it('infers freeform from response.answer.type when question metadata is missing', () => {
-    const subject = createSubject();
-
-    expect(subject.resolveSummaryQuestionType(undefined, [
+    expect(resolveSurveyResultsSummaryQuestionType(undefined, [
       {
         response: { answer: { type: 'freeform', value: 'Legacy freeform answer' } },
       },
@@ -919,9 +927,7 @@ describe('SurveyResults.resolveSummaryQuestionType', () => {
   });
 
   it('normalizes legacy text response.answer.type to freeform when question metadata is null', () => {
-    const subject = createSubject();
-
-    expect(subject.resolveSummaryQuestionType(null, [
+    expect(resolveSurveyResultsSummaryQuestionType(null, [
       {
         response: { answer: { type: 'text', value: 'Legacy text answer' } },
       },
@@ -929,38 +935,35 @@ describe('SurveyResults.resolveSummaryQuestionType', () => {
   });
 });
 
-describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
+describe('countSurveyResultsViewableResponses', () => {
   it('excludes blank freeform answers and encrypted placeholders', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible freeform answer', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 
   it('does not exclude blank answers for non-freeform questions', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Agree', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'binary')).toBe(2);
+    expect(countSurveyResultsViewableResponses(responses, 'binary')).toBe(2);
   });
 
-  it('uses question type in memoization for the same responses array', () => {
-    const subject = createSubject();
+  it('uses question type when counting the same responses array', () => {
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    const freeformCount = subject.getMemoizedViewableResponsesCount(responses, 'freeform');
-    const binaryCount = subject.getMemoizedViewableResponsesCount(responses, 'binary');
+    const freeformCount = countSurveyResultsViewableResponses(responses, 'freeform');
+    const binaryCount = countSurveyResultsViewableResponses(responses, 'binary');
 
     expect(freeformCount).toBe(1);
     expect(binaryCount).toBe(2);
@@ -968,20 +971,18 @@ describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
   });
 
   it('does not count malformed rows that have no answer payload', () => {
-    const subject = createSubject();
     const responses = [
       { response: null },
       { response: {} },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 });
 
 describe('SurveyResults freeform summary rendering', () => {
   it('omits "0 encrypted responses not shown." when no encrypted responses exist', () => {
-    const subject = createSubject();
     const responses = [
       {
         responder: '0x1111111111111111111111111111111111111111',
@@ -995,7 +996,11 @@ describe('SurveyResults freeform summary rendering', () => {
       },
     ];
 
-    const markup = renderToStaticMarkup(subject.renderFreeformAggregatorSummary(responses));
+    const markup = renderToStaticMarkup(
+      <SurveyResultsFreeformAggregatorSummary
+        summary={buildSurveyResultsFreeformSummaryModel(responses)}
+      />
+    );
     expect(markup).toContain('1 total responses. 1 blank not shown.');
     expect(markup).not.toContain('0 encrypted responses not shown.');
     expect(markup).toContain('Visible freeform answer');
