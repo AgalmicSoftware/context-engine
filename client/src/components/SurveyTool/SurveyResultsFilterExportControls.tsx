@@ -5,66 +5,45 @@ import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
-import type { QuestionFilterHandle } from './QuestionFilter';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
-import type {
-  SurveyResultsCacheFilterInput,
-  SurveyResultsCacheFilterState,
-} from './surveyResultsCacheControllerSnapshot';
 
-type SurveyResultsQuestionFilterCallback = (
-  filteredQuestionsOrCombined: unknown,
-  filterState: SurveyResultsCacheFilterState
-) => void;
-type SurveyResultsSbtFilterCallback = (
-  filteredResponses: unknown,
-  sbtFilterState?: unknown
-) => void;
-
-type SurveyResultsFilterExportControlsCacheProps = Pick<
-  SurveyResultsCacheFilterInput,
-  | 'activeSessionSlug'
-  | 'currentSurveyIdForUrl'
-  | 'currentViewModeForUrl'
-  | 'filterState'
-  | 'isQuestionCacheReady'
-  | 'isSBTCacheReady'
-  | 'questionResponsesNonce'
-  | 'questionsCacheNonce'
-  | 'sbtCacheRevision'
-  | 'showQuestionFilter'
-  | 'storageKeyPrefix'
->;
-
-type SurveyResultsFilterExportControlsProps = SurveyResultsFilterExportControlsCacheProps & {
+type SurveyResultsFilterExportControlsProps = {
+  activeSessionSlug: string;
   aggregateQuestionResponses: unknown;
+  currentSurveyIdForUrl: unknown;
+  currentViewModeForUrl: unknown;
   defaultTags?: unknown;
-  ensureLightSbtUniverse?: unknown;
   exportControlsDisplay: {
     exportAreaOpen?: boolean;
     exportOptions: readonly { label: string; value: string }[];
     exportTypeLabel?: string;
   };
+  filterState: Record<string, unknown>;
   isFilterActive: boolean;
+  isQuestionCacheReady?: unknown;
+  isSBTCacheReady?: unknown;
   network?: unknown;
   onClearFilters: React.MouseEventHandler<HTMLElement>;
   onDownload: () => void;
   onExportHtmlReport: () => void;
   onExportTypeChange: (value: string) => void;
   onFilterActivityChange: (active: unknown) => void;
-  onQuestionFilter: SurveyResultsQuestionFilterCallback;
+  onQuestionFilter: (...args: unknown[]) => void;
   onQuestionFilterCountUpdate: (count: unknown) => void;
-  onSbtFilter: SurveyResultsSbtFilterCallback;
+  onSbtFilter: (...args: unknown[]) => void;
   onSetFilterLoading: (loading: unknown) => void;
   onToggleExportArea: () => void;
   onToggleQuestionFilter: () => void;
   provider?: unknown;
   questionFilterQuestions: unknown;
-  questionFilterRef: React.Ref<QuestionFilterHandle>;
+  questionFilterRef: React.Ref<unknown>;
   questionResponses: unknown;
+  questionResponsesNonce?: unknown;
+  questionsCacheNonce?: unknown;
   responses: unknown;
-  sessionConfig?: unknown;
-  sessionSlug?: unknown;
+  sbtCacheRevision?: unknown;
+  showQuestionFilter: boolean;
+  storageKeyPrefix: string;
   styleMap: Record<string, string>;
   surveyViewMode: unknown;
   viewMode: unknown;
@@ -76,7 +55,6 @@ export const renderSurveyResultsFilterExportControls = ({
   currentSurveyIdForUrl,
   currentViewModeForUrl,
   defaultTags,
-  ensureLightSbtUniverse,
   exportControlsDisplay,
   filterState,
   isFilterActive,
@@ -102,8 +80,6 @@ export const renderSurveyResultsFilterExportControls = ({
   questionsCacheNonce,
   responses,
   sbtCacheRevision,
-  sessionConfig,
-  sessionSlug,
   showQuestionFilter,
   storageKeyPrefix,
   styleMap,
@@ -144,9 +120,6 @@ export const renderSurveyResultsFilterExportControls = ({
             isQuestionCacheReady={isQuestionCacheReady}
             isSBTCacheReady={isSBTCacheReady}
             sbtCacheRevision={sbtCacheRevision}
-            sessionSlug={sessionSlug ?? activeSessionSlug}
-            sessionConfig={sessionConfig}
-            ensureLightSbtUniverse={ensureLightSbtUniverse}
           />
         )}
         {viewMode === 'survey' && surveyViewMode === 'individuals' && (
@@ -164,9 +137,6 @@ export const renderSurveyResultsFilterExportControls = ({
             isQuestionCacheReady={isQuestionCacheReady}
             isSBTCacheReady={isSBTCacheReady}
             sbtCacheRevision={sbtCacheRevision}
-            sessionSlug={sessionSlug ?? activeSessionSlug}
-            sessionConfig={sessionConfig}
-            ensureLightSbtUniverse={ensureLightSbtUniverse}
           />
         )}
         {viewMode === 'questions' && (
@@ -182,7 +152,7 @@ export const renderSurveyResultsFilterExportControls = ({
             </Button>
 
             <QuestionFilter
-              ref={questionFilterRef}
+              ref={questionFilterRef as never}
               onFilterActivityChange={onFilterActivityChange}
               resultsMode={true}
               filterModalOpen={showQuestionFilter}
@@ -205,9 +175,6 @@ export const renderSurveyResultsFilterExportControls = ({
               sbtCacheRevision={sbtCacheRevision}
               defaultTags={defaultTags}
               activeSessionSlug={activeSessionSlug}
-              sessionSlug={sessionSlug ?? activeSessionSlug}
-              sessionConfig={sessionConfig}
-              ensureLightSbtUniverse={ensureLightSbtUniverse}
               storageKeyPrefix={storageKeyPrefix}
             />
           </>
