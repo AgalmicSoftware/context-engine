@@ -1,4 +1,6 @@
 import {
+  applyQuestionDecryptCompletionStatus,
+  applyQuestionDecryptFailureStatus,
   applyDecryptedQuestionResponseValues,
   applyDecryptedQuestionResponseValuesToContainer,
   applyDecryptedQuestionStateToSurveySlice,
@@ -53,6 +55,7 @@ import {
   resolveLatestSurveyDecryptResponse,
   resolveDecryptSurveyId,
   runDedupedDecryptTask,
+  startQuestionDecryptAttemptStatus,
   syncDecryptedQuestionIntoBaseline,
 } from './surveyToolDecryptFlow.js';
 
@@ -392,6 +395,243 @@ describe('surveyToolDecryptFlow', () => {
       keysToClear: ['q1:answer', 'q1:additional'],
       token: 3,
     })).toEqual({ 'q1:answer': 4 });
+  });
+
+  it('applies question decrypt completion status for stale, newer-token, and success paths', () => {
+    const staleSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
+    const buildStaleState = jest.fn(() => ({ decryptingByKey: { 'q1:answer': false } }));
+
+    expect(applyQuestionDecryptCompletionStatus({
+      context: { account: '0xold' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 2,
+      keysToMark: ['q1:answer'],
+      setState: staleSetState,
+      isDecryptContextCurrent: () => false,
+      canUpdateStateForAsyncSnapshot: () => true,
+      buildQuestionDecryptStaleState: buildStaleState,
+    })).toEqual({
+      shouldReturn: true,
+      result: false,
+      reason: 'stale-context',
+    });
+    expect(buildStaleState).toHaveBeenCalledWith(
+      { decryptingByKey: { 'q1:answer': true } },
+      'q1',
+      'answer',
+      2,
+    );
+
+    const newerTokenEvents = [];
+    expect(applyQuestionDecryptCompletionStatus({
+      context: { account: '0xabc' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 2,
+      keysToMark: ['q1:answer'],
+      setState: (updater) => {
+        newerTokenEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
+      },
+      clearQuestionDecryptBusyTokens: () => newerTokenEvents.push('clear'),
+      isDecryptContextCurrent: () => true,
+      ownsQuestionDecryptBusyTokens: () => false,
+      buildQuestionDecryptStaleState: () => ({ decryptingByKey: { 'q1:answer': true } }),
+      buildSuccessState: () => ({ success: true }),
+    })).toEqual({
+      shouldReturn: true,
+      result: false,
+      reason: 'stale-busy-token',
+    });
+    expect(newerTokenEvents).toEqual([{ decryptingByKey: { 'q1:answer': true } }]);
+
+    const successEvents = [];
+    const successCallback = jest.fn(() => successEvents.push('callback'));
+    expect(applyQuestionDecryptCompletionStatus({
+      context: { account: '0xabc' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 3,
+      keysToMark: ['q1:answer'],
+      setState: (updater, callback) => {
+        successEvents.push(updater({ decryptingByKey: { 'q1:answer': true } }));
+        callback();
+      },
+      clearQuestionDecryptBusyTokens: (keys, token) => successEvents.push({ clear: keys, token }),
+      isDecryptContextCurrent: () => true,
+      ownsQuestionDecryptBusyTokens: () => true,
+      buildSuccessState: () => ({ decryptingByKey: { 'q1:answer': false } }),
+      onSuccessStateApplied: successCallback,
+    })).toEqual({
+      shouldReturn: false,
+      result: null,
+      reason: 'applied',
+    });
+    expect(successEvents).toEqual([
+      { clear: ['q1:answer'], token: 3 },
+      { decryptingByKey: { 'q1:answer': false } },
+      'callback',
+    ]);
+    expect(successCallback).toHaveBeenCalledTimes(1);
+
+    const hostSuccessEvents = [];
+    const successStateOptions = { questionId: 'q1', clearMode: 'answer' };
+    const host = {
+      setState: (updater) => hostSuccessEvents.push(updater({ viewed: true })),
+      clearQuestionDecryptBusyTokens: (keys, token) => hostSuccessEvents.push({ clear: keys, token }),
+      isDecryptContextCurrent: () => true,
+      ownsQuestionDecryptBusyTokens: () => true,
+      buildViewedResponseDecryptSuccessState: jest.fn(() => ({ viewedSuccess: true })),
+    };
+
+    expect(applyQuestionDecryptCompletionStatus({
+      host,
+      context: { account: '0xabc' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 4,
+      keysToMark: ['q1:answer'],
+      successStateKind: 'viewed',
+      successStateOptions,
+    })).toEqual({
+      shouldReturn: false,
+      result: null,
+      reason: 'applied',
+    });
+    expect(host.buildViewedResponseDecryptSuccessState).toHaveBeenCalledWith(
+      { viewed: true },
+      successStateOptions,
+    );
+    expect(hostSuccessEvents).toEqual([
+      { clear: ['q1:answer'], token: 4 },
+      { viewedSuccess: true },
+    ]);
+  });
+
+  it('starts question decrypt attempt status only when a masked field is planned', () => {
+    const prepareQuestionDecryptAttempt = jest.fn(() => ({ shouldDecrypt: false }));
+
+    expect(startQuestionDecryptAttemptStatus({
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      baselineForDecrypt: { answers: {} },
+      prepareQuestionDecryptAttempt,
+    })).toEqual({
+      shouldReturn: true,
+      result: false,
+      reason: 'no-masked-field',
+    });
+    expect(prepareQuestionDecryptAttempt).toHaveBeenCalledWith({
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      baselineForDecrypt: { answers: {} },
+    });
+
+    const events = [];
+    const host = {
+      prepareQuestionDecryptAttempt: jest.fn(() => ({
+        shouldDecrypt: true,
+        decryptSelection: {
+          keysToMark: ['q1:answer', 'q1:additional'],
+          clearMode: 'both',
+        },
+        chainId: 84532,
+        lit: { getKey: jest.fn() },
+        opts: { providerKind: 'mock' },
+      })),
+      registerQuestionDecryptBusyTokens: jest.fn((keys) => {
+        events.push({ register: keys });
+        return 7;
+      }),
+      setState: jest.fn((updater) => {
+        events.push(updater({ decryptingByKey: {} }));
+      }),
+      buildQuestionDecryptStartState: jest.fn(() => ({
+        isDecrypting: true,
+        decryptingByKey: {
+          'q1:answer': true,
+          'q1:additional': true,
+        },
+      })),
+    };
+
+    expect(startQuestionDecryptAttemptStatus({
+      host,
+      questionId: 'q1',
+      fieldToDecrypt: 'both',
+      baselineForDecrypt: { answers: { q1: { value: '*' } } },
+    })).toEqual({
+      shouldReturn: false,
+      result: null,
+      reason: 'started',
+      decryptAttemptToken: 7,
+      decryptSelection: {
+        keysToMark: ['q1:answer', 'q1:additional'],
+        clearMode: 'both',
+      },
+      keysToMark: ['q1:answer', 'q1:additional'],
+      clearMode: 'both',
+      chainId: 84532,
+      lit: { getKey: expect.any(Function) },
+      opts: { providerKind: 'mock' },
+    });
+    expect(events).toEqual([
+      { register: ['q1:answer', 'q1:additional'] },
+      {
+        isDecrypting: true,
+        decryptingByKey: {
+          'q1:answer': true,
+          'q1:additional': true,
+        },
+      },
+    ]);
+  });
+
+  it('applies question decrypt failure status through stale or owned failure patches', () => {
+    const staleSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
+    const buildStaleState = jest.fn(() => ({ decryptingByKey: { 'q1:answer': false } }));
+
+    expect(applyQuestionDecryptFailureStatus({
+      context: { account: '0xold' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 2,
+      error: new Error('old failure'),
+      setState: staleSetState,
+      isDecryptContextCurrent: () => false,
+      canUpdateStateForAsyncSnapshot: () => true,
+      buildQuestionDecryptStaleState: buildStaleState,
+    })).toBe(false);
+    expect(buildStaleState).toHaveBeenCalledWith(
+      { decryptingByKey: { 'q1:answer': true } },
+      'q1',
+      'answer',
+      2,
+    );
+
+    const failureSetState = jest.fn((updater) => updater({ decryptingByKey: { 'q1:answer': true } }));
+    const buildFailureState = jest.fn(() => ({
+      decryptingByKey: { 'q1:answer': false },
+      submissionError: 'current failure',
+    }));
+
+    expect(applyQuestionDecryptFailureStatus({
+      context: { account: '0xabc' },
+      questionId: 'q1',
+      fieldToDecrypt: 'answer',
+      decryptAttemptToken: 3,
+      error: new Error('current failure'),
+      setState: failureSetState,
+      isDecryptContextCurrent: () => true,
+      buildQuestionDecryptFailureStateForAttempt: buildFailureState,
+    })).toBe(false);
+    expect(buildFailureState).toHaveBeenCalledWith(
+      { decryptingByKey: { 'q1:answer': true } },
+      'q1',
+      'answer',
+      'current failure',
+      3,
+    );
   });
 
   it('decrypts rating envelopes and builds the shared execution context', async () => {
