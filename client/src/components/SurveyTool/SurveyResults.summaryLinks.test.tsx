@@ -34,6 +34,8 @@ import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -312,6 +314,208 @@ describe('SurveyResults multichoice aggregator summary', () => {
     );
 
     expect(summaryCard?.props?.viewableResponsesCount).toBe(1);
+  });
+});
+
+describe('SurveyResults selected result display wiring', () => {
+  it('renders a selected question card with decrypted override data and header handlers', () => {
+    const lockedResponse = {
+      questionID: 'q1',
+      type: 'freeform',
+      answer: { encrypted: true, locked: true, value: '*' },
+      additional: { encrypted: true, locked: true, value: '*' },
+    };
+    const subject = createSubject();
+    const responseKey = subject.getLockedResponseKey({
+      responder: '0xaaa',
+      questionId: 'q1',
+      surveyId: 'survey-1',
+      response: lockedResponse,
+    });
+    subject.toggleQuestionBookmark = jest.fn();
+    subject.toggleQuestionSummary = jest.fn();
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: { q1: true },
+      bookmarkedQuestionIDs: ['q1'],
+      decryptedResponseOverrides: {
+        [responseKey]: {
+          additionalValue: 'Decrypted note',
+          answerValue: 'Decrypted answer',
+        },
+      },
+      surveyId: 'survey-1',
+    };
+
+    const tree = subject.renderQuestionSummary(
+      'q1',
+      [{ responder: '0xaaa', timestamp: 1, response: lockedResponse }],
+      {
+        q1: {
+          id: 'q1',
+          prompt: 'Explain the decision',
+          type: 'freeform',
+        },
+      }
+    );
+
+    const summaryCard = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsQuestionSummaryCard
+    );
+    expect(summaryCard?.props).toEqual(expect.objectContaining({
+      bookmarked: true,
+      isActive: true,
+      metadataMissing: false,
+      questionPrompt: 'Explain the decision',
+      resolvedQuestionType: 'freeform',
+      viewableResponsesCount: 1,
+    }));
+
+    summaryCard?.props?.onToggleBookmark();
+    summaryCard?.props?.onToggleSummary();
+    expect(subject.toggleQuestionBookmark).toHaveBeenCalledWith('q1');
+    expect(subject.toggleQuestionSummary).toHaveBeenCalledWith('q1');
+
+    const defaultSummary = summaryCard?.props?.renderDefaultSummary();
+    const singleQuestionResponse = findElement(
+      defaultSummary,
+      (element) => element?.props?.aggregatorResponseMode === true
+    );
+
+    expect(singleQuestionResponse?.props?.allResponses[0].response.answer.value).toBe('Decrypted answer');
+    expect(singleQuestionResponse?.props?.allResponses[0].response.additional.value).toBe('Decrypted note');
+  });
+
+  it('wires question-table view, sort, and bookmark controls without fetching data', () => {
+    const subject = attachStateHarness(createSubject());
+    subject.toggleQuestionBookmark = jest.fn();
+    subject.changeQuestionIdSort = jest.fn();
+    subject.scrollToQuestion = jest.fn();
+    subject.hasEffectiveNetworkId = jest.fn(() => true);
+    subject.getEffectiveSlug = jest.fn(() => 'session-one');
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {},
+      bookmarkedQuestionIDs: [],
+      questionIdSortAsc: true,
+      questionIdSortBy: '',
+    };
+
+    const tree = subject.renderQuestionIDsTable(
+      {
+        q1: [{ responder: '0xaaa', response: { answer: { value: 'Visible answer' } } }],
+      },
+      {
+        q1: {
+          prompt: 'Question one',
+          sessionSlug: 'session-one',
+          type: 'freeform',
+        },
+      }
+    );
+    const table = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsQuestionTable
+    );
+
+    expect(table?.props?.entries).toEqual([
+      expect.objectContaining({
+        prompt: 'Question one',
+        questionId: 'q1',
+        responsesCount: 1,
+        sessionSlug: 'session-one',
+        type: 'freeform',
+      }),
+    ]);
+
+    table?.props?.onToggleQuestionBookmark('q1');
+    table?.props?.onSort('prompt');
+    table?.props?.onViewQuestion('q1');
+
+    expect(subject.toggleQuestionBookmark).toHaveBeenCalledWith('q1');
+    expect(subject.changeQuestionIdSort).toHaveBeenCalledWith('prompt');
+    expect(subject.state.activeQuestionToggles.q1).toBe(true);
+    expect(subject.scrollToQuestion).toHaveBeenCalledWith('q1');
+  });
+
+  it('routes aggregate, question, and individual modes to the correct result panels', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+    });
+    subject.getScopedQuestionNetworkDataSync = jest.fn(() => ({
+      questions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      },
+      questionResponses: {},
+      questionsLatestBlock: 1,
+      questionResponsesLatestBlock: 1,
+    }));
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      questionResultsHydrated: true,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xaaa', response: { answer: { value: 'Question answer' } } }],
+      },
+    };
+
+    const questionList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(questionList?.props?.entries).toEqual([
+      ['q1', [{ responder: '0xaaa', response: { answer: { value: 'Question answer' } } }]],
+    ]);
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: 'survey-1',
+      surveyResultsHydrated: true,
+      surveyViewMode: 'aggregate',
+      sbtFilteredAggregatorQuestionResponses: {
+        q2: [{ responder: '0xbbb', response: { answer: { value: 'Aggregate answer' } } }],
+      },
+    };
+
+    const aggregateList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(aggregateList?.props?.entries).toEqual([
+      ['q2', [{ responder: '0xbbb', response: { answer: { value: 'Aggregate answer' } } }]],
+    ]);
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: 'survey-1',
+      surveyViewMode: 'individuals',
+      responses: [{ responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } }],
+      sbtFilteredResponses: [{ responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } }],
+    };
+
+    const individualList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+    const summariesList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(individualList?.props?.responses).toEqual([
+      { responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } },
+    ]);
+    expect(summariesList).toBeNull();
   });
 });
 
