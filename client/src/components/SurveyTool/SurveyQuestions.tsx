@@ -69,6 +69,8 @@ import {
   normalizeSubmitReceipt,
 } from './surveyToolSubmitTransactionController';
 import {
+  applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
+  applyQuestionDecryptFailureStatus as applyQuestionDecryptFailureStatusHelper,
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -123,6 +125,7 @@ import {
   resolveLatestSurveyDecryptResponse as resolveLatestSurveyDecryptResponseHelper,
   resolveDecryptSurveyId as resolveDecryptSurveyIdHelper,
   runDedupedDecryptTask as runDedupedDecryptTaskHelper,
+  startQuestionDecryptAttemptStatus as startQuestionDecryptAttemptStatusHelper,
   syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
 } from './surveyToolDecryptFlow.js';
 
@@ -6044,29 +6047,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return false;
       }
 
-      const preparedAttempt = this.prepareQuestionDecryptAttempt({
+      const attemptStatus = startQuestionDecryptAttemptStatusHelper({
+        host: this,
         questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
       });
-
-      if (!preparedAttempt.shouldDecrypt) {
-        return false;
-      }
-
-      const {
-        decryptSelection,
-        chainId,
-        lit,
-        opts,
-      } = preparedAttempt;
-      const {
-        keysToMark,
-        clearMode,
-      } = decryptSelection;
-
-      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
-      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
+      if (attemptStatus.shouldReturn) return attemptStatus.result;
+      decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
       const {
         decryptedStateSlice,
@@ -6080,44 +6068,33 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         ratingEnvelopes,
         account: context.account,
         providerLike: context.provider,
-        chainId,
-        lit,
-        opts,
+        chainId: attemptStatus.chainId,
+        lit: attemptStatus.lit,
+        opts: attemptStatus.opts,
       });
-      if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        return false;
-      }
-
-      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
-      this.setState((prev) => this.buildViewedResponseDecryptSuccessState(prev, {
+      const completionStatus = applyQuestionDecryptCompletionStatusHelper({
+        host: this,
+        context,
         questionId: qid,
-        clearMode,
-        didUpdate,
-        decryptedStateSlice,
-        decryptedImportance,
-        decryptedConviction,
-      }));
+        fieldToDecrypt,
+        decryptAttemptToken,
+        keysToMark: attemptStatus.keysToMark,
+        successStateKind: 'viewed',
+        successStateOptions: { questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, decryptedStateSlice, decryptedImportance, decryptedConviction },
+      });
+      if (completionStatus.shouldReturn) return completionStatus.result;
 
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting viewed response ${fieldToDecrypt} for ${questionId}`, error);
-      if (!this.isDecryptContextCurrent(context)) {
-        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      this.setState((prev) => {
-        return this.buildQuestionDecryptFailureStateForAttempt(prev, qid, fieldToDecrypt, error.message, decryptAttemptToken);
+      return applyQuestionDecryptFailureStatusHelper({
+        host: this,
+        context,
+        questionId: qid,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        error,
       });
-      return false;
     }
   };
 
@@ -6180,29 +6157,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return false;
       }
 
-      const preparedAttempt = this.prepareQuestionDecryptAttempt({
+      const attemptStatus = startQuestionDecryptAttemptStatusHelper({
+        host: this,
         questionId,
         fieldToDecrypt,
         baselineForDecrypt,
       });
-      const {
-        shouldDecrypt,
-        decryptSelection,
-        chainId,
-        lit,
-        opts,
-      } = preparedAttempt;
-      const {
-        keysToMark,
-        clearMode,
-      } = decryptSelection;
-
-      if (!shouldDecrypt) {
-        return false;
-      }
-
-      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
-      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
+      if (attemptStatus.shouldReturn) return attemptStatus.result;
+      decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
       const {
         decryptedStateSlice,
@@ -6216,49 +6178,37 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         ratingEnvelopes: latestRatingEnvs,
         account: context.account,
         providerLike: context.provider,
-        chainId,
-        lit,
-        opts,
+        chainId: attemptStatus.chainId,
+        lit: attemptStatus.lit,
+        opts: attemptStatus.opts,
       });
-      if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        return false;
-      }
-
-      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
-      this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
-        surveyIndex,
+      const completionStatus = applyQuestionDecryptCompletionStatusHelper({
+        host: this,
+        context,
         questionId,
-        clearMode,
-        didUpdate,
-        baselineSlice,
-        decryptedStateSlice,
-        decryptedImportance,
-        decryptedConviction,
-      }), () => {
-        this.updateJsonPreview && this.updateJsonPreview();
-        this.persistDraftSafely && this.persistDraftSafely(0);
+        fieldToDecrypt,
+        decryptAttemptToken,
+        keysToMark: attemptStatus.keysToMark,
+        successStateKind: 'self',
+        successStateOptions: { surveyIndex, questionId, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        onSuccessStateApplied: () => {
+          this.updateJsonPreview && this.updateJsonPreview();
+          this.persistDraftSafely && this.persistDraftSafely(0);
+        },
       });
+      if (completionStatus.shouldReturn) return completionStatus.result;
 
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
-      if (!this.isDecryptContextCurrent(context)) {
-        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      this.setState((prev) => (
-        this.buildQuestionDecryptFailureStateForAttempt(prev, questionId, fieldToDecrypt, error.message, decryptAttemptToken)
-      ));
-      return false;
+      return applyQuestionDecryptFailureStatusHelper({
+        host: this,
+        context,
+        questionId,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        error,
+      });
     }
   };
 
