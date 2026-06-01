@@ -1,3 +1,15 @@
+import { sanitizeSbtPageMintedTokensOverride } from './sbtPageAutoMintHelpers';
+import {
+  hasUsableSbtPageScanProgress,
+  isActiveSbtPageScanProgress,
+  resolveSbtPageRemainingBlocksCount,
+  resolveSbtPageScanProgressDisplay,
+  resolveSbtPageScanProgressFillStyle,
+  resolveSbtPageScanProgressPercent,
+  shouldShowSbtPageScanProgress,
+  type SbtPageScanProgressRecord,
+} from './sbtPageScanProgressHelpers';
+
 export type ResolveSbtPageHolderLoadingStateArgs = {
   countsLoaded?: unknown;
   hasComputedHolders?: unknown;
@@ -45,6 +57,21 @@ export type ResolveSbtPageHolderModalDisplayStateArgs = {
   showModal?: unknown;
   showScanProgress?: unknown;
 };
+export type ResolveSbtPageHolderDisplayModelArgs = {
+  countsLoaded?: unknown;
+  filteredMintedUsers?: unknown;
+  isScanActive?: unknown;
+  loadingMintersBurners?: unknown;
+  loadingMintedFilter?: unknown;
+  mintedAddresses?: unknown;
+  mintedTokensOverride?: unknown;
+  netHolders?: unknown;
+  scanProgress?: SbtPageScanProgressRecord | null;
+  sbtScanInProgress?: unknown;
+  sbtScanPending?: unknown;
+  showModal?: unknown;
+  resolveScanProgressSessionLabel?: ((progress: SbtPageScanProgressRecord | null) => unknown) | null;
+};
 export type SbtPageHolderLoadingState = {
   countsReady: boolean;
   effectiveLoading: boolean;
@@ -74,6 +101,27 @@ export type SbtPageHolderModalDisplayState = {
   showSpinnerInModalBody: boolean;
   waitingForHolderDetails: boolean;
 };
+export type SbtPageHolderDisplayModel = SbtPageHolderLoadingState &
+  SbtPageHolderResolutionState &
+  SbtPageHolderFilterItems &
+  SbtPageHolderModalDisplayState & {
+    hasActiveScanProgress: boolean;
+    hasComputedHolders: boolean;
+    hasFilteredHolders: boolean;
+    hasScanProgress: boolean;
+    holdersDisplayCount: string;
+    isInitialLoading: boolean;
+    isRefreshing: boolean;
+    mintedTokensOverride: string | null;
+    rawRemainingBlocksCount: number;
+    remainingBlocksCount: number;
+    scanProgressFillStyle: Record<string, string>;
+    scanProgressPct: number;
+    scanProgressSessionText: string | null;
+    scanProgressText: string | null;
+    showScanProgress: boolean;
+    showScanProgressInModal: boolean;
+  };
 
 export const resolveSbtPageHolderLoadingState = ({
   countsLoaded = false,
@@ -259,5 +307,131 @@ export const resolveSbtPageHolderModalDisplayState = ({
     showScanProgressInModal,
     showSpinnerInModalBody,
     waitingForHolderDetails,
+  };
+};
+
+export const resolveSbtPageHolderDisplayModel = ({
+  countsLoaded = false,
+  filteredMintedUsers: filteredMintedUsersRaw = [],
+  isScanActive = false,
+  loadingMintersBurners = false,
+  loadingMintedFilter = false,
+  mintedAddresses: mintedAddressesRaw = [],
+  mintedTokensOverride: mintedTokensOverrideRaw = null,
+  netHolders: netHoldersRaw = [],
+  scanProgress = null,
+  sbtScanInProgress = false,
+  sbtScanPending = false,
+  showModal = false,
+  resolveScanProgressSessionLabel = null,
+}: ResolveSbtPageHolderDisplayModelArgs = {}): SbtPageHolderDisplayModel => {
+  const netHolders = Array.isArray(netHoldersRaw) ? netHoldersRaw : [];
+  const mintedAddresses = Array.isArray(mintedAddressesRaw) ? mintedAddressesRaw : [];
+  const filteredMintedUsersInput = Array.isArray(filteredMintedUsersRaw)
+    ? filteredMintedUsersRaw
+    : [];
+  const hasComputedHolders = netHolders.length > 0;
+  const hasFilteredHolders = filteredMintedUsersInput.length > 0;
+  const mintedTokensOverride = sanitizeSbtPageMintedTokensOverride(mintedTokensOverrideRaw);
+  const hasScanProgress = hasUsableSbtPageScanProgress(scanProgress);
+  const hasActiveScanProgress = isActiveSbtPageScanProgress(scanProgress);
+
+  const holderLoadingState = resolveSbtPageHolderLoadingState({
+    countsLoaded,
+    hasComputedHolders,
+    hasFilteredHolders,
+    isScanActive,
+    loadingMintersBurners,
+    loadingMintedFilter,
+    mintedTokensOverride,
+    netHoldersCount: netHolders.length,
+    sbtScanInProgress,
+    sbtScanPending,
+  });
+
+  const isInitialLoading = !holderLoadingState.countsReady && holderLoadingState.effectiveLoading;
+  const isRefreshing = !isInitialLoading && holderLoadingState.effectiveLoading;
+  const rawRemainingBlocksCount = hasScanProgress
+    ? resolveSbtPageRemainingBlocksCount(scanProgress)
+    : 0;
+  const showScanProgress = shouldShowSbtPageScanProgress({
+    effectiveLoading: holderLoadingState.effectiveLoading,
+    hasActiveScanProgress,
+    rawRemainingBlocksCount,
+  });
+
+  const holderResolutionState = resolveSbtPageHolderResolutionState({
+    isRefreshing,
+    loadingMintersBurners,
+    loadingMintedFilter,
+    mintedAddresses,
+    mintedTokensOverride,
+    showScanProgress,
+  });
+
+  const holdersDisplayCount = resolveSbtPageHoldersDisplayCount({
+    mintedTokensOverride,
+    netHoldersCount: netHolders.length,
+    shouldOverrideMinted: holderLoadingState.shouldOverrideMinted,
+  });
+
+  const scanProgressSessionLabel = showScanProgress && typeof resolveScanProgressSessionLabel === 'function'
+    ? resolveScanProgressSessionLabel(scanProgress)
+    : '';
+  const scanProgressDisplay = resolveSbtPageScanProgressDisplay({
+    rawRemainingBlocksCount,
+    sessionLabel: showScanProgress ? scanProgressSessionLabel : '',
+    showScanProgress,
+  });
+  const scanProgressPct = resolveSbtPageScanProgressPercent({
+    progress: scanProgress,
+    showScanProgress,
+  });
+  const scanProgressFillStyle = resolveSbtPageScanProgressFillStyle({
+    percent: scanProgressPct,
+  });
+  const holderFilterItems = resolveSbtPageHolderFilterItems({
+    filteredMintedUsers: filteredMintedUsersInput,
+    hasComputedHolders,
+    hasFilteredHolders,
+    isScanActive,
+    netHolders,
+  });
+  const holderModalDisplayState = resolveSbtPageHolderModalDisplayState({
+    addressesAreResolving: holderResolutionState.addressesAreResolving,
+    hasActiveScanProgress,
+    hasComputedHolders,
+    hasFilteredHolders,
+    holdersReady: holderLoadingState.holdersReady,
+    isInitialLoading,
+    isRefreshing,
+    isScanActive,
+    loadingMintersBurners,
+    loadingMintedFilter,
+    shouldOverrideMinted: holderLoadingState.shouldOverrideMinted,
+    showModal,
+    showScanProgress,
+  });
+
+  return {
+    ...holderLoadingState,
+    ...holderResolutionState,
+    ...holderFilterItems,
+    ...holderModalDisplayState,
+    hasActiveScanProgress,
+    hasComputedHolders,
+    hasFilteredHolders,
+    hasScanProgress,
+    holdersDisplayCount,
+    isInitialLoading,
+    isRefreshing,
+    mintedTokensOverride,
+    rawRemainingBlocksCount,
+    remainingBlocksCount: scanProgressDisplay.remainingBlocksCount,
+    scanProgressFillStyle,
+    scanProgressPct,
+    scanProgressSessionText: scanProgressDisplay.scanProgressSessionText,
+    scanProgressText: scanProgressDisplay.scanProgressText,
+    showScanProgress,
   };
 };
