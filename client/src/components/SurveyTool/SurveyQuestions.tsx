@@ -38,7 +38,7 @@ import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
-import { buildSurveyQuestionsFullQuestionContentSections } from './SurveyQuestionsFullQuestionContentSections';
+import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
@@ -6850,25 +6850,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const {
-      answer,
-      additional,
-      convictionValue,
-      importanceValue,
-      hasConvictionImportanceValue,
-      sliderMode,
-      activeSliderValue,
-      hasAdditionalContent,
-      glowAnswer,
-      glowAdditional,
-      decryptTooltip,
-      maskedAnswer,
-      maskedAdditional,
-      allowDecryptAnswer,
-      allowDecryptAdditional,
-      isAnswerDecrypting,
-      isAdditionalDecrypting,
-    } = this.getQuestionRenderDisplayState({
+    const displayState = this.getQuestionRenderDisplayState({
       questionId: question.id,
       responseSlice: currentSurveyResponseState,
     });
@@ -6902,78 +6884,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
     }
 
-    const commentsOpen = this.getCommentsOpen(question.id, hasAdditionalContent);
-    const handleToggleComments = () => this.toggleComments(question.id, hasAdditionalContent);
-    const footerIcons = this.renderFullQuestionFooterIcons({
-      surveyIndex,
-      question,
-      answer,
-      glowAnswer,
-      maskedAnswer,
-      hasAdditionalContent,
-      commentsOpen,
-      onToggleComments: handleToggleComments,
-    });
-    const sliderSection = this.renderFullQuestionSliderSection({
-      surveyIndex,
-      questionId: question.id,
-      sliderMode,
-      activeSliderValue,
-      convictionValue,
-      importanceValue,
-      hasConvictionImportanceValue,
-      sliderOpen,
-    });
-    const contentSections = buildSurveyQuestionsFullQuestionContentSections({
-      commentsOpen,
-      maskedAnswer,
-      maskedAdditional,
-      renderResponseInput: () => this.renderFullQuestionResponseInput({
-        question,
-        qIndex,
-        surveyIndex,
-        answer,
-        glowAnswer,
-      }),
-      renderAnswerDecryptControl: () => this.renderQuestionFieldDecryptControl({
-        questionId: question.id,
-        fieldKey: 'answer',
-        allowDecrypt: allowDecryptAnswer,
-        decryptTooltip,
-        actionLabel: 'Decrypt Answer',
-        busy: isAnswerDecrypting,
-      }),
-      renderAdditionalInput: () => this.renderFullQuestionAdditionalInput({
-        qIndex,
-        surveyIndex,
-        questionId: question.id,
-        additional,
-        glowAdditional,
-      }),
-      renderAdditionalLockControl: () => this.renderQuestionAdditionalLockControl({
-        surveyIndex,
-        questionId: question.id,
-        additional,
-        glowAdditional,
-      }),
-      renderAdditionalDecryptControl: () => this.renderQuestionFieldDecryptControl({
-        questionId: question.id,
-        fieldKey: 'additional',
-        allowDecrypt: allowDecryptAdditional,
-        decryptTooltip,
-        actionLabel: 'Decrypt Comments',
-        busy: isAdditionalDecrypting,
-      }),
-    });
-
-    return this.renderFullQuestionCardShell({
+    return renderSurveyQuestionsFullQuestionDisplay({
       cardKey,
       question,
       cardIcons,
-      mainContent: contentSections.mainContent,
-      footerIcons,
-      sliderSection,
-      commentsSection: contentSections.commentsSection,
+      commentsOpen: this.getCommentsOpen(question.id, displayState.hasAdditionalContent),
+      displayState,
+      onToggleComments: (questionId, defaultOpen) => this.toggleComments(questionId, defaultOpen),
+      qIndex,
+      renderAdditionalDecryptControl: (args) => this.renderQuestionFieldDecryptControl(args),
+      renderAdditionalInput: (args) => this.renderFullQuestionAdditionalInput(args),
+      renderAdditionalLockControl: (args) => this.renderQuestionAdditionalLockControl(args),
+      renderAnswerDecryptControl: (args) => this.renderQuestionFieldDecryptControl(args),
+      renderFullQuestionCardShell: (args) => this.renderFullQuestionCardShell(args),
+      renderFullQuestionFooterIcons: (args) => this.renderFullQuestionFooterIcons(args),
+      renderFullQuestionSliderSection: (args) => this.renderFullQuestionSliderSection(args),
+      renderResponseInput: (args) => this.renderFullQuestionResponseInput(args),
+      sliderOpen,
+      surveyIndex,
     });
   };
 
