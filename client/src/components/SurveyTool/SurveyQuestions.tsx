@@ -12,7 +12,6 @@ import {
   Input,
   Card,
   CardBody,
-  InputGroup,
   InputGroupText,
   ModalHeader,
   ModalBody,
@@ -28,7 +27,6 @@ import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faSpinner, faF
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
-import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
@@ -40,6 +38,7 @@ import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import { buildSurveyQuestionsFullQuestionContentSections } from './SurveyQuestionsFullQuestionContentSections';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
@@ -3031,39 +3030,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     />
   );
 
-  renderFullQuestionAdditionalEditorRow = ({
-    qIndex,
-    surveyIndex,
-    questionId,
-    additional,
-    glowAdditional,
-  }) => (
-    <AdditionalCommentsInlineRow
-      input={this.renderFullQuestionAdditionalInput({
-        qIndex,
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })}
-      lockControl={this.renderQuestionAdditionalLockControl({
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })}
-    />
-  );
-
-  renderFullQuestionCommentsSection = (content) => {
-    if (!content) return null;
-    return (
-      <div className={styles.fullQuestionComments}>
-        {content}
-      </div>
-    );
-  };
-
   parseEncryptedEnvelope = (field) => parseEncryptedEnvelopeHelper(field);
 
   getFieldDecryptState = ({
@@ -3380,94 +3346,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         {...displayState}
         onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
       />
-    );
-  };
-
-  renderFullQuestionMainContent = ({
-    question,
-    qIndex,
-    surveyIndex,
-    answer,
-    glowAnswer,
-    maskedAnswer,
-    allowDecryptAnswer,
-    decryptTooltip,
-    isAnswerDecrypting,
-  }) => {
-    if (maskedAnswer) {
-      return this.renderQuestionFieldDecryptControl({
-        questionId: question.id,
-        fieldKey: 'answer',
-        allowDecrypt: allowDecryptAnswer,
-        decryptTooltip,
-        actionLabel: 'Decrypt Answer',
-        busy: isAnswerDecrypting,
-      });
-    }
-
-    const questionComponent = this.renderFullQuestionResponseInput({
-      question,
-      qIndex,
-      surveyIndex,
-      answer,
-      glowAnswer,
-    });
-
-    return (
-      <InputGroup id={styles.responseInputSection}>
-        {questionComponent}
-      </InputGroup>
-    );
-  };
-
-  renderFullQuestionCommentsContent = ({
-    commentsOpen,
-    questionId,
-    qIndex,
-    surveyIndex,
-    additional,
-    glowAdditional,
-    maskedAnswer,
-    maskedAdditional,
-    allowDecryptAdditional,
-    decryptTooltip,
-    isAdditionalDecrypting,
-  }) => {
-    if (!commentsOpen) return null;
-
-    if (maskedAnswer && !maskedAdditional) {
-      return this.renderFullQuestionCommentsSection(
-        this.renderFullQuestionAdditionalInput({
-          qIndex,
-          surveyIndex,
-          questionId,
-          additional,
-          glowAdditional,
-        })
-      );
-    }
-
-    if (maskedAnswer || maskedAdditional) {
-      return this.renderFullQuestionCommentsSection(
-        this.renderQuestionFieldDecryptControl({
-          questionId,
-          fieldKey: 'additional',
-          allowDecrypt: allowDecryptAdditional,
-          decryptTooltip,
-          actionLabel: 'Decrypt Comments',
-          busy: isAdditionalDecrypting,
-        })
-      );
-    }
-
-    return this.renderFullQuestionCommentsSection(
-      this.renderFullQuestionAdditionalEditorRow({
-        qIndex,
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })
     );
   };
 
@@ -7052,37 +6930,56 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       hasConvictionImportanceValue,
       sliderOpen,
     });
-
-    return this.renderFullQuestionCardShell({
-      cardKey,
-      question,
-      cardIcons,
-      mainContent: this.renderFullQuestionMainContent({
+    const contentSections = buildSurveyQuestionsFullQuestionContentSections({
+      commentsOpen,
+      maskedAnswer,
+      maskedAdditional,
+      renderResponseInput: () => this.renderFullQuestionResponseInput({
         question,
         qIndex,
         surveyIndex,
         answer,
         glowAnswer,
-        maskedAnswer,
-        allowDecryptAnswer,
-        decryptTooltip,
-        isAnswerDecrypting,
       }),
-      footerIcons,
-      sliderSection,
-      commentsSection: this.renderFullQuestionCommentsContent({
-        commentsOpen,
+      renderAnswerDecryptControl: () => this.renderQuestionFieldDecryptControl({
         questionId: question.id,
+        fieldKey: 'answer',
+        allowDecrypt: allowDecryptAnswer,
+        decryptTooltip,
+        actionLabel: 'Decrypt Answer',
+        busy: isAnswerDecrypting,
+      }),
+      renderAdditionalInput: () => this.renderFullQuestionAdditionalInput({
         qIndex,
         surveyIndex,
+        questionId: question.id,
         additional,
         glowAdditional,
-        maskedAnswer,
-        maskedAdditional,
-        allowDecryptAdditional,
-        decryptTooltip,
-        isAdditionalDecrypting,
       }),
+      renderAdditionalLockControl: () => this.renderQuestionAdditionalLockControl({
+        surveyIndex,
+        questionId: question.id,
+        additional,
+        glowAdditional,
+      }),
+      renderAdditionalDecryptControl: () => this.renderQuestionFieldDecryptControl({
+        questionId: question.id,
+        fieldKey: 'additional',
+        allowDecrypt: allowDecryptAdditional,
+        decryptTooltip,
+        actionLabel: 'Decrypt Comments',
+        busy: isAdditionalDecrypting,
+      }),
+    });
+
+    return this.renderFullQuestionCardShell({
+      cardKey,
+      question,
+      cardIcons,
+      mainContent: contentSections.mainContent,
+      footerIcons,
+      sliderSection,
+      commentsSection: contentSections.commentsSection,
     });
   };
 

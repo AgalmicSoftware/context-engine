@@ -133,8 +133,6 @@ describe('SurveyQuestions controls', () => {
     subject.handleConvictionImportanceChange = jest.fn();
     subject.getSliderPersistOptions = jest.fn(() => persistOptions);
     subject.flushDraftPersistAfterSliderChange = jest.fn();
-    subject.renderFullQuestionMainContent = jest.fn(() => <div>Main</div>);
-    subject.renderFullQuestionCommentsContent = jest.fn(() => <div>Comments</div>);
     subject.state = {
       ...subject.state,
       bookmarkedQuestions: new Set(),
