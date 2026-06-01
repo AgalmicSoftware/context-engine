@@ -1397,6 +1397,119 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.setState).not.toHaveBeenCalled();
   });
 
+  it('applies viewed decrypt results without switching into self-edit state', async () => {
+    const responseOverride = {
+      questionID: 'q1',
+      responder: '0xdef',
+      answer: { value: '*', encrypted: true, encryptedPortion: 'ans-env' },
+      additional: { value: '*', encrypted: true, encryptedPortion: 'add-env' },
+    };
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-wallet-provider' },
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      responderAddress: '0xdef',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      parsedViewAddressAnswers: { responses: [responseOverride] },
+      viewAddressAnswers: JSON.stringify({ responses: [responseOverride] }),
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.prepareViewedQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineForDecrypt: {
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'ans-env' } },
+        additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'add-env' } },
+        importance: {},
+        conviction: {},
+      },
+      ratingEnvelopes: { q1: { convictionEncrypted: 'conv-env' } },
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer', 'q1:additional'],
+        clearMode: 'both',
+      },
+      chainId: 84532,
+      lit: null,
+      opts: { providerKind: 'mock' },
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn().mockResolvedValue({
+      decryptedStateSlice: {
+        answers: { q1: { value: 'viewed answer' } },
+        additionalComments: { q1: { value: 'viewed notes' } },
+      },
+      didUpdate: true,
+      decryptedImportance: 5,
+      decryptedConviction: 8,
+    });
+
+    const result = await subject.handleDecryptViewedResponseFieldInternal(
+      'q1',
+      'both',
+      responseOverride,
+      subject.buildDecryptContextSnapshot(),
+    );
+
+    expect(result).toBe(true);
+    expect(subject.prepareViewedQuestionDecryptState).toHaveBeenCalledWith(expect.objectContaining({
+      questionId: 'q1',
+      fieldToDecrypt: 'both',
+      responseOverride,
+      account: '0xabc',
+      responderForLatest: '0xdef',
+      sessionSlug: 'edge',
+    }));
+    expect(subject.finalizeQuestionDecryptAttempt).toHaveBeenCalledWith(expect.objectContaining({
+      questionId: 'q1',
+      fieldToDecrypt: 'both',
+      account: '0xabc',
+      providerLike: subject.props.provider,
+      opts: { providerKind: 'mock' },
+    }));
+    expect(subject.state.parsedViewAddressAnswers.responses[0]).toMatchObject({
+      answer: { value: 'viewed answer' },
+      additional: { value: 'viewed notes' },
+      importance: 5,
+      conviction: 8,
+    });
+    expect(JSON.parse(subject.state.viewAddressAnswers).responses[0]).toMatchObject({
+      answer: { value: 'viewed answer' },
+      additional: { value: 'viewed notes' },
+      importance: 5,
+      conviction: 8,
+    });
+    expect(subject.state.surveysResponseState[0].answers).toEqual({});
+    expect(subject.state.decryptingByKey).toEqual({
+      'q1:answer': false,
+      'q1:additional': false,
+    });
+  });
+
   it('tries masked prompt reload sources in order and restores the better payload', async () => {
     const getQuestionDataSpy = jest
       .spyOn(contractScripts, 'getQuestionData')
