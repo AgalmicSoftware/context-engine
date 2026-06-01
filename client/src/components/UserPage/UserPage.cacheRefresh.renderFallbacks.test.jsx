@@ -7,6 +7,7 @@ import {
   treeHasText,
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
+import { t } from '../../utilities/ui/terminology.js';
 
 describe('UserPage cache refresh render and SBT fallbacks', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -58,7 +59,64 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
       expect(loadingIndicators).toHaveLength(3);
       expect(treeHasText(tree, 'No question responses found.')).toBe(false);
       expect(treeHasText(tree, 'No questions created.')).toBe(false);
-      expect(treeHasText(tree, 'No SBTs found.')).toBe(false);
+      expect(treeHasText(tree, `No ${t('sbtsLower')} found.`)).toBe(false);
+    } finally {
+      toDataUrlSpy.mockRestore();
+    }
+  });
+
+  it('renders ready empty-cache fallbacks without loading or route drift', () => {
+    const toDataUrlSpy = jest
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,');
+    try {
+      const instance = makeInstance({
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+        isSBTCacheReady: true,
+        isSurveyCacheReady: true,
+      });
+      instance.state = {
+        ...instance.state,
+        aiAvailable: true,
+        hasUncertainGateAccess: false,
+        hasUncertainSbtData: false,
+        hasUncertainUserData: false,
+        isDeepScanning: false,
+        loadingQuestions: false,
+        loadingSBTs: false,
+        loadingSurveys: false,
+        questionCreationInfo: [],
+        questionResponseInfo: [],
+        sbtList: [],
+        selectedTab: 'questions',
+        showSectionQuestionResponsesOpen: true,
+        showSectionQuestionsCreatedOpen: true,
+        surveyCreationInfo: [],
+        surveyResponseInfo: [],
+      };
+
+      const tree = instance.render();
+      const analyzeButton = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && treeHasText(node, 'Analyze')
+      )[0];
+      const compareButton = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'button' && treeHasText(node, 'Compare')
+      )[0];
+      const loadingIndicators = collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+      );
+      expect(analyzeButton.props.disabled).toBe(false);
+      expect(analyzeButton.props.title).toBeUndefined();
+      expect(compareButton.props.disabled).toBe(false);
+      expect(compareButton.props.title).toBeUndefined();
+      expect(loadingIndicators).toHaveLength(0);
+      expect(treeHasText(tree, 'No question responses found.')).toBe(true);
+      expect(treeHasText(tree, 'No questions created.')).toBe(true);
+      expect(treeHasText(tree, `No ${t('sbtsLower')} found.`)).toBe(true);
     } finally {
       toDataUrlSpy.mockRestore();
     }
@@ -77,6 +135,60 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(() => {
       inertInstance.dispatchSbtDataRefresh('0x0000000000000000000000000000000000000abc', 'edge');
     }).not.toThrow();
+  });
+
+  it('preserves SBT refresh argument order through rendered cache-boundary props', () => {
+    const refreshSbtData = jest.fn();
+    const toDataUrlSpy = jest
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,');
+    try {
+      const instance = makeInstance({ refreshSbtData });
+      instance.state = {
+        ...instance.state,
+        isDeepScanning: false,
+        loadingQuestions: false,
+        loadingSBTs: false,
+        loadingSurveys: false,
+        questionCreationInfo: [],
+        questionResponseInfo: [],
+        sbtList: [{
+          sbtInfo: {
+            name: 'Cache Boundary Badge',
+            sbtAddress: '0x0000000000000000000000000000000000000abc',
+          },
+          slug: 'edge',
+        }],
+        selectedTab: 'questions',
+        surveyCreationInfo: [],
+        surveyResponseInfo: [],
+      };
+
+      const tree = instance.render();
+      const sbtCards = collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'SBTPage'
+      );
+
+      expect(sbtCards).toHaveLength(1);
+      expect(sbtCards[0].props).toMatchObject({
+        SBTAddress: '0x0000000000000000000000000000000000000abc',
+        isSBTCacheReady: true,
+        metadataOnly: true,
+        miniaturized: true,
+        sessionSlug: 'edge',
+      });
+
+      sbtCards[0].props.refreshSbtData('0x0000000000000000000000000000000000000def');
+
+      expect(refreshSbtData).toHaveBeenCalledTimes(1);
+      expect(refreshSbtData).toHaveBeenCalledWith(
+        '0x0000000000000000000000000000000000000def',
+        'edge'
+      );
+    } finally {
+      toDataUrlSpy.mockRestore();
+    }
   });
 
   it('keeps survey/question loading active during deep scan by default', () => {
