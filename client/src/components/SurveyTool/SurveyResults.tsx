@@ -50,7 +50,6 @@ import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayH
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
-import SingleQuestionResponse from './SingleQuestionResponse';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -132,7 +131,6 @@ import {
   getSurveyResultsLatestResponsesByResponder,
 } from './surveyResultsSummaryModels';
 import {
-  renderSurveyResultsFilterSummary,
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
 import {
@@ -180,14 +178,10 @@ import {
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
-import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
-import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
-import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
-import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
-import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -5657,73 +5651,46 @@ return (
         </div>
       ) : (
         <>
-      <SurveyResultsStatusMessages
-        alertMessage={alertMessage}
-        filterLoading={filterLoading}
-        styleMap={styles}
-      />
-
-      {viewMode === 'survey' && (
-        <SurveyResultsSurveyViewModeToggle
-          isAggregate={surveyViewMode === 'aggregate'}
-          knobStyle={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
-          onKeyDown={this.handleSurveyViewModeKeyDown}
-          onToggle={this.handleSurveyViewModeToggle}
-          styleMap={styles}
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {this.renderLockedResponsesBanner(lockedResponsesModel)}
-
-      {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <SurveyResultsQuestionListCard
-          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
-          onToggle={() => this.toggleQuestionSummary('__questionList__')}
-          questionTableNode={
-            questionListDisplay.shouldRenderQuestionTable
-              ? this.renderQuestionIDsTable(
-                sbtFilteredAggregatorQuestionResponses,
-                preNetworkQuestions
-              )
-              : null
-          }
-          showEmptyState={questionListDisplay.showEmptyState}
-          styleMap={styles}
-          tableWrapperRef={this.questionIdTableRef}
-          title=" View & Sort Questions"
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {viewMode === 'questions' && (
-        <SurveyResultsQuestionListCard
-          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
-          onToggle={() => this.toggleQuestionSummary('__questionList__')}
-          questionTableNode={
-            questionListDisplay.shouldRenderQuestionTable
-              ? this.renderQuestionIDsTable(
-                sbtFilteredAggregatorQuestionResponses,
-                preNetworkQuestions
-              )
-              : null
-          }
-          showEmptyState={questionListDisplay.showEmptyState}
-          styleMap={styles}
-          title="View & Sort Questions"
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {renderSurveyResultsFilterSummary({
-        displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount,
-        displayedTotalResponsesCount: filterSummaryDisplay.displayedTotalResponsesCount,
-        normalizedFilteredQuestionsCount: filterSummaryDisplay.normalizedFilteredQuestionsCount,
-        normalizedFilteredResponsesCount: filterSummaryDisplay.normalizedFilteredResponsesCount,
-        showFilteredCountSpinner: filterSummaryDisplay.showFilteredCountSpinner,
-      })}
-
-
+      {renderSurveyResultsDisplayPanels({
+        account: this.props.account,
+        activeQuestionToggles: this.state.activeQuestionToggles,
+        activeToggles: this.state.activeToggles,
+        alertMessage,
+        applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+        currentSurveyId,
+        effectiveSlug: this.getEffectiveSlug(),
+        filterLoading,
+        filterSummaryDisplay,
+        getFallbackQuestion: this.getStableFallbackQuestion,
+        getLockedResponseKey: this.getLockedResponseKey,
+        getResponseCardProps: this.getSurveyResultsResponseCardProps,
+        lockedResponsesBannerNode: this.renderLockedResponsesBanner(lockedResponsesModel),
+        network: this.props.network,
+        onSurveyViewModeKeyDown: this.handleSurveyViewModeKeyDown,
+        onSurveyViewModeToggle: this.handleSurveyViewModeToggle,
+        onToggleQuestionList: () => this.toggleQuestionSummary('__questionList__'),
+        onToggleResponse: this.toggleResponse,
+        preNetworkQuestions,
+        questionListDisplay,
+        questionModeEntries,
+        questionResponsesNonce: this.props.questionResponsesNonce,
+        questionsCacheNonce: this.props.questionsCacheNonce,
+        renderQuestionSummary: (qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions),
+        renderQuestionTable: () => this.renderQuestionIDsTable(
+          sbtFilteredAggregatorQuestionResponses,
+          preNetworkQuestions
+        ),
+        responses: sbtFilteredResponses,
+        sbtCacheRevision: this.props.sbtCacheRevision,
+        styleMap: styles,
+        surveyAggregateEntries,
+        surveyViewMode,
+        tableWrapperRef: this.questionIdTableRef,
+        toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
+        trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+        viewMode,
+        filterControlsNode: (
+          <>
       {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
       <div className={styles.exportAndFilterContainer}>
 
@@ -5840,79 +5807,9 @@ return (
           styleMap={styles}
         />
       </div>
-
-      {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-        <SurveyResultsIndividualResponsesList
-          activeToggles={this.state.activeToggles}
-          currentSurveyId={currentSurveyId}
-          effectiveSlug={this.getEffectiveSlug()}
-          filterLoading={filterLoading}
-          onToggleResponse={this.toggleResponse}
-          renderResponseBody={(response: SurveyResultsResponseListEntry) => {
-            const parsedResponse = response.response; // Already an object
-            return parsedResponse &&
-              parsedResponse.responses &&
-              parsedResponse.responses.length > 0 ? (
-                parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
-                  const questionId = getSurveyResponseQuestionId(answerItem);
-                  const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
-                  const responseKey = this.getLockedResponseKey({
-                    responder: response?.responder,
-                    questionId,
-                    surveyId: response?.surveyId || currentSurveyId,
-                    response: answerItem,
-                  });
-                  const displayResponse = this.applyDecryptedOverrideToResponse({
-                    response: answerItem,
-                    key: responseKey,
-                  });
-                  return (
-                    <div key={aIndex} className={styles.surveyResultsOverride}>
-                      <SingleQuestionResponse
-                        aggregatorResponseMode={false}
-                        question={questionData}
-                        response={displayResponse}
-                        mode="fullscreen"
-                        isOwnResponse={
-                          this.props.account?.toLowerCase() ===
-                          response.responder?.toLowerCase()
-                        }
-                        network={this.props.network}
-                        activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
-                        questionResponsesNonce={this.props.questionResponsesNonce}
-                        questionsCacheNonce={this.props.questionsCacheNonce}
-                        sbtCacheRevision={this.props.sbtCacheRevision}
-                        {...this.getSurveyResultsResponseCardProps()}
-                      />
-                    </div>
-                  );
-                })
-              ) : (
-                <p>No question-level responses found for this user.</p>
-              );
-          }}
-          responses={sbtFilteredResponses}
-          styleMap={styles}
-        />
-      )}
-
-      {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <SurveyResultsQuestionSummariesList
-          entries={surveyAggregateEntries}
-          filterLoading={filterLoading}
-          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
-          styleMap={styles}
-        />
-      )}
-
-	      {viewMode === 'questions' && (
-        <SurveyResultsQuestionSummariesList
-          entries={questionModeEntries}
-          filterLoading={filterLoading}
-          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
-          styleMap={styles}
-        />
-      )}
+          </>
+        ),
+      })}
         </>
       )}
 
