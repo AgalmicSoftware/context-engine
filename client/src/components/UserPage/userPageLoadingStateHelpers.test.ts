@@ -8,6 +8,7 @@ import {
   resolveUserPageAiActionAvailability,
   resolveUserPageAiActionPlan,
   resolveUserPageAnalyzeButtonDisplayState,
+  resolveUserPageCacheReadinessDisplayPlan,
   resolveUserPageCompareButtonDisplayState,
   resolveUserPageSectionToggleDisplayState,
   shouldRetryUserPageQuestionData,
@@ -81,6 +82,38 @@ describe('userPageLoadingStateHelpers', () => {
     expect(cacheMiss.cacheActionKind).toBe('enabled');
     expect(cacheMiss.cacheDisplayKind).toBe('stale-or-cache-miss');
     expect(cacheMiss.hasMissingDataFallback).toBe(true);
+  });
+
+  it('resolves cache readiness display plans from passed values only', () => {
+    expect(resolveUserPageCacheReadinessDisplayPlan({
+      disabledByCache: true,
+      hasAnyLoading: true,
+      hasVisibleData: true,
+    })).toEqual({
+      cacheActionKind: 'disabled',
+      cacheDisplayKind: 'loading',
+      hasMissingDataFallback: false,
+    });
+
+    expect(resolveUserPageCacheReadinessDisplayPlan({
+      disabledByCache: false,
+      hasAnyLoading: false,
+      hasVisibleData: true,
+    })).toEqual({
+      cacheActionKind: 'enabled',
+      cacheDisplayKind: 'idle',
+      hasMissingDataFallback: false,
+    });
+
+    expect(resolveUserPageCacheReadinessDisplayPlan({
+      disabledByCache: false,
+      hasAnyLoading: false,
+      hasVisibleData: false,
+    })).toEqual({
+      cacheActionKind: 'enabled',
+      cacheDisplayKind: 'stale-or-cache-miss',
+      hasMissingDataFallback: true,
+    });
   });
 
   it('keeps gated display fallback metadata pure without mutating inputs', () => {
