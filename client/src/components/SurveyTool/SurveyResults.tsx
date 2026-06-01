@@ -3,8 +3,6 @@
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import {
-  Button,
-  Label,
   Form,
   Card,
   CardHeader,
@@ -28,13 +26,11 @@ import {
   faCaretUp,
   faCaretDown,
   faCheck,
-  faTimes,
   faArrowLeft,
   faArrowRight,
   faQuestionCircle,
   faSearch,
   faExpand,
-  faFilter,
   faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -43,8 +39,6 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import SBTFilter from '../SBTs/SBTFilter';
-import QuestionFilter from './QuestionFilter';
 import PolisReport from '../PolisReport/PolisReport';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
@@ -172,8 +166,8 @@ import {
   type SessionResultsReportQuestion,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import SurveyResultsExportControls from './SurveyResultsExportControls';
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
+import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
 import { renderSurveyResultsHtmlReportExportModal } from './SurveyResultsHtmlReportExportModal';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
@@ -5520,126 +5514,43 @@ return (
         toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
         trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
         viewMode,
-        filterControlsNode: (
-          <>
-      {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
-      <div className={styles.exportAndFilterContainer}>
-
-        <div className={styles.filterBox}>
-          {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter (Survey Individuals): */}
-            </Label>
-          )}
-          {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter (Survey Aggregate): */}
-            </Label>
-          )}
-          {viewMode === 'questions' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter Questions & Responses: */}
-            </Label>
-          )}
-
-
-
-          {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-            <SBTFilter
-              items={this.state.aggregateQuestionResponses}
-              mode="responder"
-              provider={this.props.provider}
-              network={this.props.network}
-              onFilter={this.handleFilteredResponses}
-              setFilterLoading={this.setFilterLoading}
-              autoExpand={false}
-              buttonSurface="light"
-              hideLoadingOverlay={true}
-              externalSBTFilterState={this.state.filterState.sbtFilter}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-            />
-          )}
-          {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-            <SBTFilter
-              items={this.state.responses}
-              mode="responder"
-              provider={this.props.provider}
-              network={this.props.network}
-              onFilter={this.handleFilteredResponses}
-              setFilterLoading={this.setFilterLoading}
-              autoExpand={false}
-              buttonSurface="light"
-              hideLoadingOverlay={true}
-              externalSBTFilterState={this.state.filterState.sbtFilter}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-            />
-          )}
-          {viewMode === 'questions' && (
-
-            <>
-
-         {/* The "Filter" button that toggles the QuestionFilter */}
-        <Button className={styles.questionFilterButton} onClick={this.toggleQuestionFilter}>
-          Filter
-
-          <FontAwesomeIcon icon={faFilter} className={styles.questionFilterIcon} />
-
-           {isFilterActive && (
-            <span className={styles.clearFilterIcon} onClick={this.handleClearFiltersFromParent}>
-              <FontAwesomeIcon icon={faTimes} />
-            </span>
-          )}
-        </Button>
-
-<QuestionFilter
-  ref={this.questionFilterRef}
-  onFilterActivityChange={this.handleFilterActivityChange}
-  resultsMode={true}
-  filterModalOpen={this.state.showQuestionFilter}
-  toggleFilterModal={this.toggleQuestionFilter}
-  questions={questionFilterQuestions}
-  questionResponses={this.state.questionResponses}
-	provider={this.props.provider}
-	network={this.props.network}
-	onFilter={this.handleQuestionFilter}
-	onCountUpdate={this.handleQuestionFilterCountUpdate}
-	filterState={this.state.filterState}
-	setFilterLoading={this.setFilterLoading}
-  creatorAndResponderMode={true}
-  currentViewModeForUrl={currentViewModeForFilter}
-  currentSurveyIdForUrl={currentSurveyIdForFilter}
-  questionResponsesNonce={this.props.questionResponsesNonce}
-  questionsCacheNonce={this.props.questionsCacheNonce}
-  isQuestionCacheReady={this.props.isQuestionCacheReady}
-  isSBTCacheReady={this.props.isSBTCacheReady}
-  sbtCacheRevision={this.props.sbtCacheRevision}
-  defaultTags={this.props.defaultTags}
-  activeSessionSlug={this.getEffectiveSlug()}
-  storageKeyPrefix={this.getQuestionFilterStorageKeyPrefix(currentViewModeForFilter)}
-/>
-
-
-</>
-          )}
-        </div>
-
-        <SurveyResultsExportControls
-          exportAreaOpen={exportControlsDisplay.exportAreaOpen}
-          exportOptions={exportControlsDisplay.exportOptions}
-          exportTypeLabel={exportControlsDisplay.exportTypeLabel}
-          onDownload={this.downloadCSV}
-          onExportHtmlReport={this.openHtmlReportExportModal}
-          onExportTypeChange={this.handleExportTypeChange}
-          onToggleExportArea={this.toggleExportArea}
-          styleMap={styles}
-        />
-      </div>
-          </>
-        ),
+        filterControlsNode: renderSurveyResultsFilterExportControls({
+          activeSessionSlug: this.getEffectiveSlug(),
+          aggregateQuestionResponses: this.state.aggregateQuestionResponses,
+          currentSurveyIdForUrl: currentSurveyIdForFilter,
+          currentViewModeForUrl: currentViewModeForFilter,
+          defaultTags: this.props.defaultTags,
+          exportControlsDisplay,
+          filterState: this.state.filterState,
+          isFilterActive,
+          isQuestionCacheReady: this.props.isQuestionCacheReady,
+          isSBTCacheReady: this.props.isSBTCacheReady,
+          network: this.props.network,
+          onClearFilters: this.handleClearFiltersFromParent,
+          onDownload: this.downloadCSV,
+          onExportHtmlReport: this.openHtmlReportExportModal,
+          onExportTypeChange: this.handleExportTypeChange,
+          onFilterActivityChange: this.handleFilterActivityChange,
+          onQuestionFilter: this.handleQuestionFilter,
+          onQuestionFilterCountUpdate: this.handleQuestionFilterCountUpdate,
+          onSbtFilter: this.handleFilteredResponses,
+          onSetFilterLoading: this.setFilterLoading,
+          onToggleExportArea: this.toggleExportArea,
+          onToggleQuestionFilter: this.toggleQuestionFilter,
+          provider: this.props.provider,
+          questionFilterQuestions,
+          questionFilterRef: this.questionFilterRef,
+          questionResponses: this.state.questionResponses,
+          questionResponsesNonce: this.props.questionResponsesNonce,
+          questionsCacheNonce: this.props.questionsCacheNonce,
+          responses: this.state.responses,
+          sbtCacheRevision: this.props.sbtCacheRevision,
+          showQuestionFilter: this.state.showQuestionFilter,
+          storageKeyPrefix: this.getQuestionFilterStorageKeyPrefix(currentViewModeForFilter),
+          styleMap: styles,
+          surveyViewMode,
+          viewMode,
+        }),
       })}
         </>
       )}
