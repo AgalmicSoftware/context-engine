@@ -67,6 +67,7 @@ import {
 import {
   applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
   applyQuestionDecryptFailureStatus as applyQuestionDecryptFailureStatusHelper,
+  applySurveyDecryptStaleStatus as applySurveyDecryptStaleStatusHelper,
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -83,6 +84,7 @@ import {
   buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
   buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
   buildClearedQuestionDecryptBusyTokens as buildClearedQuestionDecryptBusyTokensHelper,
+  buildSurveyDecryptAttemptSourceInputs as buildSurveyDecryptAttemptSourceInputsHelper,
   buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
   buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
   buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
@@ -1128,10 +1130,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this._activeSurveyDecryptAttemptSeq = 0;
     }
   };
-
-  buildSurveyDecryptStaleState = () => ({
-    isDecrypting: false,
-  });
 
   registerQuestionDecryptBusyTokens = (keysToMark = []) => {
     const result = buildQuestionDecryptBusyTokenRegistrationHelper({
@@ -5706,15 +5704,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const decryptContext = this.buildDecryptContextSnapshot();
     const decryptAttemptId = this.startSurveyDecryptAttempt();
     this.setState(buildDecryptEditStartState());
-    const surveyIndex = decryptContext.surveyIndex;
-
-    // Align decrypt slug with draft slug (single-Q aware)
-    const slug = decryptContext.sessionSlug || this._getEffectiveDraftSlug();
-    const fallbackUserAnswers = this.state.userAnswers;
-    const fallbackSourceSlice =
-      this.state.surveysResponseState[surveyIndex] ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const previousStateSlice = this.state.surveysResponseState?.[surveyIndex] || {};
+    const {
+      surveyIndex,
+      slug,
+      fallbackUserAnswers,
+      fallbackSourceSlice,
+      previousStateSlice,
+    } = buildSurveyDecryptAttemptSourceInputsHelper({
+      decryptContext,
+      state: this.state,
+      getEffectiveDraftSlug: () => this._getEffectiveDraftSlug(),
+    });
 
     try {
       const {
@@ -5735,13 +5735,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         fallbackSourceSlice,
         previousStateSlice,
       });
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
       const {
         normalizedDecryptedSlice,
         decryptedImportanceFromEnv,
@@ -5757,13 +5755,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         opts,
         previousStateSlice,
       });
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
 
       this.finishSurveyDecryptAttempt(decryptAttemptId);
       this.setState((prevState) => this.buildSurveyDecryptSuccessState(prevState, {
@@ -5778,13 +5774,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
     } catch (error) {
       surveyLog.error('Error decrypting answers:', error);
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
       this.finishSurveyDecryptAttempt(decryptAttemptId);
       this.setState(buildDecryptEditFailureState(error.message));
     }
