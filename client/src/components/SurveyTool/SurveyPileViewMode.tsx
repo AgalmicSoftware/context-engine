@@ -30,10 +30,6 @@ import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
 import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
-import BullhornToggleButton from './BullhornToggleButton';
-import ConvictionImportanceLabel from './ConvictionImportanceLabel';
-import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
-import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import FullQuestionHeader from './FullQuestionHeader';
@@ -43,6 +39,7 @@ import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
@@ -440,7 +437,6 @@ import {
   resolveUpdateCacheContext,
   scheduleMicrotask,
   serializeSurveyToolFilterState,
-  shouldExpandSliderToggle,
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
@@ -2264,38 +2260,35 @@ export class PileViewMode extends SurveyQuestions {
     sliderMode,
     hasConvictionImportanceValue,
   }) => (
-    <div className={styles.importanceSlider}>
-      {showSlider ? (
-        <ConvictionImportanceSliderControl
-          label={this.renderConvictionImportanceLabel(questionId, convictionValue, importanceValue)}
-          value={activeSliderValue}
-          disabled={this.state.isSubmitting}
-          onChange={(value, event) =>
-            this.handleConvictionImportanceChange(
-              0,
-              questionId,
-              sliderMode,
-              value,
-              this.getSliderPersistOptions(event)
-            )}
-          onChangeComplete={this.flushDraftPersistAfterSliderChange}
-        />
-      ) : (
-        ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-          this.renderBullhornToggleButton({
-            onClick: () => this.openConvictionSlider(questionId),
-            disabled: this.state.isSubmitting,
-            active: hasConvictionImportanceValue,
-          })
-        ) : (
-          this.renderBullhornToggleButton({
-            onClick: () => this.toggleConviction(questionId),
-            disabled: this.state.isSubmitting,
-            active: hasConvictionImportanceValue,
-          })
-        )
-      )}
-    </div>
+    <SurveyQuestionsFullQuestionSliderSection
+      activeSliderValue={activeSliderValue}
+      collapsedSliderMode={sliderMode}
+      convictionValue={convictionValue}
+      hasConvictionImportanceValue={hasConvictionImportanceValue}
+      importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
+      importanceValue={importanceValue}
+      isSubmitting={this.state.isSubmitting}
+      onChange={(value, event) =>
+        this.handleConvictionImportanceChange(
+          0,
+          questionId,
+          sliderMode,
+          value,
+          this.getSliderPersistOptions(event)
+        )}
+      onChangeComplete={this.flushDraftPersistAfterSliderChange}
+      onSelectMode={(nextMode) => {
+        if (ENABLE_IMPORTANCE_SLIDER_TOGGLE) {
+          this.openConvictionSlider(questionId, nextMode);
+          return;
+        }
+        this.toggleConviction(questionId);
+      }}
+      questionId={questionId}
+      sliderMode={sliderMode}
+      sliderOpen={showSlider}
+      sliderToggleExpandedByQuestion={this.state.sliderToggleExpandedByQuestion}
+    />
   );
 
   renderPileAdditionalInput = ({
