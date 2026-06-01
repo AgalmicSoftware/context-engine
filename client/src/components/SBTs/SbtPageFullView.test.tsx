@@ -63,11 +63,8 @@ const createArgs = (
       mintedLower: 'minted',
       minting: 'Minting',
     },
-    actionSurfaces: {
-      burnButton: <button type="button">Burn Action</button>,
-      mintButton: <button type="button">Mint Action</button>,
-    },
     adminActions: <button type="button">Admin action</button>,
+    burnButton: <button type="button">Burn Action</button>,
     callbacks: {
       bookmarkSBT: jest.fn(),
       closeDocModal: jest.fn(),
@@ -100,6 +97,7 @@ const createArgs = (
     isHolderScanActive: false,
     isSBTCacheReady: true,
     mintedLabel: 'Minted',
+    mintButton: <button type="button">Mint Action</button>,
     netHolders: [holderAddress],
     networkId: 84532,
     provider: 'provider',

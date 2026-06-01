@@ -2,6 +2,8 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
+  faChevronDown,
+  faChevronUp,
   faInfinity,
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
@@ -9,7 +11,7 @@ import { Alert } from 'reactstrap';
 
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import { getChainLabelById } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
+import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
 import {
@@ -18,15 +20,8 @@ import {
   renderSbtPageHolderModal,
 } from './SBTPageModals';
 import SbtPageActionsSection from './SbtPageActionsSection';
-import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
-import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageStatsSection from './SbtPageStatsSection';
-import type { SbtPageFullActionSurfaces } from './SbtPageFullActionButtons';
-import type {
-  SbtPageHolderCountStatus,
-  SbtPageHolderScanProgressDisplay,
-} from './SbtPageHolderStatusDisplay';
 import {
   buildSbtPageSectionHeaderClassName,
   resolveSbtPageActionFeedbackState,
@@ -112,7 +107,6 @@ type SbtPageFullViewCallbacks = {
 
 type RenderSbtPageFullViewArgs = {
   adminActions: React.ReactNode;
-  actionSurfaces: SbtPageFullActionSurfaces;
   actionLabels: {
     burn: string;
     burnedLower: string;
@@ -146,6 +140,8 @@ type RenderSbtPageFullViewArgs = {
   state: SbtPageFullViewState;
   workerScanInProgress?: unknown;
   workerScanPending?: unknown;
+  burnButton: React.ReactNode;
+  mintButton: React.ReactNode;
 };
 
 export const renderSbtPageFullViewLoading = ({
@@ -226,7 +222,6 @@ const renderSbtPageMintEndDisplay = ({
 export const renderSbtPageFullView = ({
   adminActions,
   actionLabels,
-  actionSurfaces,
   callbacks,
   defaultFeaturedSBTs,
   filterNetwork,
@@ -251,6 +246,8 @@ export const renderSbtPageFullView = ({
   state,
   workerScanInProgress,
   workerScanPending,
+  burnButton,
+  mintButton,
 }: RenderSbtPageFullViewArgs): React.ReactElement => {
   const {
     bookmarked,
@@ -380,22 +377,6 @@ export const renderSbtPageFullView = ({
   const actionsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showActions });
   const adminSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showAdminSection });
   const moreDetailsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showMoreDetails });
-  const holderCountStatus: SbtPageHolderCountStatus = {
-    isInitialLoading,
-    isRefreshing,
-    maxTokensDisplay,
-    mintedCountTitle,
-    mintedLabel,
-    netMinted,
-    refreshIndicatorStyle: resolveSbtPageRefreshIndicatorStyle(),
-  };
-  const holderScanProgressDisplay: SbtPageHolderScanProgressDisplay = {
-    scanProgressFillStyle,
-    scanProgressPct,
-    scanProgressSessionText,
-    scanProgressText,
-    showScanProgress,
-  };
   const sectionHeaderClassName = buildSbtPageSectionHeaderClassName({
     baseClassName: styles.sectionHeader,
     roundedClassName: styles.roundedHeader,
@@ -442,54 +423,75 @@ export const renderSbtPageFullView = ({
               adminAddressDisplay={renderAddressLink(adminAddress, 'admin')}
               burnLabel={burnLabel}
               creatorAddressDisplay={renderAddressLink(creatorAddress, 'creator')}
+              isInitialLoading={isInitialLoading}
               isOpen={statsSectionToggleState.isOpen}
-              holderCountStatus={holderCountStatus}
-              holderScanProgressDisplay={holderScanProgressDisplay}
+              isRefreshing={isRefreshing}
+              maxTokensDisplay={maxTokensDisplay}
+              mintedCountTitle={mintedCountTitle}
+              mintedLabel={mintedLabel}
               mintEndDisplay={mintEndDisplay}
+              netMinted={netMinted}
               networkLabel={getChainLabelById(sbtInfo?.chainID || networkId)}
               onOpenMintedModal={openMintedModal}
               onToggle={toggleStats}
               questionIconStyle={resolveSbtPageQuestionIconStyle()}
+              refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
+              scanProgressFillStyle={scanProgressFillStyle}
+              scanProgressPct={scanProgressPct}
+              scanProgressSessionText={scanProgressSessionText}
+              scanProgressText={scanProgressText}
               sectionHeaderClassName={sectionHeaderClassName}
               shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
               shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
+              showScanProgress={showScanProgress}
             />
             <SbtPageActionsSection
               actionFeedbackState={actionFeedbackState}
-              burnButton={actionSurfaces.burnButton}
+              burnButton={burnButton}
               burnLabel={actionLabels.burn}
+              burnSuccessHref={actionFeedbackState.showBurnSuccess ? getExplorerLink(lastBurnTxHash) : ''}
+              burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
               burnedLowerLabel={actionLabels.burnedLower}
               copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
               errorCopyIconState={errorCopyIconState}
               errorMessage={error as React.ReactNode}
-              getExplorerLink={getExplorerLink}
-              mintButton={actionSurfaces.mintButton}
+              isOpen={actionsSectionToggleState.isOpen}
+              mintButton={mintButton}
               mintLabel={actionLabels.mint}
+              mintSuccessHref={actionFeedbackState.showMintSuccess ? getExplorerLink(lastMintTxHash) : ''}
+              mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
               mintedLowerLabel={actionLabels.mintedLower}
               onCopyError={copyErrorToClipboard}
               onToggle={toggleActions}
               sbtLabel={sbtLabel}
               sectionHeaderClassName={sectionHeaderClassName}
-              toggleState={actionsSectionToggleState}
-              transactionState={{
-                lastBurnTxHash,
-                lastMintTxHash,
-                transactionHash,
-              }}
+              shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
+              shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
+              transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? getExplorerLink(transactionHash) : ''}
+              transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
             />
-            <SbtPageAdminSection
-              adminActions={adminActions}
-              isAdmin={userIsSbtAdmin}
-              onToggle={toggleAdminSection}
-              sectionHeaderClassName={sectionHeaderClassName}
-              toggleState={adminSectionToggleState}
-            />
-            <SbtPageMoreDetailsSection
-              onToggle={toggleMoreDetails}
-              relevantInfo={relevantInfo}
-              sectionHeaderClassName={sectionHeaderClassName}
-              toggleState={moreDetailsSectionToggleState}
-            />
+            {userIsSbtAdmin && (
+              <div className={styles.adminSection}>
+                <h2 className={sectionHeaderClassName} onClick={toggleAdminSection}>
+                  ADMIN{' '}
+                  {adminSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+                  {adminSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
+                </h2>
+                {adminSectionToggleState.isOpen && (
+                  <div className={styles.adminContainer}>
+                    {adminActions}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className={styles.moreDetailsSection}>
+              <h2 className={sectionHeaderClassName} onClick={toggleMoreDetails}>
+                MORE{' '}
+                {moreDetailsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+                {moreDetailsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
+              </h2>
+              {moreDetailsSectionToggleState.isOpen && relevantInfo}
+            </div>
           </div>
         </div>
       ) : (

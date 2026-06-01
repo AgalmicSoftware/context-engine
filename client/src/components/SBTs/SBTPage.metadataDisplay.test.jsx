@@ -199,6 +199,61 @@ describe('SBTPage metadata display', () => {
     expect(actionsSection?.props?.transactionErrorText).toBe('');
   });
 
+  it('wires extracted full-view handlers back to the parent shell methods', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.copyToClipboard = jest.fn();
+    subject.bookmarkSBT = jest.fn();
+    subject.toggleStats = jest.fn();
+    subject.toggleActions = jest.fn();
+    subject.openMintedModal = jest.fn();
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+      showActions: true,
+    };
+
+    const tree = subject.render();
+    const identityPanel = findElementInTree(
+      tree,
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    const statsSection = findElementInTree(
+      tree,
+      (element) => element?.type === SbtPageStatsSection
+    );
+    const actionsSection = findActionsSection(tree);
+
+    identityPanel.props.onContractCopy();
+    identityPanel.props.onBookmark();
+    statsSection.props.onToggle();
+    statsSection.props.onOpenMintedModal();
+    actionsSection.props.onToggle();
+
+    expect(subject.copyToClipboard).toHaveBeenCalledWith(
+      '0x00000000000000000000000000000000000000a1',
+      'contract'
+    );
+    expect(subject.bookmarkSBT).toHaveBeenCalledTimes(1);
+    expect(subject.toggleStats).toHaveBeenCalledTimes(1);
+    expect(subject.openMintedModal).toHaveBeenCalledTimes(1);
+    expect(subject.toggleActions).toHaveBeenCalledTimes(1);
+  });
+
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
     const dataUriPayload = Buffer
