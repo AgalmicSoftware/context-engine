@@ -890,6 +890,76 @@ export const buildSurveyDecryptSourceState = (
   };
 };
 
+export const buildSurveyDecryptAttemptSourceInputs = ({
+  decryptContext = null,
+  state = null,
+  getEffectiveDraftSlug = null,
+} = {}) => {
+  const surveyIndex = decryptContext?.surveyIndex || 0;
+  const fallbackSourceSlice =
+    state?.surveysResponseState?.[surveyIndex] ||
+    buildEmptyQuestionDecryptSlice();
+
+  return {
+    surveyIndex,
+    slug: decryptContext?.sessionSlug || (
+      typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : ''
+    ),
+    fallbackUserAnswers: state?.userAnswers,
+    fallbackSourceSlice,
+    previousStateSlice: state?.surveysResponseState?.[surveyIndex] || {},
+  };
+};
+
+export const applySurveyDecryptStaleStatus = ({
+  host = null,
+  context = null,
+  attemptId = null,
+  isDecryptContextCurrent = null,
+  canUpdateSurveyDecryptAttempt = null,
+  finishSurveyDecryptAttempt = null,
+  setSurveyDecryptStaleState = null,
+  buildSurveyDecryptStaleState = null,
+} = {}) => {
+  const isCurrentPort = typeof isDecryptContextCurrent === 'function'
+    ? isDecryptContextCurrent
+    : ((snapshot) => (
+        host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
+      ));
+
+  if (isCurrentPort(context)) {
+    return { shouldReturn: false, reason: 'current-context' };
+  }
+
+  const canUpdatePort = typeof canUpdateSurveyDecryptAttempt === 'function'
+    ? canUpdateSurveyDecryptAttempt
+    : ((snapshot, targetAttemptId) => (
+        host?.canUpdateSurveyDecryptAttempt
+          ? host.canUpdateSurveyDecryptAttempt(snapshot, targetAttemptId)
+          : false
+      ));
+
+  if (canUpdatePort(context, attemptId)) {
+    const finishPort = finishSurveyDecryptAttempt || host?.finishSurveyDecryptAttempt;
+    if (typeof finishPort === 'function') {
+      finishPort(attemptId);
+    }
+    const setStalePort = setSurveyDecryptStaleState || (
+      host?.setState ? host.setState.bind(host) : null
+    );
+    if (typeof setStalePort === 'function') {
+      const buildStalePort = buildSurveyDecryptStaleState || host?.buildSurveyDecryptStaleState;
+      const stalePatch = typeof buildStalePort === 'function'
+        ? buildStalePort()
+        : { isDecrypting: false };
+      setStalePort(stalePatch);
+    }
+    return { shouldReturn: true, reason: 'stale-context-applied' };
+  }
+
+  return { shouldReturn: true, reason: 'stale-context-skipped' };
+};
+
 export const hydrateLatestQuestionDecryptState = async (
   {
     questionId,
