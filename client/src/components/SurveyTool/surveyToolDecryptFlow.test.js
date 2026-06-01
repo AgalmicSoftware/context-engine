@@ -1,6 +1,7 @@
 import {
   applyQuestionDecryptCompletionStatus,
   applyQuestionDecryptFailureStatus,
+  applySurveyDecryptStaleStatus,
   applyDecryptedQuestionResponseValues,
   applyDecryptedQuestionResponseValuesToContainer,
   applyDecryptedQuestionStateToSurveySlice,
@@ -18,6 +19,7 @@ import {
   buildQuestionResponseDisplayState,
   buildQuestionRenderDisplayState,
   buildSurveyDecryptExecutionContext,
+  buildSurveyDecryptAttemptSourceInputs,
   buildSurveyDecryptSourceState,
   buildSelfQuestionDecryptBaseline,
   buildSelfQuestionDecryptSuccessState,
@@ -800,6 +802,101 @@ describe('surveyToolDecryptFlow', () => {
         hasher: 'hash-worker',
         throwOnError: true,
       },
+    });
+  });
+
+  it('plans bulk survey decrypt source inputs and stale status through injected parent ports', () => {
+    const state = {
+      userAnswers: { answers: { q1: { value: 'cached' } } },
+      surveysResponseState: [
+        null,
+        {
+          answers: { q2: { value: '*' } },
+          importance: { q2: 5 },
+          conviction: {},
+          additionalComments: {},
+        },
+      ],
+    };
+
+    expect(buildSurveyDecryptAttemptSourceInputs({
+      decryptContext: {
+        surveyIndex: 1,
+        sessionSlug: '',
+      },
+      state,
+      getEffectiveDraftSlug: () => 'fallback-slug',
+    })).toEqual({
+      surveyIndex: 1,
+      slug: 'fallback-slug',
+      fallbackUserAnswers: state.userAnswers,
+      fallbackSourceSlice: state.surveysResponseState[1],
+      previousStateSlice: state.surveysResponseState[1],
+    });
+
+    expect(buildSurveyDecryptAttemptSourceInputs({
+      decryptContext: {
+        surveyIndex: 3,
+        sessionSlug: 'session-slug',
+      },
+      state,
+      getEffectiveDraftSlug: () => 'fallback-slug',
+    })).toEqual({
+      surveyIndex: 3,
+      slug: 'session-slug',
+      fallbackUserAnswers: state.userAnswers,
+      fallbackSourceSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      previousStateSlice: {},
+    });
+
+    const staleEvents = [];
+    expect(applySurveyDecryptStaleStatus({
+      context: { account: '0xabc' },
+      attemptId: 4,
+      isDecryptContextCurrent: () => false,
+      canUpdateSurveyDecryptAttempt: (context, attemptId) => {
+        staleEvents.push({ canUpdate: context, attemptId });
+        return true;
+      },
+      finishSurveyDecryptAttempt: (attemptId) => staleEvents.push({ finish: attemptId }),
+      buildSurveyDecryptStaleState: () => ({ isDecrypting: false }),
+      setSurveyDecryptStaleState: (patch) => staleEvents.push({ patch }),
+    })).toEqual({
+      shouldReturn: true,
+      reason: 'stale-context-applied',
+    });
+    expect(staleEvents).toEqual([
+      { canUpdate: { account: '0xabc' }, attemptId: 4 },
+      { finish: 4 },
+      { patch: { isDecrypting: false } },
+    ]);
+
+    const skippedEvents = [];
+    expect(applySurveyDecryptStaleStatus({
+      context: { account: '0xabc' },
+      attemptId: 5,
+      isDecryptContextCurrent: () => false,
+      canUpdateSurveyDecryptAttempt: () => false,
+      finishSurveyDecryptAttempt: (attemptId) => skippedEvents.push({ finish: attemptId }),
+      setSurveyDecryptStaleState: (patch) => skippedEvents.push({ patch }),
+    })).toEqual({
+      shouldReturn: true,
+      reason: 'stale-context-skipped',
+    });
+    expect(skippedEvents).toEqual([]);
+
+    expect(applySurveyDecryptStaleStatus({
+      context: { account: '0xabc' },
+      attemptId: 6,
+      isDecryptContextCurrent: () => true,
+    })).toEqual({
+      shouldReturn: false,
+      reason: 'current-context',
     });
   });
 
