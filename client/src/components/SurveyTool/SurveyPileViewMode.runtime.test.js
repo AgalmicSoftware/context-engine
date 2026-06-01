@@ -2,6 +2,7 @@ import SurveyTool from './SurveyTool';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 import PileHologramAssistant from './PileHologramAssistant';
+import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const treeHasDataTestId = (node, testId) => {
@@ -138,6 +139,40 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(submitContent).not.toBeNull();
     expect(submitTrail).not.toBeNull();
     expect(submitTrailChildren).toHaveLength(3);
+  });
+
+  it('keeps the active pile slider mode when opening the collapsed control', () => {
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      network: { id: 1 },
+    });
+    subject.openConvictionSlider = jest.fn();
+    subject.toggleConviction = jest.fn();
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      sliderToggleExpandedByQuestion: {},
+    };
+
+    const section = subject.renderPileSliderSection({
+      questionId: 'q1',
+      showSlider: false,
+      convictionValue: 2,
+      importanceValue: 6,
+      activeSliderValue: 6,
+      sliderMode: 'importance',
+      hasConvictionImportanceValue: true,
+    });
+
+    expect(section?.type).toBe(SurveyQuestionsFullQuestionSliderSection);
+    expect(section?.props?.collapsedSliderMode).toBe('importance');
+
+    section.props.onSelectMode(section.props.collapsedSliderMode);
+
+    expect(subject.openConvictionSlider).toHaveBeenCalledWith('q1', 'importance');
+    expect(subject.toggleConviction).not.toHaveBeenCalled();
   });
 
   it('opens listening mode from the query string and keeps the URL synchronized', () => {
