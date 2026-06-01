@@ -1,7 +1,8 @@
 import React from 'react';
 import { SurveyQuestions } from './SurveyQuestions';
-import BullhornToggleButton from './BullhornToggleButton';
 import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   findElement,
@@ -117,7 +118,7 @@ describe('SurveyQuestions controls', () => {
     });
   });
 
-  it('applies active icon classes to bullhorn button when active', () => {
+  it('wires full-question slider section callbacks through the parent shell', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
       isStandalone: false,
@@ -126,13 +127,60 @@ describe('SurveyQuestions controls', () => {
       loginComplete: true,
       network: { id: 1 },
     });
-    const activeButton = subject.renderBullhornToggleButton({ active: true });
-    expect(activeButton?.type).toBe(BullhornToggleButton);
-    expect(activeButton?.props?.active).toBe(true);
+    const persistOptions = { persistDraft: true };
+    const event = { type: 'change' };
+    subject.setSliderMode = jest.fn();
+    subject.handleConvictionImportanceChange = jest.fn();
+    subject.getSliderPersistOptions = jest.fn(() => persistOptions);
+    subject.flushDraftPersistAfterSliderChange = jest.fn();
+    subject.renderFullQuestionMainContent = jest.fn(() => <div>Main</div>);
+    subject.renderFullQuestionCommentsContent = jest.fn(() => <div>Comments</div>);
+    subject.state = {
+      ...subject.state,
+      bookmarkedQuestions: new Set(),
+      sliderToggleExpandedByQuestion: { q1: true },
+      surveysResponseState: [{
+        answers: { q1: { value: 'Ready answer' } },
+        additionalComments: {},
+        conviction: { q1: 4 },
+        importance: { q1: 7 },
+      }],
+    };
 
-    const inactiveButton = subject.renderBullhornToggleButton({ active: false });
-    expect(inactiveButton?.type).toBe(BullhornToggleButton);
-    expect(inactiveButton?.props?.active).toBe(false);
+    const tree = subject.renderQuestion(
+      { id: 'q1', type: 'freeform', prompt: 'Ready prompt' },
+      0,
+      subject.state.surveysResponseState[0]
+    );
+    const cardShell = findFirstNodeByType(tree, SurveyQuestionsFullQuestionCardShell);
+    const sliderSection = cardShell?.props?.sliderSection;
+
+    expect(sliderSection?.type).toBe(SurveyQuestionsFullQuestionSliderSection);
+    expect(sliderSection.props).toEqual(expect.objectContaining({
+      activeSliderValue: 4,
+      convictionValue: 4,
+      hasConvictionImportanceValue: true,
+      importanceValue: 7,
+      questionId: 'q1',
+      sliderMode: 'conviction',
+      sliderOpen: true,
+    }));
+
+    sliderSection.props.onSelectMode('importance');
+    expect(subject.setSliderMode).toHaveBeenCalledWith('q1', 'importance');
+
+    sliderSection.props.onChange(8, event);
+    expect(subject.getSliderPersistOptions).toHaveBeenCalledWith(event);
+    expect(subject.handleConvictionImportanceChange).toHaveBeenCalledWith(
+      0,
+      'q1',
+      'conviction',
+      8,
+      persistOptions
+    );
+
+    sliderSection.props.onChangeComplete();
+    expect(subject.flushDraftPersistAfterSliderChange).toHaveBeenCalledTimes(1);
   });
 
   it('keeps submit controls hidden until a survey has pending edits or submitted state', () => {
