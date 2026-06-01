@@ -1,55 +1,64 @@
 import React from 'react';
 
-import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
-import SurveyResultsIndividualResponseBody, {
-  type SurveyResultsIndividualDecryptedOverrideArgs,
-  type SurveyResultsIndividualLockedResponseKeyArgs,
-  type SurveyResultsIndividualQuestionRecord,
-  type SurveyResultsIndividualResponseCardDisplayProps,
-  type SurveyResultsIndividualResponseListEntry,
-  type SurveyResultsIndividualResponseRecord,
-  type SurveyResultsIndividualAnswerRecord,
-} from './SurveyResultsIndividualResponseBody';
+import SingleQuestionResponse from './SingleQuestionResponse';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
-import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
-import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
+import {
+  renderSurveyResultsFilterSummary,
+} from './SurveyResultsPanels';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
-import type {
-  SurveyResultsCacheReadinessDisplayPlan,
-} from './surveyResultsCacheReadinessDisplayPlan';
+import { getSurveyResponseQuestionId } from './surveyResultsHelpers.js';
 
+type SurveyResultsRecord = Record<string, any>;
 type SurveyResultsEntry = [string, unknown];
+type SurveyResultsResponseListEntry = SurveyResultsRecord & {
+  responder: string;
+  surveyId?: unknown;
+};
 
-export type SurveyResultsDisplayPanelsArgs = {
+type SurveyResultsQuestionListDisplay = {
+  shouldRenderQuestionTable?: boolean;
+  showEmptyState?: boolean;
+};
+
+type SurveyResultsFilterSummaryDisplay = {
+  displayedTotalQuestionsCount?: number;
+  displayedTotalResponsesCount?: number;
+  normalizedFilteredQuestionsCount?: React.ReactNode;
+  normalizedFilteredResponsesCount?: React.ReactNode;
+  showFilteredCountSpinner?: boolean;
+};
+
+type SurveyResultsDisplayPanelsArgs = {
   account?: string;
-  activeQuestionToggles?: Record<string, unknown>;
-  activeToggles?: Record<string, unknown>;
+  activeQuestionToggles?: SurveyResultsRecord;
+  activeToggles?: SurveyResultsRecord;
   alertMessage?: React.ReactNode;
-  applyDecryptedOverrideToResponse: (
-    args: SurveyResultsIndividualDecryptedOverrideArgs
-  ) => SurveyResultsIndividualAnswerRecord | null;
-  cacheReadinessDisplay: SurveyResultsCacheReadinessDisplayPlan;
+  applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
   currentSurveyId?: string;
   effectiveSlug?: string;
   filterControlsNode?: React.ReactNode;
   filterLoading?: boolean;
-  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsIndividualQuestionRecord;
-  getLockedResponseKey: (args: SurveyResultsIndividualLockedResponseKeyArgs) => string;
-  getResponseCardProps: () => SurveyResultsIndividualResponseCardDisplayProps;
+  filterSummaryDisplay: SurveyResultsFilterSummaryDisplay;
+  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
+  getLockedResponseKey: (args: SurveyResultsRecord) => string;
+  getResponseCardProps: () => SurveyResultsRecord;
   lockedResponsesBannerNode?: React.ReactNode;
-  network?: SurveyResultsIndividualResponseRecord | null;
+  network?: SurveyResultsRecord | null;
   onSurveyViewModeKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
   onSurveyViewModeToggle: () => void;
   onToggleQuestionList: () => void;
   onToggleResponse: (index: number) => void;
-  preNetworkQuestions?: Record<string, SurveyResultsIndividualQuestionRecord>;
+  preNetworkQuestions?: Record<string, SurveyResultsRecord>;
+  questionListDisplay: SurveyResultsQuestionListDisplay;
   questionModeEntries?: SurveyResultsEntry[];
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
   renderQuestionSummary: (questionId: string, responses: unknown) => React.ReactNode;
   renderQuestionTable: () => React.ReactNode;
-  responses?: SurveyResultsIndividualResponseListEntry[];
+  responses?: SurveyResultsResponseListEntry[];
   sbtCacheRevision?: unknown;
   styleMap: Record<string, string>;
   surveyAggregateEntries?: SurveyResultsEntry[];
@@ -60,17 +69,93 @@ export type SurveyResultsDisplayPanelsArgs = {
   viewMode?: string;
 };
 
+const renderIndividualResponseBody = ({
+  account = '',
+  applyDecryptedOverrideToResponse,
+  currentSurveyId = '',
+  effectiveSlug = '',
+  getFallbackQuestion,
+  getLockedResponseKey,
+  getResponseCardProps,
+  network,
+  preNetworkQuestions = {},
+  questionResponsesNonce,
+  questionsCacheNonce,
+  response = { responder: '' },
+  sbtCacheRevision,
+  styleMap,
+}: {
+  account?: string;
+  applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
+  currentSurveyId?: string;
+  effectiveSlug?: string;
+  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
+  getLockedResponseKey: (args: SurveyResultsRecord) => string;
+  getResponseCardProps: () => SurveyResultsRecord;
+  network?: SurveyResultsRecord | null;
+  preNetworkQuestions?: Record<string, SurveyResultsRecord>;
+  questionResponsesNonce?: unknown;
+  questionsCacheNonce?: unknown;
+  response?: SurveyResultsResponseListEntry;
+  sbtCacheRevision?: unknown;
+  styleMap: Record<string, string>;
+}): React.ReactNode => {
+  const parsedResponse = response.response as SurveyResultsRecord | undefined;
+  const responseRows = Array.isArray(parsedResponse?.responses)
+    ? parsedResponse?.responses as SurveyResultsRecord[]
+    : [];
+
+  if (responseRows.length === 0) {
+    return <p>No question-level responses found for this user.</p>;
+  }
+
+  return responseRows.map((answerItem: SurveyResultsRecord, aIndex: number) => {
+    const questionId = getSurveyResponseQuestionId(answerItem);
+    const questionData = preNetworkQuestions[questionId] || getFallbackQuestion(questionId, 'individual');
+    const responseKey = getLockedResponseKey({
+      responder: response?.responder,
+      questionId,
+      surveyId: response?.surveyId || currentSurveyId,
+      response: answerItem,
+    });
+    const displayResponse = applyDecryptedOverrideToResponse({
+      response: answerItem,
+      key: responseKey,
+    });
+    return (
+      <div key={aIndex} className={styleMap.surveyResultsOverride}>
+        <SingleQuestionResponse
+          aggregatorResponseMode={false}
+          question={questionData}
+          response={displayResponse}
+          mode="fullscreen"
+          isOwnResponse={
+            account?.toLowerCase() ===
+            response.responder?.toLowerCase()
+          }
+          network={network}
+          activeSessionSlug={questionData?.sessionSlug || effectiveSlug}
+          questionResponsesNonce={questionResponsesNonce}
+          questionsCacheNonce={questionsCacheNonce}
+          sbtCacheRevision={sbtCacheRevision}
+          {...getResponseCardProps()}
+        />
+      </div>
+    );
+  });
+};
+
 export const renderSurveyResultsDisplayPanels = ({
   account = '',
   activeQuestionToggles = {},
   activeToggles = {},
   alertMessage = '',
   applyDecryptedOverrideToResponse,
-  cacheReadinessDisplay,
   currentSurveyId = '',
   effectiveSlug = '',
   filterControlsNode = null,
   filterLoading = false,
+  filterSummaryDisplay,
   getFallbackQuestion,
   getLockedResponseKey,
   getResponseCardProps,
@@ -81,6 +166,7 @@ export const renderSurveyResultsDisplayPanels = ({
   onToggleQuestionList,
   onToggleResponse,
   preNetworkQuestions = {},
+  questionListDisplay,
   questionModeEntries = [],
   questionResponsesNonce,
   questionsCacheNonce,
@@ -95,13 +181,7 @@ export const renderSurveyResultsDisplayPanels = ({
   toggleKnobStyle,
   trailingLabelStyle,
   viewMode = '',
-}: SurveyResultsDisplayPanelsArgs): React.ReactElement => {
-  const {
-    filterSummaryDisplay,
-    questionListDisplay,
-  } = cacheReadinessDisplay;
-
-  return (
+}: SurveyResultsDisplayPanelsArgs): React.ReactElement => (
   <>
     <SurveyResultsStatusMessages
       alertMessage={alertMessage}
@@ -122,25 +202,38 @@ export const renderSurveyResultsDisplayPanels = ({
 
     {lockedResponsesBannerNode}
 
-    <SurveyResultsQuestionListPanel
-      activeQuestionToggles={activeQuestionToggles}
-      onToggleQuestionList={onToggleQuestionList}
-      questionListDisplay={questionListDisplay}
-      renderQuestionTable={renderQuestionTable}
-      styleMap={styleMap}
-      surveyViewMode={surveyViewMode}
-      tableWrapperRef={tableWrapperRef}
-      trailingLabelStyle={trailingLabelStyle}
-      viewMode={viewMode}
-    />
+    {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
+      <SurveyResultsQuestionListCard
+        isOpen={!!activeQuestionToggles.__questionList__}
+        onToggle={onToggleQuestionList}
+        questionTableNode={questionListDisplay.shouldRenderQuestionTable ? renderQuestionTable() : null}
+        showEmptyState={questionListDisplay.showEmptyState}
+        styleMap={styleMap}
+        tableWrapperRef={tableWrapperRef}
+        title=" View & Sort Questions"
+        trailingLabelStyle={trailingLabelStyle}
+      />
+    )}
 
-    <SurveyResultsFilterSummary
-      displayedTotalQuestionsCount={filterSummaryDisplay.displayedTotalQuestionsCount ?? 0}
-      displayedTotalResponsesCount={filterSummaryDisplay.displayedTotalResponsesCount ?? 0}
-      normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
-      normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
-      showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
-    />
+    {viewMode === 'questions' && (
+      <SurveyResultsQuestionListCard
+        isOpen={!!activeQuestionToggles.__questionList__}
+        onToggle={onToggleQuestionList}
+        questionTableNode={questionListDisplay.shouldRenderQuestionTable ? renderQuestionTable() : null}
+        showEmptyState={questionListDisplay.showEmptyState}
+        styleMap={styleMap}
+        title="View & Sort Questions"
+        trailingLabelStyle={trailingLabelStyle}
+      />
+    )}
+
+    {renderSurveyResultsFilterSummary({
+      displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount ?? 0,
+      displayedTotalResponsesCount: filterSummaryDisplay.displayedTotalResponsesCount ?? 0,
+      normalizedFilteredQuestionsCount: filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0,
+      normalizedFilteredResponsesCount: filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0,
+      showFilteredCountSpinner: !!filterSummaryDisplay.showFilteredCountSpinner,
+    })}
 
     {filterControlsNode}
 
@@ -151,38 +244,43 @@ export const renderSurveyResultsDisplayPanels = ({
         effectiveSlug={effectiveSlug}
         filterLoading={filterLoading}
         onToggleResponse={onToggleResponse}
-        renderResponseBody={(response: SurveyResultsIndividualResponseListEntry) => (
-          <SurveyResultsIndividualResponseBody
-            account={account}
-            applyDecryptedOverrideToResponse={applyDecryptedOverrideToResponse}
-            currentSurveyId={currentSurveyId}
-            effectiveSlug={effectiveSlug}
-            getFallbackQuestion={getFallbackQuestion}
-            getLockedResponseKey={getLockedResponseKey}
-            getResponseCardProps={getResponseCardProps}
-            network={network}
-            preNetworkQuestions={preNetworkQuestions}
-            questionResponsesNonce={questionResponsesNonce}
-            questionsCacheNonce={questionsCacheNonce}
-            response={response}
-            sbtCacheRevision={sbtCacheRevision}
-            styleMap={styleMap}
-          />
-        )}
+        renderResponseBody={(response: SurveyResultsResponseListEntry) => renderIndividualResponseBody({
+          account,
+          applyDecryptedOverrideToResponse,
+          currentSurveyId,
+          effectiveSlug,
+          getFallbackQuestion,
+          getLockedResponseKey,
+          getResponseCardProps,
+          network,
+          preNetworkQuestions,
+          questionResponsesNonce,
+          questionsCacheNonce,
+          response,
+          sbtCacheRevision,
+          styleMap,
+        })}
         responses={responses}
         styleMap={styleMap}
       />
     )}
 
-    <SurveyResultsQuestionSummariesPanel
-      filterLoading={filterLoading}
-      questionModeEntries={questionModeEntries}
-      renderQuestionSummary={renderQuestionSummary}
-      styleMap={styleMap}
-      surveyAggregateEntries={surveyAggregateEntries}
-      surveyViewMode={surveyViewMode}
-      viewMode={viewMode}
-    />
+    {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
+      <SurveyResultsQuestionSummariesList
+        entries={surveyAggregateEntries}
+        filterLoading={filterLoading}
+        renderQuestionSummary={renderQuestionSummary}
+        styleMap={styleMap}
+      />
+    )}
+
+    {viewMode === 'questions' && (
+      <SurveyResultsQuestionSummariesList
+        entries={questionModeEntries}
+        filterLoading={filterLoading}
+        renderQuestionSummary={renderQuestionSummary}
+        styleMap={styleMap}
+      />
+    )}
   </>
-  );
-};
+);
