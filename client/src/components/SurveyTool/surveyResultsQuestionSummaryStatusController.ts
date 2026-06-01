@@ -52,6 +52,10 @@ export const buildSurveyResultsQuestionSummaryDisplayPlan = ({
   };
 };
 
+export const getSurveyResultsQuestionCardDomId = (questionId: string = ''): string => (
+  `questionCard-${questionId.toLowerCase()}`
+);
+
 export const buildSurveyResultsQuestionSummariesListDisplayPlan = ({
   emptyMessage = 'No results yet.',
   entries = [],
