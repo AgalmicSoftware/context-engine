@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
+import SessionWizardShell from './SessionWizardShell';
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
   <div data-testid="shell-header" data-mode={props.wizardMode}>
@@ -55,33 +55,21 @@ jest.mock('./WorkerPanel', () => (props: any) => (
   <section data-testid="shell-worker" data-worker-url={props.displayedWorkerUrl || ''}>
     {props.deployHelperToggle}
     <button type="button" onClick={props.onToggleCollapsed}>toggle worker</button>
-    <button
-      type="button"
-      onClick={props.handleDeployWorker}
-      disabled={!!props.deployStatusDisplayState?.deployButtonDisabled}
-    >
+    <button type="button" onClick={props.handleDeployWorker} disabled={props.deployInFlight}>
       deploy worker
     </button>
   </section>
 ));
 
 jest.mock('./SessionPublishSummary', () => (props: any) => (
-  <section
-    data-testid="shell-publish"
-    data-metadata-label={props.publishUiPlan?.publishMetadataDisplayState?.metadataUriLabel || ''}
-    data-metadata-uri={props.publishUiPlan?.publishMetadataDisplayState?.metadataUri || ''}
-    data-publish-advanced-open={
-      String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)
-    }
-    data-worker-source={props.workerUrlSource || ''}
-  >
+  <section data-testid="shell-publish" data-worker-source={props.workerUrlSource || ''}>
     <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
     <button type="button" onClick={props.onTogglePublishAdvanced}>publish advanced</button>
     <button
       type="button"
       data-testid="ce-wizard-publish"
       onClick={props.onPublish}
-      disabled={!!props.publishUiPlan?.publishActionDisplayState?.publishButtonDisabled}
+      disabled={props.publishBusy || !props.canPublishNow}
     >
       publish
     </button>
@@ -97,7 +85,7 @@ jest.mock('./SessionWizardModals', () => (props: any) => (
   </div>
 ));
 
-const baseProps = (): SessionWizardShellProps => ({
+const baseProps = () => ({
   account: '0x00000000000000000000000000000000000000aa',
   activeCreateSbtTargetGate: null,
   activeCreateSbtTargetGateId: '',
@@ -108,6 +96,7 @@ const baseProps = (): SessionWizardShellProps => ({
   advancedBundleFileInputRef: React.createRef<HTMLInputElement>(),
   bundleFile: null,
   bundleMode: 'url',
+  canPublishNow: true,
   clearSelectedBundleFile: jest.fn(),
   clearWorkerSecretFields: jest.fn(),
   closeContractViewerModal: jest.fn(),
@@ -129,15 +118,15 @@ const baseProps = (): SessionWizardShellProps => ({
   deployComplete: false,
   deployForm: {},
   deployHelperUrl: 'https://deploy.example.test',
-  deployStatusDisplayState: {
-    deployButtonDisabled: false,
-    deployStatusText: '',
-    isError: false,
-  },
+  deployInFlight: false,
+  deployStatus: '',
+  deployStatusIsError: false,
   deployWorkerUrl: '',
   devPersistWorkerSecrets: false,
   displayedWorkerUrl: 'https://worker.example.test',
   draft: {},
+  effectiveMetadataGatewayUrl: '',
+  effectiveMetadataTxId: '',
   effectivePersistWorkerSecrets: false,
   embeddedDeployHelperEnabled: true,
   encryptionGates: [],
@@ -150,7 +139,9 @@ const baseProps = (): SessionWizardShellProps => ({
   handleGateAddSbt: jest.fn(),
   handleGateRemoveSbt: jest.fn(),
   handleSavePendingSbtDraft: jest.fn(),
+  hasManualMetadata: false,
   hasSponsoredBundleLink: false,
+  hasUploadedMetadata: false,
   isNormalMode: true,
   jsonCopied: false,
   launchCreateSbtModal: jest.fn(),
@@ -161,6 +152,7 @@ const baseProps = (): SessionWizardShellProps => ({
   manualMaxFeePerGasGwei: '',
   manualMaxPriorityFeePerGasGwei: '',
   manualMetadataUrl: '',
+  metadataUrl: '',
   moreOptionsEntries: [],
   moreOptionsOpen: false,
   network: { id: 11155420 },
@@ -199,51 +191,16 @@ const baseProps = (): SessionWizardShellProps => ({
   persistWorkerSecrets: false,
   primaryDraftEntries: [],
   provider: null,
-  publishUiPlan: {
-    publishActionDisplayState: {
-      canPublishNow: true,
-      displayMode: 'advanced',
-      publishAdvancedOpen: false,
-      publishBusy: false,
-      publishButtonDisabled: false,
-      publishButtonLabel: 'Publish',
-      settingsButtonActive: false,
-    },
-    publishExecutionPlan: {
-      shouldAutoDeployWorker: false,
-      shouldDeployPendingSbts: false,
-      shouldRegisterSession: true,
-      shouldUploadMetadata: false,
-      stepNumbers: {},
-      steps: [],
-    },
-    publishMetadataDisplayState: {
-      effectiveMetadataGatewayUrl: '',
-      effectiveMetadataTxId: '',
-      manualMetadataDisplayUri: '',
-      metadataUri: 'ar://metadata-tx',
-      metadataUriLabel: 'Metadata URI',
-      showArweaveTx: false,
-      showManualMetadataUri: false,
-      showMetadataUri: true,
-    },
-    publishProgressDisplayState: {
-      activePublishProgressStepLabel: '',
-      publishProgressPercent: 0,
-      publishProgressPercentRounded: 0,
-      publishProgressSteps: [],
-      showPublishProgress: false,
-    },
-    publishReadiness: {
-      canPublishNow: true,
-      canUploadMetadataNow: true,
-      hasManualMetadata: false,
-      hasUploadedMetadata: false,
-      readinessKind: 'worker-upload',
-      showUploadBlockedReason: false,
-      uploadBlockedReason: '',
-    },
+  publishAdvancedOpen: false,
+  publishBusy: false,
+  publishProgressDisplayState: {
+    activePublishProgressStepLabel: '',
+    publishProgressPercent: 0,
+    publishProgressPercentRounded: 0,
+    publishProgressSteps: [],
+    showPublishProgress: false,
   },
+  publishStep: 0,
   publishedPendingSbtLinks: [],
   registerExplorerBaseUrl: '',
   registerTxs: [],
@@ -300,6 +257,7 @@ const baseProps = (): SessionWizardShellProps => ({
   toggleSection: jest.fn(),
   updateDraftValue: jest.fn(),
   updateEncryptionGate: jest.fn(),
+  uploadBlockedReason: '',
   visibleWorkerResourceKeys: [],
   workerAllowOrigins: '',
   workerMode: 'custom',
@@ -308,7 +266,8 @@ const baseProps = (): SessionWizardShellProps => ({
   workerUrlSource: 'custom worker URL',
   wizardDisplaySettingsOpen: false,
   wizardMode: 'normal',
-  normalizeSbtSelection: jest.fn(() => []),
+  normalizeArweaveUri: (value: string) => value,
+  normalizeSbtSelection: jest.fn((value) => value),
 });
 
 describe('SessionWizardShell', () => {
@@ -339,8 +298,6 @@ describe('SessionWizardShell', () => {
     expect(requirements).toHaveTextContent('OP Sepolia ETH');
     expect(worker).toHaveAttribute('data-worker-url', 'https://worker.example.test');
     expect(publish).toHaveAttribute('data-worker-source', 'custom worker URL');
-    expect(publish).toHaveAttribute('data-metadata-label', 'Metadata URI');
-    expect(publish).toHaveAttribute('data-metadata-uri', 'ar://metadata-tx');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeDisabled();
 
     fireEvent.click(screen.getByText('advanced'));
@@ -397,19 +354,7 @@ describe('SessionWizardShell', () => {
   it('preserves section visibility and publish disabled state', () => {
     const props = baseProps();
     props.showNewSessionRequirementsBanner = false;
-    props.publishUiPlan = {
-      ...props.publishUiPlan,
-      publishActionDisplayState: {
-        ...props.publishUiPlan.publishActionDisplayState,
-        canPublishNow: false,
-        publishButtonDisabled: true,
-      },
-      publishReadiness: {
-        ...props.publishUiPlan.publishReadiness,
-        canPublishNow: false,
-        readinessKind: 'blocked',
-      },
-    };
+    props.canPublishNow = false;
     props.collapsedSections = {
       encryption: true,
       metadata: true,

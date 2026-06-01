@@ -4,201 +4,17 @@ import React from 'react';
 import styles from './SessionWizard.module.scss';
 import EncryptionPanel from './EncryptionPanel';
 import SessionMetadataEditor from './SessionMetadataEditor';
-import SessionWizardPublishSection from './SessionWizardPublishSection';
+import SessionPublishSummary from './SessionPublishSummary';
 import SessionWizardHeader from './SessionWizardHeader';
-import SessionWizardIntroStatusRail from './SessionWizardIntroStatusRail';
 import SessionWizardModals from './SessionWizardModals';
+import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
+import SessionWizardRequirementsBanner from './SessionWizardRequirementsBanner';
+import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
-import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
-import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
-import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
+import WorkerPanel from './WorkerPanel';
 
-type HeaderProps = React.ComponentProps<typeof SessionWizardHeader>;
-type IntroStatusRailProps = React.ComponentProps<typeof SessionWizardIntroStatusRail>;
-type EncryptionPanelBoundaryProps = React.ComponentProps<typeof EncryptionPanel>;
-type MetadataEditorProps = React.ComponentProps<typeof SessionMetadataEditor>;
-type PublishSectionProps = React.ComponentProps<typeof SessionWizardPublishSection>;
-type WizardModalsProps = React.ComponentProps<typeof SessionWizardModals>;
-type WorkerDeployHelperToggleBoundaryProps = React.ComponentProps<typeof WorkerDeployHelperToggle>;
-
-type SessionWizardShellSectionKey = 'encryption' | 'metadata' | 'publish' | 'worker';
-
-type SessionWizardShellCollapsedSections =
-  Record<string, boolean> &
-  Record<SessionWizardShellSectionKey, boolean>;
-
-type SessionWizardShellDraft = Record<string, unknown> & {
-  contracts?: Record<string, unknown>;
-  corsWorkerUrl?: string;
-  defaultSbtTags?: string;
-  slug?: string;
-};
-
-type SessionWizardShellRenderInfoTooltip = (options: {
-  ariaLabel?: string;
-  content?: React.ReactNode;
-  id?: string;
-  placement?: SessionWizardTooltipRenderOptions['placement'];
-  testId?: string;
-  [key: string]: unknown;
-}) => React.ReactNode;
-
-export type SessionWizardShellProps = {
-  account: WizardModalsProps['account'];
-  activeCreateSbtTargetGate: EncryptionPanelBoundaryProps['activeCreateSbtTargetGate'];
-  activeCreateSbtTargetGateId: EncryptionPanelBoundaryProps['activeCreateSbtTargetGateId'];
-  activeNormalModeIndex: IntroStatusRailProps['activeNormalModeIndex'];
-  addEncryptionGate: EncryptionPanelBoundaryProps['addEncryptionGate'];
-  adminUrl: PublishSectionProps['adminUrl'];
-  adminUrlStatus: PublishSectionProps['adminUrlStatus'];
-  advancedBundleFileInputRef: WorkerPanelProps['advancedBundleFileInputRef'];
-  bundleFile: PublishSectionProps['bundleFile'];
-  bundleMode: WorkerPanelProps['bundleMode'];
-  clearSelectedBundleFile: WorkerPanelProps['clearSelectedBundleFile'];
-  clearWorkerSecretFields: WorkerPanelProps['clearWorkerSecretFields'];
-  closeContractViewerModal: WizardModalsProps['closeContractViewerModal'];
-  closeCreateSbtModal: WizardModalsProps['closeCreateSbtModal'];
-  collapsedSections: SessionWizardShellCollapsedSections;
-  contractViewerModalState: WizardModalsProps['contractViewerModalState'];
-  createSbtModalArweaveJwkOverride: WizardModalsProps['createSbtModalArweaveJwkOverride'];
-  createSbtModalChainId: WizardModalsProps['createSbtModalChainId'];
-  createSbtModalNetwork: WizardModalsProps['createSbtModalNetwork'];
-  createSbtModalSessionSlug: WizardModalsProps['createSbtModalSessionSlug'];
-  createSbtModalState: WizardModalsProps['createSbtModalState'];
-  defaultAllowedOrigins: WorkerPanelProps['defaultAllowedOrigins'];
-  defaultGateId: WizardModalsProps['defaultGateId'];
-  deployComplete: WorkerPanelProps['deployComplete'];
-  deployForm: WorkerPanelProps['deployForm'];
-  deployHelperUrl: WorkerPanelProps['deployHelperUrl'];
-  deployStatusDisplayState: WorkerPanelProps['deployStatusDisplayState'];
-  deployWorkerUrl: WorkerPanelProps['deployWorkerUrl'];
-  devPersistWorkerSecrets: WorkerPanelProps['devPersistWorkerSecrets'];
-  displayedWorkerUrl: WorkerPanelProps['displayedWorkerUrl'];
-  draft: SessionWizardShellDraft;
-  effectivePersistWorkerSecrets: WorkerPanelProps['effectivePersistWorkerSecrets'];
-  embeddedDeployHelperEnabled: WorkerDeployHelperToggleBoundaryProps['checked'];
-  encryptionGates: NonNullable<EncryptionPanelBoundaryProps['encryptionGates']>;
-  ensureLightSbtUniverse: EncryptionPanelBoundaryProps['ensureLightSbtUniverse'];
-  focusCreateSbtTargetGate: EncryptionPanelBoundaryProps['focusCreateSbtTargetGate'];
-  focusNormalModeSection: IntroStatusRailProps['onFocusNormalModeSection'];
-  getSessionWizardDefaultWorkerUrl: WorkerPanelProps['getDefaultWorkerUrl'];
-  handleCopyAdminUrl: PublishSectionProps['onCopyAdminUrl'];
-  handleGateAddSbt: EncryptionPanelBoundaryProps['handleGateAddSbt'];
-  handleGateRemoveSbt: EncryptionPanelBoundaryProps['handleGateRemoveSbt'];
-  handleDeployWorker: WorkerPanelProps['handleDeployWorker'];
-  handleSavePendingSbtDraft: WizardModalsProps['handleSavePendingSbtDraft'];
-  hasSponsoredBundleLink: HeaderProps['hasSponsoredBundleLink'];
-  isNormalMode: boolean;
-  jsonCopied: MetadataEditorProps['jsonCopied'];
-  launchCreateSbtModal: EncryptionPanelBoundaryProps['launchCreateSbtModal'];
-  localWorkerBundleFallbackFilePath: PublishSectionProps['localWorkerBundleFallbackFilePath'];
-  manualBundleUrlOverrideHelp: PublishSectionProps['manualBundleUrlOverrideHelp'];
-  manualGasLimit: PublishSectionProps['manualGasLimit'];
-  manualGasPriceGwei: PublishSectionProps['manualGasPriceGwei'];
-  manualMaxFeePerGasGwei: PublishSectionProps['manualMaxFeePerGasGwei'];
-  manualMaxPriorityFeePerGasGwei: PublishSectionProps['manualMaxPriorityFeePerGasGwei'];
-  manualMetadataUrl: PublishSectionProps['manualMetadataUrl'];
-  moreOptionsEntries: MetadataEditorProps['moreOptionsEntries'];
-  moreOptionsOpen: MetadataEditorProps['moreOptionsOpen'];
-  network: EncryptionPanelBoundaryProps['network'];
-  newSessionFundingRequirementHref: IntroStatusRailProps['fundingRequirementHref'];
-  newSessionFundingRequirementLabel: IntroStatusRailProps['fundingRequirementLabel'];
-  newSessionRequiresLitCredential: IntroStatusRailProps['newSessionRequiresLitCredential'];
-  normalizeSbtSelection: WizardModalsProps['normalizeSbtSelection'];
-  normalModeBundleHelpText: WorkerPanelProps['normalModeBundleHelpText'];
-  normalModeBundleUrl: WorkerPanelProps['normalModeBundleUrl'];
-  normalModeBundleUrlOverride: PublishSectionProps['normalModeBundleUrlOverride'];
-  normalModeBundleUrlOverrideValidationError: PublishSectionProps['normalModeBundleUrlOverrideValidationError'];
-  normalModeCards: IntroStatusRailProps['normalModeCards'];
-  normalModeManualBundleHelpText: WorkerPanelProps['normalModeManualBundleHelpText'];
-  normalModePublishSummary: PublishSectionProps['normalModePublishSummary'];
-  normalModeRetryBundleFileInputRef: WorkerPanelProps['normalModeRetryBundleFileInputRef'];
-  onCloseDisplaySettings: HeaderProps['onCloseDisplaySettings'];
-  onCloseSessionHeaderPreviewModal: WizardModalsProps['onCloseSessionHeaderPreviewModal'];
-  onCopyDraftJson: MetadataEditorProps['onCopyDraftJson'];
-  onDismissNewSessionRequirementsBanner: IntroStatusRailProps['onDismissRequirements'];
-  onEnterAdvancedMode: HeaderProps['onEnterAdvancedMode'];
-  onEnterNormalMode: HeaderProps['onEnterNormalMode'];
-  onManualGasLimitChange: PublishSectionProps['onManualGasLimitChange'];
-  onManualGasPriceGweiChange: PublishSectionProps['onManualGasPriceGweiChange'];
-  onManualMaxFeePerGasGweiChange: PublishSectionProps['onManualMaxFeePerGasGweiChange'];
-  onManualMaxPriorityFeePerGasGweiChange: PublishSectionProps['onManualMaxPriorityFeePerGasGweiChange'];
-  onManualMetadataUrlChange: PublishSectionProps['onManualMetadataUrlChange'];
-  onNormalModeBundleUrlOverrideChange: PublishSectionProps['onNormalModeBundleUrlOverrideChange'];
-  onPublish: PublishSectionProps['onPublish'];
-  onRegistryChainIdChange: HeaderProps['onRegistryChainIdChange'];
-  onRetrySponsoredBundle: IntroStatusRailProps['onRetrySponsoredBundle'];
-  onToggleDisplaySettings: HeaderProps['onToggleDisplaySettings'];
-  onToggleJsonPreview: MetadataEditorProps['onToggleJsonPreview'];
-  onToggleMoreOptions: MetadataEditorProps['onToggleMoreOptions'];
-  onTogglePublishAdvanced: PublishSectionProps['onTogglePublishAdvanced'];
-  pendingSbtDrafts: EncryptionPanelBoundaryProps['pendingSbtDrafts'];
-  pendingSbtSelectorOptions: EncryptionPanelBoundaryProps['pendingSbtSelectorOptions'];
-  persistWorkerSecrets: WorkerPanelProps['persistWorkerSecrets'];
-  primaryDraftEntries: MetadataEditorProps['primaryEntries'];
-  provider: WizardModalsProps['provider'];
-  publishUiPlan: PublishSectionProps['publishUiPlan'];
-  publishedPendingSbtLinks: PublishSectionProps['publishedPendingSbtLinks'];
-  registerExplorerBaseUrl: PublishSectionProps['registerExplorerBaseUrl'];
-  registerTxs: PublishSectionProps['registerTxs'];
-  registryAddress: HeaderProps['registryAddress'];
-  registryChainId: HeaderProps['registryChainId'];
-  registryChainName: HeaderProps['registryChainName'];
-  registryChainOptions: HeaderProps['registryChainOptions'];
-  removeEncryptionGate: EncryptionPanelBoundaryProps['removeEncryptionGate'];
-  removePendingSbtDraft: EncryptionPanelBoundaryProps['removePendingSbtDraft'];
-  renderField: SessionWizardRenderField;
-  renderResourceCard: WorkerPanelProps['renderResourceCard'];
-  renderSessionWizardInfoTooltip: SessionWizardShellRenderInfoTooltip;
-  resolvedActiveSessionSlug: WorkerPanelProps['resolvedActiveSessionSlug'];
-  resolvedWorkerBaseUrl: PublishSectionProps['resolvedWorkerBaseUrl'];
-  sbtCacheRevision: EncryptionPanelBoundaryProps['sbtCacheRevision'];
-  selectedWizardContract: WizardModalsProps['selectedWizardContract'];
-  selectedWizardContractHref: WizardModalsProps['selectedWizardContractHref'];
-  selectorSourceChainId: EncryptionPanelBoundaryProps['selectorSourceChainId'];
-  selectorSourceSessionConfig: EncryptionPanelBoundaryProps['selectorSourceSessionConfig'];
-  sessionHeaderPreviewModalOpen: WizardModalsProps['sessionHeaderPreviewModalOpen'];
-  sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
-  sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
-  sessionUrl: PublishSectionProps['sessionUrl'];
-  setBundleFile: WorkerPanelProps['setBundleFile'];
-  setBundleMode: WorkerPanelProps['setBundleMode'];
-  setDeployForm: WorkerPanelProps['setDeployForm'];
-  setDeployHelperUrl: WorkerPanelProps['setDeployHelperUrl'];
-  setNormalModeBundleUrlOverride: WorkerPanelProps['setNormalModeBundleUrlOverride'];
-  setPersistWorkerSecrets: WorkerPanelProps['setPersistWorkerSecrets'];
-  setWorkerAllowOrigins: WorkerPanelProps['setWorkerAllowOrigins'];
-  setWorkerMode: WorkerPanelProps['onWorkerModeChange'];
-  setWorkerSecretsEnabled: WorkerPanelProps['setWorkerSecretsEnabled'];
-  setWorkerUrlAutoFilled: WorkerPanelProps['setWorkerUrlAutoFilled'];
-  shouldShowDeployHelperUrlInput: WorkerPanelProps['shouldShowDeployHelperUrlInput'];
-  shouldUseSponsoredAutoDeployFlow: WorkerPanelProps['shouldUseSponsoredAutoDeployFlow'];
-  showJsonPreview: MetadataEditorProps['showJsonPreview'];
-  showNewSessionRequirementsBanner: IntroStatusRailProps['showNewSessionRequirementsBanner'];
-  showNormalModeManualBundleControls: WorkerPanelProps['showNormalModeManualBundleControls'];
-  showNormalModeWorkerStep: boolean;
-  showSharedWorkerChoice: WorkerPanelProps['showSharedWorkerChoice'];
-  showSponsoredBundleFallbackInput: PublishSectionProps['showSponsoredBundleFallbackInput'];
-  showSponsoredDeployAccessNotice: WorkerPanelProps['showSponsoredDeployAccessNotice'];
-  showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
-  sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
-  sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
-  sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
-  status: PublishSectionProps['status'];
-  signBootstrapAdminAction: WizardModalsProps['signBootstrapAdminAction'];
-  t: WizardModalsProps['t'];
-  toggleLoginModal: WizardModalsProps['toggleLoginModal'];
-  toggleSection: (section: SessionWizardShellSectionKey) => void;
-  updateDraftValue: (path: string[], value: unknown) => void;
-  updateEncryptionGate: EncryptionPanelBoundaryProps['updateEncryptionGate'];
-  visibleWorkerResourceKeys: NonNullable<WorkerPanelProps['workerResourceKeys']>;
-  workerAllowOrigins: WorkerPanelProps['workerAllowOrigins'];
-  workerMode: WorkerPanelProps['workerMode'];
-  workerSecretsEnabled: WorkerPanelProps['workerSecretsEnabled'];
-  workerUrlAutoFilled: WorkerPanelProps['workerUrlAutoFilled'];
-  workerUrlSource: PublishSectionProps['workerUrlSource'];
-  wizardDisplaySettingsOpen: HeaderProps['wizardDisplaySettingsOpen'];
-  wizardMode: string;
+type SessionWizardShellProps = {
+  [key: string]: any;
 };
 
 const SessionWizardShell = ({
@@ -212,6 +28,7 @@ const SessionWizardShell = ({
   advancedBundleFileInputRef,
   bundleFile,
   bundleMode,
+  canPublishNow,
   clearSelectedBundleFile,
   clearWorkerSecretFields,
   closeContractViewerModal,
@@ -228,11 +45,15 @@ const SessionWizardShell = ({
   deployComplete,
   deployForm,
   deployHelperUrl,
-  deployStatusDisplayState,
+  deployInFlight,
+  deployStatus,
+  deployStatusIsError,
   deployWorkerUrl,
   devPersistWorkerSecrets,
   displayedWorkerUrl,
   draft,
+  effectiveMetadataGatewayUrl,
+  effectiveMetadataTxId,
   effectivePersistWorkerSecrets,
   embeddedDeployHelperEnabled,
   encryptionGates,
@@ -245,7 +66,9 @@ const SessionWizardShell = ({
   handleGateRemoveSbt,
   handleDeployWorker,
   handleSavePendingSbtDraft,
+  hasManualMetadata,
   hasSponsoredBundleLink,
+  hasUploadedMetadata,
   isNormalMode,
   jsonCopied,
   launchCreateSbtModal,
@@ -256,12 +79,14 @@ const SessionWizardShell = ({
   manualMaxFeePerGasGwei,
   manualMaxPriorityFeePerGasGwei,
   manualMetadataUrl,
+  metadataUrl,
   moreOptionsEntries,
   moreOptionsOpen,
   network,
   newSessionFundingRequirementHref,
   newSessionFundingRequirementLabel,
   newSessionRequiresLitCredential,
+  normalizeArweaveUri,
   normalizeSbtSelection,
   normalModeBundleHelpText,
   normalModeBundleUrl,
@@ -295,7 +120,10 @@ const SessionWizardShell = ({
   persistWorkerSecrets,
   primaryDraftEntries,
   provider,
-  publishUiPlan,
+  publishAdvancedOpen,
+  publishBusy,
+  publishProgressDisplayState,
+  publishStep,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
   registerTxs,
@@ -349,6 +177,7 @@ const SessionWizardShell = ({
   toggleSection,
   updateDraftValue,
   updateEncryptionGate,
+  uploadBlockedReason,
   visibleWorkerResourceKeys,
   workerAllowOrigins,
   workerMode,
@@ -376,20 +205,28 @@ const SessionWizardShell = ({
       wizardMode={wizardMode}
     />
 
-    <SessionWizardIntroStatusRail
-      activeNormalModeIndex={activeNormalModeIndex}
-      collapsedSections={collapsedSections}
-      fundingRequirementHref={newSessionFundingRequirementHref}
-      fundingRequirementLabel={newSessionFundingRequirementLabel}
-      isNormalMode={isNormalMode}
-      newSessionRequiresLitCredential={newSessionRequiresLitCredential}
-      normalModeCards={normalModeCards}
-      onDismissRequirements={onDismissNewSessionRequirementsBanner}
-      onFocusNormalModeSection={focusNormalModeSection}
-      onRetrySponsoredBundle={onRetrySponsoredBundle}
-      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
-      sponsoredBundleStatus={sponsoredBundleStatus}
+    {showNewSessionRequirementsBanner ? (
+      <SessionWizardRequirementsBanner
+        fundingRequirementHref={newSessionFundingRequirementHref}
+        fundingRequirementLabel={newSessionFundingRequirementLabel}
+        newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+        onDismiss={onDismissNewSessionRequirementsBanner}
+      />
+    ) : null}
+
+    <SessionWizardSponsoredStatus
+      onRetry={onRetrySponsoredBundle}
+      status={sponsoredBundleStatus}
     />
+
+    {isNormalMode && (
+      <SessionWizardNormalModeRail
+        activeNormalModeIndex={activeNormalModeIndex}
+        collapsedSections={collapsedSections}
+        normalModeCards={normalModeCards}
+        onFocusSection={focusNormalModeSection}
+      />
+    )}
 
     {(!isNormalMode || !collapsedSections.encryption) && (
       <EncryptionPanel
@@ -502,7 +339,9 @@ const SessionWizardShell = ({
         resolvedActiveSessionSlug={resolvedActiveSessionSlug}
         setDeployForm={setDeployForm}
         handleDeployWorker={handleDeployWorker}
-        deployStatusDisplayState={deployStatusDisplayState}
+        deployInFlight={deployInFlight}
+        deployStatus={deployStatus}
+        deployStatusIsError={deployStatusIsError}
         showWorkerUrlField={showWorkerUrlField}
         displayedWorkerUrl={displayedWorkerUrl}
         renderField={renderField}
@@ -510,47 +349,65 @@ const SessionWizardShell = ({
       />
     )}
 
-    <SessionWizardPublishSection
-      isCollapsed={collapsedSections.publish}
-      isNormalMode={isNormalMode}
-      onToggleCollapsed={() => toggleSection('publish')}
-      normalModePublishSummary={normalModePublishSummary}
-      onPublish={onPublish}
-      onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
-      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-      normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-      onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-      normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-      manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-      bundleFileInputRef={sponsoredPublishBundleFileInputRef}
-      onBundleFileChange={setBundleFile}
-      onClearBundleFile={clearSelectedBundleFile}
-      bundleFile={bundleFile}
-      localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-      sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-      publishUiPlan={publishUiPlan}
-      renderInfoTooltip={renderSessionWizardInfoTooltip}
-      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-      workerUrlSource={workerUrlSource}
-      manualMetadataUrl={manualMetadataUrl}
-      onManualMetadataUrlChange={onManualMetadataUrlChange}
-      manualGasLimit={manualGasLimit}
-      onManualGasLimitChange={onManualGasLimitChange}
-      manualGasPriceGwei={manualGasPriceGwei}
-      onManualGasPriceGweiChange={onManualGasPriceGweiChange}
-      manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
-      onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
-      manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
-      onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
-      registerTxs={registerTxs}
-      registerExplorerBaseUrl={registerExplorerBaseUrl}
-      sessionUrl={sessionUrl}
-      adminUrl={adminUrl}
-      publishedPendingSbtLinks={publishedPendingSbtLinks}
-      onCopyAdminUrl={handleCopyAdminUrl}
-      adminUrlStatus={adminUrlStatus}
-      status={status}
-    />
+    {(!isNormalMode || !collapsedSections.publish) && (
+      <SessionPublishSummary
+        isNormalMode={isNormalMode}
+        wizardMode={wizardMode}
+        isCollapsed={collapsedSections.publish}
+        onToggleCollapsed={() => toggleSection('publish')}
+        normalModePublishSummary={normalModePublishSummary}
+        onPublish={onPublish}
+        publishBusy={publishBusy}
+        canPublishNow={canPublishNow}
+        publishAdvancedOpen={publishAdvancedOpen}
+        onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
+        showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+        normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+        onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
+        normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+        manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+        bundleFileInputRef={sponsoredPublishBundleFileInputRef}
+        onBundleFileChange={setBundleFile}
+        onClearBundleFile={clearSelectedBundleFile}
+        bundleFile={bundleFile}
+        localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+        sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+        showPublishProgress={publishProgressDisplayState.showPublishProgress}
+        activePublishProgressStepLabel={publishProgressDisplayState.activePublishProgressStepLabel}
+        publishProgressPercent={publishProgressDisplayState.publishProgressPercent}
+        publishProgressPercentRounded={publishProgressDisplayState.publishProgressPercentRounded}
+        publishStep={publishStep}
+        publishProgressSteps={publishProgressDisplayState.publishProgressSteps}
+        uploadBlockedReason={uploadBlockedReason}
+        hasManualMetadata={hasManualMetadata}
+        hasUploadedMetadata={hasUploadedMetadata}
+        renderInfoTooltip={renderSessionWizardInfoTooltip}
+        resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+        workerUrlSource={workerUrlSource}
+        manualMetadataUrl={manualMetadataUrl}
+        onManualMetadataUrlChange={onManualMetadataUrlChange}
+        manualGasLimit={manualGasLimit}
+        onManualGasLimitChange={onManualGasLimitChange}
+        manualGasPriceGwei={manualGasPriceGwei}
+        onManualGasPriceGweiChange={onManualGasPriceGweiChange}
+        manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+        onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
+        manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+        onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
+        metadataUrl={metadataUrl}
+        effectiveMetadataTxId={effectiveMetadataTxId}
+        effectiveMetadataGatewayUrl={effectiveMetadataGatewayUrl}
+        registerTxs={registerTxs}
+        registerExplorerBaseUrl={registerExplorerBaseUrl}
+        sessionUrl={sessionUrl}
+        adminUrl={adminUrl}
+        publishedPendingSbtLinks={publishedPendingSbtLinks}
+        onCopyAdminUrl={handleCopyAdminUrl}
+        adminUrlStatus={adminUrlStatus}
+        status={status}
+        normalizeArweaveUri={normalizeArweaveUri}
+      />
+    )}
 
     <SessionWizardModals
       account={account}
