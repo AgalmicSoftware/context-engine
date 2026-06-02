@@ -189,6 +189,15 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
   return treeHasText(node?.props?.children, text);
 };
 
+const getSyncStatusNodeFromSubject = (subject: any): TreeNode => {
+  const tree = subject.render();
+  const headerNode = findElement(
+    tree,
+    (element) => element?.props?.syncStatusNode
+  );
+  return headerNode?.props?.syncStatusNode;
+};
+
 describe('countQuestionModeResponses', () => {
   it('excludes blank freeform responses from question-mode totals', () => {
     const aggregatorByQuestion = {
@@ -432,6 +441,140 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     detailedRefresh?.props?.onClick();
 
     expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders question-mode loading tracks from missing polling blocks', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'Questions:')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'Responses:')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(false);
+    expect(findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    )).toBeTruthy();
+  });
+
+  it('renders question and response tracks while question-mode polling is stale', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 100,
+      questionLocalBlock: 80,
+      responseLocalBlock: 70,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+    subject._syncLoadingStartedAt = Date.now() - 15000;
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const markup = renderToStaticMarkup(syncStatusNode);
+
+    expect(markup).toContain('Syncing...');
+    expect(markup).toContain('Questions:');
+    expect(markup).toContain('Remaining Blocks: 20 (Current: 80 / Latest: 100)');
+    expect(markup).toContain('Responses:');
+    expect(markup).toContain('Remaining Blocks: 30 (Current: 70 / Latest: 100)');
+    expect(markup).toContain('Refresh Now');
+    expect(findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    )).toBeTruthy();
+  });
+
+  it('renders survey-mode readiness from the survey response track only', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'survey',
+      surveyId: '0xabc',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '0xabc',
+      networkLatestBlock: 100,
+      questionLocalBlock: 100,
+      responseLocalBlock: 100,
+      surveyLocalBlock: 40,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const markup = renderToStaticMarkup(syncStatusNode);
+
+    expect(markup).toContain('Syncing...');
+    expect(markup).not.toContain('Questions:');
+    expect(markup).toContain('Responses:');
+    expect(markup).toContain('Remaining Blocks: 60 (Current: 40 / Latest: 100)');
+    expect(markup).toContain('Refresh Now');
+  });
+
+  it('keeps long-sync gating from changing status copy or refresh availability', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(20000);
+    try {
+      const subject = createSubject({
+        isOpen: true,
+        viewMode: 'questions',
+      });
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+        networkLatestBlock: 100,
+        questionLocalBlock: 90,
+        responseLocalBlock: 100,
+        syncDetailsOpen: true,
+      };
+      subject._syncLoadingStartedAt = 4000;
+
+      let syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+      expect(renderToStaticMarkup(syncStatusNode)).toContain('Syncing...');
+      expect(findElement(
+        syncStatusNode,
+        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+      )).toBeTruthy();
+
+      subject.state = {
+        ...subject.state,
+        questionLocalBlock: 100,
+      };
+      syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+      expect(renderToStaticMarkup(syncStatusNode)).toContain('In Sync');
+      expect(findElement(
+        syncStatusNode,
+        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+      )).toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', () => {
