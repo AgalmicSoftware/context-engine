@@ -152,6 +152,24 @@ import {
   type SurveyResultsQuestionMetadataReadIdentity,
 } from './surveyResultsQuestionMetadataReadController';
 import {
+  createSurveyResultsFallbackQuestionBuckets,
+  getSurveyResultsStableFallbackQuestion,
+  type SurveyResultsFallbackQuestion,
+  type SurveyResultsFallbackQuestionBuckets,
+} from './surveyResultsFallbackQuestionHelpers';
+import {
+  EMPTY_SCOPED_QUESTION_NETWORK_DATA,
+  mergeScopedQuestionNetworkData,
+  runSurveyResultsQuestionNetworkReadController,
+  type SurveyResultsQuestionBucketRecord,
+  type SurveyResultsQuestionRecord,
+  type SurveyResultsQuestionResponsesByQuestion,
+  type SurveyResultsQuestionResponsesByResponder,
+  type SurveyResultsScopedQuestionNetworkData,
+  type SurveyResultsScopedQuestionNetworkEntry,
+  type SurveyResultsScopedQuestionNetworkMemo,
+} from './surveyResultsQuestionNetworkReadController';
+import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
 } from './surveyResultsExportController.js';
@@ -217,14 +235,6 @@ type SurveyResultsScopeContextInput = {
   state?: SurveyResultsRecord;
   viewMode?: unknown;
 };
-type SurveyResultsQuestionRecord = SurveyResultsRecord & {
-  __ceQuestionMetadataPending?: unknown;
-  id?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
-};
-type SurveyResultsQuestionResponsesByResponder = Record<string, unknown>;
-type SurveyResultsQuestionResponsesByQuestion = Record<string, SurveyResultsQuestionResponsesByResponder>;
 type SurveyResultsSummaryAnswerField = SurveyResultsRecord & {
   encrypted?: unknown;
   value?: unknown;
@@ -252,16 +262,6 @@ type SurveyResultsQuestionExportRecord = {
   prompt: unknown;
   tags: unknown[];
   type: unknown;
-};
-type SurveyResultsFallbackQuestion = SurveyResultsRecord & {
-  creator?: string;
-  id: unknown;
-  prompt: string;
-  type?: string;
-};
-type SurveyResultsFallbackQuestionBuckets = {
-  individual: Map<string, SurveyResultsFallbackQuestion>;
-  summary: Map<string, SurveyResultsFallbackQuestion>;
 };
 type SurveyResultsQuestionTableEntry = {
   prompt: string;
@@ -347,48 +347,11 @@ type SurveyResultsLockedResponseKeyArgs = {
   response?: SurveyResultsResponseRecord | null;
   surveyId?: unknown;
 };
-type SurveyResultsQuestionBucketRecord = SurveyResultsRecord & {
-  questionResponses?: SurveyResultsQuestionResponsesByQuestion;
-  questionResponsesLatestBlock?: unknown;
-  questions?: Record<string, SurveyResultsQuestionRecord>;
-  questionsLatestBlock?: unknown;
-};
 type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
   surveyResponses?: Record<string, SurveyResultsRecord>;
   surveyResponsesLatestBlock?: Record<string, unknown>;
   surveys?: Record<string, SurveyResultsRecord & { documentURLs?: unknown; questionIDs?: unknown; title?: string }>;
   surveysLatestBlock?: unknown;
-};
-type SurveyResultsScopedQuestionNetworkData = {
-  questionResponses: SurveyResultsQuestionResponsesByQuestion;
-  questionResponsesLatestBlock: number;
-  questions: Record<string, SurveyResultsQuestionRecord>;
-  questionsLatestBlock: number;
-};
-type SurveyResultsQuestionResponseMergeOptions = {
-  allowedQuestionIds?: Set<string> | null;
-};
-type SurveyResultsScopedQuestionOptions = {
-  allowedScopeSlugs?: Set<string> | unknown[] | null;
-  bucketSlug?: unknown;
-  question?: SurveyResultsQuestionRecord;
-  requireAuthoritativeBinding?: boolean;
-};
-type SurveyResultsScopedQuestionNetworkEntry = {
-  bucket?: SurveyResultsQuestionBucketRecord | null;
-  slug?: unknown;
-};
-type SurveyResultsScopedQuestionNetworkOptions = {
-  allowedScopeSlugs?: Set<string> | unknown[] | null;
-  requireAuthoritativeBinding?: boolean;
-};
-type SurveyResultsScopedQuestionNetworkMemo = {
-  bucketRefs?: unknown[];
-  netIdStr?: string;
-  requireAuthoritativeBinding?: boolean;
-  result?: SurveyResultsScopedQuestionNetworkData;
-  slugsKey?: string;
-  viewMode?: unknown;
 };
 type SurveyResultsManagedCacheUpdate = {
   namespace?: unknown;
@@ -714,157 +677,6 @@ function resolveNetBucketReadOnly(cacheObj: unknown, netIdStr: unknown, fallback
   if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
   const bucket = (cacheObj as SurveyResultsRecord)[String(netIdStr)];
   return (bucket && typeof bucket === 'object') ? bucket : fallback;
-}
-
-const EMPTY_SCOPED_QUESTION_NETWORK_DATA = Object.freeze({
-  questions: {},
-  questionResponses: {},
-  questionsLatestBlock: 0,
-  questionResponsesLatestBlock: 0,
-}) as SurveyResultsScopedQuestionNetworkData;
-
-function mergeQuestionResponsesByQuestion(
-  accumulator: SurveyResultsQuestionResponsesByQuestion = {},
-  questionResponses: unknown = {},
-  options: SurveyResultsQuestionResponseMergeOptions = {}
-): SurveyResultsQuestionResponsesByQuestion {
-  const target = (accumulator && typeof accumulator === 'object') ? accumulator : {};
-  const source = (
-    questionResponses && typeof questionResponses === 'object'
-      ? questionResponses as SurveyResultsQuestionResponsesByQuestion
-      : {}
-  );
-  const allowedQuestionIds = options.allowedQuestionIds instanceof Set
-    ? options.allowedQuestionIds
-    : null;
-  Object.keys(source).forEach((questionId) => {
-    const lowerQuestionId = String(questionId || '').trim().toLowerCase();
-    if (!lowerQuestionId) return;
-    if (allowedQuestionIds && !allowedQuestionIds.has(lowerQuestionId)) return;
-    const responderMap = source[questionId];
-    if (!responderMap || typeof responderMap !== 'object') return;
-    if (!target[lowerQuestionId] || typeof target[lowerQuestionId] !== 'object') {
-      target[lowerQuestionId] = {};
-    }
-    const targetResponderMap = target[lowerQuestionId];
-    Object.keys(responderMap).forEach((responder) => {
-      targetResponderMap[responder] = responderMap[responder];
-    });
-  });
-  return target;
-}
-
-const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
-);
-
-const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  !!question && question.__ceQuestionMetadataPending === true
-);
-
-const resolveScopedQuestionSessionSlug = (
-  question: SurveyResultsQuestionRecord = {},
-  bucketSlug: unknown = ''
-): string => {
-  const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
-  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
-  if (hasAuthoritativeQuestionSessionSlug(question)) return normalizedQuestionSlug;
-  if (hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === false) {
-    return normalizedBucketSlug;
-  }
-  return normalizedQuestionSlug || normalizedBucketSlug;
-};
-
-const shouldKeepScopedQuestion = ({
-  question = {},
-  bucketSlug = '',
-  allowedScopeSlugs = [],
-  requireAuthoritativeBinding = false,
-}: SurveyResultsScopedQuestionOptions = {}): boolean => {
-  const scopeSet = allowedScopeSlugs instanceof Set
-    ? allowedScopeSlugs
-    : new Set(
-      (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
-  if (!scopeSet.size) return true;
-  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
-  if (isPendingQuestionMetadataPlaceholder(question)) return false;
-  if (requireAuthoritativeBinding) {
-    return hasAuthoritativeQuestionSessionSlug(question) && scopeSet.has(normalizedQuestionSlug);
-  }
-  return scopeSet.has(resolveScopedQuestionSessionSlug(question, bucketSlug));
-};
-
-function mergeScopedQuestionNetworkData(
-  networkEntries: SurveyResultsScopedQuestionNetworkEntry[] = [],
-  options: SurveyResultsScopedQuestionNetworkOptions = {}
-): SurveyResultsScopedQuestionNetworkData {
-  if (!Array.isArray(networkEntries) || networkEntries.length === 0) {
-    return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
-  }
-
-  const mergedQuestions: Record<string, SurveyResultsQuestionRecord> = {};
-  const mergedQuestionResponses: SurveyResultsQuestionResponsesByQuestion = {};
-  const allowedScopeSlugs = options.allowedScopeSlugs instanceof Set
-    ? options.allowedScopeSlugs
-    : new Set(
-      (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
-  const requireAuthoritativeBinding = options.requireAuthoritativeBinding === true;
-  let questionsLatestBlock = 0;
-  let questionResponsesLatestBlock = 0;
-
-  networkEntries.forEach(({ slug = '', bucket = {} }) => {
-    const questionBucket = (
-      bucket && typeof bucket === 'object'
-        ? bucket as SurveyResultsQuestionBucketRecord
-        : {}
-    );
-    const allowedQuestionIds: Set<string> = new Set();
-    const questions = (
-      questionBucket.questions && typeof questionBucket.questions === 'object'
-        ? questionBucket.questions
-        : {}
-    );
-    Object.keys(questions).forEach((questionId) => {
-      const lowerQuestionId = String(questionId || '').trim().toLowerCase();
-      if (!lowerQuestionId) return;
-      const question = questions[questionId] || {};
-      if (!shouldKeepScopedQuestion({
-        question,
-        bucketSlug: slug,
-        allowedScopeSlugs,
-        requireAuthoritativeBinding,
-      })) return;
-      allowedQuestionIds.add(lowerQuestionId);
-      if (Object.prototype.hasOwnProperty.call(mergedQuestions, lowerQuestionId)) return;
-      mergedQuestions[lowerQuestionId] = {
-        id: question?.id || questionId,
-        ...(question || {}),
-        sessionSlug: resolveScopedQuestionSessionSlug(question, slug),
-      };
-    });
-
-    mergeQuestionResponsesByQuestion(
-      mergedQuestionResponses,
-      questionBucket.questionResponses || {},
-      { allowedQuestionIds }
-    );
-    questionsLatestBlock = Math.max(questionsLatestBlock, Number(questionBucket.questionsLatestBlock || 0));
-    questionResponsesLatestBlock = Math.max(
-      questionResponsesLatestBlock,
-      Number(questionBucket.questionResponsesLatestBlock || 0)
-    );
-  });
-
-  return {
-    questions: mergedQuestions,
-    questionResponses: mergedQuestionResponses,
-    questionsLatestBlock,
-    questionResponsesLatestBlock,
-  };
 }
 
 const normalizeNonceKey = (value: unknown): number | null => {
@@ -1443,49 +1255,30 @@ class SurveyResults extends Component<any, any> {
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
-    const slugsKey = questionReadSlugs.join('|');
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries: SurveyResultsScopedQuestionNetworkEntry[] = questionReadSlugs.map((slug) => ({
-      slug,
-      bucket: resolveNetBucketReadOnly(
-        peekCacheSync('questionsCache', slug, { clone: false }) || {},
-        netIdStr,
-        {
-          questionsLatestBlock: 0,
-          questions: {},
-          questionResponses: {},
-          questionResponsesLatestBlock: 0,
-        }
-      ) as SurveyResultsQuestionBucketRecord,
-    }));
-    const memo: SurveyResultsScopedQuestionNetworkMemo = this._scopedQuestionNetworkDataSyncMemo || {};
-    const bucketRefs = entries.map((entry) => entry.bucket);
-    const memoMatches = (
-      memo.viewMode === viewMode &&
-      memo.netIdStr === netIdStr &&
-      memo.slugsKey === slugsKey &&
-      memo.requireAuthoritativeBinding === requireAuthoritativeBinding &&
-      Array.isArray(memo.bucketRefs) &&
-      memo.bucketRefs.length === bucketRefs.length &&
-      memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index])
-    );
-    if (memoMatches) return memo.result || EMPTY_SCOPED_QUESTION_NETWORK_DATA;
-
-    const result = mergeScopedQuestionNetworkData(entries, {
-      allowedScopeSlugs: questionReadSlugs,
-      // Regression guard: explicit ?session= pins must ignore legacy bucket leaks
-      // until question metadata is rehydrated with an authoritative session binding.
-      requireAuthoritativeBinding,
-    });
-    this._scopedQuestionNetworkDataSyncMemo = {
-      viewMode,
+    const controllerResult = runSurveyResultsQuestionNetworkReadController({
       netIdStr,
-      slugsKey,
+      previousMemo: this._scopedQuestionNetworkDataSyncMemo,
+      questionReadSlugs,
       requireAuthoritativeBinding,
-      bucketRefs,
-      result,
-    };
-    return result;
+      viewMode,
+      ports: {
+        readQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
+          peekCacheSync('questionsCache', slug, { clone: false }) || {},
+          networkId,
+          {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          }
+        ) as SurveyResultsQuestionBucketRecord,
+      },
+    });
+    if (!controllerResult.memoHit && controllerResult.memo) {
+      this._scopedQuestionNetworkDataSyncMemo = controllerResult.memo;
+    }
+    return controllerResult.result;
   }
 
   async getScopedQuestionNetworkData(
@@ -5003,31 +4796,10 @@ getStableFallbackQuestion = (
   questionId: unknown,
   mode: unknown = 'summary'
 ): SurveyResultsFallbackQuestion => {
-const cacheKey = String(questionId || '');
 if (!this._stableFallbackQuestions || typeof this._stableFallbackQuestions !== 'object') {
-  this._stableFallbackQuestions = {
-    summary: new Map(),
-    individual: new Map(),
-  };
+  this._stableFallbackQuestions = createSurveyResultsFallbackQuestionBuckets();
 }
-const fallbackQuestions = this._stableFallbackQuestions as SurveyResultsFallbackQuestionBuckets;
-const bucket = mode === 'individual'
-  ? fallbackQuestions.individual
-  : fallbackQuestions.summary;
-if (bucket.has(cacheKey)) return bucket.get(cacheKey) as SurveyResultsFallbackQuestion;
-const fallback: SurveyResultsFallbackQuestion = mode === 'individual'
-  ? {
-    id: questionId,
-    creator: '',
-    type: '',
-    prompt: '',
-  }
-  : {
-    id: questionId,
-    prompt: 'Unknown question',
-  };
-bucket.set(cacheKey, fallback);
-return fallback;
+return getSurveyResultsStableFallbackQuestion(this._stableFallbackQuestions, questionId, mode);
 };
 
 getMemoizedQuestionTableEntries = (
