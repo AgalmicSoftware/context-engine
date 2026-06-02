@@ -264,6 +264,30 @@ describe('SurveyResults locked responses banner', () => {
     expect(gateLink).toBeTruthy();
   });
 
+  it('keeps decrypt controls display-only and disables them while parent decrypt is running', () => {
+    const subject = createSubject();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.state = {
+      ...subject.state,
+      lockedResponsesDecrypting: true,
+      lockedResponseDetailsOpen: true,
+    };
+
+    const tree = subject.renderLockedResponsesBanner({
+      lockedCount: 1,
+      gateDetails: [],
+    });
+    const decryptButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-results-decrypt-btn'
+    );
+
+    expect(decryptButton).toBeTruthy();
+    expect(decryptButton?.props?.disabled).toBe(true);
+    expect(decryptButton?.props?.onClick).toBe(subject.handleDecryptLockedResponses);
+    expect(treeHasText(decryptButton, 'Decrypt')).toBe(true);
+  });
+
   it('resolves SBT details from configured session gates before falling back to generic copy', () => {
     const subject = createSubject({
       network: { id: 84532 },
