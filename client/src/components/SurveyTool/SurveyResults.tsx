@@ -152,6 +152,12 @@ import {
   type SurveyResultsQuestionMetadataReadIdentity,
 } from './surveyResultsQuestionMetadataReadController';
 import {
+  createSurveyResultsFallbackQuestionBuckets,
+  getSurveyResultsStableFallbackQuestion,
+  type SurveyResultsFallbackQuestion,
+  type SurveyResultsFallbackQuestionBuckets,
+} from './surveyResultsFallbackQuestionHelpers';
+import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
 } from './surveyResultsExportController.js';
@@ -252,16 +258,6 @@ type SurveyResultsQuestionExportRecord = {
   prompt: unknown;
   tags: unknown[];
   type: unknown;
-};
-type SurveyResultsFallbackQuestion = SurveyResultsRecord & {
-  creator?: string;
-  id: unknown;
-  prompt: string;
-  type?: string;
-};
-type SurveyResultsFallbackQuestionBuckets = {
-  individual: Map<string, SurveyResultsFallbackQuestion>;
-  summary: Map<string, SurveyResultsFallbackQuestion>;
 };
 type SurveyResultsQuestionTableEntry = {
   prompt: string;
@@ -5003,31 +4999,10 @@ getStableFallbackQuestion = (
   questionId: unknown,
   mode: unknown = 'summary'
 ): SurveyResultsFallbackQuestion => {
-const cacheKey = String(questionId || '');
 if (!this._stableFallbackQuestions || typeof this._stableFallbackQuestions !== 'object') {
-  this._stableFallbackQuestions = {
-    summary: new Map(),
-    individual: new Map(),
-  };
+  this._stableFallbackQuestions = createSurveyResultsFallbackQuestionBuckets();
 }
-const fallbackQuestions = this._stableFallbackQuestions as SurveyResultsFallbackQuestionBuckets;
-const bucket = mode === 'individual'
-  ? fallbackQuestions.individual
-  : fallbackQuestions.summary;
-if (bucket.has(cacheKey)) return bucket.get(cacheKey) as SurveyResultsFallbackQuestion;
-const fallback: SurveyResultsFallbackQuestion = mode === 'individual'
-  ? {
-    id: questionId,
-    creator: '',
-    type: '',
-    prompt: '',
-  }
-  : {
-    id: questionId,
-    prompt: 'Unknown question',
-  };
-bucket.set(cacheKey, fallback);
-return fallback;
+return getSurveyResultsStableFallbackQuestion(this._stableFallbackQuestions, questionId, mode);
 };
 
 getMemoizedQuestionTableEntries = (
