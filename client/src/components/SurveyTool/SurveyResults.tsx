@@ -142,6 +142,9 @@ import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
+  runSurveyResultsQueuedRefreshController,
+} from './surveyResultsQueuedRefreshController';
+import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
 import {
@@ -2025,9 +2028,12 @@ class SurveyResults extends Component<any, any> {
       runPostPatchTasks();
     }
 
-    if (refreshReasons.size > 0) {
-      this.queueResultsRefresh(Array.from(refreshReasons).join('|'));
-    }
+    runSurveyResultsQueuedRefreshController({
+      ports: {
+        queueResultsRefresh: this.queueResultsRefresh,
+      },
+      reasons: refreshReasons,
+    });
   }
 
 
