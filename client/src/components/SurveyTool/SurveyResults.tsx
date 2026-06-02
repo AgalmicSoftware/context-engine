@@ -135,6 +135,9 @@ import {
   buildSurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
 import {
+  buildSurveyResultsCacheControllerSnapshot,
+} from './surveyResultsCacheControllerSnapshot';
+import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
@@ -5354,9 +5357,6 @@ const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
 const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
 
-const currentViewModeForFilter = this.state.viewMode;
-const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.surveyId : null;
-
 const surveyIdAbbreviation = currentSurveyId
   ? getShortenedSurveyID(currentSurveyId, false, null, false)
   : null;
@@ -5373,20 +5373,34 @@ const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResu
       { key: 'riskMatrix', label: 'Risk Matrix' },
     ]
   : [];
-
-const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan({
+const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
+  activeSessionSlug: slug,
   aggregatorEntriesCount,
+  currentSurveyId,
+  currentSurveyIdForUrl: viewMode === 'survey' ? currentSurveyId : null,
+  currentViewModeForUrl: viewMode,
   filteredQuestionsCount,
   filteredResponsesCount,
   filterLoading,
+  filterState: this.state.filterState as SurveyResultsRecord,
+  hasRefreshQuestionMetadata: typeof this.props.refreshQuestionMetadata === 'function',
+  hasRefreshQuestionResponses: typeof this.props.refreshQuestionResponses === 'function',
+  hasRefreshSurveyResponsesByID: typeof this.props.refreshSurveyResponsesByID === 'function',
+  isQuestionCacheReady: this.props.isQuestionCacheReady,
+  isSBTCacheReady: this.props.isSBTCacheReady,
   networkLatestBlock: this.state.networkLatestBlock,
   nowMs: Date.now(),
   questionLocalBlock: this.state.questionLocalBlock,
+  questionResponsesNonce: this.props.questionResponsesNonce,
+  questionsCacheNonce: this.props.questionsCacheNonce,
   questionResultsHydrated: this.state.questionResultsHydrated,
   refreshTargetQuestionBlock: this.state.refreshTargetQuestionBlock,
   refreshTargetResponseBlock: this.state.refreshTargetResponseBlock,
   refreshTargetSurveyBlock: this.state.refreshTargetSurveyBlock,
   responseLocalBlock: this.state.responseLocalBlock,
+  sbtCacheRevision: this.props.sbtCacheRevision,
+  showQuestionFilter: this.state.showQuestionFilter,
+  storageKeyPrefix: this.getQuestionFilterStorageKeyPrefix(viewMode),
   surveyLocalBlock: this.state.surveyLocalBlock,
   surveyResultsHydrated: this.state.surveyResultsHydrated,
   surveyViewMode,
@@ -5395,6 +5409,10 @@ const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan({
   totalResponsesCount,
   viewMode,
 });
+const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
+  cacheControllerSnapshot.cacheReadinessInput
+);
+const filterInput = cacheControllerSnapshot.filterInput;
 const {
   filterSummaryDisplay,
   questionListDisplay,
@@ -5506,16 +5524,16 @@ return (
         trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
         viewMode,
         filterControlsNode: renderSurveyResultsFilterExportControls({
-          activeSessionSlug: this.getEffectiveSlug(),
+          activeSessionSlug: filterInput.activeSessionSlug,
           aggregateQuestionResponses: this.state.aggregateQuestionResponses,
-          currentSurveyIdForUrl: currentSurveyIdForFilter,
-          currentViewModeForUrl: currentViewModeForFilter,
+          currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
+          currentViewModeForUrl: filterInput.currentViewModeForUrl,
           defaultTags: this.props.defaultTags,
           exportControlsDisplay,
-          filterState: this.state.filterState,
+          filterState: filterInput.filterState,
           isFilterActive,
-          isQuestionCacheReady: this.props.isQuestionCacheReady,
-          isSBTCacheReady: this.props.isSBTCacheReady,
+          isQuestionCacheReady: filterInput.isQuestionCacheReady,
+          isSBTCacheReady: filterInput.isSBTCacheReady,
           network: this.props.network,
           onClearFilters: this.handleClearFiltersFromParent,
           onDownload: this.downloadCSV,
@@ -5532,12 +5550,12 @@ return (
           questionFilterQuestions,
           questionFilterRef: this.questionFilterRef,
           questionResponses: this.state.questionResponses,
-          questionResponsesNonce: this.props.questionResponsesNonce,
-          questionsCacheNonce: this.props.questionsCacheNonce,
+          questionResponsesNonce: filterInput.questionResponsesNonce,
+          questionsCacheNonce: filterInput.questionsCacheNonce,
           responses: this.state.responses,
-          sbtCacheRevision: this.props.sbtCacheRevision,
-          showQuestionFilter: this.state.showQuestionFilter,
-          storageKeyPrefix: this.getQuestionFilterStorageKeyPrefix(currentViewModeForFilter),
+          sbtCacheRevision: filterInput.sbtCacheRevision,
+          showQuestionFilter: filterInput.showQuestionFilter,
+          storageKeyPrefix: filterInput.storageKeyPrefix,
           styleMap: styles,
           surveyViewMode,
           viewMode,
