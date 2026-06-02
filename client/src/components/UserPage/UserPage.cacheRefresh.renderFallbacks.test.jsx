@@ -122,6 +122,79 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     }
   });
 
+  it('keeps gated question response uncertainty in the loading fallback state', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress,
+    });
+    const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
+    const toDataUrlSpy = jest
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,');
+    try {
+      const dataByNamespace = {
+        surveysCache: [],
+        sbtCache: [],
+        userCache: [],
+        questionsCache: [{
+          slug: 'edge',
+          data: {
+            [networkID]: {
+              questions: {
+                q1: {
+                  id: 'q1',
+                  prompt: 'Private prompt',
+                  type: 'freeform',
+                },
+              },
+              questionResponses: {
+                q1: {
+                  [viewAddress.toLowerCase()]: JSON.stringify({
+                    answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+                  }),
+                },
+              },
+            },
+          },
+        }],
+      };
+
+      instance._dgHasAny = jest.fn(() => true);
+      instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+      instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+      expect(instance.state.hasUncertainGateAccess).toBe(true);
+      expect(instance.state.loadingQuestions).toBe(true);
+      expect(instance.state.questionResponseInfo).toHaveLength(0);
+      expect(retrySpy).toHaveBeenCalledWith(30000);
+
+      instance.state = {
+        ...instance.state,
+        aiAvailable: true,
+        isDeepScanning: false,
+        selectedTab: 'questions',
+        showSectionQuestionResponsesOpen: true,
+        showSectionQuestionsCreatedOpen: true,
+      };
+
+      const tree = instance.render();
+      const loadingIndicators = collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'UserPageDeepScanStatusIndicator'
+      );
+
+      expect(loadingIndicators).toHaveLength(2);
+      expect(treeHasText(tree, 'No question responses found.')).toBe(false);
+      expect(treeHasText(tree, 'No questions created.')).toBe(false);
+    } finally {
+      toDataUrlSpy.mockRestore();
+      retrySpy.mockRestore();
+    }
+  });
+
   it('routes SBT refresh through the injected cache refresh boundary', () => {
     const refreshSbtData = jest.fn();
     const instance = makeInstance({ refreshSbtData });
