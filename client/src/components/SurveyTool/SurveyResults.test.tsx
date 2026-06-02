@@ -755,4 +755,93 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     });
     expect(subject.getNetworkQuestionsForCurrentContext).not.toHaveBeenCalled();
   });
+
+  it('reads cached question metadata for selected summaries when no render cache is preloaded', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const cachedQuestion = {
+      id: 'q-ready',
+      prompt: 'Ready cached prompt',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-ready': cachedQuestion,
+    }));
+    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Ready',
+        [],
+        null
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(summary.props.metadataMissing).toBe(false);
+      expect(summary.props.questionPrompt).toBe('Ready cached prompt');
+      expect(defaultSummary.props.question).toBe(cachedQuestion);
+      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('falls back for selected summaries when the cached metadata read is empty without side effects', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(summary.props.metadataMissing).toBe(true);
+      expect(summary.props.questionPrompt).toBe('Unknown question: Q-Empty');
+      expect(defaultSummary.props.question).toEqual({
+        id: 'Q-Empty',
+        prompt: 'Unknown question',
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
 });
