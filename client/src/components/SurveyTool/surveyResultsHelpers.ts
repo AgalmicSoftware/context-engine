@@ -271,6 +271,12 @@ export const buildSurveyResultsNetworkLatestBlockPatch = (networkLatestBlock: un
   networkLatestBlock: Number(networkLatestBlock || 0),
 });
 
+export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown) => ({
+  refreshTargetQuestionBlock: latestBlock,
+  refreshTargetResponseBlock: latestBlock,
+  refreshTargetSurveyBlock: latestBlock,
+});
+
 export const buildSurveyResultsFilteredQuestionsCountPatch = (filteredQuestionsCount: unknown) => ({
   filteredQuestionsCount,
 });

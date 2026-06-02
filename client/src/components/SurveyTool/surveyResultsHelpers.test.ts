@@ -21,6 +21,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -92,6 +93,11 @@ describe('surveyResultsHelpers state patches', () => {
     });
     expect(buildSurveyResultsNetworkLatestBlockPatch('123')).toEqual({
       networkLatestBlock: 123,
+    });
+    expect(buildSurveyResultsRefreshTargetBlocksPatch(456)).toEqual({
+      refreshTargetQuestionBlock: 456,
+      refreshTargetResponseBlock: 456,
+      refreshTargetSurveyBlock: 456,
     });
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,
