@@ -1,5 +1,4 @@
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -50,11 +49,6 @@ export type SurveyResultsQuestionNetworkReadControllerPorts = {
   readQuestionBucket?: (slug: string, netIdStr: string) => unknown;
 };
 
-export type SurveyResultsQuestionNetworkAsyncReadControllerPorts = {
-  peekQuestionBucket?: (slug: string, netIdStr: string) => unknown;
-  readQuestionBucket?: (slug: string, netIdStr: string) => Promise<unknown> | unknown;
-};
-
 export type SurveyResultsQuestionNetworkReadControllerArgs = {
   netIdStr?: unknown;
   ports?: SurveyResultsQuestionNetworkReadControllerPorts;
@@ -64,22 +58,10 @@ export type SurveyResultsQuestionNetworkReadControllerArgs = {
   viewMode?: unknown;
 };
 
-export type SurveyResultsQuestionNetworkAsyncReadControllerArgs = {
-  netIdStr?: unknown;
-  ports?: SurveyResultsQuestionNetworkAsyncReadControllerPorts;
-  questionReadSlugs?: unknown[] | null;
-  requireAuthoritativeBinding?: unknown;
-};
-
 export type SurveyResultsQuestionNetworkReadControllerResult = {
   memo: SurveyResultsScopedQuestionNetworkMemo | null;
   memoHit: boolean;
   result: SurveyResultsScopedQuestionNetworkData;
-};
-
-export type SurveyResultsQuestionNetworkAsyncReadControllerResult = {
-  result: SurveyResultsScopedQuestionNetworkData;
-  statePatch: SurveyResultsRecord;
 };
 
 type SurveyResultsQuestionResponseMergeOptions = {
@@ -248,13 +230,10 @@ export function mergeScopedQuestionNetworkData(
       questionBucket.questionResponses || {},
       { allowedQuestionIds }
     );
-    questionsLatestBlock = Math.max(
-      questionsLatestBlock,
-      normalizeSurveyResultsBlockNumber(questionBucket.questionsLatestBlock)
-    );
+    questionsLatestBlock = Math.max(questionsLatestBlock, Number(questionBucket.questionsLatestBlock || 0));
     questionResponsesLatestBlock = Math.max(
       questionResponsesLatestBlock,
-      normalizeSurveyResultsBlockNumber(questionBucket.questionResponsesLatestBlock)
+      Number(questionBucket.questionResponsesLatestBlock || 0)
     );
   });
 
@@ -328,44 +307,5 @@ export const runSurveyResultsQuestionNetworkReadController = ({
     },
     memoHit: false,
     result,
-  };
-};
-
-export const runSurveyResultsQuestionNetworkAsyncReadController = async ({
-  netIdStr = '',
-  ports = {},
-  questionReadSlugs = [],
-  requireAuthoritativeBinding = false,
-}: SurveyResultsQuestionNetworkAsyncReadControllerArgs = {}): Promise<SurveyResultsQuestionNetworkAsyncReadControllerResult> => {
-  const normalizedNetIdStr = String(netIdStr || '');
-  if (!normalizedNetIdStr) {
-    return {
-      result: EMPTY_SCOPED_QUESTION_NETWORK_DATA,
-      statePatch: {},
-    };
-  }
-
-  const slugs = toSlugList(questionReadSlugs);
-  const entries: SurveyResultsScopedQuestionNetworkEntry[] = await Promise.all(slugs.map(async (slug) => {
-    let bucket = typeof ports.peekQuestionBucket === 'function'
-      ? ports.peekQuestionBucket(slug, normalizedNetIdStr)
-      : null;
-    if (!bucket || typeof bucket !== 'object' || Object.keys(bucket).length === 0) {
-      bucket = typeof ports.readQuestionBucket === 'function'
-        ? await ports.readQuestionBucket(slug, normalizedNetIdStr)
-        : EMPTY_QUESTION_BUCKET;
-    }
-    return {
-      slug,
-      bucket: toQuestionBucket(bucket),
-    };
-  }));
-
-  return {
-    result: mergeScopedQuestionNetworkData(entries, {
-      allowedScopeSlugs: slugs,
-      requireAuthoritativeBinding: requireAuthoritativeBinding === true,
-    }),
-    statePatch: {},
   };
 };
