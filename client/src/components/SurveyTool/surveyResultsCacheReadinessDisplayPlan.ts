@@ -33,20 +33,10 @@ export type SurveyResultsCacheReadinessDisplayPlanArgs = {
   viewMode?: unknown;
 };
 
-export type SurveyResultsCacheReadinessMode = 'questions' | 'survey' | 'unknown';
-
-export type SurveyResultsCacheReadinessDescriptor = {
-  areSummaryCountsHydrated: boolean;
-  filterLoading: boolean;
-  mode: SurveyResultsCacheReadinessMode;
-  summaryCountsSource: 'question-results' | 'survey-results';
-};
-
 export type SurveyResultsCacheReadinessDisplayPlan = {
   areSummaryCountsHydrated: boolean;
   filterSummaryDisplay: SurveyResultsFilterSummaryDisplayPlan;
   questionListDisplay: SurveyResultsQuestionListDisplayPlan;
-  readinessDescriptor: SurveyResultsCacheReadinessDescriptor;
   syncStatusDisplay: SurveyResultsSyncStatusDisplayPlan;
 };
 
@@ -78,13 +68,6 @@ export const buildSurveyResultsCacheReadinessDisplayPlan = ({
   viewMode = '',
 }: SurveyResultsCacheReadinessDisplayPlanArgs = {}): SurveyResultsCacheReadinessDisplayPlan => {
   const normalizedViewMode = String(viewMode || '');
-  const mode: SurveyResultsCacheReadinessMode =
-    normalizedViewMode === 'questions' || normalizedViewMode === 'survey'
-      ? normalizedViewMode
-      : 'unknown';
-  const summaryCountsSource = mode === 'survey'
-    ? 'survey-results'
-    : 'question-results';
   const areSummaryCountsHydrated = normalizedViewMode === 'survey'
     ? !!surveyResultsHydrated
     : !!questionResultsHydrated;
@@ -126,12 +109,6 @@ export const buildSurveyResultsCacheReadinessDisplayPlan = ({
     areSummaryCountsHydrated,
     filterSummaryDisplay,
     questionListDisplay,
-    readinessDescriptor: {
-      areSummaryCountsHydrated,
-      filterLoading: !!filterLoading,
-      mode,
-      summaryCountsSource,
-    },
     syncStatusDisplay,
   };
 };

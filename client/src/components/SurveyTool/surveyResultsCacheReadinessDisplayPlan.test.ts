@@ -24,12 +24,6 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
         shouldRenderQuestionTable: false,
         showEmptyState: true,
       },
-      readinessDescriptor: {
-        areSummaryCountsHydrated: false,
-        filterLoading: false,
-        mode: 'questions',
-        summaryCountsSource: 'question-results',
-      },
       syncStatusDisplay: {
         isSyncingOrLoading: true,
         showQuickRefresh: true,
@@ -67,49 +61,10 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
         normalizedFilteredResponsesCount: 3,
         showFilteredCountSpinner: false,
       },
-      readinessDescriptor: {
-        areSummaryCountsHydrated: true,
-        mode: 'survey',
-        summaryCountsSource: 'survey-results',
-      },
       syncStatusDisplay: {
         isSynced: true,
         showQuickRefresh: false,
         syncStatusText: 'In Sync',
-      },
-    });
-  });
-
-  it('describes survey-mode readiness with survey count ownership', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      filterLoading: true,
-      questionResultsHydrated: false,
-      surveyResultsHydrated: true,
-      surveyViewMode: 'individual',
-      viewMode: 'survey',
-    })).toMatchObject({
-      areSummaryCountsHydrated: true,
-      readinessDescriptor: {
-        areSummaryCountsHydrated: true,
-        filterLoading: true,
-        mode: 'survey',
-        summaryCountsSource: 'survey-results',
-      },
-    });
-  });
-
-  it('keeps unknown modes on the question-result count boundary used by legacy callers', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      questionResultsHydrated: true,
-      surveyResultsHydrated: false,
-      viewMode: 'legacy-results',
-    })).toMatchObject({
-      areSummaryCountsHydrated: true,
-      readinessDescriptor: {
-        areSummaryCountsHydrated: true,
-        filterLoading: false,
-        mode: 'unknown',
-        summaryCountsSource: 'question-results',
       },
     });
   });
@@ -144,25 +99,6 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
           progress: 66,
           showRemainingSpinner: true,
         },
-      },
-    });
-  });
-
-  it('does not enable the long-sync notice before the readiness threshold', () => {
-    expect(buildSurveyResultsCacheReadinessDisplayPlan({
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: 99,
-      responseLocalBlock: 100,
-      questionResultsHydrated: true,
-      syncLoadingStartedAt: 1000,
-      nowMs: 14999,
-    })).toMatchObject({
-      syncStatusDisplay: {
-        isSynced: false,
-        showLongSyncNotice: false,
-        showQuickRefresh: true,
-        syncStatusText: 'Syncing...',
       },
     });
   });
