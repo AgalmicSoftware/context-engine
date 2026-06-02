@@ -148,6 +148,10 @@ import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
 import {
+  runSurveyResultsQuestionMetadataReadController,
+  type SurveyResultsQuestionMetadataReadIdentity,
+} from './surveyResultsQuestionMetadataReadController';
+import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
 } from './surveyResultsExportController.js';
@@ -2568,7 +2572,9 @@ try {
 }
 };
 
-getNetworkQuestionsForCurrentContext = (): Record<string, SurveyResultsQuestionRecord> => {
+getNetworkQuestionsForCurrentContext = (
+  _identity?: SurveyResultsQuestionMetadataReadIdentity
+): Record<string, SurveyResultsQuestionRecord> => {
   const networkData = this.getScopedQuestionNetworkDataSync(
     this.state.viewMode || this.props.viewMode || 'questions'
   ) as SurveyResultsScopedQuestionNetworkData;
@@ -4951,17 +4957,27 @@ renderLockedResponsesBanner = (
 renderQuestionSummary = (
   questionId: string,
   responses: unknown,
-  preNetworkQuestions: Record<string, SurveyResultsRecord>
+  preNetworkQuestions?: Record<string, SurveyResultsRecord> | null
 ): React.ReactNode => {
-  // Prefer preloaded per-render cache to avoid repeated localStorage hits.
-  let networkQuestions = preNetworkQuestions;
-  if (!networkQuestions) {
-    networkQuestions = this.getNetworkQuestionsForCurrentContext();
-  }
+  const activeSessionSlug = this.getEffectiveSlug();
+  const questionMetadataRead = runSurveyResultsQuestionMetadataReadController({
+    identity: {
+      activeSessionSlug,
+      currentSurveyId: String(this.state.surveyId || ''),
+      questionId,
+      viewMode: String(this.state.viewMode || this.props.viewMode || 'questions'),
+    },
+    ports: {
+      readNetworkQuestions: this.getNetworkQuestionsForCurrentContext,
+    },
+    // Prefer preloaded per-render cache to avoid repeated localStorage hits.
+    preloadedNetworkQuestions: preNetworkQuestions,
+  });
+  const networkQuestions = questionMetadataRead.networkQuestions;
 
   return SurveyResultsQuestionSummary({
     activeQuestionToggles: this.state.activeQuestionToggles,
-    activeSessionSlug: this.getEffectiveSlug(),
+    activeSessionSlug,
     applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
     bookmarkedQuestionIDs: this.state.bookmarkedQuestionIDs,
     bookmarkIconStyle: SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
