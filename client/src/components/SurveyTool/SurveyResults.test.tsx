@@ -811,6 +811,100 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     }
   });
 
+  it('passes selected survey and question identity to selected summary metadata reads', () => {
+    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId,
+      viewMode: 'survey',
+    });
+    const cachedQuestion = {
+      id: 'q-survey',
+      prompt: 'Survey selected prompt',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-survey': cachedQuestion,
+    }));
+
+    const summary = subject.renderQuestionSummary(
+      'Q-Survey',
+      [],
+      null
+    ) as React.ReactElement;
+
+    expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+      activeSessionSlug: 'edge',
+      currentSurveyId: surveyId,
+      questionId: 'Q-Survey',
+      viewMode: 'survey',
+    });
+    expect(summary.props.metadataMissing).toBe(false);
+    expect(summary.props.questionPrompt).toBe('Survey selected prompt');
+  });
+
+  it('keeps loading selected metadata placeholders as cached results without side effects', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const pendingQuestion = {
+      __ceQuestionMetadataPending: true,
+      id: 'q-loading',
+      prompt: 'Loading cached question metadata...',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-loading': pendingQuestion,
+    }));
+    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Loading',
+        [{ responder: '0xabc', response: { answer: { value: 'Cached answer' } } }],
+        null
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Loading',
+        viewMode: 'questions',
+      });
+      expect(summary.props.metadataMissing).toBe(false);
+      expect(summary.props.questionPrompt).toBe('Loading cached question metadata...');
+      expect(defaultSummary.props.question).toBe(pendingQuestion);
+      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
   it('falls back for selected summaries when the cached metadata read is empty without side effects', () => {
     const subject = createSubject({
       activeSessionSlug: 'edge',
