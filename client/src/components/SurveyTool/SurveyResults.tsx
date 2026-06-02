@@ -139,6 +139,10 @@ import {
   buildSurveyResultsCacheControllerSnapshot,
 } from './surveyResultsCacheControllerSnapshot';
 import {
+  buildSurveyResultsFilterBookmarkWritePlan,
+  type SurveyResultsFilterBookmarkWritePlan,
+} from './surveyResultsCacheWriteEligibilityPlan';
+import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
@@ -5021,9 +5025,12 @@ try {
 };
 
 handleBookmarkFilter = async (): Promise<void> => {
-if (!this._isMounted) return;
-
 const filterToBookmark = this.state.filterState;
+const mountedWritePlan = buildSurveyResultsFilterBookmarkWritePlan({
+  filterState: filterToBookmark,
+  isMounted: this._isMounted,
+});
+if (!mountedWritePlan.shouldReadCache) return;
 const slug = this.getEffectiveSlug();
 
 let filtersCache: unknown = peekCacheSync('filters', slug, { clone: false });
@@ -5033,27 +5040,40 @@ if (!filtersCache || typeof filtersCache !== 'object') {
   filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
 }
 const filtersCacheRecord = toSurveyResultsRecord(filtersCache) as SurveyResultsFiltersCache;
-let bookmarks: unknown[] = [];
+let writePlan: SurveyResultsFilterBookmarkWritePlan;
 try {
-  const parsed = filtersCacheRecord.bookmarkedFilters;
-  if (Array.isArray(parsed)) {
-    bookmarks = [...parsed];
-  } else if (parsed != null) {
+  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
+    filtersCache: filtersCacheRecord,
+    filtersCacheLoaded: true,
+    filterState: filterToBookmark,
+    isMounted: this._isMounted,
+    slug,
+  });
+  if (writePlan.bookmarkedFiltersInvalid) {
     surveyLog.warn('Bookmarked filters cache was not an array. Initializing to empty array.');
   }
 } catch (e) {
   surveyLog.error('Error parsing bookmarked filters cache:', e);
+  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
+    filtersCache: {},
+    filtersCacheLoaded: true,
+    filterState: filterToBookmark,
+    isMounted: this._isMounted,
+    slug,
+  });
 }
 
-// Optional: Duplicate check (skipped for simplicity as per instructions)
-bookmarks.push(filterToBookmark);
+if (!writePlan.shouldWrite || !writePlan.payload) return;
 
 try {
-  await (writeCache as SurveyResultsWriteCache)('filters', slug, {
-    ...filtersCacheRecord,
-    bookmarkedFilters: bookmarks,
-  });
-  this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
+  await (writeCache as SurveyResultsWriteCache)(
+    writePlan.target.namespace,
+    writePlan.target.slug,
+    writePlan.payload
+  );
+  if (writePlan.successFeedback) {
+    this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
+  }
 
   if (this._bookmarkFeedbackTimer) {
     clearTimeout(this._bookmarkFeedbackTimer);
