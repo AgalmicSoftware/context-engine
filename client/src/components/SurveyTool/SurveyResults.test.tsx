@@ -25,6 +25,8 @@ import ConnectedSurveyResults, {
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
 import styles from './SurveyResults.module.scss';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
@@ -366,6 +368,151 @@ describe('SurveyResults question-list display wiring', () => {
 });
 
 describe('SurveyResults cache/readiness shell wiring', () => {
+  it('preserves selected survey identity outputs for the header and individual response list', () => {
+    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      isResponsesCacheReady: true,
+      isSurveyCacheReady: true,
+      sessionSlug: 'controller-session',
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject.state = {
+      ...subject.state,
+      networkLatestBlock: 90,
+      surveyId,
+      surveyLocalBlock: 90,
+      surveyResultsHydrated: true,
+      surveyTitle: 'Controller Input Survey',
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+      responses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+      sbtFilteredResponses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+    };
+
+    const tree = subject.render();
+    const header = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsModalHeader
+    );
+    const individualList = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+
+    expect(header?.props).toEqual(expect.objectContaining({
+      currentSurveyId: surveyId,
+      effectiveSlug: 'controller-session',
+      surveyTitle: 'Controller Input Survey',
+      viewMode: 'survey',
+    }));
+    expect(individualList?.props).toEqual(expect.objectContaining({
+      currentSurveyId: surveyId,
+      effectiveSlug: 'controller-session',
+      filterLoading: false,
+      responses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+    }));
+  });
+
+  it('preserves question filter, cache readiness, filter loading, and polling inputs for controller extraction', () => {
+    const filterState = { text: 'controller input', sbtFilter: { selectedSBTGroups: ['group-a'] } };
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      defaultTags: ['alpha', 'beta'],
+      isOpen: true,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      questionResponsesNonce: 'responses-nonce-1',
+      questionsCacheNonce: 'questions-nonce-2',
+      sbtCacheRevision: 'sbt-revision-3',
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      filterLoading: true,
+      filterState,
+      networkLatestBlock: 100,
+      questionLocalBlock: 40,
+      questionResponses: {
+        q1: {
+          '0xaaa': { answer: { value: 'Visible answer' } },
+        },
+      },
+      refreshTargetQuestionBlock: 80,
+      refreshTargetResponseBlock: 70,
+      responseLocalBlock: 20,
+      showQuestionFilter: true,
+      viewMode: 'questions',
+    };
+
+    const tree = subject.render();
+    const questionFilter = findElement(
+      tree,
+      (element) => element?.props?.resultsMode === true && element?.props?.creatorAndResponderMode === true
+    );
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+
+    const questionFilterProps = questionFilter?.props || {};
+    expect({
+      activeSessionSlug: questionFilterProps.activeSessionSlug,
+      currentSurveyIdForUrl: questionFilterProps.currentSurveyIdForUrl,
+      currentViewModeForUrl: questionFilterProps.currentViewModeForUrl,
+      defaultTags: questionFilterProps.defaultTags,
+      filterState: questionFilterProps.filterState,
+      isQuestionCacheReady: questionFilterProps.isQuestionCacheReady,
+      isSBTCacheReady: questionFilterProps.isSBTCacheReady,
+      questionResponsesNonce: questionFilterProps.questionResponsesNonce,
+      questionsCacheNonce: questionFilterProps.questionsCacheNonce,
+      sbtCacheRevision: questionFilterProps.sbtCacheRevision,
+      storageKeyPrefix: questionFilterProps.storageKeyPrefix,
+    }).toEqual({
+      activeSessionSlug: 'edge',
+      currentSurveyIdForUrl: null,
+      currentViewModeForUrl: 'questions',
+      defaultTags: ['alpha', 'beta'],
+      filterState,
+      isQuestionCacheReady: false,
+      isSBTCacheReady: true,
+      questionResponsesNonce: 'responses-nonce-1',
+      questionsCacheNonce: 'questions-nonce-2',
+      sbtCacheRevision: 'sbt-revision-3',
+      storageKeyPrefix: 'dg:filters:__scope__:demo|edge',
+    });
+    expect(questionFilter?.props?.setFilterLoading).toBe(subject.setFilterLoading);
+    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 40');
+    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 50');
+
+    quickRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
   it('shows the quick refresh action during missing-cache loading and dispatches the parent refresh handler', () => {
     const subject = createSubject({
       isOpen: true,
