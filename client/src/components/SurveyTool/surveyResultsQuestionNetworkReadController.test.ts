@@ -125,6 +125,88 @@ describe('surveyResultsQuestionNetworkReadController', () => {
     expect(second.memo).toBe(first.memo);
   });
 
+  it('normalizes ready cached responses with the scoped read identity args', () => {
+    const readQuestionBucket = jest.fn(() => ({
+      questionsLatestBlock: 12,
+      questionResponsesLatestBlock: 13,
+      questions: {
+        'Q-Ready': {
+          id: 'Q-Ready',
+          prompt: 'Ready response question',
+          sessionSlug: 'edge',
+        },
+      },
+      questionResponses: {
+        'Q-Ready': {
+          '0xABC': { answer: { value: 'Cached response' } },
+        },
+      },
+    }));
+
+    const result = runSurveyResultsQuestionNetworkReadController({
+      netIdStr: 84532,
+      questionReadSlugs: ['edge'],
+      ports: {
+        readQuestionBucket,
+      },
+      viewMode: 'questions',
+    });
+
+    expect(readQuestionBucket).toHaveBeenCalledWith('edge', '84532');
+    expect(result.result.questions).toEqual({
+      'q-ready': expect.objectContaining({
+        id: 'Q-Ready',
+        prompt: 'Ready response question',
+        sessionSlug: 'edge',
+      }),
+    });
+    expect(result.result.questionResponses).toEqual({
+      'q-ready': {
+        '0xABC': { answer: { value: 'Cached response' } },
+      },
+    });
+    expect(result.result.questionResponsesLatestBlock).toBe(13);
+  });
+
+  it('keeps empty and missing cached response buckets empty without inventing fallback responses', () => {
+    const readQuestionBucket = jest.fn((slug) => (
+      slug === 'edge'
+        ? {
+            questionsLatestBlock: 9,
+            questionResponsesLatestBlock: 0,
+            questions: {
+              q1: {
+                id: 'q1',
+                prompt: 'Question without responses',
+                sessionSlug: 'edge',
+              },
+            },
+            questionResponses: {},
+          }
+        : null
+    ));
+
+    const result = runSurveyResultsQuestionNetworkReadController({
+      netIdStr: '84532',
+      questionReadSlugs: ['edge', 'missing'],
+      ports: {
+        readQuestionBucket,
+      },
+      viewMode: 'questions',
+    });
+
+    expect(readQuestionBucket).toHaveBeenCalledWith('edge', '84532');
+    expect(readQuestionBucket).toHaveBeenCalledWith('missing', '84532');
+    expect(result.result.questions).toEqual({
+      q1: expect.objectContaining({
+        prompt: 'Question without responses',
+        sessionSlug: 'edge',
+      }),
+    });
+    expect(result.result.questionResponses).toEqual({});
+    expect(result.result.questionResponsesLatestBlock).toBe(0);
+  });
+
   it('does not call write, persistence, decrypt, export, fetch, polling, or state ports', () => {
     const ports = {
       readQuestionBucket: jest.fn(() => ({})),

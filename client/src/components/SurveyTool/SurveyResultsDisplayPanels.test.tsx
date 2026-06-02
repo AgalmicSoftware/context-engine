@@ -226,4 +226,71 @@ describe('SurveyResultsDisplayPanels', () => {
     });
     expect(getResponseCardProps).toHaveBeenCalledTimes(1);
   });
+
+  it('renders cached response rows with fallback question metadata when the question cache is missing', () => {
+    const applyDecryptedOverrideToResponse = jest.fn(({ response }) => response);
+    const getFallbackQuestion = jest.fn((questionId) => ({
+      id: questionId,
+      prompt: `Fallback ${questionId}`,
+      type: 'freeform',
+    }));
+    const getLockedResponseKey = jest.fn(() => 'fallback-response-key');
+    const getResponseCardProps = jest.fn(() => ({
+      containerClassName: 'response-card',
+      bodyClassName: 'response-body',
+    }));
+    const onToggleResponse = jest.fn();
+    const tree = renderSurveyResultsDisplayPanels({
+      ...baseProps,
+      applyDecryptedOverrideToResponse,
+      getFallbackQuestion,
+      getLockedResponseKey,
+      getResponseCardProps,
+      onToggleResponse,
+      preNetworkQuestions: {},
+      responses: [{
+        responder: '0xDEF',
+        surveyId: 'survey-1',
+        response: {
+          responses: [{
+            questionID: 'q-missing',
+            answer: { value: 'Cached answer' },
+          }],
+        },
+      }],
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    });
+    const individualList = findFirstNodeByType(tree, SurveyResultsIndividualResponsesList);
+    const responseBody = individualList.props.renderResponseBody(individualList.props.responses[0], 0);
+    const responseCard = findFirstNodeByType(responseBody, SingleQuestionResponse);
+
+    expect(individualList?.props?.responses).toHaveLength(1);
+    expect(responseCard?.props?.question).toEqual({
+      id: 'q-missing',
+      prompt: 'Fallback q-missing',
+      type: 'freeform',
+    });
+    expect(responseCard?.props?.response.answer.value).toBe('Cached answer');
+    expect(responseCard?.props?.activeSessionSlug).toBe('session-one');
+    expect(getFallbackQuestion).toHaveBeenCalledWith('q-missing', 'individual');
+    expect(getLockedResponseKey).toHaveBeenCalledWith({
+      responder: '0xDEF',
+      questionId: 'q-missing',
+      surveyId: 'survey-1',
+      response: {
+        questionID: 'q-missing',
+        answer: { value: 'Cached answer' },
+      },
+    });
+    expect(applyDecryptedOverrideToResponse).toHaveBeenCalledWith({
+      response: {
+        questionID: 'q-missing',
+        answer: { value: 'Cached answer' },
+      },
+      key: 'fallback-response-key',
+    });
+    expect(getResponseCardProps).toHaveBeenCalledTimes(1);
+    expect(onToggleResponse).not.toHaveBeenCalled();
+  });
 });
