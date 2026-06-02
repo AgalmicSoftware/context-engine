@@ -758,6 +758,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
 
   it('reads cached question metadata for selected summaries when no render cache is preloaded', () => {
     const subject = createSubject({
+      activeSessionSlug: 'edge',
       isOpen: true,
       viewMode: 'questions',
     });
@@ -788,6 +789,12 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       const defaultSummary = summary.props.renderDefaultSummary();
 
       expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Ready',
+        viewMode: 'questions',
+      });
       expect(summary.props.metadataMissing).toBe(false);
       expect(summary.props.questionPrompt).toBe('Ready cached prompt');
       expect(defaultSummary.props.question).toBe(cachedQuestion);
@@ -806,6 +813,7 @@ describe('SurveyResults cache/readiness shell wiring', () => {
 
   it('falls back for selected summaries when the cached metadata read is empty without side effects', () => {
     const subject = createSubject({
+      activeSessionSlug: 'edge',
       isOpen: true,
       viewMode: 'questions',
     });
@@ -827,6 +835,12 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       const defaultSummary = summary.props.renderDefaultSummary();
 
       expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Empty',
+        viewMode: 'questions',
+      });
       expect(summary.props.metadataMissing).toBe(true);
       expect(summary.props.questionPrompt).toBe('Unknown question: Q-Empty');
       expect(defaultSummary.props.question).toEqual({
