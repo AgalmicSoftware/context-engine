@@ -1,4 +1,5 @@
 import {
+  runSurveyResultsQuestionNetworkAsyncReadController,
   runSurveyResultsQuestionNetworkReadController,
 } from './surveyResultsQuestionNetworkReadController';
 
@@ -205,6 +206,105 @@ describe('surveyResultsQuestionNetworkReadController', () => {
     });
     expect(result.result.questionResponses).toEqual({});
     expect(result.result.questionResponsesLatestBlock).toBe(0);
+  });
+
+  it('uses the async read port only when the injected peek port misses', async () => {
+    const peekBucket = {
+      questionsLatestBlock: 20,
+      questionResponsesLatestBlock: 21,
+      questions: {
+        qpeek: {
+          id: 'qpeek',
+          prompt: 'Peek prompt',
+          sessionSlug: 'edge',
+        },
+      },
+      questionResponses: {
+        qpeek: {
+          '0xaaa': { answer: { value: 'Peek response' } },
+        },
+      },
+    };
+    const readBucket = {
+      questionsLatestBlock: 30,
+      questionResponsesLatestBlock: 31,
+      questions: {
+        qread: {
+          id: 'qread',
+          prompt: 'Read prompt',
+          sessionSlug: 'fallback',
+        },
+      },
+      questionResponses: {
+        qread: {
+          '0xbbb': { answer: { value: 'Read response' } },
+        },
+      },
+    };
+    const peekQuestionBucket = jest.fn((slug) => (slug === 'edge' ? peekBucket : {}));
+    const readQuestionBucket = jest.fn((slug) => (slug === 'fallback' ? readBucket : null));
+
+    const result = await runSurveyResultsQuestionNetworkAsyncReadController({
+      netIdStr: 84532,
+      questionReadSlugs: ['edge', 'fallback'],
+      ports: {
+        peekQuestionBucket,
+        readQuestionBucket,
+      },
+      requireAuthoritativeBinding: false,
+    });
+
+    expect(peekQuestionBucket).toHaveBeenCalledWith('edge', '84532');
+    expect(peekQuestionBucket).toHaveBeenCalledWith('fallback', '84532');
+    expect(readQuestionBucket).toHaveBeenCalledTimes(1);
+    expect(readQuestionBucket).toHaveBeenCalledWith('fallback', '84532');
+    expect(result.statePatch).toEqual({});
+    expect(result.result).toMatchObject({
+      questionsLatestBlock: 30,
+      questionResponsesLatestBlock: 31,
+      questions: {
+        qpeek: expect.objectContaining({ prompt: 'Peek prompt', sessionSlug: 'edge' }),
+        qread: expect.objectContaining({ prompt: 'Read prompt', sessionSlug: 'fallback' }),
+      },
+      questionResponses: {
+        qpeek: {
+          '0xaaa': { answer: { value: 'Peek response' } },
+        },
+        qread: {
+          '0xbbb': { answer: { value: 'Read response' } },
+        },
+      },
+    });
+  });
+
+  it('does not call async write, persistence, decrypt, export, fetch, polling, or state ports', async () => {
+    const ports = {
+      peekQuestionBucket: jest.fn(() => ({})),
+      readQuestionBucket: jest.fn(() => ({})),
+      writeCache: jest.fn(),
+      persistCache: jest.fn(),
+      decryptResponses: jest.fn(),
+      exportResults: jest.fn(),
+      fetchResults: jest.fn(),
+      schedulePolling: jest.fn(),
+      setState: jest.fn(),
+    };
+
+    await runSurveyResultsQuestionNetworkAsyncReadController({
+      netIdStr: '84532',
+      questionReadSlugs: ['edge'],
+      ports,
+    });
+
+    expect(ports.peekQuestionBucket).toHaveBeenCalledTimes(1);
+    expect(ports.readQuestionBucket).toHaveBeenCalledTimes(1);
+    expect(ports.writeCache).not.toHaveBeenCalled();
+    expect(ports.persistCache).not.toHaveBeenCalled();
+    expect(ports.decryptResponses).not.toHaveBeenCalled();
+    expect(ports.exportResults).not.toHaveBeenCalled();
+    expect(ports.fetchResults).not.toHaveBeenCalled();
+    expect(ports.schedulePolling).not.toHaveBeenCalled();
+    expect(ports.setState).not.toHaveBeenCalled();
   });
 
   it('does not call write, persistence, decrypt, export, fetch, polling, or state ports', () => {

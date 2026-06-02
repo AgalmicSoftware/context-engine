@@ -159,14 +159,13 @@ import {
 } from './surveyResultsFallbackQuestionHelpers';
 import {
   EMPTY_SCOPED_QUESTION_NETWORK_DATA,
-  mergeScopedQuestionNetworkData,
+  runSurveyResultsQuestionNetworkAsyncReadController,
   runSurveyResultsQuestionNetworkReadController,
   type SurveyResultsQuestionBucketRecord,
   type SurveyResultsQuestionRecord,
   type SurveyResultsQuestionResponsesByQuestion,
   type SurveyResultsQuestionResponsesByResponder,
   type SurveyResultsScopedQuestionNetworkData,
-  type SurveyResultsScopedQuestionNetworkEntry,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
 import {
@@ -1288,25 +1287,29 @@ class SurveyResults extends Component<any, any> {
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries: SurveyResultsScopedQuestionNetworkEntry[] = await Promise.all(questionReadSlugs.map(async (slug) => {
-      let questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-      if (!questionsCache || Object.keys(questionsCache).length === 0) {
-        questionsCache = (await readCache('questionsCache', slug)) || {};
-      }
-      return {
-        slug,
-        bucket: resolveNetBucketReadOnly(questionsCache, netIdStr, {
-          questionsLatestBlock: 0,
-          questions: {},
-          questionResponses: {},
-          questionResponsesLatestBlock: 0,
-        }) as SurveyResultsQuestionBucketRecord,
-      };
-    }));
-    return mergeScopedQuestionNetworkData(entries, {
-      allowedScopeSlugs: questionReadSlugs,
+    const controllerResult = await runSurveyResultsQuestionNetworkAsyncReadController({
+      netIdStr,
+      questionReadSlugs,
       requireAuthoritativeBinding,
+      ports: {
+        peekQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
+          peekCacheSync('questionsCache', slug, { clone: false }) || {},
+          networkId,
+          {}
+        ) as SurveyResultsQuestionBucketRecord,
+        readQuestionBucket: async (slug, networkId) => resolveNetBucketReadOnly(
+          (await readCache('questionsCache', slug)) || {},
+          networkId,
+          {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          }
+        ) as SurveyResultsQuestionBucketRecord,
+      },
     });
+    return controllerResult.result;
   }
 
   appendSessionHintToSurveyPath = (pathIn: unknown = ''): string => {
