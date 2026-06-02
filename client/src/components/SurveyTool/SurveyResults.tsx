@@ -4766,7 +4766,7 @@ renderQuestionSummary = (
     // Prefer preloaded per-render cache to avoid repeated localStorage hits.
     preloadedNetworkQuestions: preNetworkQuestions,
   });
-  const networkQuestions = questionMetadataRead.networkQuestions;
+  const networkQuestions = questionMetadataRead.selectedNetworkQuestions;
 
   return SurveyResultsQuestionSummary({
     activeQuestionToggles: this.state.activeQuestionToggles,
