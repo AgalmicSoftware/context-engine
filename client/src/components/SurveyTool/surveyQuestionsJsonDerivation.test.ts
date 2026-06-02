@@ -95,6 +95,54 @@ describe('surveyQuestionsJsonDerivation', () => {
     });
   });
 
+  it('preserves gated encrypted payload shape for submitted response JSON readiness', () => {
+    const encryptedPortion = {
+      ciphertext: 'ciphertext',
+      dataToEncryptHash: 'hash',
+    };
+
+    expect(buildSubmittedResponseJson({
+      singleQuestionMode: true,
+      rawResponse: {
+        encrypted: true,
+        encryptedPortion,
+        encryptionAudience: 'gate',
+        value: '*',
+      },
+    })).toEqual({
+      encrypted: true,
+      encryptedPortion,
+      encryptionAudience: 'gate',
+      value: '*',
+      conviction: null,
+      importance: null,
+    });
+
+    expect(buildSubmittedResponseJson({
+      rawResponse: {
+        surveyId: 'survey-gated',
+        responses: [{
+          encrypted: true,
+          encryptedPortion,
+          encryptionAudience: 'gate',
+          questionId: 'q-gated',
+          value: '*',
+        }],
+      },
+    })).toEqual({
+      surveyId: 'survey-gated',
+      responses: [{
+        encrypted: true,
+        encryptedPortion,
+        encryptionAudience: 'gate',
+        questionId: 'q-gated',
+        value: '*',
+        conviction: null,
+        importance: null,
+      }],
+    });
+  });
+
   it('expands survey question IDs into full question JSON when possible', () => {
     const survey = {
       id: 's1',
