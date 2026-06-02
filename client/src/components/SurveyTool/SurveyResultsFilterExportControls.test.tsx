@@ -152,6 +152,8 @@ describe('renderSurveyResultsFilterExportControls', () => {
     const onSbtFilter = jest.fn();
     const onToggleExportArea = jest.fn();
     render(renderSurveyResultsFilterExportControls(createProps({
+      isQuestionCacheReady: false,
+      isSBTCacheReady: false,
       onSbtFilter,
       onToggleExportArea,
     })));
@@ -164,6 +166,8 @@ describe('renderSurveyResultsFilterExportControls', () => {
       buttonSurface: 'light',
       externalSBTFilterState: { selected: ['0xaaa'] },
       hideLoadingOverlay: true,
+      isQuestionCacheReady: false,
+      isSBTCacheReady: false,
       items: [{ responder: '0xaaa' }],
       mode: 'responder',
     }));
@@ -187,11 +191,17 @@ describe('renderSurveyResultsFilterExportControls', () => {
   });
 
   it('renders question-mode filter controls with parent-owned handlers and storage context', () => {
+    const onDownload = jest.fn();
+    const onExportHtmlReport = jest.fn();
     const onQuestionFilter = jest.fn();
     const onToggleQuestionFilter = jest.fn();
     render(renderSurveyResultsFilterExportControls(createProps({
       currentViewModeForUrl: 'questions',
       isFilterActive: true,
+      isQuestionCacheReady: false,
+      isSBTCacheReady: false,
+      onDownload,
+      onExportHtmlReport,
       onQuestionFilter,
       onToggleQuestionFilter,
       showQuestionFilter: true,
@@ -209,9 +219,15 @@ describe('renderSurveyResultsFilterExportControls', () => {
       currentSurveyIdForUrl: 'survey-1',
       currentViewModeForUrl: 'questions',
       filterModalOpen: true,
+      isQuestionCacheReady: false,
+      isSBTCacheReady: false,
       questions: [{ id: 'q1' }],
       resultsMode: true,
       storageKeyPrefix: 'question:filters',
+    }));
+    expect(mockExportControls).toHaveBeenCalledWith(expect.objectContaining({
+      onDownload,
+      onExportHtmlReport,
     }));
     expect(onToggleQuestionFilter).toHaveBeenCalledTimes(1);
     expect(onQuestionFilter).toHaveBeenCalledWith(['question-filtered']);

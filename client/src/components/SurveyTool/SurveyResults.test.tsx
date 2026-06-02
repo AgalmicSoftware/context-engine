@@ -330,4 +330,139 @@ describe('SurveyResults question-list display wiring', () => {
     expect(questionListCard?.props?.questionTableNode).toBeNull();
     expect(renderQuestionIDsTableSpy).not.toHaveBeenCalled();
   });
+
+  it('keeps loading question-list display active without showing the empty state', () => {
+    const subject = createSubject({ isOpen: true });
+    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable').mockReturnValue(<table><tbody /></table>);
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        __questionList__: true,
+      },
+      filterLoading: true,
+      sbtFilteredAggregatorQuestionResponses: {},
+      viewMode: 'questions',
+    };
+
+    const questionListCard = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionListCard
+    );
+
+    expect(questionListCard?.props?.showEmptyState).toBe(false);
+    expect(questionListCard?.props?.questionTableNode?.type).toBe('table');
+    expect(renderQuestionIDsTableSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SurveyResults cache/readiness shell wiring', () => {
+  it('shows the quick refresh action during missing-cache loading and dispatches the parent refresh handler', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: false,
+    };
+
+    const tree = subject.render();
+    const headerNode = findElement(
+      tree,
+      (element) => element?.props?.syncStatusNode
+    );
+    const syncStatusNode = headerNode?.props?.syncStatusNode;
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+
+    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
+    expect(quickRefresh).toBeTruthy();
+
+    quickRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides quick refresh when results are in sync while keeping the detailed refresh action parent-owned', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 25,
+      questionLocalBlock: 25,
+      responseLocalBlock: 25,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const tree = subject.render();
+    const headerNode = findElement(
+      tree,
+      (element) => element?.props?.syncStatusNode
+    );
+    const syncStatusNode = headerNode?.props?.syncStatusNode;
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+    const detailedRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.title === 'Refresh Data from Cache/Chain'
+    );
+
+    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(true);
+    expect(quickRefresh).toBeNull();
+    expect(detailedRefresh).toBeTruthy();
+
+    detailedRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { id: 'q1', prompt: 'Cached question' },
+    }));
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        'Q-missing': true,
+      },
+    };
+
+    const summary = subject.renderQuestionSummary(
+      'Q-missing',
+      [{ responder: '0xabc', response: { answer: { value: 'Fallback answer' } } }],
+      {}
+    ) as React.ReactElement;
+    const defaultSummary = summary.props.renderDefaultSummary();
+
+    expect(summary.props.metadataMissing).toBe(true);
+    expect(summary.props.questionPrompt).toBe('Unknown question: Q-missing');
+    expect(defaultSummary.props.question).toEqual({
+      id: 'Q-missing',
+      prompt: 'Unknown question',
+    });
+    expect(subject.getNetworkQuestionsForCurrentContext).not.toHaveBeenCalled();
+  });
 });
