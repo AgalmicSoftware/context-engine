@@ -770,6 +770,11 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     };
     subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
       'q-ready': cachedQuestion,
+      'q-other': {
+        id: 'q-other',
+        prompt: 'Other cached prompt',
+        sessionSlug: 'edge',
+      },
     }));
     subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
     subject.setState = jest.fn();
