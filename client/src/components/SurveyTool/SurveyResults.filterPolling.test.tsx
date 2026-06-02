@@ -401,6 +401,7 @@ describe('SurveyResults bookmark cache writes', () => {
     expect(peekSpy).not.toHaveBeenCalled();
     expect(readSpy).not.toHaveBeenCalled();
     expect(writeSpy).not.toHaveBeenCalled();
+    expect(subject.getEffectiveSlug).not.toHaveBeenCalled();
     expect(subject.setState).not.toHaveBeenCalled();
   });
 
