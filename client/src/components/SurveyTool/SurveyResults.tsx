@@ -90,6 +90,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -2039,9 +2040,7 @@ class SurveyResults extends Component<any, any> {
       this.setState(
         {
           networkLatestBlock: latest,
-          refreshTargetQuestionBlock: latest,
-          refreshTargetResponseBlock: latest,
-          refreshTargetSurveyBlock: latest
+          ...buildSurveyResultsRefreshTargetBlocksPatch(latest),
         },
         () => {
           // Re-read localStorage derived counters and repaint from cache immediately
@@ -5202,11 +5201,7 @@ try {
   const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
 
   this.setState(
-    {
-      refreshTargetQuestionBlock: latestOnChain,
-      refreshTargetResponseBlock: latestOnChain,
-      refreshTargetSurveyBlock: latestOnChain
-    },
+    buildSurveyResultsRefreshTargetBlocksPatch(latestOnChain),
     async () => {
       await runSurveyResultsManualRefreshDispatchController({
         ports: {
