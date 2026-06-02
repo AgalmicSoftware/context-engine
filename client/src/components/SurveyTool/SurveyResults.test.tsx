@@ -724,6 +724,99 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     }
   });
 
+  it('routes async scoped question cache reads through peek before read fallback without side effects', async () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const peekBucket = {
+      questionsLatestBlock: 40,
+      questionResponsesLatestBlock: 41,
+      questions: {
+        qpeek: {
+          id: 'qpeek',
+          prompt: 'Peek prompt',
+          sessionSlug: 'edge',
+        },
+      },
+      questionResponses: {
+        qpeek: {
+          '0xaaa': { answer: { value: 'Peek answer' } },
+        },
+      },
+    };
+    const readBucket = {
+      questionsLatestBlock: 50,
+      questionResponsesLatestBlock: 51,
+      questions: {
+        qread: {
+          id: 'qread',
+          prompt: 'Read prompt',
+          sessionSlug: 'fallback',
+        },
+      },
+      questionResponses: {
+        qread: {
+          '0xbbb': { answer: { value: 'Read answer' } },
+        },
+      },
+    };
+    subject.getQuestionReadSlugs = jest.fn(() => ['edge', 'fallback']);
+    subject.shouldRequireAuthoritativeQuestionScope = jest.fn(() => false);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((_namespace: string, slug: string) => (
+      slug === 'edge' ? { 84532: peekBucket } : {}
+    ));
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (_namespace: string, slug: string) => (
+      slug === 'fallback' ? { 84532: readBucket } : {}
+    ));
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const result = await subject.getScopedQuestionNetworkData('questions');
+
+      expect(subject.getQuestionReadSlugs).toHaveBeenCalledWith('questions');
+      expect(subject.shouldRequireAuthoritativeQuestionScope).toHaveBeenCalledWith('questions');
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'fallback', { clone: false });
+      expect(readSpy).toHaveBeenCalledTimes(1);
+      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'fallback');
+      expect(result).toMatchObject({
+        questionsLatestBlock: 50,
+        questionResponsesLatestBlock: 51,
+        questions: {
+          qpeek: expect.objectContaining({ prompt: 'Peek prompt', sessionSlug: 'edge' }),
+          qread: expect.objectContaining({ prompt: 'Read prompt', sessionSlug: 'fallback' }),
+        },
+        questionResponses: {
+          qpeek: {
+            '0xaaa': { answer: { value: 'Peek answer' } },
+          },
+          qread: {
+            '0xbbb': { answer: { value: 'Read answer' } },
+          },
+        },
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      peekSpy.mockRestore();
+      readSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
   it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', () => {
     const subject = createSubject({
       isOpen: true,
