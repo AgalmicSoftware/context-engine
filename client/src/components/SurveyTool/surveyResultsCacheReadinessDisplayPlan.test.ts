@@ -102,4 +102,23 @@ describe('surveyResultsCacheReadinessDisplayPlan', () => {
       },
     });
   });
+
+  it('does not enable the long-sync notice before the readiness threshold', () => {
+    expect(buildSurveyResultsCacheReadinessDisplayPlan({
+      viewMode: 'questions',
+      networkLatestBlock: 100,
+      questionLocalBlock: 99,
+      responseLocalBlock: 100,
+      questionResultsHydrated: true,
+      syncLoadingStartedAt: 1000,
+      nowMs: 14999,
+    })).toMatchObject({
+      syncStatusDisplay: {
+        isSynced: false,
+        showLongSyncNotice: false,
+        showQuickRefresh: true,
+        syncStatusText: 'Syncing...',
+      },
+    });
+  });
 });
