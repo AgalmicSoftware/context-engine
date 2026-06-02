@@ -48,7 +48,9 @@ jest.mock('../SurveyTool/SingleQuestionResponse', () => ({
       data-show-importance={String(showImportance)}
     >
       {question?.prompt || question?.id}
-      <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+      {(questionOnly || canDecryptOtherResponses) && (
+        <button type="button" onClick={() => onDecryptQuestion?.(question?.id)}>decrypt</button>
+      )}
     </div>
   ),
 }));
@@ -169,5 +171,50 @@ describe('UserPageQuestionSection', () => {
     expect(screen.queryByTestId('created-loading')).toBeNull();
     expect(screen.queryByTestId('question-response-card')).toBeNull();
     expect(screen.queryByTestId('created-question-card')).toBeNull();
+  });
+
+  it('passes cache-derived decrypt eligibility without invoking decrypt on render', () => {
+    const onDecryptQuestion = jest.fn();
+
+    render(
+      <UserPageQuestionSection
+        {...createProps({
+          detailedQuestionResponseMap: {
+            'q-gated': {
+              answer: { encrypted: true, encryptionAudience: 'gate', value: '*' },
+            },
+            'q-open': {
+              answer: { value: 'cached clear text' },
+            },
+          },
+          onDecryptQuestion,
+          questionResponseEntries: [{
+            canDecryptOtherResponses: false,
+            id: 'q-gated',
+            prompt: 'Gated cached response',
+            slug: 'gated-session',
+          }, {
+            id: 'q-open',
+            prompt: 'Open cached response',
+          }],
+          questionResponsesNonce: 'cache-nonce',
+          sbtCacheRevision: 'gate-revision',
+        })}
+      />
+    );
+
+    const responseCards = screen.getAllByTestId('question-response-card');
+    expect(responseCards).toHaveLength(2);
+    expect(responseCards[0]).toHaveAttribute('data-can-decrypt', 'false');
+    expect(responseCards[0]).toHaveAttribute('data-session-slug', 'gated-session');
+    expect(responseCards[1]).toHaveAttribute('data-can-decrypt', 'false');
+    expect(responseCards[1]).toHaveAttribute('data-session-slug', 'fallback-session');
+    responseCards.forEach((card) => {
+      expect(card).toHaveAttribute('data-nonce', 'cache-nonce');
+      expect(card).toHaveAttribute('data-revision', 'gate-revision');
+      expect(card).toHaveAttribute('data-has-response', 'true');
+      expect(card.querySelector('button')).toBeNull();
+    });
+    expect(onDecryptQuestion).not.toHaveBeenCalled();
   });
 });
