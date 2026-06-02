@@ -135,6 +135,9 @@ import {
   buildSurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
 import {
+  runSurveyResultsManualRefreshDispatchController,
+} from './surveyResultsManualRefreshController';
+import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
 import {
@@ -5202,21 +5205,16 @@ try {
       refreshTargetSurveyBlock: latestOnChain
     },
     async () => {
-      if (this.state.viewMode === 'questions') {
-        if (this.props.refreshQuestionMetadata) {
-          surveyLog.log("refreshQuestionMetadata present")
-          await this.props.refreshQuestionMetadata();
-        }
-        if (this.props.refreshQuestionResponses) {
-          await this.props.refreshQuestionResponses();
-        }
-      } else if (
-        this.state.viewMode === 'survey' &&
-        this.state.surveyId && // Use state.surveyId
-        this.props.refreshSurveyResponsesByID
-      ) {
-        await this.props.refreshSurveyResponsesByID(this.state.surveyId.toLowerCase());
-      }
+      await runSurveyResultsManualRefreshDispatchController({
+        ports: {
+          onQuestionMetadataRefreshAvailable: () => surveyLog.log("refreshQuestionMetadata present"),
+          refreshQuestionMetadata: this.props.refreshQuestionMetadata,
+          refreshQuestionResponses: this.props.refreshQuestionResponses,
+          refreshSurveyResponsesByID: this.props.refreshSurveyResponsesByID,
+        },
+        surveyId: this.state.surveyId,
+        viewMode: this.state.viewMode,
+      });
       this.resetLocalStoragePollingBackoff('manual-refresh');
       this.pollLocalStorageForUpdates();
       this.queueResultsRefresh('manual-refresh');
