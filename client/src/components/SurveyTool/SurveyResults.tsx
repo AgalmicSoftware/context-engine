@@ -131,12 +131,12 @@ import {
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsExportControlsDisplayDescriptor,
 } from './surveyResultsExportDisplayHelpers.js';
-import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
 import {
-  buildSurveyResultsQuestionListDisplayPlan,
+  buildSurveyResultsCacheReadinessDisplayPlan,
+} from './surveyResultsCacheReadinessDisplayPlan';
+import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
-import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -5351,10 +5351,6 @@ const exportControlsDisplay = buildSurveyResultsExportControlsDisplayDescriptor(
 });
 const aggregatorEntries = this.getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
 const aggregatorEntriesCount = aggregatorEntries.length;
-const questionListDisplay = buildSurveyResultsQuestionListDisplayPlan({
-  aggregatorEntriesCount,
-  filterLoading,
-});
 const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQuestions);
 const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
@@ -5366,10 +5362,6 @@ const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.s
 const surveyIdAbbreviation = currentSurveyId
   ? getShortenedSurveyID(currentSurveyId, false, null, false)
   : null;
-const areSummaryCountsHydrated =
-  viewMode === 'survey'
-    ? !!this.state.surveyResultsHydrated
-    : !!this.state.questionResultsHydrated;
 const isDemoQuestionResults = this.getIsDemoQuestionResultsContext();
 const demoResultsViewMode = isDemoQuestionResults
   ? this.state.demoResultsViewMode || 'raw'
@@ -5384,31 +5376,32 @@ const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResu
     ]
   : [];
 
-const filterSummaryDisplay = buildSurveyResultsFilterSummaryDisplayPlan({
+const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan({
   aggregatorEntriesCount,
-  areSummaryCountsHydrated,
   filteredQuestionsCount,
   filteredResponsesCount,
   filterLoading,
-  surveyViewMode,
-  totalQuestionsCount,
-  totalResponsesCount,
-  viewMode,
-});
-
-const syncStatusDisplay = buildSurveyResultsSyncStatusDisplayPlan({
   networkLatestBlock: this.state.networkLatestBlock,
+  nowMs: Date.now(),
   questionLocalBlock: this.state.questionLocalBlock,
+  questionResultsHydrated: this.state.questionResultsHydrated,
   refreshTargetQuestionBlock: this.state.refreshTargetQuestionBlock,
   refreshTargetResponseBlock: this.state.refreshTargetResponseBlock,
   refreshTargetSurveyBlock: this.state.refreshTargetSurveyBlock,
   responseLocalBlock: this.state.responseLocalBlock,
-  showLongSyncNotice:
-    this._syncLoadingStartedAt !== null &&
-    Date.now() - this._syncLoadingStartedAt >= 15000,
   surveyLocalBlock: this.state.surveyLocalBlock,
+  surveyResultsHydrated: this.state.surveyResultsHydrated,
+  surveyViewMode,
+  syncLoadingStartedAt: this._syncLoadingStartedAt,
+  totalQuestionsCount,
+  totalResponsesCount,
   viewMode,
 });
+const {
+  filterSummaryDisplay,
+  questionListDisplay,
+  syncStatusDisplay,
+} = cacheReadinessDisplay;
 
 return (
   <>
