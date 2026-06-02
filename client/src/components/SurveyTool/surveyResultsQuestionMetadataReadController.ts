@@ -22,7 +22,6 @@ export type SurveyResultsQuestionMetadataReadControllerResult = {
   metadataStatus: 'ready' | 'missing' | 'loading';
   networkQuestions: Record<string, SurveyResultsRecord>;
   question: SurveyResultsRecord | null;
-  selectedNetworkQuestions: Record<string, SurveyResultsRecord>;
   statePatch: SurveyResultsRecord;
 };
 
@@ -71,16 +70,12 @@ export const runSurveyResultsQuestionMetadataReadController = ({
       ? networkQuestions[questionKey]
       : null
   );
-  const selectedNetworkQuestions = questionKey && question
-    ? { [questionKey]: question }
-    : {};
 
   return {
     identity: normalizedIdentity,
     metadataStatus: resolveMetadataStatus(question),
     networkQuestions,
     question,
-    selectedNetworkQuestions,
     statePatch: {},
   };
 };
