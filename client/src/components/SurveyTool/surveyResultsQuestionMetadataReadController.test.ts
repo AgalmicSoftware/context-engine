@@ -47,6 +47,12 @@ describe('surveyResultsQuestionMetadataReadController', () => {
         id: 'q1',
         prompt: 'Ready prompt',
       },
+      selectedNetworkQuestions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Ready prompt',
+        },
+      },
       statePatch: {},
     });
   });
@@ -74,6 +80,9 @@ describe('surveyResultsQuestionMetadataReadController', () => {
     expect(result.metadataStatus).toBe('ready');
     expect(result.networkQuestions).toBe(preloaded);
     expect(result.question).toBe(preloaded.q2);
+    expect(result.selectedNetworkQuestions).toEqual({
+      q2: preloaded.q2,
+    });
   });
 
   it('returns a missing status and empty patch for missing or empty cache results', () => {
@@ -88,6 +97,7 @@ describe('surveyResultsQuestionMetadataReadController', () => {
       metadataStatus: 'missing',
       networkQuestions: {},
       question: null,
+      selectedNetworkQuestions: {},
       statePatch: {},
     });
 
@@ -102,6 +112,7 @@ describe('surveyResultsQuestionMetadataReadController', () => {
       metadataStatus: 'missing',
       networkQuestions: {},
       question: null,
+      selectedNetworkQuestions: {},
       statePatch: {},
     });
   });
@@ -124,6 +135,9 @@ describe('surveyResultsQuestionMetadataReadController', () => {
 
     expect(result.metadataStatus).toBe('loading');
     expect(result.question).toBe(pendingQuestion);
+    expect(result.selectedNetworkQuestions).toEqual({
+      'q-pending': pendingQuestion,
+    });
     expect(result.statePatch).toEqual({});
   });
 
