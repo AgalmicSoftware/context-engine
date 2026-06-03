@@ -444,6 +444,127 @@ describe('SurveyResults bookmark cache writes', () => {
     }
   });
 
+  it('orders survey bookmark identity, cache read, write dispatch, and parent state application', async () => {
+    const events: string[] = [];
+    const liveBookmarksCache = {
+      surveys: [],
+      questions: ['existing-question'],
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      events.push('peek');
+      return liveBookmarksCache;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(async () => {
+      events.push('write');
+      return true;
+    });
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    const originalSetState = subject.setState;
+    subject.setState = jest.fn((updater, cb) => {
+      events.push('setState');
+      return originalSetState(updater, cb);
+    });
+    subject.getEffectiveSlug = jest.fn(() => {
+      events.push('slug');
+      return 'edge';
+    });
+    events.length = 0;
+
+    subject.toggleSurveyBookmark('s-ordered');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['s-ordered'],
+      questions: ['existing-question'],
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-ordered']);
+    expect(events.slice(0, 4)).toEqual(['slug', 'peek', 'write', 'setState']);
+  });
+
+  it('normalizes malformed question bookmark lists before writing to the active slug', async () => {
+    const malformedCache = {
+      surveys: ['existing-survey'],
+      questions: 'bad-questions',
+      otherField: 'kept',
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(malformedCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleQuestionBookmark('q2');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['existing-survey'],
+      questions: ['q2'],
+      otherField: 'kept',
+    });
+    expect(malformedCache).toEqual({
+      surveys: ['existing-survey'],
+      questions: 'bad-questions',
+      otherField: 'kept',
+    });
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q2']);
+  });
+
+  it('falls back to default bookmark cache when the sync cache read throws', async () => {
+    const readError = new Error('bookmark read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      throw readError;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    try {
+      subject.toggleSurveyBookmark('s-read-fallback');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+        surveys: ['s-read-fallback'],
+        questions: [],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-read-fallback']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        '[SurveyResults] Error reading bookmarksCache:',
+        readError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('preserves current empty-slug bookmark write identity when no effective slug is available', async () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: '',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => '');
+
+    subject.toggleQuestionBookmark('q-empty-slug');
+    await flushMicrotasks();
+
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', '', { clone: false });
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', '', {
+      surveys: [],
+      questions: ['q-empty-slug'],
+    });
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q-empty-slug']);
+  });
+
   it('blocks filter bookmark writes when the results view is unmounted', async () => {
     const subject = attachStateHarness(createSubject({
       activeSessionSlug: 'edge',
