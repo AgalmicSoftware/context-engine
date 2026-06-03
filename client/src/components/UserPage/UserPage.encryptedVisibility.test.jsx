@@ -1,5 +1,6 @@
 /** @file UserPage.encryptedVisibility.test.jsx */
 import UserPage from './UserPage';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
@@ -267,7 +268,12 @@ describe('UserPage encrypted response visibility', () => {
             questionResponses: {
               q1: {
                 [viewAddress]: JSON.stringify({
-                  answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+                  answer: {
+                    value: '*',
+                    encrypted: true,
+                    encryptedPortion: '{"v":2}',
+                    encryptionAudience: 'gate',
+                  },
                 }),
               },
             },
@@ -283,6 +289,13 @@ describe('UserPage encrypted response visibility', () => {
 
     expect(instance.state.questionResponseInfo).toHaveLength(1);
     expect(instance.state.questionResponseInfo[0].canDecryptOtherResponses).toBe(true);
+    expect(instance.state.detailedQuestionResponses.q1.answer).toEqual({
+      value: '*',
+      encrypted: true,
+      encryptedPortion: '{"v":2}',
+      encryptionAudience: 'gate',
+    });
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
     expect(instance.state.questionCreationInfo).toHaveLength(1);
   });
 
