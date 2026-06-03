@@ -1050,4 +1050,52 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       writeSpy.mockRestore();
     }
   });
+
+  it('reuses selected-summary fallback status objects without cache persistence or state writes', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const firstSummary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const firstDefaultSummary = firstSummary.props.renderDefaultSummary();
+      const secondSummary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const secondDefaultSummary = secondSummary.props.renderDefaultSummary();
+
+      expect(firstSummary.props.metadataMissing).toBe(true);
+      expect(secondSummary.props.metadataMissing).toBe(true);
+      expect(firstDefaultSummary.props.question).toBe(secondDefaultSummary.props.question);
+      expect(firstDefaultSummary.props.question).toEqual({
+        id: 'Q-Empty',
+        prompt: 'Unknown question',
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
 });
