@@ -20,6 +20,19 @@ type BuildSurveyResultsRefreshStatusWritePlanArgs = {
   latestBlock?: unknown;
   writeNetworkLatestBlock?: unknown;
 };
+type BuildSurveyResultsRefreshStatusSequencePlanArgs = BuildSurveyResultsRefreshStatusWritePlanArgs & {
+  followUpEffects?: readonly unknown[] | unknown;
+};
+export type SurveyResultsRefreshStatusSequenceEffect =
+  | {
+    kind: 'state-patch';
+    keys: string[];
+    target: { latestBlock?: unknown };
+  }
+  | {
+    kind: 'follow-up';
+    effect: string;
+  };
 
 export type SurveyResultsResponseField = UnknownRecord & {
   value?: unknown;
@@ -282,11 +295,19 @@ export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown)
   refreshTargetSurveyBlock: latestBlock,
 });
 
-export const buildSurveyResultsRefreshStatusWritePlan = ({
+const normalizeRefreshStatusFollowUpEffects = (followUpEffects: readonly unknown[] | unknown = []): string[] => {
+  if (!Array.isArray(followUpEffects)) return [];
+  return followUpEffects
+    .map((effect) => String(effect || '').trim())
+    .filter(Boolean);
+};
+
+export const buildSurveyResultsRefreshStatusSequencePlan = ({
   isMounted = true,
   latestBlock,
   writeNetworkLatestBlock = false,
-}: BuildSurveyResultsRefreshStatusWritePlanArgs = {}) => {
+  followUpEffects = [],
+}: BuildSurveyResultsRefreshStatusSequencePlanArgs = {}) => {
   const target = {
     latestBlock,
   };
@@ -294,6 +315,9 @@ export const buildSurveyResultsRefreshStatusWritePlan = ({
   if (isMounted === false) {
     return {
       blockedReason: 'unmounted' as const,
+      dispatchEligibility: 'blocked' as const,
+      orderedEffects: [] as SurveyResultsRefreshStatusSequenceEffect[],
+      shouldDispatchFollowUp: false,
       shouldWrite: false,
       statePatch: null,
       target,
@@ -301,16 +325,49 @@ export const buildSurveyResultsRefreshStatusWritePlan = ({
   }
 
   const refreshTargetPatch = buildSurveyResultsRefreshTargetBlocksPatch(latestBlock);
+  const statePatch = writeNetworkLatestBlock === true
+    ? {
+      networkLatestBlock: latestBlock,
+      ...refreshTargetPatch,
+    }
+    : refreshTargetPatch;
+  const orderedEffects: SurveyResultsRefreshStatusSequenceEffect[] = [
+    {
+      kind: 'state-patch',
+      keys: Object.keys(statePatch),
+      target,
+    },
+    ...normalizeRefreshStatusFollowUpEffects(followUpEffects).map((effect) => ({
+      kind: 'follow-up' as const,
+      effect,
+    })),
+  ];
 
   return {
     blockedReason: '' as const,
+    dispatchEligibility: 'eligible' as const,
+    orderedEffects,
+    shouldDispatchFollowUp: true,
     shouldWrite: true,
-    statePatch: writeNetworkLatestBlock === true
-      ? {
-        networkLatestBlock: latestBlock,
-        ...refreshTargetPatch,
-      }
-      : refreshTargetPatch,
+    statePatch,
+    target,
+  };
+};
+
+export const buildSurveyResultsRefreshStatusWritePlan = (
+  args: BuildSurveyResultsRefreshStatusWritePlanArgs = {}
+) => {
+  const {
+    blockedReason,
+    shouldWrite,
+    statePatch,
+    target,
+  } = buildSurveyResultsRefreshStatusSequencePlan(args);
+
+  return {
+    blockedReason,
+    shouldWrite,
+    statePatch,
     target,
   };
 };
