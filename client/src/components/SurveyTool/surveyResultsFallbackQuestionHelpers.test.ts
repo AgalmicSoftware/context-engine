@@ -125,4 +125,37 @@ describe('surveyResultsFallbackQuestionHelpers', () => {
     });
     expect(plan.fallbackQuestion).toBe(cached);
   });
+
+  it('recovers selected fallback helper writes after a transient bucket failure', () => {
+    const buckets = createSurveyResultsFallbackQuestionBuckets();
+    const originalSet = buckets.summary.set.bind(buckets.summary);
+    const error = new Error('fallback bucket write failed');
+    const setSpy = jest.spyOn(buckets.summary, 'set')
+      .mockImplementationOnce(() => {
+        throw error;
+      })
+      .mockImplementation((key, value) => originalSet(key, value));
+
+    expect(() => getSurveyResultsStableFallbackQuestion(
+      buckets,
+      'Q-Recover',
+      'summary'
+    )).toThrow(error);
+    expect(buckets.summary.has('Q-Recover')).toBe(false);
+
+    const recovered = getSurveyResultsStableFallbackQuestion(
+      buckets,
+      'Q-Recover',
+      'summary'
+    );
+
+    expect(setSpy).toHaveBeenCalledTimes(2);
+    expect(buckets.summary.get('Q-Recover')).toBe(recovered);
+    expect(recovered).toEqual({
+      id: 'Q-Recover',
+      prompt: 'Unknown question',
+    });
+
+    setSpy.mockRestore();
+  });
 });
