@@ -139,6 +139,21 @@ const attachStateHarness = (subject: any): any => {
   return subject;
 };
 
+const createAnalysisArtifact = (inputSignature = 'input-sig') => ({
+  generatedAt: '2026-06-01T00:00:00.000Z',
+  inputSignature,
+  kind: 'ce_session_results_analysis_artifact',
+  participants: [],
+  sections: {
+    argumentMap: { available: true, debates: [] },
+    atlas: { available: true, edges: [], nodes: [] },
+    breakdown: { available: true, dimensions: [], groups: [], summary: {} },
+    riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
+  },
+  source: 'ai-generated',
+  version: 1,
+});
+
 const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
   const stack: TreeNode[] = [node];
   while (stack.length > 0) {
@@ -845,6 +860,92 @@ describe('SurveyResults export/view controls', () => {
     expect(snapshot.sections.argumentMap.available).toBe(true);
     expect(snapshot.sections.riskMatrix.available).toBe(true);
     expect(snapshot.sections.atlas.available).toBe(true);
+  });
+
+  it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
+    const subject = createSubject({
+      network: { id: 11155420 },
+      sessionSlug: 'alpha-session',
+    });
+    subject.getEffectiveSlug = jest.fn(() => 'alpha-session');
+
+    const existingArtifact = createAnalysisArtifact('old-input');
+    const nextArtifact = createAnalysisArtifact('new-input');
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      existingFlag: true,
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:OP Sepolia:old-input': existingArtifact,
+      },
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined);
+
+    await subject.writeSessionResultsAnalysisArtifactToCache(nextArtifact);
+
+    expect(readSpy).toHaveBeenCalledWith('analysisCache', 'alpha-session');
+    expect(writeSpy).toHaveBeenCalledWith('analysisCache', 'alpha-session', {
+      existingFlag: true,
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:OP Sepolia:old-input': existingArtifact,
+        'sessionResultsAnalysis:v1:OP Sepolia:new-input': nextArtifact,
+      },
+    });
+  });
+
+  it('uses a cached complete analysis artifact without AI calls or cache writes', async () => {
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+    const cachedArtifact = createAnalysisArtifact('cached-input');
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'cached-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => cachedArtifact);
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(subject.state.htmlReportAnalysisArtifact).toBe(cachedArtifact);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisInputSignature).toBe('cached-input');
+  });
+
+  it('surfaces analysis cache write failures and allows a later retry at the write boundary', async () => {
+    const subject = createSubject({
+      network: { id: 84532 },
+      sessionSlug: 'beta-session',
+    });
+    subject.getEffectiveSlug = jest.fn(() => 'beta-session');
+
+    const artifact = createAnalysisArtifact('retry-input');
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      sessionResultsAnalysis: {},
+    });
+    const writeSpy = jest
+      .spyOn(cacheScripts, 'writeCache')
+      .mockRejectedValueOnce(new Error('analysis write failed'))
+      .mockResolvedValueOnce(undefined);
+
+    await expect(subject.writeSessionResultsAnalysisArtifactToCache(artifact)).rejects.toThrow(
+      'analysis write failed'
+    );
+    await expect(subject.writeSessionResultsAnalysisArtifactToCache(artifact)).resolves.toBeUndefined();
+
+    expect(writeSpy).toHaveBeenCalledTimes(2);
+    expect(writeSpy).toHaveBeenLastCalledWith('analysisCache', 'beta-session', {
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:Base Sepolia:retry-input': artifact,
+      },
+    });
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
