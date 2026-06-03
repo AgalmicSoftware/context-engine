@@ -21,6 +21,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
@@ -152,6 +153,81 @@ describe('surveyResultsHelpers state patches', () => {
         latestBlock: undefined,
       },
     });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: 321,
+      followUpEffects: [
+        'manualRefreshDispatch',
+        '',
+        'resetLocalStoragePollingBackoff:manual-refresh',
+        'pollLocalStorageForUpdates',
+        'queueResultsRefresh:manual-refresh',
+      ],
+    })).toEqual({
+      blockedReason: '',
+      dispatchEligibility: 'eligible',
+      orderedEffects: [
+        {
+          kind: 'state-patch',
+          keys: [
+            'refreshTargetQuestionBlock',
+            'refreshTargetResponseBlock',
+            'refreshTargetSurveyBlock',
+          ],
+          target: {
+            latestBlock: 321,
+          },
+        },
+        { kind: 'follow-up', effect: 'manualRefreshDispatch' },
+        { kind: 'follow-up', effect: 'resetLocalStoragePollingBackoff:manual-refresh' },
+        { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
+        { kind: 'follow-up', effect: 'queueResultsRefresh:manual-refresh' },
+      ],
+      shouldDispatchFollowUp: true,
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: 321,
+        refreshTargetResponseBlock: 321,
+        refreshTargetSurveyBlock: 321,
+      },
+      target: {
+        latestBlock: 321,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      isMounted: false,
+      latestBlock: 654,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    })).toEqual({
+      blockedReason: 'unmounted',
+      dispatchEligibility: 'blocked',
+      orderedEffects: [],
+      shouldDispatchFollowUp: false,
+      shouldWrite: false,
+      statePatch: null,
+      target: {
+        latestBlock: 654,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: 789,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    }).orderedEffects).toEqual([
+      {
+        kind: 'state-patch',
+        keys: [
+          'networkLatestBlock',
+          'refreshTargetQuestionBlock',
+          'refreshTargetResponseBlock',
+          'refreshTargetSurveyBlock',
+        ],
+        target: {
+          latestBlock: 789,
+        },
+      },
+      { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
+    ]);
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,
     });
