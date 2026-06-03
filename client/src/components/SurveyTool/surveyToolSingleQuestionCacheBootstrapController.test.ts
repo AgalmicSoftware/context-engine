@@ -83,6 +83,68 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
     expect(writeQuestionsCache).toHaveBeenCalledTimes(1);
   });
 
+  it('restores encrypted gated recent question payloads over stale cached shells', async () => {
+    const writeQuestionsCache = jest.fn();
+    const questionsCache = {
+      '84532': {
+        questions: {
+          q1: {
+            id: 'q1',
+            prompt: 'stale plaintext shell',
+            tags: ['old-tag'],
+          },
+        },
+      },
+    };
+    const recentPayload = {
+      prompt: {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: 'cipher-prompt',
+      },
+      encryption: {
+        enabled: true,
+        gates: [{ id: 'gate-alpha', type: 'sbt' }],
+      },
+      tags: ['gated'],
+    };
+
+    const result = await resolveSingleQuestionCacheBootstrap({
+      questionId: 'q1',
+      effectiveSingleSlug: 'edge',
+      account: '0xabc',
+      resolveCacheState: jest.fn().mockResolvedValue({
+        netIdStr: '84532',
+        questionsCache,
+      }),
+      readRecentPayload: jest.fn().mockReturnValue(recentPayload),
+      canUseRecentPayload: jest.fn().mockReturnValue(true),
+      pickBetterQuestionPayload: jest.fn((_current, next) => next),
+      areQuestionPayloadsEquivalent: jest.fn().mockReturnValue(false),
+      writeQuestionsCache,
+    });
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') {
+      throw new Error(`expected ready, got ${result.status}`);
+    }
+
+    expect(result.questionData).toEqual({
+      ...recentPayload,
+      id: 'q1',
+    });
+    expect(writeQuestionsCache).toHaveBeenCalledWith('edge', {
+      '84532': {
+        questions: {
+          q1: {
+            ...recentPayload,
+            id: 'q1',
+          },
+        },
+      },
+    });
+  });
+
   it("returns 'missing-cache-state' when no cache and no recent payload", async () => {
     await expect(resolveSingleQuestionCacheBootstrap({
       questionId: 'q1',
