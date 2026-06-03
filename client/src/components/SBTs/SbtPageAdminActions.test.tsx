@@ -134,6 +134,38 @@ describe('SbtPageAdminActions', () => {
     expect(onExportPasswords).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps disabled admin burn and invite generation actions inert', () => {
+    const onAdminBurn = jest.fn();
+    const onGenerateAdminInvites = jest.fn();
+
+    render(
+      <SbtPageAdminActions
+        {...createProps({
+          adminBurnStatusButtonState: {
+            disabled: true,
+          },
+          onAdminBurn,
+          onGenerateAdminInvites,
+          passwordGenerationButtonState: {
+            disabled: true,
+          },
+        })}
+      />
+    );
+
+    const burnButton = screen.getByRole('button', { name: 'Burn SBT' });
+    const generateButton = screen.getByRole('button', { name: 'Generate Invites' });
+
+    expect(burnButton).toBeDisabled();
+    expect(generateButton).toBeDisabled();
+
+    fireEvent.click(burnButton);
+    fireEvent.click(generateButton);
+
+    expect(onAdminBurn).not.toHaveBeenCalled();
+    expect(onGenerateAdminInvites).not.toHaveBeenCalled();
+  });
+
   it('renders previous-password and no-more-invite states from display plans', () => {
     const { rerender } = render(
       <SbtPageAdminActions
