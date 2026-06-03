@@ -90,7 +90,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
-  buildSurveyResultsRefreshStatusWritePlan,
+  buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -1850,14 +1850,19 @@ class SurveyResults extends Component<any, any> {
     try {
       const slug = this.getEffectiveSlug();
       const latest = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
-      const refreshStatusWritePlan = buildSurveyResultsRefreshStatusWritePlan({
+      const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
         isMounted: this._isMounted,
         latestBlock: latest,
         writeNetworkLatestBlock: true,
+        followUpEffects: [
+          'pollLocalStorageForUpdates',
+          'resetLocalStoragePollingBackoff:nonce-tick',
+          'queueResultsRefresh:nonce-tick',
+        ],
       });
-      if (!refreshStatusWritePlan.shouldWrite || !refreshStatusWritePlan.statePatch) return;
+      if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
       this.setState(
-        refreshStatusWritePlan.statePatch,
+        refreshStatusSequencePlan.statePatch,
         () => {
           // Re-read localStorage derived counters and repaint from cache immediately
           this.pollLocalStorageForUpdates();
@@ -4990,13 +4995,19 @@ handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = this.getEffectiveSlug();
   const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
-  const refreshStatusWritePlan = buildSurveyResultsRefreshStatusWritePlan({
+  const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
     latestBlock: latestOnChain,
+    followUpEffects: [
+      'manualRefreshDispatch',
+      'resetLocalStoragePollingBackoff:manual-refresh',
+      'pollLocalStorageForUpdates',
+      'queueResultsRefresh:manual-refresh',
+    ],
   });
-  if (!refreshStatusWritePlan.shouldWrite || !refreshStatusWritePlan.statePatch) return;
+  if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
 
   this.setState(
-    refreshStatusWritePlan.statePatch,
+    refreshStatusSequencePlan.statePatch,
     async () => {
       await runSurveyResultsManualRefreshDispatchController({
         ports: {
