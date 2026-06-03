@@ -1477,6 +1477,139 @@ describe('SurveyResults question-mode polling and filter state', () => {
       'queue:manual-refresh',
     ]);
   });
+
+  it('manual refresh keeps missing latest block as a parent-owned status write', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshQuestionMetadata: jest.fn(async () => calls.push('metadata')),
+      refreshQuestionResponses: jest.fn(async () => calls.push('responses')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(undefined);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: undefined,
+        refreshTargetResponseBlock: undefined,
+        refreshTargetSurveyBlock: undefined,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'metadata',
+      'responses',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
+
+  it('manual survey refresh keeps dispatch inert when the survey target is missing', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshSurveyResponsesByID: jest.fn(async () => calls.push('survey')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(222);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.state.refreshTargetQuestionBlock).toBe(222);
+    expect(subject.state.refreshTargetResponseBlock).toBe(222);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(222);
+    expect(subject.props.refreshSurveyResponsesByID).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
+
+  it('manual refresh does not short-circuit already current refresh target blocks', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshQuestionMetadata: jest.fn(async () => calls.push('metadata')),
+      refreshQuestionResponses: jest.fn(async () => calls.push('responses')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      refreshTargetQuestionBlock: 777,
+      refreshTargetResponseBlock: 777,
+      refreshTargetSurveyBlock: 777,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(777);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: 777,
+        refreshTargetResponseBlock: 777,
+        refreshTargetSurveyBlock: 777,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'metadata',
+      'responses',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
 });
 
 describe('SurveyResults modal and polling behavior', () => {
