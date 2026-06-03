@@ -90,7 +90,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
-  buildSurveyResultsRefreshTargetBlocksPatch,
+  buildSurveyResultsRefreshStatusWritePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -1850,12 +1850,14 @@ class SurveyResults extends Component<any, any> {
     try {
       const slug = this.getEffectiveSlug();
       const latest = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
-      if (!this._isMounted) return;
+      const refreshStatusWritePlan = buildSurveyResultsRefreshStatusWritePlan({
+        isMounted: this._isMounted,
+        latestBlock: latest,
+        writeNetworkLatestBlock: true,
+      });
+      if (!refreshStatusWritePlan.shouldWrite || !refreshStatusWritePlan.statePatch) return;
       this.setState(
-        {
-          networkLatestBlock: latest,
-          ...buildSurveyResultsRefreshTargetBlocksPatch(latest),
-        },
+        refreshStatusWritePlan.statePatch,
         () => {
           // Re-read localStorage derived counters and repaint from cache immediately
           this.pollLocalStorageForUpdates();
@@ -4988,9 +4990,13 @@ handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = this.getEffectiveSlug();
   const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
+  const refreshStatusWritePlan = buildSurveyResultsRefreshStatusWritePlan({
+    latestBlock: latestOnChain,
+  });
+  if (!refreshStatusWritePlan.shouldWrite || !refreshStatusWritePlan.statePatch) return;
 
   this.setState(
-    buildSurveyResultsRefreshTargetBlocksPatch(latestOnChain),
+    refreshStatusWritePlan.statePatch,
     async () => {
       await runSurveyResultsManualRefreshDispatchController({
         ports: {

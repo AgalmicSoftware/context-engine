@@ -22,6 +22,7 @@ import {
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsRefreshTargetBlocksPatch,
+  buildSurveyResultsRefreshStatusWritePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -98,6 +99,58 @@ describe('surveyResultsHelpers state patches', () => {
       refreshTargetQuestionBlock: 456,
       refreshTargetResponseBlock: 456,
       refreshTargetSurveyBlock: 456,
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: 456 })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: 456,
+        refreshTargetResponseBlock: 456,
+        refreshTargetSurveyBlock: 456,
+      },
+      target: {
+        latestBlock: 456,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
+      latestBlock: 789,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        networkLatestBlock: 789,
+        refreshTargetQuestionBlock: 789,
+        refreshTargetResponseBlock: 789,
+        refreshTargetSurveyBlock: 789,
+      },
+      target: {
+        latestBlock: 789,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
+      isMounted: false,
+      latestBlock: 999,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: 'unmounted',
+      shouldWrite: false,
+      statePatch: null,
+      target: {
+        latestBlock: 999,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: undefined })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: undefined,
+        refreshTargetResponseBlock: undefined,
+        refreshTargetSurveyBlock: undefined,
+      },
+      target: {
+        latestBlock: undefined,
+      },
     });
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,

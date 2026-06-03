@@ -15,6 +15,11 @@ type BuildSurveyResultsQuestionFilterCountPatchArgs = {
   props?: unknown;
   state?: unknown;
 };
+type BuildSurveyResultsRefreshStatusWritePlanArgs = {
+  isMounted?: unknown;
+  latestBlock?: unknown;
+  writeNetworkLatestBlock?: unknown;
+};
 
 export type SurveyResultsResponseField = UnknownRecord & {
   value?: unknown;
@@ -276,6 +281,39 @@ export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown)
   refreshTargetResponseBlock: latestBlock,
   refreshTargetSurveyBlock: latestBlock,
 });
+
+export const buildSurveyResultsRefreshStatusWritePlan = ({
+  isMounted = true,
+  latestBlock,
+  writeNetworkLatestBlock = false,
+}: BuildSurveyResultsRefreshStatusWritePlanArgs = {}) => {
+  const target = {
+    latestBlock,
+  };
+
+  if (isMounted === false) {
+    return {
+      blockedReason: 'unmounted' as const,
+      shouldWrite: false,
+      statePatch: null,
+      target,
+    };
+  }
+
+  const refreshTargetPatch = buildSurveyResultsRefreshTargetBlocksPatch(latestBlock);
+
+  return {
+    blockedReason: '' as const,
+    shouldWrite: true,
+    statePatch: writeNetworkLatestBlock === true
+      ? {
+        networkLatestBlock: latestBlock,
+        ...refreshTargetPatch,
+      }
+      : refreshTargetPatch,
+    target,
+  };
+};
 
 export const buildSurveyResultsFilteredQuestionsCountPatch = (filteredQuestionsCount: unknown) => ({
   filteredQuestionsCount,
