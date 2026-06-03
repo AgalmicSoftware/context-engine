@@ -943,4 +943,19 @@ describe('sbtPageHelpers', () => {
       parentOwnsInitialRefresh: false,
     });
   });
+
+  it('keeps cache-ready metadata hydration inert while preserving the central refresh boundary', () => {
+    const refreshSbtData = jest.fn();
+
+    expect(resolveSbtPageMetadataHydrationMode({
+      forceEventFetch: false,
+      isSBTCacheReady: true,
+      refreshSbtData,
+    })).toEqual({
+      usingCentralHydration: true,
+      parentOwnsInitialRefresh: false,
+    });
+
+    expect(refreshSbtData).not.toHaveBeenCalled();
+  });
 });
