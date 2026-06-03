@@ -1266,6 +1266,78 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.requestFetchResponses).toHaveBeenCalledTimes(2);
   });
 
+  it('nonce tick writes refresh status targets before parent polling follow-up', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: { id: 'provider' },
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn(() => calls.push('reset'));
+    subject.queueResultsRefresh = jest.fn(() => calls.push('queue'));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(234);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.state.networkLatestBlock).toBe(234);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(234);
+    expect(subject.state.refreshTargetResponseBlock).toBe(234);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(234);
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        networkLatestBlock: 234,
+        refreshTargetQuestionBlock: 234,
+        refreshTargetResponseBlock: 234,
+        refreshTargetSurveyBlock: 234,
+      },
+      expect.any(Function)
+    );
+    expect(calls).toEqual(['poll', 'reset', 'queue']);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('nonce-tick');
+  });
+
+  it('skips refresh status writes and polling follow-up when nonce refresh unmounts before write', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = false;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.setState = jest.fn();
+    subject.pollLocalStorageForUpdates = jest.fn();
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(345);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.pollLocalStorageForUpdates).not.toHaveBeenCalled();
+    expect(subject.resetLocalStoragePollingBackoff).not.toHaveBeenCalled();
+    expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+    expect(subject.state.refreshTargetQuestionBlock).toBe(0);
+    expect(subject.state.refreshTargetResponseBlock).toBe(0);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(0);
+  });
+
   it('manual refresh dispatches question refresh ports before shell polling follow-up', async () => {
     const calls: string[] = [];
     const subject = createSubject({
