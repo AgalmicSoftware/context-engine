@@ -139,6 +139,7 @@ import {
   buildSurveyResultsCacheControllerSnapshot,
 } from './surveyResultsCacheControllerSnapshot';
 import {
+  buildSurveyResultsAnalysisArtifactWritePlan,
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
   type SurveyResultsFilterBookmarkWritePlan,
@@ -3222,14 +3223,18 @@ artifact: SessionResultsGeneratedAnalysisArtifact
 ): Promise<void> => {
 const slug = this.getSessionResultsAnalysisCacheSlug();
 const current = toSurveyResultsRecord(await readCache('analysisCache', slug));
-const artifacts = toSurveyResultsRecord(current.sessionResultsAnalysis);
-await (writeCache as SurveyResultsWriteCache)('analysisCache', slug, {
-  ...current,
-  sessionResultsAnalysis: {
-    ...artifacts,
-    [this.getSessionResultsAnalysisCacheKey(artifact.inputSignature)]: artifact,
-  },
+const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
+  artifact,
+  cacheKey: this.getSessionResultsAnalysisCacheKey(artifact.inputSignature),
+  currentCache: current,
+  slug,
 });
+if (!writePlan.shouldWrite || !writePlan.payload) return;
+await (writeCache as SurveyResultsWriteCache)(
+  writePlan.target.namespace,
+  writePlan.target.slug,
+  writePlan.payload
+);
 }
 
 getSessionResultsAnalysisTextField = (field: unknown): string => {

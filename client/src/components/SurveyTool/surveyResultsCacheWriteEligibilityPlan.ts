@@ -23,6 +23,24 @@ export type SurveyResultsFilterBookmarkWritePlan = {
   };
 };
 
+export type SurveyResultsAnalysisArtifactWritePlanArgs = {
+  artifact?: unknown;
+  cacheKey?: unknown;
+  currentCache?: unknown;
+  slug?: unknown;
+};
+
+export type SurveyResultsAnalysisArtifactWritePlan = {
+  blockedReason: '' | 'missing-artifact' | 'missing-cache-key';
+  payload: SurveyResultsRecord | null;
+  shouldWrite: boolean;
+  target: {
+    namespace: 'analysisCache';
+    slug: string;
+    cacheKey: string;
+  };
+};
+
 export type SurveyResultsSurveyQuestionBookmarkWritePlanArgs = {
   bookmarkId?: unknown;
   bookmarkType?: unknown;
@@ -52,6 +70,53 @@ export type SurveyResultsSurveyQuestionBookmarkWritePlan = {
 const toRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
+
+export const buildSurveyResultsAnalysisArtifactWritePlan = ({
+  artifact = null,
+  cacheKey = '',
+  currentCache = {},
+  slug = '',
+}: SurveyResultsAnalysisArtifactWritePlanArgs = {}): SurveyResultsAnalysisArtifactWritePlan => {
+  const target = {
+    namespace: 'analysisCache' as const,
+    slug: String(slug || ''),
+    cacheKey: String(cacheKey || ''),
+  };
+
+  if (!artifact || typeof artifact !== 'object') {
+    return {
+      blockedReason: 'missing-artifact',
+      payload: null,
+      shouldWrite: false,
+      target,
+    };
+  }
+
+  if (!target.cacheKey) {
+    return {
+      blockedReason: 'missing-cache-key',
+      payload: null,
+      shouldWrite: false,
+      target,
+    };
+  }
+
+  const currentCacheRecord = toRecord(currentCache);
+  const artifacts = toRecord(currentCacheRecord.sessionResultsAnalysis);
+
+  return {
+    blockedReason: '',
+    payload: {
+      ...currentCacheRecord,
+      sessionResultsAnalysis: {
+        ...artifacts,
+        [target.cacheKey]: artifact,
+      },
+    },
+    shouldWrite: true,
+    target,
+  };
+};
 
 export const buildSurveyResultsFilterBookmarkWritePlan = ({
   filtersCache = {},

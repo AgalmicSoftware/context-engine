@@ -1,4 +1,5 @@
 import {
+  buildSurveyResultsAnalysisArtifactWritePlan,
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
@@ -64,16 +65,15 @@ describe('surveyResultsCacheWriteReadiness', () => {
     {
       blockers: [
         'AI generation flow',
-        'artifact normalization/merge',
         'report export/download execution',
-        'broad analysis cache persistence',
+        'cache write execution',
       ],
       controllerReady: false,
       hasInjectedController: false,
       hasMethodBoundaryCoverage: true,
-      hasPurePlan: false,
+      hasPurePlan: typeof buildSurveyResultsAnalysisArtifactWritePlan === 'function',
       path: 'analysis/export artifact writes',
-      status: 'method-covered-deferred',
+      status: 'pure-plan-only',
     },
   ];
 
@@ -89,6 +89,7 @@ describe('surveyResultsCacheWriteReadiness', () => {
     expect(hasMethodBoundaryCoverage).toBe(true);
     expect([
       'controller-routed',
+      'pure-plan-only',
       'pure-sequence-plan-only',
       'method-covered-deferred',
     ]).toContain(status);
@@ -104,6 +105,15 @@ describe('surveyResultsCacheWriteReadiness', () => {
       expect(blockers).toEqual(expect.arrayContaining([
         'parent-owned setState application',
         'polling/backoff lifecycle',
+      ]));
+    }
+    if (status === 'pure-plan-only') {
+      expect(controllerReady).toBe(false);
+      expect(hasPurePlan).toBe(true);
+      expect(hasInjectedController).toBe(false);
+      expect(blockers).toEqual(expect.arrayContaining([
+        'AI generation flow',
+        'cache write execution',
       ]));
     }
     if (status === 'method-covered-deferred') {
