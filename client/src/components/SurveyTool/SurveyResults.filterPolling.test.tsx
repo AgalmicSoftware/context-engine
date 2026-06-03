@@ -512,6 +512,35 @@ describe('SurveyResults bookmark cache writes', () => {
     expect(subject.state.bookmarkedQuestionIDs).toEqual(['q2']);
   });
 
+  it('applies plan-derived survey bookmark removals through the parent write path', async () => {
+    const liveBookmarksCache = {
+      surveys: ['s-remove', 's-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveBookmarksCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleSurveyBookmark('s-remove');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['s-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    });
+    expect(liveBookmarksCache).toEqual({
+      surveys: ['s-remove', 's-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-keep']);
+  });
+
   it('falls back to default bookmark cache when the sync cache read throws', async () => {
     const readError = new Error('bookmark read failed');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
