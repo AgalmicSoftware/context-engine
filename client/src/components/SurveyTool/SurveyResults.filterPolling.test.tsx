@@ -560,6 +560,64 @@ describe('SurveyResults bookmark cache writes', () => {
       consoleErrorSpy.mockRestore();
     }
   });
+
+  it('keeps failed filter bookmark writes inert and allows a later successful retry', async () => {
+    jest.useFakeTimers();
+    const liveCache = { bookmarkedFilters: ['existing-filter'] };
+    const writeError = new Error('write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache')
+      .mockRejectedValueOnce(writeError)
+      .mockResolvedValueOnce(true);
+
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterBookmarkedFeedback: false,
+      filterState: { types: ['radio'] },
+    };
+
+    try {
+      await subject.handleBookmarkFilter();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', {
+        bookmarkedFilters: ['existing-filter', { types: ['radio'] }],
+      });
+      expect(subject.state.filterBookmarkedFeedback).toBe(false);
+      expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        'Error saving bookmarked filters cache:',
+        writeError
+      );
+
+      subject.state = {
+        ...subject.state,
+        filterState: { types: ['slider'] },
+      };
+
+      await subject.handleBookmarkFilter();
+
+      expect(writeSpy).toHaveBeenCalledTimes(2);
+      expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', {
+        bookmarkedFilters: ['existing-filter', { types: ['slider'] }],
+      });
+      expect(subject.state.filterBookmarkedFeedback).toBe(true);
+
+      jest.runOnlyPendingTimers();
+
+      expect(subject.state.filterBookmarkedFeedback).toBe(false);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      jest.useRealTimers();
+    }
+  });
 });
 
 describe('SurveyResults fallback questions', () => {
