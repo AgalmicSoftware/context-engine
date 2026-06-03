@@ -1382,6 +1382,54 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(calls).toEqual(['poll', 'reset:nonce-tick', 'queue:nonce-tick']);
   });
 
+  it('preserves a queued nonce retry after latest-block failure and recovers status writes', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+
+    const first = createDeferred<number>();
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce(654);
+
+    const firstRunPromise = subject.handleNonceTick();
+    subject.handleNonceTick();
+    expect(subject._nonceTickInFlight).toBe(true);
+    expect(subject._nonceTickQueued).toBe(true);
+
+    first.reject(new Error('latest block failed'));
+    await firstRunPromise;
+    await flushMicrotasks();
+
+    expect(subject._nonceTickInFlight).toBe(false);
+    expect(subject._nonceTickQueued).toBe(false);
+    expect(subject.state.networkLatestBlock).toBe(654);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(654);
+    expect(subject.state.refreshTargetResponseBlock).toBe(654);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(654);
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual([
+      'reset:nonce-tick-fallback',
+      'queue:nonce-tick-fallback',
+      'poll',
+      'reset:nonce-tick',
+      'queue:nonce-tick',
+    ]);
+  });
+
   it('manual refresh dispatches question refresh ports before shell polling follow-up', async () => {
     const calls: string[] = [];
     const subject = createSubject({
