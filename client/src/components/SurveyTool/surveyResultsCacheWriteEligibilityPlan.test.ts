@@ -1,9 +1,124 @@
 import {
+  buildSurveyResultsAnalysisArtifactWritePlan,
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 
 describe('surveyResultsCacheWriteEligibilityPlan', () => {
+  it('derives analysis artifact write payloads without mutating sibling artifacts', () => {
+    const artifact = {
+      inputSignature: 'new-input',
+      kind: 'ce_session_results_analysis_artifact',
+    };
+    const currentCache = {
+      existingFlag: true,
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:OP Sepolia:old-input': {
+          inputSignature: 'old-input',
+        },
+      },
+    };
+
+    const plan = buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:new-input',
+      currentCache,
+      slug: 'alpha-session',
+    });
+
+    expect(plan).toEqual({
+      blockedReason: '',
+      payload: {
+        existingFlag: true,
+        sessionResultsAnalysis: {
+          'sessionResultsAnalysis:v1:OP Sepolia:old-input': {
+            inputSignature: 'old-input',
+          },
+          'sessionResultsAnalysis:v1:OP Sepolia:new-input': artifact,
+        },
+      },
+      shouldWrite: true,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'alpha-session',
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:new-input',
+      },
+    });
+    expect(currentCache.sessionResultsAnalysis).toEqual({
+      'sessionResultsAnalysis:v1:OP Sepolia:old-input': {
+        inputSignature: 'old-input',
+      },
+    });
+  });
+
+  it('normalizes malformed analysis artifact buckets while preserving unrelated fields', () => {
+    const artifact = {
+      inputSignature: 'retry-input',
+      kind: 'ce_session_results_analysis_artifact',
+    };
+
+    expect(buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact,
+      cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
+      currentCache: {
+        existingFlag: true,
+        sessionResultsAnalysis: 'bad-artifacts',
+      },
+      slug: 'beta-session',
+    })).toEqual({
+      blockedReason: '',
+      payload: {
+        existingFlag: true,
+        sessionResultsAnalysis: {
+          'sessionResultsAnalysis:v1:Base Sepolia:retry-input': artifact,
+        },
+      },
+      shouldWrite: true,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'beta-session',
+        cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
+      },
+    });
+  });
+
+  it('blocks analysis artifact write plans without moving cache reads or writes', () => {
+    expect(buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact: null,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+      currentCache: {
+        sessionResultsAnalysis: {
+          existing: { inputSignature: 'existing' },
+        },
+      },
+      slug: '',
+    })).toEqual({
+      blockedReason: 'missing-artifact',
+      payload: null,
+      shouldWrite: false,
+      target: {
+        namespace: 'analysisCache',
+        slug: '',
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+      },
+    });
+
+    expect(buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact: { inputSignature: 'missing-key' },
+      cacheKey: '',
+      slug: 'gamma-session',
+    })).toEqual({
+      blockedReason: 'missing-cache-key',
+      payload: null,
+      shouldWrite: false,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'gamma-session',
+        cacheKey: '',
+      },
+    });
+  });
+
   it('blocks filter bookmark writes before cache reads when the results view is unmounted', () => {
     expect(buildSurveyResultsFilterBookmarkWritePlan({
       filterState: { type: 'radio' },
