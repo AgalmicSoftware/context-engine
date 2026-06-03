@@ -145,6 +145,10 @@ import {
   type SurveyResultsFilterBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 import {
+  runSurveyResultsAnalysisArtifactWriteController,
+  type SurveyResultsAnalysisArtifactWritePort,
+} from './surveyResultsAnalysisArtifactWriteController';
+import {
   runSurveyResultsFilterBookmarkWriteController,
 } from './surveyResultsFilterBookmarkWriteController';
 import {
@@ -3230,11 +3234,13 @@ const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
   slug,
 });
 if (!writePlan.shouldWrite || !writePlan.payload) return;
-await (writeCache as SurveyResultsWriteCache)(
-  writePlan.target.namespace,
-  writePlan.target.slug,
-  writePlan.payload
-);
+const writeResult = await runSurveyResultsAnalysisArtifactWriteController({
+  plan: writePlan,
+  ports: {
+    writeAnalysisArtifact: writeCache as unknown as SurveyResultsAnalysisArtifactWritePort,
+  },
+});
+if (!writeResult.ok && writeResult.error) throw writeResult.error;
 }
 
 getSessionResultsAnalysisTextField = (field: unknown): string => {
