@@ -143,6 +143,9 @@ import {
   type SurveyResultsFilterBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 import {
+  runSurveyResultsFilterBookmarkWriteController,
+} from './surveyResultsFilterBookmarkWriteController';
+import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
@@ -5065,13 +5068,21 @@ try {
 
 if (!writePlan.shouldWrite || !writePlan.payload) return;
 
+const writeResult = await runSurveyResultsFilterBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeFilterBookmark: writeCache as SurveyResultsWriteCache,
+  },
+});
+if (!writeResult.ok) {
+  if (writeResult.error) {
+    surveyLog.error('Error saving bookmarked filters cache:', writeResult.error);
+  }
+  return;
+}
+
 try {
-  await (writeCache as SurveyResultsWriteCache)(
-    writePlan.target.namespace,
-    writePlan.target.slug,
-    writePlan.payload
-  );
-  if (writePlan.successFeedback) {
+  if (writeResult.shouldApplySuccessFeedback) {
     this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
   }
 
