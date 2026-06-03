@@ -139,4 +139,61 @@ describe('surveyResultsSurveyQuestionBookmarkWriteController', () => {
       },
     });
   });
+
+  it('captures synchronous write-port throws as plain failure results', async () => {
+    const writeError = new Error('sync write failed');
+    const writeBookmarksCache = jest.fn(() => {
+      throw writeError;
+    });
+
+    const result = await runSurveyResultsSurveyQuestionBookmarkWriteController({
+      plan: {
+        blockedReason: '',
+        payload: {
+          surveys: [],
+          questions: ['q1'],
+        },
+        shouldWrite: true,
+        statePatch: {
+          key: 'bookmarkedQuestionIDs',
+          value: ['q1'],
+        },
+        target: {
+          namespace: 'bookmarksCache',
+          slug: 'edge',
+        },
+        toggled: {
+          action: 'add',
+          bookmarkType: 'question',
+          id: 'q1',
+        },
+      },
+      ports: {
+        writeBookmarksCache,
+      },
+    });
+
+    expect(writeBookmarksCache).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: [],
+      questions: ['q1'],
+    });
+    expect(result).toEqual({
+      attempted: true,
+      error: writeError,
+      ok: false,
+      statePatch: {
+        key: 'bookmarkedQuestionIDs',
+        value: ['q1'],
+      },
+      target: {
+        namespace: 'bookmarksCache',
+        slug: 'edge',
+      },
+      toggled: {
+        action: 'add',
+        bookmarkType: 'question',
+        id: 'q1',
+      },
+    });
+  });
 });
