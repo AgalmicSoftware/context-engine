@@ -1,4 +1,5 @@
 import {
+  buildSurveyResultsFallbackQuestionWritePlan,
   createSurveyResultsFallbackQuestionBuckets,
   getSurveyResultsStableFallbackQuestion,
 } from './surveyResultsFallbackQuestionHelpers';
@@ -49,5 +50,79 @@ describe('surveyResultsFallbackQuestionHelpers', () => {
       id: '',
       prompt: 'Unknown question',
     });
+  });
+
+  it('plans summary fallback writes without mutating buckets', () => {
+    const buckets = createSurveyResultsFallbackQuestionBuckets();
+
+    const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, 'Q-Plan', 'summary');
+
+    expect(plan).toEqual({
+      blockedReason: '',
+      fallbackQuestion: {
+        id: 'Q-Plan',
+        prompt: 'Unknown question',
+      },
+      payload: {
+        id: 'Q-Plan',
+        prompt: 'Unknown question',
+      },
+      shouldWrite: true,
+      target: {
+        bucketName: 'summary',
+        cacheKey: 'Q-Plan',
+      },
+    });
+    expect(plan.payload).toBe(plan.fallbackQuestion);
+    expect(buckets.summary.has('Q-Plan')).toBe(false);
+  });
+
+  it('plans individual fallback writes with the existing payload shape', () => {
+    const buckets = createSurveyResultsFallbackQuestionBuckets();
+
+    const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, 'Q-Plan', 'individual');
+
+    expect(plan).toEqual({
+      blockedReason: '',
+      fallbackQuestion: {
+        id: 'Q-Plan',
+        creator: '',
+        type: '',
+        prompt: '',
+      },
+      payload: {
+        id: 'Q-Plan',
+        creator: '',
+        type: '',
+        prompt: '',
+      },
+      shouldWrite: true,
+      target: {
+        bucketName: 'individual',
+        cacheKey: 'Q-Plan',
+      },
+    });
+    expect(plan.payload).toBe(plan.fallbackQuestion);
+    expect(buckets.individual.has('Q-Plan')).toBe(false);
+  });
+
+  it('blocks fallback writes on cache hits and returns the cached reference', () => {
+    const buckets = createSurveyResultsFallbackQuestionBuckets();
+    const cached = { id: 'Q-Plan', prompt: 'Cached fallback' };
+    buckets.summary.set('Q-Plan', cached);
+
+    const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, 'Q-Plan', 'summary');
+
+    expect(plan).toEqual({
+      blockedReason: 'cache-hit',
+      fallbackQuestion: cached,
+      payload: null,
+      shouldWrite: false,
+      target: {
+        bucketName: 'summary',
+        cacheKey: 'Q-Plan',
+      },
+    });
+    expect(plan.fallbackQuestion).toBe(cached);
   });
 });
