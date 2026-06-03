@@ -89,6 +89,55 @@ describe('surveyToolResponseMerge', () => {
     });
   });
 
+  it('prefers refreshed plaintext over stale decrypted values even when envelopes match', () => {
+    expect(mergeDecryptedViewedResponse({
+      answer: {
+        value: 'old decrypted answer',
+        encrypted: true,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'old decrypted note',
+        encrypted: true,
+        encryptedPortion: 'add-env',
+      },
+      importance: 4,
+      importanceEncrypted: 'imp-env',
+      conviction: 2,
+      convictionEncrypted: 'conv-env',
+    }, {
+      answer: {
+        value: 'fresh plaintext answer',
+        encrypted: false,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'fresh plaintext note',
+        encrypted: false,
+        encryptedPortion: 'add-env',
+      },
+      importance: 9,
+      importanceEncrypted: 'imp-env',
+      conviction: 7,
+      convictionEncrypted: 'conv-env',
+    })).toEqual({
+      answer: {
+        value: 'fresh plaintext answer',
+        encrypted: false,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'fresh plaintext note',
+        encrypted: false,
+        encryptedPortion: 'add-env',
+      },
+      importance: 9,
+      importanceEncrypted: 'imp-env',
+      conviction: 7,
+      convictionEncrypted: 'conv-env',
+    });
+  });
+
   it('merges survey response arrays per question id while keeping untouched rows intact', () => {
     expect(mergeDecryptedViewedResponse({
       responses: [
