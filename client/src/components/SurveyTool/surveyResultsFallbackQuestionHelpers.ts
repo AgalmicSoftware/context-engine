@@ -1,3 +1,5 @@
+import { runSurveyResultsFallbackQuestionWriteController } from './surveyResultsFallbackQuestionWriteController';
+
 type SurveyResultsRecord = Record<string, unknown>;
 
 export type SurveyResultsFallbackQuestion = SurveyResultsRecord & {
@@ -79,8 +81,13 @@ export const getSurveyResultsStableFallbackQuestion = (
   mode: unknown = 'summary'
 ): SurveyResultsFallbackQuestion => {
   const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, questionId, mode);
-  if (plan.shouldWrite && plan.payload) {
-    buckets[plan.target.bucketName].set(plan.target.cacheKey, plan.payload);
-  }
-  return plan.fallbackQuestion;
+  const result = runSurveyResultsFallbackQuestionWriteController({
+    plan,
+    ports: {
+      writeFallbackQuestion: (bucketName, cacheKey, payload) => {
+        buckets[bucketName].set(cacheKey, payload);
+      },
+    },
+  });
+  return result.fallbackQuestion || plan.fallbackQuestion;
 };
