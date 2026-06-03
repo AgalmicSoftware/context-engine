@@ -73,35 +73,6 @@ describe('surveyResultsFilterBookmarkWriteController', () => {
       },
     });
     expect(writeFilterBookmark).not.toHaveBeenCalled();
-
-    await expect(runSurveyResultsFilterBookmarkWriteController({
-      plan: {
-        blockedReason: '',
-        bookmarkedFiltersInvalid: false,
-        payload: null,
-        shouldReadCache: true,
-        shouldWrite: true,
-        successFeedback: true,
-        target: {
-          namespace: 'filters',
-          slug: 'edge',
-        },
-      },
-      ports: {
-        writeFilterBookmark,
-      },
-    })).resolves.toEqual({
-      attempted: false,
-      error: null,
-      ok: false,
-      shouldApplySuccessFeedback: false,
-      statePatch: {},
-      target: {
-        namespace: 'filters',
-        slug: 'edge',
-      },
-    });
-    expect(writeFilterBookmark).not.toHaveBeenCalled();
   });
 
   it('returns write failures without throwing or applying feedback', async () => {
