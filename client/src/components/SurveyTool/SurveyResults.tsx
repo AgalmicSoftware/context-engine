@@ -140,6 +140,7 @@ import {
 } from './surveyResultsCacheControllerSnapshot';
 import {
   buildSurveyResultsFilterBookmarkWritePlan,
+  buildSurveyResultsSurveyQuestionBookmarkWritePlan,
   type SurveyResultsFilterBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 import {
@@ -254,10 +255,6 @@ type SurveyResultsSummaryResponsePayload = SurveyResultsRecord & {
 type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
   response?: SurveyResultsSummaryResponsePayload | null;
   responder?: unknown;
-};
-type SurveyResultsBookmarkCache = {
-  questions: unknown[];
-  surveys: unknown[];
 };
 type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
@@ -4106,84 +4103,62 @@ this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedToggleP
 
 toggleSurveyBookmark = (surveyId: unknown): void => {
 const slug = this.getEffectiveSlug();
-let bookmarksCache: SurveyResultsBookmarkCache;
-const defaultCache: SurveyResultsBookmarkCache = { surveys: [], questions: [] };
+let bookmarksCache: unknown = {};
 
 try {
-  const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-  const parsedRecord = parsed as SurveyResultsRecord;
-  bookmarksCache = (parsed && typeof parsed === 'object')
-    ? {
-        ...parsedRecord,
-        surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-        questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-      }
-    : defaultCache;
-  if (
-    typeof bookmarksCache !== 'object' ||
-    bookmarksCache === null ||
-    !Array.isArray(bookmarksCache.surveys) ||
-    !Array.isArray(bookmarksCache.questions)
-  ) {
-    bookmarksCache = defaultCache;
-  }
+  bookmarksCache = peekCacheSync('bookmarksCache', slug, { clone: false });
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-  bookmarksCache = defaultCache;
+  bookmarksCache = {};
 }
 
-const surveyIndex = bookmarksCache.surveys.indexOf(surveyId);
-if (surveyIndex > -1) {
-  bookmarksCache.surveys.splice(surveyIndex, 1);
-} else {
-  bookmarksCache.surveys.push(surveyId);
-}
+const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+  bookmarkId: surveyId,
+  bookmarkType: 'survey',
+  bookmarksCache,
+  slug,
+});
 
-void (writeCache as SurveyResultsWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
+if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
+
+void (writeCache as SurveyResultsWriteCache)(
+  writePlan.target.namespace,
+  writePlan.target.slug,
+  writePlan.payload
+).catch((error: unknown) => {
   surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
 });
-this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(bookmarksCache.surveys));
+this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value));
 };
 
 toggleQuestionBookmark = (questionId: unknown): void => {
 const slug = this.getEffectiveSlug();
-let bookmarksCache: SurveyResultsBookmarkCache;
-const defaultCache: SurveyResultsBookmarkCache = { surveys: [], questions: [] };
+let bookmarksCache: unknown = {};
 
 try {
-  const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-  const parsedRecord = parsed as SurveyResultsRecord;
-  bookmarksCache = (parsed && typeof parsed === 'object')
-    ? {
-        ...parsedRecord,
-        surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-        questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-      }
-    : defaultCache;
-  if (
-    typeof bookmarksCache !== 'object' ||
-    bookmarksCache === null ||
-    !Array.isArray(bookmarksCache.surveys) ||
-    !Array.isArray(bookmarksCache.questions)
-  ) {
-    bookmarksCache = defaultCache;
-  }
+  bookmarksCache = peekCacheSync('bookmarksCache', slug, { clone: false });
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-  bookmarksCache = defaultCache;
+  bookmarksCache = {};
 }
 
-const questionIndex = bookmarksCache.questions.indexOf(questionId);
-if (questionIndex > -1) {
-  bookmarksCache.questions.splice(questionIndex, 1);
-} else {
-  bookmarksCache.questions.push(questionId);
-}
+const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+  bookmarkId: questionId,
+  bookmarkType: 'question',
+  bookmarksCache,
+  slug,
+});
 
-void (writeCache as SurveyResultsWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
+if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
+
+void (writeCache as SurveyResultsWriteCache)(
+  writePlan.target.namespace,
+  writePlan.target.slug,
+  writePlan.payload
+).catch((error: unknown) => {
   surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
 });
-this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(bookmarksCache.questions));
+this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value));
 };
 
 transformIndividualResponsesToAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {

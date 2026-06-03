@@ -1,5 +1,7 @@
 type SurveyResultsRecord = Record<string, unknown>;
 
+export type SurveyResultsBookmarkWriteKind = 'survey' | 'question';
+
 export type SurveyResultsFilterBookmarkWritePlanArgs = {
   filtersCache?: unknown;
   filterState?: unknown;
@@ -19,6 +21,32 @@ export type SurveyResultsFilterBookmarkWritePlan = {
     namespace: 'filters';
     slug: string;
   };
+};
+
+export type SurveyResultsSurveyQuestionBookmarkWritePlanArgs = {
+  bookmarkId?: unknown;
+  bookmarkType?: unknown;
+  bookmarksCache?: unknown;
+  slug?: unknown;
+};
+
+export type SurveyResultsSurveyQuestionBookmarkWritePlan = {
+  blockedReason: '' | 'invalid-bookmark-type';
+  payload: SurveyResultsRecord | null;
+  shouldWrite: boolean;
+  statePatch: {
+    key: 'bookmarkedSurveyIDs' | 'bookmarkedQuestionIDs';
+    value: unknown[];
+  } | null;
+  target: {
+    namespace: 'bookmarksCache';
+    slug: string;
+  };
+  toggled: {
+    action: 'add' | 'remove';
+    bookmarkType: SurveyResultsBookmarkWriteKind;
+    id: unknown;
+  } | null;
 };
 
 const toRecord = (value: unknown): SurveyResultsRecord => (
@@ -76,5 +104,68 @@ export const buildSurveyResultsFilterBookmarkWritePlan = ({
     shouldWrite: true,
     successFeedback: true,
     target,
+  };
+};
+
+export const buildSurveyResultsSurveyQuestionBookmarkWritePlan = ({
+  bookmarkId,
+  bookmarkType,
+  bookmarksCache = {},
+  slug = '',
+}: SurveyResultsSurveyQuestionBookmarkWritePlanArgs = {}): SurveyResultsSurveyQuestionBookmarkWritePlan => {
+  const target = {
+    namespace: 'bookmarksCache' as const,
+    slug: String(slug || ''),
+  };
+
+  if (bookmarkType !== 'survey' && bookmarkType !== 'question') {
+    return {
+      blockedReason: 'invalid-bookmark-type',
+      payload: null,
+      shouldWrite: false,
+      statePatch: null,
+      target,
+      toggled: null,
+    };
+  }
+
+  const bookmarksCacheRecord = toRecord(bookmarksCache);
+  const surveys = Array.isArray(bookmarksCacheRecord.surveys)
+    ? [...bookmarksCacheRecord.surveys]
+    : [];
+  const questions = Array.isArray(bookmarksCacheRecord.questions)
+    ? [...bookmarksCacheRecord.questions]
+    : [];
+  const targetList = bookmarkType === 'survey' ? surveys : questions;
+  const bookmarkIndex = targetList.indexOf(bookmarkId);
+  const action = bookmarkIndex > -1 ? 'remove' : 'add';
+
+  if (bookmarkIndex > -1) {
+    targetList.splice(bookmarkIndex, 1);
+  } else {
+    targetList.push(bookmarkId);
+  }
+
+  const nextSurveys = bookmarkType === 'survey' ? targetList : surveys;
+  const nextQuestions = bookmarkType === 'question' ? targetList : questions;
+
+  return {
+    blockedReason: '',
+    payload: {
+      ...bookmarksCacheRecord,
+      surveys: nextSurveys,
+      questions: nextQuestions,
+    },
+    shouldWrite: true,
+    statePatch: {
+      key: bookmarkType === 'survey' ? 'bookmarkedSurveyIDs' : 'bookmarkedQuestionIDs',
+      value: bookmarkType === 'survey' ? nextSurveys : nextQuestions,
+    },
+    target,
+    toggled: {
+      action,
+      bookmarkType,
+      id: bookmarkId,
+    },
   };
 };
