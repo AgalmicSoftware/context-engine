@@ -335,9 +335,7 @@ describe('SurveyResults filter state synchronization', () => {
 
     expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
     const reason = subject.queueResultsRefresh.mock.calls[0][0];
-    expect(reason).toContain('modal-open');
-    expect(reason).toContain('cache-ready');
-    expect(reason).toContain('responses-cache-ready');
+    expect(reason).toBe('modal-open|cache-ready|responses-cache-ready');
   });
 });
 
@@ -1419,6 +1417,65 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.resetLocalStoragePollingBackoff).toHaveBeenCalledWith('manual-refresh');
     expect(subject.queueResultsRefresh).toHaveBeenCalledWith('manual-refresh');
     expect(calls).toEqual(['metadata', 'responses', 'reset', 'poll', 'queue']);
+  });
+
+  it('manual survey refresh writes target status before survey dispatch and polling follow-up', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: { id: 'provider' },
+      refreshSurveyResponsesByID: jest.fn(async (surveyId: string) => {
+        calls.push(`survey:${surveyId}`);
+      }),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '0xABC',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    subject.setState = jest.fn((patch, cb) => {
+      calls.push(`setState:${Object.keys(patch || {}).join(',')}`);
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(321);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: 321,
+        refreshTargetResponseBlock: 321,
+        refreshTargetSurveyBlock: 321,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshSurveyResponsesByID).toHaveBeenCalledWith('0xabc');
+    expect(subject.state.refreshTargetQuestionBlock).toBe(321);
+    expect(subject.state.refreshTargetResponseBlock).toBe(321);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(321);
+    expect(calls).toEqual([
+      'setState:refreshTargetQuestionBlock,refreshTargetResponseBlock,refreshTargetSurveyBlock',
+      'survey:0xabc',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
   });
 });
 
