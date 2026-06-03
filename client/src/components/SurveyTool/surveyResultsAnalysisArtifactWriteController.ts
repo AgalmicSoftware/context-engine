@@ -1,14 +1,14 @@
 import type {
   SurveyResultsAnalysisArtifactWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
-import type {
-  SurveyResultsAnalysisArtifactCacheWritePort,
-  SurveyResultsAnalysisArtifactCacheTarget,
-} from './surveyResultsAnalysisArtifactCachePorts';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
-export type SurveyResultsAnalysisArtifactWritePort = SurveyResultsAnalysisArtifactCacheWritePort;
+export type SurveyResultsAnalysisArtifactWritePort = (
+  namespace: 'analysisCache',
+  slug: string,
+  payload: SurveyResultsRecord
+) => Promise<unknown> | unknown;
 
 export type SurveyResultsAnalysisArtifactWriteControllerPorts = {
   writeAnalysisArtifact?: SurveyResultsAnalysisArtifactWritePort;
@@ -23,14 +23,17 @@ export type SurveyResultsAnalysisArtifactWriteControllerResult = {
   attempted: boolean;
   error: unknown | null;
   ok: boolean;
-  target: SurveyResultsAnalysisArtifactCacheTarget;
+  target: {
+    namespace: 'analysisCache';
+    slug: string;
+    cacheKey: string;
+  };
 };
 
 const EMPTY_TARGET = Object.freeze({
   namespace: 'analysisCache' as const,
   slug: '',
   cacheKey: '',
-  inputSignature: '',
 });
 
 export const runSurveyResultsAnalysisArtifactWriteController = async ({

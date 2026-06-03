@@ -17,6 +17,9 @@ import {
   runSurveyResultsFallbackQuestionWriteController,
 } from './surveyResultsFallbackQuestionWriteController';
 import {
+  runSurveyResultsAnalysisArtifactWriteController,
+} from './surveyResultsAnalysisArtifactWriteController';
+import {
   runSurveyResultsSurveyQuestionBookmarkWriteController,
 } from './surveyResultsSurveyQuestionBookmarkWriteController';
 
@@ -66,14 +69,14 @@ describe('surveyResultsCacheWriteReadiness', () => {
       blockers: [
         'AI generation flow',
         'report export/download execution',
-        'cache write execution',
+        'parent-owned cache reads',
       ],
-      controllerReady: false,
-      hasInjectedController: false,
+      controllerReady: true,
+      hasInjectedController: typeof runSurveyResultsAnalysisArtifactWriteController === 'function',
       hasMethodBoundaryCoverage: true,
       hasPurePlan: typeof buildSurveyResultsAnalysisArtifactWritePlan === 'function',
       path: 'analysis/export artifact writes',
-      status: 'pure-plan-only',
+      status: 'controller-routed',
     },
   ];
 
