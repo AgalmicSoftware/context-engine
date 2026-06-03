@@ -948,6 +948,51 @@ describe('SurveyResults export/view controls', () => {
     });
   });
 
+  it('keeps analysis write failures in the generation status path without starting downloads', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
+      breakdown: {
+        dimensions: [],
+        groups: [],
+        summary: { overview: 'Generated but not cached.' },
+      },
+    }));
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'write-failure-session',
+    }));
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'write-failure-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('cache write failed'));
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe(
+      'Unable to generate analysis views right now. Check AI settings and try again.'
+    );
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
+      String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis')
+    )))).toBe(true);
+  });
+
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'survey',
