@@ -1338,6 +1338,52 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.state.refreshTargetSurveyBlock).toBe(0);
   });
 
+  it('recovers refresh status writes after a nonce latest-block failure', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockRejectedValueOnce(new Error('latest block failed'))
+      .mockResolvedValueOnce(456);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.pollLocalStorageForUpdates).not.toHaveBeenCalled();
+    expect(calls).toEqual(['reset:nonce-tick-fallback', 'queue:nonce-tick-fallback']);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(0);
+    expect(subject.state.refreshTargetResponseBlock).toBe(0);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(0);
+
+    calls.length = 0;
+    jest.clearAllMocks();
+    subject._isMounted = true;
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.state.networkLatestBlock).toBe(456);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(456);
+    expect(subject.state.refreshTargetResponseBlock).toBe(456);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(456);
+    expect(subject.pollLocalStorageForUpdates).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(['poll', 'reset:nonce-tick', 'queue:nonce-tick']);
+  });
+
   it('manual refresh dispatches question refresh ports before shell polling follow-up', async () => {
     const calls: string[] = [];
     const subject = createSubject({
