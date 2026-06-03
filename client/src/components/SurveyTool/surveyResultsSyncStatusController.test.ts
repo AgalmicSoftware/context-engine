@@ -1,4 +1,5 @@
 import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
+import { buildSurveyResultsRefreshStatusSequencePlan } from './surveyResultsHelpers';
 
 describe('surveyResultsSyncStatusController', () => {
   it('builds the missing-block loading fallback', () => {
@@ -146,6 +147,39 @@ describe('surveyResultsSyncStatusController', () => {
         showSpinner: false,
       },
       showLongSyncNotice: true,
+      showQuickRefresh: true,
+      syncStatusText: 'Syncing...',
+    });
+  });
+
+  it('keeps sequence-plan refresh target patches compatible with syncing copy', () => {
+    const sequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: 100,
+      followUpEffects: ['manualRefreshDispatch'],
+    });
+    if (!sequencePlan.statePatch) throw new Error('Expected a refresh target state patch');
+
+    expect(buildSurveyResultsSyncStatusDisplayPlan({
+      viewMode: 'questions',
+      networkLatestBlock: 100,
+      questionLocalBlock: 20,
+      responseLocalBlock: 40,
+      ...sequencePlan.statePatch,
+    })).toMatchObject({
+      isSynced: false,
+      isSyncingOrLoading: true,
+      question: {
+        label: 'Remaining Blocks: 80',
+        progress: 20,
+        remainingBlocks: 80,
+        showRemainingSpinner: true,
+      },
+      response: {
+        label: 'Remaining Blocks: 60',
+        progress: 40,
+        remainingBlocks: 60,
+        showRemainingSpinner: true,
+      },
       showQuickRefresh: true,
       syncStatusText: 'Syncing...',
     });
