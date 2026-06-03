@@ -172,6 +172,34 @@ describe('SessionPublishSummary', () => {
     expect(onPublish).not.toHaveBeenCalled();
   });
 
+  it('renders advanced worker and metadata controls without publishing', () => {
+    const onManualMetadataUrlChange = jest.fn();
+    const onPublish = jest.fn();
+
+    render(
+      <SessionPublishSummary
+        {...buildProps({
+          onManualMetadataUrlChange,
+          onPublish,
+          publishAdvancedOpen: true,
+          resolvedWorkerBaseUrl: 'https://worker.example.test',
+          workerUrlSource: 'custom worker URL',
+        })}
+      />
+    );
+
+    expect(
+      screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)')
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {
+      target: { value: 'ar://metadata-tx' },
+    });
+
+    expect(onManualMetadataUrlChange).toHaveBeenCalledWith('ar://metadata-tx');
+    expect(onPublish).not.toHaveBeenCalled();
+  });
+
   it('renders published inline SBT links with human-readable labels', () => {
     const firstHref = buildSbtDetailPath(
       '0x00000000000000000000000000000000000000a1',
