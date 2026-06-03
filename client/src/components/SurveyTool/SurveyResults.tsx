@@ -147,6 +147,10 @@ import {
   runSurveyResultsFilterBookmarkWriteController,
 } from './surveyResultsFilterBookmarkWriteController';
 import {
+  runSurveyResultsSurveyQuestionBookmarkWriteController,
+  type SurveyResultsBookmarksCacheWritePort,
+} from './surveyResultsSurveyQuestionBookmarkWriteController';
+import {
   runSurveyResultsManualRefreshDispatchController,
 } from './surveyResultsManualRefreshController';
 import {
@@ -4121,12 +4125,15 @@ const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
 
 if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
 
-void (writeCache as SurveyResultsWriteCache)(
-  writePlan.target.namespace,
-  writePlan.target.slug,
-  writePlan.payload
-).catch((error: unknown) => {
-  surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
+void runSurveyResultsSurveyQuestionBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+  },
+}).then((writeResult) => {
+  if (!writeResult.ok && writeResult.error) {
+    surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
+  }
 });
 this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value));
 };
@@ -4151,12 +4158,15 @@ const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
 
 if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
 
-void (writeCache as SurveyResultsWriteCache)(
-  writePlan.target.namespace,
-  writePlan.target.slug,
-  writePlan.payload
-).catch((error: unknown) => {
-  surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
+void runSurveyResultsSurveyQuestionBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+  },
+}).then((writeResult) => {
+  if (!writeResult.ok && writeResult.error) {
+    surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
+  }
 });
 this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value));
 };
