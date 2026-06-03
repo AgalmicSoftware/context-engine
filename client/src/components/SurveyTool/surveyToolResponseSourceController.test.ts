@@ -90,6 +90,65 @@ describe('surveyToolResponseSourceController', () => {
     });
   });
 
+  it('keeps a decrypted edit baseline ahead of stale self and cache fallback sources', () => {
+    const editBaseline = {
+      answers: {
+        q1: {
+          value: 'decrypted answer',
+          encrypted: false,
+          encryptedPortion: 'answer-env',
+        },
+      },
+      importance: { q1: 6 },
+      conviction: { q1: 8 },
+      additionalComments: {
+        q1: {
+          value: 'decrypted note',
+          encrypted: false,
+          encryptedPortion: 'note-env',
+        },
+      },
+    };
+    const userAnswers = { responses: [{ questionID: 'q1' }] };
+    const userAnswersSliceCache = {
+      source: { responses: [{ questionID: 'old-q' }] },
+      value: {
+        answers: { q1: { value: 'stale cached self' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    };
+    const buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: '*' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+    const buildSliceFromLocalCache = jest.fn(() => ({
+      answers: { q1: { value: 'stale local cache' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+
+    expect(resolveSurveyBaselineSourceSlice({
+      editBaseline,
+      allowLocalCache: true,
+      userAnswers,
+      userAnswersSliceCache,
+      buildSliceFromUserAnswers,
+      buildSliceFromLocalCache,
+    })).toEqual({
+      baselineSlice: editBaseline,
+      nextUserAnswersSliceCache: userAnswersSliceCache,
+      source: 'edit-baseline',
+    });
+
+    expect(buildSliceFromUserAnswers).not.toHaveBeenCalled();
+    expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
+  });
+
   it('treats missing plaintext ratings as consistent when the latest response carries encrypted rating envelopes', () => {
     const latest = {
       responses: [{
