@@ -115,4 +115,39 @@ describe('UserPageAnalysisModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh analysis' }));
     expect(onRefreshAnalysis).not.toHaveBeenCalled();
   });
+
+  it('keeps cached analysis visible while refresh is disabled during analysis', () => {
+    const onRefreshAnalysis = jest.fn();
+    render(
+      <UserPageAnalysisModal
+        {...createProps({
+          analysisCacheStatusState: {
+            analysisCacheAge: '30 seconds ago',
+            shouldRenderAnalysisCacheStatus: true,
+          },
+          analysisModalDisplayState: {
+            shouldRenderAnalysisBody: true,
+            shouldRenderAnalyzing: true,
+            shouldRenderDetails: true,
+            shouldRenderError: false,
+            shouldRenderHistoricalAlignment: false,
+            shouldRenderHistoricalFigure: false,
+            shouldRenderHistoricalReasoning: false,
+          },
+          analyzing: true,
+          onRefreshAnalysis,
+        })}
+      />
+    );
+
+    expect(screen.getByText('Cached analysis from 30 seconds ago')).toBeInTheDocument();
+    expect(screen.getByText('Profile synthesis')).toBeInTheDocument();
+    expect(screen.getByText('Detailed analysis text')).toBeInTheDocument();
+    expect(screen.getByText('Generating insights… 1.3s')).toBeInTheDocument();
+
+    const refreshButton = screen.getByRole('button', { name: 'Refresh analysis' });
+    expect(refreshButton).toBeDisabled();
+    fireEvent.click(refreshButton);
+    expect(onRefreshAnalysis).not.toHaveBeenCalled();
+  });
 });
