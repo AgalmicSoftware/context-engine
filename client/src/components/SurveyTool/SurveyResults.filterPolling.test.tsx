@@ -594,6 +594,56 @@ describe('SurveyResults bookmark cache writes', () => {
     expect(subject.state.bookmarkedQuestionIDs).toEqual(['q-empty-slug']);
   });
 
+  it('keeps survey bookmark write failures state-applied and allows a later successful retry', async () => {
+    const liveBookmarksCache = {
+      surveys: ['existing-survey'],
+      questions: ['existing-question'],
+    };
+    const writeError = new Error('survey bookmark write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveBookmarksCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache')
+      .mockRejectedValueOnce(writeError)
+      .mockResolvedValueOnce(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    try {
+      subject.toggleSurveyBookmark('s-fail');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
+        surveys: ['existing-survey', 's-fail'],
+        questions: ['existing-question'],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['existing-survey', 's-fail']);
+      expect(liveBookmarksCache).toEqual({
+        surveys: ['existing-survey'],
+        questions: ['existing-question'],
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        '[SurveyResults] Error saving bookmarksCache:',
+        writeError
+      );
+
+      subject.toggleSurveyBookmark('s-retry');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledTimes(2);
+      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
+        surveys: ['existing-survey', 's-retry'],
+        questions: ['existing-question'],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['existing-survey', 's-retry']);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
   it('blocks filter bookmark writes when the results view is unmounted', async () => {
     const subject = attachStateHarness(createSubject({
       activeSessionSlug: 'edge',
