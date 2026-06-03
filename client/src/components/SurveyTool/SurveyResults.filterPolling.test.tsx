@@ -444,6 +444,92 @@ describe('SurveyResults bookmark cache writes', () => {
     }
   });
 
+  it('falls back to async filter cache reads before writing bookmark payloads', async () => {
+    const filterState = { types: ['multichoice'], tags: ['fallback'] };
+    const readFiltersCache = { bookmarkedFilters: ['from-read'], persisted: true };
+    const events: string[] = [];
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      events.push('peek');
+      return null;
+    });
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async () => {
+      events.push('read');
+      return readFiltersCache;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(async () => {
+      events.push('write');
+      return true;
+    });
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    const originalSetState = subject.setState;
+    subject.setState = jest.fn((updater, cb) => {
+      events.push('setState');
+      return originalSetState(updater, cb);
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => {
+      events.push('slug');
+      return 'edge';
+    });
+    subject.state = {
+      ...subject.state,
+      filterBookmarkedFeedback: false,
+      filterState,
+    };
+    events.length = 0;
+
+    await subject.handleBookmarkFilter();
+
+    expect(peekSpy).toHaveBeenCalledWith('filters', 'edge', { clone: false });
+    expect(readSpy).toHaveBeenCalledWith('filters', 'edge');
+    expect(writeSpy).toHaveBeenCalledWith('filters', 'edge', {
+      bookmarkedFilters: ['from-read', filterState],
+      persisted: true,
+    });
+    expect(readFiltersCache).toEqual({
+      bookmarkedFilters: ['from-read'],
+      persisted: true,
+    });
+    expect(subject.state.filterBookmarkedFeedback).toBe(true);
+    expect(events.slice(0, 4)).toEqual(['slug', 'peek', 'read', 'write']);
+    expect(events).toContain('setState');
+  });
+
+  it('initializes invalid bookmarked filter cache shape without changing the target identity', async () => {
+    const filterState = { types: ['slider'], range: [1, 5] };
+    const invalidCache = {
+      bookmarkedFilters: 'not-an-array',
+      otherField: 'kept',
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(invalidCache);
+    const readSpy = jest.spyOn(cacheScripts, 'readCache');
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterState,
+    };
+
+    await subject.handleBookmarkFilter();
+
+    expect(peekSpy).toHaveBeenCalledWith('filters', 'edge', { clone: false });
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(writeSpy).toHaveBeenCalledWith('filters', 'edge', {
+      bookmarkedFilters: [filterState],
+      otherField: 'kept',
+    });
+    expect(invalidCache).toEqual({
+      bookmarkedFilters: 'not-an-array',
+      otherField: 'kept',
+    });
+  });
+
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
     const writeError = new Error('write failed');
