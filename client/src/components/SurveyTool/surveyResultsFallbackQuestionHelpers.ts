@@ -12,20 +12,45 @@ export type SurveyResultsFallbackQuestionBuckets = {
   summary: Map<string, SurveyResultsFallbackQuestion>;
 };
 
+export type SurveyResultsFallbackQuestionBucketName = 'individual' | 'summary';
+
+export type SurveyResultsFallbackQuestionWritePlan = {
+  blockedReason: '' | 'cache-hit';
+  fallbackQuestion: SurveyResultsFallbackQuestion;
+  payload: SurveyResultsFallbackQuestion | null;
+  shouldWrite: boolean;
+  target: {
+    bucketName: SurveyResultsFallbackQuestionBucketName;
+    cacheKey: string;
+  };
+};
+
 export const createSurveyResultsFallbackQuestionBuckets = (): SurveyResultsFallbackQuestionBuckets => ({
   individual: new Map(),
   summary: new Map(),
 });
 
-export const getSurveyResultsStableFallbackQuestion = (
+export const buildSurveyResultsFallbackQuestionWritePlan = (
   buckets: SurveyResultsFallbackQuestionBuckets,
   questionId: unknown,
   mode: unknown = 'summary'
-): SurveyResultsFallbackQuestion => {
+): SurveyResultsFallbackQuestionWritePlan => {
   const cacheKey = String(questionId || '');
-  const bucket = mode === 'individual' ? buckets.individual : buckets.summary;
+  const bucketName: SurveyResultsFallbackQuestionBucketName = mode === 'individual'
+    ? 'individual'
+    : 'summary';
+  const bucket = buckets[bucketName];
   const cached = bucket.get(cacheKey);
-  if (cached) return cached;
+  const target = { bucketName, cacheKey };
+  if (cached) {
+    return {
+      blockedReason: 'cache-hit',
+      fallbackQuestion: cached,
+      payload: null,
+      shouldWrite: false,
+      target,
+    };
+  }
 
   const fallback: SurveyResultsFallbackQuestion = mode === 'individual'
     ? {
@@ -38,6 +63,24 @@ export const getSurveyResultsStableFallbackQuestion = (
       id: questionId,
       prompt: 'Unknown question',
     };
-  bucket.set(cacheKey, fallback);
-  return fallback;
+
+  return {
+    blockedReason: '',
+    fallbackQuestion: fallback,
+    payload: fallback,
+    shouldWrite: true,
+    target,
+  };
+};
+
+export const getSurveyResultsStableFallbackQuestion = (
+  buckets: SurveyResultsFallbackQuestionBuckets,
+  questionId: unknown,
+  mode: unknown = 'summary'
+): SurveyResultsFallbackQuestion => {
+  const plan = buildSurveyResultsFallbackQuestionWritePlan(buckets, questionId, mode);
+  if (plan.shouldWrite && plan.payload) {
+    buckets[plan.target.bucketName].set(plan.target.cacheKey, plan.payload);
+  }
+  return plan.fallbackQuestion;
 };

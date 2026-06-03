@@ -1098,4 +1098,29 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       writeSpy.mockRestore();
     }
   });
+
+  it('wires selected fallback status plans through parent summary and individual modes', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+
+    const summary = subject.getStableFallbackQuestion('Q-Plan', 'summary');
+    const individual = subject.getStableFallbackQuestion('Q-Plan', 'individual');
+
+    expect(subject.getStableFallbackQuestion('Q-Plan', 'summary')).toBe(summary);
+    expect(subject.getStableFallbackQuestion('Q-Plan', 'individual')).toBe(individual);
+    expect(summary).toEqual({
+      id: 'Q-Plan',
+      prompt: 'Unknown question',
+    });
+    expect(individual).toEqual({
+      id: 'Q-Plan',
+      creator: '',
+      type: '',
+      prompt: '',
+    });
+    expect(individual).not.toBe(summary);
+  });
 });
