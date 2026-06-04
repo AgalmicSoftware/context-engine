@@ -1,12 +1,13 @@
 import type {
   SurveyResultsAnalysisLifecyclePlan,
+  SurveyResultsAnalysisLifecycleStatePatch,
   SurveyResultsAnalysisLifecycleStatus,
 } from './surveyResultsAnalysisLifecyclePlan';
 
 export type SurveyResultsAnalysisLifecycleControllerPhase = 'before-generation' | 'failure-recovery';
 
 export type SurveyResultsAnalysisLifecycleStatePatchPort = (
-  patch: Record<string, unknown>
+  patch: SurveyResultsAnalysisLifecycleStatePatch
 ) => unknown;
 
 export type SurveyResultsAnalysisLifecycleControllerPorts = {
@@ -32,7 +33,7 @@ export type SurveyResultsAnalysisLifecycleAppliedPort =
 export type SurveyResultsAnalysisLifecycleControllerResult = {
   appliedPort: SurveyResultsAnalysisLifecycleAppliedPort;
   handled: boolean;
-  patch: Record<string, unknown> | null;
+  patch: SurveyResultsAnalysisLifecycleStatePatch | null;
   shouldGenerate: boolean;
   status: SurveyResultsAnalysisLifecycleStatus | 'failure-recovery' | 'missing-plan';
   target: SurveyResultsAnalysisLifecyclePlan['target'] | null;
@@ -49,7 +50,7 @@ const missingPlanResult: SurveyResultsAnalysisLifecycleControllerResult = {
 
 const applyPort = (
   appliedPort: SurveyResultsAnalysisLifecycleAppliedPort,
-  patch: Record<string, unknown>,
+  patch: SurveyResultsAnalysisLifecycleStatePatch,
   port?: SurveyResultsAnalysisLifecycleStatePatchPort
 ): SurveyResultsAnalysisLifecycleAppliedPort => {
   if (typeof port !== 'function') return '';
