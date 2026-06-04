@@ -149,9 +149,11 @@ import {
 import {
   buildSurveyResultsAnalysisArtifactCacheKey,
   buildSurveyResultsAnalysisArtifactCacheReadRequestPlan,
-  selectSurveyResultsAnalysisArtifactFromCache,
   type SurveyResultsAnalysisArtifactCacheReadPort,
 } from './surveyResultsAnalysisArtifactCachePorts';
+import {
+  runSurveyResultsAnalysisArtifactReadController,
+} from './surveyResultsAnalysisArtifactReadController';
 import {
   runSurveyResultsAnalysisArtifactWriteController,
   type SurveyResultsAnalysisArtifactWritePort,
@@ -3150,17 +3152,15 @@ const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
   inputSignature,
   slug: this.getSessionResultsAnalysisCacheSlug(),
 });
-if (!readPlan.shouldRead || !readPlan.readRequest) return null;
 const readAnalysisCache = peekCacheSync as SurveyResultsAnalysisArtifactCacheReadPort;
-const cacheObj = readAnalysisCache(
-  readPlan.readRequest.namespace,
-  readPlan.readRequest.slug,
-  readPlan.readRequest.options
-);
-return selectSurveyResultsAnalysisArtifactFromCache({
-  cacheValue: cacheObj,
+const readResult = runSurveyResultsAnalysisArtifactReadController({
+  ports: {
+    readAnalysisArtifactCache: readAnalysisCache,
+  },
+  readRequest: readPlan.shouldRead ? readPlan.readRequest : null,
   target: readPlan.target,
 });
+return readResult.artifact;
 }
 
 writeSessionResultsAnalysisArtifactToCache = async (
