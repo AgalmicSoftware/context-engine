@@ -90,6 +90,38 @@ describe('resolveSessionWizardPublishReadiness', () => {
     }));
   });
 
+  it('keeps custom-worker metadata upload blocked while metadata fallbacks allow publish readiness', () => {
+    expect(resolveSessionWizardPublishReadiness({
+      ...baseInput,
+      workerMode: 'custom',
+      usesDefaultWorkerUrl: false,
+      deployVerifiedInUi: false,
+      deployWorkerMatchesConfiguredUrl: false,
+      manualMetadataUrl: `https://arweave.net/${txId}`,
+    })).toEqual(expect.objectContaining({
+      canUploadMetadataNow: false,
+      uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
+      hasManualMetadata: true,
+      hasUploadedMetadata: false,
+      canPublishNow: true,
+    }));
+
+    expect(resolveSessionWizardPublishReadiness({
+      ...baseInput,
+      workerMode: 'custom',
+      usesDefaultWorkerUrl: false,
+      deployVerifiedInUi: true,
+      deployWorkerMatchesConfiguredUrl: false,
+      metadataUrl: txId,
+    })).toEqual(expect.objectContaining({
+      canUploadMetadataNow: false,
+      uploadBlockedReason: 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
+      hasManualMetadata: false,
+      hasUploadedMetadata: true,
+      canPublishNow: true,
+    }));
+  });
+
   it('allows sponsored auto-deploy publish readiness without upload readiness', () => {
     expect(resolveSessionWizardPublishReadiness({
       ...baseInput,
