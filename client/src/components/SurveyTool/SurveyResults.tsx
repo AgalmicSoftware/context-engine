@@ -3736,9 +3736,9 @@ try {
     if (!completionPlan.usable) {
       throw new Error(`Generated analysis artifact completion failed: ${completionPlan.blockedReason}`);
     }
-    await this.writeSessionResultsAnalysisArtifactToCache(
-      completionPlan.cacheWriteDescriptor?.payload || artifact
-    );
+    if (completionPlan.shouldWriteCache && completionPlan.cacheWriteDescriptor) {
+      await this.writeSessionResultsAnalysisArtifactToCache(completionPlan.cacheWriteDescriptor.payload);
+    }
   }
   if (!completionPlan?.lifecyclePatchDescriptor) {
     throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
