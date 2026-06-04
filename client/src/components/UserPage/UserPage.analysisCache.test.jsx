@@ -326,12 +326,20 @@ describe('UserPage analysis cache and routing', () => {
         name: 'Fresh After Expiry',
         historicalAlignment: {},
       });
+      instance.state = {
+        ...instance.state,
+        aiAnalysis: 'stale cached summary',
+        analysisCachedAt: cachedAt - 1000,
+        analysisServedFromCache: true,
+      };
 
       await instance.analyzeUser();
 
       expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.aiAnalysis).toBe('new summary after expiry');
       expect(instance.state.analysisName).toBe('Fresh After Expiry');
       expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
       const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
       expect(refreshed.entry.cachedAt).toBe(cachedAt);
       expect(refreshed.entry.result.summary).toBe('new summary after expiry');

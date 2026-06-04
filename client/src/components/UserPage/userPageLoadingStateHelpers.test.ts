@@ -142,6 +142,56 @@ describe('userPageLoadingStateHelpers', () => {
     expect(JSON.stringify({ questionResponses, surveysCreated })).toBe(inputSnapshot);
   });
 
+  it('keeps each incomplete cache lane disabled while preserving visible gated cached data', () => {
+    const readyInputs = {
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+    };
+    const incompleteLanes = [
+      { isQuestionCacheReady: false },
+      { isResponsesCacheReady: false },
+      { isSBTCacheReady: false },
+      { isSurveyCacheReady: false },
+    ];
+
+    incompleteLanes.forEach((lane) => {
+      const descriptor = buildUserPageCacheRefreshDisplayState({
+        ...readyInputs,
+        ...lane,
+        aiAvailable: true,
+        questionResponseInfo: [{ id: 'cached-response' }],
+      });
+
+      expect(descriptor.loadingState.disabledByCache).toBe(true);
+      expect(descriptor.cacheActionKind).toBe('disabled');
+      expect(descriptor.aiActionPlan.analyzeButtonDisplayState).toMatchObject({
+        disabled: true,
+        title: 'Available when the user page fully loads.',
+      });
+      expect(descriptor.aiActionPlan.compareButtonDisplayState).toMatchObject({
+        disabled: true,
+        title: 'Available when the user page fully loads.',
+      });
+      expect(descriptor.hasVisibleData).toBe(true);
+      expect(descriptor.hasMissingDataFallback).toBe(false);
+    });
+
+    const gatedVisible = buildUserPageCacheRefreshDisplayState({
+      ...readyInputs,
+      hasUncertainGateAccess: true,
+      hasUncertainUserData: true,
+      questionResponseInfo: [{ id: 'gated-cached-response' }],
+    });
+
+    expect(gatedVisible.cacheActionKind).toBe('enabled');
+    expect(gatedVisible.cacheDisplayKind).toBe('idle');
+    expect(gatedVisible.hasGatedOrDecryptDisplayFallback).toBe(true);
+    expect(gatedVisible.hasMissingDataFallback).toBe(false);
+    expect(gatedVisible.hasVisibleData).toBe(true);
+  });
+
   it('builds loading state from cache readiness and deep-scan activity', () => {
     expect(buildUserPageRenderLoadingState({
       isDeepScanLoadingEnabledForSection: (section) => section === 'surveys',
