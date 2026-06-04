@@ -90,6 +90,51 @@ describe('surveyToolResponseSourceController', () => {
     });
   });
 
+  it('keeps stale decrypted local cache fallback disabled until the parent opts in', () => {
+    const staleDecryptedCacheSlice = {
+      answers: {
+        q1: {
+          encrypted: false,
+          encryptedPortion: 'stale-answer-envelope',
+          value: 'stale decrypted answer',
+        },
+      },
+      importance: { q1: 5 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          encrypted: false,
+          encryptedPortion: 'stale-note-envelope',
+          value: 'stale decrypted note',
+        },
+      },
+    };
+    const buildSliceFromLocalCache = jest.fn(() => staleDecryptedCacheSlice);
+
+    expect(resolveSurveyBaselineSourceSlice({
+      editBaseline: null,
+      allowLocalCache: false,
+      userAnswers: null,
+      userAnswersSliceCache: null,
+      buildSliceFromUserAnswers: jest.fn(),
+      buildSliceFromLocalCache,
+    })).toEqual({
+      baselineSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      nextUserAnswersSliceCache: {
+        source: null,
+        value: null,
+      },
+      source: 'empty',
+    });
+
+    expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
+  });
+
   it('keeps a decrypted edit baseline ahead of stale self and cache fallback sources', () => {
     const editBaseline = {
       answers: {
