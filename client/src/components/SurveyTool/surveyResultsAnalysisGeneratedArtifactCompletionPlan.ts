@@ -6,10 +6,6 @@ import {
   SURVEY_RESULTS_ANALYSIS_FAILURE_MESSAGE,
   type SurveyResultsAnalysisLifecycleStatePatch,
 } from './surveyResultsAnalysisLifecyclePlan';
-import {
-  buildSurveyResultsAnalysisArtifactCacheTarget,
-  type SurveyResultsAnalysisArtifactCacheTarget,
-} from './surveyResultsAnalysisArtifactCachePorts';
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionPlanArgs = {
   artifact?: SessionResultsGeneratedAnalysisArtifact | null;
@@ -32,7 +28,11 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheBlockedReason =
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheWriteDescriptor = {
   payload: SessionResultsGeneratedAnalysisArtifact;
-  target: SurveyResultsAnalysisArtifactCacheTarget;
+  target: {
+    namespace: 'analysisCache';
+    slug: string;
+    cacheKey: string;
+  };
 };
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionPayloadDescriptor = {
@@ -101,13 +101,11 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
     ? artifact
     : null;
   const artifactInputSignature = String(normalizedArtifact?.inputSignature || '');
-  const cacheTarget = buildSurveyResultsAnalysisArtifactCacheTarget({
-    cacheKey,
-    inputSignature: normalizedInputSignature,
-    slug,
-  });
   const target = {
-    ...cacheTarget,
+    namespace: 'analysisCache' as const,
+    slug: String(slug || ''),
+    cacheKey: String(cacheKey || ''),
+    inputSignature: normalizedInputSignature,
     artifactInputSignature,
   };
   const requested = normalizeSections(requestedSections);
@@ -161,7 +159,6 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
           namespace: target.namespace,
           slug: target.slug,
           cacheKey: target.cacheKey,
-          inputSignature: target.inputSignature,
         },
       },
     failurePatchDescriptor: null,

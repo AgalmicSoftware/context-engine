@@ -56,7 +56,6 @@ describe('surveyResultsAnalysisGeneratedArtifactCompletionPlan', () => {
           namespace: 'analysisCache',
           slug: 'alpha-session',
           cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
-          inputSignature: 'ready-input',
         },
       },
       failurePatchDescriptor: null,
