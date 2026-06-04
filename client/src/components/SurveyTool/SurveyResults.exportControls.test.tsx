@@ -841,6 +841,238 @@ describe('SurveyResults export/view controls', () => {
     expect(subject.state.htmlReportModalOpen).toBe(true);
   });
 
+  it('keeps report export blocked when the selected payload is missing and no snapshot key is selected', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Missing Payload Session',
+      sessionSlug: 'missing-payload',
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      htmlReportSelectedSections: {
+        argumentMap: false,
+        atlas: false,
+        report: true,
+        riskMatrix: false,
+        snapshotJson: false,
+      },
+      viewMode: 'questions',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredResponsesCount: 0,
+      sbtFilteredAggregatorQuestionResponses: {},
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.downloadHtmlReport();
+
+    expect(subject.state.alertMessage).toBe('Select at least one available report section before export.');
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+  });
+
+  it('falls back missing selected-section keys to snapshot JSON identity without cache persistence', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Missing Key Session',
+      sessionSlug: 'missing-key-session',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      htmlReportSelectedSections: {
+        report: false,
+      },
+      viewMode: 'questions',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredResponsesCount: 0,
+      sbtFilteredAggregatorQuestionResponses: {},
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.downloadHtmlReport();
+
+    expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1);
+    const [html, filename] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
+    expect(filename).toBe('contextEngine_sessionReport_missing-key-session_2026-05-25T18_30_00_000Z.html');
+    expect(html).toContain('"slug": "missing-key-session"');
+    expect(html).toContain('"name": "Missing Key Session"');
+    expect(html).toContain('<a href="#snapshot-json">Snapshot JSON</a>');
+    expect(html).toContain('<section id="snapshot-json"');
+    expect(html).not.toContain('<a href="#report">Report</a>');
+    expect(html).not.toContain('<section id="report"');
+    expect(html).toContain('"privacyMode": "redacted"');
+    expect(subject.state.alertMessage).toBe('');
+    expect(subject.state.htmlReportModalOpen).toBe(false);
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
+  it('keeps the rendered report export action inert while analysis generation is pending', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Pending Export Session',
+      sessionSlug: 'pending-export',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+    subject.downloadHtmlReport = jest.fn();
+    subject.state = {
+      ...subject.state,
+      htmlReportAnalysisGenerating: true,
+      htmlReportAnalysisProgress: 'Generating Risk Matrix (1/1)',
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Can pending exports download?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    render(
+      <MemoryRouter>
+        {subject.renderHtmlReportExportModal()}
+      </MemoryRouter>
+    );
+
+    const downloadButton = screen.getByTestId('ce-surveyresults-html-report-download');
+    expect(downloadButton).toBeDisabled();
+    fireEvent.click(downloadButton);
+    expect(subject.downloadHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
+  it('recovers from stale selected analysis state after the report artifact becomes available', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Stale Analysis Session',
+      sessionSlug: 'stale-analysis',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      htmlReportSelectedSections: {
+        argumentMap: false,
+        atlas: false,
+        report: true,
+        riskMatrix: true,
+        snapshotJson: true,
+      },
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Can stale selected sections recover?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => subject.state.htmlReportAnalysisArtifact);
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.downloadHtmlReport();
+
+    expect(subject.state.alertMessage).toBe('Generate selected analysis views before downloading the report.');
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+
+    const nextArtifact = createAnalysisArtifact('stale-analysis-input');
+    subject.state = {
+      ...subject.state,
+      htmlReportAnalysisArtifact: nextArtifact,
+    };
+
+    await subject.downloadHtmlReport();
+
+    expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1);
+    const [html, filename] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
+    expect(filename).toBe('contextEngine_sessionReport_stale-analysis_2026-05-25T18_30_00_000Z.html');
+    expect(html).toContain('Can stale selected sections recover?');
+    expect(html).toContain('<a href="#risk-matrix">Risk Matrix</a>');
+    expect(html).toContain('<section id="risk-matrix"');
+    expect(subject.state.alertMessage).toBe('');
+    expect(subject.state.htmlReportModalOpen).toBe(false);
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('surfaces HTML report download failures and allows a later retry', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const subject = attachStateHarness(createSubject({
