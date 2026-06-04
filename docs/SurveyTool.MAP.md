@@ -52,7 +52,7 @@
   - `surveyResultsCacheWriteEligibilityPlan.ts`: **280 lines**
   - `surveyResultsAnalysisLifecyclePlan.ts`: **236 lines**
   - `surveyResultsAnalysisLifecycleController.ts`: **113 lines**
-  - `surveyResultsAnalysisArtifactCachePorts.ts`: **121 lines**
+  - `surveyResultsAnalysisArtifactCachePorts.ts`: **139 lines**
   - `surveyResultsAnalysisArtifactWriteController.ts`: **72 lines**
   - `surveyResultsFilterBookmarkWriteController.ts`: **79 lines**
   - `surveyResultsSurveyQuestionBookmarkWriteController.ts`: **79 lines**
