@@ -159,6 +159,10 @@ import {
   type SurveyResultsAnalysisArtifactWritePort,
 } from './surveyResultsAnalysisArtifactWriteController';
 import {
+  buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+  type SurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+} from './surveyResultsAnalysisGeneratedArtifactCompletionPlan';
+import {
   buildSurveyResultsAnalysisLifecyclePlan,
 } from './surveyResultsAnalysisLifecyclePlan';
 import {
@@ -3690,6 +3694,7 @@ if (!lifecycleResult.shouldGenerate) {
 
 try {
   const missingSections = analysisLifecyclePlan.missingSections;
+  let completionPlan: SurveyResultsAnalysisGeneratedArtifactCompletionPlan | null = null;
   for (let index = 0; index < missingSections.length; index += 1) {
     const section = missingSections[index];
     const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
@@ -3720,14 +3725,25 @@ try {
       next: sectionArtifact,
       sections: [section],
     });
-    await this.writeSessionResultsAnalysisArtifactToCache(artifact);
+    completionPlan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact,
+      cacheKey: artifact ? this.getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '',
+      failureStatePatch: analysisLifecyclePlan.failureRecovery.statePatch,
+      inputSignature,
+      requestedSections: analysisLifecyclePlan.sectionsToGenerate,
+      slug: this.getSessionResultsAnalysisCacheSlug(),
+    });
+    if (!completionPlan.usable) {
+      throw new Error(`Generated analysis artifact completion failed: ${completionPlan.blockedReason}`);
+    }
+    await this.writeSessionResultsAnalysisArtifactToCache(
+      completionPlan.cacheWriteDescriptor?.payload || artifact
+    );
   }
-  this.setState({
-    htmlReportAnalysisArtifact: artifact,
-    htmlReportAnalysisGenerating: false,
-    htmlReportAnalysisError: '',
-    htmlReportAnalysisProgress: '',
-  });
+  if (!completionPlan?.lifecyclePatchDescriptor) {
+    throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
+  }
+  this.setState(completionPlan.lifecyclePatchDescriptor);
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
   runSurveyResultsAnalysisLifecycleController({
