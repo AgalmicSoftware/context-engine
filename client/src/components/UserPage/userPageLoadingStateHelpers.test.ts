@@ -1,5 +1,6 @@
 import {
   buildUserPageCacheRefreshDisplayState,
+  buildUserPageCacheRefreshStatePatch,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
   buildUserPageUncertainEmptyText,
@@ -391,6 +392,103 @@ describe('userPageLoadingStateHelpers', () => {
       keepSurveyLoadingDuringDeepScan: false,
       keepSurveyLoadingFromUserUncertainty: true,
       preserveUserDataUncertainty: true,
+    });
+  });
+
+  it('builds cache refresh state patches from section plans without applying parent state', () => {
+    const plan = buildUserPageCacheRefreshStatePatch({
+      aggregatePresent: true,
+      deepScanCarryPatch: { deepScanTooltipLines: ['synced through parent'] },
+      hasQuestionSources: true,
+      hasSbtSources: true,
+      hasSurveySources: true,
+      keepQuestionLoadingDuringDeepScan: true,
+      keepSurveyLoadingDuringDeepScan: true,
+      prevState: {
+        hasUncertainUserData: true,
+        isDeepScanning: true,
+        userStats: { existing: 1, badgesReceived: 1 },
+      },
+      questionSection: {
+        detailedQuestionResponses: { q1: { id: 'q1' } },
+        questionCreationInfo: [{ id: 'created-q1' }],
+        questionResponseInfo: [],
+        questionsCreated: 1,
+        questionsResponded: 0,
+      },
+      sbtSection: {
+        badgesReceived: 2,
+        sbtList: [],
+      },
+      surveySection: {
+        detailedSurveyResponses: { s1: { id: 's1' } },
+        surveyCreationInfo: [{ id: 'created-s1' }],
+        surveyResponseInfo: [],
+        surveysCreated: 1,
+        surveysResponded: 0,
+      },
+      uncertainResources: new Set(['questionResponses']),
+    });
+
+    expect(plan.statePatch).toMatchObject({
+      deepScanTooltipLines: ['synced through parent'],
+      hasUncertainGateAccess: true,
+      loadingQuestions: true,
+      loadingSBTs: true,
+      loadingSurveys: true,
+      questionCreationInfo: [{ id: 'created-q1' }],
+      questionResponseInfo: [],
+      sbtList: [],
+      surveyCreationInfo: [{ id: 'created-s1' }],
+      surveyResponseInfo: [],
+      userStats: {
+        badgesReceived: 2,
+        existing: 1,
+        questionsCreated: 1,
+        questionsResponded: 0,
+        surveysCreated: 1,
+        surveysResponded: 0,
+      },
+    });
+    expect(plan.loadingDiag).toMatchObject({
+      hasQuestionGateUncertainty: true,
+      hasSurveyGateUncertainty: false,
+      loadingQuestions: true,
+      loadingSBTs: true,
+      loadingSurveys: true,
+      preserveUserDataUncertainty: true,
+      questionResponseCount: 0,
+      sbtCount: 0,
+      surveyResponseCount: 0,
+    });
+  });
+
+  it('keeps held cache lanes loading when section derivation is skipped', () => {
+    const plan = buildUserPageCacheRefreshStatePatch({
+      aggregatePresent: false,
+      holdQuestionLoading: true,
+      holdSbtLoading: true,
+      holdSurveyLoading: true,
+      markLoading: true,
+      prevState: {
+        hasUncertainUserData: false,
+        isDeepScanning: false,
+      },
+    });
+
+    expect(plan.statePatch).toEqual({
+      hasUncertainGateAccess: false,
+      loadingQuestions: true,
+      loadingSBTs: true,
+      loadingSurveys: true,
+    });
+    expect(plan.loadingDiag).toMatchObject({
+      loadingQuestions: true,
+      loadingSBTs: true,
+      loadingSurveys: true,
+      questionResponseCount: 'N/A (held)',
+      sbtCount: 'N/A (held)',
+      surveyResponseCount: 'N/A (held)',
     });
   });
 

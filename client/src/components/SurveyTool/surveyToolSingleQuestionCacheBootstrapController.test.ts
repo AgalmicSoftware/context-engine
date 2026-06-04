@@ -1,4 +1,8 @@
-import { resolveSingleQuestionCacheBootstrap } from './surveyToolSingleQuestionCacheBootstrapController';
+import {
+  buildSingleQuestionSeededHydrationState,
+  resolveSingleQuestionCacheBootstrap,
+  resolveSingleQuestionCacheBootstrapFlowPlan,
+} from './surveyToolSingleQuestionCacheBootstrapController';
 
 type TestQuestionsCache = Record<string, {
   questions: Record<string, Record<string, unknown>>;
@@ -16,6 +20,136 @@ const ensureQuestionsNet = (cache: unknown, netId: string): TestQuestionsCache =
 };
 
 describe('surveyToolSingleQuestionCacheBootstrapController', () => {
+  it('plans ready cache bootstrap results as continuation without seeded hydration', () => {
+    const cacheState = {
+      netIdStr: '84532',
+      questionsCache: {
+        '84532': {
+          questions: {
+            q1: { id: 'q1', prompt: 'cached' },
+          },
+        },
+      },
+    };
+
+    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: {
+        status: 'ready',
+        cacheState,
+        questionData: { id: 'q1', prompt: 'cached' },
+        recentPayloadForAccount: null,
+      },
+    })).toEqual({
+      action: 'continue',
+      cacheState,
+      questionData: { id: 'q1', prompt: 'cached' },
+      recentPayloadForAccount: null,
+      seededHydration: null,
+    });
+  });
+
+  it('plans seeded recent payloads waiting on a viewed response as retry-only parent work', () => {
+    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: {
+        status: 'seeded-from-recent',
+        cacheState: null,
+        questionData: { id: 'q1', prompt: 'recent' },
+        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+        shouldBootstrapViewedResponse: true,
+        fallbackNetId: '',
+      },
+    })).toEqual({
+      action: 'stop',
+      debugPhase: '',
+      fallbackStatePatch: {},
+      logMissingCacheState: false,
+      preserveCurrentPoolPatch: null,
+      retryPlan: {
+        reason: 'recent-payload-waiting-for-response-bootstrap',
+        retryingPhase: 'recent-payload-response-bootstrap-retrying',
+        exhaustedPhase: 'recent-payload-response-bootstrap-exhausted',
+        exhaustedStatePatch: {
+          viewAddressAnswers: '',
+          parsedViewAddressAnswers: null,
+          noResponse: true,
+          responseLookupWarning: '',
+          isLoadingResponse: false,
+        },
+      },
+      seededHydration: {
+        questionData: { id: 'q1', prompt: 'recent' },
+        isLoadingResponse: true,
+      },
+    });
+  });
+
+  it('plans seeded recent payloads without a fallback network as a parent stop', () => {
+    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: {
+        status: 'seeded-from-recent',
+        cacheState: null,
+        questionData: { id: 'q1', prompt: 'recent' },
+        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+        shouldBootstrapViewedResponse: false,
+        fallbackNetId: '',
+      },
+    })).toEqual({
+      action: 'stop',
+      debugPhase: 'recent-payload-missing-network',
+      fallbackStatePatch: { isLoadingResponse: false },
+      logMissingCacheState: false,
+      preserveCurrentPoolPatch: null,
+      retryPlan: null,
+      seededHydration: {
+        questionData: { id: 'q1', prompt: 'recent' },
+        isLoadingResponse: false,
+      },
+    });
+  });
+
+  it('plans missing cache state stops without creating parent side effects', () => {
+    expect(resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: { status: 'missing-cache-state' },
+    })).toEqual({
+      action: 'stop',
+      debugPhase: 'missing-cache-state',
+      fallbackStatePatch: { isLoadingResponse: false },
+      logMissingCacheState: true,
+      preserveCurrentPoolPatch: { isLoadingResponse: false },
+      retryPlan: null,
+      seededHydration: null,
+    });
+  });
+
+  it('builds seeded hydration patches while delegating response-state merging to the parent', () => {
+    const mergeSurveyResponseState = jest.fn((previous, questions, surveyIndex) => ({
+      previous,
+      questions,
+      surveyIndex,
+    }));
+
+    expect(buildSingleQuestionSeededHydrationState({
+      prevState: {
+        surveysResponseState: [{ answers: { q1: { value: 'old' } } }],
+      },
+      questionData: { id: 'q1', prompt: 'recent' },
+      isLoadingResponse: true,
+      mergeSurveyResponseState,
+    })).toEqual({
+      questionPool: [{ id: 'q1', prompt: 'recent' }],
+      surveysResponseState: {
+        previous: [{ answers: { q1: { value: 'old' } } }],
+        questions: [{ id: 'q1', prompt: 'recent' }],
+        surveyIndex: 0,
+      },
+      viewAddressAnswers: '',
+      parsedViewAddressAnswers: null,
+      noResponse: false,
+      isLoadingResponse: true,
+    });
+    expect(mergeSurveyResponseState).toHaveBeenCalledTimes(1);
+  });
+
   it("returns 'ready' when cache state resolves immediately and no recent payload exists", async () => {
     const questionData = { id: 'q1', prompt: 'test' };
 
