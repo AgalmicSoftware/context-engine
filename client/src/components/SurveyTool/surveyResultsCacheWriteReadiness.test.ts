@@ -7,6 +7,9 @@ import {
   buildSurveyResultsAnalysisLifecyclePlan,
 } from './surveyResultsAnalysisLifecyclePlan';
 import {
+  runSurveyResultsAnalysisLifecycleController,
+} from './surveyResultsAnalysisLifecycleController';
+import {
   buildSurveyResultsCacheControllerSnapshot,
 } from './surveyResultsCacheControllerSnapshot';
 import {
@@ -94,12 +97,12 @@ describe('surveyResultsCacheWriteReadiness', () => {
         'cache read/write execution',
         'parent-owned setState application',
       ],
-      controllerReady: false,
-      hasInjectedController: false,
+      controllerReady: true,
+      hasInjectedController: typeof runSurveyResultsAnalysisLifecycleController === 'function',
       hasMethodBoundaryCoverage: true,
       hasPurePlan: typeof buildSurveyResultsAnalysisLifecyclePlan === 'function',
       path: 'analysis lifecycle status and recovery',
-      status: 'pure-plan-only',
+      status: 'controller-routed',
     },
     {
       blockers: [
