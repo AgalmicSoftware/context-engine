@@ -1,6 +1,10 @@
 import type {
   SessionResultsGeneratedAnalysisArtifact,
 } from '../../utilities/sessionResultsExport';
+import {
+  SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND,
+  SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
+} from '../../utilities/sessionResultsExport';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -63,6 +67,20 @@ const toRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
 
+const isAnalysisArtifactCandidate = (
+  value: SurveyResultsRecord,
+  inputSignature: string
+): value is SessionResultsGeneratedAnalysisArtifact => (
+  value.kind === SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND &&
+  value.version === SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION &&
+  value.source === 'ai-generated' &&
+  value.inputSignature === inputSignature &&
+  typeof value.generatedAt === 'string' &&
+  Array.isArray(value.participants) &&
+  !!value.sections &&
+  typeof value.sections === 'object'
+);
+
 export const buildSurveyResultsAnalysisArtifactCacheKey = ({
   chainId = '',
   inputSignature = '',
@@ -116,6 +134,6 @@ export const selectSurveyResultsAnalysisArtifactFromCache = ({
   const artifacts = toRecord(bucket.sessionResultsAnalysis);
   const artifact = artifacts[cacheKey];
   if (!artifact || typeof artifact !== 'object') return null;
-  const selected = artifact as SessionResultsGeneratedAnalysisArtifact;
-  return selected.inputSignature === inputSignature ? selected : null;
+  const selected = artifact as SurveyResultsRecord;
+  return isAnalysisArtifactCandidate(selected, inputSignature) ? selected : null;
 };
