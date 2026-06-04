@@ -97,9 +97,12 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
   const currentMatches = currentArtifact?.inputSignature === normalizedInputSignature
     ? currentArtifact
     : null;
-  const artifact = currentMatches || cachedArtifact || null;
+  const cachedMatches = cachedArtifact?.inputSignature === normalizedInputSignature
+    ? cachedArtifact
+    : null;
+  const artifact = currentMatches || cachedMatches || null;
   const source: SurveyResultsAnalysisLifecyclePlan['target']['source'] =
-    currentMatches ? 'current' : cachedArtifact ? 'cache' : 'none';
+    currentMatches ? 'current' : cachedMatches ? 'cache' : 'none';
   const target = {
     artifactInputSignature: String(artifact?.inputSignature || ''),
     inputSignature: normalizedInputSignature,

@@ -49,7 +49,7 @@
   - `surveyResultsQuestionMetadataReadController.ts`: **86 lines**
   - `surveyResultsQuestionNetworkReadController.ts`: **367 lines**
   - `surveyResultsCacheWriteEligibilityPlan.ts`: **236 lines**
-  - `surveyResultsAnalysisLifecyclePlan.ts`: **201 lines**
+  - `surveyResultsAnalysisLifecyclePlan.ts`: **204 lines**
   - `surveyResultsAnalysisArtifactWriteController.ts`: **73 lines**
   - `surveyResultsFilterBookmarkWriteController.ts`: **79 lines**
   - `surveyResultsSurveyQuestionBookmarkWriteController.ts`: **79 lines**
