@@ -15,6 +15,40 @@ type CacheState = {
   questionsCache: QuestionsCache;
 };
 
+type SeededHydrationPlan = {
+  questionData: QuestionPayload;
+  isLoadingResponse: boolean;
+};
+
+type CacheBootstrapFlowRetryPlan = {
+  reason: string;
+  retryingPhase: string;
+  exhaustedPhase: string;
+  exhaustedStatePatch: UnknownRecord;
+};
+
+export type CacheBootstrapFlowContinue = {
+  action: 'continue';
+  cacheState: CacheState;
+  questionData: QuestionPayload | null;
+  recentPayloadForAccount: QuestionPayload | null;
+  seededHydration: SeededHydrationPlan | null;
+};
+
+export type CacheBootstrapFlowStop = {
+  action: 'stop';
+  debugPhase: string;
+  fallbackStatePatch: UnknownRecord;
+  logMissingCacheState: boolean;
+  preserveCurrentPoolPatch: UnknownRecord | null;
+  retryPlan: CacheBootstrapFlowRetryPlan | null;
+  seededHydration: SeededHydrationPlan | null;
+};
+
+export type CacheBootstrapFlowPlan =
+  | CacheBootstrapFlowContinue
+  | CacheBootstrapFlowStop;
+
 export type CacheBootstrapReady = {
   status: 'ready';
   cacheState: CacheState;
@@ -39,6 +73,120 @@ export type CacheBootstrapResult =
   | CacheBootstrapReady
   | CacheBootstrapSeeded
   | CacheBootstrapMissing;
+
+const buildMissingCacheStateStopPlan = (
+  seededHydration: SeededHydrationPlan | null = null,
+): CacheBootstrapFlowStop => ({
+  action: 'stop',
+  debugPhase: 'missing-cache-state',
+  fallbackStatePatch: { isLoadingResponse: false },
+  logMissingCacheState: true,
+  preserveCurrentPoolPatch: { isLoadingResponse: false },
+  retryPlan: null,
+  seededHydration,
+});
+
+export const resolveSingleQuestionCacheBootstrapFlowPlan = ({
+  cacheBootstrapResult = null,
+}: {
+  cacheBootstrapResult?: CacheBootstrapResult | null;
+} = {}): CacheBootstrapFlowPlan => {
+  if (!cacheBootstrapResult || cacheBootstrapResult.status === 'missing-cache-state') {
+    return buildMissingCacheStateStopPlan();
+  }
+
+  if (cacheBootstrapResult.status === 'ready') {
+    return {
+      action: 'continue',
+      cacheState: cacheBootstrapResult.cacheState,
+      questionData: cacheBootstrapResult.questionData,
+      recentPayloadForAccount: cacheBootstrapResult.recentPayloadForAccount,
+      seededHydration: null,
+    };
+  }
+
+  const seededHydration = {
+    questionData: cacheBootstrapResult.questionData,
+    isLoadingResponse: cacheBootstrapResult.shouldBootstrapViewedResponse,
+  };
+
+  if (cacheBootstrapResult.shouldBootstrapViewedResponse) {
+    return {
+      action: 'stop',
+      debugPhase: '',
+      fallbackStatePatch: {},
+      logMissingCacheState: false,
+      preserveCurrentPoolPatch: null,
+      retryPlan: {
+        reason: 'recent-payload-waiting-for-response-bootstrap',
+        retryingPhase: 'recent-payload-response-bootstrap-retrying',
+        exhaustedPhase: 'recent-payload-response-bootstrap-exhausted',
+        exhaustedStatePatch: {
+          viewAddressAnswers: '',
+          parsedViewAddressAnswers: null,
+          noResponse: true,
+          responseLookupWarning: '',
+          isLoadingResponse: false,
+        },
+      },
+      seededHydration,
+    };
+  }
+
+  if (!cacheBootstrapResult.fallbackNetId) {
+    return {
+      action: 'stop',
+      debugPhase: 'recent-payload-missing-network',
+      fallbackStatePatch: { isLoadingResponse: false },
+      logMissingCacheState: false,
+      preserveCurrentPoolPatch: null,
+      retryPlan: null,
+      seededHydration,
+    };
+  }
+
+  if (!cacheBootstrapResult.cacheState) {
+    return buildMissingCacheStateStopPlan(seededHydration);
+  }
+
+  return {
+    action: 'continue',
+    cacheState: cacheBootstrapResult.cacheState,
+    questionData: cacheBootstrapResult.questionData,
+    recentPayloadForAccount: cacheBootstrapResult.recentPayloadForAccount,
+    seededHydration,
+  };
+};
+
+export const buildSingleQuestionSeededHydrationState = ({
+  prevState = {},
+  questionData = null,
+  isLoadingResponse = false,
+  mergeSurveyResponseState = (previous: unknown) => previous,
+}: {
+  prevState?: UnknownRecord;
+  questionData?: QuestionPayload | null;
+  isLoadingResponse?: unknown;
+  mergeSurveyResponseState?: (
+    previousResponseState: unknown,
+    questionPool: QuestionPayload[],
+    surveyIndex: number
+  ) => unknown;
+} = {}) => {
+  const seededQuestion = { ...((questionData || {}) as QuestionPayload), id: questionData?.id };
+  const previousResponseState =
+    prevState.surveysResponseState ||
+    [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }];
+
+  return {
+    questionPool: [seededQuestion],
+    surveysResponseState: mergeSurveyResponseState(previousResponseState, [seededQuestion], 0),
+    viewAddressAnswers: '',
+    parsedViewAddressAnswers: null,
+    noResponse: false,
+    isLoadingResponse: !!isLoadingResponse,
+  };
+};
 
 export const resolveSingleQuestionCacheBootstrap = async ({
   questionId = '',
