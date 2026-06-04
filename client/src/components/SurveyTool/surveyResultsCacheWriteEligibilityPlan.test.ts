@@ -119,6 +119,49 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     });
   });
 
+  it('pins analysis artifact target identity for missing route and cache identifiers', () => {
+    const artifact = {
+      inputSignature: 'missing-route-input',
+      kind: 'ce_session_results_analysis_artifact',
+    };
+
+    expect(buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input',
+      currentCache: null,
+      slug: undefined,
+    })).toEqual({
+      blockedReason: '',
+      payload: {
+        sessionResultsAnalysis: {
+          'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input': artifact,
+        },
+      },
+      shouldWrite: true,
+      target: {
+        namespace: 'analysisCache',
+        slug: '',
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input',
+      },
+    });
+
+    expect(buildSurveyResultsAnalysisArtifactWritePlan({
+      artifact,
+      cacheKey: undefined,
+      currentCache: null,
+      slug: 'missing-key-session',
+    })).toEqual({
+      blockedReason: 'missing-cache-key',
+      payload: null,
+      shouldWrite: false,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'missing-key-session',
+        cacheKey: '',
+      },
+    });
+  });
+
   it('blocks filter bookmark writes before cache reads when the results view is unmounted', () => {
     expect(buildSurveyResultsFilterBookmarkWritePlan({
       filterState: { type: 'radio' },
@@ -154,6 +197,43 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'filters',
         slug: 'edge',
       },
+    });
+  });
+
+  it('pins filter bookmark target identity before cache payload readiness', () => {
+    const cases = [
+      {
+        expectedSlug: '',
+        slug: undefined,
+      },
+      {
+        expectedSlug: '',
+        slug: '',
+      },
+      {
+        expectedSlug: 'survey-route',
+        slug: 'survey-route',
+      },
+    ];
+
+    cases.forEach(({ expectedSlug, slug }) => {
+      expect(buildSurveyResultsFilterBookmarkWritePlan({
+        filterState: { tags: ['identity'] },
+        filtersCacheLoaded: false,
+        isMounted: true,
+        slug,
+      })).toEqual({
+        blockedReason: '',
+        bookmarkedFiltersInvalid: false,
+        payload: null,
+        shouldReadCache: true,
+        shouldWrite: false,
+        successFeedback: false,
+        target: {
+          namespace: 'filters',
+          slug: expectedSlug,
+        },
+      });
     });
   });
 
@@ -343,6 +423,58 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       target: {
         namespace: 'bookmarksCache',
         slug: 'edge',
+      },
+      toggled: null,
+    });
+  });
+
+  it('documents current parent-owned bookmark id validation boundary', () => {
+    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+      bookmarkId: undefined,
+      bookmarkType: 'survey',
+      bookmarksCache: {
+        questions: ['q1'],
+        surveys: [],
+      },
+      slug: undefined,
+    })).toEqual({
+      blockedReason: '',
+      payload: {
+        questions: ['q1'],
+        surveys: [undefined],
+      },
+      shouldWrite: true,
+      statePatch: {
+        key: 'bookmarkedSurveyIDs',
+        value: [undefined],
+      },
+      target: {
+        namespace: 'bookmarksCache',
+        slug: '',
+      },
+      toggled: {
+        action: 'add',
+        bookmarkType: 'survey',
+        id: undefined,
+      },
+    });
+
+    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+      bookmarkId: 'q-missing-kind',
+      bookmarkType: '',
+      bookmarksCache: {
+        questions: ['q1'],
+        surveys: ['s1'],
+      },
+      slug: undefined,
+    })).toEqual({
+      blockedReason: 'invalid-bookmark-type',
+      payload: null,
+      shouldWrite: false,
+      statePatch: null,
+      target: {
+        namespace: 'bookmarksCache',
+        slug: '',
       },
       toggled: null,
     });
