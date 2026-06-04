@@ -1,14 +1,13 @@
 import type {
   SurveyResultsAnalysisArtifactWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
+import type {
+  SurveyResultsAnalysisArtifactCacheWritePort,
+} from './surveyResultsAnalysisArtifactCachePorts';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
-export type SurveyResultsAnalysisArtifactWritePort = (
-  namespace: 'analysisCache',
-  slug: string,
-  payload: SurveyResultsRecord
-) => Promise<unknown> | unknown;
+export type SurveyResultsAnalysisArtifactWritePort = SurveyResultsAnalysisArtifactCacheWritePort;
 
 export type SurveyResultsAnalysisArtifactWriteControllerPorts = {
   writeAnalysisArtifact?: SurveyResultsAnalysisArtifactWritePort;
