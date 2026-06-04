@@ -1283,6 +1283,10 @@ describe('SurveyResults export/view controls', () => {
     subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
     subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown', 'riskMatrix']);
     subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.getSessionResultsAnalysisCacheKey = jest.fn((signature) => (
+      `sessionResultsAnalysis:v1:OP Sepolia:${String(signature || '')}`
+    ));
+    subject.getSessionResultsAnalysisCacheSlug = jest.fn(() => 'lifecycle-session');
     subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(async (artifact) => {
       writeEvents.push({
         artifact,
@@ -1340,6 +1344,8 @@ describe('SurveyResults export/view controls', () => {
     await generation;
 
     expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(2);
+    expect(subject.getSessionResultsAnalysisCacheKey).toHaveBeenCalledWith('lifecycle-input');
+    expect(subject.getSessionResultsAnalysisCacheSlug).toHaveBeenCalled();
     expect(writeEvents[1].progress).toBe('Generating Risk Matrix (2/2)');
     expect(writeEvents[1].artifact.sections.breakdown.available).toBe(true);
     expect(writeEvents[1].artifact.sections.riskMatrix.available).toBe(true);
@@ -1356,6 +1362,47 @@ describe('SurveyResults export/view controls', () => {
       htmlReportAnalysisError: '',
       htmlReportAnalysisProgress: '',
     }));
+  });
+
+  it('skips generated artifact cache dispatch when the completion plan has no cache key', async () => {
+    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
+      breakdown: {
+        dimensions: [],
+        groups: [{ id: 'group_1', label: 'No cache key group' }],
+        summary: { overview: 'Display can complete without cache identity.' },
+      },
+    }));
+
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'missing-cache-key-session',
+    }));
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'missing-cache-key-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.getSessionResultsAnalysisCacheKey = jest.fn(() => '');
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(() => Promise.resolve());
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(subject.getSessionResultsAnalysisCacheKey).toHaveBeenCalledWith('missing-cache-key-input');
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(subject.state.htmlReportAnalysisArtifact?.inputSignature).toBe('missing-cache-key-input');
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
   it('keeps section generation failures inside the analysis lifecycle without fetch, decrypt, or download side effects', async () => {

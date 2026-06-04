@@ -25,6 +25,9 @@ export type SurveyResultsAnalysisLifecyclePayloadDescriptor = {
   sectionsToGenerate: SessionResultsAnalysisSectionKey[];
 };
 
+export const SURVEY_RESULTS_ANALYSIS_FAILURE_MESSAGE =
+  'Unable to generate analysis views right now. Check AI settings and try again.';
+
 export type SurveyResultsAnalysisLifecycleStatePatch = {
   htmlReportAnalysisArtifact?: SessionResultsGeneratedAnalysisArtifact | null;
   htmlReportAnalysisGenerating: boolean;
@@ -110,7 +113,7 @@ const buildFailureRecovery = (): SurveyResultsAnalysisLifecycleFailureRecovery =
   canRetry: true,
   statePatch: {
     htmlReportAnalysisGenerating: false,
-    htmlReportAnalysisError: 'Unable to generate analysis views right now. Check AI settings and try again.',
+    htmlReportAnalysisError: SURVEY_RESULTS_ANALYSIS_FAILURE_MESSAGE,
     htmlReportAnalysisProgress: '',
   },
   status: 'retryable',
