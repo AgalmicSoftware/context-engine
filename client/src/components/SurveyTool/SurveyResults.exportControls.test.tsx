@@ -1292,8 +1292,17 @@ describe('SurveyResults export/view controls', () => {
 
     await subject.generateHtmlReportAnalysisViews();
 
+    const expectedReadyPatch = buildSurveyResultsAnalysisLifecyclePlan({
+      allSections: ['breakdown', 'argumentMap', 'riskMatrix', 'atlas'],
+      cachedArtifact,
+      inputSignature: 'cached-input',
+      requestedSections: ['breakdown'],
+    }).statePatch;
+
     expect(callAI).not.toHaveBeenCalled();
     expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(subject.setState).toHaveBeenCalledWith(expectedReadyPatch);
+    expect(subject.setState).toHaveBeenCalledTimes(1);
     expect(subject.state.htmlReportAnalysisArtifact).toBe(cachedArtifact);
     expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
     expect(subject.state.htmlReportAnalysisError).toBe('');
