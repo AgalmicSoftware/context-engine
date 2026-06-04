@@ -1551,6 +1551,60 @@ describe('SurveyResults export/view controls', () => {
     expect(subject.readSessionResultsAnalysisArtifactFromCache('read-input')).toBeNull();
   });
 
+  it('falls back to generation when the analysis cache read port throws', async () => {
+    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
+      breakdown: {
+        dimensions: [],
+        groups: [{ id: 'read_error_group', label: 'Read error group' }],
+        summary: { overview: 'Generated after cache read failure.' },
+      },
+    }));
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      network: { id: 11155420 },
+      sessionSlug: 'read-error-session',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'read-error-session');
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'read-error-input',
+      participants: [],
+    }));
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(() => Promise.resolve());
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      throw new Error('analysis cache read failed');
+    });
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('analysisCache', 'read-error-session', { clone: false });
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    const [writtenArtifact] = subject.writeSessionResultsAnalysisArtifactToCache.mock.calls[0];
+    expect(writtenArtifact.inputSignature).toBe('read-error-input');
+    expect(writtenArtifact.sections.breakdown.available).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact).toBe(writtenArtifact);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
     const subject = createSubject({
       network: { id: 11155420 },
