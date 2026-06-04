@@ -1482,6 +1482,39 @@ describe('SurveyResults export/view controls', () => {
     expect(writeSpy).not.toHaveBeenCalled();
   });
 
+  it('reads generated analysis artifacts through the scoped sync analysis cache request', () => {
+    const subject = createSubject({
+      network: { id: 11155420 },
+      sessionSlug: 'alpha-session',
+    });
+    subject.getEffectiveSlug = jest.fn(() => 'alpha-session');
+    const cachedArtifact = createAnalysisArtifact('read-input');
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:OP Sepolia:read-input': cachedArtifact,
+      },
+    });
+
+    expect(subject.readSessionResultsAnalysisArtifactFromCache('read-input')).toBe(cachedArtifact);
+    expect(peekSpy).toHaveBeenCalledWith('analysisCache', 'alpha-session', { clone: false });
+  });
+
+  it('rejects stale analysis artifacts returned from the selected cache key', () => {
+    const subject = createSubject({
+      network: { id: 11155420 },
+      sessionSlug: 'alpha-session',
+    });
+    subject.getEffectiveSlug = jest.fn(() => 'alpha-session');
+    const staleArtifact = createAnalysisArtifact('stale-input');
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      sessionResultsAnalysis: {
+        'sessionResultsAnalysis:v1:OP Sepolia:read-input': staleArtifact,
+      },
+    });
+
+    expect(subject.readSessionResultsAnalysisArtifactFromCache('read-input')).toBeNull();
+  });
+
   it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
     const subject = createSubject({
       network: { id: 11155420 },
