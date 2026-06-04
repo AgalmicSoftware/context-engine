@@ -1125,6 +1125,106 @@ describe('SurveyResults export/view controls', () => {
     }));
   });
 
+  it('keeps section generation failures inside the analysis lifecycle without fetch, decrypt, or download side effects', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    (callAI as jest.Mock)
+      .mockResolvedValueOnce(JSON.stringify({
+        breakdown: {
+          dimensions: [],
+          groups: [{ id: 'group_1', label: 'Partial group' }],
+          summary: { overview: 'First section ready.' },
+        },
+      }))
+      .mockRejectedValueOnce(new Error('risk matrix unavailable'))
+      .mockResolvedValueOnce(JSON.stringify({
+        riskMatrix: {
+          categories: [{ id: 'risk_1', label: 'Recovered risk' }],
+          comments: [],
+          heatmap: {},
+          scenarioLinks: [],
+        },
+      }));
+
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'partial-failure-session',
+    }));
+    const cachedArtifacts: any[] = [];
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'partial-failure-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => (
+      cachedArtifacts[cachedArtifacts.length - 1] || null
+    ));
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown', 'riskMatrix']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => subject.state.htmlReportAnalysisArtifact);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(async (artifact) => {
+      cachedArtifacts.push(artifact);
+    });
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(2);
+    expect((callAI as jest.Mock).mock.calls[0][1]).toEqual(expect.objectContaining({
+      sessionSlug: 'partial-failure-session',
+      taskType: 'analysis',
+    }));
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    expect(cachedArtifacts[0]).toEqual(expect.objectContaining({
+      inputSignature: 'partial-failure-input',
+      kind: 'ce_session_results_analysis_artifact',
+      source: 'ai-generated',
+      version: 1,
+    }));
+    expect(cachedArtifacts[0].sections.breakdown.available).toBe(true);
+    expect(cachedArtifacts[0].sections.riskMatrix.available).toBe(false);
+    expect(subject.state.htmlReportAnalysisArtifact).toBeNull();
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe(
+      'Unable to generate analysis views right now. Check AI settings and try again.'
+    );
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
+      String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis')
+    )))).toBe(true);
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(3);
+    expect((callAI as jest.Mock).mock.calls[2][0]).toEqual(
+      expect.stringContaining('Generate only this result view: Risk Matrix')
+    );
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(2);
+    expect(cachedArtifacts[1].sections.breakdown.available).toBe(true);
+    expect(cachedArtifacts[1].sections.riskMatrix.available).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact).toBe(cachedArtifacts[1]);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
     const subject = createSubject({
       network: { id: 11155420 },
