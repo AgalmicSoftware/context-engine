@@ -303,6 +303,69 @@ describe('UserPage bookmark action boundary', () => {
   });
 });
 
+describe('UserPage decrypt action boundary', () => {
+  it('keeps rendered decrypt wiring inert without an account while preserving cached response identity', async () => {
+    const encryptedResponse = {
+      questionID: 'q1',
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: '{"v":2}',
+        encryptionAudience: 'gate',
+      },
+    };
+    const instance = makeInstance({
+      account: '',
+      activeSessionSlug: 'edge',
+      provider: 'wagmi',
+    });
+    instance.state = {
+      ...instance.state,
+      detailedQuestionResponses: {
+        q1: encryptedResponse,
+      },
+      loadingQuestions: false,
+      loadingSBTs: false,
+      loadingSurveys: false,
+      questionCreationInfo: [],
+      questionResponseInfo: [{
+        canDecryptOtherResponses: true,
+        id: 'q1',
+        prompt: 'Cached gated response',
+        sessionSlug: 'edge',
+      }],
+      selectedTab: 'questions',
+      showSectionQuestionResponsesOpen: true,
+      showSectionQuestionsCreatedOpen: true,
+      surveyCreationInfo: [],
+      surveyResponseInfo: [],
+    };
+
+    const tree = instance.render();
+    const [questionSection] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageQuestionSection'
+    );
+
+    expect(questionSection).toBeTruthy();
+    expect(questionSection.props.questionResponseEntries).toEqual([{
+      canDecryptOtherResponses: true,
+      id: 'q1',
+      prompt: 'Cached gated response',
+      sessionSlug: 'edge',
+    }]);
+    expect(questionSection.props.detailedQuestionResponseMap.q1).toBe(encryptedResponse);
+    expect(questionSection.props.questionResponsesNonce).toBe(0);
+    expect(questionSection.props.sbtCacheRevision).toBe(0);
+
+    const didDecrypt = await questionSection.props.onDecryptQuestion('q1', 'answer', encryptedResponse);
+
+    expect(didDecrypt).toBe(false);
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
+    expect(instance.setState).not.toHaveBeenCalled();
+  });
+});
+
 describe('UserPage survey route boundaries', () => {
   it('keeps parent-owned survey href and open callbacks aligned with session and responder routes', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
