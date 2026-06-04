@@ -149,6 +149,9 @@ import {
   type SurveyResultsAnalysisArtifactWritePort,
 } from './surveyResultsAnalysisArtifactWriteController';
 import {
+  buildSurveyResultsAnalysisLifecyclePlan,
+} from './surveyResultsAnalysisLifecyclePlan';
+import {
   runSurveyResultsFilterBookmarkWriteController,
 } from './surveyResultsFilterBookmarkWriteController';
 import {
@@ -3635,14 +3638,6 @@ Object.entries(sections).forEach(([sectionKey, selected]) => {
 return SESSION_RESULTS_ANALYSIS_SECTION_KEYS.filter((key) => keys.has(key));
 }
 
-doesHtmlReportAnalysisArtifactCoverSections = (
-  artifact: SessionResultsGeneratedAnalysisArtifact | null,
-  sections: readonly SessionResultsAnalysisSectionKey[]
-): boolean => (
-  !!artifact &&
-  sections.every((section) => !!artifact.sections?.[section]?.available)
-);
-
 openHtmlReportExportModal = (): void => {
 const snapshot = this.buildSessionResultsHtmlReportSnapshot();
 this.setState({
@@ -3726,35 +3721,25 @@ if (!eligibility.eligible) {
 }
 
 const cached = this.readSessionResultsAnalysisArtifactFromCache(inputSignature);
-const sectionsToGenerate = this.getHtmlReportAnalysisSectionsToGenerate();
 const currentArtifact = this.getHtmlReportAnalysisArtifact();
-let artifact: SessionResultsGeneratedAnalysisArtifact | null = (
-  currentArtifact?.inputSignature === inputSignature ? currentArtifact : null
-) || cached || null;
+const analysisLifecyclePlan = buildSurveyResultsAnalysisLifecyclePlan({
+  allSections: SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
+  cachedArtifact: cached,
+  currentArtifact,
+  inputSignature,
+  requestedSections: this.getHtmlReportAnalysisSectionsToGenerate(),
+});
+let artifact: SessionResultsGeneratedAnalysisArtifact | null = analysisLifecyclePlan.artifact;
 
-if (sectionsToGenerate.length === 0) {
-  sectionsToGenerate.push(...SESSION_RESULTS_ANALYSIS_SECTION_KEYS);
-}
-
-if (this.doesHtmlReportAnalysisArtifactCoverSections(artifact, sectionsToGenerate)) {
-  this.setState({
-    htmlReportAnalysisArtifact: artifact,
-    htmlReportAnalysisError: '',
-    htmlReportAnalysisInputSignature: inputSignature,
-    htmlReportAnalysisProgress: '',
-  });
+if (!analysisLifecyclePlan.shouldGenerate) {
+  this.setState(analysisLifecyclePlan.statePatch);
   return;
 }
 
-this.setState({
-  htmlReportAnalysisGenerating: true,
-  htmlReportAnalysisError: '',
-  htmlReportAnalysisInputSignature: inputSignature,
-  htmlReportAnalysisProgress: '',
-});
+this.setState(analysisLifecyclePlan.statePatch);
 
 try {
-  const missingSections = sectionsToGenerate.filter((section) => !artifact?.sections?.[section]?.available);
+  const missingSections = analysisLifecyclePlan.missingSections;
   for (let index = 0; index < missingSections.length; index += 1) {
     const section = missingSections[index];
     const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
