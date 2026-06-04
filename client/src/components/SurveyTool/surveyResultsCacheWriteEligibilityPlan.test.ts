@@ -82,6 +82,71 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     });
   });
 
+  it('pins analysis artifact payload normalization for empty, partial, and ready source caches', () => {
+    const artifact = {
+      inputSignature: 'matrix-input',
+      kind: 'ce_session_results_analysis_artifact',
+    };
+    const cacheKey = 'sessionResultsAnalysis:v1:OP Sepolia:matrix-input';
+
+    const cases = [
+      {
+        currentCache: undefined,
+        expectedPayload: {
+          sessionResultsAnalysis: {
+            [cacheKey]: artifact,
+          },
+        },
+      },
+      {
+        currentCache: {
+          staleLatestBlock: 41,
+        },
+        expectedPayload: {
+          staleLatestBlock: 41,
+          sessionResultsAnalysis: {
+            [cacheKey]: artifact,
+          },
+        },
+      },
+      {
+        currentCache: {
+          sessionResultsAnalysis: {
+            'sessionResultsAnalysis:v1:OP Sepolia:old-input': {
+              inputSignature: 'old-input',
+            },
+          },
+        },
+        expectedPayload: {
+          sessionResultsAnalysis: {
+            'sessionResultsAnalysis:v1:OP Sepolia:old-input': {
+              inputSignature: 'old-input',
+            },
+            [cacheKey]: artifact,
+          },
+        },
+      },
+    ];
+
+    cases.forEach(({ currentCache, expectedPayload }) => {
+      expect(buildSurveyResultsAnalysisArtifactWritePlan({
+        artifact,
+        cacheKey,
+        currentCache,
+        slug: 'payload-session',
+      })).toEqual({
+        blockedReason: '',
+        payload: expectedPayload,
+        shouldWrite: true,
+        target: {
+          namespace: 'analysisCache',
+          slug: 'payload-session',
+          cacheKey,
+        },
+      });
+    });
+  });
+
   it('blocks analysis artifact write plans without moving cache reads or writes', () => {
     expect(buildSurveyResultsAnalysisArtifactWritePlan({
       artifact: null,
@@ -237,6 +302,55 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
     });
   });
 
+  it('pins filter payload normalization for empty and partial cache shapes', () => {
+    const filterState = { tags: ['payload-matrix'] };
+
+    expect(buildSurveyResultsFilterBookmarkWritePlan({
+      filtersCache: undefined,
+      filtersCacheLoaded: true,
+      filterState,
+      isMounted: true,
+      slug: 'payload-session',
+    })).toEqual({
+      blockedReason: '',
+      bookmarkedFiltersInvalid: false,
+      payload: {
+        bookmarkedFilters: [filterState],
+      },
+      shouldReadCache: true,
+      shouldWrite: true,
+      successFeedback: true,
+      target: {
+        namespace: 'filters',
+        slug: 'payload-session',
+      },
+    });
+
+    expect(buildSurveyResultsFilterBookmarkWritePlan({
+      filtersCache: {
+        unrelated: 'kept',
+      },
+      filtersCacheLoaded: true,
+      filterState,
+      isMounted: true,
+      slug: 'payload-session',
+    })).toEqual({
+      blockedReason: '',
+      bookmarkedFiltersInvalid: false,
+      payload: {
+        bookmarkedFilters: [filterState],
+        unrelated: 'kept',
+      },
+      shouldReadCache: true,
+      shouldWrite: true,
+      successFeedback: true,
+      target: {
+        namespace: 'filters',
+        slug: 'payload-session',
+      },
+    });
+  });
+
   it('derives the target identity and payload shape from passed-in cache values', () => {
     const filterState = { types: ['radio'], tags: ['alpha'] };
     const filtersCache = {
@@ -366,6 +480,66 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
       toggled: {
         action: 'remove',
+        bookmarkType: 'question',
+        id: 'q1',
+      },
+    });
+  });
+
+  it('pins survey/question bookmark payload normalization for empty and partial cache shapes', () => {
+    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+      bookmarkId: 's1',
+      bookmarkType: 'survey',
+      bookmarksCache: undefined,
+      slug: 'payload-session',
+    })).toEqual({
+      blockedReason: '',
+      payload: {
+        surveys: ['s1'],
+        questions: [],
+      },
+      shouldWrite: true,
+      statePatch: {
+        key: 'bookmarkedSurveyIDs',
+        value: ['s1'],
+      },
+      target: {
+        namespace: 'bookmarksCache',
+        slug: 'payload-session',
+      },
+      toggled: {
+        action: 'add',
+        bookmarkType: 'survey',
+        id: 's1',
+      },
+    });
+
+    expect(buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+      bookmarkId: 'q1',
+      bookmarkType: 'question',
+      bookmarksCache: {
+        surveys: ['s1'],
+        unrelated: 'kept',
+      },
+      slug: 'payload-session',
+    })).toEqual({
+      blockedReason: '',
+      payload: {
+        surveys: ['s1'],
+        questions: ['q1'],
+        unrelated: 'kept',
+      },
+      shouldWrite: true,
+      statePatch: {
+        key: 'bookmarkedQuestionIDs',
+        value: ['q1'],
+      },
+      target: {
+        namespace: 'bookmarksCache',
+        slug: 'payload-session',
+      },
+      toggled: {
+        action: 'add',
         bookmarkType: 'question',
         id: 'q1',
       },
