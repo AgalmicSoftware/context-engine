@@ -25,9 +25,17 @@ export type SurveyResultsAnalysisLifecyclePayloadDescriptor = {
   sectionsToGenerate: SessionResultsAnalysisSectionKey[];
 };
 
+export type SurveyResultsAnalysisLifecycleStatePatch = {
+  htmlReportAnalysisArtifact?: SessionResultsGeneratedAnalysisArtifact | null;
+  htmlReportAnalysisGenerating: boolean;
+  htmlReportAnalysisError: string;
+  htmlReportAnalysisInputSignature?: string;
+  htmlReportAnalysisProgress: string;
+};
+
 export type SurveyResultsAnalysisLifecycleFailureRecovery = {
   canRetry: boolean;
-  statePatch: Record<string, unknown>;
+  statePatch: SurveyResultsAnalysisLifecycleStatePatch;
   status: 'retryable';
 };
 
@@ -39,7 +47,7 @@ export type SurveyResultsAnalysisLifecyclePlan = {
   payloadDescriptor: SurveyResultsAnalysisLifecyclePayloadDescriptor;
   sectionsToGenerate: SessionResultsAnalysisSectionKey[];
   shouldGenerate: boolean;
-  statePatch: Record<string, unknown>;
+  statePatch: SurveyResultsAnalysisLifecycleStatePatch;
   status: SurveyResultsAnalysisLifecycleStatus;
   target: {
     artifactInputSignature: string;
@@ -70,6 +78,33 @@ const getAvailableSections = (
     ? sections.filter((section) => !!artifact.sections?.[section]?.available)
     : []
 );
+
+const buildPayloadDescriptor = ({
+  allSections,
+  artifact,
+  inputSignature,
+  missingSections,
+  requestedSections,
+  sectionsToGenerate,
+  target,
+}: {
+  allSections: readonly SessionResultsAnalysisSectionKey[];
+  artifact: SessionResultsGeneratedAnalysisArtifact | null;
+  inputSignature: string;
+  missingSections: SessionResultsAnalysisSectionKey[];
+  requestedSections: SessionResultsAnalysisSectionKey[];
+  sectionsToGenerate: SessionResultsAnalysisSectionKey[];
+  target: SurveyResultsAnalysisLifecyclePlan['target'];
+}): SurveyResultsAnalysisLifecyclePayloadDescriptor => ({
+  artifactInputSignature: target.artifactInputSignature,
+  artifactPresent: !!artifact,
+  artifactSource: target.source,
+  availableSections: getAvailableSections(artifact, allSections),
+  inputSignature,
+  missingSections,
+  requestedSections,
+  sectionsToGenerate,
+});
 
 const buildFailureRecovery = (): SurveyResultsAnalysisLifecycleFailureRecovery => ({
   canRetry: true,
@@ -120,16 +155,15 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
       blockedReason,
       failureRecovery,
       missingSections,
-      payloadDescriptor: {
-        artifactInputSignature: target.artifactInputSignature,
-        artifactPresent: !!artifact,
-        artifactSource: source,
-        availableSections: getAvailableSections(artifact, all),
+      payloadDescriptor: buildPayloadDescriptor({
+        allSections: all,
+        artifact,
         inputSignature: normalizedInputSignature,
         missingSections,
         requestedSections: requested,
         sectionsToGenerate,
-      },
+        target,
+      }),
       sectionsToGenerate,
       shouldGenerate: false,
       statePatch: {
@@ -150,16 +184,15 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
       blockedReason,
       failureRecovery,
       missingSections,
-      payloadDescriptor: {
-        artifactInputSignature: target.artifactInputSignature,
-        artifactPresent: !!artifact,
-        artifactSource: source,
-        availableSections: getAvailableSections(artifact, all),
+      payloadDescriptor: buildPayloadDescriptor({
+        allSections: all,
+        artifact,
         inputSignature: normalizedInputSignature,
         missingSections,
         requestedSections: requested,
         sectionsToGenerate,
-      },
+        target,
+      }),
       sectionsToGenerate,
       shouldGenerate: false,
       statePatch: {
@@ -180,16 +213,15 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
     blockedReason,
     failureRecovery,
     missingSections,
-    payloadDescriptor: {
-      artifactInputSignature: target.artifactInputSignature,
-      artifactPresent: !!artifact,
-      artifactSource: source,
-      availableSections: getAvailableSections(artifact, all),
+    payloadDescriptor: buildPayloadDescriptor({
+      allSections: all,
+      artifact,
       inputSignature: normalizedInputSignature,
       missingSections,
       requestedSections: requested,
       sectionsToGenerate,
-    },
+      target,
+    }),
     sectionsToGenerate,
     shouldGenerate: true,
     statePatch: {
