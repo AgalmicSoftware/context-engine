@@ -11,13 +11,36 @@ export type SurveyResultsAnalysisLifecyclePlanArgs = {
   requestedSections?: readonly SessionResultsAnalysisSectionKey[];
 };
 
+export type SurveyResultsAnalysisLifecycleBlockedReason = '' | 'missing-analysis-sections';
+export type SurveyResultsAnalysisLifecycleStatus = 'ready-artifact' | 'generate-missing-sections';
+
+export type SurveyResultsAnalysisLifecyclePayloadDescriptor = {
+  artifactInputSignature: string;
+  artifactPresent: boolean;
+  artifactSource: 'current' | 'cache' | 'none';
+  availableSections: SessionResultsAnalysisSectionKey[];
+  inputSignature: string;
+  missingSections: SessionResultsAnalysisSectionKey[];
+  requestedSections: SessionResultsAnalysisSectionKey[];
+  sectionsToGenerate: SessionResultsAnalysisSectionKey[];
+};
+
+export type SurveyResultsAnalysisLifecycleFailureRecovery = {
+  canRetry: boolean;
+  statePatch: Record<string, unknown>;
+  status: 'retryable';
+};
+
 export type SurveyResultsAnalysisLifecyclePlan = {
   artifact: SessionResultsGeneratedAnalysisArtifact | null;
+  blockedReason: SurveyResultsAnalysisLifecycleBlockedReason;
+  failureRecovery: SurveyResultsAnalysisLifecycleFailureRecovery;
   missingSections: SessionResultsAnalysisSectionKey[];
+  payloadDescriptor: SurveyResultsAnalysisLifecyclePayloadDescriptor;
   sectionsToGenerate: SessionResultsAnalysisSectionKey[];
   shouldGenerate: boolean;
   statePatch: Record<string, unknown>;
-  status: 'ready-artifact' | 'generate-missing-sections';
+  status: SurveyResultsAnalysisLifecycleStatus;
   target: {
     artifactInputSignature: string;
     inputSignature: string;
@@ -39,6 +62,25 @@ const artifactCoversSections = (
   sections.every((section) => !!artifact.sections?.[section]?.available)
 );
 
+const getAvailableSections = (
+  artifact: SessionResultsGeneratedAnalysisArtifact | null,
+  sections: readonly SessionResultsAnalysisSectionKey[]
+): SessionResultsAnalysisSectionKey[] => (
+  artifact
+    ? sections.filter((section) => !!artifact.sections?.[section]?.available)
+    : []
+);
+
+const buildFailureRecovery = (): SurveyResultsAnalysisLifecycleFailureRecovery => ({
+  canRetry: true,
+  statePatch: {
+    htmlReportAnalysisGenerating: false,
+    htmlReportAnalysisError: 'Unable to generate analysis views right now. Check AI settings and try again.',
+    htmlReportAnalysisProgress: '',
+  },
+  status: 'retryable',
+});
+
 export const buildSurveyResultsAnalysisLifecyclePlan = ({
   allSections = [],
   cachedArtifact = null,
@@ -47,10 +89,11 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
   requestedSections = [],
 }: SurveyResultsAnalysisLifecyclePlanArgs = {}): SurveyResultsAnalysisLifecyclePlan => {
   const normalizedInputSignature = String(inputSignature || '');
+  const all = normalizeSections(allSections);
   const requested = normalizeSections(requestedSections);
   const sectionsToGenerate = requested.length > 0
     ? requested
-    : normalizeSections(allSections);
+    : all;
   const currentMatches = currentArtifact?.inputSignature === normalizedInputSignature
     ? currentArtifact
     : null;
@@ -62,11 +105,28 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
     inputSignature: normalizedInputSignature,
     source,
   };
+  const blockedReason: SurveyResultsAnalysisLifecycleBlockedReason = sectionsToGenerate.length > 0
+    ? ''
+    : 'missing-analysis-sections';
+  const failureRecovery = buildFailureRecovery();
 
   if (artifactCoversSections(artifact, sectionsToGenerate)) {
+    const missingSections: SessionResultsAnalysisSectionKey[] = [];
     return {
       artifact,
-      missingSections: [],
+      blockedReason,
+      failureRecovery,
+      missingSections,
+      payloadDescriptor: {
+        artifactInputSignature: target.artifactInputSignature,
+        artifactPresent: !!artifact,
+        artifactSource: source,
+        availableSections: getAvailableSections(artifact, all),
+        inputSignature: normalizedInputSignature,
+        missingSections,
+        requestedSections: requested,
+        sectionsToGenerate,
+      },
       sectionsToGenerate,
       shouldGenerate: false,
       statePatch: {
@@ -80,9 +140,22 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
     };
   }
 
+  const missingSections = sectionsToGenerate.filter((section) => !artifact?.sections?.[section]?.available);
   return {
     artifact,
-    missingSections: sectionsToGenerate.filter((section) => !artifact?.sections?.[section]?.available),
+    blockedReason,
+    failureRecovery,
+    missingSections,
+    payloadDescriptor: {
+      artifactInputSignature: target.artifactInputSignature,
+      artifactPresent: !!artifact,
+      artifactSource: source,
+      availableSections: getAvailableSections(artifact, all),
+      inputSignature: normalizedInputSignature,
+      missingSections,
+      requestedSections: requested,
+      sectionsToGenerate,
+    },
     sectionsToGenerate,
     shouldGenerate: true,
     statePatch: {
