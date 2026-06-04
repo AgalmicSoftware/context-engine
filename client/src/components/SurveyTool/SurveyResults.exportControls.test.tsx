@@ -752,6 +752,148 @@ describe('SurveyResults export/view controls', () => {
     }));
   });
 
+  it('blocks HTML report downloads without exporter identity before rendering artifacts', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      loginComplete: false,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Export this report?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    await subject.downloadHtmlReport();
+
+    expect(subject.state.alertMessage).toBe(
+      'Connect a wallet with permission to view these results before export.'
+    );
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+  });
+
+  it('blocks selected report sections when the generated analysis artifact is missing', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      htmlReportSelectedSections: {
+        argumentMap: false,
+        atlas: false,
+        report: true,
+        riskMatrix: true,
+        snapshotJson: true,
+      },
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Export this report?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    await subject.downloadHtmlReport();
+
+    expect(subject.state.alertMessage).toBe(
+      'Generate selected analysis views before downloading the report.'
+    );
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+  });
+
+  it('surfaces HTML report download failures and allows a later retry', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Demo Session',
+      sessionSlug: 'demo',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+    (downloadSessionResultsHtmlReport as jest.Mock)
+      .mockImplementationOnce(() => {
+        throw new Error('download failed');
+      });
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Export this report?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    await subject.downloadHtmlReport();
+
+    expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1);
+    expect(subject.state.alertMessage).toBe('Unable to export the HTML report.');
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+    expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
+      String(arg).includes('[SurveyResults.downloadHtmlReport] Failed to export HTML report')
+    )))).toBe(true);
+
+    await subject.downloadHtmlReport();
+
+    expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(2);
+    expect(subject.state.alertMessage).toBe('');
+    expect(subject.state.htmlReportModalOpen).toBe(false);
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('generates AI analysis with synthetic participant IDs and stores the local artifact', async () => {
     (callAI as jest.Mock).mockImplementation((prompt: string) => {
       if (prompt.includes('Generate only this result view: Breakdown')) {
