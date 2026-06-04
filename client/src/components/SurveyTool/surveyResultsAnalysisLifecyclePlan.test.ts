@@ -80,6 +80,7 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
       shouldGenerate: false,
       statePatch: {
         htmlReportAnalysisArtifact: artifact,
+        htmlReportAnalysisGenerating: false,
         htmlReportAnalysisError: '',
         htmlReportAnalysisInputSignature: 'current-input',
         htmlReportAnalysisProgress: '',
