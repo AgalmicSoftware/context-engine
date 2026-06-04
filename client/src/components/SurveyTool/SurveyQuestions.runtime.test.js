@@ -265,6 +265,132 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.isLoadingResponse).toBe(false);
   });
 
+  it('ignores stale recent decrypted payloads and keeps bootstrap on the normal metadata path', async () => {
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    window.sessionStorage.setItem('dg:recentQuestionPayloads', JSON.stringify({
+      q1: {
+        savedAtMs: now - (13 * 60 * 60 * 1000),
+        creator: '0xAbC',
+        prompt: 'Expired gated prompt',
+        promptDecrypted: true,
+        encryptedPrompt: 'expired-ciphertext',
+        questionType: 'text',
+        tags: ['expired'],
+      },
+    }));
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
+      creator: '0xAbC',
+      encryptedPrompt: 'fresh-ciphertext',
+      id: 'q1',
+      prompt: 'Fresh network prompt',
+      promptDecrypted: true,
+      questionType: 'text',
+      tags: ['fresh'],
+    });
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      questionID: 'Q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-provider' },
+      network: { id: 84532 },
+      networkChainId: 84532,
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      isLoadingResponse: true,
+      autoDecryptEnabled: false,
+    };
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.updateSingleQuestionDebug = jest.fn();
+    subject.clearSingleQuestionBootstrapRetry = jest.fn();
+    subject.scheduleSingleQuestionBootstrapRetry = jest.fn(() => false);
+    subject.updateJsonPreview = jest.fn();
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+    subject.prefillSingleQuestionResponse = jest.fn();
+    let callbackRun = Promise.resolve();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const maybePromise = callback();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          callbackRun = callbackRun.then(() => maybePromise);
+        }
+      }
+      return patch;
+    });
+
+    await subject.fetchSingleQuestionData();
+    await callbackRun;
+
+    expect(getQuestionDataSpy).toHaveBeenCalled();
+    expect(getResponseSpy).toHaveBeenCalledWith(
+      subject.props.provider,
+      '0xabc',
+      'q1',
+      'edge',
+    );
+    expect(subject.state.questionPool[0]).toMatchObject({
+      id: 'q1',
+      prompt: 'Fresh network prompt',
+      encryptedPrompt: 'fresh-ciphertext',
+      questionType: 'text',
+    });
+    expect(writeSpy).toHaveBeenCalledWith(
+      'questionsCache',
+      'edge',
+      expect.objectContaining({
+        84532: expect.objectContaining({
+          questions: expect.objectContaining({
+            q1: expect.objectContaining({
+              prompt: 'Fresh network prompt',
+              encryptedPrompt: 'fresh-ciphertext',
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(writeSpy).not.toHaveBeenCalledWith(
+      'questionsCache',
+      'edge',
+      expect.objectContaining({
+        84532: expect.objectContaining({
+          questions: expect.objectContaining({
+            q1: expect.objectContaining({
+              prompt: 'Expired gated prompt',
+              encryptedPrompt: 'expired-ciphertext',
+            }),
+          }),
+        }),
+      }),
+    );
+    expect(subject.updateJsonPreview).toHaveBeenCalledWith();
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledWith();
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledWith();
+    expect(subject.prefillSingleQuestionResponse).not.toHaveBeenCalled();
+    expect(subject.state.userAnswers).toBeNull();
+    expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
   it('persists SurveyQuestions bookmarks with optimistic cache writes', async () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ questions: [] });
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
