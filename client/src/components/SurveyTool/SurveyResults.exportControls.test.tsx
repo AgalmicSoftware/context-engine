@@ -1623,6 +1623,58 @@ describe('SurveyResults export/view controls', () => {
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
+  it('ignores stale cached analysis artifacts and keeps generation side effects in the analysis path', async () => {
+    (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
+      breakdown: {
+        dimensions: [],
+        groups: [{ id: 'fresh_cached_group', label: 'Fresh cached group' }],
+        summary: { overview: 'Fresh cached analysis.' },
+      },
+    }));
+    const staleCachedArtifact = createAnalysisArtifact('stale-cache-input');
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'stale-cache-session',
+    }));
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'fresh-cache-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => staleCachedArtifact);
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(() => Promise.resolve());
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).toHaveBeenCalledWith('fresh-cache-input');
+    expect(callAI).toHaveBeenCalledTimes(1);
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    const [writtenArtifact] = subject.writeSessionResultsAnalysisArtifactToCache.mock.calls[0];
+    expect(writtenArtifact.inputSignature).toBe('fresh-cache-input');
+    expect(writtenArtifact).not.toBe(staleCachedArtifact);
+    expect(subject.state.htmlReportAnalysisArtifact).toBe(writtenArtifact);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.state.htmlReportAnalysisInputSignature).toBe('fresh-cache-input');
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('blocks ineligible analysis payloads before cache lookup, AI calls, or artifact writes', async () => {
     const subject = attachStateHarness(createSubject({
       account: '0x9999999999999999999999999999999999999999',
