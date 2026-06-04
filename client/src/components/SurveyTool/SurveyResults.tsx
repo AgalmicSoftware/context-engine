@@ -152,6 +152,10 @@ import {
   buildSurveyResultsAnalysisLifecyclePlan,
 } from './surveyResultsAnalysisLifecyclePlan';
 import {
+  runSurveyResultsAnalysisLifecycleController,
+  type SurveyResultsAnalysisLifecycleStatePatchPort,
+} from './surveyResultsAnalysisLifecycleController';
+import {
   runSurveyResultsFilterBookmarkWriteController,
 } from './surveyResultsFilterBookmarkWriteController';
 import {
@@ -3106,6 +3110,10 @@ const artifact = this.state.htmlReportAnalysisArtifact as SessionResultsGenerate
 return artifact && artifact.kind ? artifact : null;
 }
 
+applyHtmlReportAnalysisLifecycleStatePatch: SurveyResultsAnalysisLifecycleStatePatchPort = (patch) => {
+this.setState(patch);
+}
+
 buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
 const built = this.buildSessionResultsAnalysisPayloadForAi();
 const questions = built.aiPayload.questions;
@@ -3731,12 +3739,17 @@ const analysisLifecyclePlan = buildSurveyResultsAnalysisLifecyclePlan({
 });
 let artifact: SessionResultsGeneratedAnalysisArtifact | null = analysisLifecyclePlan.artifact;
 
-if (!analysisLifecyclePlan.shouldGenerate) {
-  this.setState(analysisLifecyclePlan.statePatch);
+const lifecycleResult = runSurveyResultsAnalysisLifecycleController({
+  plan: analysisLifecyclePlan,
+  ports: {
+    applyBlockedState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    applyGenerateStartState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    applyReadyState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+  },
+});
+if (!lifecycleResult.shouldGenerate) {
   return;
 }
-
-this.setState(analysisLifecyclePlan.statePatch);
 
 try {
   const missingSections = analysisLifecyclePlan.missingSections;
@@ -3782,7 +3795,13 @@ try {
   });
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
-  this.setState(analysisLifecyclePlan.failureRecovery.statePatch);
+  runSurveyResultsAnalysisLifecycleController({
+    phase: 'failure-recovery',
+    plan: analysisLifecyclePlan,
+    ports: {
+      applyFailureRecoveryState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    },
+  });
 }
 }
 
