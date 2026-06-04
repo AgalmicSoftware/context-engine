@@ -30,6 +30,7 @@ import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
+import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
@@ -1174,6 +1175,12 @@ describe('SurveyResults export/view controls', () => {
 
     await subject.generateHtmlReportAnalysisViews();
 
+    const expectedFailurePatch = buildSurveyResultsAnalysisLifecyclePlan({
+      allSections: ['breakdown', 'riskMatrix'],
+      inputSignature: 'partial-failure-input',
+      requestedSections: ['breakdown', 'riskMatrix'],
+    }).failureRecovery.statePatch;
+
     expect(callAI).toHaveBeenCalledTimes(2);
     expect((callAI as jest.Mock).mock.calls[0][1]).toEqual(expect.objectContaining({
       sessionSlug: 'partial-failure-session',
@@ -1194,6 +1201,7 @@ describe('SurveyResults export/view controls', () => {
       'Unable to generate analysis views right now. Check AI settings and try again.'
     );
     expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.setState).toHaveBeenCalledWith(expectedFailurePatch);
     expect(subject.fetchResponses).not.toHaveBeenCalled();
     expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
     expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
