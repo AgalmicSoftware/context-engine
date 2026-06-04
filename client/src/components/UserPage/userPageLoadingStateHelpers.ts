@@ -59,9 +59,34 @@ export type UserPageUncertaintyLoadingFlags = {
   preserveUserDataUncertainty: boolean;
 };
 
+export type UserPageCacheRefreshStatePatchPlan = {
+  loadingDiag: UserPageUnknownRecord;
+  statePatch: UserPageUnknownRecord | null;
+  uncertaintyFlags: UserPageUncertaintyLoadingFlags;
+};
+
 export type BuildUserPageUserStatsMergePatchArgs = {
   prevUserStats?: unknown;
   userStatsPatch?: unknown;
+};
+
+export type BuildUserPageCacheRefreshStatePatchArgs = {
+  aggregatePresent?: unknown;
+  deepScanCarryPatch?: unknown;
+  hasQuestionSources?: unknown;
+  hasSbtSources?: unknown;
+  hasSurveySources?: unknown;
+  holdQuestionLoading?: unknown;
+  holdSbtLoading?: unknown;
+  holdSurveyLoading?: unknown;
+  keepQuestionLoadingDuringDeepScan?: unknown;
+  keepSurveyLoadingDuringDeepScan?: unknown;
+  markLoading?: unknown;
+  prevState?: unknown;
+  questionSection?: unknown;
+  sbtSection?: unknown;
+  surveySection?: unknown;
+  uncertainResources?: unknown;
 };
 
 export type BuildUserPageRenderLoadingStateArgs = {
@@ -557,4 +582,139 @@ export const buildUserPageUserStatsMergePatch = ({
   if (Object.keys(patch).length === 0) return null;
   const previous = isPlainAnalysisObject(prevUserStats) ? prevUserStats : {};
   return { ...previous, ...patch };
+};
+
+const readRefreshSectionCount = (
+  section: unknown,
+  key: string,
+): number | string => {
+  if (!isPlainAnalysisObject(section)) return 'N/A (held)';
+  const maybeLength = (section[key] as UserPageLengthLike | undefined)?.length;
+  return maybeLength ?? 'N/A (held)';
+};
+
+const readRefreshSectionLength = (
+  section: UserPageUnknownRecord,
+  key: string,
+): number => {
+  const length = Number((section[key] as UserPageLengthLike | undefined)?.length || 0);
+  return Number.isFinite(length) && length > 0 ? length : 0;
+};
+
+export const buildUserPageCacheRefreshStatePatch = ({
+  aggregatePresent = false,
+  deepScanCarryPatch = {},
+  hasQuestionSources = false,
+  hasSbtSources = false,
+  hasSurveySources = false,
+  holdQuestionLoading = false,
+  holdSbtLoading = false,
+  holdSurveyLoading = false,
+  keepQuestionLoadingDuringDeepScan = false,
+  keepSurveyLoadingDuringDeepScan = false,
+  markLoading = false,
+  prevState = null,
+  questionSection = null,
+  sbtSection = null,
+  surveySection = null,
+  uncertainResources = null,
+}: BuildUserPageCacheRefreshStatePatchArgs = {}): UserPageCacheRefreshStatePatchPlan => {
+  const prev = isPlainAnalysisObject(prevState) ? prevState : {};
+  const next: UserPageUnknownRecord = {};
+  const userStatsPatch: UserPageUnknownRecord = {};
+  const uncertaintyFlags = buildUserPageUncertaintyLoadingFlags({
+    hasQuestionSources,
+    hasSbtSources,
+    hasSurveySources,
+    keepQuestionLoadingDuringDeepScan,
+    keepSurveyLoadingDuringDeepScan,
+    prevState: prev,
+    uncertainResources,
+  });
+  const {
+    hasGateUncertainty,
+    hasQuestionGateUncertainty,
+    hasSurveyGateUncertainty,
+    keepQuestionLoadingFromUserUncertainty,
+    keepSbtLoadingFromUserUncertainty,
+    keepSurveyLoadingFromUserUncertainty,
+    preserveUserDataUncertainty,
+  } = uncertaintyFlags;
+
+  next.hasUncertainGateAccess = hasGateUncertainty;
+
+  const survey = isPlainAnalysisObject(surveySection) ? surveySection : null;
+  if (survey) {
+    next.surveyResponseInfo = survey.surveyResponseInfo;
+    next.surveyCreationInfo = survey.surveyCreationInfo;
+    next.detailedSurveyResponses = survey.detailedSurveyResponses;
+    userStatsPatch.surveysResponded = survey.surveysResponded;
+    userStatsPatch.surveysCreated = survey.surveysCreated;
+    next.loadingSurveys = (
+      keepSurveyLoadingFromUserUncertainty ||
+      hasSurveyGateUncertainty ||
+      (!!keepSurveyLoadingDuringDeepScan && !!prev.isDeepScanning)
+    ) && readRefreshSectionLength(survey, 'surveyResponseInfo') === 0;
+  } else if (holdSurveyLoading || markLoading || !aggregatePresent) {
+    next.loadingSurveys = true;
+  }
+
+  const question = isPlainAnalysisObject(questionSection) ? questionSection : null;
+  if (question) {
+    next.questionCreationInfo = question.questionCreationInfo;
+    next.questionResponseInfo = question.questionResponseInfo;
+    next.detailedQuestionResponses = question.detailedQuestionResponses;
+    userStatsPatch.questionsCreated = question.questionsCreated;
+    userStatsPatch.questionsResponded = question.questionsResponded;
+    next.loadingQuestions = (
+      keepQuestionLoadingFromUserUncertainty ||
+      hasQuestionGateUncertainty ||
+      (!!keepQuestionLoadingDuringDeepScan && !!prev.isDeepScanning)
+    ) && readRefreshSectionLength(question, 'questionResponseInfo') === 0;
+  } else if (holdQuestionLoading || markLoading || !aggregatePresent) {
+    next.loadingQuestions = true;
+  }
+
+  const sbt = isPlainAnalysisObject(sbtSection) ? sbtSection : null;
+  if (sbt) {
+    next.sbtList = sbt.sbtList;
+    userStatsPatch.badgesReceived = sbt.badgesReceived;
+    next.loadingSBTs = keepSbtLoadingFromUserUncertainty && readRefreshSectionLength(sbt, 'sbtList') === 0;
+  } else if (holdSbtLoading || markLoading || !aggregatePresent) {
+    next.loadingSBTs = true;
+  }
+
+  if (isPlainAnalysisObject(deepScanCarryPatch)) {
+    Object.assign(next, deepScanCarryPatch);
+  }
+
+  const userStatsMergePatch = buildUserPageUserStatsMergePatch({
+    prevUserStats: prev.userStats,
+    userStatsPatch,
+  });
+  if (userStatsMergePatch) {
+    next.userStats = userStatsMergePatch;
+  }
+
+  return {
+    loadingDiag: {
+      prevIsDeepScanning: prev.isDeepScanning,
+      prevHasUncertainUserData: prev.hasUncertainUserData,
+      preserveUserDataUncertainty,
+      keepSurveyLoadingDuringDeepScan,
+      keepSurveyLoadingFromUserUncertainty,
+      hasSurveyGateUncertainty,
+      keepQuestionLoadingDuringDeepScan,
+      keepQuestionLoadingFromUserUncertainty,
+      hasQuestionGateUncertainty,
+      loadingSurveys: next.loadingSurveys,
+      loadingQuestions: next.loadingQuestions,
+      loadingSBTs: next.loadingSBTs,
+      surveyResponseCount: readRefreshSectionCount(surveySection, 'surveyResponseInfo'),
+      questionResponseCount: readRefreshSectionCount(questionSection, 'questionResponseInfo'),
+      sbtCount: readRefreshSectionCount(sbtSection, 'sbtList'),
+    },
+    statePatch: Object.keys(next).length > 0 ? next : null,
+    uncertaintyFlags,
+  };
 };

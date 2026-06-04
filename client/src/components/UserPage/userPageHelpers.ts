@@ -190,6 +190,7 @@ export type {
 } from './userPageProfileDisplayHelpers';
 export {
   buildUserPageCacheRefreshDisplayState,
+  buildUserPageCacheRefreshStatePatch,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
   buildUserPageUncertainEmptyText,
