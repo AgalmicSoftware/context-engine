@@ -1040,6 +1040,64 @@ describe('SurveyResults export/view controls', () => {
     expect(subject.state.htmlReportAnalysisInputSignature).toBe('cached-input');
   });
 
+  it('blocks ineligible analysis payloads before cache lookup, AI calls, or artifact writes', async () => {
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'blocked-session',
+    }));
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+    };
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: {
+        counts: {
+          participants: 0,
+          questions: 0,
+          responses: 0,
+        },
+        eligible: false,
+        reasons: ['Need at least one response.'],
+      },
+      inputSignature: 'blocked-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn();
+    subject.getHtmlReportAnalysisArtifact = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.getHtmlReportAnalysisSectionsToGenerate).not.toHaveBeenCalled();
+    expect(subject.getHtmlReportAnalysisArtifact).not.toHaveBeenCalled();
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+    expect(subject.setState).toHaveBeenCalledWith({
+      htmlReportAnalysisError: 'Need at least one response.',
+      htmlReportAnalysisInputSignature: 'blocked-input',
+    });
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('Need at least one response.');
+    expect(subject.state.htmlReportAnalysisInputSignature).toBe('blocked-input');
+
+    const tree = subject.renderHtmlReportExportModal();
+    const generateButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-surveyresults-html-report-generate-analysis'
+    );
+    expect(treeHasText(tree, 'Need at least one response.')).toBe(true);
+    expect(generateButton?.props?.disabled).toBe(true);
+    expect(generateButton?.props?.children).toBe('Generate Analysis Views');
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+  });
+
   it('surfaces analysis cache write failures and allows a later retry at the write boundary', async () => {
     const subject = createSubject({
       network: { id: 84532 },
