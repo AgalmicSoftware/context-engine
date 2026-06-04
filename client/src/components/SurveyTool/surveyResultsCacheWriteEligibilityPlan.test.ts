@@ -1,5 +1,6 @@
 import {
   buildSurveyResultsAnalysisArtifactWritePlan,
+  buildSurveyResultsAnalysisArtifactWriteReadinessPlan,
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
@@ -148,6 +149,21 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
   });
 
   it('blocks analysis artifact write plans without moving cache reads or writes', () => {
+    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+      artifact: null,
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+      slug: '',
+    })).toEqual({
+      blockedReason: 'missing-artifact',
+      shouldReadCache: false,
+      shouldWrite: false,
+      target: {
+        namespace: 'analysisCache',
+        slug: '',
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+      },
+    });
+
     expect(buildSurveyResultsAnalysisArtifactWritePlan({
       artifact: null,
       cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
@@ -168,6 +184,21 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       },
     });
 
+    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+      artifact: { inputSignature: 'missing-key' },
+      cacheKey: '',
+      slug: 'gamma-session',
+    })).toEqual({
+      blockedReason: 'missing-cache-key',
+      shouldReadCache: false,
+      shouldWrite: false,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'gamma-session',
+        cacheKey: '',
+      },
+    });
+
     expect(buildSurveyResultsAnalysisArtifactWritePlan({
       artifact: { inputSignature: 'missing-key' },
       cacheKey: '',
@@ -180,6 +211,26 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'gamma-session',
         cacheKey: '',
+      },
+    });
+  });
+
+  it('allows analysis artifact write readiness to hand off valid targets before payload construction', () => {
+    expect(buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+      artifact: {
+        inputSignature: 'ready-input',
+        kind: 'ce_session_results_analysis_artifact',
+      },
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+      slug: 'ready-session',
+    })).toEqual({
+      blockedReason: '',
+      shouldReadCache: true,
+      shouldWrite: true,
+      target: {
+        namespace: 'analysisCache',
+        slug: 'ready-session',
+        cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
       },
     });
   });

@@ -1465,6 +1465,23 @@ describe('SurveyResults export/view controls', () => {
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
+  it('skips analysis artifact cache reads when persistence has no generated artifact', async () => {
+    const subject = createSubject({
+      network: { id: 11155420 },
+      sessionSlug: 'missing-artifact-session',
+    });
+    subject.getEffectiveSlug = jest.fn(() => 'missing-artifact-session');
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      sessionResultsAnalysis: {},
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined);
+
+    await subject.writeSessionResultsAnalysisArtifactToCache(null);
+
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
   it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
     const subject = createSubject({
       network: { id: 11155420 },
