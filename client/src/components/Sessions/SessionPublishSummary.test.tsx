@@ -200,6 +200,55 @@ describe('SessionPublishSummary', () => {
     expect(onPublish).not.toHaveBeenCalled();
   });
 
+  it('keeps manual metadata and gas controls callback-only while showing active metadata sources', () => {
+    const onManualGasLimitChange = jest.fn();
+    const onManualGasPriceGweiChange = jest.fn();
+    const onManualMaxFeePerGasGweiChange = jest.fn();
+    const onManualMaxPriorityFeePerGasGweiChange = jest.fn();
+    const onPublish = jest.fn();
+
+    render(
+      <SessionPublishSummary
+        {...buildProps({
+          hasManualMetadata: true,
+          hasUploadedMetadata: true,
+          manualGasLimit: '900000',
+          manualGasPriceGwei: '',
+          manualMaxFeePerGasGwei: '',
+          manualMaxPriorityFeePerGasGwei: '',
+          manualMetadataUrl: 'ar://manual-tx',
+          metadataUrl: 'ar://uploaded-tx',
+          normalizeArweaveUri: (value) => `normalized:${value}`,
+          onManualGasLimitChange,
+          onManualGasPriceGweiChange,
+          onManualMaxFeePerGasGweiChange,
+          onManualMaxPriorityFeePerGasGweiChange,
+          onPublish,
+          publishAdvancedOpen: true,
+        })}
+      />
+    );
+
+    expect(screen.getByText('Uploaded metadata URI:')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent('ar://uploaded-tx');
+    expect(screen.getByText('Manual metadata URI:')).toBeInTheDocument();
+    expect(screen.getByText('normalized:ar://manual-tx')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('1000000'), {
+      target: { value: '1200000' },
+    });
+    const blankGasInputs = screen.getAllByPlaceholderText('(leave blank)');
+    fireEvent.change(blankGasInputs[0], { target: { value: '1.5' } });
+    fireEvent.change(blankGasInputs[1], { target: { value: '2.5' } });
+    fireEvent.change(blankGasInputs[2], { target: { value: '0.5' } });
+
+    expect(onManualGasLimitChange).toHaveBeenCalledWith('1200000');
+    expect(onManualGasPriceGweiChange).toHaveBeenCalledWith('1.5');
+    expect(onManualMaxFeePerGasGweiChange).toHaveBeenCalledWith('2.5');
+    expect(onManualMaxPriorityFeePerGasGweiChange).toHaveBeenCalledWith('0.5');
+    expect(onPublish).not.toHaveBeenCalled();
+  });
+
   it('renders published inline SBT links with human-readable labels', () => {
     const firstHref = buildSbtDetailPath(
       '0x00000000000000000000000000000000000000a1',
