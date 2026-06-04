@@ -1283,6 +1283,10 @@ describe('SurveyResults export/view controls', () => {
     subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
     subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown', 'riskMatrix']);
     subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.getSessionResultsAnalysisCacheKey = jest.fn((signature) => (
+      `sessionResultsAnalysis:v1:OP Sepolia:${String(signature || '')}`
+    ));
+    subject.getSessionResultsAnalysisCacheSlug = jest.fn(() => 'lifecycle-session');
     subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(async (artifact) => {
       writeEvents.push({
         artifact,
@@ -1340,6 +1344,8 @@ describe('SurveyResults export/view controls', () => {
     await generation;
 
     expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(2);
+    expect(subject.getSessionResultsAnalysisCacheKey).toHaveBeenCalledWith('lifecycle-input');
+    expect(subject.getSessionResultsAnalysisCacheSlug).toHaveBeenCalled();
     expect(writeEvents[1].progress).toBe('Generating Risk Matrix (2/2)');
     expect(writeEvents[1].artifact.sections.breakdown.available).toBe(true);
     expect(writeEvents[1].artifact.sections.riskMatrix.available).toBe(true);
