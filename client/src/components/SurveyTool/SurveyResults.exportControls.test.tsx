@@ -1268,6 +1268,11 @@ describe('SurveyResults export/view controls', () => {
       loginComplete: true,
     }));
     const cachedArtifact = createAnalysisArtifact('cached-input');
+    subject.state = {
+      ...subject.state,
+      htmlReportAnalysisGenerating: true,
+      htmlReportAnalysisProgress: 'Generating cached section (1/1)',
+    };
     subject.isHtmlReportDemoModeActive = jest.fn(() => false);
     subject.isHtmlReportExportAuthorized = jest.fn(() => true);
     subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
@@ -1280,14 +1285,26 @@ describe('SurveyResults export/view controls', () => {
     subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown']);
     subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
     subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
 
     await subject.generateHtmlReportAnalysisViews();
 
     expect(callAI).not.toHaveBeenCalled();
     expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
     expect(subject.state.htmlReportAnalysisArtifact).toBe(cachedArtifact);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
     expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
     expect(subject.state.htmlReportAnalysisInputSignature).toBe('cached-input');
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
   it('blocks analysis generation before cache reads when exporter identity is missing', async () => {

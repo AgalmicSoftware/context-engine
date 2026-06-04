@@ -161,6 +161,7 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
       shouldGenerate: false,
       statePatch: {
         htmlReportAnalysisArtifact: artifact,
+        htmlReportAnalysisGenerating: false,
         htmlReportAnalysisError: '',
         htmlReportAnalysisInputSignature: normalizedInputSignature,
         htmlReportAnalysisProgress: '',
