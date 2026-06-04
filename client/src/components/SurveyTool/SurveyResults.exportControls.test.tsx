@@ -948,7 +948,7 @@ describe('SurveyResults export/view controls', () => {
     });
   });
 
-  it('keeps analysis write failures in the generation status path without starting downloads', async () => {
+  it('keeps analysis write failures in the generation status path and recovers without starting downloads', async () => {
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     (callAI as jest.Mock).mockResolvedValue(JSON.stringify({
       breakdown: {
@@ -975,7 +975,8 @@ describe('SurveyResults export/view controls', () => {
     subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
     subject.writeSessionResultsAnalysisArtifactToCache = jest
       .fn()
-      .mockRejectedValueOnce(new Error('cache write failed'));
+      .mockRejectedValueOnce(new Error('cache write failed'))
+      .mockResolvedValueOnce(undefined);
 
     await subject.generateHtmlReportAnalysisViews();
 
@@ -991,6 +992,19 @@ describe('SurveyResults export/view controls', () => {
     expect(consoleErrorSpy.mock.calls.some((call) => call.some((arg) => (
       String(arg).includes('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis')
     )))).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact).toBeNull();
+
+    await subject.generateHtmlReportAnalysisViews();
+
+    expect(callAI).toHaveBeenCalledTimes(2);
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(2);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.state.htmlReportAnalysisInputSignature).toBe('write-failure-input');
+    expect(subject.state.htmlReportAnalysisArtifact?.sections.breakdown.available).toBe(true);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
   it('exports survey-response CSV from current individual payloads with metadata fallbacks and latest-row dedupe', () => {
