@@ -30,6 +30,22 @@ export type SurveyResultsAnalysisArtifactWritePlanArgs = {
   slug?: unknown;
 };
 
+export type SurveyResultsAnalysisArtifactWriteReadinessPlanArgs = Omit<
+  SurveyResultsAnalysisArtifactWritePlanArgs,
+  'currentCache'
+>;
+
+export type SurveyResultsAnalysisArtifactWriteReadinessPlan = {
+  blockedReason: '' | 'missing-artifact' | 'missing-cache-key';
+  shouldReadCache: boolean;
+  shouldWrite: boolean;
+  target: {
+    namespace: 'analysisCache';
+    slug: string;
+    cacheKey: string;
+  };
+};
+
 export type SurveyResultsAnalysisArtifactWritePlan = {
   blockedReason: '' | 'missing-artifact' | 'missing-cache-key';
   payload: SurveyResultsRecord | null;
@@ -71,12 +87,11 @@ const toRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
 
-export const buildSurveyResultsAnalysisArtifactWritePlan = ({
+export const buildSurveyResultsAnalysisArtifactWriteReadinessPlan = ({
   artifact = null,
   cacheKey = '',
-  currentCache = {},
   slug = '',
-}: SurveyResultsAnalysisArtifactWritePlanArgs = {}): SurveyResultsAnalysisArtifactWritePlan => {
+}: SurveyResultsAnalysisArtifactWriteReadinessPlanArgs = {}): SurveyResultsAnalysisArtifactWriteReadinessPlan => {
   const target = {
     namespace: 'analysisCache' as const,
     slug: String(slug || ''),
@@ -86,7 +101,7 @@ export const buildSurveyResultsAnalysisArtifactWritePlan = ({
   if (!artifact || typeof artifact !== 'object') {
     return {
       blockedReason: 'missing-artifact',
-      payload: null,
+      shouldReadCache: false,
       shouldWrite: false,
       target,
     };
@@ -95,9 +110,38 @@ export const buildSurveyResultsAnalysisArtifactWritePlan = ({
   if (!target.cacheKey) {
     return {
       blockedReason: 'missing-cache-key',
-      payload: null,
+      shouldReadCache: false,
       shouldWrite: false,
       target,
+    };
+  }
+
+  return {
+    blockedReason: '',
+    shouldReadCache: true,
+    shouldWrite: true,
+    target,
+  };
+};
+
+export const buildSurveyResultsAnalysisArtifactWritePlan = ({
+  artifact = null,
+  cacheKey = '',
+  currentCache = {},
+  slug = '',
+}: SurveyResultsAnalysisArtifactWritePlanArgs = {}): SurveyResultsAnalysisArtifactWritePlan => {
+  const readinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+    artifact,
+    cacheKey,
+    slug,
+  });
+
+  if (!readinessPlan.shouldReadCache) {
+    return {
+      blockedReason: readinessPlan.blockedReason,
+      payload: null,
+      shouldWrite: false,
+      target: readinessPlan.target,
     };
   }
 
@@ -110,11 +154,11 @@ export const buildSurveyResultsAnalysisArtifactWritePlan = ({
       ...currentCacheRecord,
       sessionResultsAnalysis: {
         ...artifacts,
-        [target.cacheKey]: artifact,
+        [readinessPlan.target.cacheKey]: artifact,
       },
     },
     shouldWrite: true,
-    target,
+    target: readinessPlan.target,
   };
 };
 

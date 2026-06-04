@@ -141,6 +141,7 @@ import {
 } from './surveyResultsCacheControllerSnapshot';
 import {
   buildSurveyResultsAnalysisArtifactWritePlan,
+  buildSurveyResultsAnalysisArtifactWriteReadinessPlan,
   buildSurveyResultsFilterBookmarkWritePlan,
   buildSurveyResultsSurveyQuestionBookmarkWritePlan,
   type SurveyResultsFilterBookmarkWritePlan,
@@ -3147,13 +3148,20 @@ return artifact && typeof artifact === 'object'
 }
 
 writeSessionResultsAnalysisArtifactToCache = async (
-artifact: SessionResultsGeneratedAnalysisArtifact
+artifact: SessionResultsGeneratedAnalysisArtifact | null
 ): Promise<void> => {
 const slug = this.getSessionResultsAnalysisCacheSlug();
+const cacheKey = artifact ? this.getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '';
+const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+  artifact,
+  cacheKey,
+  slug,
+});
+if (!writeReadinessPlan.shouldReadCache) return;
 const current = toSurveyResultsRecord(await readCache('analysisCache', slug));
 const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
   artifact,
-  cacheKey: this.getSessionResultsAnalysisCacheKey(artifact.inputSignature),
+  cacheKey,
   currentCache: current,
   slug,
 });
@@ -3696,9 +3704,7 @@ try {
       next: sectionArtifact,
       sections: [section],
     });
-    if (artifact) {
-      await this.writeSessionResultsAnalysisArtifactToCache(artifact);
-    }
+    await this.writeSessionResultsAnalysisArtifactToCache(artifact);
   }
   this.setState({
     htmlReportAnalysisArtifact: artifact,
