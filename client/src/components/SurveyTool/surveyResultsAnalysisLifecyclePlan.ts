@@ -12,7 +12,7 @@ export type SurveyResultsAnalysisLifecyclePlanArgs = {
 };
 
 export type SurveyResultsAnalysisLifecycleBlockedReason = '' | 'missing-analysis-sections';
-export type SurveyResultsAnalysisLifecycleStatus = 'ready-artifact' | 'generate-missing-sections';
+export type SurveyResultsAnalysisLifecycleStatus = 'ready-artifact' | 'generate-missing-sections' | 'blocked';
 
 export type SurveyResultsAnalysisLifecyclePayloadDescriptor = {
   artifactInputSignature: string;
@@ -109,6 +109,36 @@ export const buildSurveyResultsAnalysisLifecyclePlan = ({
     ? ''
     : 'missing-analysis-sections';
   const failureRecovery = buildFailureRecovery();
+
+  if (blockedReason) {
+    const missingSections: SessionResultsAnalysisSectionKey[] = [];
+    return {
+      artifact,
+      blockedReason,
+      failureRecovery,
+      missingSections,
+      payloadDescriptor: {
+        artifactInputSignature: target.artifactInputSignature,
+        artifactPresent: !!artifact,
+        artifactSource: source,
+        availableSections: getAvailableSections(artifact, all),
+        inputSignature: normalizedInputSignature,
+        missingSections,
+        requestedSections: requested,
+        sectionsToGenerate,
+      },
+      sectionsToGenerate,
+      shouldGenerate: false,
+      statePatch: {
+        htmlReportAnalysisGenerating: false,
+        htmlReportAnalysisError: '',
+        htmlReportAnalysisInputSignature: normalizedInputSignature,
+        htmlReportAnalysisProgress: '',
+      },
+      status: 'blocked',
+      target,
+    };
+  }
 
   if (artifactCoversSections(artifact, sectionsToGenerate)) {
     const missingSections: SessionResultsAnalysisSectionKey[] = [];

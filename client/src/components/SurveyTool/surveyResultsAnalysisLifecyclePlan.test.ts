@@ -215,8 +215,10 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
       requestedSections: [],
     });
 
+    expect(plan.artifact).toBeNull();
     expect(plan.blockedReason).toBe('missing-analysis-sections');
     expect(plan.failureRecovery).toEqual(retryableFailureRecovery);
+    expect(plan.missingSections).toEqual([]);
     expect(plan.payloadDescriptor).toEqual({
       artifactInputSignature: '',
       artifactPresent: false,
@@ -227,6 +229,15 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
       requestedSections: [],
       sectionsToGenerate: [],
     });
+    expect(plan.sectionsToGenerate).toEqual([]);
+    expect(plan.shouldGenerate).toBe(false);
+    expect(plan.statePatch).toEqual({
+      htmlReportAnalysisGenerating: false,
+      htmlReportAnalysisError: '',
+      htmlReportAnalysisInputSignature: 'empty-sections-input',
+      htmlReportAnalysisProgress: '',
+    });
+    expect(plan.status).toBe('blocked');
     expect(plan.target).toEqual({
       artifactInputSignature: '',
       inputSignature: 'empty-sections-input',
