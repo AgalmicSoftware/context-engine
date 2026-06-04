@@ -3782,11 +3782,7 @@ try {
   });
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
-  this.setState({
-    htmlReportAnalysisGenerating: false,
-    htmlReportAnalysisError: 'Unable to generate analysis views right now. Check AI settings and try again.',
-    htmlReportAnalysisProgress: '',
-  });
+  this.setState(analysisLifecyclePlan.failureRecovery.statePatch);
 }
 }
 
