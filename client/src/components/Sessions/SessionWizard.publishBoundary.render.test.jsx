@@ -76,6 +76,38 @@ describe('SessionWizard publish boundary rendering', () => {
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
+  it('keeps blank manual metadata blocked and inert without upload or registry execution', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Blank Manual Metadata Boundary Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: '   ' },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).toBeDisabled();
+    });
+    expect(screen.getByText('Set a worker URL before uploading metadata.')).toBeInTheDocument();
+
+    fireEvent.click(publishButton);
+
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+  });
+
   it('renders parent-derived register progress during manual metadata publish', async () => {
     const manualMetadataUri = `ar://${'c'.repeat(43)}`;
     let resolveRegister = () => {};
