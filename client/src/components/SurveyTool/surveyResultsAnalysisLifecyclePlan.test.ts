@@ -134,6 +134,46 @@ describe('surveyResultsAnalysisLifecyclePlan', () => {
     });
   });
 
+  it('ignores stale cached artifacts and plans generation against the current signature', () => {
+    const staleArtifact = createArtifact('stale-cache-input');
+
+    expect(buildSurveyResultsAnalysisLifecyclePlan({
+      allSections,
+      cachedArtifact: staleArtifact,
+      inputSignature: 'fresh-input',
+      requestedSections: ['breakdown'],
+    })).toEqual({
+      artifact: null,
+      blockedReason: '',
+      failureRecovery: retryableFailureRecovery,
+      missingSections: ['breakdown'],
+      payloadDescriptor: {
+        artifactInputSignature: '',
+        artifactPresent: false,
+        artifactSource: 'none',
+        availableSections: [],
+        inputSignature: 'fresh-input',
+        missingSections: ['breakdown'],
+        requestedSections: ['breakdown'],
+        sectionsToGenerate: ['breakdown'],
+      },
+      sectionsToGenerate: ['breakdown'],
+      shouldGenerate: true,
+      statePatch: {
+        htmlReportAnalysisGenerating: true,
+        htmlReportAnalysisError: '',
+        htmlReportAnalysisInputSignature: 'fresh-input',
+        htmlReportAnalysisProgress: '',
+      },
+      status: 'generate-missing-sections',
+      target: {
+        artifactInputSignature: '',
+        inputSignature: 'fresh-input',
+        source: 'none',
+      },
+    });
+  });
+
   it('expands an empty requested section list to all analysis sections', () => {
     const cachedArtifact = createArtifact('cached-input');
 
