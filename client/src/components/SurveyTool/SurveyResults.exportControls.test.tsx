@@ -129,6 +129,12 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
+const flushMicrotasks = async (cycles = 3): Promise<void> => {
+  for (let index = 0; index < cycles; index += 1) {
+    await Promise.resolve();
+  }
+};
+
 const attachStateHarness = (subject: any): any => {
   subject.setState = jest.fn((updater, cb) => {
     const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
@@ -860,6 +866,121 @@ describe('SurveyResults export/view controls', () => {
     expect(snapshot.sections.argumentMap.available).toBe(true);
     expect(snapshot.sections.riskMatrix.available).toBe(true);
     expect(snapshot.sections.atlas.available).toBe(true);
+  });
+
+  it('orders analysis generation status, cache writes, and final parent state on success', async () => {
+    const firstAnalysis = createDeferred<string>();
+    const secondAnalysis = createDeferred<string>();
+    (callAI as jest.Mock)
+      .mockImplementationOnce(() => firstAnalysis.promise)
+      .mockImplementationOnce(() => secondAnalysis.promise);
+
+    const subject = attachStateHarness(createSubject({
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+      sessionSlug: 'lifecycle-session',
+    }));
+    const stateEvents: Array<{
+      generating: unknown;
+      patch: Record<string, unknown>;
+      progress: unknown;
+    }> = [];
+    const originalSetState = subject.setState;
+    subject.setState = jest.fn((updater, cb) => {
+      const patch = originalSetState(updater, cb);
+      stateEvents.push({
+        generating: subject.state.htmlReportAnalysisGenerating,
+        patch,
+        progress: subject.state.htmlReportAnalysisProgress,
+      });
+      return patch;
+    });
+    const writeEvents: Array<{ artifact: any; progress: unknown }> = [];
+
+    subject.isHtmlReportDemoModeActive = jest.fn(() => false);
+    subject.isHtmlReportExportAuthorized = jest.fn(() => true);
+    subject.buildSessionResultsAnalysisPayloadForAi = jest.fn(() => ({
+      aiPayload: { questions: [], responses: [], segmentDimensions: [] },
+      eligibility: { eligible: true, reasons: [] },
+      inputSignature: 'lifecycle-input',
+      participants: [],
+    }));
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn(() => null);
+    subject.getHtmlReportAnalysisSectionsToGenerate = jest.fn(() => ['breakdown', 'riskMatrix']);
+    subject.getHtmlReportAnalysisArtifact = jest.fn(() => null);
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn(async (artifact) => {
+      writeEvents.push({
+        artifact,
+        progress: subject.state.htmlReportAnalysisProgress,
+      });
+    });
+
+    const generation = subject.generateHtmlReportAnalysisViews();
+
+    expect((callAI as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('Generate only this result view: Breakdown'),
+    ]);
+    expect(stateEvents.map((event) => event.patch)).toEqual([
+      expect.objectContaining({
+        htmlReportAnalysisGenerating: true,
+        htmlReportAnalysisError: '',
+        htmlReportAnalysisInputSignature: 'lifecycle-input',
+        htmlReportAnalysisProgress: '',
+      }),
+      {
+        htmlReportAnalysisProgress: 'Generating Breakdown (1/2)',
+      },
+    ]);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(true);
+    expect(subject.state.htmlReportAnalysisProgress).toBe('Generating Breakdown (1/2)');
+    expect(treeHasText(subject.renderHtmlReportExportModal(), 'Generating Breakdown (1/2)')).toBe(true);
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+
+    firstAnalysis.resolve(JSON.stringify({
+      breakdown: {
+        dimensions: [],
+        groups: [{ id: 'group_1', label: 'Lifecycle group' }],
+        summary: { overview: 'First section ready.' },
+      },
+    }));
+    await flushMicrotasks();
+
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(1);
+    expect(writeEvents[0].progress).toBe('Generating Breakdown (1/2)');
+    expect(writeEvents[0].artifact.sections.breakdown.available).toBe(true);
+    expect(subject.state.htmlReportAnalysisProgress).toBe('Generating Risk Matrix (2/2)');
+    expect((callAI as jest.Mock).mock.calls.map((call) => call[0])).toEqual([
+      expect.stringContaining('Generate only this result view: Breakdown'),
+      expect.stringContaining('Generate only this result view: Risk Matrix'),
+    ]);
+
+    secondAnalysis.resolve(JSON.stringify({
+      riskMatrix: {
+        categories: [{ id: 'risk_1', label: 'Lifecycle risk' }],
+        comments: [],
+        heatmap: {},
+        scenarioLinks: [],
+      },
+    }));
+    await generation;
+
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).toHaveBeenCalledTimes(2);
+    expect(writeEvents[1].progress).toBe('Generating Risk Matrix (2/2)');
+    expect(writeEvents[1].artifact.sections.breakdown.available).toBe(true);
+    expect(writeEvents[1].artifact.sections.riskMatrix.available).toBe(true);
+    expect(subject.state.htmlReportAnalysisArtifact).toBe(writeEvents[1].artifact);
+    expect(subject.state.htmlReportAnalysisGenerating).toBe(false);
+    expect(subject.state.htmlReportAnalysisError).toBe('');
+    expect(subject.state.htmlReportAnalysisProgress).toBe('');
+    expect(subject.state.htmlReportAnalysisInputSignature).toBe('lifecycle-input');
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(stateEvents[stateEvents.length - 1].patch).toEqual(expect.objectContaining({
+      htmlReportAnalysisArtifact: writeEvents[1].artifact,
+      htmlReportAnalysisGenerating: false,
+      htmlReportAnalysisError: '',
+      htmlReportAnalysisProgress: '',
+    }));
   });
 
   it('writes generated analysis artifacts to the scoped cache key without clobbering siblings', async () => {
