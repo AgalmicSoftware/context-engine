@@ -147,6 +147,12 @@ import {
   type SurveyResultsFilterBookmarkWritePlan,
 } from './surveyResultsCacheWriteEligibilityPlan';
 import {
+  buildSurveyResultsAnalysisArtifactCacheKey,
+  buildSurveyResultsAnalysisArtifactCacheReadRequestPlan,
+  selectSurveyResultsAnalysisArtifactFromCache,
+  type SurveyResultsAnalysisArtifactCacheReadPort,
+} from './surveyResultsAnalysisArtifactCachePorts';
+import {
   runSurveyResultsAnalysisArtifactWriteController,
   type SurveyResultsAnalysisArtifactWritePort,
 } from './surveyResultsAnalysisArtifactWriteController';
@@ -3128,23 +3134,33 @@ return buildSurveyResultsDemoAnalysisArtifact({
 getSessionResultsAnalysisCacheSlug = (): string => this.getEffectiveSlug() || 'general';
 
 getSessionResultsAnalysisCacheKey = (inputSignature: unknown): string => (
-`sessionResultsAnalysis:v1:${this.getHtmlReportNetworkLabel() || this.getHtmlReportChainId() || 'unknown'}:${String(inputSignature || '')}`
+buildSurveyResultsAnalysisArtifactCacheKey({
+  chainId: this.getHtmlReportChainId(),
+  inputSignature,
+  networkLabel: this.getHtmlReportNetworkLabel(),
+})
 );
-
-getSessionResultsAnalysisCacheBucket = (): SurveyResultsRecord => {
-const cacheObj = peekCacheSync('analysisCache', this.getSessionResultsAnalysisCacheSlug(), { clone: false });
-return toSurveyResultsRecord(cacheObj);
-}
 
 readSessionResultsAnalysisArtifactFromCache = (
 inputSignature: unknown
 ): SessionResultsGeneratedAnalysisArtifact | null => {
-const bucket = this.getSessionResultsAnalysisCacheBucket();
-const artifacts = toSurveyResultsRecord(bucket.sessionResultsAnalysis);
-const artifact = artifacts[this.getSessionResultsAnalysisCacheKey(inputSignature)];
-return artifact && typeof artifact === 'object'
-  ? artifact as SessionResultsGeneratedAnalysisArtifact
-  : null;
+const cacheKey = this.getSessionResultsAnalysisCacheKey(inputSignature);
+const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
+  cacheKey,
+  inputSignature,
+  slug: this.getSessionResultsAnalysisCacheSlug(),
+});
+if (!readPlan.shouldRead || !readPlan.readRequest) return null;
+const readAnalysisCache = peekCacheSync as SurveyResultsAnalysisArtifactCacheReadPort;
+const cacheObj = readAnalysisCache(
+  readPlan.readRequest.namespace,
+  readPlan.readRequest.slug,
+  readPlan.readRequest.options
+);
+return selectSurveyResultsAnalysisArtifactFromCache({
+  cacheValue: cacheObj,
+  target: readPlan.target,
+});
 }
 
 writeSessionResultsAnalysisArtifactToCache = async (
