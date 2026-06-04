@@ -65,6 +65,52 @@ describe('surveyToolResponseSourceController', () => {
     expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
   });
 
+  it('rebuilds recent submitted-response slices instead of reusing stale source memo or cache fallback', () => {
+    const staleUserAnswers = { responses: [{ questionID: 'q1', answer: { value: 'stale' } }] };
+    const recentUserAnswers = { responses: [{ questionID: 'q1', answer: { value: 'recent' } }] };
+    const recentSlice = {
+      answers: { q1: { value: 'recent' } },
+      importance: { q1: 6 },
+      conviction: {},
+      additionalComments: {},
+    };
+    const staleCachedSlice = {
+      answers: { q1: { value: 'stale memo' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
+    const buildSliceFromUserAnswers = jest.fn(() => recentSlice);
+    const buildSliceFromLocalCache = jest.fn(() => ({
+      answers: { q1: { value: 'stale local cache' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+
+    expect(resolveSurveyBaselineSourceSlice({
+      editBaseline: null,
+      allowLocalCache: true,
+      userAnswers: recentUserAnswers,
+      userAnswersSliceCache: {
+        source: staleUserAnswers,
+        value: staleCachedSlice,
+      },
+      buildSliceFromUserAnswers,
+      buildSliceFromLocalCache,
+    })).toEqual({
+      baselineSlice: recentSlice,
+      nextUserAnswersSliceCache: {
+        source: recentUserAnswers,
+        value: recentSlice,
+      },
+      source: 'user-answers',
+    });
+
+    expect(buildSliceFromUserAnswers).toHaveBeenCalledWith(recentUserAnswers);
+    expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
+  });
+
   it('falls back to local cache when allowed and there is no baseline or user answer source', () => {
     const localCacheSlice = {
       answers: { q1: { value: 'from-cache' } },
@@ -222,6 +268,34 @@ describe('surveyToolResponseSourceController', () => {
       })),
       valuesEqual: (left, right) => left === right,
     })).toBe(true);
+  });
+
+  it('rejects stale decrypted cache values when the latest submitted source is still masked', () => {
+    expect(areSurveyResponsesConsistent({
+      latest: {
+        responses: [{
+          questionID: 'q1',
+          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+          additional: { value: '*', encrypted: true, encryptedPortion: 'note-env' },
+          importanceEncrypted: 'imp-env',
+          convictionEncrypted: 'conv-env',
+        }],
+      },
+      editBaseline: {
+        answers: { q1: { value: 'stale decrypted answer', encrypted: false } },
+        additionalComments: { q1: { value: 'stale decrypted note', encrypted: false } },
+        importance: { q1: 4 },
+        conviction: { q1: 7 },
+      },
+      renderedIds: ['q1'],
+      buildSliceFromUserAnswers: jest.fn(() => ({
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: 'answer-env' } },
+        additionalComments: { q1: { value: '*', encrypted: true, encryptedPortion: 'note-env' } },
+        importance: {},
+        conviction: {},
+      })),
+      valuesEqual: (left, right) => left === right,
+    })).toBe(false);
   });
 
   it('detects mismatched answer values even when other fields match', () => {
