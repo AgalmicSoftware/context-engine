@@ -16,6 +16,7 @@ import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeade
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
+import SessionWizardStorageProfileField from './SessionWizardStorageProfileField';
 import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
@@ -153,8 +154,6 @@ import {
   isSessionWizardDefaultWorkerPlaceholderUrl,
 } from './sessionWizardWorkerDefaults';
 import {
-  SESSION_STORAGE_BACKENDS,
-  buildSessionStorageProfileDisplayDescriptor,
   isWorkerSbtGateCloudflareStorageProfile,
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
@@ -2646,100 +2645,18 @@ const SessionWizard = ({
 
     if (path.length === 0 && key === 'storageProfile') {
       if (wizardMode !== 'advanced') return null;
-      const storageProfile = normalizeSessionStorageProfileConfig(value);
-      const storageProfileDisplay = buildSessionStorageProfileDisplayDescriptor(storageProfile);
       const isCollapsed = metadataObjectCollapsed.storageProfile;
-      const updateStorageBackend = (backend) => {
-        updateDraftValue(
-          ['storageProfile'],
-          normalizeSessionStorageProfileConfig({
-            ...(value && typeof value === 'object' ? value : {}),
-            backend,
-          })
-        );
-      };
-      const updateCloudflarePayloadAccessMode = (mode) => {
-        updateDraftValue(
-          ['storageProfile'],
-          normalizeSessionStorageProfileConfig({
-            ...(value && typeof value === 'object' ? value : {}),
-            backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
-            payloadAccessControl: {
-              ...(storageProfile.payloadAccessControl && typeof storageProfile.payloadAccessControl === 'object'
-                ? storageProfile.payloadAccessControl
-                : {}),
-              mode,
-            },
-          })
-        );
-      };
       return (
-        <CollapsibleFieldGroup
+        <SessionWizardStorageProfileField
           key={keyString}
           title={displayLabel}
+          value={value}
           isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
           onToggleCollapsed={() =>
             setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
           }
-        >
-          {!isCollapsed && (
-            <>
-              <div
-                className={styles.inlineToggleRow}
-                role="radiogroup"
-                aria-label="Session storage profile"
-              >
-                {storageProfileDisplay.backendOptions.map((option) => (
-                  <Button
-                    key={option.backend}
-                    type="button"
-                    role="radio"
-                    aria-checked={option.selected}
-                    className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
-                    onClick={() => updateStorageBackend(option.backend)}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-              {storageProfileDisplay.backendHelperText &&
-              !storageProfileDisplay.showCloudflarePayloadAccessControls ? (
-                <div className={styles.helperText}>
-                  {storageProfileDisplay.backendHelperText}
-                </div>
-              ) : null}
-              {storageProfileDisplay.showCloudflarePayloadAccessControls ? (
-                <>
-                  <div className={styles.helperText}>
-                    {storageProfileDisplay.backendHelperText}
-                  </div>
-                  <div
-                    className={styles.inlineToggleRow}
-                    role="radiogroup"
-                    aria-label="Cloudflare payload access mode"
-                  >
-                    {storageProfileDisplay.cloudflarePayloadAccessOptions.map((option) => (
-                      <Button
-                        key={option.mode}
-                        type="button"
-                        role="radio"
-                        aria-checked={option.selected}
-                        className={`${styles.workerModePill} ${option.selected ? styles.workerModePillActive : ''}`}
-                        onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
-                      >
-                        {option.label}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className={styles.helperText}>
-                    {storageProfileDisplay.cloudflarePayloadAccessHelperText}
-                  </div>
-                </>
-              ) : null}
-            </>
-          )}
-        </CollapsibleFieldGroup>
+          onStorageProfileChange={(nextProfile) => updateDraftValue(['storageProfile'], nextProfile)}
+        />
       );
     }
 
