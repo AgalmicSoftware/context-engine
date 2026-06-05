@@ -667,6 +667,29 @@ const isGateAccessContext = (value: unknown): value is GateAccessContext => (
   isUserPageGateAccessContext(value)
 );
 
+const createGateAccessContext = (): GateAccessContext => ({
+  pendingKeys: new Set(),
+  uncertainResources: new Set(),
+});
+
+const captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
+  pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
+  uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
+});
+
+const mergeGateContextSnapshot = (
+  targetContext: GateAccessContext | null,
+  snapshot: GateAccessContextSnapshot | null = null
+): void => {
+  if (!isGateAccessContext(targetContext) || !snapshot) return;
+  (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
+    targetContext.pendingKeys.add(String(item || ''));
+  });
+  (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
+    targetContext.uncertainResources.add(String(item || ''));
+  });
+};
+
 const buildUserAnalysisFingerprint = async (
   input: Omit<UserPageAnalysisFingerprintInput, 'version'>
 ) => buildUserPageAnalysisFingerprint({
@@ -1999,29 +2022,6 @@ class UserPage extends Component<any, any> {
     return didUpdate;
   };
 
-  _createGateAccessContext = (): GateAccessContext => ({
-    pendingKeys: new Set(),
-    uncertainResources: new Set(),
-  });
-
-  _captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
-    pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
-    uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
-  });
-
-  _mergeGateContextSnapshot = (
-    targetContext: GateAccessContext | null,
-    snapshot: GateAccessContextSnapshot | null = null
-  ): void => {
-    if (!isGateAccessContext(targetContext) || !snapshot) return;
-    (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
-      targetContext.pendingKeys.add(String(item || ''));
-    });
-    (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
-      targetContext.uncertainResources.add(String(item || ''));
-    });
-  };
-
   _evaluateEncryptedVisibility = ({
     resourceKey = 'default',
     slug = '',
@@ -2709,7 +2709,7 @@ class UserPage extends Component<any, any> {
     let sbtSection: SbtSectionResult | null = null;
     let deepScanTooltipLines: string[] | null = null;
     let deepScanProgressRows: DeepScanProgressRow[] | null = null;
-    const gateContext = this._createGateAccessContext();
+    const gateContext = createGateAccessContext();
 
     try {
       const aggregateMemoKey = this._buildUnifiedCacheAggregateMemoKey({
@@ -2751,12 +2751,12 @@ class UserPage extends Component<any, any> {
         const surveyMemo = this._sectionDeriveMemo?.survey;
         if (!force && surveyMemo && surveyMemo.signature === surveySignature) {
           surveySection = surveyMemo.result as SurveySectionResult;
-          this._mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
+          mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
         } else {
-          const surveyGateContext = this._createGateAccessContext();
+          const surveyGateContext = createGateAccessContext();
           surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
-          const surveyGateSnapshot = this._captureGateContextSnapshot(surveyGateContext);
-          this._mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
+          const surveyGateSnapshot = captureGateContextSnapshot(surveyGateContext);
+          mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
             signature: surveySignature,
             result: surveySection,
@@ -2773,12 +2773,12 @@ class UserPage extends Component<any, any> {
         const questionMemo = this._sectionDeriveMemo?.question;
         if (!force && questionMemo && questionMemo.signature === questionSignature) {
           questionSection = questionMemo.result as QuestionSectionResult;
-          this._mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
+          mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
         } else {
-          const questionGateContext = this._createGateAccessContext();
+          const questionGateContext = createGateAccessContext();
           questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
-          const questionGateSnapshot = this._captureGateContextSnapshot(questionGateContext);
-          this._mergeGateContextSnapshot(gateContext, questionGateSnapshot);
+          const questionGateSnapshot = captureGateContextSnapshot(questionGateContext);
+          mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
             signature: questionSignature,
             result: questionSection,
