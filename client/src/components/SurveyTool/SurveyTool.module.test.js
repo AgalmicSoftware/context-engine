@@ -7,6 +7,15 @@ import {
   buildSurveyDraftSemanticSignature,
 } from './surveyToolUtils.js';
 import { SurveyQuestions } from './SurveyQuestions';
+import {
+  applyDecryptedQuestionResponseValues,
+  applyDecryptedQuestionStateToSurveySlice,
+  clearQuestionFieldBusyMap,
+  ensureQuestionDecryptSliceShape,
+  getQuestionFieldTaskKeys,
+  getQuestionRatingEnvelopes,
+  markQuestionFieldBusyMap,
+} from './surveyToolDecryptFlow.js';
 import { PileViewMode } from './SurveyPileViewMode';
 import { QuestionsDashboard } from './SurveySelector';
 import DeferredRatingSlider from './DeferredRatingSlider';
@@ -264,11 +273,11 @@ describe('SurveyTool module', () => {
     expect(subject.getQuestionFieldTaskKey(' Q1 ', ' Prompt ')).toBe('q1:prompt');
     expect(subject.getQuestionFieldTaskKey('q1', 'additional')).toBe('q1:additional');
     expect(subject.getQuestionFieldTaskKey('', 'answer')).toBe('');
-    expect(subject.getQuestionFieldTaskKeys(' Q1 ', {
+    expect(getQuestionFieldTaskKeys(' Q1 ', {
       includeAnswer: true,
       includeAdditional: true,
     })).toEqual(['q1:answer', 'q1:additional']);
-    expect(subject.markQuestionFieldBusyMap({
+    expect(markQuestionFieldBusyMap({
       'q1:prompt': true,
     }, ['q1:answer', '', 'q1:additional'])).toEqual({
       'q1:prompt': true,
@@ -279,7 +288,7 @@ describe('SurveyTool module', () => {
     expect(subject.isQuestionFieldBusy('q1', 'additional')).toBe(true);
     expect(subject.isQuestionFieldBusy('q1', 'answer')).toBe(false);
     expect(subject.isQuestionFieldBusy('', 'prompt')).toBe(false);
-    expect(subject.clearQuestionFieldBusyMap({
+    expect(clearQuestionFieldBusyMap({
       'q1:answer': true,
       'q1:additional': true,
       'q1:prompt': true,
@@ -419,16 +428,7 @@ describe('SurveyTool module', () => {
   });
 
   it('applies shared decrypted question response values onto viewed response records', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.applyDecryptedQuestionResponseValues(
+    expect(applyDecryptedQuestionResponseValues(
       {
         answer: { value: '*' },
         additional: { value: '*' },
@@ -453,16 +453,7 @@ describe('SurveyTool module', () => {
   });
 
   it('applies shared decrypted question state onto survey response slices', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.applyDecryptedQuestionStateToSurveySlice(
+    expect(applyDecryptedQuestionStateToSurveySlice(
       {
         answers: { q1: { value: '*', encrypted: true } },
         additionalComments: { q1: { value: '*', encrypted: true } },
@@ -632,7 +623,7 @@ describe('SurveyTool module', () => {
       network: { id: 84532 },
     });
 
-    expect(subject.getQuestionRatingEnvelopes(
+    expect(getQuestionRatingEnvelopes(
       {
         responses: [
           { questionID: 'q2', importanceEncrypted: 'skip-me' },
@@ -669,7 +660,7 @@ describe('SurveyTool module', () => {
       additionalComments: null,
     }));
 
-    expect(subject.ensureQuestionDecryptSliceShape({
+    expect(ensureQuestionDecryptSliceShape({
       answers: { q1: { value: '*' } },
       additionalComments: null,
     })).toEqual({
