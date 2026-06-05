@@ -4462,29 +4462,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     );
   };
 
-  tryAutoDecryptOnce = (questionId, field) => {
-    const key = `${questionId}:${field}`;
-
-    // simple in-memory dedupe; do not mark as "attempted" until we actually decrypt successfully
-    if (this._autoDecQueueDedup?.has(key)) return;
-    if (!this._autoDecQueueDedup) this._autoDecQueueDedup = new Set();
-    this._autoDecQueueDedup.add(key);
-
-    this.setManagedTimeout(() => {
-      (async () => {
-        try {
-          if (this.props.loginComplete && this.props.account) {
-            await this.handleDecryptQuestionAnswer(questionId, field);
-            // success will be marked by the existing success path in maybeAutoDecryptVisibleFields()
-          }
-        } finally {
-          this._autoDecQueueDedup?.delete(key);
-        }
-      })();
-    }, 0);
-  };
-
-
   getLatestQuestionResponse = async (responder, questionId, networkID, questionsCache) => {
     const slug = this._getEffectiveDraftSlug();
     const strNet = String(networkID || '');
@@ -6730,81 +6707,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
 
-  encryptData = async (pubKeyOrOpts, extraOpts = {}) => {
-    surveyLog.log("encryptData() - invoked");
-    if (!this.props.loginComplete) {
-      this.props.toggleLoginModal(true);
-      return;
-    }
-
-    const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const currentSurveyResponseState = this.state.surveysResponseState[surveyIndex];
-
-    if (!currentSurveyResponseState) {
-      surveyLog.error("Cannot encrypt: Survey response state is not available.");
-      return;
-    }
-
-    // Narrow down to changed qIDs and changed encrypted fields only
-    const { changedQids } = this.getChangedQidsAndFields(surveyIndex);
-    if (!changedQids || changedQids.size === 0) {
-      // Nothing changed → nothing to encrypt
-      return;
-    }
-
-    const {
-      groups: workGroups,
-      missingRecipients,
-    } = this.buildFieldEncryptionWorkGroups(currentSurveyResponseState, changedQids);
-    const hasWork = workGroups.some((group) => (
-      Object.keys(group?.slice?.answers || {}).length > 0 ||
-      Object.keys(group?.slice?.additionalComments || {}).length > 0
-    ));
-
-    if (!hasWork) {
-      // Either no encrypted fields changed or they are masked '*' (unchanged) → skip.
-      return;
-    }
-    if (missingRecipients.length > 0) {
-      this.setState(buildSubmissionErrorState(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`));
-      return;
-    }
-
-    try {
-      const baseOptions =
-        typeof pubKeyOrOpts === 'object'
-          ? { ...(pubKeyOrOpts || {}), ...(extraOpts || {}) }
-          : { ...(extraOpts || {}) };
-      const modifiedSlice = await this.encryptFieldWorkGroups({
-        workGroups,
-        baseOpts: baseOptions,
-      });
-
-      // Merge encrypted results back into the full slice, touching ONLY changed qIDs/fields.
-      const updatedSurveysResponseState = [...this.state.surveysResponseState];
-      const base = { ...(updatedSurveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      Object.keys(modifiedSlice.answers || {}).forEach((qid) => {
-        base.answers = { ...(base.answers || {}) };
-        base.answers[qid] = { ...(base.answers[qid] || {}), ...(modifiedSlice.answers[qid] || {}) };
-      });
-      Object.keys(modifiedSlice.additionalComments || {}).forEach((qid) => {
-        base.additionalComments = { ...(base.additionalComments || {}) };
-        base.additionalComments[qid] = { ...(base.additionalComments[qid] || {}), ...(modifiedSlice.additionalComments[qid] || {}) };
-      });
-
-      updatedSurveysResponseState[surveyIndex] = base;
-
-      this.setState(buildSurveysResponseStatePatch(updatedSurveysResponseState), () => {
-        const jsonData = this.prepareJsonAndHash(surveyIndex);
-        this.setState(buildJsonPreviewState(jsonData));
-      });
-    } catch (error) {
-      surveyLog.error("Encryption error:", error);
-      this.setState(buildSubmissionErrorState(error.message || 'Encryption failed.'));
-    }
-  };
-
   buildResponseGatePolicyCacheKey = () =>
     buildResponseGatePolicyCacheKeyFromInputs({
       singleQuestionMode: this.props.singleQuestionMode,
@@ -7520,56 +7422,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely && this.persistDraftSafely();
     });
-  };
-
-  buildLitEncryptionOptions = (audience = 'default') => {
-    const audienceRaw = String(audience || 'default').trim().toLowerCase();
-    if (audienceRaw === 'self') {
-      return undefined;
-    }
-
-    const litHooks =
-      this.props.lit ||
-      this.props.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-    if (!litHooks || (!litHooks.saveKey && !litHooks.getKey && !litHooks.accessControlConditions)) {
-      return undefined;
-    }
-
-    const gatePolicy = this.getResponseGatePolicy();
-    const gateRecipients = Array.isArray(gatePolicy?.recipients) ? gatePolicy.recipients : [];
-    const base = {
-      saveKey: litHooks.saveKey,
-      getKey: litHooks.getKey,
-      ...(gatePolicy?.allowFallbackConditions && litHooks.accessControlConditions
-        ? { accessControlConditions: litHooks.accessControlConditions }
-        : {}),
-      ...(litHooks.chain ? { chain: litHooks.chain } : {}),
-    };
-
-    if (gateRecipients.length) {
-      return {
-        ...base,
-        accessControlConditions: gateRecipients[0].accessControlConditions,
-        chain: gateRecipients[0].chain,
-        recipients: gateRecipients,
-      };
-    }
-
-    if (audienceRaw === 'gate') {
-      return undefined;
-    }
-
-    // If the resource gate resolves open on-chain, do not apply default/global Lit ACLs.
-    if (!gatePolicy?.allowFallbackConditions) {
-      return undefined;
-    }
-
-    if (!base.saveKey && !base.getKey && !base.accessControlConditions) {
-      return undefined;
-    }
-
-    return base;
   };
 
   buildLitEncryptionOptionsForRecipients = (recipients = []) => {
