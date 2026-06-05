@@ -1007,8 +1007,8 @@ describe('SurveyResults freeform summary rendering', () => {
   });
 });
 
-describe('SurveyResults Polis report props', () => {
-  it('passes scoped question scan progress through to PolisReport', () => {
+describe('SurveyResults demo surface props', () => {
+  it('passes scoped question scan progress through to the demo report surface', () => {
     const progress = {
       slug: 'edge',
       phase: 'scan',
@@ -1035,18 +1035,18 @@ describe('SurveyResults Polis report props', () => {
     };
 
     const tree = subject.render();
-    const polisNode = findElement(
+    const demoSurfaceNode = findElement(
       tree,
       (candidate) => (
         candidate?.props?.questionScanProgress === progress &&
         candidate?.props?.isQuestionCacheReady === false &&
         candidate?.props?.isResponsesCacheReady === false &&
-        candidate?.props?.disclaimersActive === true
+        candidate?.props?.viewKey === 'report'
       )
     );
 
-    expect(polisNode).toBeTruthy();
-    expect(polisNode.props.questionScanProgress).toBe(progress);
+    expect(demoSurfaceNode).toBeTruthy();
+    expect(demoSurfaceNode.props.questionScanProgress).toBe(progress);
   });
 });
 
