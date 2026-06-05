@@ -80,7 +80,6 @@ type UserPageSurveySectionProps = {
   surveySectionDisplayState: UserPageSurveySectionDisplayState;
   surveysCreatedLoadingIndicator?: React.ReactNode;
   surveysCreatedSectionToggleState: UserPageSectionToggleState;
-  surveysQuestionsToggle?: React.ReactNode;
 };
 
 const UserPageSurveySection = ({
@@ -106,10 +105,8 @@ const UserPageSurveySection = ({
   surveySectionDisplayState,
   surveysCreatedLoadingIndicator = null,
   surveysCreatedSectionToggleState,
-  surveysQuestionsToggle = null,
 }: UserPageSurveySectionProps): React.ReactElement => (
   <div className={styles.leftColumn}>
-    {surveysQuestionsToggle}
     <div className={styles.surveySection}>
       <h2
         onClick={onSurveyResponsesSectionToggle}
