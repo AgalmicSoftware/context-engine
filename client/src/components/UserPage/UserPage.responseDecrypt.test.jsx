@@ -182,13 +182,35 @@ describe('UserPage response decrypt helpers', () => {
     await instance.handleDecryptQuestionAnswer('q1', 'answer', encryptedResponse);
 
     expect(cryptoUtils.decryptSingleField).toHaveBeenCalledWith(
-      expect.any(Object),
+      {
+        answers: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: '{"v":2}',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: '',
+            encrypted: false,
+          },
+        },
+        importance: {},
+        conviction: {},
+      },
       'q1',
       'answer',
-      expect.objectContaining({
+      {
+        account: '0x00000000000000000000000000000000000000bb',
+        provider: 'wagmi',
+        providerKind: 'wagmi',
+        chainId: 84532,
         surveyId,
         acceptedSurveyIds: [surveyId, ethers.constants.HashZero],
-      })
+        lit: null,
+        throwOnError: true,
+      }
     );
   });
 
