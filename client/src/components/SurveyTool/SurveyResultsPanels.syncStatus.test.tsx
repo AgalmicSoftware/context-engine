@@ -2,31 +2,45 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { renderSurveyResultsSyncStatusPanel } from './SurveyResultsPanels';
+import type { SurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
 
-const basePanelProps = {
+const buildSyncStatusDisplay = (
+  overrides: Partial<SurveyResultsSyncStatusDisplayPlan> = {}
+): SurveyResultsSyncStatusDisplayPlan => ({
   isSynced: false,
   isSyncingOrLoading: true,
   syncStatusText: 'Syncing...',
   showLongSyncNotice: false,
+  showQuickRefresh: true,
+  viewMode: 'questions',
+  question: {
+    color: 'info',
+    label: 'Remaining Blocks: 50',
+    progress: 50,
+    remainingBlocks: 50,
+    showRemainingSpinner: true,
+    showSpinner: false,
+  },
+  response: {
+    color: 'info',
+    label: 'Remaining Blocks: 40',
+    progress: 60,
+    remainingBlocks: 40,
+    showRemainingSpinner: true,
+    showSpinner: false,
+  },
+  ...overrides,
+});
+
+const basePanelProps = {
   syncDetailsOpen: true,
   syncDetailsStyle: { display: 'block' },
   onToggleSyncDetails: jest.fn(),
   onManualRefresh: jest.fn(),
-  viewMode: 'questions',
-  showQuickRefresh: true,
-  showQuestionSpinner: false,
-  questionProgress: 50,
-  questionColor: 'info',
-  questionBarText: 'Remaining Blocks: 50',
-  showQuestionRemainingSpinner: true,
-  showResponseSpinner: false,
-  responseProgress: 60,
-  responseColor: 'info',
-  responseBarText: 'Remaining Blocks: 40',
-  showResponseRemainingSpinner: true,
   miniBarSpinnerStyle: { width: 12 },
   miniProgressStyle: { height: 6 },
   remainingSpinnerStyle: { marginLeft: 4 },
+  syncStatusDisplay: buildSyncStatusDisplay(),
 };
 
 describe('renderSurveyResultsSyncStatusPanel', () => {
@@ -44,6 +58,7 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
           ...basePanelProps,
           onManualRefresh,
           onToggleSyncDetails,
+          syncStatusDisplay: buildSyncStatusDisplay(),
         })}
       </>
     );
@@ -69,17 +84,29 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
       <>
         {renderSurveyResultsSyncStatusPanel({
           ...basePanelProps,
-          isSynced: true,
-          isSyncingOrLoading: false,
-          syncStatusText: 'In Sync',
-          showQuickRefresh: false,
-          viewMode: 'survey',
-          questionBarText: '',
-          responseColor: 'success',
-          responseProgress: 100,
-          responseBarText: 'In Sync (Current: 100 / Latest: 100)',
-          showQuestionRemainingSpinner: false,
-          showResponseRemainingSpinner: false,
+          syncStatusDisplay: buildSyncStatusDisplay({
+            isSynced: true,
+            isSyncingOrLoading: false,
+            syncStatusText: 'In Sync',
+            showQuickRefresh: false,
+            viewMode: 'survey',
+            question: {
+              color: 'info',
+              label: '',
+              progress: 0,
+              remainingBlocks: 0,
+              showRemainingSpinner: false,
+              showSpinner: false,
+            },
+            response: {
+              color: 'success',
+              label: 'In Sync (Current: 100 / Latest: 100)',
+              progress: 100,
+              remainingBlocks: 0,
+              showRemainingSpinner: false,
+              showSpinner: false,
+            },
+          }),
         })}
       </>
     );
@@ -106,10 +133,25 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
           syncDetailsStyle: { display: undefined },
           onManualRefresh,
           onToggleSyncDetails,
-          showQuestionSpinner: true,
-          showResponseSpinner: true,
-          questionBarText: '',
-          responseBarText: '',
+          syncStatusDisplay: buildSyncStatusDisplay({
+            syncStatusText: 'Loading...',
+            question: {
+              color: 'info',
+              label: '',
+              progress: 0,
+              remainingBlocks: 0,
+              showRemainingSpinner: false,
+              showSpinner: true,
+            },
+            response: {
+              color: 'info',
+              label: '',
+              progress: 0,
+              remainingBlocks: 0,
+              showRemainingSpinner: false,
+              showSpinner: true,
+            },
+          }),
         })}
       </>
     );

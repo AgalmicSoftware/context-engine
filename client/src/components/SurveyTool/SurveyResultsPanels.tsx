@@ -4,28 +4,16 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyResults.module.scss';
+import type {
+  SurveyResultsSyncStatusDisplayPlan,
+} from './surveyResultsSyncStatusController';
 
 type SurveyResultsSyncStatusPanelArgs = {
-  isSynced: boolean;
-  isSyncingOrLoading: boolean;
-  syncStatusText: string;
-  showLongSyncNotice: boolean;
+  syncStatusDisplay: SurveyResultsSyncStatusDisplayPlan;
   syncDetailsOpen: boolean;
   syncDetailsStyle: React.CSSProperties;
   onToggleSyncDetails: () => void;
   onManualRefresh: () => void;
-  viewMode: string;
-  showQuickRefresh?: boolean;
-  showQuestionSpinner: boolean;
-  questionProgress: number;
-  questionColor: string;
-  questionBarText: string;
-  showQuestionRemainingSpinner?: boolean;
-  showResponseSpinner: boolean;
-  responseProgress: number;
-  responseColor: string;
-  responseBarText: string;
-  showResponseRemainingSpinner?: boolean;
   miniBarSpinnerStyle: React.CSSProperties;
   miniProgressStyle: React.CSSProperties;
   remainingSpinnerStyle: React.CSSProperties;
@@ -47,30 +35,27 @@ const renderSurveyResultsSyncBarText = (
 );
 
 export const renderSurveyResultsSyncStatusPanel = ({
-  isSynced,
-  isSyncingOrLoading,
-  syncStatusText,
-  showLongSyncNotice,
+  syncStatusDisplay,
   syncDetailsOpen,
   syncDetailsStyle,
   onToggleSyncDetails,
   onManualRefresh,
-  viewMode,
-  showQuickRefresh = !isSynced,
-  showQuestionSpinner,
-  questionProgress,
-  questionColor,
-  questionBarText,
-  showQuestionRemainingSpinner = false,
-  showResponseSpinner,
-  responseProgress,
-  responseColor,
-  responseBarText,
-  showResponseRemainingSpinner = false,
   miniBarSpinnerStyle,
   miniProgressStyle,
   remainingSpinnerStyle,
-}: SurveyResultsSyncStatusPanelArgs) => (
+}: SurveyResultsSyncStatusPanelArgs) => {
+  const {
+    isSynced,
+    isSyncingOrLoading,
+    syncStatusText,
+    showLongSyncNotice,
+    showQuickRefresh,
+    viewMode,
+    question,
+    response,
+  } = syncStatusDisplay;
+
+  return (
   <div className={styles.syncStatusContainer}>
     <button
       type="button"
@@ -108,7 +93,7 @@ export const renderSurveyResultsSyncStatusPanel = ({
         {viewMode === 'questions' && (
           <div className={styles.miniBarLine}>
             <div className={styles.miniBarLabel}>Questions:</div>
-            {showQuestionSpinner ? (
+            {question.showSpinner ? (
               <>
                 <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
                 <div className={styles.miniBarFraction}>Loading...</div>
@@ -116,15 +101,15 @@ export const renderSurveyResultsSyncStatusPanel = ({
             ) : (
               <>
                 <Progress
-                  value={questionProgress}
-                  color={questionColor}
+                  value={question.progress}
+                  color={question.color}
                   style={miniProgressStyle}
                   className={styles.miniProgress}
                 />
                 <div className={styles.miniBarFraction}>
                   {renderSurveyResultsSyncBarText(
-                    questionBarText,
-                    showQuestionRemainingSpinner,
+                    question.label,
+                    question.showRemainingSpinner,
                     remainingSpinnerStyle
                   )}
                 </div>
@@ -135,7 +120,7 @@ export const renderSurveyResultsSyncStatusPanel = ({
 
         <div className={styles.miniBarLine}>
           <div className={styles.miniBarLabel}>Responses:</div>
-          {showResponseSpinner ? (
+          {response.showSpinner ? (
             <>
               <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
               <div className={styles.miniBarFraction}>Loading...</div>
@@ -143,15 +128,15 @@ export const renderSurveyResultsSyncStatusPanel = ({
           ) : (
             <>
               <Progress
-                value={responseProgress}
-                color={responseColor}
+                value={response.progress}
+                color={response.color}
                 style={miniProgressStyle}
                 className={styles.miniProgress}
               />
               <div className={styles.miniBarFraction}>
                 {renderSurveyResultsSyncBarText(
-                  responseBarText,
-                  showResponseRemainingSpinner,
+                  response.label,
+                  response.showRemainingSpinner,
                   remainingSpinnerStyle
                 )}
               </div>
@@ -169,7 +154,8 @@ export const renderSurveyResultsSyncStatusPanel = ({
       </div>
     </div>
   </div>
-);
+  );
+};
 
 type SurveyResultsFilterSummaryArgs = {
   displayedTotalQuestionsCount: number;
