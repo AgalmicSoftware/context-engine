@@ -88,12 +88,10 @@ import {
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
   hasUserPageResponseSubmissionHints,
-  inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
   isPlainAnalysisObject,
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
-  isUserPageEncryptedResponseField,
   isUserPageGateAccessContext,
   isUserPageResponsePayloadEncrypted,
   mergeUserPageQuestionCacheSource,
@@ -156,7 +154,6 @@ import {
   type UserPageEffectiveAiConfigRequest,
   type UserPageEffectiveAiConfigResult,
   type UserPageSourceSlugMap,
-  applyUserPageDecryptedPatchToResponseField,
 } from './userPageHelpers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
@@ -1925,10 +1922,6 @@ class UserPage extends Component<any, any> {
     );
   };
 
-  _isEncryptedResponseField = (fieldObj: unknown = null): boolean => {
-    return isUserPageEncryptedResponseField(fieldObj);
-  };
-
   _isAnswerFieldEncrypted = (responseObj: unknown = null): boolean => {
     return isUserPageAnswerFieldEncrypted(responseObj);
   };
@@ -1949,16 +1942,8 @@ class UserPage extends Component<any, any> {
     return inferUserPageResponseFieldEncryptionAudience(responseObj, fieldKey, fallback);
   };
 
-  _inferResponseEncryptionAudience = (responseObj: unknown = null, fallback: unknown = 'gate'): string => {
-    return inferUserPageResponseEncryptionAudience(responseObj, fallback);
-  };
-
   buildDecryptableResponseField = (field: unknown = null): DecryptableResponseField => {
     return buildUserPageDecryptableResponseField(field);
-  };
-
-  applyDecryptedPatchToResponseField = (field: unknown = null, decryptedPatch: unknown = null): unknown => {
-    return applyUserPageDecryptedPatchToResponseField(field, decryptedPatch);
   };
 
   buildDecryptedResponsePatch = ({
