@@ -696,13 +696,6 @@ describe('surveyToolDecryptFlow', () => {
         questionId: 'q1',
         surveyId: 'survey-1',
       },
-      requestPlanTarget: {
-        chainId: 84532,
-        fieldToDecrypt: 'both',
-        providerKind: 'browser',
-        questionId: 'q1',
-        surveyId: 'survey-1',
-      },
       opts: {
         providerKind: 'browser',
         provider,
