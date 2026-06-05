@@ -3774,9 +3774,6 @@ class UserPage extends Component<any, any> {
       sbtSectionLoadingEmpty,
     });
 
-    // Old “tabs/breadcrumb” toggle is now in-section; keep reference but render nothing.
-    const surveysQuestionsToggle: React.ReactNode = null;
-
     // Unique tooltip targets (wrapping spans) for disabled buttons.
     // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
     // in reactstrap tooltip `target` selectors.
@@ -3984,7 +3981,6 @@ class UserPage extends Component<any, any> {
                   deepScanTooltipTitle
                 ) : null}
                 surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
-                surveysQuestionsToggle={surveysQuestionsToggle}
               />
             )}
 
@@ -4020,7 +4016,6 @@ class UserPage extends Component<any, any> {
                 questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
                 responderAddress={propViewAddress}
                 sbtCacheRevision={this.props.sbtCacheRevision}
-                surveysQuestionsToggle={surveysQuestionsToggle}
               />
             )}
 

@@ -114,7 +114,6 @@ const createProps = (
   },
   responderAddress: '0xviewer',
   sbtCacheRevision: 'revision-1',
-  surveysQuestionsToggle: null,
   ...overrides,
 });
 

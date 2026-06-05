@@ -122,7 +122,6 @@ const createProps = (
     shouldRenderClosedIcon: false,
     shouldRenderOpenIcon: true,
   },
-  surveysQuestionsToggle: null,
   ...overrides,
 });
 
