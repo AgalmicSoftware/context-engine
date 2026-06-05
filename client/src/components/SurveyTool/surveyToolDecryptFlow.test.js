@@ -689,6 +689,20 @@ describe('surveyToolDecryptFlow', () => {
       surveyId: 'survey-1',
       questionPool: [{ id: 'pool-q' }],
       lit: { getKey: litHooks.getKey },
+      target: {
+        chainId: 84532,
+        fieldToDecrypt: 'both',
+        providerKind: 'browser',
+        questionId: 'q1',
+        surveyId: 'survey-1',
+      },
+      requestPlanTarget: {
+        chainId: 84532,
+        fieldToDecrypt: 'both',
+        providerKind: 'browser',
+        questionId: 'q1',
+        surveyId: 'survey-1',
+      },
       opts: {
         providerKind: 'browser',
         provider,
@@ -1104,6 +1118,7 @@ describe('surveyToolDecryptFlow', () => {
         buildQuestionDecryptExecutionContext,
       },
     )).toEqual({
+      blockedReason: 'no-masked-field',
       shouldDecrypt: false,
       decryptSelection: {
         hasMaskedField: false,
@@ -1123,6 +1138,7 @@ describe('surveyToolDecryptFlow', () => {
         buildQuestionDecryptExecutionContext,
       },
     )).toEqual({
+      blockedReason: '',
       shouldDecrypt: true,
       decryptSelection: {
         hasMaskedField: true,
@@ -1132,8 +1148,28 @@ describe('surveyToolDecryptFlow', () => {
         clearMode: 'answer',
       },
       chainId: 84532,
+      decryptRequest: {
+        fieldToDecrypt: 'answer',
+        options: { providerKind: 'browser' },
+        questionId: 'q1',
+        responseSlice: { answers: { q1: { value: '*', encrypted: true } } },
+        target: {
+          chainId: 84532,
+          fieldToDecrypt: 'answer',
+          providerKind: 'browser',
+          questionId: 'q1',
+          surveyId: '',
+        },
+      },
       lit: { getKey: expect.any(Function) },
       opts: { providerKind: 'browser' },
+      target: {
+        chainId: 84532,
+        fieldToDecrypt: 'answer',
+        providerKind: 'browser',
+        questionId: 'q1',
+        surveyId: '',
+      },
     });
 
     expect(buildQuestionDecryptExecutionContext).toHaveBeenCalledTimes(1);

@@ -1,3 +1,8 @@
+import {
+  buildSurveyQuestionDecryptExecutionPlan,
+  buildSurveyQuestionDecryptRequestPlan,
+} from './surveyQuestionDecryptRequestPlan';
+
 export const buildEmptyQuestionDecryptSlice = () => ({
   answers: {},
   importance: {},
@@ -1308,25 +1313,21 @@ export const buildQuestionDecryptExecutionContext = ({
     (Array.isArray(questionPool) && questionPool.length > 0)
       ? questionPool
       : (Array.isArray(pileQuestions) ? pileQuestions : []);
-  const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
+  const executionPlan = buildSurveyQuestionDecryptExecutionPlan({
+    account,
+    chainId,
+    hasher,
+    litHooks,
+    provider,
+    providerKind,
+    questionId,
+    questionPool: resolvedQuestionPool,
+    surveyId,
+  });
 
   return {
-    providerKind,
-    chainId,
-    surveyId,
-    questionPool: resolvedQuestionPool,
-    lit,
-    opts: {
-      providerKind,
-      provider,
-      account,
-      chainId,
-      surveyId,
-      questionPool: resolvedQuestionPool,
-      ...(lit ? { lit } : {}),
-      hasher,
-      throwOnError: true,
-    },
+    ...executionPlan,
+    requestPlanTarget: executionPlan.target,
   };
 };
 
@@ -1390,6 +1391,7 @@ export const prepareQuestionDecryptAttempt = (
 
   if (!decryptSelection.hasMaskedField) {
     return {
+      blockedReason: 'no-masked-field',
       shouldDecrypt: false,
       decryptSelection,
     };
@@ -1399,14 +1401,35 @@ export const prepareQuestionDecryptAttempt = (
     chainId,
     lit,
     opts,
+    target,
   } = buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
+  const requestPlan = buildSurveyQuestionDecryptRequestPlan({
+    account: opts?.account,
+    baselineForDecrypt,
+    chainId,
+    decryptSelection,
+    fieldToDecrypt,
+    hasher: opts?.hasher,
+    litHooks: lit,
+    provider: opts?.provider,
+    providerKind: opts?.providerKind,
+    questionId,
+    questionPool: opts?.questionPool,
+    surveyId: opts?.surveyId,
+  });
+  const decryptRequest = requestPlan.decryptRequest
+    ? { ...requestPlan.decryptRequest, options: opts || requestPlan.decryptRequest.options }
+    : null;
 
   return {
-    shouldDecrypt: true,
-    decryptSelection,
-    chainId,
+    blockedReason: requestPlan.blockedReason,
+    shouldDecrypt: requestPlan.shouldDecrypt,
+    decryptSelection: requestPlan.decryptSelection,
+    chainId: requestPlan.chainId,
+    decryptRequest,
     lit,
     opts,
+    target: requestPlan.target || target,
   };
 };
 
