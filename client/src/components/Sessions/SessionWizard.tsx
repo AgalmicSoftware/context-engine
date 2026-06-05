@@ -118,7 +118,6 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
-  resolveSessionWizardPublishProgressDisplayState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
@@ -128,7 +127,7 @@ import {
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
-import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
+import { resolveSessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
 import {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
@@ -312,6 +311,7 @@ export {
   resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+export { resolveSessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
 export {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
@@ -4389,7 +4389,7 @@ const SessionWizard = ({
     !isNewSessionBannerDismissedForCurrentContext &&
     !(shouldRespectPersistedNewSessionBannerDismissal && persistedNewSessionBannerDismissed) &&
     !sponsoredBundleOwnsNewSessionEntryFlow;
-  const publishReadiness = resolveSessionWizardPublishReadiness({
+  const publishUiPlan = resolveSessionWizardPublishUiPlan({
     resolvedWorkerBaseUrl,
     workerMode,
     usesDefaultWorkerUrl,
@@ -4398,6 +4398,12 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     manualMetadataUrl,
     metadataUrl,
+    deployComplete,
+    hasPendingDrafts: hasUndeployedPendingSbtDrafts,
+    publishBusy,
+    publishStep,
+    publishStepElapsedMs,
+    sbtsLabel: t('sbts'),
   });
   const {
     canUploadMetadataNow,
@@ -4405,7 +4411,7 @@ const SessionWizard = ({
     hasManualMetadata,
     hasUploadedMetadata,
     canPublishNow,
-  } = publishReadiness;
+  } = publishUiPlan.publishReadiness;
   const deployStatusLower = toStr(deployStatus).toLowerCase();
   const deployStatusIsError = !!deployStatus &&
     !deployInFlight &&
@@ -4532,21 +4538,7 @@ const SessionWizard = ({
     contractKey: selectedWizardContract?.key || '',
     sessionSlug: selectedWizardContractSessionSlug,
   }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
-  const publishProgressPlan = buildSessionWizardPublishExecutionPlan({
-    workerMode,
-    sponsoredAutoDeployReady: canUseSponsoredAutoDeployNow,
-    deployComplete,
-    hasPendingDrafts: hasUndeployedPendingSbtDrafts,
-    hasManualMetadata,
-    canUploadMetadataNow,
-  });
-  const publishProgressDisplayState = resolveSessionWizardPublishProgressDisplayState({
-    elapsedMs: publishStepElapsedMs,
-    publishBusy,
-    publishStep,
-    publishSteps: publishProgressPlan.steps,
-    sbtsLabel: t('sbts'),
-  });
+  const publishProgressDisplayState = publishUiPlan.publishProgressDisplayState;
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
