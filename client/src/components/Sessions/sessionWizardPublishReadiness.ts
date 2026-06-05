@@ -1,4 +1,9 @@
 import { normalizeSessionWizardArweaveUri } from './sessionWizardUrlSupport';
+import {
+  buildSessionWizardPublishExecutionPlan,
+  resolveSessionWizardPublishProgressDisplayState,
+  type SessionWizardPublishProgressDisplayState,
+} from './sessionWizardPublishFlow';
 
 export type SessionWizardPublishReadinessInput = {
   resolvedWorkerBaseUrl: string;
@@ -17,6 +22,21 @@ export type SessionWizardPublishReadinessDescriptor = {
   hasManualMetadata: boolean;
   hasUploadedMetadata: boolean;
   canPublishNow: boolean;
+};
+
+export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
+  deployComplete?: boolean;
+  hasPendingDrafts?: boolean;
+  publishBusy?: boolean;
+  publishStep?: number;
+  publishStepElapsedMs?: number;
+  sbtsLabel?: unknown;
+};
+
+export type SessionWizardPublishUiPlan = {
+  publishReadiness: SessionWizardPublishReadinessDescriptor;
+  publishExecutionPlan: ReturnType<typeof buildSessionWizardPublishExecutionPlan>;
+  publishProgressDisplayState: SessionWizardPublishProgressDisplayState;
 };
 
 export function resolveSessionWizardPublishReadiness({
@@ -56,5 +76,38 @@ export function resolveSessionWizardPublishReadiness({
     hasManualMetadata,
     hasUploadedMetadata,
     canPublishNow,
+  };
+}
+
+export function resolveSessionWizardPublishUiPlan({
+  deployComplete = false,
+  hasPendingDrafts = false,
+  publishBusy = false,
+  publishStep = 0,
+  publishStepElapsedMs = 0,
+  sbtsLabel = 'SBTs',
+  ...readinessInput
+}: SessionWizardPublishUiPlanInput): SessionWizardPublishUiPlan {
+  const publishReadiness = resolveSessionWizardPublishReadiness(readinessInput);
+  const publishExecutionPlan = buildSessionWizardPublishExecutionPlan({
+    workerMode: readinessInput.workerMode,
+    sponsoredAutoDeployReady: readinessInput.canUseSponsoredAutoDeployNow,
+    deployComplete,
+    hasPendingDrafts,
+    hasManualMetadata: publishReadiness.hasManualMetadata,
+    canUploadMetadataNow: publishReadiness.canUploadMetadataNow,
+  });
+  const publishProgressDisplayState = resolveSessionWizardPublishProgressDisplayState({
+    elapsedMs: publishStepElapsedMs,
+    publishBusy,
+    publishStep,
+    publishSteps: publishExecutionPlan.steps,
+    sbtsLabel,
+  });
+
+  return {
+    publishReadiness,
+    publishExecutionPlan,
+    publishProgressDisplayState,
   };
 }
