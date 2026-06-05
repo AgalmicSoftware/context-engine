@@ -21,6 +21,7 @@ const buildPlan = (
     namespace: 'analysisCache',
     slug: 'alpha-session',
     cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:new-input',
+    inputSignature: 'new-input',
   },
   ...overrides,
 });
@@ -56,6 +57,7 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
         namespace: 'analysisCache',
         slug: 'beta-session',
         cacheKey: '',
+        inputSignature: '',
       },
     });
 
@@ -87,6 +89,7 @@ describe('surveyResultsAnalysisArtifactWriteController', () => {
         namespace: 'analysisCache',
         slug: 'retry-session',
         cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
+        inputSignature: 'retry-input',
       },
     });
 
