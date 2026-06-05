@@ -265,6 +265,100 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.isLoadingResponse).toBe(false);
   });
 
+  it('seeds recent viewed-question metadata and waits for responder restore without fetching execution paths', async () => {
+    const now = 1_700_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    window.sessionStorage.setItem('dg:recentQuestionPayloads', JSON.stringify({
+      q1: {
+        savedAtMs: now - 1_000,
+        creator: '0xAbC',
+        prompt: 'Recent viewed prompt',
+        promptDecrypted: true,
+        encryptedPrompt: 'recent-viewed-ciphertext',
+        questionType: 'text',
+        tags: ['gate'],
+      },
+    }));
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(null);
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue(null);
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      questionID: 'Q1',
+      responderAddress: '0xdef',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-provider' },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      pileQuestions: [],
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      isLoadingResponse: true,
+      autoDecryptEnabled: false,
+    };
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.updateSingleQuestionDebug = jest.fn();
+    subject.clearSingleQuestionBootstrapRetry = jest.fn();
+    subject.scheduleSingleQuestionBootstrapRetry = jest.fn(() => true);
+    subject.updateJsonPreview = jest.fn();
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.prefillSingleQuestionResponse = jest.fn();
+    let callbackRun = Promise.resolve();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const maybePromise = callback();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          callbackRun = callbackRun.then(() => maybePromise);
+        }
+      }
+      return patch;
+    });
+
+    await subject.fetchSingleQuestionData();
+    await callbackRun;
+
+    expect(subject.state.questionPool[0]).toMatchObject({
+      id: 'q1',
+      prompt: 'Recent viewed prompt',
+      promptDecrypted: true,
+      encryptedPrompt: 'recent-viewed-ciphertext',
+      questionType: 'text',
+    });
+    expect(subject.state.isLoadingResponse).toBe(true);
+    expect(subject.scheduleSingleQuestionBootstrapRetry).toHaveBeenCalledWith({
+      questionId: 'q1',
+      attempt: 0,
+      reason: 'recent-payload-waiting-for-response-bootstrap',
+    });
+    expect(subject.updateSingleQuestionDebug).toHaveBeenCalledWith(expect.objectContaining({
+      phase: 'recent-payload-response-bootstrap-retrying',
+      questionId: 'q1',
+      responderAddress: '0xdef',
+      didScheduleRetry: true,
+    }));
+    expect(getQuestionDataSpy).not.toHaveBeenCalled();
+    expect(getResponseSpy).not.toHaveBeenCalled();
+    expect(subject.prefillSingleQuestionResponse).not.toHaveBeenCalled();
+    expect(subject.updateJsonPreview).toHaveBeenCalledWith();
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledWith(expect.objectContaining({
+      responseHydrationOwned: true,
+    }));
+  });
+
   it('ignores stale recent decrypted payloads and keeps bootstrap on the normal metadata path', async () => {
     const now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockReturnValue(now);
