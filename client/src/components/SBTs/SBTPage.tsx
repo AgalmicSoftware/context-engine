@@ -83,8 +83,7 @@ import {
   buildSbtPageDocModalErrorPatch,
   buildSbtPageDocModalOpenPatch,
   buildSbtPageDocModalResetPatch,
-  buildSbtPageEncryptedEnvelopeDecryptKey,
-  buildSbtPageEncryptedEnvelopeFingerprint,
+  buildSbtPageEncryptedMetadataDecryptPlan,
   buildSbtPageErrorPatch,
   buildSbtPageExportFormatPatch,
   buildSbtPageExplorerUrl,
@@ -2443,54 +2442,29 @@ class SBTPage extends Component<any, any> {
       applyPrimaryMetadataState(sbtInfo);
 
       const resolvedChainId = Number(getSessionChainId(resolvedSlug) || sbtInfo?.chainID || currentNetwork?.id || 0) || null;
-      const encryptedFields = isRecord(sbtInfo?.encryptedFields)
-        ? sbtInfo.encryptedFields
-        : {};
-      const nameEnvelope =
-        encryptedFields?.name ||
-        sbtInfo?.nameEncrypted ||
-        sbtInfo?.encryptedName ||
-        null;
-      const descriptionEnvelope =
-        encryptedFields?.description ||
-        sbtInfo?.descriptionEncrypted ||
-        sbtInfo?.encryptedDescription ||
-        null;
-      const tagsEnvelope =
-        encryptedFields?.tags ||
-        sbtInfo?.tagsEncrypted ||
-        sbtInfo?.encryptedTags ||
-        null;
-      const documentUrlsEnvelope =
-        encryptedFields?.documentURLs ||
-        sbtInfo?.documentURLsEncrypted ||
-        sbtInfo?.docUrlsEncrypted ||
-        null;
-      const imageEnvelope =
-        encryptedFields?.image ||
-        sbtInfo?.imageEncrypted ||
-        sbtInfo?.encryptedImage ||
-        null;
       const litHooks = this.getActiveLitHooks();
       const lit = litHooks && typeof litHooks.getKey === 'function'
         ? { getKey: litHooks.getKey }
         : null;
       const activeAccount = this.props.account;
-      const envelopeFingerprint = buildSbtPageEncryptedEnvelopeFingerprint({
-        nameEnvelope,
+      const metadataDecryptPlan = buildSbtPageEncryptedMetadataDecryptPlan({
+        activeAccount,
+        decryptTriedByKey: this._descDecryptTried,
+        hasLitKey: !!lit,
+        metaKey,
+        sbtInfo,
+      });
+      const {
+        decryptKey,
         descriptionEnvelope,
-        tagsEnvelope,
         documentUrlsEnvelope,
         imageEnvelope,
-      });
-      const decryptKey = buildSbtPageEncryptedEnvelopeDecryptKey({
-        metaKey,
-        activeAccount,
-        envelopeFingerprint,
-      });
-      if ((nameEnvelope || descriptionEnvelope || tagsEnvelope || documentUrlsEnvelope || imageEnvelope) && !this._descDecryptTried[decryptKey]) {
+        nameEnvelope,
+        tagsEnvelope,
+      } = metadataDecryptPlan;
+      if (metadataDecryptPlan.shouldEnterDecryptBoundary) {
         if (!isCurrentLoad()) return;
-        if (lit && activeAccount) {
+        if (metadataDecryptPlan.canAttemptDecrypt && lit && activeAccount) {
           let allFieldsOk = true;
           if (nameEnvelope) {
             try {
