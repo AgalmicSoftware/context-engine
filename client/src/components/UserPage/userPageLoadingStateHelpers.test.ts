@@ -463,6 +463,46 @@ describe('userPageLoadingStateHelpers', () => {
     });
   });
 
+  it('composes cache refresh deep-scan carry and loading inputs without parent state application', () => {
+    const plan = buildUserPageCacheRefreshStatePatch({
+      aggregatePresent: true,
+      deepScanProgressRows: [{ slug: 'session-a', percentComplete: 50 }],
+      deepScanTooltipLines: ['session-a scanning'],
+      isDeepScanLoadingEnabledForSection: (section) => section === 'questions',
+      prevState: {
+        isDeepScanning: true,
+        userStats: {},
+      },
+      questionSection: {
+        detailedQuestionResponses: {},
+        questionCreationInfo: [],
+        questionResponseInfo: [],
+        questionsCreated: 0,
+        questionsResponded: 0,
+      },
+      surveySection: {
+        detailedSurveyResponses: {},
+        surveyCreationInfo: [],
+        surveyResponseInfo: [],
+        surveysCreated: 0,
+        surveysResponded: 0,
+      },
+    });
+
+    expect(plan.statePatch).toMatchObject({
+      deepScanProgressRows: [{ slug: 'session-a', percentComplete: 50 }],
+      deepScanTooltipLines: ['session-a scanning'],
+      loadingQuestions: true,
+      loadingSurveys: false,
+    });
+    expect(plan.loadingDiag).toMatchObject({
+      keepQuestionLoadingDuringDeepScan: true,
+      keepSurveyLoadingDuringDeepScan: false,
+      loadingQuestions: true,
+      loadingSurveys: false,
+    });
+  });
+
   it('keeps held cache lanes loading when section derivation is skipped', () => {
     const plan = buildUserPageCacheRefreshStatePatch({
       aggregatePresent: false,
