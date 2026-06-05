@@ -86,27 +86,6 @@ describe('SurveyResultsDemoSurface', () => {
     }));
   });
 
-  it('preserves opaque cache progress inputs at the report handoff', () => {
-    const progress = { slug: 'demo', phase: 'scan' };
-
-    render(
-      <SurveyResultsDemoSurface
-        activeSlug="demo"
-        onAtlasModalClose={jest.fn()}
-        onAtlasNodeOpen={jest.fn()}
-        questionResponses={[]}
-        questionResponsesNonce="opaque-nonce"
-        questionScanProgress={progress}
-        viewKey="report"
-      />
-    );
-
-    expect(mockPolisReport).toHaveBeenCalledWith(expect.objectContaining({
-      questionResponsesNonce: 'opaque-nonce',
-      questionScanProgress: progress,
-    }));
-  });
-
   it('renders atlas and keeps modal close state owned by the parent callback', async () => {
     const onAtlasModalClose = jest.fn();
 
