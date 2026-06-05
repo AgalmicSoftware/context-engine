@@ -148,10 +148,12 @@ export type {
 export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
+  buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
@@ -167,8 +169,10 @@ export {
 } from './userPageGateHelpers';
 export type {
   UserPageDecryptableResponseField,
+  UserPageDecryptedResponseStatePatchResult,
   UserPageEncryptedVisibilityDisplayState,
   UserPageGateAccessStatusByResource,
+  UserPageResponseDecryptRequestPlan,
   UserPageResponseDecryptSurveyBindings,
 } from './userPageGateHelpers';
 export {
