@@ -11,6 +11,7 @@ import {
   mergeSbtPageBurnEvidenceIntoPreservedHolderState,
   normalizeSbtPageCountMap,
   normalizeSbtPageLoadInfoOptions,
+  reconcileSbtPageHolderRefreshState,
 } from './sbtPageHolderHelpers';
 
 describe('sbtPageHolderHelpers', () => {
@@ -164,6 +165,64 @@ describe('sbtPageHolderHelpers', () => {
     expect(normalizeSbtPageLoadInfoOptions(['bad'])).toEqual({
       forceEventFetch: false,
       preferCountsOnly: false,
+    });
+  });
+
+  it('reconciles incomplete holder refreshes by preserving visible rows and new burn evidence', () => {
+    const result = reconcileSbtPageHolderRefreshState({
+      nextBurnedAddresses: ['0xA'],
+      nextCountsLoaded: false,
+      nextHoldersMetaKey: 'holders-key',
+      nextMintedAddresses: [],
+      prevState: {
+        burnedAddresses: [],
+        countsLoaded: true,
+        filteredMintedUsers: ['0xA', '0xB'],
+        holdersMetaKey: 'holders-key',
+        mintedAddresses: ['0xA', '0xB'],
+        mintedTokensOverride: '2',
+        showModal: true,
+      },
+      userLower: '0xB',
+    });
+
+    expect(result).toEqual({
+      burnedAddresses: ['0xa'],
+      countsLoaded: true,
+      filteredMintedUsers: ['0xb'],
+      filteredMintedUsersSignature: buildSbtPageHolderListSignature(['0xb']),
+      mintedAddresses: ['0xa', '0xb'],
+      mintedTokensOverride: '2',
+      userHasSBT: true,
+    });
+  });
+
+  it('reconciles new-key empty holder replacements and drops stale minted-token approximations', () => {
+    const result = reconcileSbtPageHolderRefreshState({
+      nextBurnedAddresses: [],
+      nextCountsLoaded: true,
+      nextHoldersMetaKey: 'new-holders-key',
+      nextMintedAddresses: [],
+      prevState: {
+        burnedAddresses: [],
+        countsLoaded: false,
+        filteredMintedUsers: ['0xA'],
+        holdersMetaKey: 'holders-key',
+        mintedAddresses: ['0xA'],
+        mintedTokensOverride: '1',
+        showModal: true,
+      },
+      userLower: '0xA',
+    });
+
+    expect(result).toEqual({
+      burnedAddresses: [],
+      countsLoaded: true,
+      filteredMintedUsers: [],
+      filteredMintedUsersSignature: buildSbtPageHolderListSignature([]),
+      mintedAddresses: [],
+      mintedTokensOverride: null,
+      userHasSBT: false,
     });
   });
 });
