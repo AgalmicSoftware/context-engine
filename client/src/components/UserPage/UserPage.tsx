@@ -93,6 +93,7 @@ import {
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
   isUserPageGateAccessContext,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
@@ -198,7 +199,6 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { isMaskedQuestionPayload } from '../../utilities/survey/questionRouting.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -1884,20 +1884,6 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _isQuestionPayloadEncrypted = (questionObj: unknown = null): boolean => {
-    const questionRecord = toAnalysisRecord(questionObj);
-    if (!Object.keys(questionRecord).length) return false;
-    if (isMaskedQuestionPayload(questionRecord)) return true;
-    return !!(
-      questionRecord.promptEncrypted ||
-      questionRecord.encryptedPrompt ||
-      questionRecord.optionsEncrypted ||
-      questionRecord.encryptedOptions ||
-      questionRecord.tagsEncrypted ||
-      questionRecord.encryptedTags
-    );
-  };
-
   handleDecryptQuestionAnswer = async (
     questionId: unknown,
     fieldToDecrypt: unknown = 'both',
@@ -2341,7 +2327,7 @@ class UserPage extends Component<any, any> {
           type: normalizedResponse.type || 'unknown',
           prompt: normalizedResponse.prompt || 'Unknown Question',
         });
-        const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
+        const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
         const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
         const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
         const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
@@ -2459,7 +2445,7 @@ class UserPage extends Component<any, any> {
         questionData: qData,
       });
       if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
-        if (this._isQuestionPayloadEncrypted(qData)) {
+        if (isUserPageQuestionPayloadEncrypted(qData)) {
           const visibility = this._evaluateEncryptedVisibility({
             resourceKey: 'questionResponses',
             slug: sourceSlug,
@@ -2546,7 +2532,7 @@ class UserPage extends Component<any, any> {
         getSessionSlugByName,
         questionData: qData,
       });
-      const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
+      const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
       const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
       const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
       const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);

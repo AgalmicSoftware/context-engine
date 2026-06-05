@@ -2,6 +2,7 @@ import {
   toAnalysisRecord,
   type UserPageUnknownRecord,
 } from './userPageCoreHelpers';
+import { isMaskedQuestionPayload } from '../../utilities/survey/questionRouting.js';
 
 type UserPageGateAccessCacheKeyArgs = {
   account?: unknown;
@@ -202,6 +203,20 @@ export const isUserPageAdditionalFieldEncrypted = (responseObj: unknown = null):
 export const isUserPageResponsePayloadEncrypted = (responseObj: unknown = null): boolean => (
   isUserPageAnswerFieldEncrypted(responseObj) || isUserPageAdditionalFieldEncrypted(responseObj)
 );
+
+export const isUserPageQuestionPayloadEncrypted = (questionObj: unknown = null): boolean => {
+  const questionRecord = toAnalysisRecord(questionObj);
+  if (!Object.keys(questionRecord).length) return false;
+  if (isMaskedQuestionPayload(questionRecord)) return true;
+  return !!(
+    questionRecord.promptEncrypted ||
+    questionRecord.encryptedPrompt ||
+    questionRecord.optionsEncrypted ||
+    questionRecord.encryptedOptions ||
+    questionRecord.tagsEncrypted ||
+    questionRecord.encryptedTags
+  );
+};
 
 export const inferUserPageResponseFieldEncryptionAudience = (
   responseObj: unknown = null,

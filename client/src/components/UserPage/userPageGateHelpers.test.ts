@@ -12,6 +12,7 @@ import {
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
   isUserPageEncryptedResponseField,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   normalizeUserPageGateResourceKey,
   normalizeUserPageGateSlug,
@@ -166,6 +167,19 @@ describe('userPageGateHelpers', () => {
       additional: { encryptionAudience: 'gate' },
     })).toBe('gate');
     expect(inferUserPageResponseEncryptionAudience({}, '')).toBe('gate');
+  });
+
+  it('detects encrypted and masked question payloads', () => {
+    expect(isUserPageQuestionPayloadEncrypted(null)).toBe(false);
+    expect(isUserPageQuestionPayloadEncrypted({ prompt: 'Public prompt' })).toBe(false);
+    expect(isUserPageQuestionPayloadEncrypted({ promptEncrypted: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ encryptedPrompt: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ optionsEncrypted: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ encryptedOptions: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ tagsEncrypted: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ encryptedTags: '{"v":2}' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ prompt: '[encrypted]' })).toBe(true);
+    expect(isUserPageQuestionPayloadEncrypted({ options: [], optionsEncrypted: '{"v":2}' })).toBe(true);
   });
 
   it('builds decryptable response fields and decrypted patches', () => {
