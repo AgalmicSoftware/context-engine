@@ -265,6 +265,66 @@ describe('hasAnyCountableSurveyAnswer', () => {
   });
 });
 
+describe('SurveyResults constructor bookmark bootstrap', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('hydrates bookmarked survey and question IDs from a valid cache copy', () => {
+    const cachedSurveys = ['s1', 's2'];
+    const cachedQuestions = ['q1'];
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: cachedSurveys,
+      questions: cachedQuestions,
+    });
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+    expect(subject.state.bookmarkedSurveyIDs).not.toBe(cachedSurveys);
+    expect(subject.state.bookmarkedQuestionIDs).not.toBe(cachedQuestions);
+
+    cachedSurveys.push('s3');
+    cachedQuestions.push('q2');
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+  });
+
+  it.each([
+    ['null cache', null],
+    ['missing arrays', {}],
+    ['wrong bookmark list types', { surveys: 'x', questions: 5 }],
+  ])('defaults bookmarked IDs for malformed cache: %s', (_label, cachedValue) => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(cachedValue);
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+  });
+
+  it('defaults bookmarked IDs when the cache read throws', () => {
+    const readError = new Error('bookmark constructor read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      throw readError;
+    });
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[SurveyResults] Error reading bookmarksCache:',
+      readError
+    );
+  });
+});
+
 describe('SurveyResults display helpers', () => {
   it('builds aggregator classes and table icon styles', () => {
     expect(SURVEY_RESULTS_CLICKABLE_ICON_STYLE).toEqual({ cursor: 'pointer' });
