@@ -49,6 +49,38 @@ export type CacheBootstrapFlowPlan =
   | CacheBootstrapFlowContinue
   | CacheBootstrapFlowStop;
 
+export type CacheBootstrapStopHandlingContinue = {
+  action: 'continue';
+};
+
+export type CacheBootstrapStopHandlingRetry = {
+  action: 'retry';
+  retryRequest: {
+    questionId: string;
+    attempt: number;
+    reason: string;
+  };
+  retryOutcome: {
+    debugPayload: UnknownRecord;
+    exhaustedStatePatch: UnknownRecord | null;
+    shouldClearRetry: boolean;
+  } | null;
+};
+
+export type CacheBootstrapStopHandlingFallback = {
+  action: 'fallback';
+  debugPayload: UnknownRecord | null;
+  fallbackStatePatch: UnknownRecord | null;
+  logMissingCacheState: boolean;
+  preserveCurrentPoolPatch: UnknownRecord | null;
+  shouldApplyFallbackStatePatch: boolean;
+};
+
+export type CacheBootstrapStopHandlingPlan =
+  | CacheBootstrapStopHandlingContinue
+  | CacheBootstrapStopHandlingRetry
+  | CacheBootstrapStopHandlingFallback;
+
 export type CacheBootstrapReady = {
   status: 'ready';
   cacheState: CacheState;
@@ -185,6 +217,96 @@ export const buildSingleQuestionSeededHydrationState = ({
     parsedViewAddressAnswers: null,
     noResponse: false,
     isLoadingResponse: !!isLoadingResponse,
+  };
+};
+
+const hasObjectKeys = (value: unknown): boolean => (
+  !!value
+  && typeof value === 'object'
+  && !Array.isArray(value)
+  && Object.keys(value as UnknownRecord).length > 0
+);
+
+export const resolveSingleQuestionCacheBootstrapStopHandlingPlan = ({
+  bootstrapRetryAttempt = 0,
+  cacheBootstrapPlan = null,
+  didScheduleRetry,
+  effectiveSingleSlug = '',
+  questionId = '',
+  responderAddress = '',
+  runId = null,
+}: {
+  bootstrapRetryAttempt?: unknown;
+  cacheBootstrapPlan?: CacheBootstrapFlowPlan | null;
+  didScheduleRetry?: unknown;
+  effectiveSingleSlug?: unknown;
+  questionId?: unknown;
+  responderAddress?: unknown;
+  runId?: unknown;
+} = {}): CacheBootstrapStopHandlingPlan => {
+  if (!cacheBootstrapPlan || cacheBootstrapPlan.action !== 'stop') {
+    return { action: 'continue' };
+  }
+
+  const retryAttempt = Number(bootstrapRetryAttempt || 0);
+  const normalizedQuestionId = String(questionId || '').trim().toLowerCase();
+  const effectiveSlug = String(effectiveSingleSlug || '');
+
+  if (cacheBootstrapPlan.retryPlan) {
+    const retryRequest = {
+      questionId: normalizedQuestionId,
+      attempt: retryAttempt,
+      reason: cacheBootstrapPlan.retryPlan.reason,
+    };
+    const hasRetryOutcome = typeof didScheduleRetry === 'boolean';
+
+    return {
+      action: 'retry',
+      retryRequest,
+      retryOutcome: hasRetryOutcome
+        ? {
+            debugPayload: {
+              phase: didScheduleRetry
+                ? cacheBootstrapPlan.retryPlan.retryingPhase
+                : cacheBootstrapPlan.retryPlan.exhaustedPhase,
+              runId,
+              questionId: normalizedQuestionId,
+              effectiveSingleSlug: effectiveSlug,
+              responderAddress: String(responderAddress || '').toLowerCase(),
+              retryAttempt,
+              didScheduleRetry: !!didScheduleRetry,
+            },
+            exhaustedStatePatch: didScheduleRetry
+              ? null
+              : cacheBootstrapPlan.retryPlan.exhaustedStatePatch,
+            shouldClearRetry: !didScheduleRetry,
+          }
+        : null,
+    };
+  }
+
+  const debugPayload = cacheBootstrapPlan.debugPhase
+    ? {
+        phase: cacheBootstrapPlan.debugPhase,
+        runId,
+        questionId: normalizedQuestionId,
+        effectiveSingleSlug: effectiveSlug,
+        ...(cacheBootstrapPlan.debugPhase === 'recent-payload-missing-network'
+          ? { retryAttempt }
+          : {}),
+      }
+    : null;
+  const fallbackStatePatch = hasObjectKeys(cacheBootstrapPlan.fallbackStatePatch)
+    ? cacheBootstrapPlan.fallbackStatePatch
+    : null;
+
+  return {
+    action: 'fallback',
+    debugPayload,
+    fallbackStatePatch,
+    logMissingCacheState: !!cacheBootstrapPlan.logMissingCacheState,
+    preserveCurrentPoolPatch: cacheBootstrapPlan.preserveCurrentPoolPatch || null,
+    shouldApplyFallbackStatePatch: !!fallbackStatePatch,
   };
 };
 
