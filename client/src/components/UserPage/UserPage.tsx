@@ -34,7 +34,6 @@ import {
   buildUserPageCacheRefreshInputSignature,
   buildUserPageCacheRefreshStatePatch,
   buildUserPageCacheLoadingHoldFlags,
-  buildUserPageCacheSourceSnapshot,
   buildUserPageCopiedStatePatch,
   buildUserPageDeepScanReportSignature,
   buildUserPageDeepScanReportStatus,
@@ -979,11 +978,6 @@ class UserPage extends Component<any, any> {
       rows,
       lines: formatUserPageDeepScanTooltipLinesFromRows(rows, formatUserPageDeepScanBlockCount),
     };
-  };
-
-  computeDeepScanTooltipLines = (): string[] | null => {
-    const snapshot = this.computeDeepScanProgressSnapshot();
-    return snapshot?.lines || null;
   };
 
   computeDeepScanProgressRows = (): DeepScanProgressRow[] | null => {
@@ -3530,7 +3524,6 @@ class UserPage extends Component<any, any> {
     const {
       addressHref,
       addressLabel,
-      nicknameToUse,
       pendingNicknameForThis: pendingForThis,
       shouldLinkAddressLabel,
     } = resolveUserPageAddressDisplayState({
@@ -3688,9 +3681,7 @@ class UserPage extends Component<any, any> {
       viewAddress: propViewAddress,
     });
     const {
-      hasNickForThis,
       isOwner,
-      notOwnPage,
       showPen,
       showUsernamePen,
     } = headerPassiveDisplayState.profileEditVisibility;
