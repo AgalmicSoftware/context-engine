@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faSpinner, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faCheck, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -15,20 +15,15 @@ import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
-import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
-import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
 import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
-import {
-  getSbtDisplayName,
-  getSbtMaskedFieldValue,
-} from '../../utilities/sbt/sbtDisplayNames.js';
+import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import {
   getSbtPasswordRecoveryCodes,
@@ -132,7 +127,6 @@ import {
   findSbtPageCachedEntryAcrossGroups,
   findNestedInteractiveElement,
   generateSbtPageRandomPasswords,
-  getBlockExplorerBaseUrl,
   getDisplayImageFallbackCandidateCount,
   getErrorMessage,
   getExplicitSbtPageSessionSlug,
@@ -200,14 +194,12 @@ import {
   resolveSbtPageUserAdminStatus,
   resolveSbtAddress,
   resolveSbtAddressString,
-  resolveSbtChainId,
   sanitizeSbtPageMintedTokensOverride,
   shouldRunSbtPagePropListAutoMint,
   shouldRunSbtPagePropPasswordAutoMint,
 } from './sbtPageHelpers';
 import type {
   SbtPageDecodedInviteInput,
-  SbtPageHistorySummary,
   SbtPageUrlAutoMintIntent,
 } from './sbtPageHelpers';
 
