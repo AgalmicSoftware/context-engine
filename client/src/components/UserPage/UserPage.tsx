@@ -48,6 +48,7 @@ import {
   buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageFullProfileModalStatePatch,
@@ -1825,7 +1826,6 @@ class UserPage extends Component<any, any> {
     if (!account || !pendingKeys || pendingKeys.size === 0) return;
     const generation = this._responseGateAccessGeneration;
     const now = Date.now();
-    const terminalStatuses = new Set<string>(['granted', 'denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
 
     pendingKeys.forEach((pendingKey: unknown) => {
       const [slugRaw, resourceRaw] = String(pendingKey || '').split('::');
@@ -1833,34 +1833,26 @@ class UserPage extends Component<any, any> {
       const resourceKey = String(resourceRaw || '').trim() || 'default';
       const cacheKey = this._buildGateAccessCacheKey({ slug, resourceKey });
       const cached = this._responseGateAccessStatusByKey.get(cacheKey);
-      const cachedTs = Number(cached?.ts || 0);
-      const cachedAgeMs = Number.isFinite(cachedTs) && cachedTs > 0
-        ? Math.max(0, now - cachedTs)
-        : Number.POSITIVE_INFINITY;
-      if (
-        cached &&
-        terminalStatuses.has(String(cached.status || '')) &&
-        cachedAgeMs < USERPAGE_GATE_TERMINAL_RECHECK_MS
-      ) {
+      const checkPlan = buildUserPageGateAccessCheckPlan({
+        cachedStatus: cached?.status,
+        cachedTs: cached?.ts,
+        hasCachedEntry: !!cached,
+        hasInFlight: this._responseGateAccessInFlightByKey.has(cacheKey),
+        nowMs: now,
+        terminalRecheckMs: USERPAGE_GATE_TERMINAL_RECHECK_MS,
+        unknownRetryMs: USERPAGE_GATE_UNKNOWN_RETRY_MS,
+      });
+      if (checkPlan.action === 'skip' || checkPlan.action === 'in-flight') {
         return;
       }
-      if (
-        cached &&
-        (cached.status === 'unknown' || cached.status === 'error' || cached.status === 'unresolved') &&
-        cachedAgeMs < USERPAGE_GATE_UNKNOWN_RETRY_MS
-      ) {
-        this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS - cachedAgeMs);
+      if (checkPlan.action === 'schedule-retry') {
+        this.scheduleResponseGateRetry(checkPlan.retryDelayMs);
         return;
       }
-      if (this._responseGateAccessInFlightByKey.has(cacheKey)) return;
 
-      const previousStatus = String(cached?.status || 'missing');
-      const shouldPreserveStatusWhileRevalidating = !!(
-        cached &&
-        terminalStatuses.has(previousStatus) &&
-        cachedAgeMs >= USERPAGE_GATE_TERMINAL_RECHECK_MS
-      );
-      if (!shouldPreserveStatusWhileRevalidating) {
+      const previousStatus = checkPlan.previousStatus;
+      const shouldPreserveStatusWhileRevalidating = checkPlan.shouldPreserveStatusWhileRevalidating;
+      if (checkPlan.shouldSetCheckingStatus) {
         this._setResponseGateAccessStatus(cacheKey, 'checking', now);
       }
       const cfg = getSessionConfigBySlugOrDefault(slug) || {};
