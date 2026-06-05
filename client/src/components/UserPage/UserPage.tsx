@@ -110,7 +110,6 @@ import {
   normalizeUserPageSingleQuestionResponsePayload,
   mergeUserPageQueuedCacheRefreshFlags,
   parseUserPageCachedResponsePayload,
-  readUserPageCacheSourcePresence,
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
@@ -1586,12 +1585,6 @@ class UserPage extends Component<any, any> {
   };
 
   _dgHasAny = (name: unknown): boolean => hasNamespaceEntriesSync(String(name || ''));
-
-  _readCacheSourcePresence = (): CacheSourcePresence => {
-    return readUserPageCacheSourcePresence({
-      hasNamespaceEntries: this._dgHasAny,
-    });
-  };
 
   _readCacheSourceSnapshot = (): CacheSourceSnapshot => {
     return readUserPageCacheSourceSnapshot({
