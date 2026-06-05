@@ -612,14 +612,6 @@ export const SURVEY_RESULTS_TRAILING_LABEL_STYLE: React.CSSProperties = {
   marginLeft: '10px',
 };
 
-export const buildSurveyResultsAggregatorPanelClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.surveyResultsAggregatorPanel} ${styleMap.surveyResultsAggregatorText}`;
-
-export const buildSurveyResultsMultichoiceOptionClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.surveyResultsFreeformAnswer} ${styleMap.surveyResultsMultichoiceOption}`;
-
 export const resolveSurveyResultsSyncDetailsStyle = (
   syncDetailsOpen: unknown
 ): React.CSSProperties => ({
