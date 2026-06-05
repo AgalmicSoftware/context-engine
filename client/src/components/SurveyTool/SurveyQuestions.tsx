@@ -204,6 +204,10 @@ import {
   decideAutomaticPromptDecryptByKind,
 } from './surveyQuestionsDecryptEligibility.js';
 import {
+  buildDecryptContextKeyFromContext,
+  buildResponseGatePolicyCacheKeyFromInputs,
+} from './surveyQuestionsCacheKeys.js';
+import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
@@ -1080,20 +1084,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     };
   };
 
-  buildDecryptContextKey = (snapshot = null) => {
-    const context = snapshot || this.buildDecryptContextSnapshot();
-    return [
-      context.account || '',
-      context.providerKind || '',
-      context.sessionSlug || '',
-      context.networkID || '',
-      context.responder || '',
-      context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
-      String(context.surveyIndex ?? '').trim(),
-      String(context.surveyId || '').trim().toLowerCase(),
-      String(context.questionID || '').trim().toLowerCase(),
-    ].join('|');
-  };
+  buildDecryptContextKey = (snapshot = null) =>
+    buildDecryptContextKeyFromContext(snapshot || this.buildDecryptContextSnapshot());
 
   isDecryptContextCurrent = (snapshot = null) => (
     !!snapshot &&
@@ -6866,22 +6858,16 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
   };
 
-  buildResponseGatePolicyCacheKey = () => {
-    const isQuestionResponseFlow = !!(this.props.singleQuestionMode || this.props.isStandalone);
-    const questionId = isQuestionResponseFlow ? String(this.props.questionID || '').toLowerCase() : '';
-    const surveyId = isQuestionResponseFlow ? '' : String(this.props.surveyId || '').toLowerCase();
-    const hintedSessionSlug = getSessionSlugHintFromProps(this.props);
-    const effectiveSessionSlug = resolveEffectiveSlug(this.props);
-    const networkId = String(this.props.network?.id ?? this.props.networkChainId ?? '');
-    return [
-      isQuestionResponseFlow ? 'question' : 'survey',
-      questionId,
-      surveyId,
-      hintedSessionSlug,
-      effectiveSessionSlug,
-      networkId,
-    ].join('|');
-  };
+  buildResponseGatePolicyCacheKey = () =>
+    buildResponseGatePolicyCacheKeyFromInputs({
+      singleQuestionMode: this.props.singleQuestionMode,
+      isStandalone: this.props.isStandalone,
+      questionID: this.props.questionID,
+      surveyId: this.props.surveyId,
+      hintedSessionSlug: getSessionSlugHintFromProps(this.props),
+      effectiveSessionSlug: resolveEffectiveSlug(this.props),
+      networkId: String(this.props.network?.id ?? this.props.networkChainId ?? ''),
+    });
 
   getResponseGatePolicy = () => {
     const cacheKey = this.buildResponseGatePolicyCacheKey();
