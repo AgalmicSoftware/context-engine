@@ -126,9 +126,6 @@ describe('renderSurveyResultsSyncStatusPanel', () => {
       <>
         {renderSurveyResultsSyncStatusPanel({
           ...basePanelProps,
-          isSynced: false,
-          isSyncingOrLoading: true,
-          syncStatusText: 'Loading...',
           syncDetailsOpen: false,
           syncDetailsStyle: { display: undefined },
           onManualRefresh,
