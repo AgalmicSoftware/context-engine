@@ -66,8 +66,6 @@ import {
   applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
   applyQuestionDecryptFailureStatus as applyQuestionDecryptFailureStatusHelper,
   applySurveyDecryptStaleStatus as applySurveyDecryptStaleStatusHelper,
-  applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
-  applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
   buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
   buildDecryptTaskKey as buildDecryptTaskKeyHelper,
   buildFieldDecryptState as buildFieldDecryptStateHelper,
@@ -87,21 +85,16 @@ import {
   buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
   buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
   buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
-  clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
   buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
   buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
   decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
   decryptQuestionRatingEnvelopes as decryptQuestionRatingEnvelopesHelper,
-  ensureQuestionDecryptSliceShape as ensureQuestionDecryptSliceShapeHelper,
   finalizeSurveyDecryptAttempt as finalizeSurveyDecryptAttemptHelper,
   finalizeQuestionDecryptAttempt as finalizeQuestionDecryptAttemptHelper,
   getViewedResponseOverrideForQuestion as getViewedResponseOverrideForQuestionHelper,
   getQuestionFieldDecryptSelection as getQuestionFieldDecryptSelectionHelper,
   getQuestionFieldTaskKey as getQuestionFieldTaskKeyHelper,
-  getQuestionFieldTaskKeys as getQuestionFieldTaskKeysHelper,
-  getQuestionRatingEnvelopes as getQuestionRatingEnvelopesHelper,
   hydrateLatestQuestionDecryptState as hydrateLatestQuestionDecryptStateHelper,
-  markQuestionFieldBusyMap as markQuestionFieldBusyMapHelper,
   mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
   mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
   mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
@@ -1198,17 +1191,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return !!(this.state.decryptingByKey && this.state.decryptingByKey[taskKey]);
   };
 
-  getQuestionFieldTaskKeys = (
-    questionId,
-    { includeAnswer = false, includeAdditional = false } = {},
-  ) => getQuestionFieldTaskKeysHelper(questionId, { includeAnswer, includeAdditional });
-
-  markQuestionFieldBusyMap = (busyMap, keysToMark = []) =>
-    markQuestionFieldBusyMapHelper(busyMap, keysToMark);
-
-  clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') =>
-    clearQuestionFieldBusyMapHelper(busyMap, questionId, fieldToDecrypt);
-
   getQuestionFieldDecryptSelection = (
     questionId,
     fieldToDecrypt = 'both',
@@ -1278,16 +1260,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       getProviderKind: cryptoUtils.getProviderKind,
     });
   };
-
-  applyDecryptedQuestionResponseValues = (
-    responseRecord,
-    options = {},
-  ) => applyDecryptedQuestionResponseValuesHelper(responseRecord, options);
-
-  applyDecryptedQuestionStateToSurveySlice = (
-    targetStateSlice,
-    options = {},
-  ) => applyDecryptedQuestionStateToSurveySliceHelper(targetStateSlice, options);
 
   buildViewedResponseDecryptSuccessState = (
     prevState,
@@ -1444,9 +1416,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     options = {},
   ) => normalizeBulkDecryptedSliceForSurveyStateHelper(decryptedSlice, options);
 
-  getQuestionRatingEnvelopes = (source, questionId = null) =>
-    getQuestionRatingEnvelopesHelper(source, questionId);
-
   mergeQuestionRatingEnvelopeState = (previousState, nextSource, questionId = null) =>
     mergeQuestionRatingEnvelopeStateHelper(previousState, nextSource, questionId);
 
@@ -1464,9 +1433,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     fieldToDecrypt,
     errorMessage,
   );
-
-  ensureQuestionDecryptSliceShape = (responseSlice) =>
-    ensureQuestionDecryptSliceShapeHelper(responseSlice);
 
   buildViewedResponseDecryptBaseline = (responseOverride, questionId) =>
     buildViewedResponseDecryptBaselineHelper(
