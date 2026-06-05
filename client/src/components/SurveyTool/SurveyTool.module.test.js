@@ -414,6 +414,13 @@ describe('SurveyTool module', () => {
       chainId: 84532,
       surveyId: 'survey-1',
       questionPool: [{ id: 'pool-q' }],
+      target: {
+        providerKind: 'browser',
+        chainId: 84532,
+        surveyId: 'survey-1',
+        questionId: 'q1',
+        fieldToDecrypt: 'both',
+      },
       lit: { getKey: litHooks.getKey },
       opts: {
         providerKind: 'browser',
