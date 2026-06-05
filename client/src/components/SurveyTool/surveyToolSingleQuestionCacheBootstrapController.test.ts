@@ -1,4 +1,5 @@
 import {
+  buildSingleQuestionSourceRestoreContextPlan,
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
   resolveSingleQuestionCacheBootstrapFlowPlan,
@@ -21,6 +22,112 @@ const ensureQuestionsNet = (cache: unknown, netId: string): TestQuestionsCache =
 };
 
 describe('surveyToolSingleQuestionCacheBootstrapController', () => {
+  it('plans missing route question ids without cache, retry, or state execution', () => {
+    const getQuestionFetchCandidateSlugs = jest.fn(() => ['edge']);
+
+    expect(buildSingleQuestionSourceRestoreContextPlan({
+      bootstrapRetryAttempt: 2,
+      getQuestionFetchCandidateSlugs,
+      props: { questionID: '' },
+      runId: 9,
+    })).toEqual({
+      status: 'missing-question-id',
+      bootstrapRetryAttempt: 2,
+      debugPayload: {
+        phase: 'missing-question-id',
+        runId: 9,
+        bootstrapRetryAttempt: 2,
+      },
+      hasPendingRetryForQuestion: false,
+      pendingRetryQuestionId: '',
+      pendingRetrySig: '',
+      questionId: '',
+      retryCleanupAction: 'none',
+      statePatch: { isLoadingResponse: false },
+    });
+    expect(getQuestionFetchCandidateSlugs).not.toHaveBeenCalled();
+  });
+
+  it('plans source slug candidates and retry cleanup without clearing retries in the helper', () => {
+    const getQuestionFetchCandidateSlugs = jest.fn(() => ['edge', 'fallback', '']);
+
+    expect(buildSingleQuestionSourceRestoreContextPlan({
+      bootstrapRetryAttempt: 0,
+      getQuestionFetchCandidateSlugs,
+      maxCandidateSlugs: 2,
+      pendingRetrySig: 'other-question:1',
+      props: {
+        questionID: 'Q1',
+        sessionName: 'Edge',
+        sessionSlug: 'edge',
+        activeSessionSlug: 'edge',
+        sessionSlugPinned: true,
+        responderAddress: '0xABCD',
+        questionResponsesNonce: 4,
+        questionsCacheNonce: 7,
+      },
+      questionPool: [{ id: 'q1', sessionName: 'edge-from-pool' }],
+      runId: 10,
+    })).toEqual(expect.objectContaining({
+      status: 'ready',
+      bootstrapRetryAttempt: 0,
+      fetchCandidateSlugs: ['edge', 'fallback'],
+      hasPendingRetryForQuestion: false,
+      pendingRetryQuestionId: 'other-question',
+      pendingRetrySig: 'other-question:1',
+      questionId: 'q1',
+      retryCleanupAction: 'clear-different-question',
+      slugPinned: true,
+      startDebugPayload: {
+        phase: 'start',
+        runId: 10,
+        questionId: 'q1',
+        responderAddress: '0xabcd',
+        bootstrapRetryAttempt: 0,
+        pendingRetrySig: 'other-question:1',
+        hasPendingRetryForQuestion: false,
+        questionResponsesNonce: 4,
+        questionsCacheNonce: 7,
+      },
+    }));
+    expect(getQuestionFetchCandidateSlugs).toHaveBeenCalledWith(
+      'q1',
+      expect.any(String),
+      { allowPinnedFallback: true }
+    );
+  });
+
+  it('plans blocked question state without applying parent mutations', () => {
+    const getQuestionFetchCandidateSlugs = jest.fn(() => ['blocked-slug']);
+
+    expect(buildSingleQuestionSourceRestoreContextPlan({
+      getBlockedQuestionIds: jest.fn(() => new Set(['blocked-question'])),
+      getQuestionFetchCandidateSlugs,
+      maxCandidateSlugs: 3,
+      props: {
+        questionID: 'blocked-question',
+        sessionSlug: 'blocked-slug',
+        activeSessionSlug: 'blocked-slug',
+      },
+      runId: 11,
+    })).toEqual(expect.objectContaining({
+      status: 'blocked-question',
+      debugPayload: {
+        phase: 'blocked-question',
+        runId: 11,
+        questionId: 'blocked-question',
+        effectiveSingleSlug: 'blocked-slug',
+      },
+      statePatch: {
+        questionPool: [],
+        isLoadingResponse: false,
+        noResponse: true,
+        responseLookupWarning: '',
+        displayAnswerMode: true,
+      },
+    }));
+  });
+
   it('plans ready cache bootstrap results as continuation without seeded hydration', () => {
     const cacheState = {
       netIdStr: '84532',

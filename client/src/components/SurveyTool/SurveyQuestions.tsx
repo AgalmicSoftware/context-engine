@@ -383,6 +383,7 @@ import {
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
 import {
+  buildSingleQuestionSourceRestoreContextPlan,
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
   resolveSingleQuestionCacheBootstrapFlowPlan,
@@ -5089,18 +5090,22 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       : Math.max(fetchTimeoutMs, 20000);
     const maxCandidateSlugs = Math.max(2, Number(opts?.maxCandidateSlugs || 8));
 
-    let questionId = this.props.questionID;
-    if (!questionId) {
-      this.updateSingleQuestionDebug({
-        phase: 'missing-question-id',
-        runId,
-        bootstrapRetryAttempt,
-      });
+    const sourceContextPlan = buildSingleQuestionSourceRestoreContextPlan({
+      bootstrapRetryAttempt,
+      getQuestionFetchCandidateSlugs: this.getQuestionFetchCandidateSlugs,
+      maxCandidateSlugs,
+      pendingRetrySig: this._singleQuestionBootstrapRetrySig,
+      props: this.props,
+      questionPool: this.state.questionPool,
+      runId,
+    });
+    if (sourceContextPlan.status === 'missing-question-id') {
+      this.updateSingleQuestionDebug(sourceContextPlan.debugPayload);
       surveyLog.warn('SurveyQuestions: No questionID provided in singleQuestionMode.');
-      safeSetState({ isLoadingResponse: false });
+      safeSetState(sourceContextPlan.statePatch);
       return;
     }
-    questionId = questionId.toLowerCase();
+    const questionId = sourceContextPlan.questionId;
     const preserveCurrentSingleQuestionPool = (extraState = {}) => {
       const existingPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : [];
       const existingCurrentQuestion = existingPool.find((item) => (
@@ -5114,63 +5119,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       return true;
     };
 
-    // Keep retry timers stable across cache-tick refreshes for the same question.
-    // Otherwise we can repeatedly cancel the delayed retry before it executes.
-    const pendingRetrySig = String(this._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
-    const pendingRetryQuestionId = pendingRetrySig ? pendingRetrySig.split(':')[0] : '';
-    const hasPendingRetryForQuestion = !!(pendingRetryQuestionId && pendingRetryQuestionId === questionId);
-    if (bootstrapRetryAttempt > 0) {
-      this.clearSingleQuestionBootstrapRetry();
-    } else if (pendingRetryQuestionId && pendingRetryQuestionId !== questionId) {
+    if (sourceContextPlan.retryCleanupAction !== 'none') {
       this.clearSingleQuestionBootstrapRetry();
     }
-    this.updateSingleQuestionDebug({
-      phase: 'start',
-      runId,
-      questionId,
-      responderAddress: String(this.props.responderAddress || '').toLowerCase(),
-      bootstrapRetryAttempt,
-      pendingRetrySig: pendingRetrySig || null,
-      hasPendingRetryForQuestion,
-      questionResponsesNonce: Number(this.props.questionResponsesNonce || 0),
-      questionsCacheNonce: Number(this.props.questionsCacheNonce || 0),
-    });
+    this.updateSingleQuestionDebug(sourceContextPlan.startDebugPayload);
 
-    // Resolve slug for this single-question view (scoped)
-    const slugPinned = getSessionSlugPinnedFromProps(this.props);
-    const explicitSingleSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(this.props));
-    const explicitSingleSlugKnown = explicitSingleSlug === '' || !!resolveExplicitSessionContext(explicitSingleSlug).sessionConfig;
-    const currentQuestionSessionName = this.state.questionPool?.[0]?.sessionName;
-    const resolvedSingleSlug = resolveSlugForIds({
-      sessionName: this.props.sessionName || currentQuestionSessionName,
-      questionId: this.props.questionID,
-      surveyId: null,
-      props: this.props,
-      network: this.props.network
-    });
-    let effectiveSingleSlug = explicitSingleSlug || resolvedSingleSlug || resolveEffectiveSlug(this.props);
-    const fetchCandidateSlugs = this.getQuestionFetchCandidateSlugs(
-      questionId,
-      effectiveSingleSlug,
-      { allowPinnedFallback: !slugPinned || bootstrapRetryAttempt > 0 || !explicitSingleSlugKnown }
-    ).slice(0, maxCandidateSlugs);
+    let effectiveSingleSlug = sourceContextPlan.effectiveSingleSlug;
+    const fetchCandidateSlugs = sourceContextPlan.fetchCandidateSlugs;
+    const hasPendingRetryForQuestion = sourceContextPlan.hasPendingRetryForQuestion;
 
-    const BLOCKED_QUESTION_IDS_SET = getBlockedQuestionIdsSet(effectiveSingleSlug);
-    if (BLOCKED_QUESTION_IDS_SET.has(questionId)) {
-      this.updateSingleQuestionDebug({
-        phase: 'blocked-question',
-        runId,
-        questionId,
-        effectiveSingleSlug: String(effectiveSingleSlug || ''),
-      });
+    if (sourceContextPlan.status === 'blocked-question') {
+      this.updateSingleQuestionDebug(sourceContextPlan.debugPayload);
       surveyLog.warn(`SurveyQuestions: Question ${questionId} is blocked; skipping.`);
-      safeSetState({
-        questionPool: [],
-        isLoadingResponse: false,
-        noResponse: true,
-        responseLookupWarning: '',
-        displayAnswerMode: true,
-      });
+      safeSetState(sourceContextPlan.statePatch);
       return;
     }
 
