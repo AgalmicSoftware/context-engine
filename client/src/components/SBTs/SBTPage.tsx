@@ -37,6 +37,7 @@ import {
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import SbtPageAdminActions from './SbtPageAdminActions';
 import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
+import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import {
@@ -3862,18 +3863,15 @@ renderMintButton() {
   // Unlimited (signature) path - hide inputs after success
   if (mintFlowDisplayState.shouldRenderGroupPasswordJoin) {
     return (
-      <div id={styles.mintButtonArea}>
-        <div className={styles.passwordEntry}>
-          <input
-            type="password"
-            className={styles.input}
-            value={groupPasswordInput || ''}
-            onChange={this.handleGroupPasswordInputChange}
-            placeholder="Group Password"
-          />
-        </div>
-        <button
-          onClick={(event) => runSbtPageMintActionController({
+      <SbtPageMintInputAction
+        buttonClassName={mintActionButtonClassName}
+        contentState={passwordJoinContentState}
+        disabled={passwordJoinButtonState.disabled}
+        inputType="password"
+        inputValue={groupPasswordInput || ''}
+        onInputChange={this.handleGroupPasswordInputChange}
+        placeholder="Group Password"
+        onAction={(event) => runSbtPageMintActionController({
             disabled: passwordJoinButtonState.disabled,
             event,
             plan: mintActionPlan,
@@ -3881,31 +3879,22 @@ renderMintButton() {
               dispatchMint: this.mintUnlimitedWithGroupPassword,
             },
           })}
-          disabled={passwordJoinButtonState.disabled}
-          className={mintActionButtonClassName}
-        >
-          {passwordJoinContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {passwordJoinContentState.shouldRenderLabel && passwordJoinContentState.label}
-        </button>
-      </div>
+      />
     );
   }
 
   // Limited group-password - hide inputs after success
   if (mintFlowDisplayState.shouldRenderInviteJoin) {
     return (
-      <div id={styles.mintButtonArea}>
-        <div className={styles.passwordEntry}>
-          <input
-            type="password"
-            className={styles.input}
-            value={groupPasswordInput || ''}
-            onChange={this.handleGroupPasswordInputChange}
-            placeholder="Group Password"
-          />
-        </div>
-        <button
-          onClick={(event) => runSbtPageMintActionController({
+      <SbtPageMintInputAction
+        buttonClassName={mintActionButtonClassName}
+        contentState={passwordJoinContentState}
+        disabled={passwordJoinButtonState.disabled}
+        inputType="password"
+        inputValue={groupPasswordInput || ''}
+        onInputChange={this.handleGroupPasswordInputChange}
+        placeholder="Group Password"
+        onAction={(event) => runSbtPageMintActionController({
             disabled: passwordJoinButtonState.disabled,
             event,
             mintArgs: [this.state.groupPasswordInput],
@@ -3914,13 +3903,7 @@ renderMintButton() {
               dispatchMint: this.claimWithInviteCode,
             },
           })}
-          disabled={passwordJoinButtonState.disabled}
-          className={mintActionButtonClassName}
-        >
-          {passwordJoinContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {passwordJoinContentState.shouldRenderLabel && passwordJoinContentState.label}
-        </button>
-      </div>
+      />
     );
   }
 
@@ -3985,18 +3968,15 @@ renderMintButton() {
 
   if (mintFlowDisplayState.shouldRenderManualClaimStart) {
     return (
-      <div id={styles.mintButtonArea}>
-        <div className={styles.passwordEntry}>
-          <input
-            type="text"
-            className={styles.input}
-            value={manualPasswordInput || ''}
-            onChange={this.handleManualPasswordInputChange}
-            placeholder="Claim Code"
-          />
-        </div>
-        <button
-          onClick={(event) => runSbtPageMintActionController({
+      <SbtPageMintInputAction
+        buttonClassName={mintActionButtonClassName}
+        contentState={manualClaimStartContentState}
+        disabled={manualClaimButtonState.disabled}
+        inputType="text"
+        inputValue={manualPasswordInput || ''}
+        onInputChange={this.handleManualPasswordInputChange}
+        placeholder="Claim Code"
+        onAction={(event) => runSbtPageMintActionController({
             disabled: manualClaimButtonState.disabled,
             event,
             mintArgs: [true],
@@ -4005,13 +3985,7 @@ renderMintButton() {
               dispatchMint: this.handleMint,
             },
           })}
-          disabled={manualClaimButtonState.disabled}
-          className={mintActionButtonClassName}
-        >
-          {manualClaimStartContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {manualClaimStartContentState.shouldRenderLabel && manualClaimStartContentState.label}
-        </button>
-      </div>
+      />
     );
   }
   if (mintFlowDisplayState.shouldRenderClaimCountdown) {
@@ -4023,18 +3997,15 @@ renderMintButton() {
   }
   if (mintFlowDisplayState.shouldRenderManualClaimFinish) {
     return (
-      <div id={styles.mintButtonArea}>
-        <div className={styles.passwordEntry}>
-          <input
-            type="text"
-            className={styles.input}
-            value={manualPasswordInput || ''}
-            onChange={this.handleManualPasswordInputChange}
-            placeholder="Claim Code"
-          />
-        </div>
-        <button
-          onClick={(event) => runSbtPageMintActionController({
+      <SbtPageMintInputAction
+        buttonClassName={mintActionButtonClassName}
+        contentState={manualClaimFinishContentState}
+        disabled={manualClaimButtonState.disabled}
+        inputType="text"
+        inputValue={manualPasswordInput || ''}
+        onInputChange={this.handleManualPasswordInputChange}
+        placeholder="Claim Code"
+        onAction={(event) => runSbtPageMintActionController({
             disabled: manualClaimButtonState.disabled,
             event,
             mintArgs: [true],
@@ -4043,13 +4014,7 @@ renderMintButton() {
               dispatchMint: this.handleMint,
             },
           })}
-          disabled={manualClaimButtonState.disabled}
-          className={mintActionButtonClassName}
-        >
-          {manualClaimFinishContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {manualClaimFinishContentState.shouldRenderLabel && manualClaimFinishContentState.label}
-        </button>
-      </div>
+      />
     );
   }
   if (mintFlowDisplayState.shouldRenderClaimSuccess) {
