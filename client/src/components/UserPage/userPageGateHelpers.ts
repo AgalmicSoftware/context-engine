@@ -254,7 +254,7 @@ export const buildUserPageGateAccessCheckPlan = ({
   cachedTs = 0,
   hasCachedEntry = false,
   hasInFlight = false,
-  nowMs = Date.now(),
+  nowMs = Number.POSITIVE_INFINITY,
   terminalRecheckMs = 60 * 1000,
   unknownRetryMs = 30 * 1000,
 }: BuildUserPageGateAccessCheckPlanInput = {}): UserPageGateAccessCheckPlan => {
