@@ -119,7 +119,6 @@ import {
   buildSbtPageLoadInfoStartLogContext,
   coerceSbtPageEpochSeconds,
   coerceSbtPageStringArrayValue,
-  computeSbtPageNetCounts,
   computeSbtPageNetHoldersList,
   deriveSbtPageCacheNetKey,
   decodeSbtPageInviteInput,
@@ -135,7 +134,6 @@ import {
   getNextDisplayImageFallbackState,
   isActiveSbtPageScanProgress,
   isRecord,
-  mergeSbtPageBurnEvidenceIntoPreservedHolderState,
   normalizeSbtPageLoadInfoOptions,
   normalizeSbtPageHistorySummary,
   needsSbtPageDirectMetadataHydration,
@@ -184,6 +182,7 @@ import {
   resolveSbtPageRecoveryCacheChainId,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
+  reconcileSbtPageHolderRefreshState,
   resolveSbtPageCachedGroupPasswordHash,
   resolveSbtPageChainMetadataReadNeeds,
   resolveSbtPageGroupPasswordMintState,
@@ -200,6 +199,8 @@ import {
   shouldRunSbtPagePropPasswordAutoMint,
 } from './sbtPageHelpers';
 import type {
+  ReconcileSbtPageHolderRefreshStateArgs,
+  ReconciledSbtPageHolderRefreshState,
   SbtPageDecodedInviteInput,
   SbtPageUrlAutoMintIntent,
 } from './sbtPageHelpers';
@@ -304,11 +305,6 @@ type BuildNextFilteredHolderRowsArgs = {
   nextNetHolders?: unknown;
   replaceRows?: boolean;
 };
-type PreservedHolderState = {
-  mintedAddresses: string[];
-  burnedAddresses: string[];
-  burnDiscovered: boolean;
-};
 type HolderRefreshStateLike = Record<string, unknown> & {
   mintedAddresses?: unknown;
   burnedAddresses?: unknown;
@@ -321,24 +317,6 @@ type HolderRefreshStateLike = Record<string, unknown> & {
   countsLoaded?: unknown;
   mintedTokensOverride?: unknown;
   showFullImage?: unknown;
-};
-type ReconcileHolderRefreshStateArgs = {
-  prevState?: HolderRefreshStateLike | null;
-  nextMintedAddresses?: unknown;
-  nextBurnedAddresses?: unknown;
-  nextCountsLoaded?: unknown;
-  nextHoldersMetaKey?: unknown;
-  nextMintedTokensOverride?: unknown;
-  userLower?: unknown;
-};
-type ReconciledHolderRefreshState = {
-  mintedAddresses: unknown[];
-  burnedAddresses: unknown[];
-  countsLoaded: boolean;
-  mintedTokensOverride: string | null;
-  userHasSBT: boolean;
-  filteredMintedUsers: unknown[];
-  filteredMintedUsersSignature: string;
 };
 type SbtPageLoadInfoOptions = {
   forceEventFetch: boolean;
@@ -1656,116 +1634,15 @@ class SBTPage extends Component<any, any> {
     }, this.buildAddressListSignature);
   };
 
-  mergeBurnEvidenceIntoPreservedHolderState = (
-    prevMinted: unknown = [],
-    prevBurned: unknown = [],
-    nextMinted: unknown = [],
-    nextBurned: unknown = []
-  ): PreservedHolderState => {
-    return mergeSbtPageBurnEvidenceIntoPreservedHolderState(
-      prevMinted,
-      prevBurned,
-      nextMinted,
-      nextBurned
-    );
-  };
-
   // Regression guard: once holder rows are visible for the active SBT/network, only a
   // resolved replacement set or per-address burn evidence may remove them.
-  reconcileHolderRefreshState = ({
-    prevState,
-    nextMintedAddresses,
-    nextBurnedAddresses,
-    nextCountsLoaded,
-    nextHoldersMetaKey,
-    nextMintedTokensOverride,
-    userLower,
-  }: ReconcileHolderRefreshStateArgs): ReconciledHolderRefreshState => {
-    const prev = isRecord(prevState) ? prevState : {};
-    const prevMinted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
-    const prevBurned = Array.isArray(prev.burnedAddresses) ? prev.burnedAddresses : [];
-    const nextMinted = Array.isArray(nextMintedAddresses) ? nextMintedAddresses : [];
-    const nextBurned = Array.isArray(nextBurnedAddresses) ? nextBurnedAddresses : [];
-    const nextCountsLoadedFlag = nextCountsLoaded === true;
-    const sameHoldersKey =
-      !!nextHoldersMetaKey &&
-      !!prev?.holdersMetaKey &&
-      String(prev.holdersMetaKey) === String(nextHoldersMetaKey);
-    const prevNetHolders = computeSbtPageNetHoldersList(prevMinted, prevBurned);
-    const nextNetHolders = computeSbtPageNetHoldersList(nextMinted, nextBurned);
-    const hasResolvedReplacement = nextCountsLoadedFlag && nextNetHolders.length > 0;
-    const shouldPreserveExisting =
-      sameHoldersKey &&
-      prevNetHolders.length > 0 &&
-      !hasResolvedReplacement;
-    const shouldManageVisibleRows =
-      prev.showModal === true ||
-      prev.mintingAddressesFilterInitialized === true ||
-      (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
-
-    let mintedAddresses = nextMinted;
-    let burnedAddresses = nextBurned;
-    let filteredMintedUsers: unknown[] = Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : [];
-
-    if (shouldPreserveExisting) {
-      const merged = this.mergeBurnEvidenceIntoPreservedHolderState(
-        prevMinted,
-        prevBurned,
-        nextMinted,
-        nextBurned
-      );
-      mintedAddresses = merged.mintedAddresses;
-      burnedAddresses = merged.burnedAddresses;
-      if (shouldManageVisibleRows && merged.burnDiscovered) {
-        const nextVisibleHolders = computeSbtPageNetHoldersList(mintedAddresses, burnedAddresses);
-        filteredMintedUsers = this.buildNextFilteredHolderRows({
-          prevFilteredRows: filteredMintedUsers,
-          prevNetHolders,
-          nextNetHolders: nextVisibleHolders,
-          replaceRows: false,
-        });
-      }
-    } else if (shouldManageVisibleRows) {
-      filteredMintedUsers = this.buildNextFilteredHolderRows({
-        prevFilteredRows: filteredMintedUsers,
-        prevNetHolders,
-        nextNetHolders,
-        replaceRows: true,
-      });
-    }
-
-    const effectiveNetCounts = computeSbtPageNetCounts(mintedAddresses, burnedAddresses);
-    const prevMintedTokensOverride = sanitizeSbtPageMintedTokensOverride(prev.mintedTokensOverride);
-    const incomingMintedTokensOverride = sanitizeSbtPageMintedTokensOverride(nextMintedTokensOverride);
-    const userKey = String(userLower || '').toLowerCase();
-    const shouldKeepPrevApproximation =
-      !nextCountsLoadedFlag ||
-      nextNetHolders.length > 0;
-
-    return {
-      mintedAddresses,
-      burnedAddresses,
-      countsLoaded: shouldPreserveExisting
-        ? (prev.countsLoaded === true || nextCountsLoadedFlag)
-        : nextCountsLoadedFlag,
-      mintedTokensOverride: shouldPreserveExisting
-        ? (incomingMintedTokensOverride != null ? incomingMintedTokensOverride : prevMintedTokensOverride)
-        : (
-          incomingMintedTokensOverride != null
-            ? incomingMintedTokensOverride
-            : (shouldKeepPrevApproximation ? prevMintedTokensOverride : null)
-        ),
-      userHasSBT: userKey ? ((effectiveNetCounts.get(userKey) || 0) > 0) : false,
-      filteredMintedUsers,
-      filteredMintedUsersSignature: shouldManageVisibleRows
-        ? this.buildAddressListSignature(filteredMintedUsers)
-        : (
-          typeof prev.filteredMintedUsersSignature === 'string'
-            ? prev.filteredMintedUsersSignature
-            : this.buildAddressListSignature(filteredMintedUsers)
-        ),
-    };
-  };
+  reconcileHolderRefreshState = (
+    args: ReconcileSbtPageHolderRefreshStateArgs
+  ): ReconciledSbtPageHolderRefreshState => reconcileSbtPageHolderRefreshState({
+    ...args,
+    buildAddressListSignature: this.buildAddressListSignature,
+    buildNextFilteredHolderRows: this.buildNextFilteredHolderRows,
+  });
 
   handleModalFilteredMintedUsers = (filtered: unknown): void => {
     if (!this._isMounted) return;

@@ -1,3 +1,5 @@
+import { sanitizeSbtPageMintedTokensOverride } from './sbtPageAutoMintHelpers';
+
 type BuildNextFilteredHolderRowsArgs = {
   prevFilteredRows?: unknown;
   prevNetHolders?: unknown;
@@ -68,6 +70,37 @@ type PreservedHolderState = {
   mintedAddresses: string[];
   burnedAddresses: string[];
   burnDiscovered: boolean;
+};
+export type SbtPageHolderRefreshStateLike = Record<string, unknown> & {
+  burnedAddresses?: unknown;
+  countsLoaded?: unknown;
+  filteredMintedUsers?: unknown;
+  filteredMintedUsersSignature?: unknown;
+  holdersMetaKey?: unknown;
+  mintedAddresses?: unknown;
+  mintedTokensOverride?: unknown;
+  mintingAddressesFilterInitialized?: unknown;
+  showModal?: unknown;
+};
+export type ReconcileSbtPageHolderRefreshStateArgs = {
+  buildAddressListSignature?: ((list: unknown) => unknown) | null;
+  buildNextFilteredHolderRows?: ((args: BuildNextFilteredHolderRowsArgs) => unknown) | null;
+  nextBurnedAddresses?: unknown;
+  nextCountsLoaded?: unknown;
+  nextHoldersMetaKey?: unknown;
+  nextMintedAddresses?: unknown;
+  nextMintedTokensOverride?: unknown;
+  prevState?: SbtPageHolderRefreshStateLike | null;
+  userLower?: unknown;
+};
+export type ReconciledSbtPageHolderRefreshState = {
+  burnedAddresses: unknown[];
+  countsLoaded: boolean;
+  filteredMintedUsers: unknown[];
+  filteredMintedUsersSignature: string;
+  mintedAddresses: unknown[];
+  mintedTokensOverride: string | null;
+  userHasSBT: boolean;
 };
 type AddressCountMap = Record<string, number>;
 type SbtPageLoadInfoOptions = {
@@ -346,5 +379,111 @@ export const normalizeSbtPageLoadInfoOptions = (
   return {
     forceEventFetch: optionsOrForce === true,
     preferCountsOnly: false,
+  };
+};
+
+export const reconcileSbtPageHolderRefreshState = ({
+  buildAddressListSignature = buildSbtPageHolderListSignature,
+  buildNextFilteredHolderRows = buildSbtPageNextFilteredHolderRows,
+  nextBurnedAddresses = [],
+  nextCountsLoaded = false,
+  nextHoldersMetaKey = '',
+  nextMintedAddresses = [],
+  nextMintedTokensOverride = null,
+  prevState = null,
+  userLower = '',
+}: ReconcileSbtPageHolderRefreshStateArgs = {}): ReconciledSbtPageHolderRefreshState => {
+  const prev = isSbtPageHolderRecord(prevState) ? prevState : {};
+  const prevMinted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
+  const prevBurned = Array.isArray(prev.burnedAddresses) ? prev.burnedAddresses : [];
+  const nextMinted = Array.isArray(nextMintedAddresses) ? nextMintedAddresses : [];
+  const nextBurned = Array.isArray(nextBurnedAddresses) ? nextBurnedAddresses : [];
+  const nextCountsLoadedFlag = nextCountsLoaded === true;
+  const sameHoldersKey =
+    !!nextHoldersMetaKey &&
+    !!prev.holdersMetaKey &&
+    String(prev.holdersMetaKey) === String(nextHoldersMetaKey);
+  const prevNetHolders = computeSbtPageNetHoldersList(prevMinted, prevBurned);
+  const nextNetHolders = computeSbtPageNetHoldersList(nextMinted, nextBurned);
+  const hasResolvedReplacement = nextCountsLoadedFlag && nextNetHolders.length > 0;
+  const shouldPreserveExisting =
+    sameHoldersKey &&
+    prevNetHolders.length > 0 &&
+    !hasResolvedReplacement;
+  const shouldManageVisibleRows =
+    prev.showModal === true ||
+    prev.mintingAddressesFilterInitialized === true ||
+    (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
+  const resolveNextRows = typeof buildNextFilteredHolderRows === 'function'
+    ? buildNextFilteredHolderRows
+    : buildSbtPageNextFilteredHolderRows;
+  const resolveSignature = typeof buildAddressListSignature === 'function'
+    ? buildAddressListSignature
+    : buildSbtPageHolderListSignature;
+
+  let mintedAddresses = nextMinted;
+  let burnedAddresses = nextBurned;
+  let filteredMintedUsers: unknown[] = Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : [];
+
+  if (shouldPreserveExisting) {
+    const merged = mergeSbtPageBurnEvidenceIntoPreservedHolderState(
+      prevMinted,
+      prevBurned,
+      nextMinted,
+      nextBurned
+    );
+    mintedAddresses = merged.mintedAddresses;
+    burnedAddresses = merged.burnedAddresses;
+    if (shouldManageVisibleRows && merged.burnDiscovered) {
+      const nextVisibleHolders = computeSbtPageNetHoldersList(mintedAddresses, burnedAddresses);
+      const nextRows = resolveNextRows({
+        prevFilteredRows: filteredMintedUsers,
+        prevNetHolders,
+        nextNetHolders: nextVisibleHolders,
+        replaceRows: false,
+      });
+      filteredMintedUsers = Array.isArray(nextRows) ? nextRows : [];
+    }
+  } else if (shouldManageVisibleRows) {
+    const nextRows = resolveNextRows({
+      prevFilteredRows: filteredMintedUsers,
+      prevNetHolders,
+      nextNetHolders,
+      replaceRows: true,
+    });
+    filteredMintedUsers = Array.isArray(nextRows) ? nextRows : [];
+  }
+
+  const effectiveNetCounts = computeSbtPageNetCounts(mintedAddresses, burnedAddresses);
+  const prevMintedTokensOverride = sanitizeSbtPageMintedTokensOverride(prev.mintedTokensOverride);
+  const incomingMintedTokensOverride = sanitizeSbtPageMintedTokensOverride(nextMintedTokensOverride);
+  const userKey = String(userLower || '').toLowerCase();
+  const shouldKeepPrevApproximation =
+    !nextCountsLoadedFlag ||
+    nextNetHolders.length > 0;
+  const signature = shouldManageVisibleRows
+    ? String(resolveSignature(filteredMintedUsers) || '')
+    : (
+      typeof prev.filteredMintedUsersSignature === 'string'
+        ? prev.filteredMintedUsersSignature
+        : String(resolveSignature(filteredMintedUsers) || '')
+    );
+
+  return {
+    mintedAddresses,
+    burnedAddresses,
+    countsLoaded: shouldPreserveExisting
+      ? (prev.countsLoaded === true || nextCountsLoadedFlag)
+      : nextCountsLoadedFlag,
+    mintedTokensOverride: shouldPreserveExisting
+      ? (incomingMintedTokensOverride != null ? incomingMintedTokensOverride : prevMintedTokensOverride)
+      : (
+        incomingMintedTokensOverride != null
+          ? incomingMintedTokensOverride
+          : (shouldKeepPrevApproximation ? prevMintedTokensOverride : null)
+      ),
+    userHasSBT: userKey ? ((effectiveNetCounts.get(userKey) || 0) > 0) : false,
+    filteredMintedUsers,
+    filteredMintedUsersSignature: signature,
   };
 };
