@@ -371,6 +371,26 @@ type BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {
   envelopeFingerprint?: unknown;
   metaKey?: unknown;
 };
+type BuildSbtPageEncryptedMetadataDecryptPlanArgs = {
+  activeAccount?: unknown;
+  decryptTriedByKey?: unknown;
+  hasLitKey?: unknown;
+  metaKey?: unknown;
+  sbtInfo?: unknown;
+};
+export type SbtPageEncryptedMetadataDecryptPlan = {
+  alreadyTried: boolean;
+  canAttemptDecrypt: boolean;
+  decryptKey: string;
+  descriptionEnvelope: unknown;
+  documentUrlsEnvelope: unknown;
+  envelopeFingerprint: string;
+  hasEncryptedMetadata: boolean;
+  imageEnvelope: unknown;
+  nameEnvelope: unknown;
+  shouldEnterDecryptBoundary: boolean;
+  tagsEnvelope: unknown;
+};
 type ResolveSbtPageCachedGroupPasswordHashArgs = {
   groupPasswordHash?: unknown;
   groupPasswordHashLoaded?: unknown;
@@ -575,6 +595,59 @@ export const buildSbtPageEncryptedEnvelopeDecryptKey = ({
 }: BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {}): string => (
   `${metaKey}:${activeAccount || ''}:${envelopeFingerprint || ''}`
 );
+
+export const buildSbtPageEncryptedMetadataDecryptPlan = ({
+  activeAccount = '',
+  decryptTriedByKey = null,
+  hasLitKey = false,
+  metaKey = '',
+  sbtInfo = {},
+}: BuildSbtPageEncryptedMetadataDecryptPlanArgs = {}): SbtPageEncryptedMetadataDecryptPlan => {
+  const info = isRecord(sbtInfo) ? sbtInfo : {};
+  const encryptedFields = isRecord(info.encryptedFields) ? info.encryptedFields : {};
+  const nameEnvelope = encryptedFields.name || info.nameEncrypted || info.encryptedName || null;
+  const descriptionEnvelope = encryptedFields.description || info.descriptionEncrypted || info.encryptedDescription || null;
+  const tagsEnvelope = encryptedFields.tags || info.tagsEncrypted || info.encryptedTags || null;
+  const documentUrlsEnvelope = encryptedFields.documentURLs || info.documentURLsEncrypted || info.docUrlsEncrypted || null;
+  const imageEnvelope = encryptedFields.image || info.imageEncrypted || info.encryptedImage || null;
+  const envelopeFingerprint = buildSbtPageEncryptedEnvelopeFingerprint({
+    nameEnvelope,
+    descriptionEnvelope,
+    tagsEnvelope,
+    documentUrlsEnvelope,
+    imageEnvelope,
+  });
+  const decryptKey = buildSbtPageEncryptedEnvelopeDecryptKey({
+    metaKey,
+    activeAccount,
+    envelopeFingerprint,
+  });
+  const alreadyTried = !!(
+    isRecord(decryptTriedByKey) &&
+    decryptTriedByKey[decryptKey]
+  );
+  const hasEncryptedMetadata = !!(
+    nameEnvelope ||
+    descriptionEnvelope ||
+    tagsEnvelope ||
+    documentUrlsEnvelope ||
+    imageEnvelope
+  );
+  const shouldEnterDecryptBoundary = hasEncryptedMetadata && !alreadyTried;
+  return {
+    alreadyTried,
+    canAttemptDecrypt: shouldEnterDecryptBoundary && !!activeAccount && !!hasLitKey,
+    decryptKey,
+    descriptionEnvelope,
+    documentUrlsEnvelope,
+    envelopeFingerprint,
+    hasEncryptedMetadata,
+    imageEnvelope,
+    nameEnvelope,
+    shouldEnterDecryptBoundary,
+    tagsEnvelope,
+  };
+};
 
 export const resolveSbtPageCachedGroupPasswordHash = ({
   groupPasswordHash = null,

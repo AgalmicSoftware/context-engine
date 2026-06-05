@@ -25,6 +25,7 @@ import {
   buildSbtPageDocModalResetPatch,
   buildSbtPageEncryptedEnvelopeDecryptKey,
   buildSbtPageEncryptedEnvelopeFingerprint,
+  buildSbtPageEncryptedMetadataDecryptPlan,
   buildSbtPageErrorPatch,
   buildSbtPageExportFormatPatch,
   buildSbtPageInitialState,
@@ -551,6 +552,82 @@ describe('sbtPageHelpers', () => {
       activeAccount: '0xA',
       envelopeFingerprint: 'nt',
     })).toBe('meta:0xA:nt');
+    expect(buildSbtPageEncryptedMetadataDecryptPlan({
+      activeAccount: '0xA',
+      hasLitKey: true,
+      metaKey: 'session:84532:0xsbt',
+      sbtInfo: {
+        encryptedFields: {
+          name: 'name-envelope',
+          description: 'desc-envelope',
+          tags: 'tags-envelope',
+          documentURLs: 'docs-envelope',
+          image: { storage: 'lit-arweave', txId: 'image-tx' },
+        },
+        nameEncrypted: 'legacy-name-envelope',
+        encryptedImage: 'legacy-image-envelope',
+      },
+    })).toEqual({
+      alreadyTried: false,
+      canAttemptDecrypt: true,
+      decryptKey: 'session:84532:0xsbt:0xA:ndtui',
+      descriptionEnvelope: 'desc-envelope',
+      documentUrlsEnvelope: 'docs-envelope',
+      envelopeFingerprint: 'ndtui',
+      hasEncryptedMetadata: true,
+      imageEnvelope: { storage: 'lit-arweave', txId: 'image-tx' },
+      nameEnvelope: 'name-envelope',
+      shouldEnterDecryptBoundary: true,
+      tagsEnvelope: 'tags-envelope',
+    });
+    expect(buildSbtPageEncryptedMetadataDecryptPlan({
+      activeAccount: '0xA',
+      decryptTriedByKey: { 'session:84532:0xsbt:0xA:d': true },
+      hasLitKey: true,
+      metaKey: 'session:84532:0xsbt',
+      sbtInfo: {
+        descriptionEncrypted: 'desc-envelope',
+      },
+    })).toEqual(expect.objectContaining({
+      alreadyTried: true,
+      canAttemptDecrypt: false,
+      decryptKey: 'session:84532:0xsbt:0xA:d',
+      descriptionEnvelope: 'desc-envelope',
+      hasEncryptedMetadata: true,
+      shouldEnterDecryptBoundary: false,
+    }));
+    expect(buildSbtPageEncryptedMetadataDecryptPlan({
+      activeAccount: '',
+      hasLitKey: false,
+      metaKey: 'session:84532:0xsbt',
+      sbtInfo: {
+        encryptedDescription: 'desc-envelope',
+        docUrlsEncrypted: 'docs-envelope',
+        imageEncrypted: 'image-envelope',
+      },
+    })).toEqual(expect.objectContaining({
+      canAttemptDecrypt: false,
+      decryptKey: 'session:84532:0xsbt::dui',
+      descriptionEnvelope: 'desc-envelope',
+      documentUrlsEnvelope: 'docs-envelope',
+      hasEncryptedMetadata: true,
+      imageEnvelope: 'image-envelope',
+      shouldEnterDecryptBoundary: true,
+    }));
+    expect(buildSbtPageEncryptedMetadataDecryptPlan({
+      activeAccount: '0xA',
+      hasLitKey: true,
+      metaKey: 'session:84532:0xsbt',
+      sbtInfo: {
+        name: 'Public badge',
+      },
+    })).toEqual(expect.objectContaining({
+      canAttemptDecrypt: false,
+      decryptKey: 'session:84532:0xsbt:0xA:',
+      envelopeFingerprint: '',
+      hasEncryptedMetadata: false,
+      shouldEnterDecryptBoundary: false,
+    }));
     expect(resolveSbtPageCachedGroupPasswordHash({
       preferCountsOnly: true,
       groupPasswordHashLoaded: true,
