@@ -1735,13 +1735,6 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _buildGatePendingKey = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => (
-    buildUserPageGatePendingKey({ resourceKey, slug })
-  );
-
   _setResponseGateAccessStatus = (
     cacheKey: unknown,
     status: unknown,
@@ -2080,7 +2073,7 @@ class UserPage extends Component<any, any> {
     });
     if (isGateAccessContext(gateContext)) {
       displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
-        gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: pendingResourceKey }));
+        gateContext.pendingKeys.add(buildUserPageGatePendingKey({ slug, resourceKey: pendingResourceKey }));
       });
       if (displayState.uncertainResourceKey) {
         gateContext.uncertainResources.add(displayState.uncertainResourceKey);
