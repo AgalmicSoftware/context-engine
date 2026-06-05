@@ -1,5 +1,6 @@
 import {
   buildSurveyResultsAnalysisArtifactCacheTarget,
+  type SurveyResultsAnalysisArtifactCacheTarget,
 } from './surveyResultsAnalysisArtifactCachePorts';
 
 type SurveyResultsRecord = Record<string, unknown>;
@@ -31,6 +32,7 @@ export type SurveyResultsAnalysisArtifactWritePlanArgs = {
   artifact?: unknown;
   cacheKey?: unknown;
   currentCache?: unknown;
+  inputSignature?: unknown;
   slug?: unknown;
 };
 
@@ -43,22 +45,14 @@ export type SurveyResultsAnalysisArtifactWriteReadinessPlan = {
   blockedReason: '' | 'missing-artifact' | 'missing-cache-key';
   shouldReadCache: boolean;
   shouldWrite: boolean;
-  target: {
-    namespace: 'analysisCache';
-    slug: string;
-    cacheKey: string;
-  };
+  target: SurveyResultsAnalysisArtifactCacheTarget;
 };
 
 export type SurveyResultsAnalysisArtifactWritePlan = {
   blockedReason: '' | 'missing-artifact' | 'missing-cache-key';
   payload: SurveyResultsRecord | null;
   shouldWrite: boolean;
-  target: {
-    namespace: 'analysisCache';
-    slug: string;
-    cacheKey: string;
-  };
+  target: SurveyResultsAnalysisArtifactCacheTarget;
 };
 
 export type SurveyResultsSurveyQuestionBookmarkWritePlanArgs = {
@@ -94,17 +88,15 @@ const toRecord = (value: unknown): SurveyResultsRecord => (
 export const buildSurveyResultsAnalysisArtifactWriteReadinessPlan = ({
   artifact = null,
   cacheKey = '',
+  inputSignature = '',
   slug = '',
 }: SurveyResultsAnalysisArtifactWriteReadinessPlanArgs = {}): SurveyResultsAnalysisArtifactWriteReadinessPlan => {
   const cacheTarget = buildSurveyResultsAnalysisArtifactCacheTarget({
     cacheKey,
+    inputSignature,
     slug,
   });
-  const target = {
-    namespace: cacheTarget.namespace,
-    slug: cacheTarget.slug,
-    cacheKey: cacheTarget.cacheKey,
-  };
+  const target = cacheTarget;
 
   if (!artifact || typeof artifact !== 'object') {
     return {
@@ -136,11 +128,13 @@ export const buildSurveyResultsAnalysisArtifactWritePlan = ({
   artifact = null,
   cacheKey = '',
   currentCache = {},
+  inputSignature = '',
   slug = '',
 }: SurveyResultsAnalysisArtifactWritePlanArgs = {}): SurveyResultsAnalysisArtifactWritePlan => {
   const readinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
     artifact,
     cacheKey,
+    inputSignature,
     slug,
   });
 

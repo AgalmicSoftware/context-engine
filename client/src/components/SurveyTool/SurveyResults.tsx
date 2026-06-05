@@ -3102,6 +3102,7 @@ const cacheKey = artifact ? this.getSessionResultsAnalysisCacheKey(artifact.inpu
 const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
   artifact,
   cacheKey,
+  inputSignature: artifact?.inputSignature || '',
   slug,
 });
 if (!writeReadinessPlan.shouldReadCache) return;
@@ -3110,6 +3111,7 @@ const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
   artifact,
   cacheKey,
   currentCache: current,
+  inputSignature: artifact?.inputSignature || '',
   slug,
 });
 if (!writePlan.shouldWrite || !writePlan.payload) return;
