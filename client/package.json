@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
-  "license": "CPAL-1.0",
+  "license": "MPL-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/AgalmicSoftware/context-engine"

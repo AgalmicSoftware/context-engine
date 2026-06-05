@@ -49,6 +49,10 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 - Include screenshots, logs, or repro notes for UI, web3, worker, or encryption-flow changes when they help review.
 - Update docs and tests when behavior, config, or workflows change.
 
+## Licensing Contributions
+
+By contributing, you agree that your contributions are licensed under the license applicable to the files you modify. For most public core files, that license is `MPL-2.0`; files or directories with their own license notices keep those terms.
+
 ## Commits
 
 - Use concise conventional commit messages such as `fix: guard empty response payload` or `docs: clarify client tooling`.

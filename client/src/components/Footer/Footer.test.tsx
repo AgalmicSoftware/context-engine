@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MPL-2.0
+
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
@@ -58,10 +60,10 @@ describe('Footer', () => {
     }
   });
 
-  it('renders the CPAL attribution text with a separate GitHub icon link', () => {
+  it('renders the footer attribution text with a separate GitHub icon link', () => {
     renderFooter();
 
-    const attributionLink = screen.getByTestId('ce-footer-cpal-attribution');
+    const attributionLink = screen.getByTestId('ce-footer-brand-attribution');
     const githubLink = screen.getByTestId('ce-footer-link-github');
 
     expect(attributionLink).toHaveTextContent('Software by Agalmic');
@@ -72,7 +74,7 @@ describe('Footer', () => {
     );
     expect(githubLink).toHaveAttribute('target', '_blank');
     expect(githubLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.queryByTestId('ce-footer-cpal-link')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-footer-brand-link')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 

@@ -1,4 +1,6 @@
-This package is part of the Context Engine client/app OSS surface and remains licensed under CPAL-1.0.
+SPDX-License-Identifier: MPL-2.0
 
-See ../LICENSE for the full CPAL-1.0 text.
-See ../LICENSING.md for the repo-wide split-license map, including the worker/tooling boundary and mirrored worker artifact exceptions.
+This package is part of the Context Engine public open-source core and is licensed under MPL-2.0 unless a more specific file or directory notice says otherwise.
+
+See ../LICENSE for the full MPL-2.0 text.
+See ../LICENSING.md for the repo-wide multi-license map, including the worker/tooling boundary and shared-file rules.
