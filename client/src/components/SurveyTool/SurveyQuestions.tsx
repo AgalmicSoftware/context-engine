@@ -8402,8 +8402,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         mode="fullscreen"
         sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
+        onDecryptQuestion={this.handleDecryptQuestionAnswer}
+        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
         promptReloading={promptReloading}
         showImportance={true}
         provider={this.props.provider}
@@ -8429,8 +8429,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         mode="fullscreen"
         sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
+        onDecryptQuestion={this.handleDecryptQuestionAnswer}
+        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
         promptReloading={promptReloading}
         showImportance={true}
         provider={this.props.provider}
