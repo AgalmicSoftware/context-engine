@@ -52,8 +52,6 @@ const SessionWizardShell = ({
   devPersistWorkerSecrets,
   displayedWorkerUrl,
   draft,
-  effectiveMetadataGatewayUrl,
-  effectiveMetadataTxId,
   effectivePersistWorkerSecrets,
   embeddedDeployHelperEnabled,
   encryptionGates,
@@ -79,14 +77,12 @@ const SessionWizardShell = ({
   manualMaxFeePerGasGwei,
   manualMaxPriorityFeePerGasGwei,
   manualMetadataUrl,
-  metadataUrl,
   moreOptionsEntries,
   moreOptionsOpen,
   network,
   newSessionFundingRequirementHref,
   newSessionFundingRequirementLabel,
   newSessionRequiresLitCredential,
-  normalizeArweaveUri,
   normalizeSbtSelection,
   normalModeBundleHelpText,
   normalModeBundleUrl,
@@ -122,6 +118,7 @@ const SessionWizardShell = ({
   provider,
   publishAdvancedOpen,
   publishBusy,
+  publishMetadataDisplayState,
   publishProgressDisplayState,
   publishStep,
   publishedPendingSbtLinks,
@@ -372,6 +369,7 @@ const SessionWizardShell = ({
         bundleFile={bundleFile}
         localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
         sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+        publishMetadataDisplayState={publishMetadataDisplayState}
         showPublishProgress={publishProgressDisplayState.showPublishProgress}
         activePublishProgressStepLabel={publishProgressDisplayState.activePublishProgressStepLabel}
         publishProgressPercent={publishProgressDisplayState.publishProgressPercent}
@@ -394,9 +392,6 @@ const SessionWizardShell = ({
         onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
         manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
         onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
-        metadataUrl={metadataUrl}
-        effectiveMetadataTxId={effectiveMetadataTxId}
-        effectiveMetadataGatewayUrl={effectiveMetadataGatewayUrl}
         registerTxs={registerTxs}
         registerExplorerBaseUrl={registerExplorerBaseUrl}
         sessionUrl={sessionUrl}
@@ -405,7 +400,6 @@ const SessionWizardShell = ({
         onCopyAdminUrl={handleCopyAdminUrl}
         adminUrlStatus={adminUrlStatus}
         status={status}
-        normalizeArweaveUri={normalizeArweaveUri}
       />
     )}
 

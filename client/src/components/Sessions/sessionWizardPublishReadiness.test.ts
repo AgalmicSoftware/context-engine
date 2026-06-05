@@ -1,4 +1,5 @@
 import {
+  resolveSessionWizardPublishMetadataDisplayState,
   resolveSessionWizardPublishReadiness,
   resolveSessionWizardPublishUiPlan,
   type SessionWizardPublishReadinessInput,
@@ -141,7 +142,10 @@ describe('resolveSessionWizardPublishReadiness', () => {
     const input = Object.freeze({
       ...baseInput,
       deployComplete: false,
+      effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
+      effectiveMetadataTxId: txId,
       hasPendingDrafts: true,
+      metadataUrl: `ar://${txId}`,
       publishBusy: true,
       publishStep: 2,
       publishStepElapsedMs: 1300,
@@ -153,7 +157,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
     expect(plan.publishReadiness).toEqual(expect.objectContaining({
       canUploadMetadataNow: true,
       hasManualMetadata: false,
-      hasUploadedMetadata: false,
+      hasUploadedMetadata: true,
       canPublishNow: true,
     }));
     expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
@@ -179,6 +183,16 @@ describe('resolveSessionWizardPublishReadiness', () => {
         { key: 'register-session', label: 'Register On-chain' },
         { key: 'done', label: 'Done' },
       ],
+    });
+    expect(plan.publishMetadataDisplayState).toEqual({
+      effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
+      effectiveMetadataTxId: txId,
+      manualMetadataDisplayUri: '',
+      metadataUri: `ar://${txId}`,
+      metadataUriLabel: 'Metadata URI',
+      showArweaveTx: true,
+      showManualMetadataUri: false,
+      showMetadataUri: true,
     });
     expect(plan.publishProgressDisplayState.publishProgressPercent).toBeGreaterThan(25);
     expect(plan.publishProgressDisplayState.publishProgressPercent).toBeLessThan(50);
@@ -246,8 +260,58 @@ describe('resolveSessionWizardPublishReadiness', () => {
     expect(Object.keys(plan)).toEqual([
       'publishReadiness',
       'publishExecutionPlan',
+      'publishMetadataDisplayState',
       'publishProgressDisplayState',
     ]);
     expect(plan.publishProgressDisplayState.activePublishProgressStepLabel).toBe('Deploy Worker');
+  });
+
+  it('describes uploaded and manual metadata fallback display without upload execution ports', () => {
+    expect(resolveSessionWizardPublishMetadataDisplayState({
+      effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
+      effectiveMetadataTxId: txId,
+      metadataUrl: `ar://${txId}`,
+    })).toEqual({
+      effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
+      effectiveMetadataTxId: txId,
+      manualMetadataDisplayUri: '',
+      metadataUri: `ar://${txId}`,
+      metadataUriLabel: 'Metadata URI',
+      showArweaveTx: true,
+      showManualMetadataUri: false,
+      showMetadataUri: true,
+    });
+
+    expect(resolveSessionWizardPublishMetadataDisplayState({
+      manualMetadataUrl: `https://arweave.net/${txId}`,
+      metadataUrl: txId,
+    })).toEqual(expect.objectContaining({
+      manualMetadataDisplayUri: `ar://${txId}`,
+      metadataUri: `ar://${txId}`,
+      metadataUriLabel: 'Uploaded metadata URI',
+      showArweaveTx: false,
+      showManualMetadataUri: true,
+      showMetadataUri: true,
+    }));
+
+    expect(resolveSessionWizardPublishMetadataDisplayState({
+      effectiveMetadataTxId: txId,
+      metadataUrl: `ar://${txId}`,
+    })).toEqual(expect.objectContaining({
+      effectiveMetadataGatewayUrl: '',
+      effectiveMetadataTxId: txId,
+      showArweaveTx: false,
+    }));
+
+    expect(resolveSessionWizardPublishMetadataDisplayState()).toEqual({
+      effectiveMetadataGatewayUrl: '',
+      effectiveMetadataTxId: '',
+      manualMetadataDisplayUri: '',
+      metadataUri: '',
+      metadataUriLabel: '',
+      showArweaveTx: false,
+      showManualMetadataUri: false,
+      showMetadataUri: false,
+    });
   });
 });
