@@ -127,9 +127,14 @@ import {
   type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
 import {
+  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsHtmlReportReadinessPlan,
+  type SurveyResultsHtmlReportSectionAvailability,
+  type SurveyResultsHtmlReportSectionKey,
+  type SurveyResultsHtmlReportSectionRow,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
   buildSurveyResultsCacheReadinessDisplayPlan,
@@ -523,20 +528,6 @@ type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
-type SurveyResultsHtmlReportSectionAvailability = {
-  argumentMap: boolean;
-  atlas: boolean;
-  report: boolean;
-  riskMatrix: boolean;
-  snapshotJson: boolean;
-};
-type SurveyResultsHtmlReportSectionKey = keyof SurveyResultsHtmlReportSectionAvailability;
-type SurveyResultsHtmlReportSectionRow = {
-  available: boolean;
-  key: SurveyResultsHtmlReportSectionKey;
-  label: string;
-  reason: string;
-};
 type SurveyResultsSbtDisplayLabelResolver = (args: {
   address: string;
   chainId?: unknown;
@@ -550,19 +541,6 @@ const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolv
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
 
-const DEFAULT_HTML_REPORT_SELECTED_SECTIONS: Required<SessionResultsSectionSelection> = Object.freeze({
-  argumentMap: false,
-  atlas: false,
-  report: true,
-  riskMatrix: false,
-  snapshotJson: true,
-});
-
-const HTML_REPORT_ANALYSIS_SECTION_KEYS: SurveyResultsHtmlReportSectionKey[] = [
-  'argumentMap',
-  'riskMatrix',
-  'atlas',
-];
 const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<Record<SurveyResultsHtmlReportSectionKey, SessionResultsAnalysisSectionKey>> = {
   argumentMap: 'argumentMap',
   atlas: 'atlas',
@@ -3046,6 +3024,16 @@ getHtmlReportSelectedSections = (): Required<SessionResultsSectionSelection> => 
   ...(this.state.htmlReportSelectedSections || {}),
 });
 
+buildHtmlReportReadinessPlan = (
+  snapshot: SessionResultsHtmlSnapshot,
+  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
+) => buildSurveyResultsHtmlReportReadinessPlan({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  isAuthorized: this.isHtmlReportExportAuthorized(),
+  selectedSections: sections,
+  snapshot,
+});
+
 getHtmlReportAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact | null => {
 const artifact = this.state.htmlReportAnalysisArtifact as SessionResultsGeneratedAnalysisArtifact | null;
 return artifact && artifact.kind ? artifact : null;
@@ -3423,86 +3411,31 @@ return buildRedactedSessionResultsSnapshot({
 
 getHtmlReportSectionAvailability = (
 snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionAvailability => ({
-  report: snapshot.sections.report.available,
-  argumentMap: snapshot.sections.argumentMap.available,
-  riskMatrix: snapshot.sections.riskMatrix.available,
-  atlas: snapshot.sections.atlas.available,
-  snapshotJson: true,
-});
+): SurveyResultsHtmlReportSectionAvailability => this.buildHtmlReportReadinessPlan(snapshot).availability;
 
 getHtmlReportSectionRows = (
 snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionRow[] => ([
-  {
-    available: snapshot.sections.report.available,
-    key: 'report',
-    label: 'Report',
-    reason: snapshot.sections.report.available ? 'Ready' : 'No hydrated results',
-  },
-  {
-    available: snapshot.sections.argumentMap.available,
-    key: 'argumentMap',
-    label: 'Argument Map',
-    reason: snapshot.sections.argumentMap.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: snapshot.sections.riskMatrix.available,
-    key: 'riskMatrix',
-    label: 'Risk Matrix',
-    reason: snapshot.sections.riskMatrix.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: snapshot.sections.atlas.available,
-    key: 'atlas',
-    label: 'Atlas Nodes',
-    reason: snapshot.sections.atlas.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: true,
-    key: 'snapshotJson',
-    label: 'Embedded Snapshot JSON',
-    reason: 'Always available',
-  },
-]);
+): SurveyResultsHtmlReportSectionRow[] => this.buildHtmlReportReadinessPlan(snapshot).sectionRows;
 
 hasHtmlReportExportableSections = (
   snapshot: SessionResultsHtmlSnapshot,
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  (sections.report && snapshot.sections.report.available) ||
-  (sections.argumentMap && snapshot.sections.argumentMap.available) ||
-  (sections.riskMatrix && snapshot.sections.riskMatrix.available) ||
-  (sections.atlas && snapshot.sections.atlas.available) ||
-  sections.snapshotJson
-);
+): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).hasExportableSections;
 
 hasHtmlReportUnavailableSelectedSections = (
   snapshot: SessionResultsHtmlSnapshot,
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  (sections.report && !snapshot.sections.report.available) ||
-  (sections.argumentMap && !snapshot.sections.argumentMap.available) ||
-  (sections.riskMatrix && !snapshot.sections.riskMatrix.available) ||
-  (sections.atlas && !snapshot.sections.atlas.available)
-);
+): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).hasUnavailableSelectedSections;
 
 needsHtmlReportAnalysisGeneration = (
   snapshot: SessionResultsHtmlSnapshot,
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  HTML_REPORT_ANALYSIS_SECTION_KEYS.some((key) => sections[key] && !this.getHtmlReportSectionAvailability(snapshot)[key])
-);
+): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).needsAnalysisGeneration;
 
 canDownloadHtmlReport = (
   snapshot: SessionResultsHtmlSnapshot,
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  this.isHtmlReportExportAuthorized() &&
-  this.hasHtmlReportExportableSections(snapshot, sections) &&
-  !this.hasHtmlReportUnavailableSelectedSections(snapshot, sections) &&
-  !this.state.htmlReportAnalysisGenerating
-);
+): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).canDownload;
 
 getHtmlReportAnalysisSectionsToGenerate = (
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
@@ -3689,15 +3622,16 @@ downloadHtmlReport = async (): Promise<void> => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
+const readinessPlan = this.buildHtmlReportReadinessPlan(snapshot, selectedSections);
 if (!this.isHtmlReportExportAuthorized()) {
   this.setState(buildSurveyResultsAlertMessagePatch('Connect a wallet with permission to view these results before export.'));
   return;
 }
-if (!this.hasHtmlReportExportableSections(snapshot, selectedSections)) {
+if (!readinessPlan.hasExportableSections) {
   this.setState(buildSurveyResultsAlertMessagePatch('Select at least one available report section before export.'));
   return;
 }
-if (this.hasHtmlReportUnavailableSelectedSections(snapshot, selectedSections)) {
+if (readinessPlan.hasUnavailableSelectedSections) {
   this.setState(buildSurveyResultsAlertMessagePatch('Generate selected analysis views before downloading the report.'));
   return;
 }
@@ -5007,35 +4941,33 @@ try {
 renderHtmlReportExportModal = (): React.ReactNode => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
-const sectionRows = this.getHtmlReportSectionRows(snapshot);
 const selectedSections = this.getHtmlReportSelectedSections();
-const canDownload = this.canDownloadHtmlReport(snapshot, selectedSections);
+const readinessPlan = this.buildHtmlReportReadinessPlan(snapshot, selectedSections);
 const isAuthorized = this.isHtmlReportExportAuthorized();
 const isDemoSession = this.isHtmlReportDemoSession();
 const isDemoMode = this.isHtmlReportDemoModeActive();
-const needsAnalysisGeneration = this.needsHtmlReportAnalysisGeneration(snapshot, selectedSections);
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
 
 return renderSurveyResultsHtmlReportExportModal({
   analysisGenerating: this.state.htmlReportAnalysisGenerating,
   analysisPayload,
   analysisProgress: this.state.htmlReportAnalysisProgress,
-  canDownload,
+  canDownload: readinessPlan.canDownload,
   exportFormat: this.state.htmlReportExportFormat,
   htmlReportAnalysisError: this.state.htmlReportAnalysisError,
   isAuthorized,
   isDemoMode,
   isDemoSession,
   isOpen: this.state.htmlReportModalOpen,
-  needsAnalysisGeneration,
+  needsAnalysisGeneration: readinessPlan.needsAnalysisGeneration,
   onClose: this.closeHtmlReportExportModal,
   onDownload: this.downloadHtmlReport,
   onFormatChange: this.handleHtmlReportFormatChange,
   onGenerateAnalysis: this.generateHtmlReportAnalysisViews,
   onToggleDemoMode: this.toggleHtmlReportDemoMode,
   onToggleSection: this.toggleHtmlReportSection,
-  sectionRows,
-  selectedSections,
+  sectionRows: readinessPlan.sectionRows,
+  selectedSections: readinessPlan.selectedSections,
   snapshot,
   styleMap: styles,
 });
