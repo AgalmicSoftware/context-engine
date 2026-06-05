@@ -150,6 +150,10 @@ import {
   type SurveyResultsAnalysisArtifactCacheReadPort,
 } from './surveyResultsAnalysisArtifactCachePorts';
 import {
+  buildSurveyResultsBookmarksCacheReadRequest,
+  selectSurveyResultsBookmarkLists,
+} from './surveyResultsBookmarkCacheReadPorts';
+import {
   runSurveyResultsAnalysisArtifactReadController,
 } from './surveyResultsAnalysisArtifactReadController';
 import {
@@ -925,23 +929,23 @@ class SurveyResults extends Component<any, any> {
     super(props);
 
     const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
-    let parsedCache;
-    const defaultCache = { surveys: [], questions: [] };
+    const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug: initialSlug });
+    let bookmarksCacheValue: unknown = null;
 
     try {
-      parsedCache = peekCacheSync('bookmarksCache', initialSlug, { clone: false });
-      if (
-        !parsedCache ||
-        typeof parsedCache !== 'object' ||
-        !Array.isArray(parsedCache.surveys) ||
-        !Array.isArray(parsedCache.questions)
-      ) {
-        parsedCache = defaultCache;
-      }
+      bookmarksCacheValue = peekCacheSync(
+        bookmarksReadRequest.namespace,
+        bookmarksReadRequest.slug,
+        bookmarksReadRequest.options
+      );
     } catch (error) {
       surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-      parsedCache = defaultCache;
+      bookmarksCacheValue = null;
     }
+    const {
+      surveys: bootstrapSurveyIds,
+      questions: bootstrapQuestionIds,
+    } = selectSurveyResultsBookmarkLists(bookmarksCacheValue);
 
     this._syncLoadingStartedAt = null;
     this._scrollMutationObserver = null;
@@ -967,8 +971,8 @@ class SurveyResults extends Component<any, any> {
       showQuestionFilter: false,
       filterState: this.props.filterState || {},
       syncDetailsOpen: false,
-      bookmarkedQuestionIDs: Array.isArray(parsedCache.questions) ? [...parsedCache.questions] : [],
-      bookmarkedSurveyIDs: Array.isArray(parsedCache.surveys) ? [...parsedCache.surveys] : [],
+      bookmarkedQuestionIDs: bootstrapQuestionIds,
+      bookmarkedSurveyIDs: bootstrapSurveyIds,
       questionIdSortBy: 'responses',
       questionIdSortAsc: true,
       totalQuestionsCount: 0,
@@ -3999,10 +4003,15 @@ this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedToggleP
 
 toggleSurveyBookmark = (surveyId: unknown): void => {
 const slug = this.getEffectiveSlug();
+const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug });
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync('bookmarksCache', slug, { clone: false });
+  bookmarksCache = peekCacheSync(
+    bookmarksReadRequest.namespace,
+    bookmarksReadRequest.slug,
+    bookmarksReadRequest.options
+  );
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
   bookmarksCache = {};
@@ -4032,10 +4041,15 @@ this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.va
 
 toggleQuestionBookmark = (questionId: unknown): void => {
 const slug = this.getEffectiveSlug();
+const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug });
 let bookmarksCache: unknown = {};
 
 try {
-  bookmarksCache = peekCacheSync('bookmarksCache', slug, { clone: false });
+  bookmarksCache = peekCacheSync(
+    bookmarksReadRequest.namespace,
+    bookmarksReadRequest.slug,
+    bookmarksReadRequest.options
+  );
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
   bookmarksCache = {};
