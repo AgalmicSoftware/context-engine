@@ -67,8 +67,7 @@ type SessionPublishSummaryProps = {
   publishStep: number;
   publishProgressSteps: PublishProgressStep[];
   uploadBlockedReason: string;
-  hasManualMetadata: boolean;
-  hasUploadedMetadata: boolean;
+  showUploadBlockedReason: boolean;
   renderInfoTooltip: (options: Record<string, unknown>) => React.ReactNode;
   resolvedWorkerBaseUrl: string;
   workerUrlSource: string;
@@ -122,8 +121,7 @@ const SessionPublishSummary = ({
   publishStep,
   publishProgressSteps,
   uploadBlockedReason,
-  hasManualMetadata,
-  hasUploadedMetadata,
+  showUploadBlockedReason,
   renderInfoTooltip,
   resolvedWorkerBaseUrl,
   workerUrlSource,
@@ -325,7 +323,7 @@ const SessionPublishSummary = ({
           </div>
         ) : null}
 
-        {!canPublishNow && !hasManualMetadata && !hasUploadedMetadata ? (
+        {showUploadBlockedReason ? (
           <div className={styles.statusNote}>
             {uploadBlockedReason}
           </div>

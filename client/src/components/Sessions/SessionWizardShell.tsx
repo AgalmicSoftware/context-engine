@@ -64,9 +64,7 @@ const SessionWizardShell = ({
   handleGateRemoveSbt,
   handleDeployWorker,
   handleSavePendingSbtDraft,
-  hasManualMetadata,
   hasSponsoredBundleLink,
-  hasUploadedMetadata,
   isNormalMode,
   jsonCopied,
   launchCreateSbtModal,
@@ -156,6 +154,7 @@ const SessionWizardShell = ({
   setWorkerUrlAutoFilled,
   shouldShowDeployHelperUrlInput,
   shouldUseSponsoredAutoDeployFlow,
+  showUploadBlockedReason,
   showJsonPreview,
   showNewSessionRequirementsBanner,
   showNormalModeManualBundleControls,
@@ -377,8 +376,7 @@ const SessionWizardShell = ({
         publishStep={publishStep}
         publishProgressSteps={publishProgressDisplayState.publishProgressSteps}
         uploadBlockedReason={uploadBlockedReason}
-        hasManualMetadata={hasManualMetadata}
-        hasUploadedMetadata={hasUploadedMetadata}
+        showUploadBlockedReason={showUploadBlockedReason}
         renderInfoTooltip={renderSessionWizardInfoTooltip}
         resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
         workerUrlSource={workerUrlSource}

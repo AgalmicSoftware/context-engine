@@ -4410,9 +4410,8 @@ const SessionWizard = ({
   const {
     canUploadMetadataNow,
     uploadBlockedReason,
-    hasManualMetadata,
-    hasUploadedMetadata,
     canPublishNow,
+    showUploadBlockedReason,
   } = publishUiPlan.publishReadiness;
   const deployStatusLower = toStr(deployStatus).toLowerCase();
   const deployStatusIsError = !!deployStatus &&
@@ -4610,9 +4609,7 @@ const SessionWizard = ({
       handleGateAddSbt={handleGateAddSbt}
       handleGateRemoveSbt={handleGateRemoveSbt}
       handleSavePendingSbtDraft={handleSavePendingSbtDraft}
-      hasManualMetadata={hasManualMetadata}
       hasSponsoredBundleLink={hasSponsoredBundleLink}
-      hasUploadedMetadata={hasUploadedMetadata}
       isNormalMode={isNormalMode}
       jsonCopied={jsonCopied}
       launchCreateSbtModal={launchCreateSbtModal}
@@ -4701,6 +4698,7 @@ const SessionWizard = ({
       setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
       shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
       shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
+      showUploadBlockedReason={showUploadBlockedReason}
       showJsonPreview={showJsonPreview}
       showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
       showNormalModeManualBundleControls={showNormalModeManualBundleControls}

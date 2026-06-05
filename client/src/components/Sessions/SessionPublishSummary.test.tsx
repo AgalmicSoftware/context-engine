@@ -45,8 +45,7 @@ const buildProps = (
   publishStep: 0,
   publishProgressSteps: [],
   uploadBlockedReason: '',
-  hasManualMetadata: false,
-  hasUploadedMetadata: false,
+  showUploadBlockedReason: false,
   renderInfoTooltip: () => null,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
@@ -110,6 +109,7 @@ describe('SessionPublishSummary', () => {
       <SessionPublishSummary
         {...buildProps({
           canPublishNow: false,
+          showUploadBlockedReason: true,
           uploadBlockedReason: 'Set a worker URL before uploading metadata.',
         })}
       />
@@ -122,7 +122,7 @@ describe('SessionPublishSummary', () => {
       <SessionPublishSummary
         {...buildProps({
           canPublishNow: false,
-          hasManualMetadata: true,
+          showUploadBlockedReason: false,
           uploadBlockedReason: 'Set a worker URL before uploading metadata.',
         })}
       />
@@ -293,8 +293,6 @@ describe('SessionPublishSummary', () => {
     render(
       <SessionPublishSummary
         {...buildProps({
-          hasManualMetadata: true,
-          hasUploadedMetadata: true,
           manualGasLimit: '900000',
           manualGasPriceGwei: '',
           manualMaxFeePerGasGwei: '',
