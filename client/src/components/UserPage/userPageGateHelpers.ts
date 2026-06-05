@@ -58,6 +58,28 @@ type BuildUserPageEncryptedVisibilityDisplayStateInput = {
   viewAddressLower?: unknown;
   viewerAccount?: unknown;
 };
+type BuildUserPageGateAccessCheckPlanInput = {
+  cachedStatus?: unknown;
+  cachedTs?: unknown;
+  hasCachedEntry?: unknown;
+  hasInFlight?: unknown;
+  nowMs?: unknown;
+  terminalRecheckMs?: unknown;
+  unknownRetryMs?: unknown;
+};
+export type UserPageGateAccessCheckPlanAction =
+  | 'execute'
+  | 'in-flight'
+  | 'schedule-retry'
+  | 'skip';
+export type UserPageGateAccessCheckPlan = {
+  action: UserPageGateAccessCheckPlanAction;
+  cachedAgeMs: number;
+  previousStatus: string;
+  retryDelayMs: number;
+  shouldPreserveStatusWhileRevalidating: boolean;
+  shouldSetCheckingStatus: boolean;
+};
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
   value: unknown;
@@ -210,6 +232,94 @@ export const buildUserPageEncryptedVisibilityDisplayState = ({
     uncertain: true,
     pendingResourceKeys,
     uncertainResourceKey: normalizeUserPageGateResourceKey(resourceKey),
+  };
+};
+
+const USER_PAGE_GATE_TERMINAL_STATUSES = new Set<string>([
+  'granted',
+  'denied',
+  'needs-wallet',
+  'no-gate',
+  'invalid-gate',
+]);
+
+const USER_PAGE_GATE_TRANSIENT_RETRY_STATUSES = new Set<string>([
+  'unknown',
+  'error',
+  'unresolved',
+]);
+
+export const buildUserPageGateAccessCheckPlan = ({
+  cachedStatus = 'missing',
+  cachedTs = 0,
+  hasCachedEntry = false,
+  hasInFlight = false,
+  nowMs = Date.now(),
+  terminalRecheckMs = 60 * 1000,
+  unknownRetryMs = 30 * 1000,
+}: BuildUserPageGateAccessCheckPlanInput = {}): UserPageGateAccessCheckPlan => {
+  const previousStatus = String(cachedStatus || 'missing');
+  const cachedTsNumber = Number(cachedTs || 0);
+  const cachedAgeMs = Number.isFinite(cachedTsNumber) && cachedTsNumber > 0
+    ? Math.max(0, Number(nowMs || 0) - cachedTsNumber)
+    : Number.POSITIVE_INFINITY;
+  const terminalMs = Math.max(0, Number(terminalRecheckMs) || 0);
+  const retryMs = Math.max(0, Number(unknownRetryMs) || 0);
+  const hasCached = !!hasCachedEntry;
+
+  if (
+    hasCached &&
+    USER_PAGE_GATE_TERMINAL_STATUSES.has(previousStatus) &&
+    cachedAgeMs < terminalMs
+  ) {
+    return {
+      action: 'skip',
+      cachedAgeMs,
+      previousStatus,
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    };
+  }
+
+  if (
+    hasCached &&
+    USER_PAGE_GATE_TRANSIENT_RETRY_STATUSES.has(previousStatus) &&
+    cachedAgeMs < retryMs
+  ) {
+    return {
+      action: 'schedule-retry',
+      cachedAgeMs,
+      previousStatus,
+      retryDelayMs: retryMs - cachedAgeMs,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    };
+  }
+
+  if (hasInFlight) {
+    return {
+      action: 'in-flight',
+      cachedAgeMs,
+      previousStatus,
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    };
+  }
+
+  const shouldPreserveStatusWhileRevalidating = !!(
+    hasCached &&
+    USER_PAGE_GATE_TERMINAL_STATUSES.has(previousStatus) &&
+    cachedAgeMs >= terminalMs
+  );
+  return {
+    action: 'execute',
+    cachedAgeMs,
+    previousStatus,
+    retryDelayMs: 0,
+    shouldPreserveStatusWhileRevalidating,
+    shouldSetCheckingStatus: !shouldPreserveStatusWhileRevalidating,
   };
 };
 

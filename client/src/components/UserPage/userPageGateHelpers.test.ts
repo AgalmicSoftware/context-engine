@@ -3,6 +3,7 @@ import {
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptSurveyBindings,
@@ -135,6 +136,90 @@ describe('userPageGateHelpers', () => {
       uncertainResourceKey: 'surveyResponses',
     });
     expect(statusByResource).toEqual(originalStatusByResource);
+  });
+
+  it('plans gate-access check scheduling without executing sponsored access checks', () => {
+    const nowMs = 100_000;
+    const unknownRetryMs = 30_000;
+    const terminalRecheckMs = 60_000;
+
+    expect(buildUserPageGateAccessCheckPlan({
+      cachedStatus: 'granted',
+      cachedTs: nowMs - 10_000,
+      hasCachedEntry: true,
+      nowMs,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual({
+      action: 'skip',
+      cachedAgeMs: 10_000,
+      previousStatus: 'granted',
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    });
+
+    expect(buildUserPageGateAccessCheckPlan({
+      cachedStatus: 'unknown',
+      cachedTs: nowMs - 5_000,
+      hasCachedEntry: true,
+      nowMs,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual({
+      action: 'schedule-retry',
+      cachedAgeMs: 5_000,
+      previousStatus: 'unknown',
+      retryDelayMs: 25_000,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    });
+
+    expect(buildUserPageGateAccessCheckPlan({
+      cachedStatus: 'denied',
+      cachedTs: nowMs - 90_000,
+      hasCachedEntry: true,
+      nowMs,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual({
+      action: 'execute',
+      cachedAgeMs: 90_000,
+      previousStatus: 'denied',
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: true,
+      shouldSetCheckingStatus: false,
+    });
+
+    expect(buildUserPageGateAccessCheckPlan({
+      cachedStatus: 'missing',
+      hasCachedEntry: false,
+      hasInFlight: true,
+      nowMs,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual({
+      action: 'in-flight',
+      cachedAgeMs: Number.POSITIVE_INFINITY,
+      previousStatus: 'missing',
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: false,
+    });
+
+    expect(buildUserPageGateAccessCheckPlan({
+      hasCachedEntry: false,
+      nowMs,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual({
+      action: 'execute',
+      cachedAgeMs: Number.POSITIVE_INFINITY,
+      previousStatus: 'missing',
+      retryDelayMs: 0,
+      shouldPreserveStatusWhileRevalidating: false,
+      shouldSetCheckingStatus: true,
+    });
   });
 
   it('detects encrypted response fields and payload audiences', () => {
