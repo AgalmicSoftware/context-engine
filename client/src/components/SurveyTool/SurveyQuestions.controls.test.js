@@ -127,11 +127,8 @@ describe('SurveyQuestions controls', () => {
       loginComplete: true,
       network: { id: 1 },
     });
-    const persistOptions = { persistDraft: true };
-    const event = { type: 'change' };
     subject.setSliderMode = jest.fn();
     subject.handleConvictionImportanceChange = jest.fn();
-    subject.getSliderPersistOptions = jest.fn(() => persistOptions);
     subject.flushDraftPersistAfterSliderChange = jest.fn();
     subject.state = {
       ...subject.state,
@@ -167,14 +164,13 @@ describe('SurveyQuestions controls', () => {
     sliderSection.props.onSelectMode('importance');
     expect(subject.setSliderMode).toHaveBeenCalledWith('q1', 'importance');
 
-    sliderSection.props.onChange(8, event);
-    expect(subject.getSliderPersistOptions).toHaveBeenCalledWith(event);
+    sliderSection.props.onChange(8, { type: 'keydown' });
     expect(subject.handleConvictionImportanceChange).toHaveBeenCalledWith(
       0,
       'q1',
       'conviction',
       8,
-      persistOptions
+      { persistDraft: true }
     );
 
     sliderSection.props.onChangeComplete();
