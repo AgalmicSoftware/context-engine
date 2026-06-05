@@ -29,6 +29,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
+import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsExportDisplayHelpers';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
@@ -560,7 +561,12 @@ describe('SurveyResults export/view controls', () => {
 
     const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
     const selectedSections = subject.getHtmlReportSelectedSections();
-    const readinessPlan = subject.buildHtmlReportReadinessPlan(snapshot, selectedSections);
+    const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+      analysisGenerating: subject.state.htmlReportAnalysisGenerating,
+      isAuthorized: subject.isHtmlReportExportAuthorized(),
+      selectedSections,
+      snapshot,
+    });
 
     expect(subject.getHtmlReportAnalysisArtifact()).toBeNull();
     expect(readinessPlan.availability).toEqual({

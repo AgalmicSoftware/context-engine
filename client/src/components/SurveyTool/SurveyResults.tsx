@@ -3022,16 +3022,6 @@ getHtmlReportSelectedSections = (): Required<SessionResultsSectionSelection> => 
   ...(this.state.htmlReportSelectedSections || {}),
 });
 
-buildHtmlReportReadinessPlan = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-) => buildSurveyResultsHtmlReportReadinessPlan({
-  analysisGenerating: this.state.htmlReportAnalysisGenerating,
-  isAuthorized: this.isHtmlReportExportAuthorized(),
-  selectedSections: sections,
-  snapshot,
-});
-
 getHtmlReportAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact | null => {
 const artifact = this.state.htmlReportAnalysisArtifact as SessionResultsGeneratedAnalysisArtifact | null;
 return artifact && artifact.kind ? artifact : null;
@@ -3592,8 +3582,14 @@ downloadHtmlReport = async (): Promise<void> => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
-const readinessPlan = this.buildHtmlReportReadinessPlan(snapshot, selectedSections);
-if (!this.isHtmlReportExportAuthorized()) {
+const isAuthorized = this.isHtmlReportExportAuthorized();
+const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  isAuthorized,
+  selectedSections,
+  snapshot,
+});
+if (!isAuthorized) {
   this.setState(buildSurveyResultsAlertMessagePatch('Connect a wallet with permission to view these results before export.'));
   return;
 }
@@ -4912,8 +4908,13 @@ renderHtmlReportExportModal = (): React.ReactNode => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
-const readinessPlan = this.buildHtmlReportReadinessPlan(snapshot, selectedSections);
 const isAuthorized = this.isHtmlReportExportAuthorized();
+const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  isAuthorized,
+  selectedSections,
+  snapshot,
+});
 const isDemoSession = this.isHtmlReportDemoSession();
 const isDemoMode = this.isHtmlReportDemoModeActive();
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
