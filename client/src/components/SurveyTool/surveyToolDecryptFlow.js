@@ -1327,7 +1327,6 @@ export const buildQuestionDecryptExecutionContext = ({
 
   return {
     ...executionPlan,
-    requestPlanTarget: executionPlan.target,
   };
 };
 
