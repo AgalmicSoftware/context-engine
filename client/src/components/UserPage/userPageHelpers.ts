@@ -159,6 +159,7 @@ export {
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
   isUserPageEncryptedResponseField,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   normalizeUserPageGateResourceKey,
   normalizeUserPageGateSlug,
