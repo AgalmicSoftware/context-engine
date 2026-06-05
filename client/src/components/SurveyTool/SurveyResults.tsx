@@ -132,9 +132,7 @@ import {
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportControlsDisplayDescriptor,
   buildSurveyResultsHtmlReportReadinessPlan,
-  type SurveyResultsHtmlReportSectionAvailability,
   type SurveyResultsHtmlReportSectionKey,
-  type SurveyResultsHtmlReportSectionRow,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
   buildSurveyResultsCacheReadinessDisplayPlan,
@@ -3408,34 +3406,6 @@ return buildRedactedSessionResultsSnapshot({
   },
 });
 }
-
-getHtmlReportSectionAvailability = (
-snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionAvailability => this.buildHtmlReportReadinessPlan(snapshot).availability;
-
-getHtmlReportSectionRows = (
-snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionRow[] => this.buildHtmlReportReadinessPlan(snapshot).sectionRows;
-
-hasHtmlReportExportableSections = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).hasExportableSections;
-
-hasHtmlReportUnavailableSelectedSections = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).hasUnavailableSelectedSections;
-
-needsHtmlReportAnalysisGeneration = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).needsAnalysisGeneration;
-
-canDownloadHtmlReport = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => this.buildHtmlReportReadinessPlan(snapshot, sections).canDownload;
 
 getHtmlReportAnalysisSectionsToGenerate = (
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()

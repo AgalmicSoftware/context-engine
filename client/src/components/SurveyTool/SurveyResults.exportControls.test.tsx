@@ -560,26 +560,27 @@ describe('SurveyResults export/view controls', () => {
 
     const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
     const selectedSections = subject.getHtmlReportSelectedSections();
+    const readinessPlan = subject.buildHtmlReportReadinessPlan(snapshot, selectedSections);
 
     expect(subject.getHtmlReportAnalysisArtifact()).toBeNull();
-    expect(subject.getHtmlReportSectionAvailability(snapshot)).toEqual({
+    expect(readinessPlan.availability).toEqual({
       argumentMap: false,
       atlas: false,
       report: true,
       riskMatrix: false,
       snapshotJson: true,
     });
-    expect(subject.getHtmlReportSectionRows(snapshot)).toEqual([
+    expect(readinessPlan.sectionRows).toEqual([
       { available: true, key: 'report', label: 'Report', reason: 'Ready' },
       { available: false, key: 'argumentMap', label: 'Argument Map', reason: 'Needs analysis' },
       { available: false, key: 'riskMatrix', label: 'Risk Matrix', reason: 'Needs analysis' },
       { available: false, key: 'atlas', label: 'Atlas Nodes', reason: 'Needs analysis' },
       { available: true, key: 'snapshotJson', label: 'Embedded Snapshot JSON', reason: 'Always available' },
     ]);
-    expect(subject.hasHtmlReportExportableSections(snapshot, selectedSections)).toBe(true);
-    expect(subject.hasHtmlReportUnavailableSelectedSections(snapshot, selectedSections)).toBe(true);
-    expect(subject.needsHtmlReportAnalysisGeneration(snapshot, selectedSections)).toBe(true);
-    expect(subject.canDownloadHtmlReport(snapshot, selectedSections)).toBe(false);
+    expect(readinessPlan.hasExportableSections).toBe(true);
+    expect(readinessPlan.hasUnavailableSelectedSections).toBe(true);
+    expect(readinessPlan.needsAnalysisGeneration).toBe(true);
+    expect(readinessPlan.canDownload).toBe(false);
     expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
     expect(callAI).not.toHaveBeenCalled();
