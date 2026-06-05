@@ -2058,13 +2058,6 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  toggleDocsSection = (): void => {
-    if (this._isMounted) this.setState((prevState: { showDocsSection?: unknown }) => buildSbtPageBooleanTogglePatch({
-      state: prevState,
-      stateKey: 'showDocsSection',
-    }));
-  };
-
   renderAddressLink = (address: unknown, key = 'contract'): React.ReactNode => {
     const { isRenderable, normalized } = resolveSbtPageAddressLinkState({
       address,
