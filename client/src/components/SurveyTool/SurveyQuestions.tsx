@@ -2423,13 +2423,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(questionId || '').trim().toLowerCase();
     const slugPinned = getSessionSlugPinnedFromProps(this.props);
     const explicitSlug = sanitize(getSessionSlugHintFromProps(this.props));
+    const currentQuestionSessionName = this.state.questionPool?.[0]?.sessionName;
     const resolvedSlug = sanitize(
       resolveSlugForIds({
-        sessionName:
-          this.props.sessionName ||
-          this.props.sessionName ||
-          (this.state.questionPool?.[0]?.sessionName) ||
-          (this.state.questionPool?.[0]?.sessionName),
+        sessionName: this.props.sessionName || currentQuestionSessionName,
         questionId: qid || this.props.questionID || null,
         surveyId: this.props.singleQuestionMode ? null : (this.props.surveyId || null),
         props: this.props,
@@ -5143,12 +5140,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const slugPinned = getSessionSlugPinnedFromProps(this.props);
     const explicitSingleSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(this.props));
     const explicitSingleSlugKnown = explicitSingleSlug === '' || !!resolveExplicitSessionContext(explicitSingleSlug).sessionConfig;
+    const currentQuestionSessionName = this.state.questionPool?.[0]?.sessionName;
     const resolvedSingleSlug = resolveSlugForIds({
-      sessionName:
-        this.props.sessionName ||
-        this.props.sessionName ||
-        (this.state.questionPool?.[0]?.sessionName) ||
-        (this.state.questionPool?.[0]?.sessionName),
+      sessionName: this.props.sessionName || currentQuestionSessionName,
       questionId: this.props.questionID,
       surveyId: null,
       props: this.props,
