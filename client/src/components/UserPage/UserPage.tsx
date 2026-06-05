@@ -93,6 +93,7 @@ import {
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
   isUserPageGateAccessContext,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
@@ -198,7 +199,6 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { isMaskedQuestionPayload } from '../../utilities/survey/questionRouting.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -478,23 +478,6 @@ type EncryptedVisibilityResult = {
   uncertain?: boolean;
 };
 
-type DecryptableResponseField = UnknownRecord & {
-  value: unknown;
-  encrypted: boolean;
-};
-
-type DecryptedResponsePatchInput = {
-  responseObj?: unknown;
-  questionId?: unknown;
-  fieldToDecrypt?: unknown;
-  decryptedResult?: unknown;
-};
-
-type ResponseDecryptSurveyBindings = {
-  surveyId: string;
-  acceptedSurveyIds: string[];
-};
-
 type DecryptSingleFieldOptions = UnknownRecord & {
   account: string;
   provider?: unknown;
@@ -683,6 +666,29 @@ const writeCacheTyped = writeCache as (
 const isGateAccessContext = (value: unknown): value is GateAccessContext => (
   isUserPageGateAccessContext(value)
 );
+
+const createGateAccessContext = (): GateAccessContext => ({
+  pendingKeys: new Set(),
+  uncertainResources: new Set(),
+});
+
+const captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
+  pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
+  uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
+});
+
+const mergeGateContextSnapshot = (
+  targetContext: GateAccessContext | null,
+  snapshot: GateAccessContextSnapshot | null = null
+): void => {
+  if (!isGateAccessContext(targetContext) || !snapshot) return;
+  (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
+    targetContext.pendingKeys.add(String(item || ''));
+  });
+  (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
+    targetContext.uncertainResources.add(String(item || ''));
+  });
+};
 
 const buildUserAnalysisFingerprint = async (
   input: Omit<UserPageAnalysisFingerprintInput, 'version'>
@@ -1752,13 +1758,6 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _buildGatePendingKey = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => (
-    buildUserPageGatePendingKey({ resourceKey, slug })
-  );
-
   _setResponseGateAccessStatus = (
     cacheKey: unknown,
     status: unknown,
@@ -1908,71 +1907,6 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _isQuestionPayloadEncrypted = (questionObj: unknown = null): boolean => {
-    const questionRecord = toAnalysisRecord(questionObj);
-    if (!Object.keys(questionRecord).length) return false;
-    if (isMaskedQuestionPayload(questionRecord)) return true;
-    return !!(
-      questionRecord.promptEncrypted ||
-      questionRecord.encryptedPrompt ||
-      questionRecord.optionsEncrypted ||
-      questionRecord.encryptedOptions ||
-      questionRecord.tagsEncrypted ||
-      questionRecord.encryptedTags
-    );
-  };
-
-  _isAnswerFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAnswerFieldEncrypted(responseObj);
-  };
-
-  _isAdditionalFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAdditionalFieldEncrypted(responseObj);
-  };
-
-  _isResponsePayloadEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageResponsePayloadEncrypted(responseObj);
-  };
-
-  _inferResponseFieldEncryptionAudience = (
-    responseObj: unknown = null,
-    fieldKey: unknown = 'answer',
-    fallback: unknown = 'gate'
-  ): string => {
-    return inferUserPageResponseFieldEncryptionAudience(responseObj, fieldKey, fallback);
-  };
-
-  buildDecryptableResponseField = (field: unknown = null): DecryptableResponseField => {
-    return buildUserPageDecryptableResponseField(field);
-  };
-
-  buildDecryptedResponsePatch = ({
-    responseObj = null,
-    questionId = '',
-    fieldToDecrypt = 'both',
-    decryptedResult = null,
-  }: DecryptedResponsePatchInput = {}): UnknownRecord | null => {
-    return buildUserPageDecryptedResponsePatch({
-      responseObj,
-      questionId,
-      fieldToDecrypt,
-      decryptedResult,
-    });
-  };
-
-  getResponseDecryptSurveyBindings = (
-    questionId: unknown,
-    responseOverride: unknown = null
-  ): ResponseDecryptSurveyBindings => {
-    return buildUserPageResponseDecryptSurveyBindings({
-      detailedSurveyResponses: this.state.detailedSurveyResponses,
-      hashZero: ethers.constants.HashZero,
-      questionId,
-      questionResponseInfo: this.state.questionResponseInfo,
-      responseOverride,
-    });
-  };
-
   handleDecryptQuestionAnswer = async (
     questionId: unknown,
     fieldToDecrypt: unknown = 'both',
@@ -1992,14 +1926,20 @@ class UserPage extends Component<any, any> {
     const {
       surveyId,
       acceptedSurveyIds,
-    } = this.getResponseDecryptSurveyBindings(qid, responseOverride);
+    } = buildUserPageResponseDecryptSurveyBindings({
+      detailedSurveyResponses: this.state.detailedSurveyResponses,
+      hashZero: ethers.constants.HashZero,
+      questionId: qid,
+      questionResponseInfo: this.state.questionResponseInfo,
+      responseOverride,
+    });
 
     const responseSlice = {
       answers: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.answer),
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.answer),
       },
       additionalComments: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.additional),
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.additional),
       },
       importance: {},
       conviction: {},
@@ -2022,7 +1962,7 @@ class UserPage extends Component<any, any> {
       return false;
     }
 
-    const patchedResponse = this.buildDecryptedResponsePatch({
+    const patchedResponse = buildUserPageDecryptedResponsePatch({
       responseObj: responseOverride,
       questionId: qid,
       fieldToDecrypt,
@@ -2082,29 +2022,6 @@ class UserPage extends Component<any, any> {
     return didUpdate;
   };
 
-  _createGateAccessContext = (): GateAccessContext => ({
-    pendingKeys: new Set(),
-    uncertainResources: new Set(),
-  });
-
-  _captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
-    pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
-    uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
-  });
-
-  _mergeGateContextSnapshot = (
-    targetContext: GateAccessContext | null,
-    snapshot: GateAccessContextSnapshot | null = null
-  ): void => {
-    if (!isGateAccessContext(targetContext) || !snapshot) return;
-    (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
-      targetContext.pendingKeys.add(String(item || ''));
-    });
-    (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
-      targetContext.uncertainResources.add(String(item || ''));
-    });
-  };
-
   _evaluateEncryptedVisibility = ({
     resourceKey = 'default',
     slug = '',
@@ -2142,7 +2059,7 @@ class UserPage extends Component<any, any> {
     });
     if (isGateAccessContext(gateContext)) {
       displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
-        gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: pendingResourceKey }));
+        gateContext.pendingKeys.add(buildUserPageGatePendingKey({ slug, resourceKey: pendingResourceKey }));
       });
       if (displayState.uncertainResourceKey) {
         gateContext.uncertainResources.add(displayState.uncertainResourceKey);
@@ -2410,10 +2327,10 @@ class UserPage extends Component<any, any> {
           type: normalizedResponse.type || 'unknown',
           prompt: normalizedResponse.prompt || 'Unknown Question',
         });
-        const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-        const answerEncrypted = this._isAnswerFieldEncrypted(normalizedResponse);
-        const additionalEncrypted = this._isAdditionalFieldEncrypted(normalizedResponse);
-        const responseEncrypted = this._isResponsePayloadEncrypted(normalizedResponse);
+        const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+        const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
+        const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
+        const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
         let canDecryptOtherResponses = false;
 
         if (questionEncrypted || answerEncrypted) {
@@ -2422,7 +2339,7 @@ class UserPage extends Component<any, any> {
             slug: sourceSlug,
             viewAddressLower,
             encryptionAudience: answerEncrypted
-              ? this._inferResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
+              ? inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
               : 'gate',
             gateContext,
           });
@@ -2433,7 +2350,7 @@ class UserPage extends Component<any, any> {
             resourceKey: 'surveyResponses',
             slug: sourceSlug,
             viewAddressLower,
-            encryptionAudience: this._inferResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
+            encryptionAudience: inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
             gateContext,
           });
           canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
@@ -2528,7 +2445,7 @@ class UserPage extends Component<any, any> {
         questionData: qData,
       });
       if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
-        if (this._isQuestionPayloadEncrypted(qData)) {
+        if (isUserPageQuestionPayloadEncrypted(qData)) {
           const visibility = this._evaluateEncryptedVisibility({
             resourceKey: 'questionResponses',
             slug: sourceSlug,
@@ -2615,10 +2532,10 @@ class UserPage extends Component<any, any> {
         getSessionSlugByName,
         questionData: qData,
       });
-      const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-      const answerEncrypted = this._isAnswerFieldEncrypted(userResponseObject);
-      const additionalEncrypted = this._isAdditionalFieldEncrypted(userResponseObject);
-      const responseEncrypted = this._isResponsePayloadEncrypted(userResponseObject);
+      const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+      const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
+      const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
+      const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);
       let canDecryptOtherResponses = false;
       if (questionEncrypted || answerEncrypted) {
         const visibility = this._evaluateEncryptedVisibility({
@@ -2626,7 +2543,7 @@ class UserPage extends Component<any, any> {
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
           encryptionAudience: answerEncrypted
-            ? this._inferResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
+            ? inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
             : 'gate',
           gateContext,
         });
@@ -2637,7 +2554,7 @@ class UserPage extends Component<any, any> {
           resourceKey: 'questionResponses',
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
-          encryptionAudience: this._inferResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
+          encryptionAudience: inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
           gateContext,
         });
         canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
@@ -2792,7 +2709,7 @@ class UserPage extends Component<any, any> {
     let sbtSection: SbtSectionResult | null = null;
     let deepScanTooltipLines: string[] | null = null;
     let deepScanProgressRows: DeepScanProgressRow[] | null = null;
-    const gateContext = this._createGateAccessContext();
+    const gateContext = createGateAccessContext();
 
     try {
       const aggregateMemoKey = this._buildUnifiedCacheAggregateMemoKey({
@@ -2834,12 +2751,12 @@ class UserPage extends Component<any, any> {
         const surveyMemo = this._sectionDeriveMemo?.survey;
         if (!force && surveyMemo && surveyMemo.signature === surveySignature) {
           surveySection = surveyMemo.result as SurveySectionResult;
-          this._mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
+          mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
         } else {
-          const surveyGateContext = this._createGateAccessContext();
+          const surveyGateContext = createGateAccessContext();
           surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
-          const surveyGateSnapshot = this._captureGateContextSnapshot(surveyGateContext);
-          this._mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
+          const surveyGateSnapshot = captureGateContextSnapshot(surveyGateContext);
+          mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
             signature: surveySignature,
             result: surveySection,
@@ -2856,12 +2773,12 @@ class UserPage extends Component<any, any> {
         const questionMemo = this._sectionDeriveMemo?.question;
         if (!force && questionMemo && questionMemo.signature === questionSignature) {
           questionSection = questionMemo.result as QuestionSectionResult;
-          this._mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
+          mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
         } else {
-          const questionGateContext = this._createGateAccessContext();
+          const questionGateContext = createGateAccessContext();
           questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
-          const questionGateSnapshot = this._captureGateContextSnapshot(questionGateContext);
-          this._mergeGateContextSnapshot(gateContext, questionGateSnapshot);
+          const questionGateSnapshot = captureGateContextSnapshot(questionGateContext);
+          mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
             signature: questionSignature,
             result: questionSection,

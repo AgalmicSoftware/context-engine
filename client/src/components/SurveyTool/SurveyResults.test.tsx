@@ -17,14 +17,11 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
-import styles from './SurveyResults.module.scss';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
@@ -294,12 +291,6 @@ describe('SurveyResults display helpers', () => {
     expect(SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE).toEqual({ marginRight: '6px' });
     expect(SURVEY_RESULTS_MINI_PROGRESS_STYLE).toEqual({ minWidth: '100px' });
     expect(SURVEY_RESULTS_TRAILING_LABEL_STYLE).toEqual({ marginLeft: '10px' });
-    expect(buildSurveyResultsAggregatorPanelClassName(styles)).toBe(
-      `${styles.surveyResultsAggregatorPanel} ${styles.surveyResultsAggregatorText}`
-    );
-    expect(buildSurveyResultsMultichoiceOptionClassName(styles)).toBe(
-      `${styles.surveyResultsFreeformAnswer} ${styles.surveyResultsMultichoiceOption}`
-    );
     expect(resolveSurveyResultsSyncDetailsStyle(true)).toEqual({ display: 'block' });
     expect(resolveSurveyResultsSyncDetailsStyle(false)).toEqual({ display: undefined });
     expect(resolveSurveyResultsToggleKnobStyle(true)).toEqual({

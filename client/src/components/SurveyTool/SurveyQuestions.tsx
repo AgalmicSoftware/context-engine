@@ -2911,9 +2911,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.persistDraftSafely && this.persistDraftSafely(0);
   };
 
-  // Keyboard changes persist during onChange so draft edits are not lost.
-  getSliderPersistOptions = (event) => buildSliderPersistOptions(event);
-
   handleConvictionImportanceChange = (surveyIndex, questionId, mode, value, options = {}) => {
     if (mode === 'importance') {
       this.handleImportance(surveyIndex, questionId, value, options);
@@ -2945,7 +2942,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           questionId,
           sliderMode,
           value,
-          this.getSliderPersistOptions(event)
+          buildSliderPersistOptions(event)
         )}
       onChangeComplete={this.flushDraftPersistAfterSliderChange}
       onCommit={(committedValue) => this.handleConvictionImportanceChange(
@@ -2996,7 +2993,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         surveyIndex,
         question.id,
         ratingAnswer,
-        this.getSliderPersistOptions(event)
+        buildSliderPersistOptions(event)
       )}
       onRatingChangeComplete={this.flushDraftPersistAfterSliderChange}
       onToggleAnswerEncryption={(newEncryptedState) => this.toggleAnswerEncryption(
@@ -6854,16 +6851,16 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       cardIcons,
       commentsOpen: this.getCommentsOpen(question.id, displayState.hasAdditionalContent),
       displayState,
-      onToggleComments: (questionId, defaultOpen) => this.toggleComments(questionId, defaultOpen),
+      onToggleComments: this.toggleComments,
       qIndex,
-      renderAdditionalDecryptControl: (args) => this.renderQuestionFieldDecryptControl(args),
-      renderAdditionalInput: (args) => this.renderFullQuestionAdditionalInput(args),
-      renderAdditionalLockControl: (args) => this.renderQuestionAdditionalLockControl(args),
-      renderAnswerDecryptControl: (args) => this.renderQuestionFieldDecryptControl(args),
-      renderFullQuestionCardShell: (args) => this.renderFullQuestionCardShell(args),
-      renderFullQuestionFooterIcons: (args) => this.renderFullQuestionFooterIcons(args),
-      renderFullQuestionSliderSection: (args) => this.renderFullQuestionSliderSection(args),
-      renderResponseInput: (args) => this.renderFullQuestionResponseInput(args),
+      renderAdditionalDecryptControl: this.renderQuestionFieldDecryptControl,
+      renderAdditionalInput: this.renderFullQuestionAdditionalInput,
+      renderAdditionalLockControl: this.renderQuestionAdditionalLockControl,
+      renderAnswerDecryptControl: this.renderQuestionFieldDecryptControl,
+      renderFullQuestionCardShell: this.renderFullQuestionCardShell,
+      renderFullQuestionFooterIcons: this.renderFullQuestionFooterIcons,
+      renderFullQuestionSliderSection: this.renderFullQuestionSliderSection,
+      renderResponseInput: this.renderFullQuestionResponseInput,
       sliderOpen,
       surveyIndex,
     });
@@ -7030,8 +7027,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return policy;
   };
 
-  getResponseGateRecipientSpecs = () => this.getResponseGatePolicy().recipients;
-
   getQuestionLookupMap = () => {
     const stateQuestionPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : null;
     const statePileQuestions = Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : null;
@@ -7189,7 +7184,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return Array.isArray(policy?.recipients) ? policy.recipients : [];
   };
 
-  hasDefaultResponseGateRecipients = () => this.getResponseGateRecipientSpecs().length > 0;
+  hasDefaultResponseGateRecipients = () => {
+    const recipients = this.getResponseGatePolicy()?.recipients;
+    return Array.isArray(recipients) && recipients.length > 0;
+  };
 
   getDefaultResponseEncryptionAudience = () => (
     this.hasDefaultResponseGateRecipients() ? 'gate' : 'self'
@@ -7207,8 +7205,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
       hasDefaultGateRecipients: () => this.hasDefaultResponseGateRecipients(),
     });
-
-  getDefaultResponseEncryptionEnabled = () => this.getDefaultResponseEncryptionAudience() === 'gate';
 
   buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') =>
     buildEmptyResponseFieldStateCore(questionId, fieldKey, {
@@ -8402,8 +8398,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         mode="fullscreen"
         sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
+        onDecryptQuestion={this.handleDecryptQuestionAnswer}
+        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
         promptReloading={promptReloading}
         showImportance={true}
         provider={this.props.provider}
@@ -8429,8 +8425,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         mode="fullscreen"
         sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
+        onDecryptQuestion={this.handleDecryptQuestionAnswer}
+        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
         promptReloading={promptReloading}
         showImportance={true}
         provider={this.props.provider}
