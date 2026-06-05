@@ -1,4 +1,13 @@
 import type { UnknownRecord } from './surveyToolTypes';
+import {
+  getBlockedQuestionIdsSet,
+  getSessionSlugHintFromProps,
+  getSessionSlugPinnedFromProps,
+  normalizeSessionSlugValue,
+  resolveEffectiveSlug,
+  resolveExplicitSessionContext,
+  resolveSlugForIds,
+} from './surveyToolUtils.js';
 
 type QuestionPayload = UnknownRecord & {
   creator?: unknown;
@@ -26,6 +35,63 @@ type CacheBootstrapFlowRetryPlan = {
   exhaustedPhase: string;
   exhaustedStatePatch: UnknownRecord;
 };
+
+type QuestionFetchCandidateSlugResolver = (
+  questionId: string,
+  preferredSlug: string,
+  options: { allowPinnedFallback: boolean }
+) => string[];
+
+type BlockedQuestionIdsResolver = (sessionSlug: string) => Set<string>;
+
+type SourceRestoreRetryCleanupAction =
+  | 'none'
+  | 'clear-current-attempt'
+  | 'clear-different-question';
+
+type SourceRestoreCommonPlan = {
+  bootstrapRetryAttempt: number;
+  hasPendingRetryForQuestion: boolean;
+  pendingRetryQuestionId: string;
+  pendingRetrySig: string;
+  questionId: string;
+  retryCleanupAction: SourceRestoreRetryCleanupAction;
+};
+
+export type SingleQuestionSourceRestoreMissingQuestionPlan = SourceRestoreCommonPlan & {
+  status: 'missing-question-id';
+  debugPayload: UnknownRecord;
+  statePatch: UnknownRecord;
+};
+
+export type SingleQuestionSourceRestoreBlockedQuestionPlan = SourceRestoreCommonPlan & {
+  status: 'blocked-question';
+  effectiveSingleSlug: string;
+  explicitSingleSlug: string;
+  explicitSingleSlugKnown: boolean;
+  fetchCandidateSlugs: string[];
+  resolvedSingleSlug: string;
+  slugPinned: boolean;
+  startDebugPayload: UnknownRecord;
+  debugPayload: UnknownRecord;
+  statePatch: UnknownRecord;
+};
+
+export type SingleQuestionSourceRestoreReadyPlan = SourceRestoreCommonPlan & {
+  status: 'ready';
+  effectiveSingleSlug: string;
+  explicitSingleSlug: string;
+  explicitSingleSlugKnown: boolean;
+  fetchCandidateSlugs: string[];
+  resolvedSingleSlug: string;
+  slugPinned: boolean;
+  startDebugPayload: UnknownRecord;
+};
+
+export type SingleQuestionSourceRestoreContextPlan =
+  | SingleQuestionSourceRestoreMissingQuestionPlan
+  | SingleQuestionSourceRestoreBlockedQuestionPlan
+  | SingleQuestionSourceRestoreReadyPlan;
 
 export type CacheBootstrapFlowContinue = {
   action: 'continue';
@@ -117,6 +183,126 @@ const buildMissingCacheStateStopPlan = (
   retryPlan: null,
   seededHydration,
 });
+
+export const buildSingleQuestionSourceRestoreContextPlan = ({
+  bootstrapRetryAttempt = 0,
+  getBlockedQuestionIds = getBlockedQuestionIdsSet,
+  getQuestionFetchCandidateSlugs = () => [],
+  maxCandidateSlugs = 0,
+  pendingRetrySig = '',
+  props = {},
+  questionPool = [],
+  runId = null,
+}: {
+  bootstrapRetryAttempt?: unknown;
+  getBlockedQuestionIds?: BlockedQuestionIdsResolver;
+  getQuestionFetchCandidateSlugs?: QuestionFetchCandidateSlugResolver;
+  maxCandidateSlugs?: unknown;
+  pendingRetrySig?: unknown;
+  props?: UnknownRecord;
+  questionPool?: unknown;
+  runId?: unknown;
+} = {}): SingleQuestionSourceRestoreContextPlan => {
+  const retryAttempt = Number(bootstrapRetryAttempt || 0);
+  const rawQuestionId = props.questionID;
+  const retrySig = String(pendingRetrySig || '').trim().toLowerCase();
+  const pendingRetryQuestionId = retrySig ? retrySig.split(':')[0] : '';
+
+  if (!rawQuestionId) {
+    return {
+      status: 'missing-question-id',
+      bootstrapRetryAttempt: retryAttempt,
+      debugPayload: {
+        phase: 'missing-question-id',
+        runId,
+        bootstrapRetryAttempt: retryAttempt,
+      },
+      hasPendingRetryForQuestion: false,
+      pendingRetryQuestionId,
+      pendingRetrySig: retrySig,
+      questionId: '',
+      retryCleanupAction: 'none',
+      statePatch: { isLoadingResponse: false },
+    };
+  }
+
+  const questionId = String(rawQuestionId).toLowerCase();
+  const hasPendingRetryForQuestion = !!(pendingRetryQuestionId && pendingRetryQuestionId === questionId);
+  const retryCleanupAction: SourceRestoreRetryCleanupAction = retryAttempt > 0
+    ? 'clear-current-attempt'
+    : pendingRetryQuestionId && pendingRetryQuestionId !== questionId
+      ? 'clear-different-question'
+      : 'none';
+  const slugPinned = !!getSessionSlugPinnedFromProps(props);
+  const explicitSingleSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(props));
+  const explicitSingleSlugKnown =
+    explicitSingleSlug === '' || !!resolveExplicitSessionContext(explicitSingleSlug).sessionConfig;
+  const currentQuestionSessionName = (questionPool as { [index: number]: UnknownRecord } | null)?.[0]?.sessionName;
+  const resolvedSingleSlug = resolveSlugForIds({
+    sessionName: props.sessionName || currentQuestionSessionName,
+    questionId: rawQuestionId,
+    surveyId: null,
+    props,
+    network: props.network as UnknownRecord | null | undefined,
+  });
+  const effectiveSingleSlug = explicitSingleSlug || resolvedSingleSlug || resolveEffectiveSlug(props);
+  const fetchCandidateSlugs = getQuestionFetchCandidateSlugs(
+    questionId,
+    effectiveSingleSlug,
+    { allowPinnedFallback: !slugPinned || retryAttempt > 0 || !explicitSingleSlugKnown }
+  ).slice(0, Math.max(0, Number(maxCandidateSlugs || 0)));
+  const startDebugPayload = {
+    phase: 'start',
+    runId,
+    questionId,
+    responderAddress: String(props.responderAddress || '').toLowerCase(),
+    bootstrapRetryAttempt: retryAttempt,
+    pendingRetrySig: retrySig || null,
+    hasPendingRetryForQuestion,
+    questionResponsesNonce: Number(props.questionResponsesNonce || 0),
+    questionsCacheNonce: Number(props.questionsCacheNonce || 0),
+  };
+  const common = {
+    bootstrapRetryAttempt: retryAttempt,
+    effectiveSingleSlug,
+    explicitSingleSlug,
+    explicitSingleSlugKnown,
+    fetchCandidateSlugs,
+    hasPendingRetryForQuestion,
+    pendingRetryQuestionId,
+    pendingRetrySig: retrySig,
+    questionId,
+    resolvedSingleSlug,
+    retryCleanupAction,
+    slugPinned,
+    startDebugPayload,
+  };
+
+  if (getBlockedQuestionIds(effectiveSingleSlug).has(questionId)) {
+    return {
+      ...common,
+      status: 'blocked-question',
+      debugPayload: {
+        phase: 'blocked-question',
+        runId,
+        questionId,
+        effectiveSingleSlug: String(effectiveSingleSlug || ''),
+      },
+      statePatch: {
+        questionPool: [],
+        isLoadingResponse: false,
+        noResponse: true,
+        responseLookupWarning: '',
+        displayAnswerMode: true,
+      },
+    };
+  }
+
+  return {
+    ...common,
+    status: 'ready',
+  };
+};
 
 export const resolveSingleQuestionCacheBootstrapFlowPlan = ({
   cacheBootstrapResult = null,
