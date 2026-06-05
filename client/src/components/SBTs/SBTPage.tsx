@@ -3917,27 +3917,29 @@ renderMintButton() {
       isSuccess: isMinted,
       successLabel: t('minted'),
     });
-    return SbtPageStatusActionButton({
-      className: mintActionButtonClassName,
-      contentState: openMintButtonContentState,
-      disabled,
-      onClick: (event) => runSbtPageMintActionController({
-        canOpenMintTx,
-        disabled,
-        event,
-        mintArgs: [true],
-        plan: mintActionPlan,
-        ports: {
-          dispatchMint: this.handleMint,
-          openMintTransaction: () => window.open(
-            this.getExplorerLink(lastMintTxHash),
-            '_blank',
-            'noopener,noreferrer'
-          ),
-        },
-      }),
-      title,
-    });
+    return (
+      <SbtPageStatusActionButton
+        className={mintActionButtonClassName}
+        contentState={openMintButtonContentState}
+        disabled={disabled}
+        onClick={(event) => runSbtPageMintActionController({
+          canOpenMintTx,
+          disabled,
+          event,
+          mintArgs: [true],
+          plan: mintActionPlan,
+          ports: {
+            dispatchMint: this.handleMint,
+            openMintTransaction: () => window.open(
+              this.getExplorerLink(lastMintTxHash),
+              '_blank',
+              'noopener,noreferrer'
+            ),
+          },
+        })}
+        title={title}
+      />
+    );
   }
 
   if (mintFlowDisplayState.shouldRenderManualClaimStart) {
@@ -4029,19 +4031,21 @@ renderMintButton() {
       return null;
     }
 
-    return SbtPageStatusActionButton({
-      className: burnActionButtonClassName,
-      contentState: burnButtonContentState,
-      disabled: burnStatusButtonState.disabled,
-      onClick: (event) => runSbtPageBurnActionController({
-        disabled: burnStatusButtonState.disabled,
-        event,
-        plan: burnActionPlan,
-        ports: {
-          dispatchBurn: this.handleBurn,
-        },
-      }),
-    });
+    return (
+      <SbtPageStatusActionButton
+        className={burnActionButtonClassName}
+        contentState={burnButtonContentState}
+        disabled={burnStatusButtonState.disabled}
+        onClick={(event) => runSbtPageBurnActionController({
+          disabled: burnStatusButtonState.disabled,
+          event,
+          plan: burnActionPlan,
+          ports: {
+            dispatchBurn: this.handleBurn,
+          },
+        })}
+      />
+    );
   };
 
   renderRelevantInfo = (): React.ReactNode => {

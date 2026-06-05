@@ -503,7 +503,6 @@ import {
   buildJsonPreviewState,
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
-  buildResponseEditCompleteState,
   buildResponseLoadingResetState,
   buildShowJsonState,
   buildSubmitPreparationErrorState,
@@ -522,7 +521,6 @@ import {
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
-  toggleShowJsonState,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
