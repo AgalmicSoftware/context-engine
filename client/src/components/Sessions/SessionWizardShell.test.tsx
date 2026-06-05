@@ -62,7 +62,12 @@ jest.mock('./WorkerPanel', () => (props: any) => (
 ));
 
 jest.mock('./SessionPublishSummary', () => (props: any) => (
-  <section data-testid="shell-publish" data-worker-source={props.workerUrlSource || ''}>
+  <section
+    data-testid="shell-publish"
+    data-metadata-label={props.publishMetadataDisplayState?.metadataUriLabel || ''}
+    data-metadata-uri={props.publishMetadataDisplayState?.metadataUri || ''}
+    data-worker-source={props.workerUrlSource || ''}
+  >
     <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
     <button type="button" onClick={props.onTogglePublishAdvanced}>publish advanced</button>
     <button
@@ -125,8 +130,6 @@ const baseProps = () => ({
   devPersistWorkerSecrets: false,
   displayedWorkerUrl: 'https://worker.example.test',
   draft: {},
-  effectiveMetadataGatewayUrl: '',
-  effectiveMetadataTxId: '',
   effectivePersistWorkerSecrets: false,
   embeddedDeployHelperEnabled: true,
   encryptionGates: [],
@@ -152,7 +155,6 @@ const baseProps = () => ({
   manualMaxFeePerGasGwei: '',
   manualMaxPriorityFeePerGasGwei: '',
   manualMetadataUrl: '',
-  metadataUrl: '',
   moreOptionsEntries: [],
   moreOptionsOpen: false,
   network: { id: 11155420 },
@@ -193,6 +195,16 @@ const baseProps = () => ({
   provider: null,
   publishAdvancedOpen: false,
   publishBusy: false,
+  publishMetadataDisplayState: {
+    effectiveMetadataGatewayUrl: '',
+    effectiveMetadataTxId: '',
+    manualMetadataDisplayUri: '',
+    metadataUri: 'ar://metadata-tx',
+    metadataUriLabel: 'Metadata URI',
+    showArweaveTx: false,
+    showManualMetadataUri: false,
+    showMetadataUri: true,
+  },
   publishProgressDisplayState: {
     activePublishProgressStepLabel: '',
     publishProgressPercent: 0,
@@ -266,7 +278,6 @@ const baseProps = () => ({
   workerUrlSource: 'custom worker URL',
   wizardDisplaySettingsOpen: false,
   wizardMode: 'normal',
-  normalizeArweaveUri: (value: string) => value,
   normalizeSbtSelection: jest.fn((value) => value),
 });
 
@@ -298,6 +309,8 @@ describe('SessionWizardShell', () => {
     expect(requirements).toHaveTextContent('OP Sepolia ETH');
     expect(worker).toHaveAttribute('data-worker-url', 'https://worker.example.test');
     expect(publish).toHaveAttribute('data-worker-source', 'custom worker URL');
+    expect(publish).toHaveAttribute('data-metadata-label', 'Metadata URI');
+    expect(publish).toHaveAttribute('data-metadata-uri', 'ar://metadata-tx');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeDisabled();
 
     fireEvent.click(screen.getByText('advanced'));

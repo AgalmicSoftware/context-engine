@@ -13,6 +13,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
+import type { SessionWizardPublishMetadataDisplayState } from './sessionWizardPublishReadiness';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type PublishSummaryItem = {
@@ -58,6 +59,7 @@ type SessionPublishSummaryProps = {
   bundleFile: File | null;
   localWorkerBundleFallbackFilePath: string;
   sponsoredManualBundleRetryMessage: string;
+  publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
   showPublishProgress: boolean;
   activePublishProgressStepLabel: string;
   publishProgressPercent: number;
@@ -80,9 +82,6 @@ type SessionPublishSummaryProps = {
   onManualMaxFeePerGasGweiChange: (value: string) => void;
   manualMaxPriorityFeePerGasGwei: string;
   onManualMaxPriorityFeePerGasGweiChange: (value: string) => void;
-  metadataUrl: string;
-  effectiveMetadataTxId: string;
-  effectiveMetadataGatewayUrl: string;
   registerTxs: RegisterTxEntry[];
   registerExplorerBaseUrl: string;
   sessionUrl: string;
@@ -91,7 +90,6 @@ type SessionPublishSummaryProps = {
   onCopyAdminUrl: () => void;
   adminUrlStatus: string;
   status: string;
-  normalizeArweaveUri: (value: string) => string;
 };
 
 const SessionPublishSummary = ({
@@ -116,6 +114,7 @@ const SessionPublishSummary = ({
   bundleFile,
   localWorkerBundleFallbackFilePath,
   sponsoredManualBundleRetryMessage,
+  publishMetadataDisplayState,
   showPublishProgress,
   activePublishProgressStepLabel,
   publishProgressPercent,
@@ -138,9 +137,6 @@ const SessionPublishSummary = ({
   onManualMaxFeePerGasGweiChange,
   manualMaxPriorityFeePerGasGwei,
   onManualMaxPriorityFeePerGasGweiChange,
-  metadataUrl,
-  effectiveMetadataTxId,
-  effectiveMetadataGatewayUrl,
   registerTxs,
   registerExplorerBaseUrl,
   sessionUrl,
@@ -149,7 +145,6 @@ const SessionPublishSummary = ({
   onCopyAdminUrl,
   adminUrlStatus,
   status,
-  normalizeArweaveUri,
 }: SessionPublishSummaryProps) => (
   <section id="session-wizard-section-publish" className={styles.panel}>
     {wizardMode === 'advanced' ? (
@@ -428,29 +423,23 @@ const SessionPublishSummary = ({
           </>
         ) : null}
 
-        {metadataUrl && !manualMetadataUrl ? (
+        {publishMetadataDisplayState.showMetadataUri ? (
           <div className={styles.linkRow}>
-            <span className={styles.linkLabel}>Metadata URI:</span>
-            <span data-testid={E2E_TESTIDS.WIZARD_METADATA_URI}>{metadataUrl}</span>
+            <span className={styles.linkLabel}>{publishMetadataDisplayState.metadataUriLabel}:</span>
+            <span data-testid={E2E_TESTIDS.WIZARD_METADATA_URI}>{publishMetadataDisplayState.metadataUri}</span>
           </div>
         ) : null}
-        {metadataUrl && manualMetadataUrl ? (
-          <div className={styles.linkRow}>
-            <span className={styles.linkLabel}>Uploaded metadata URI:</span>
-            <span data-testid={E2E_TESTIDS.WIZARD_METADATA_URI}>{metadataUrl}</span>
-          </div>
-        ) : null}
-        {manualMetadataUrl ? (
+        {publishMetadataDisplayState.showManualMetadataUri ? (
           <div className={styles.linkRow}>
             <span className={styles.linkLabel}>Manual metadata URI:</span>
-            <span>{normalizeArweaveUri(manualMetadataUrl)}</span>
+            <span>{publishMetadataDisplayState.manualMetadataDisplayUri}</span>
           </div>
         ) : null}
-        {effectiveMetadataTxId ? (
+        {publishMetadataDisplayState.showArweaveTx ? (
           <div className={styles.linkRow}>
             <span className={styles.linkLabel}>Arweave tx:</span>
-            <a href={effectiveMetadataGatewayUrl} target="_blank" rel="noopener noreferrer">
-              {effectiveMetadataGatewayUrl}
+            <a href={publishMetadataDisplayState.effectiveMetadataGatewayUrl} target="_blank" rel="noopener noreferrer">
+              {publishMetadataDisplayState.effectiveMetadataGatewayUrl}
             </a>
           </div>
         ) : null}
