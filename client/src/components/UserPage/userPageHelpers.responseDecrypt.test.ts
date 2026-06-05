@@ -1,9 +1,11 @@
 import {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
+  buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
@@ -200,6 +202,141 @@ describe('userPageHelpers response decrypt helpers', () => {
     })).toEqual({
       surveyId: hashZero,
       acceptedSurveyIds: [hashZero],
+    });
+  });
+
+  it('builds a typed response decrypt request plan without executing crypto', () => {
+    const hashZero = '0x0000000000000000000000000000000000000000000000000000000000000000';
+    const getKey = jest.fn();
+    const responseOverride = {
+      surveyID: 'Survey-A',
+      answer: { value: '*', encryptedPortion: 'answer-cipher' },
+      additional: { value: '', encrypted: false },
+    };
+
+    expect(buildUserPageResponseDecryptRequestPlan({
+      account: ' 0xABC ',
+      detailedSurveyResponses: {
+        SurveyA: [{
+          questionData: { id: 'Q1' },
+          responseData: responseOverride,
+        }],
+      },
+      hashZero,
+      litHooks: { getKey },
+      networkId: '84532',
+      provider: 'provider-ref',
+      questionId: ' Q1 ',
+      responseOverride,
+    })).toEqual({
+      account: '0xABC',
+      blockedReason: '',
+      cryptoOptions: {
+        acceptedSurveyIds: ['survey-a', 'surveya', hashZero],
+        account: '0xABC',
+        chainId: 84532,
+        lit: { getKey },
+        provider: 'provider-ref',
+        providerKind: 'provider-ref',
+        surveyId: 'survey-a',
+        throwOnError: true,
+      },
+      questionId: 'q1',
+      responseSlice: {
+        answers: {
+          q1: {
+            value: '*',
+            encrypted: true,
+            encryptedPortion: 'answer-cipher',
+          },
+        },
+        additionalComments: {
+          q1: {
+            value: '',
+            encrypted: false,
+          },
+        },
+        importance: {},
+        conviction: {},
+      },
+      status: 'ready',
+    });
+
+    expect(buildUserPageResponseDecryptRequestPlan({
+      account: '',
+      questionId: 'q1',
+      responseOverride,
+    })).toEqual(expect.objectContaining({
+      blockedReason: 'missing-account',
+      cryptoOptions: null,
+      responseSlice: null,
+      status: 'blocked',
+    }));
+  });
+
+  it('builds decrypted response state patches without mutating previous buckets', () => {
+    const encryptedResponse = {
+      answer: { value: '*', encrypted: true },
+      additional: { value: '', encrypted: false },
+    };
+    const patchedResponse = {
+      answer: { value: 'clear', encrypted: false },
+      additional: { value: '', encrypted: false },
+    };
+    const previousState = {
+      detailedQuestionResponses: {
+        q1: encryptedResponse,
+      },
+      detailedSurveyResponses: {
+        s1: [
+          {
+            questionData: { id: 'q1' },
+            responseData: encryptedResponse,
+          },
+          {
+            questionData: { id: 'q2' },
+            responseData: { answer: { value: 'other' } },
+          },
+        ],
+      },
+    };
+
+    const result = buildUserPageDecryptedResponseStatePatch({
+      patchedResponse,
+      previousState,
+      questionId: 'Q1',
+      responseOverride: encryptedResponse,
+    });
+
+    expect(result.didUpdate).toBe(true);
+    expect(result.statePatch).toEqual({
+      detailedQuestionResponses: {
+        q1: patchedResponse,
+      },
+      detailedSurveyResponses: {
+        s1: [
+          {
+            questionData: { id: 'q1' },
+            responseData: patchedResponse,
+          },
+          previousState.detailedSurveyResponses.s1[1],
+        ],
+      },
+    });
+    expect(previousState.detailedQuestionResponses.q1).toBe(encryptedResponse);
+    expect(previousState.detailedSurveyResponses.s1[0].responseData).toBe(encryptedResponse);
+
+    expect(buildUserPageDecryptedResponseStatePatch({
+      patchedResponse,
+      previousState: {
+        detailedQuestionResponses: {},
+        detailedSurveyResponses: {},
+      },
+      questionId: 'q1',
+      responseOverride: encryptedResponse,
+    })).toEqual({
+      didUpdate: false,
+      statePatch: null,
     });
   });
 });

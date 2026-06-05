@@ -28,6 +28,18 @@ type BuildUserPageResponseDecryptSurveyBindingsInput = {
   questionResponseInfo?: unknown;
   responseOverride?: unknown;
 };
+type BuildUserPageResponseDecryptRequestPlanInput = BuildUserPageResponseDecryptSurveyBindingsInput & {
+  account?: unknown;
+  litHooks?: unknown;
+  networkId?: unknown;
+  provider?: unknown;
+};
+type BuildUserPageDecryptedResponseStatePatchInput = {
+  patchedResponse?: unknown;
+  previousState?: unknown;
+  questionId?: unknown;
+  responseOverride?: unknown;
+};
 export type UserPageGateAccessStatusByResource = {
   resourceKey: string;
   status: string;
@@ -53,6 +65,32 @@ export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
 export type UserPageResponseDecryptSurveyBindings = {
   surveyId: string;
   acceptedSurveyIds: string[];
+};
+export type UserPageResponseDecryptRequestPlan = {
+  account: string;
+  blockedReason: '' | 'missing-account' | 'missing-question' | 'missing-response';
+  cryptoOptions: {
+    acceptedSurveyIds: string[];
+    account: string;
+    chainId: number;
+    lit: { getKey: unknown } | null;
+    provider: unknown;
+    providerKind: unknown;
+    surveyId: string;
+    throwOnError: true;
+  } | null;
+  questionId: string;
+  responseSlice: {
+    answers: Record<string, UserPageDecryptableResponseField>;
+    additionalComments: Record<string, UserPageDecryptableResponseField>;
+    importance: Record<string, unknown>;
+    conviction: Record<string, unknown>;
+  } | null;
+  status: 'blocked' | 'ready';
+};
+export type UserPageDecryptedResponseStatePatchResult = {
+  didUpdate: boolean;
+  statePatch: UserPageUnknownRecord | null;
 };
 
 export const normalizeUserPageGateSlug = (slug: unknown): string => {
@@ -372,5 +410,136 @@ export const buildUserPageResponseDecryptSurveyBindings = ({
   return {
     surveyId: surveyIds[0] || String(hashZero || ''),
     acceptedSurveyIds: surveyIds,
+  };
+};
+
+export const buildUserPageResponseDecryptRequestPlan = ({
+  account = '',
+  detailedSurveyResponses = null,
+  hashZero = '',
+  litHooks = null,
+  networkId = 0,
+  provider = null,
+  questionId = '',
+  questionResponseInfo = [],
+  responseOverride = null,
+}: BuildUserPageResponseDecryptRequestPlanInput = {}): UserPageResponseDecryptRequestPlan => {
+  const qid = String(questionId || '').trim().toLowerCase();
+  const normalizedAccount = String(account || '').trim();
+  const blockedPlan = (
+    blockedReason: UserPageResponseDecryptRequestPlan['blockedReason']
+  ): UserPageResponseDecryptRequestPlan => ({
+    account: normalizedAccount,
+    blockedReason,
+    cryptoOptions: null,
+    questionId: qid,
+    responseSlice: null,
+    status: 'blocked',
+  });
+  if (!qid) return blockedPlan('missing-question');
+  if (!normalizedAccount) return blockedPlan('missing-account');
+
+  const responseRecord = toAnalysisRecord(responseOverride);
+  if (!Object.keys(responseRecord).length) return blockedPlan('missing-response');
+
+  const hooksRecord = toAnalysisRecord(litHooks);
+  const lit = typeof hooksRecord.getKey === 'function'
+    ? { getKey: hooksRecord.getKey }
+    : null;
+  const { surveyId, acceptedSurveyIds } = buildUserPageResponseDecryptSurveyBindings({
+    detailedSurveyResponses,
+    hashZero,
+    questionId: qid,
+    questionResponseInfo,
+    responseOverride,
+  });
+
+  return {
+    account: normalizedAccount,
+    blockedReason: '',
+    cryptoOptions: {
+      account: normalizedAccount,
+      provider,
+      providerKind: provider,
+      chainId: Number(networkId ?? 0) || 0,
+      surveyId,
+      acceptedSurveyIds,
+      lit,
+      throwOnError: true,
+    },
+    questionId: qid,
+    responseSlice: {
+      answers: {
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.answer),
+      },
+      additionalComments: {
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.additional),
+      },
+      importance: {},
+      conviction: {},
+    },
+    status: 'ready',
+  };
+};
+
+export const buildUserPageDecryptedResponseStatePatch = ({
+  patchedResponse = null,
+  previousState = null,
+  questionId = '',
+  responseOverride = null,
+}: BuildUserPageDecryptedResponseStatePatchInput = {}): UserPageDecryptedResponseStatePatchResult => {
+  const qid = String(questionId || '').trim().toLowerCase();
+  if (!qid || !Object.keys(toAnalysisRecord(patchedResponse)).length) {
+    return { didUpdate: false, statePatch: null };
+  }
+  const prevState = toAnalysisRecord(previousState);
+  const prevDetailedQuestionResponses = toAnalysisRecord(prevState.detailedQuestionResponses);
+  const prevDetailedSurveyResponses = toAnalysisRecord(prevState.detailedSurveyResponses);
+  const nextDetailedQuestionResponses: UserPageUnknownRecord = { ...prevDetailedQuestionResponses };
+  const nextDetailedSurveyResponses: UserPageUnknownRecord = { ...prevDetailedSurveyResponses };
+  let didUpdate = false;
+
+  Object.keys(nextDetailedQuestionResponses).forEach((questionKey: string) => {
+    if (nextDetailedQuestionResponses[questionKey] === responseOverride) {
+      nextDetailedQuestionResponses[questionKey] = patchedResponse;
+      didUpdate = true;
+    }
+  });
+
+  if (
+    !didUpdate &&
+    Object.prototype.hasOwnProperty.call(nextDetailedQuestionResponses, qid)
+  ) {
+    nextDetailedQuestionResponses[qid] = patchedResponse;
+    didUpdate = true;
+  }
+
+  Object.keys(nextDetailedSurveyResponses).forEach((surveyId: string) => {
+    const surveyEntries = nextDetailedSurveyResponses[surveyId];
+    if (!Array.isArray(surveyEntries)) return;
+    let surveyEntriesChanged = false;
+    const updatedEntries = surveyEntries.map((entry: unknown) => {
+      const entryRecord = toAnalysisRecord(entry);
+      if (!Object.keys(entryRecord).length) return entry;
+      if (entryRecord.responseData !== responseOverride) return entry;
+      surveyEntriesChanged = true;
+      return {
+        ...entryRecord,
+        responseData: patchedResponse,
+      };
+    });
+    if (surveyEntriesChanged) {
+      nextDetailedSurveyResponses[surveyId] = updatedEntries;
+      didUpdate = true;
+    }
+  });
+
+  if (!didUpdate) return { didUpdate: false, statePatch: null };
+  return {
+    didUpdate: true,
+    statePatch: {
+      detailedQuestionResponses: nextDetailedQuestionResponses,
+      detailedSurveyResponses: nextDetailedSurveyResponses,
+    },
   };
 };
