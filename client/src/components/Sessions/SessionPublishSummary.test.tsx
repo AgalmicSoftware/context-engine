@@ -154,6 +154,76 @@ describe('SessionPublishSummary', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '42% Upload Arweave');
   });
 
+  it('renders completed publish status, uploaded metadata fallback, and result links without publishing', () => {
+    const onCopyAdminUrl = jest.fn();
+    const onPublish = jest.fn();
+
+    render(
+      <SessionPublishSummary
+        {...buildProps({
+          activePublishProgressStepLabel: 'Done',
+          adminUrl: 'https://context.example.test/admin/readiness-session',
+          adminUrlStatus: 'Admin URL copied.',
+          effectiveMetadataGatewayUrl: 'https://arweave.example.test/metadata-tx',
+          effectiveMetadataTxId: 'metadata-tx',
+          metadataUrl: 'ar://metadata-tx',
+          onCopyAdminUrl,
+          onPublish,
+          publishBusy: false,
+          publishProgressPercent: 100,
+          publishProgressPercentRounded: 100,
+          publishProgressSteps: [
+            { key: 'upload-metadata', label: 'Upload Arweave' },
+            { key: 'register-session', label: 'Register On-chain' },
+            { key: 'done', label: 'Done' },
+          ],
+          publishStep: 3,
+          registerExplorerBaseUrl: 'https://optimism-sepolia.blockscout.com',
+          registerTxs: [
+            { action: 'createSession', hash: '0xregister1' },
+            { action: 'setSessionFields', hash: '0xregister2' },
+          ],
+          sessionUrl: 'https://context.example.test/session/readiness-session',
+          showPublishProgress: true,
+          status: 'Published session readiness-session.',
+        })}
+      />
+    );
+
+    const progressCard = screen.getByTestId('ce-wizard-publish-progress');
+    expect(progressCard).toHaveTextContent('Publish Complete');
+    expect(progressCard).toHaveTextContent('Done');
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByText('Metadata URI:')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent('ar://metadata-tx');
+    expect(screen.queryByText('Uploaded metadata URI:')).not.toBeInTheDocument();
+    expect(screen.getByText('Arweave tx:')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://arweave.example.test/metadata-tx' }))
+      .toHaveAttribute('href', 'https://arweave.example.test/metadata-tx');
+    expect(screen.getByText('Register txs:')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('createSession:')).toBeInTheDocument();
+    expect(screen.getByRole('link', {
+      name: 'https://optimism-sepolia.blockscout.com/tx/0xregister1',
+    })).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister1');
+    expect(screen.getByText('setSessionFields:')).toBeInTheDocument();
+    expect(screen.getByRole('link', {
+      name: 'https://optimism-sepolia.blockscout.com/tx/0xregister2',
+    })).toHaveAttribute('href', 'https://optimism-sepolia.blockscout.com/tx/0xregister2');
+    expect(screen.getByRole('link', {
+      name: 'https://context.example.test/session/readiness-session',
+    })).toHaveAttribute('href', 'https://context.example.test/session/readiness-session');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL))
+      .toHaveAttribute('href', 'https://context.example.test/admin/readiness-session');
+    expect(screen.getByText('Admin URL copied.')).toBeInTheDocument();
+    expect(screen.getByText('Published session readiness-session.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Copy/i }));
+
+    expect(onCopyAdminUrl).toHaveBeenCalledTimes(1);
+    expect(onPublish).not.toHaveBeenCalled();
+  });
+
   it('keeps the advanced settings toggle inert from publish execution', () => {
     const onPublish = jest.fn();
     const onTogglePublishAdvanced = jest.fn();
