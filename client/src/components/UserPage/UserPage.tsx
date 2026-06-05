@@ -40,7 +40,6 @@ import {
   buildUserPageDeepScanReportStatus,
   buildUserPageDeepScanReportStatePatch,
   buildUserPageDeepScanReportTelemetryPayloads,
-  buildUserPageDeepScanRefreshCarryPatch,
   buildUserPageDeepScanTooltipDisplayState,
   buildUserPageDeepScanProgressStatePatch,
   buildUserPageDeepScanPrioritySlugs,
@@ -2957,23 +2956,17 @@ class UserPage extends Component<any, any> {
     }
 
     this.setState((prevState: UnknownRecord) => {
-      const keepSurveyLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('surveys');
-      const keepQuestionLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('questions');
       const cacheRefreshStatePatchPlan = buildUserPageCacheRefreshStatePatch({
         aggregatePresent: !!aggregate,
-        deepScanCarryPatch: buildUserPageDeepScanRefreshCarryPatch({
-          deepScanProgressRows,
-          deepScanTooltipLines,
-          prevState,
-        }),
+        deepScanProgressRows,
+        deepScanTooltipLines,
         hasQuestionSources,
         hasSbtSources,
         hasSurveySources,
         holdQuestionLoading,
         holdSbtLoading,
         holdSurveyLoading,
-        keepQuestionLoadingDuringDeepScan,
-        keepSurveyLoadingDuringDeepScan,
+        isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
         markLoading,
         prevState,
         questionSection,

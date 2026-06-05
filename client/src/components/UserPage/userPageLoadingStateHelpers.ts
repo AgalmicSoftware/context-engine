@@ -2,6 +2,7 @@ import {
   isPlainAnalysisObject,
   type UserPageUnknownRecord,
 } from './userPageCoreHelpers';
+import { buildUserPageDeepScanRefreshCarryPatch } from './userPageDeepScanHelpers';
 
 type UserPageLengthLike = {
   length: number;
@@ -73,12 +74,15 @@ export type BuildUserPageUserStatsMergePatchArgs = {
 export type BuildUserPageCacheRefreshStatePatchArgs = {
   aggregatePresent?: unknown;
   deepScanCarryPatch?: unknown;
+  deepScanProgressRows?: unknown;
+  deepScanTooltipLines?: unknown;
   hasQuestionSources?: unknown;
   hasSbtSources?: unknown;
   hasSurveySources?: unknown;
   holdQuestionLoading?: unknown;
   holdSbtLoading?: unknown;
   holdSurveyLoading?: unknown;
+  isDeepScanLoadingEnabledForSection?: ((section?: unknown) => unknown) | null;
   keepQuestionLoadingDuringDeepScan?: unknown;
   keepSurveyLoadingDuringDeepScan?: unknown;
   markLoading?: unknown;
@@ -603,15 +607,18 @@ const readRefreshSectionLength = (
 
 export const buildUserPageCacheRefreshStatePatch = ({
   aggregatePresent = false,
-  deepScanCarryPatch = {},
+  deepScanCarryPatch = undefined,
+  deepScanProgressRows = null,
+  deepScanTooltipLines = null,
   hasQuestionSources = false,
   hasSbtSources = false,
   hasSurveySources = false,
   holdQuestionLoading = false,
   holdSbtLoading = false,
   holdSurveyLoading = false,
-  keepQuestionLoadingDuringDeepScan = false,
-  keepSurveyLoadingDuringDeepScan = false,
+  isDeepScanLoadingEnabledForSection = null,
+  keepQuestionLoadingDuringDeepScan = undefined,
+  keepSurveyLoadingDuringDeepScan = undefined,
   markLoading = false,
   prevState = null,
   questionSection = null,
@@ -620,14 +627,32 @@ export const buildUserPageCacheRefreshStatePatch = ({
   uncertainResources = null,
 }: BuildUserPageCacheRefreshStatePatchArgs = {}): UserPageCacheRefreshStatePatchPlan => {
   const prev = isPlainAnalysisObject(prevState) ? prevState : {};
+  const sectionDeepScanLoadingEnabled = typeof isDeepScanLoadingEnabledForSection === 'function'
+    ? isDeepScanLoadingEnabledForSection
+    : null;
+  const resolvedKeepQuestionLoadingDuringDeepScan =
+    keepQuestionLoadingDuringDeepScan == null
+      ? !!sectionDeepScanLoadingEnabled?.('questions')
+      : !!keepQuestionLoadingDuringDeepScan;
+  const resolvedKeepSurveyLoadingDuringDeepScan =
+    keepSurveyLoadingDuringDeepScan == null
+      ? !!sectionDeepScanLoadingEnabled?.('surveys')
+      : !!keepSurveyLoadingDuringDeepScan;
+  const resolvedDeepScanCarryPatch = deepScanCarryPatch === undefined
+    ? buildUserPageDeepScanRefreshCarryPatch({
+        deepScanProgressRows,
+        deepScanTooltipLines,
+        prevState: prev,
+      })
+    : deepScanCarryPatch;
   const next: UserPageUnknownRecord = {};
   const userStatsPatch: UserPageUnknownRecord = {};
   const uncertaintyFlags = buildUserPageUncertaintyLoadingFlags({
     hasQuestionSources,
     hasSbtSources,
     hasSurveySources,
-    keepQuestionLoadingDuringDeepScan,
-    keepSurveyLoadingDuringDeepScan,
+    keepQuestionLoadingDuringDeepScan: resolvedKeepQuestionLoadingDuringDeepScan,
+    keepSurveyLoadingDuringDeepScan: resolvedKeepSurveyLoadingDuringDeepScan,
     prevState: prev,
     uncertainResources,
   });
@@ -653,7 +678,7 @@ export const buildUserPageCacheRefreshStatePatch = ({
     next.loadingSurveys = (
       keepSurveyLoadingFromUserUncertainty ||
       hasSurveyGateUncertainty ||
-      (!!keepSurveyLoadingDuringDeepScan && !!prev.isDeepScanning)
+      (resolvedKeepSurveyLoadingDuringDeepScan && !!prev.isDeepScanning)
     ) && readRefreshSectionLength(survey, 'surveyResponseInfo') === 0;
   } else if (holdSurveyLoading || markLoading || !aggregatePresent) {
     next.loadingSurveys = true;
@@ -669,7 +694,7 @@ export const buildUserPageCacheRefreshStatePatch = ({
     next.loadingQuestions = (
       keepQuestionLoadingFromUserUncertainty ||
       hasQuestionGateUncertainty ||
-      (!!keepQuestionLoadingDuringDeepScan && !!prev.isDeepScanning)
+      (resolvedKeepQuestionLoadingDuringDeepScan && !!prev.isDeepScanning)
     ) && readRefreshSectionLength(question, 'questionResponseInfo') === 0;
   } else if (holdQuestionLoading || markLoading || !aggregatePresent) {
     next.loadingQuestions = true;
@@ -684,8 +709,8 @@ export const buildUserPageCacheRefreshStatePatch = ({
     next.loadingSBTs = true;
   }
 
-  if (isPlainAnalysisObject(deepScanCarryPatch)) {
-    Object.assign(next, deepScanCarryPatch);
+  if (isPlainAnalysisObject(resolvedDeepScanCarryPatch)) {
+    Object.assign(next, resolvedDeepScanCarryPatch);
   }
 
   const userStatsMergePatch = buildUserPageUserStatsMergePatch({
@@ -701,10 +726,10 @@ export const buildUserPageCacheRefreshStatePatch = ({
       prevIsDeepScanning: prev.isDeepScanning,
       prevHasUncertainUserData: prev.hasUncertainUserData,
       preserveUserDataUncertainty,
-      keepSurveyLoadingDuringDeepScan,
+      keepSurveyLoadingDuringDeepScan: resolvedKeepSurveyLoadingDuringDeepScan,
       keepSurveyLoadingFromUserUncertainty,
       hasSurveyGateUncertainty,
-      keepQuestionLoadingDuringDeepScan,
+      keepQuestionLoadingDuringDeepScan: resolvedKeepQuestionLoadingDuringDeepScan,
       keepQuestionLoadingFromUserUncertainty,
       hasQuestionGateUncertainty,
       loadingSurveys: next.loadingSurveys,
