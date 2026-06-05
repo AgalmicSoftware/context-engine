@@ -220,6 +220,18 @@ describe('userPageGateHelpers', () => {
       shouldPreserveStatusWhileRevalidating: false,
       shouldSetCheckingStatus: true,
     });
+
+    expect(buildUserPageGateAccessCheckPlan({
+      cachedStatus: 'granted',
+      cachedTs: nowMs - 10_000,
+      hasCachedEntry: true,
+      terminalRecheckMs,
+      unknownRetryMs,
+    })).toEqual(expect.objectContaining({
+      action: 'execute',
+      cachedAgeMs: Number.POSITIVE_INFINITY,
+      shouldPreserveStatusWhileRevalidating: true,
+    }));
   });
 
   it('detects encrypted response fields and payload audiences', () => {
