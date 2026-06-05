@@ -3,6 +3,7 @@ import type {
 } from './surveyResultsCacheWriteEligibilityPlan';
 import type {
   SurveyResultsAnalysisArtifactCacheWritePort,
+  SurveyResultsAnalysisArtifactCacheTarget,
 } from './surveyResultsAnalysisArtifactCachePorts';
 
 type SurveyResultsRecord = Record<string, unknown>;
@@ -22,17 +23,14 @@ export type SurveyResultsAnalysisArtifactWriteControllerResult = {
   attempted: boolean;
   error: unknown | null;
   ok: boolean;
-  target: {
-    namespace: 'analysisCache';
-    slug: string;
-    cacheKey: string;
-  };
+  target: SurveyResultsAnalysisArtifactCacheTarget;
 };
 
 const EMPTY_TARGET = Object.freeze({
   namespace: 'analysisCache' as const,
   slug: '',
   cacheKey: '',
+  inputSignature: '',
 });
 
 export const runSurveyResultsAnalysisArtifactWriteController = async ({

@@ -24,6 +24,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
       artifact,
       cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:new-input',
       currentCache,
+      inputSignature: 'new-input',
       slug: 'alpha-session',
     });
 
@@ -43,6 +44,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'alpha-session',
         cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:new-input',
+        inputSignature: 'new-input',
       },
     });
     expect(currentCache.sessionResultsAnalysis).toEqual({
@@ -79,6 +81,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'beta-session',
         cacheKey: 'sessionResultsAnalysis:v1:Base Sepolia:retry-input',
+        inputSignature: '',
       },
     });
   });
@@ -143,6 +146,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
           namespace: 'analysisCache',
           slug: 'payload-session',
           cacheKey,
+          inputSignature: '',
         },
       });
     });
@@ -161,6 +165,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: '',
         cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+        inputSignature: '',
       },
     });
 
@@ -181,6 +186,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: '',
         cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing',
+        inputSignature: '',
       },
     });
 
@@ -196,6 +202,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'gamma-session',
         cacheKey: '',
+        inputSignature: '',
       },
     });
 
@@ -211,6 +218,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'gamma-session',
         cacheKey: '',
+        inputSignature: '',
       },
     });
   });
@@ -222,6 +230,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         kind: 'ce_session_results_analysis_artifact',
       },
       cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+      inputSignature: 'ready-input',
       slug: 'ready-session',
     })).toEqual({
       blockedReason: '',
@@ -231,6 +240,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'ready-session',
         cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+        inputSignature: 'ready-input',
       },
     });
   });
@@ -258,6 +268,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: '',
         cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:missing-route-input',
+        inputSignature: '',
       },
     });
 
@@ -274,6 +285,7 @@ describe('surveyResultsCacheWriteEligibilityPlan', () => {
         namespace: 'analysisCache',
         slug: 'missing-key-session',
         cacheKey: '',
+        inputSignature: '',
       },
     });
   });

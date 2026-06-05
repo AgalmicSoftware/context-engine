@@ -8,6 +8,7 @@ import {
 } from './surveyResultsAnalysisLifecyclePlan';
 import {
   buildSurveyResultsAnalysisArtifactCacheTarget,
+  type SurveyResultsAnalysisArtifactCacheTarget,
 } from './surveyResultsAnalysisArtifactCachePorts';
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionPlanArgs = {
@@ -31,11 +32,7 @@ export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheBlockedReason =
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionCacheWriteDescriptor = {
   payload: SessionResultsGeneratedAnalysisArtifact;
-  target: {
-    namespace: 'analysisCache';
-    slug: string;
-    cacheKey: string;
-  };
+  target: SurveyResultsAnalysisArtifactCacheTarget;
 };
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionPayloadDescriptor = {
@@ -164,6 +161,7 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
           namespace: target.namespace,
           slug: target.slug,
           cacheKey: target.cacheKey,
+          inputSignature: target.inputSignature,
         },
       },
     failurePatchDescriptor: null,
