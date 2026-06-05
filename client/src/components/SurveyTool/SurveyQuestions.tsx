@@ -67,7 +67,6 @@ import {
   applyQuestionDecryptFailureStatus as applyQuestionDecryptFailureStatusHelper,
   applySurveyDecryptStaleStatus as applySurveyDecryptStaleStatusHelper,
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
-  applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
   buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
   buildDecryptTaskKey as buildDecryptTaskKeyHelper,
@@ -86,11 +85,9 @@ import {
   buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
   buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
   buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
-  buildEmptyQuestionDecryptSlice as buildEmptyQuestionDecryptSliceHelper,
   buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
   buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
   clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
-  collectQuestionRatingEnvelopesByQid as collectQuestionRatingEnvelopesByQidHelper,
   buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
   buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
   decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
@@ -108,7 +105,6 @@ import {
   mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
   mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
   mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
-  carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
   normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
   normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
   ownsQuestionDecryptBusyTokens as ownsQuestionDecryptBusyTokensHelper,
@@ -1288,11 +1284,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     options = {},
   ) => applyDecryptedQuestionResponseValuesHelper(responseRecord, options);
 
-  applyDecryptedQuestionResponseValuesToContainer = (
-    viewedResponseContainer,
-    options = {},
-  ) => applyDecryptedQuestionResponseValuesToContainerHelper(viewedResponseContainer, options);
-
   applyDecryptedQuestionStateToSurveySlice = (
     targetStateSlice,
     options = {},
@@ -1338,14 +1329,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     questionId,
     responseOverride,
   ) => mergeQuestionResponseOverrideIntoDecryptSliceHelper(responseSlice, questionId, responseOverride);
-
-  collectQuestionRatingEnvelopesByQid = (source) =>
-    collectQuestionRatingEnvelopesByQidHelper(source);
-
-  carryForwardSurveyQuestionRatings = (
-    sourceSlice,
-    previousStateSlice = null,
-  ) => carryForwardSurveyQuestionRatingsHelper(sourceSlice, previousStateSlice);
 
   buildSurveyDecryptSourceState = (
     latestResponse = null,
@@ -1481,8 +1464,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     fieldToDecrypt,
     errorMessage,
   );
-
-  buildEmptyQuestionDecryptSlice = () => buildEmptyQuestionDecryptSliceHelper();
 
   ensureQuestionDecryptSliceShape = (responseSlice) =>
     ensureQuestionDecryptSliceShapeHelper(responseSlice);
