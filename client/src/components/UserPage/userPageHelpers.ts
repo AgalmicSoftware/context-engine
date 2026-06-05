@@ -151,6 +151,7 @@ export {
   buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptRequestPlan,
