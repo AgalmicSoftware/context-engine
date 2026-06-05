@@ -2,6 +2,7 @@ import {
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
   resolveSingleQuestionCacheBootstrapFlowPlan,
+  resolveSingleQuestionCacheBootstrapStopHandlingPlan,
 } from './surveyToolSingleQuestionCacheBootstrapController';
 
 type TestQuestionsCache = Record<string, {
@@ -148,6 +149,106 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       isLoadingResponse: true,
     });
     expect(mergeSurveyResponseState).toHaveBeenCalledTimes(1);
+  });
+
+  it('plans retry stop handling without scheduling retries or applying state', () => {
+    const cacheBootstrapPlan = resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: {
+        status: 'seeded-from-recent',
+        cacheState: null,
+        questionData: { id: 'q1', prompt: 'recent' },
+        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+        shouldBootstrapViewedResponse: true,
+        fallbackNetId: '',
+      },
+    });
+
+    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+      bootstrapRetryAttempt: 2,
+      cacheBootstrapPlan,
+      effectiveSingleSlug: 'edge',
+      questionId: 'Q1',
+      responderAddress: '0xABCD',
+      runId: 17,
+    })).toEqual({
+      action: 'retry',
+      retryRequest: {
+        questionId: 'q1',
+        attempt: 2,
+        reason: 'recent-payload-waiting-for-response-bootstrap',
+      },
+      retryOutcome: null,
+    });
+
+    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+      bootstrapRetryAttempt: 2,
+      cacheBootstrapPlan,
+      didScheduleRetry: false,
+      effectiveSingleSlug: 'edge',
+      questionId: 'Q1',
+      responderAddress: '0xABCD',
+      runId: 17,
+    })).toEqual({
+      action: 'retry',
+      retryRequest: {
+        questionId: 'q1',
+        attempt: 2,
+        reason: 'recent-payload-waiting-for-response-bootstrap',
+      },
+      retryOutcome: {
+        debugPayload: {
+          phase: 'recent-payload-response-bootstrap-exhausted',
+          runId: 17,
+          questionId: 'q1',
+          effectiveSingleSlug: 'edge',
+          responderAddress: '0xabcd',
+          retryAttempt: 2,
+          didScheduleRetry: false,
+        },
+        exhaustedStatePatch: {
+          viewAddressAnswers: '',
+          parsedViewAddressAnswers: null,
+          noResponse: true,
+          responseLookupWarning: '',
+          isLoadingResponse: false,
+        },
+        shouldClearRetry: true,
+      },
+    });
+  });
+
+  it('plans fallback stop handling without logging or mutating parent state', () => {
+    const cacheBootstrapPlan = resolveSingleQuestionCacheBootstrapFlowPlan({
+      cacheBootstrapResult: {
+        status: 'seeded-from-recent',
+        cacheState: null,
+        questionData: { id: 'q1', prompt: 'recent' },
+        recentPayloadForAccount: { id: 'q1', prompt: 'recent' },
+        shouldBootstrapViewedResponse: false,
+        fallbackNetId: '',
+      },
+    });
+
+    expect(resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+      bootstrapRetryAttempt: 3,
+      cacheBootstrapPlan,
+      effectiveSingleSlug: 'edge',
+      questionId: 'Q1',
+      runId: 18,
+    })).toEqual({
+      action: 'fallback',
+      debugPayload: {
+        phase: 'recent-payload-missing-network',
+        runId: 18,
+        questionId: 'q1',
+        effectiveSingleSlug: 'edge',
+        retryAttempt: 3,
+      },
+      fallbackStatePatch: { isLoadingResponse: false },
+      logMissingCacheState: false,
+      preserveCurrentPoolPatch: null,
+      shouldApplyFallbackStatePatch: true,
+    });
   });
 
   it("returns 'ready' when cache state resolves immediately and no recent payload exists", async () => {

@@ -398,6 +398,7 @@ import {
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
   resolveSingleQuestionCacheBootstrapFlowPlan,
+  resolveSingleQuestionCacheBootstrapStopHandlingPlan,
 } from './surveyToolSingleQuestionCacheBootstrapController';
 import {
   buildSingleQuestionEncryptedMetadataPlaceholder,
@@ -5335,13 +5336,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       effectiveSingleSlug,
       responderAddress: String(responderAddress || ''),
       account: String(this.props.account || ''),
-      resolveCacheState: (slug) => resolveSingleQuestionCacheState({
-        slug,
-        questionId,
-        resolveQuestionBootstrapContext: (nextSlug) => resolveQuestionBootstrapContext(this.props, nextSlug),
-        readQuestionsCacheAsync,
-        ensureQuestionsNet,
-      }),
+      resolveCacheState: getCacheStateForSlug,
       readRecentPayload: readRecentQuestionPayload,
       canUseRecentPayload: canUseRecentQuestionPayloadForAccount,
       resolveBootstrapNetworkId: (slug) => resolveQuestionBootstrapContext(this.props, slug).networkIdStr || '',
@@ -5372,55 +5367,49 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (isStaleRun()) return;
 
     if (cacheBootstrapPlan.action === 'stop') {
-      if (cacheBootstrapPlan.retryPlan) {
-        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
-          questionId,
-          attempt: bootstrapRetryAttempt,
-          reason: cacheBootstrapPlan.retryPlan.reason,
-        });
-        this.updateSingleQuestionDebug({
-          phase: didScheduleRetry
-            ? cacheBootstrapPlan.retryPlan.retryingPhase
-            : cacheBootstrapPlan.retryPlan.exhaustedPhase,
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          responderAddress: String(responderAddress || '').toLowerCase(),
-          retryAttempt: bootstrapRetryAttempt,
-          didScheduleRetry: !!didScheduleRetry,
-        });
-        if (!didScheduleRetry) {
+      const stopPlanContext = {
+        bootstrapRetryAttempt,
+        cacheBootstrapPlan,
+        effectiveSingleSlug,
+        questionId,
+        responderAddress,
+        runId,
+      };
+      const stopHandlingPlan = resolveSingleQuestionCacheBootstrapStopHandlingPlan(stopPlanContext);
+      if (stopHandlingPlan.action === 'retry') {
+        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry(stopHandlingPlan.retryRequest);
+        const retryOutcome = resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+          ...stopPlanContext,
+          didScheduleRetry,
+        }).retryOutcome;
+        if (retryOutcome?.debugPayload) {
+          this.updateSingleQuestionDebug(retryOutcome.debugPayload);
+        }
+        if (retryOutcome?.shouldClearRetry) {
           this.clearSingleQuestionBootstrapRetry();
-          safeSetState(cacheBootstrapPlan.retryPlan.exhaustedStatePatch);
+          safeSetState(retryOutcome.exhaustedStatePatch);
         }
         return;
       }
 
-      if (cacheBootstrapPlan.debugPhase) {
-        const debugPayload = {
-          phase: cacheBootstrapPlan.debugPhase,
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          ...(cacheBootstrapPlan.debugPhase === 'recent-payload-missing-network'
-            ? { retryAttempt: bootstrapRetryAttempt }
-            : {}),
-        };
-        this.updateSingleQuestionDebug({
-          ...debugPayload,
-        });
-      }
-      if (cacheBootstrapPlan.logMissingCacheState) {
-        surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
-      }
-      if (cacheBootstrapPlan.preserveCurrentPoolPatch) {
-        if (preserveCurrentSingleQuestionPool(cacheBootstrapPlan.preserveCurrentPoolPatch)) {
-          return;
+      if (stopHandlingPlan.action === 'fallback') {
+        if (stopHandlingPlan.debugPayload) {
+          this.updateSingleQuestionDebug(stopHandlingPlan.debugPayload);
         }
+        if (stopHandlingPlan.logMissingCacheState) {
+          surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
+        }
+        if (stopHandlingPlan.preserveCurrentPoolPatch) {
+          if (preserveCurrentSingleQuestionPool(stopHandlingPlan.preserveCurrentPoolPatch)) {
+            return;
+          }
+        }
+        if (stopHandlingPlan.shouldApplyFallbackStatePatch) {
+          safeSetState(stopHandlingPlan.fallbackStatePatch);
+        }
+        return;
       }
-      if (cacheBootstrapPlan.fallbackStatePatch && Object.keys(cacheBootstrapPlan.fallbackStatePatch).length > 0) {
-        safeSetState(cacheBootstrapPlan.fallbackStatePatch);
-      }
+
       return;
     }
 
