@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faExternalLinkAlt, faImage, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faImage, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -15,7 +15,7 @@ import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
-import ContractsSection from './ContractsSection';
+import SessionWizardContractsField from './SessionWizardContractsField';
 import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
@@ -100,10 +100,6 @@ import {
 } from './sessionWizardWriteNormalization.js';
 import {
   buildContractsPageHref,
-  getContractExplainer,
-  getSessionWizardContractModalTriggerTestId,
-  getSessionWizardContractRowTestId,
-  getSessionWizardContractTooltipTestId,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import usePendingSbtDrafts, {
@@ -251,7 +247,6 @@ import {
 import {
   buildSponsoredSbtLookupContextKey,
   deepClone,
-  formatContractLabel,
   generateSessionId,
   getChainName,
 } from './sessionWizardCoreUtils';
@@ -2569,7 +2564,7 @@ const SessionWizard = ({
       const visibleKeys = getVisibleSessionWizardContractKeys(contracts, defaults);
       const isCollapsed = metadataObjectCollapsed.contracts;
       return (
-        <ContractsSection
+        <SessionWizardContractsField
           key={keyString}
           title={displayLabel}
           contracts={contracts}
@@ -2579,51 +2574,11 @@ const SessionWizard = ({
           onToggleCollapsed={() =>
             setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
           }
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          renderContractEntry={(contractKey) => {
-            const entry = contracts[contractKey] || {};
-            const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
-            const contractTooltipId = `gw-contract-tooltip-${contractKey}`;
-            const contractLabel = formatContractLabel(contractKey);
-            return (
-              <div
-                key={contractKey}
-                className={styles.contractRow}
-                data-testid={getSessionWizardContractRowTestId(contractKey)}
-              >
-                <div className={styles.contractRowHeader}>
-                  <div className={styles.contractLabelActions}>
-                    <div className={styles.contractLabel}>{contractLabel}</div>
-                    <div className={styles.contractActions}>
-                      {renderSessionWizardInfoTooltip({
-                        id: contractTooltipId,
-                        content: getContractExplainer(contractKey),
-                        placement: 'right',
-                        testId: getSessionWizardContractTooltipTestId(contractKey),
-                        ariaLabel: `${contractLabel} contract info`,
-                      })}
-                      <button
-                        type="button"
-                        className={`${styles.iconButton} ${styles.contractActionButton}`}
-                        onClick={() => openContractViewerModal(contractKey)}
-                        aria-label={`Open ${contractLabel} contract details`}
-                        title={`Open ${contractLabel} contract details`}
-                        data-testid={getSessionWizardContractModalTriggerTestId(contractKey)}
-                      >
-                        <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <Input
-                  className={styles.contractInput}
-                  value={address}
-                  placeholder="0x..."
-                  onChange={(e) => updateDraftValue(['contracts', contractKey, 'address'], e.target.value)}
-                />
-              </div>
-            );
-          }}
+          onAddressChange={(contractKey, address) =>
+            updateDraftValue(['contracts', contractKey, 'address'], address)
+          }
+          onOpenContractViewer={openContractViewerModal}
+          renderInfoTooltip={renderSessionWizardInfoTooltip}
         />
       );
     }
