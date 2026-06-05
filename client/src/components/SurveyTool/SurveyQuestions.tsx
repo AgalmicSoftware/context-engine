@@ -6,13 +6,11 @@ import {
   Dropdown,
   DropdownToggle,
   DropdownMenu,
-  DropdownItem,
   FormGroup,
   Label,
   Input,
   Card,
   CardBody,
-  InputGroupText,
   ModalHeader,
   ModalBody,
   ModalFooter,
@@ -135,10 +133,8 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { ethers, utils } from 'ethers';
-import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { createLogger } from 'utilities/logging.js';
@@ -223,11 +219,6 @@ import {
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
-import {
-  normalizeRatingValue,
-  RATING_MAX,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
 
 import {
   EMPTY_QUESTION_POOL,
@@ -4380,19 +4371,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     },
   });
 
-  resolveUserAnswersBaselineSlice = () => {
-    const {
-      slice,
-      nextCache,
-    } = resolveSurveyUserAnswersSlice({
-      userAnswers: this.state.userAnswers,
-      userAnswersSliceCache: this._userAnswersSliceCache,
-      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-    });
-    this._userAnswersSliceCache = nextCache;
-    return slice;
-  };
-
   resolveDiffBaselineSlice = (allowLocalCache = false) => {
     const {
       baselineSlice,
@@ -4407,17 +4385,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
     this._userAnswersSliceCache = nextUserAnswersSliceCache;
     return baselineSlice;
-  };
-
-  // Check if a slice is effectively empty
-  isSliceEmpty = (slice) => {
-    if (!slice) return true;
-    const hasVal = (v) => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).length > 0);
-    if (Object.values(slice.answers || {}).some(a => hasVal(a?.value))) return false;
-    if (Object.values(slice.additionalComments || {}).some(a => hasVal(a?.value))) return false;
-    if (Object.keys(slice.importance || {}).length > 0) return false;
-    if (Object.keys(slice.conviction || {}).length > 0) return false;
-    return true;
   };
 
 
@@ -5147,25 +5114,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     safe({ isLoadingResponse: false });
   }
-
-  getQuestionResponse = async (responderAddress, questionId) => {
-    surveyLog.log(
-      "SurveyQuestions: getQuestionResponse() - invoked with questionId:",
-      questionId
-    );
-    // Use the same slug resolution as drafts/decrypt in single-question flows
-    const slug = this._getEffectiveDraftSlug();
-    const questionAnswer = await contractScripts.getResponse(
-      this.props.provider,
-      responderAddress,
-      questionId,
-      slug
-    );
-    surveyLog.log("SurveyQuestions: questionAnswer: ", questionAnswer);
-    return questionAnswer;
-  };
-
-
 
   // Prefill single-question draft from prior response.
   // Hydrates encrypted: true for previously encrypted fields.
@@ -6118,16 +6066,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  getQuadraticVoteCost = (votes) => {
-    const value = Number(votes) || 0;
-    return value * value;
-  };
-
-  getQuadraticVoteWeight = (credits) => {
-    const value = Number(credits) || 0;
-    return Math.sqrt(Math.max(0, value));
-  };
-
   /**
    * Toggle encryption for the main answer field.
    * Signature must remain: (surveyIndex, questionId, newEncryptedState)
@@ -6212,11 +6150,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
 
-
-  toggleShowJson = () => {
-    this.setState(toggleShowJsonState);
-  };
-
   toggleDisplayAnswerMode = () => {
     this.setState(
       prevState => ({
@@ -6236,15 +6169,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         this.updateJsonPreview();
       }
     );
-  };
-
-  handleUpdateResponse = async () => {
-    if (this.state.isEditing) {
-      await this.encryptAndUpload();
-      this.setState(buildResponseEditCompleteState());
-    } else {
-      this.handleDecryptEdit();
-    }
   };
 
   handleShowJsonAtBottom = () => {
@@ -8409,34 +8333,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       />
     );
   };
-
-  renderSingleQuestionAnswer = (question, response, isOwnResponse) => {
-    if (!question || !response) {
-      surveyLog.warn('renderSingleQuestionAnswer: question or response is undefined');
-      return null;
-    }
-    const promptReloading = this.isQuestionFieldBusy(question.id, 'prompt');
-    return (
-      <SingleQuestionResponse
-        question={question}
-        response={response}
-        isOwnResponse={isOwnResponse}
-        canDecryptOtherResponses={this.state.canDecryptOtherResponses}
-        mode="fullscreen"
-        sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
-        activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={this.handleDecryptQuestionAnswer}
-        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
-        promptReloading={promptReloading}
-        showImportance={true}
-        provider={this.props.provider}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionsCacheNonce={this.props.questionsCacheNonce || this.state.questionsCacheNonce}
-        sbtCacheRevision={this.props.sbtCacheRevision}
-      />
-    );
-  };
-
 
   hasEncryptedAnswers = () => {
     const stats =
