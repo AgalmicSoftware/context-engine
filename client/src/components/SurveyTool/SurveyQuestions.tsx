@@ -7030,8 +7030,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return policy;
   };
 
-  getResponseGateRecipientSpecs = () => this.getResponseGatePolicy().recipients;
-
   getQuestionLookupMap = () => {
     const stateQuestionPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : null;
     const statePileQuestions = Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : null;
@@ -7189,7 +7187,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return Array.isArray(policy?.recipients) ? policy.recipients : [];
   };
 
-  hasDefaultResponseGateRecipients = () => this.getResponseGateRecipientSpecs().length > 0;
+  hasDefaultResponseGateRecipients = () => {
+    const recipients = this.getResponseGatePolicy()?.recipients;
+    return Array.isArray(recipients) && recipients.length > 0;
+  };
 
   getDefaultResponseEncryptionAudience = () => (
     this.hasDefaultResponseGateRecipients() ? 'gate' : 'self'
@@ -7207,8 +7208,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
       hasDefaultGateRecipients: () => this.hasDefaultResponseGateRecipients(),
     });
-
-  getDefaultResponseEncryptionEnabled = () => this.getDefaultResponseEncryptionAudience() === 'gate';
 
   buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') =>
     buildEmptyResponseFieldStateCore(questionId, fieldKey, {

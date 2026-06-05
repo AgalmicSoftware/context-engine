@@ -88,7 +88,10 @@ describe('SurveyPileViewMode gated empty states', () => {
       decryptingByKey: {},
       canDecryptOtherResponsesStatus: 'needs-wallet',
     };
-    subject.getResponseGateRecipientSpecs = jest.fn(() => ([{ type: 'lit-sbt-v1' }]));
+    subject.getResponseGatePolicy = jest.fn(() => ({
+      recipients: [{ type: 'lit-sbt-v1' }],
+      allowFallbackConditions: true,
+    }));
     subject.setState = jest.fn((update, cb) => {
       const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
       if (patch && typeof patch === 'object') {
