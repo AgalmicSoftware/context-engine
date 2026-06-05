@@ -2,12 +2,12 @@
 /** @file SessionWizard.tsx */
 // Temporary: this file is mid-migration from JSX to TSX. Keep the runtime
 // unblocked while we restore strict typing in smaller, reviewable slices.
-import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faImage, faSpinner, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faImage, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
@@ -20,7 +20,6 @@ import SessionWizardStorageProfileField from './SessionWizardStorageProfileField
 import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
-import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -34,7 +33,6 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import {
-  hasSponsoredBundleFields,
   normalizeSparseSponsoredBundlePayload,
 } from '../../utilities/arweave/sponsoredBundles.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
@@ -81,22 +79,15 @@ import {
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
 import {
-  buildWorkerSecretsPayload,
   resolveWorkerSecretsSnapshot,
-  syncWorkerConfigAfterPartialDeploy,
-  syncWorkerSecretsAfterDeploy,
-  withSecretsSyncStatus,
-  withWorkerConfigSyncWarning,
 } from './sessionWizardSecrets.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
   buildSessionWizardRegistrySessionFields,
-  buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import {
@@ -139,10 +130,6 @@ import {
 } from './sessionWizardPublishController';
 import { resolveSessionWizardPublishReadiness } from './sessionWizardPublishReadiness';
 import {
-  normalizeSessionWizardDeployErrorMessage,
-  withSessionWizardDeployHelperWorkersDevStatus,
-} from './sessionWizardDeployErrors';
-import {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
   resolveSessionWizardWorkerVerificationUiState,
@@ -171,7 +158,6 @@ import {
   promotePendingSbtSelectionsAfterDeploy,
   serializeDefaultFeaturedSbtSelections,
 } from './sessionWizardSbtSelections';
-import type { PendingSbtDraftLike } from './sessionWizardSbtSelections';
 import {
   FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID,
   FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE,
@@ -182,7 +168,6 @@ import {
   persistSessionWizardSbtRecoveryCodes,
 } from './sessionWizardPendingSbtPublish';
 import {
-  DEFAULT_GATE_KEYS,
   areSbtSelectionsEqual,
   buildDefaultGateState,
   buildEmptyProvisionedSponsoredContext,
@@ -201,7 +186,6 @@ import {
 import {
   cacheSessionWorkerConfigAfterDeploy,
   resolveSponsoredBundleAdvancedFieldNotices,
-  resolveSponsoredBundleBootstrapWorkerUrl,
 } from './sessionWizardSponsoredBundleSupport';
 import {
   __test__resetSessionWizardSponsoredBundleCacheKey,
@@ -223,8 +207,6 @@ import {
   __test__getSessionWizardDefaultAiSettings,
   __test__isSessionWizardDevMode,
   DEV_PERSIST_WORKER_SECRETS,
-  LOCAL_WORKER_BUNDLE_FALLBACK_PICKER_HELP,
-  LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP,
   MANUAL_BUNDLE_URL_OVERRIDE_HELP,
   METADATA_FIELD_ORDER,
   NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
@@ -264,7 +246,6 @@ import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
   readSessionWizardNewSessionBannerDismissed,
-  scrubSponsoredBundleHashSecret,
   writeSessionWizardNewSessionBannerDismissed,
 } from './sessionWizardRouteState';
 import {
@@ -292,7 +273,6 @@ import {
   buildSessionWizardGateOptions,
   normalizeSessionWizardGateIds as normalizeGateIds,
   resolveSessionWizardResourceGate as resolveResourceGate,
-  resolveSessionWizardResourceGateIds,
 } from './sessionWizardResourceGateSupport';
 import {
   buildSessionWizardCreateSbtModalLaunchState,
@@ -313,7 +293,6 @@ import {
 import type {
   ChainIdLike,
   NetworkLike,
-  SessionConfigLike,
   SessionContractsLike,
   WorkerSecretsLike,
 } from '../shellTypes';
