@@ -1,6 +1,6 @@
 /** @file SurveyResults.tsx */
 
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import {
   Form,
@@ -39,7 +39,6 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import PolisReport from '../PolisReport/PolisReport';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -60,7 +59,6 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
-import LazyFallback from '../Shared/LazyFallback';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
@@ -238,6 +236,7 @@ import {
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
 import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
 import { renderSurveyResultsHtmlReportExportModal } from './SurveyResultsHtmlReportExportModal';
+import SurveyResultsDemoSurface from './SurveyResultsDemoSurface';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
@@ -254,9 +253,6 @@ export {
 } from './surveyResultsHelpers.js';
 
 const surveyLog = createLogger('surveys');
-const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
-const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
-const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const LATEST_BLOCK_POLL_THROTTLE_MS = 8000;
 const RESPONSE_PARSE_MEMO_MAX_SIZE = 500;
 const LOCAL_STORAGE_POLL_MIN_MS = 2000;
@@ -265,7 +261,6 @@ const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
 type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
-const DebateMapForSurveyResults = DebateMap as React.ComponentType<SurveyResultsRecord>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
 type SurveyResultsScopeContextInput = {
   props?: SurveyResultsRecord;
@@ -1947,70 +1942,6 @@ class SurveyResults extends Component<any, any> {
   handleDemoAtlasModalClose = (): void => {
     if (!this.state.demoResultsAtlasNodeId) return;
     this.setState(buildSurveyResultsDemoAtlasNodePatch());
-  };
-
-  renderDemoResultsSurface = (viewKey: unknown = 'report'): React.ReactNode => {
-    const activeSlug = this.getEffectiveSlug();
-    if (viewKey === 'report') {
-      return (
-        <div id="polisReportSection">
-          <PolisReport
-            questionResponses={this.getMemoizedPolisQuestionResponses(
-              true,
-              this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
-                ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
-                : (this.state.sbtFilteredAggregatorQuestionResponses || {})
-            )}
-            network={this.props.network}
-            networkChainId={this.props.networkChainId}
-            disclaimersActive={true}
-            filterState={this.props.filterState || this.state.filterState}
-            defaultTags={this.props.defaultTags}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            questionScanProgress={this.props.questionScanProgress}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            slug={activeSlug}
-          />
-        </div>
-      );
-    }
-
-    if (viewKey === 'breakdown') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Breakdown..." minHeight="30vh" />}>
-          <DemoAnalysisWorkspace sessionSlug={activeSlug} />
-        </Suspense>
-      );
-    }
-
-    if (viewKey === 'atlas') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Atlas..." minHeight="30vh" />}>
-          <div className={styles.demoResultsAtlasSurface}>
-            <DebateMapForSurveyResults
-              activeSessionSlug={activeSlug}
-              demoMode={true}
-              embedded={true}
-              requestedModalNodeId={this.state.demoResultsAtlasNodeId}
-              onModalClose={this.state.demoResultsAtlasNodeId ? this.handleDemoAtlasModalClose : null}
-            />
-          </div>
-        </Suspense>
-      );
-    }
-
-    if (viewKey === 'riskMatrix') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-          <div className={styles.demoResultsRiskMatrixSurface}>
-            <RiskMatrix embedded={true} onOpenAtlasNode={this.handleDemoAtlasOpen} />
-          </div>
-        </Suspense>
-      );
-    }
-
-    return null;
   };
 
   handleClearFiltersFromParent = (e: React.SyntheticEvent): void => {
@@ -5268,7 +5199,27 @@ return (
           className={styles.demoResultsSurface}
           data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
         >
-          {this.renderDemoResultsSurface(demoResultsViewMode)}
+          <SurveyResultsDemoSurface
+            activeSlug={this.getEffectiveSlug()}
+            atlasNodeId={this.state.demoResultsAtlasNodeId}
+            defaultTags={this.props.defaultTags}
+            filterState={this.props.filterState || this.state.filterState}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            network={this.props.network}
+            networkChainId={this.props.networkChainId}
+            onAtlasModalClose={this.handleDemoAtlasModalClose}
+            onAtlasNodeOpen={this.handleDemoAtlasOpen}
+            questionResponses={this.getMemoizedPolisQuestionResponses(
+              true,
+              this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+                ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+                : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+            )}
+            questionResponsesNonce={this.props.questionResponsesNonce}
+            questionScanProgress={this.props.questionScanProgress}
+            viewKey={demoResultsViewMode}
+          />
         </div>
       ) : (
         <>
