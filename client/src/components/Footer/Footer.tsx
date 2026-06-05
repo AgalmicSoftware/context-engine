@@ -121,11 +121,6 @@ class Footer extends React.Component<FooterProps> {
               </ul>
             </nav>
             <div className={styles.copyright}>
-              {/* CPAL-1.0 Attribution (Exhibit B)
-                  This line serves as both org branding and the required CPAL attribution.
-                  Required by LICENSE Exhibit B. Do not remove in OSS builds.
-                  Commercial builds with paid CPAL exception may replace or remove.
-                  To update: change text here AND in LICENSE Exhibit B. */}
               <span
                 className="copyright-link"
                 data-testid="ce-footer-brand-attribution"
