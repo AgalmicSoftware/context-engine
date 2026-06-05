@@ -502,6 +502,95 @@ describe('SurveyResults export/view controls', () => {
     expect(downloadButton?.props?.className).toBe(styles.htmlReportDownloadButton);
   });
 
+  it('pins HTML report readiness to snapshot availability and selected section identity without side effects', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      sessionName: 'Readiness Session',
+      sessionSlug: 'readiness-session',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      htmlReportAnalysisArtifact: {
+        generatedAt: '2026-05-25T18:30:00.000Z',
+        inputSignature: 'stale-artifact-missing-kind',
+        sections: {
+          argumentMap: { available: true, debates: [] },
+          atlas: { available: true, edges: [], nodes: [] },
+          breakdown: { available: true, dimensions: [], groups: [], summary: {} },
+          riskMatrix: { available: true, categories: [], comments: [], heatmap: {}, scenarioLinks: [] },
+        },
+      },
+      htmlReportAnalysisGenerating: false,
+      htmlReportModalOpen: true,
+      htmlReportSelectedSections: {
+        argumentMap: true,
+        atlas: false,
+        report: true,
+        riskMatrix: false,
+        snapshotJson: false,
+      },
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Which sections are ready?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    const snapshot = subject.buildSessionResultsHtmlReportSnapshot('2026-05-25T18:30:00.000Z');
+    const selectedSections = subject.getHtmlReportSelectedSections();
+
+    expect(subject.getHtmlReportAnalysisArtifact()).toBeNull();
+    expect(subject.getHtmlReportSectionAvailability(snapshot)).toEqual({
+      argumentMap: false,
+      atlas: false,
+      report: true,
+      riskMatrix: false,
+      snapshotJson: true,
+    });
+    expect(subject.getHtmlReportSectionRows(snapshot)).toEqual([
+      { available: true, key: 'report', label: 'Report', reason: 'Ready' },
+      { available: false, key: 'argumentMap', label: 'Argument Map', reason: 'Needs analysis' },
+      { available: false, key: 'riskMatrix', label: 'Risk Matrix', reason: 'Needs analysis' },
+      { available: false, key: 'atlas', label: 'Atlas Nodes', reason: 'Needs analysis' },
+      { available: true, key: 'snapshotJson', label: 'Embedded Snapshot JSON', reason: 'Always available' },
+    ]);
+    expect(subject.hasHtmlReportExportableSections(snapshot, selectedSections)).toBe(true);
+    expect(subject.hasHtmlReportUnavailableSelectedSections(snapshot, selectedSections)).toBe(true);
+    expect(subject.needsHtmlReportAnalysisGeneration(snapshot, selectedSections)).toBe(true);
+    expect(subject.canDownloadHtmlReport(snapshot, selectedSections)).toBe(false);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+  });
+
   it('enables demo preview mode with local analysis sections without a connected wallet', () => {
     const subject = attachStateHarness(createSubject({
       isOpen: true,
