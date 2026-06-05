@@ -1,5 +1,6 @@
 import {
   buildSurveyResultsAnalysisArtifactCacheKey,
+  buildSurveyResultsAnalysisArtifactCacheTarget,
   buildSurveyResultsAnalysisArtifactCacheReadRequestPlan,
   selectSurveyResultsAnalysisArtifactFromCache,
 } from './surveyResultsAnalysisArtifactCachePorts';
@@ -35,6 +36,17 @@ describe('surveyResultsAnalysisArtifactCachePorts', () => {
   });
 
   it('derives a typed sync read request without performing cache execution', () => {
+    expect(buildSurveyResultsAnalysisArtifactCacheTarget({
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+      inputSignature: 'ready-input',
+      slug: 'alpha-session',
+    })).toEqual({
+      namespace: 'analysisCache',
+      slug: 'alpha-session',
+      cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
+      inputSignature: 'ready-input',
+    });
+
     const plan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
       cacheKey: 'sessionResultsAnalysis:v1:OP Sepolia:ready-input',
       inputSignature: 'ready-input',

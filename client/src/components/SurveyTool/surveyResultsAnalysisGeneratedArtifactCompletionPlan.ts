@@ -6,6 +6,9 @@ import {
   SURVEY_RESULTS_ANALYSIS_FAILURE_MESSAGE,
   type SurveyResultsAnalysisLifecycleStatePatch,
 } from './surveyResultsAnalysisLifecyclePlan';
+import {
+  buildSurveyResultsAnalysisArtifactCacheTarget,
+} from './surveyResultsAnalysisArtifactCachePorts';
 
 export type SurveyResultsAnalysisGeneratedArtifactCompletionPlanArgs = {
   artifact?: SessionResultsGeneratedAnalysisArtifact | null;
@@ -101,11 +104,13 @@ export const buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan = ({
     ? artifact
     : null;
   const artifactInputSignature = String(normalizedArtifact?.inputSignature || '');
-  const target = {
-    namespace: 'analysisCache' as const,
-    slug: String(slug || ''),
-    cacheKey: String(cacheKey || ''),
+  const cacheTarget = buildSurveyResultsAnalysisArtifactCacheTarget({
+    cacheKey,
     inputSignature: normalizedInputSignature,
+    slug,
+  });
+  const target = {
+    ...cacheTarget,
     artifactInputSignature,
   };
   const requested = normalizeSections(requestedSections);
