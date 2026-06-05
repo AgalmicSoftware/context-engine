@@ -478,23 +478,6 @@ type EncryptedVisibilityResult = {
   uncertain?: boolean;
 };
 
-type DecryptableResponseField = UnknownRecord & {
-  value: unknown;
-  encrypted: boolean;
-};
-
-type DecryptedResponsePatchInput = {
-  responseObj?: unknown;
-  questionId?: unknown;
-  fieldToDecrypt?: unknown;
-  decryptedResult?: unknown;
-};
-
-type ResponseDecryptSurveyBindings = {
-  surveyId: string;
-  acceptedSurveyIds: string[];
-};
-
 type DecryptSingleFieldOptions = UnknownRecord & {
   account: string;
   provider?: unknown;
@@ -1922,57 +1905,6 @@ class UserPage extends Component<any, any> {
     );
   };
 
-  _isAnswerFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAnswerFieldEncrypted(responseObj);
-  };
-
-  _isAdditionalFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAdditionalFieldEncrypted(responseObj);
-  };
-
-  _isResponsePayloadEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageResponsePayloadEncrypted(responseObj);
-  };
-
-  _inferResponseFieldEncryptionAudience = (
-    responseObj: unknown = null,
-    fieldKey: unknown = 'answer',
-    fallback: unknown = 'gate'
-  ): string => {
-    return inferUserPageResponseFieldEncryptionAudience(responseObj, fieldKey, fallback);
-  };
-
-  buildDecryptableResponseField = (field: unknown = null): DecryptableResponseField => {
-    return buildUserPageDecryptableResponseField(field);
-  };
-
-  buildDecryptedResponsePatch = ({
-    responseObj = null,
-    questionId = '',
-    fieldToDecrypt = 'both',
-    decryptedResult = null,
-  }: DecryptedResponsePatchInput = {}): UnknownRecord | null => {
-    return buildUserPageDecryptedResponsePatch({
-      responseObj,
-      questionId,
-      fieldToDecrypt,
-      decryptedResult,
-    });
-  };
-
-  getResponseDecryptSurveyBindings = (
-    questionId: unknown,
-    responseOverride: unknown = null
-  ): ResponseDecryptSurveyBindings => {
-    return buildUserPageResponseDecryptSurveyBindings({
-      detailedSurveyResponses: this.state.detailedSurveyResponses,
-      hashZero: ethers.constants.HashZero,
-      questionId,
-      questionResponseInfo: this.state.questionResponseInfo,
-      responseOverride,
-    });
-  };
-
   handleDecryptQuestionAnswer = async (
     questionId: unknown,
     fieldToDecrypt: unknown = 'both',
@@ -1992,14 +1924,20 @@ class UserPage extends Component<any, any> {
     const {
       surveyId,
       acceptedSurveyIds,
-    } = this.getResponseDecryptSurveyBindings(qid, responseOverride);
+    } = buildUserPageResponseDecryptSurveyBindings({
+      detailedSurveyResponses: this.state.detailedSurveyResponses,
+      hashZero: ethers.constants.HashZero,
+      questionId: qid,
+      questionResponseInfo: this.state.questionResponseInfo,
+      responseOverride,
+    });
 
     const responseSlice = {
       answers: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.answer),
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.answer),
       },
       additionalComments: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.additional),
+        [qid]: buildUserPageDecryptableResponseField(responseRecord.additional),
       },
       importance: {},
       conviction: {},
@@ -2022,7 +1960,7 @@ class UserPage extends Component<any, any> {
       return false;
     }
 
-    const patchedResponse = this.buildDecryptedResponsePatch({
+    const patchedResponse = buildUserPageDecryptedResponsePatch({
       responseObj: responseOverride,
       questionId: qid,
       fieldToDecrypt,
@@ -2411,9 +2349,9 @@ class UserPage extends Component<any, any> {
           prompt: normalizedResponse.prompt || 'Unknown Question',
         });
         const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-        const answerEncrypted = this._isAnswerFieldEncrypted(normalizedResponse);
-        const additionalEncrypted = this._isAdditionalFieldEncrypted(normalizedResponse);
-        const responseEncrypted = this._isResponsePayloadEncrypted(normalizedResponse);
+        const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
+        const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
+        const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
         let canDecryptOtherResponses = false;
 
         if (questionEncrypted || answerEncrypted) {
@@ -2422,7 +2360,7 @@ class UserPage extends Component<any, any> {
             slug: sourceSlug,
             viewAddressLower,
             encryptionAudience: answerEncrypted
-              ? this._inferResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
+              ? inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
               : 'gate',
             gateContext,
           });
@@ -2433,7 +2371,7 @@ class UserPage extends Component<any, any> {
             resourceKey: 'surveyResponses',
             slug: sourceSlug,
             viewAddressLower,
-            encryptionAudience: this._inferResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
+            encryptionAudience: inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
             gateContext,
           });
           canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
@@ -2616,9 +2554,9 @@ class UserPage extends Component<any, any> {
         questionData: qData,
       });
       const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-      const answerEncrypted = this._isAnswerFieldEncrypted(userResponseObject);
-      const additionalEncrypted = this._isAdditionalFieldEncrypted(userResponseObject);
-      const responseEncrypted = this._isResponsePayloadEncrypted(userResponseObject);
+      const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
+      const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
+      const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);
       let canDecryptOtherResponses = false;
       if (questionEncrypted || answerEncrypted) {
         const visibility = this._evaluateEncryptedVisibility({
@@ -2626,7 +2564,7 @@ class UserPage extends Component<any, any> {
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
           encryptionAudience: answerEncrypted
-            ? this._inferResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
+            ? inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
             : 'gate',
           gateContext,
         });
@@ -2637,7 +2575,7 @@ class UserPage extends Component<any, any> {
           resourceKey: 'questionResponses',
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
-          encryptionAudience: this._inferResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
+          encryptionAudience: inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
           gateContext,
         });
         canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
