@@ -2911,9 +2911,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.persistDraftSafely && this.persistDraftSafely(0);
   };
 
-  // Keyboard changes persist during onChange so draft edits are not lost.
-  getSliderPersistOptions = (event) => buildSliderPersistOptions(event);
-
   handleConvictionImportanceChange = (surveyIndex, questionId, mode, value, options = {}) => {
     if (mode === 'importance') {
       this.handleImportance(surveyIndex, questionId, value, options);
@@ -2945,7 +2942,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           questionId,
           sliderMode,
           value,
-          this.getSliderPersistOptions(event)
+          buildSliderPersistOptions(event)
         )}
       onChangeComplete={this.flushDraftPersistAfterSliderChange}
       onCommit={(committedValue) => this.handleConvictionImportanceChange(
@@ -2996,7 +2993,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         surveyIndex,
         question.id,
         ratingAnswer,
-        this.getSliderPersistOptions(event)
+        buildSliderPersistOptions(event)
       )}
       onRatingChangeComplete={this.flushDraftPersistAfterSliderChange}
       onToggleAnswerEncryption={(newEncryptedState) => this.toggleAnswerEncryption(
