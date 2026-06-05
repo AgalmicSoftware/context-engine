@@ -45,7 +45,7 @@ import {
   buildUserPageDeepScanRequestStatePatch,
   buildUserPageDeepScanTooltipInputSignature,
   buildUserPageDeriveTelemetrySnapshot,
-  buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageGateAccessCacheKey,
@@ -58,7 +58,7 @@ import {
   buildUserPageNicknameInputStatePatch,
   buildUserPageNicknameSaveStatePatch,
   buildUserPageNoSbtVisibleTelemetryState,
-  buildUserPageResponseDecryptSurveyBindings,
+  buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseSectionDeriveSignature,
   buildUserPageCacheRefreshDisplayState,
   buildUserPageCreatedQuestionWrapperClassName,
@@ -1906,51 +1906,34 @@ class UserPage extends Component<any, any> {
     fieldToDecrypt: unknown = 'both',
     responseOverride: unknown = null
   ): Promise<boolean> => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    const account = String(this.props.account || '').trim();
-    if (!qid || !account) return false;
-    const responseRecord = toAnalysisRecord(responseOverride);
-    if (!Object.keys(responseRecord).length) return false;
-
-    const litHooks = getGlobalLitHooks();
-    const lit = litHooks && typeof litHooks.getKey === 'function'
-      ? { getKey: litHooks.getKey }
-      : null;
-    const chainId = Number(this.props.network?.id ?? this.props.networkChainId ?? 0) || 0;
-    const {
-      surveyId,
-      acceptedSurveyIds,
-    } = buildUserPageResponseDecryptSurveyBindings({
+    const decryptRequestPlan = buildUserPageResponseDecryptRequestPlan({
+      account: this.props.account,
       detailedSurveyResponses: this.state.detailedSurveyResponses,
       hashZero: ethers.constants.HashZero,
-      questionId: qid,
+      litHooks: getGlobalLitHooks(),
+      networkId: this.props.network?.id ?? this.props.networkChainId ?? 0,
+      provider: this.props.provider,
+      questionId,
       questionResponseInfo: this.state.questionResponseInfo,
       responseOverride,
     });
-
-    const responseSlice = {
-      answers: {
-        [qid]: buildUserPageDecryptableResponseField(responseRecord.answer),
-      },
-      additionalComments: {
-        [qid]: buildUserPageDecryptableResponseField(responseRecord.additional),
-      },
-      importance: {},
-      conviction: {},
-    };
+    if (
+      decryptRequestPlan.status !== 'ready' ||
+      !decryptRequestPlan.responseSlice ||
+      !decryptRequestPlan.cryptoOptions
+    ) {
+      return false;
+    }
+    const qid = decryptRequestPlan.questionId;
 
     let decryptedResult: unknown = null;
     try {
-      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(responseSlice, qid, fieldToDecrypt, {
-        account,
-        provider: this.props.provider,
-        providerKind: this.props.provider,
-        chainId,
-        surveyId,
-        acceptedSurveyIds,
-        lit,
-        throwOnError: true,
-      });
+      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(
+        decryptRequestPlan.responseSlice,
+        qid,
+        fieldToDecrypt,
+        decryptRequestPlan.cryptoOptions
+      );
     } catch (error) {
       accountLog.warn('[UserPage] Failed to decrypt viewed response:', error);
       return false;
@@ -1966,51 +1949,14 @@ class UserPage extends Component<any, any> {
 
     let didUpdate = false;
     this.setState((prevState: UnknownRecord) => {
-      const prevDetailedQuestionResponses = toAnalysisRecord(prevState.detailedQuestionResponses);
-      const prevDetailedSurveyResponses = toAnalysisRecord(prevState.detailedSurveyResponses);
-      const nextDetailedQuestionResponses: UnknownRecord = { ...prevDetailedQuestionResponses };
-      const nextDetailedSurveyResponses: UnknownRecord = { ...prevDetailedSurveyResponses };
-
-      Object.keys(nextDetailedQuestionResponses).forEach((questionKey: string) => {
-        if (nextDetailedQuestionResponses[questionKey] === responseOverride) {
-          nextDetailedQuestionResponses[questionKey] = patchedResponse;
-          didUpdate = true;
-        }
+      const patchResult = buildUserPageDecryptedResponseStatePatch({
+        patchedResponse,
+        previousState: prevState,
+        questionId: qid,
+        responseOverride,
       });
-
-      if (
-        !didUpdate &&
-        Object.prototype.hasOwnProperty.call(nextDetailedQuestionResponses, qid)
-      ) {
-        nextDetailedQuestionResponses[qid] = patchedResponse;
-        didUpdate = true;
-      }
-
-      Object.keys(nextDetailedSurveyResponses).forEach((surveyId: string) => {
-        const surveyEntries = nextDetailedSurveyResponses[surveyId];
-        if (!Array.isArray(surveyEntries)) return;
-        let surveyEntriesChanged = false;
-        const updatedEntries = surveyEntries.map((entry: unknown) => {
-          const entryRecord = toAnalysisRecord(entry);
-          if (!Object.keys(entryRecord).length) return entry;
-          if (entryRecord.responseData !== responseOverride) return entry;
-          surveyEntriesChanged = true;
-          return {
-            ...entryRecord,
-            responseData: patchedResponse,
-          };
-        });
-        if (surveyEntriesChanged) {
-          nextDetailedSurveyResponses[surveyId] = updatedEntries;
-          didUpdate = true;
-        }
-      });
-
-      if (!didUpdate) return null;
-      return {
-        detailedQuestionResponses: nextDetailedQuestionResponses,
-        detailedSurveyResponses: nextDetailedSurveyResponses,
-      };
+      didUpdate = patchResult.didUpdate;
+      return patchResult.statePatch;
     });
 
     return didUpdate;
