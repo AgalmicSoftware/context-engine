@@ -11,6 +11,7 @@ import {
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
+import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 
 describe('SBTPage session routing and holder loading', () => {
   setupSBTPageTestLifecycle();
@@ -154,7 +155,7 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleBurn = jest.fn();
 
     const tree = subject.renderBurnButton();
-    const burnButton = findElementInTree(tree, (node) => node?.type === 'button');
+    const burnButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
 
     expect(burnButton).not.toBeNull();
     burnButton.props.onClick({ preventDefault: jest.fn() });
@@ -181,7 +182,7 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleMint = jest.fn();
 
     const tree = subject.renderMintButton();
-    const mintButton = findElementInTree(tree, (node) => node?.type === 'button');
+    const mintButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
 
     expect(mintButton).not.toBeNull();
     mintButton.props.onClick({ preventDefault: jest.fn() });
