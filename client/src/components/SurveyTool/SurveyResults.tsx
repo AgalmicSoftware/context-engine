@@ -5170,10 +5170,7 @@ return (
       surveyIdAbbreviation={surveyIdAbbreviation}
       surveyTitle={surveyTitle}
       syncStatusNode={renderSurveyResultsSyncStatusPanel({
-          isSynced: syncStatusDisplay.isSynced,
-          isSyncingOrLoading: syncStatusDisplay.isSyncingOrLoading,
-          syncStatusText: syncStatusDisplay.syncStatusText,
-          showLongSyncNotice: syncStatusDisplay.showLongSyncNotice,
+          syncStatusDisplay,
           syncDetailsOpen: !!this.state.syncDetailsOpen,
           syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
           onToggleSyncDetails: () =>
@@ -5182,18 +5179,6 @@ return (
               stateKey: 'syncDetailsOpen',
             })),
           onManualRefresh: () => this.handleManualRefresh(),
-          viewMode: syncStatusDisplay.viewMode,
-          showQuickRefresh: syncStatusDisplay.showQuickRefresh,
-          showQuestionSpinner: syncStatusDisplay.question.showSpinner,
-          questionProgress: syncStatusDisplay.question.progress,
-          questionColor: syncStatusDisplay.question.color,
-          questionBarText: syncStatusDisplay.question.label,
-          showQuestionRemainingSpinner: syncStatusDisplay.question.showRemainingSpinner,
-          showResponseSpinner: syncStatusDisplay.response.showSpinner,
-          responseProgress: syncStatusDisplay.response.progress,
-          responseColor: syncStatusDisplay.response.color,
-          responseBarText: syncStatusDisplay.response.label,
-          showResponseRemainingSpinner: syncStatusDisplay.response.showRemainingSpinner,
           miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
           miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
           remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
