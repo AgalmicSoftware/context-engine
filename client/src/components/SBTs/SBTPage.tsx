@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy, faCheck, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faCopy, faCheck, faSpinner, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -35,6 +35,7 @@ import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFu
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
+import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 import {
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
@@ -3916,39 +3917,27 @@ renderMintButton() {
       isSuccess: isMinted,
       successLabel: t('minted'),
     });
-    return (
-      <div>
-        <button
-          onClick={(event) => runSbtPageMintActionController({
-            canOpenMintTx,
-            disabled,
-            event,
-            mintArgs: [true],
-            plan: mintActionPlan,
-            ports: {
-              dispatchMint: this.handleMint,
-              openMintTransaction: () => window.open(
-                this.getExplorerLink(lastMintTxHash),
-                '_blank',
-                'noopener,noreferrer'
-              ),
-            },
-          })}
-          disabled={disabled}
-          className={mintActionButtonClassName}
-          title={title}
-        >
-          {openMintButtonContentState.shouldRenderIdleLabel && openMintButtonContentState.idleLabel}
-          {openMintButtonContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {openMintButtonContentState.shouldRenderSuccess && (
-            <>{openMintButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
-          )}
-          {openMintButtonContentState.shouldRenderFailure && (
-            <>{openMintButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
-          )}
-        </button>
-      </div>
-    );
+    return SbtPageStatusActionButton({
+      className: mintActionButtonClassName,
+      contentState: openMintButtonContentState,
+      disabled,
+      onClick: (event) => runSbtPageMintActionController({
+        canOpenMintTx,
+        disabled,
+        event,
+        mintArgs: [true],
+        plan: mintActionPlan,
+        ports: {
+          dispatchMint: this.handleMint,
+          openMintTransaction: () => window.open(
+            this.getExplorerLink(lastMintTxHash),
+            '_blank',
+            'noopener,noreferrer'
+          ),
+        },
+      }),
+      title,
+    });
   }
 
   if (mintFlowDisplayState.shouldRenderManualClaimStart) {
@@ -4040,31 +4029,19 @@ renderMintButton() {
       return null;
     }
 
-    return (
-      <div>
-        <button
-          onClick={(event) => runSbtPageBurnActionController({
-            disabled: burnStatusButtonState.disabled,
-            event,
-            plan: burnActionPlan,
-            ports: {
-              dispatchBurn: this.handleBurn,
-            },
-          })}
-          disabled={burnStatusButtonState.disabled}
-          className={burnActionButtonClassName}
-        >
-          {burnButtonContentState.shouldRenderIdleLabel && burnButtonContentState.idleLabel}
-          {burnButtonContentState.shouldRenderPendingIcon && <FontAwesomeIcon icon={faSpinner} spin />}
-          {burnButtonContentState.shouldRenderSuccess && (
-            <>{burnButtonContentState.successLabel} <FontAwesomeIcon icon={faCheck} /></>
-          )}
-          {burnButtonContentState.shouldRenderFailure && (
-            <>{burnButtonContentState.failureLabel} <FontAwesomeIcon icon={faTimes} /></>
-          )}
-        </button>
-      </div>
-    );
+    return SbtPageStatusActionButton({
+      className: burnActionButtonClassName,
+      contentState: burnButtonContentState,
+      disabled: burnStatusButtonState.disabled,
+      onClick: (event) => runSbtPageBurnActionController({
+        disabled: burnStatusButtonState.disabled,
+        event,
+        plan: burnActionPlan,
+        ports: {
+          dispatchBurn: this.handleBurn,
+        },
+      }),
+    });
   };
 
   renderRelevantInfo = (): React.ReactNode => {
