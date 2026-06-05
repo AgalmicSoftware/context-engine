@@ -478,59 +478,96 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     }
   });
 
-  it('includes held SBTs even when metadata name is missing, unless explicitly unlisted', () => {
+  it('renders held SBTs even when metadata name is missing, unless explicitly unlisted', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
 
-    const section = instance._deriveSbtSection({
-      sbtAggregate: {
-        '0x1000000000000000000000000000000000000001': {
-          sbtAddress: '0x1000000000000000000000000000000000000001',
-          sbtInfo: { unlisted: false },
-          mintedSet: new Set([viewLower]),
-          burnedSet: new Set(),
-          slug: 'edge',
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      userCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          '84532': {
+            sbtList: {
+              '0x1000000000000000000000000000000000000001': {
+                sbtAddress: '0x1000000000000000000000000000000000000001',
+                sbtInfo: { unlisted: false },
+                mintedAddresses: [viewLower],
+                burnedAddresses: [],
+              },
+              '0x2000000000000000000000000000000000000002': {
+                sbtAddress: '0x2000000000000000000000000000000000000002',
+                sbtInfo: { unlisted: true },
+                mintedAddresses: [viewLower],
+                burnedAddresses: [],
+              },
+            },
+          },
         },
-        '0x2000000000000000000000000000000000000002': {
-          sbtAddress: '0x2000000000000000000000000000000000000002',
-          sbtInfo: { unlisted: true },
-          mintedSet: new Set([viewLower]),
-          burnedSet: new Set(),
-          slug: 'edge',
-        },
-      },
-    }, viewLower);
+      }],
+    };
 
-    expect(section.sbtList).toHaveLength(1);
-    expect(section.sbtList[0].sbtInfo.sbtAddress).toBe('0x1000000000000000000000000000000000000001');
-    expect(String(section.sbtList[0].sbtInfo.name || '')).toContain('Group');
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+    const tree = instance.render();
+    const [sbtSection] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageSbtSection'
+    );
+
+    expect(sbtSection).toBeTruthy();
+    expect(sbtSection.props.sbtEntries).toHaveLength(1);
+    expect(sbtSection.props.sbtEntries[0].sbtInfo.sbtAddress).toBe('0x1000000000000000000000000000000000000001');
+    expect(String(sbtSection.props.sbtEntries[0].sbtInfo.name || '')).toContain('Group');
   });
 
-  it('uses masked display text for held SBTs with locked names', () => {
+  it('renders masked display text for held SBTs with locked names', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
     const instance = makeInstance({ viewAddress });
 
-    const section = instance._deriveSbtSection({
-      sbtAggregate: {
-        '0x1000000000000000000000000000000000000001': {
-          sbtAddress: '0x1000000000000000000000000000000000000001',
-          sbtInfo: {
-            name: '',
-            contractName: 'CE-SBT-12',
-            nameLocked: true,
-            unlisted: false,
+    const dataByNamespace = {
+      surveysCache: [],
+      questionsCache: [],
+      userCache: [],
+      sbtCache: [{
+        slug: 'edge',
+        data: {
+          '84532': {
+            sbtList: {
+              '0x1000000000000000000000000000000000000001': {
+                sbtAddress: '0x1000000000000000000000000000000000000001',
+                sbtInfo: {
+                  name: '',
+                  contractName: 'CE-SBT-12',
+                  nameLocked: true,
+                  unlisted: false,
+                },
+                mintedAddresses: [viewLower],
+                burnedAddresses: [],
+              },
+            },
           },
-          mintedSet: new Set([viewLower]),
-          burnedSet: new Set(),
-          slug: 'edge',
         },
-      },
-    }, viewLower);
+      }],
+    };
 
-    expect(section.sbtList).toHaveLength(1);
-    expect(section.sbtList[0].sbtInfo.name).toBe('[encrypted]');
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+    const tree = instance.render();
+    const [sbtSection] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageSbtSection'
+    );
+
+    expect(sbtSection).toBeTruthy();
+    expect(sbtSection.props.sbtEntries).toHaveLength(1);
+    expect(sbtSection.props.sbtEntries[0].sbtInfo.name).toBe('[encrypted]');
   });
 
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {
