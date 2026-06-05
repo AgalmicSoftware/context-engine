@@ -200,6 +200,10 @@ import {
   buildResponseGateConfigSignature,
 } from './surveyToolResponseAccess';
 import {
+  decideAutoDecryptBlocked,
+  decideAutomaticPromptDecryptByKind,
+} from './surveyQuestionsDecryptEligibility.js';
+import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
@@ -568,9 +572,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   isAutoDecryptBlocked = () => {
     try {
       const kind = cryptoUtils.getProviderKind(this.props.provider);
-      if (kind === 'wagmi') return true;
-      if (kind === 'porto') return !this.isPortoAutoSignReady();
-      return false;
+      return decideAutoDecryptBlocked(kind, () => this.isPortoAutoSignReady());
     } catch (_) {
       return false;
     }
@@ -580,9 +582,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!this.props.loginComplete || !this.props.account || !this.props.provider) return false;
     try {
       const kind = cryptoUtils.getProviderKind(this.props.provider);
-      if (kind === 'web3auth') return true;
-      if (kind === 'porto') return this.isPortoAutoSignReady();
-      return false;
+      return decideAutomaticPromptDecryptByKind(kind, () => this.isPortoAutoSignReady());
     } catch (_) {
       return false;
     }
