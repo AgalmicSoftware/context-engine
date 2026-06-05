@@ -3667,6 +3667,10 @@ class UserPage extends Component<any, any> {
       deepScanTooltipLines,
       isDeepScanning,
     });
+    const renderDeepScanIndicator = (isLoading: boolean, spinnerId: string) =>
+      isLoading
+        ? this.renderDeepScanStatusIndicator(spinnerId, deepScanTooltipContent, deepScanProgressRows, deepScanTooltipTitle)
+        : null;
 
     const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
       account,
@@ -3835,20 +3839,10 @@ class UserPage extends Component<any, any> {
                 sbtCacheRevision={this.props.sbtCacheRevision}
                 surveyCreationEntries={surveyCreationEntries}
                 surveyResponseEntries={surveyResponseEntries}
-                surveyResponsesLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
-                  surveySpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                surveyResponsesLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveySpinnerId)}
                 surveyResponsesSectionToggleState={surveyResponsesSectionToggleState}
                 surveySectionDisplayState={surveySectionDisplayState}
-                surveysCreatedLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
-                  surveysCreatedSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                surveysCreatedLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveysCreatedSpinnerId)}
                 surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
               />
             )}
@@ -3866,22 +3860,12 @@ class UserPage extends Component<any, any> {
                 onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
                 questionCreationEntries={questionCreationEntries}
                 questionResponsesEmptyText={questionResponsesEmptyText}
-                questionResponsesLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
-                  questionSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                questionResponsesLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionSpinnerId)}
                 questionResponsesNonce={this.props.questionResponsesNonce}
                 questionResponseEntries={questionResponseEntries}
                 questionResponsesSectionToggleState={questionResponsesSectionToggleState}
                 questionSectionDisplayState={questionSectionDisplayState}
-                questionsCreatedLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
-                  questionsCreatedSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                questionsCreatedLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionsCreatedSpinnerId)}
                 questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
                 responderAddress={propViewAddress}
                 sbtCacheRevision={this.props.sbtCacheRevision}
@@ -3893,12 +3877,7 @@ class UserPage extends Component<any, any> {
               heading={`${t('minted')} ${t('sbts')}:`}
               isLoading={isSbtLoadingAny}
               isSBTCacheReady={this.props.isSBTCacheReady}
-              loadingIndicator={isSbtLoadingAny ? this.renderDeepScanStatusIndicator(
-                sbtSpinnerId,
-                deepScanTooltipContent,
-                deepScanProgressRows,
-                deepScanTooltipTitle
-              ) : null}
+              loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
               loginComplete={loginComplete}
               network={network}
               onRefreshSbtData={this.dispatchSbtDataRefresh}
