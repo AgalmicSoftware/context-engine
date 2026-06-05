@@ -126,6 +126,12 @@ export {
   mergeSbtPageBurnEvidenceIntoPreservedHolderState,
   normalizeSbtPageCountMap,
   normalizeSbtPageLoadInfoOptions,
+  reconcileSbtPageHolderRefreshState,
+} from './sbtPageHolderHelpers';
+export type {
+  ReconcileSbtPageHolderRefreshStateArgs,
+  ReconciledSbtPageHolderRefreshState,
+  SbtPageHolderRefreshStateLike,
 } from './sbtPageHolderHelpers';
 export {
   buildSbtPagePasswordExportFile,
