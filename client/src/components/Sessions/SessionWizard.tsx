@@ -4398,6 +4398,8 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     manualMetadataUrl,
     metadataUrl,
+    effectiveMetadataGatewayUrl,
+    effectiveMetadataTxId,
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     publishBusy,
@@ -4539,6 +4541,7 @@ const SessionWizard = ({
     sessionSlug: selectedWizardContractSessionSlug,
   }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
   const publishProgressDisplayState = publishUiPlan.publishProgressDisplayState;
+  const publishMetadataDisplayState = publishUiPlan.publishMetadataDisplayState;
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
@@ -4595,8 +4598,6 @@ const SessionWizard = ({
       devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
       displayedWorkerUrl={displayedWorkerUrl}
       draft={draft}
-      effectiveMetadataGatewayUrl={effectiveMetadataGatewayUrl}
-      effectiveMetadataTxId={effectiveMetadataTxId}
       effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
       embeddedDeployHelperEnabled={embeddedDeployHelperEnabled}
       encryptionGates={encryptionGates}
@@ -4622,7 +4623,6 @@ const SessionWizard = ({
       manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
       manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
       manualMetadataUrl={manualMetadataUrl}
-      metadataUrl={metadataUrl}
       moreOptionsEntries={moreOptionsEntries}
       moreOptionsOpen={moreOptionsOpen}
       network={network}
@@ -4663,6 +4663,7 @@ const SessionWizard = ({
       provider={provider}
       publishAdvancedOpen={publishAdvancedOpen}
       publishBusy={publishBusy}
+      publishMetadataDisplayState={publishMetadataDisplayState}
       publishProgressDisplayState={publishProgressDisplayState}
       publishStep={publishStep}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
@@ -4727,7 +4728,6 @@ const SessionWizard = ({
       workerUrlSource={workerUrlSource}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
-      normalizeArweaveUri={normalizeArweaveUri}
       normalizeSbtSelection={normalizeSbtSelection}
     />
   );

@@ -26,6 +26,8 @@ export type SessionWizardPublishReadinessDescriptor = {
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   deployComplete?: boolean;
+  effectiveMetadataGatewayUrl?: string;
+  effectiveMetadataTxId?: string;
   hasPendingDrafts?: boolean;
   publishBusy?: boolean;
   publishStep?: number;
@@ -33,9 +35,21 @@ export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput
   sbtsLabel?: unknown;
 };
 
+export type SessionWizardPublishMetadataDisplayState = {
+  effectiveMetadataGatewayUrl: string;
+  effectiveMetadataTxId: string;
+  manualMetadataDisplayUri: string;
+  metadataUri: string;
+  metadataUriLabel: 'Metadata URI' | 'Uploaded metadata URI' | '';
+  showArweaveTx: boolean;
+  showManualMetadataUri: boolean;
+  showMetadataUri: boolean;
+};
+
 export type SessionWizardPublishUiPlan = {
   publishReadiness: SessionWizardPublishReadinessDescriptor;
   publishExecutionPlan: ReturnType<typeof buildSessionWizardPublishExecutionPlan>;
+  publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
   publishProgressDisplayState: SessionWizardPublishProgressDisplayState;
 };
 
@@ -79,8 +93,41 @@ export function resolveSessionWizardPublishReadiness({
   };
 }
 
+export function resolveSessionWizardPublishMetadataDisplayState({
+  effectiveMetadataGatewayUrl = '',
+  effectiveMetadataTxId = '',
+  manualMetadataUrl = '',
+  metadataUrl = '',
+}: {
+  effectiveMetadataGatewayUrl?: unknown;
+  effectiveMetadataTxId?: unknown;
+  manualMetadataUrl?: unknown;
+  metadataUrl?: unknown;
+} = {}): SessionWizardPublishMetadataDisplayState {
+  const normalizedManualMetadataUri = normalizeSessionWizardArweaveUri(manualMetadataUrl);
+  const normalizedMetadataUri = normalizeSessionWizardArweaveUri(metadataUrl);
+  const normalizedGatewayUrl = String(effectiveMetadataGatewayUrl || '').trim();
+  const normalizedTxId = String(effectiveMetadataTxId || '').trim();
+  const showMetadataUri = !!normalizedMetadataUri;
+  const showManualMetadataUri = !!normalizedManualMetadataUri;
+  return {
+    effectiveMetadataGatewayUrl: normalizedGatewayUrl,
+    effectiveMetadataTxId: normalizedTxId,
+    manualMetadataDisplayUri: normalizedManualMetadataUri,
+    metadataUri: normalizedMetadataUri || String(metadataUrl || '').trim(),
+    metadataUriLabel: showMetadataUri
+      ? (showManualMetadataUri ? 'Uploaded metadata URI' : 'Metadata URI')
+      : '',
+    showArweaveTx: !!normalizedTxId && !!normalizedGatewayUrl,
+    showManualMetadataUri,
+    showMetadataUri,
+  };
+}
+
 export function resolveSessionWizardPublishUiPlan({
   deployComplete = false,
+  effectiveMetadataGatewayUrl = '',
+  effectiveMetadataTxId = '',
   hasPendingDrafts = false,
   publishBusy = false,
   publishStep = 0,
@@ -104,10 +151,17 @@ export function resolveSessionWizardPublishUiPlan({
     publishSteps: publishExecutionPlan.steps,
     sbtsLabel,
   });
+  const publishMetadataDisplayState = resolveSessionWizardPublishMetadataDisplayState({
+    effectiveMetadataGatewayUrl,
+    effectiveMetadataTxId,
+    manualMetadataUrl: readinessInput.manualMetadataUrl,
+    metadataUrl: readinessInput.metadataUrl,
+  });
 
   return {
     publishReadiness,
     publishExecutionPlan,
+    publishMetadataDisplayState,
     publishProgressDisplayState,
   };
 }
