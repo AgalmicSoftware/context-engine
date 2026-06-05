@@ -2982,23 +2982,6 @@ class UserPage extends Component<any, any> {
   }
 
   // -----------------------------------------------------------
-  //                    SECTION REFRESH WRAPPERS
-  // -----------------------------------------------------------
-  getSurveyDataFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  };
-
-  getQuestionDataFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  }
-
-  getSBTsFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  }
-
-
-
-  // -----------------------------------------------------------
   //        COPY / BOOKMARK / COLLAPSE / USERNAME
   // -----------------------------------------------------------
 
