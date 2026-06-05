@@ -1,3 +1,7 @@
+import {
+  buildSurveyResultsAnalysisArtifactCacheTarget,
+} from './surveyResultsAnalysisArtifactCachePorts';
+
 type SurveyResultsRecord = Record<string, unknown>;
 
 export type SurveyResultsBookmarkWriteKind = 'survey' | 'question';
@@ -92,10 +96,14 @@ export const buildSurveyResultsAnalysisArtifactWriteReadinessPlan = ({
   cacheKey = '',
   slug = '',
 }: SurveyResultsAnalysisArtifactWriteReadinessPlanArgs = {}): SurveyResultsAnalysisArtifactWriteReadinessPlan => {
+  const cacheTarget = buildSurveyResultsAnalysisArtifactCacheTarget({
+    cacheKey,
+    slug,
+  });
   const target = {
-    namespace: 'analysisCache' as const,
-    slug: String(slug || ''),
-    cacheKey: String(cacheKey || ''),
+    namespace: cacheTarget.namespace,
+    slug: cacheTarget.slug,
+    cacheKey: cacheTarget.cacheKey,
   };
 
   if (!artifact || typeof artifact !== 'object') {

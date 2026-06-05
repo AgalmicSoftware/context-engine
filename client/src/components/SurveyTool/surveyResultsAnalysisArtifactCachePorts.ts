@@ -52,6 +52,12 @@ export type SurveyResultsAnalysisArtifactCacheKeyArgs = {
   networkLabel?: unknown;
 };
 
+export type SurveyResultsAnalysisArtifactCacheTargetArgs = {
+  cacheKey?: unknown;
+  inputSignature?: unknown;
+  slug?: unknown;
+};
+
 export type SurveyResultsAnalysisArtifactCacheReadRequestPlanArgs = {
   cacheKey?: unknown;
   inputSignature?: unknown;
@@ -89,17 +95,27 @@ export const buildSurveyResultsAnalysisArtifactCacheKey = ({
   `sessionResultsAnalysis:v1:${String(networkLabel || chainId || 'unknown')}:${String(inputSignature || '')}`
 );
 
+export const buildSurveyResultsAnalysisArtifactCacheTarget = ({
+  cacheKey = '',
+  inputSignature = '',
+  slug = '',
+}: SurveyResultsAnalysisArtifactCacheTargetArgs = {}): SurveyResultsAnalysisArtifactCacheTarget => ({
+  namespace: 'analysisCache',
+  slug: String(slug || ''),
+  cacheKey: String(cacheKey || ''),
+  inputSignature: String(inputSignature || ''),
+});
+
 export const buildSurveyResultsAnalysisArtifactCacheReadRequestPlan = ({
   cacheKey = '',
   inputSignature = '',
   slug = '',
 }: SurveyResultsAnalysisArtifactCacheReadRequestPlanArgs = {}): SurveyResultsAnalysisArtifactCacheReadRequestPlan => {
-  const target: SurveyResultsAnalysisArtifactCacheTarget = {
-    namespace: 'analysisCache',
-    slug: String(slug || ''),
-    cacheKey: String(cacheKey || ''),
-    inputSignature: String(inputSignature || ''),
-  };
+  const target = buildSurveyResultsAnalysisArtifactCacheTarget({
+    cacheKey,
+    inputSignature,
+    slug,
+  });
 
   if (!target.cacheKey) {
     return {
