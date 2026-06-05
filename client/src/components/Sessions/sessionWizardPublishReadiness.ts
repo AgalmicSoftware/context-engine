@@ -22,6 +22,7 @@ export type SessionWizardPublishReadinessDescriptor = {
   hasManualMetadata: boolean;
   hasUploadedMetadata: boolean;
   canPublishNow: boolean;
+  showUploadBlockedReason: boolean;
 };
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
@@ -83,6 +84,7 @@ export function resolveSessionWizardPublishReadiness({
     hasManualMetadata ||
     hasUploadedMetadata
   );
+  const showUploadBlockedReason = !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
 
   return {
     canUploadMetadataNow,
@@ -90,6 +92,7 @@ export function resolveSessionWizardPublishReadiness({
     hasManualMetadata,
     hasUploadedMetadata,
     canPublishNow,
+    showUploadBlockedReason,
   };
 }
 

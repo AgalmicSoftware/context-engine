@@ -142,9 +142,7 @@ const baseProps = () => ({
   handleGateAddSbt: jest.fn(),
   handleGateRemoveSbt: jest.fn(),
   handleSavePendingSbtDraft: jest.fn(),
-  hasManualMetadata: false,
   hasSponsoredBundleLink: false,
-  hasUploadedMetadata: false,
   isNormalMode: true,
   jsonCopied: false,
   launchCreateSbtModal: jest.fn(),
@@ -255,6 +253,7 @@ const baseProps = () => ({
   showSharedWorkerChoice: false,
   showSponsoredBundleFallbackInput: false,
   showSponsoredDeployAccessNotice: false,
+  showUploadBlockedReason: false,
   signBootstrapAdminAction: jest.fn(),
   sponsoredBundleStatus: {
     message: 'Sponsored bundle loaded.',

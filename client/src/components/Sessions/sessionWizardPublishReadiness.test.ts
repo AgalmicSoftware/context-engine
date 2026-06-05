@@ -26,6 +26,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      showUploadBlockedReason: false,
     });
   });
 
@@ -40,6 +41,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       canUploadMetadataNow: false,
       uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
       canPublishNow: false,
+      showUploadBlockedReason: true,
     }));
 
     expect(resolveSessionWizardPublishReadiness({
