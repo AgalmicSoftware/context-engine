@@ -81,7 +81,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`docs/cache/README.md`](docs/cache/README.md) | Frontend cache docs index |
 | [`docs/public-client-config.md`](docs/public-client-config.md) | Env config |
 | [`docs/lit-protocol-information.md`](docs/lit-protocol-information.md) | Lit Protocol docs |
-| [`LICENSING.md`](LICENSING.md) | CPAL/MIT split license |
+| [`LICENSING.md`](LICENSING.md) | MPL/MIT/CC0 license map |
 | [`CHANGELOG.md`](CHANGELOG.md) | Shipped changes |
 | [`ROADMAP.md`](ROADMAP.md) | Public roadmap |
 

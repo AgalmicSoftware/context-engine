@@ -1,6 +1,6 @@
 # Context Engine
 
-![License: CPAL-1.0](https://img.shields.io/badge/License-CPAL--1.0-blue.svg)
+![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)
 
 <p align="center">
   <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card asking whether humans and agents need better tools for debate, negotiation, and sensemaking, with Agree selected." />
@@ -103,7 +103,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Licensing
 
-This repo is intentionally multi-license. The main client/app OSS surface in `client/` remains `CPAL-1.0`. The worker subtree under `workers/` is `MIT`, and third-party worker dependencies and tooling keep their own licenses. The project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/) are dedicated under CC0; see [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md). See [LICENSING.md](LICENSING.md) for the current boundary map and shared-file rules.
+This repo is intentionally multi-license. The public open-source core is licensed under `MPL-2.0`. Files and directories with their own license notices remain under those notices, including MIT worker-side code, files with explicit MIT notices, the CPAL-licensed `contextEngine-cc/` add-on, and the CC0 project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/). Third-party dependencies retain their own licenses. See [LICENSING.md](LICENSING.md) for the current boundary map and shared-file rules.
 
 ## Roadmap
 
