@@ -350,6 +350,66 @@ describe('SBTPage mini-card', () => {
     expect(mintUnlimitedWithGroupPassword).toHaveBeenCalledWith();
   });
 
+  it('keeps pending mini-card invite and group-password joins disabled and inert', () => {
+    const claimWithInviteCode = jest.fn();
+    const { cardNode: inviteCardNode } = renderMiniCardNode(
+      {},
+      {
+        groupPasswordInput: 'invite-code',
+        hasInviteMint: true,
+        mintingStatus: 'pending',
+        showMiniPasswordInput: true,
+      },
+      (subject) => {
+        subject.claimWithInviteCode = claimWithInviteCode;
+      }
+    );
+    const inviteCardTree = SbtPageMiniCard(inviteCardNode.props);
+    const inviteButton = findElementInTree(
+      inviteCardTree,
+      (element) => element?.type === 'button' && element?.props?.onClick === inviteCardNode.props.onClaimWithInviteCode
+    );
+
+    expect(inviteCardNode.props.miniMintActionPlan).toMatchObject({
+      disabled: true,
+      handlerKind: 'claim-with-invite-code',
+      inertReason: 'disabled',
+      viewKind: 'invite-input',
+    });
+    expect(inviteButton?.props.disabled).toBe(true);
+    inviteCardNode.props.onClaimWithInviteCode({ preventDefault: jest.fn() });
+    expect(claimWithInviteCode).not.toHaveBeenCalled();
+
+    const mintUnlimitedWithGroupPassword = jest.fn();
+    const { cardNode: groupPasswordCardNode } = renderMiniCardNode(
+      {},
+      {
+        groupPasswordInput: 'group-code',
+        hasGroupPasswordMint: true,
+        mintingStatus: 'pending',
+        showMiniPasswordInput: true,
+      },
+      (subject) => {
+        subject.mintUnlimitedWithGroupPassword = mintUnlimitedWithGroupPassword;
+      }
+    );
+    const groupPasswordCardTree = SbtPageMiniCard(groupPasswordCardNode.props);
+    const groupPasswordButton = findElementInTree(
+      groupPasswordCardTree,
+      (element) => element?.type === 'button' && element?.props?.onClick === groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword
+    );
+
+    expect(groupPasswordCardNode.props.miniMintActionPlan).toMatchObject({
+      disabled: true,
+      handlerKind: 'mint-unlimited-with-group-password',
+      inertReason: 'disabled',
+      viewKind: 'group-password-input',
+    });
+    expect(groupPasswordButton?.props.disabled).toBe(true);
+    groupPasswordCardNode.props.onMintUnlimitedWithGroupPassword({ preventDefault: jest.fn() });
+    expect(mintUnlimitedWithGroupPassword).not.toHaveBeenCalled();
+  });
+
   it('routes mini-card disclosure clicks through the parent password input action', () => {
     const { cardNode, subject } = renderMiniCardNode({}, {
       hasInviteMint: true,
