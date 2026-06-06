@@ -9,6 +9,9 @@ import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
+import type {
+  SurveyResultsCacheReadinessDisplayPlan,
+} from './surveyResultsCacheReadinessDisplayPlan';
 import { getSurveyResponseQuestionId } from './surveyResultsHelpers.js';
 
 type SurveyResultsRecord = Record<string, any>;
@@ -18,30 +21,17 @@ type SurveyResultsResponseListEntry = SurveyResultsRecord & {
   surveyId?: unknown;
 };
 
-type SurveyResultsQuestionListDisplay = {
-  shouldRenderQuestionTable?: boolean;
-  showEmptyState?: boolean;
-};
-
-type SurveyResultsFilterSummaryDisplay = {
-  displayedTotalQuestionsCount?: number;
-  displayedTotalResponsesCount?: number;
-  normalizedFilteredQuestionsCount?: React.ReactNode;
-  normalizedFilteredResponsesCount?: React.ReactNode;
-  showFilteredCountSpinner?: boolean;
-};
-
 type SurveyResultsDisplayPanelsArgs = {
   account?: string;
   activeQuestionToggles?: SurveyResultsRecord;
   activeToggles?: SurveyResultsRecord;
   alertMessage?: React.ReactNode;
   applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
+  cacheReadinessDisplay: SurveyResultsCacheReadinessDisplayPlan;
   currentSurveyId?: string;
   effectiveSlug?: string;
   filterControlsNode?: React.ReactNode;
   filterLoading?: boolean;
-  filterSummaryDisplay: SurveyResultsFilterSummaryDisplay;
   getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
   getLockedResponseKey: (args: SurveyResultsRecord) => string;
   getResponseCardProps: () => SurveyResultsRecord;
@@ -52,7 +42,6 @@ type SurveyResultsDisplayPanelsArgs = {
   onToggleQuestionList: () => void;
   onToggleResponse: (index: number) => void;
   preNetworkQuestions?: Record<string, SurveyResultsRecord>;
-  questionListDisplay: SurveyResultsQuestionListDisplay;
   questionModeEntries?: SurveyResultsEntry[];
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
@@ -151,11 +140,11 @@ export const renderSurveyResultsDisplayPanels = ({
   activeToggles = {},
   alertMessage = '',
   applyDecryptedOverrideToResponse,
+  cacheReadinessDisplay,
   currentSurveyId = '',
   effectiveSlug = '',
   filterControlsNode = null,
   filterLoading = false,
-  filterSummaryDisplay,
   getFallbackQuestion,
   getLockedResponseKey,
   getResponseCardProps,
@@ -166,7 +155,6 @@ export const renderSurveyResultsDisplayPanels = ({
   onToggleQuestionList,
   onToggleResponse,
   preNetworkQuestions = {},
-  questionListDisplay,
   questionModeEntries = [],
   questionResponsesNonce,
   questionsCacheNonce,
@@ -181,7 +169,13 @@ export const renderSurveyResultsDisplayPanels = ({
   toggleKnobStyle,
   trailingLabelStyle,
   viewMode = '',
-}: SurveyResultsDisplayPanelsArgs): React.ReactElement => (
+}: SurveyResultsDisplayPanelsArgs): React.ReactElement => {
+  const {
+    filterSummaryDisplay,
+    questionListDisplay,
+  } = cacheReadinessDisplay;
+
+  return (
   <>
     <SurveyResultsStatusMessages
       alertMessage={alertMessage}
@@ -283,4 +277,5 @@ export const renderSurveyResultsDisplayPanels = ({
       />
     )}
   </>
-);
+  );
+};

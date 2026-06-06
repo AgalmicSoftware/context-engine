@@ -58,17 +58,54 @@ const baseProps = {
   activeToggles: {},
   alertMessage: '',
   applyDecryptedOverrideToResponse: jest.fn(({ response }) => response),
+  cacheReadinessDisplay: {
+    areSummaryCountsHydrated: true,
+    filterSummaryDisplay: {
+      displayedTotalQuestionsCount: 0,
+      displayedTotalResponsesCount: 0,
+      normalizedFilteredQuestionsCount: 0,
+      normalizedFilteredResponsesCount: 0,
+      showFilteredCountSpinner: false,
+    },
+    questionListDisplay: {
+      shouldRenderQuestionTable: false,
+      showEmptyState: true,
+    },
+    readinessDescriptor: {
+      areSummaryCountsHydrated: true,
+      filterLoading: false,
+      mode: 'survey',
+      summaryCountsSource: 'survey-results',
+    },
+    syncStatusDisplay: {
+      isSynced: true,
+      isSyncingOrLoading: false,
+      question: {
+        color: 'success',
+        label: 'Loaded',
+        progress: 100,
+        remainingBlocks: 0,
+        showRemainingSpinner: false,
+        showSpinner: false,
+      },
+      response: {
+        color: 'success',
+        label: 'Loaded',
+        progress: 100,
+        remainingBlocks: 0,
+        showRemainingSpinner: false,
+        showSpinner: false,
+      },
+      showLongSyncNotice: false,
+      showQuickRefresh: false,
+      syncStatusText: 'In Sync',
+      viewMode: 'survey',
+    },
+  },
   currentSurveyId: 'survey-1',
   effectiveSlug: 'session-one',
   filterControlsNode: <div data-testid="filters">Filters</div>,
   filterLoading: false,
-  filterSummaryDisplay: {
-    displayedTotalQuestionsCount: 0,
-    displayedTotalResponsesCount: 0,
-    normalizedFilteredQuestionsCount: 0,
-    normalizedFilteredResponsesCount: 0,
-    showFilteredCountSpinner: false,
-  },
   getFallbackQuestion: jest.fn((questionId) => ({ id: questionId, prompt: 'Fallback', type: 'freeform' })),
   getLockedResponseKey: jest.fn(() => 'locked-key'),
   getResponseCardProps: jest.fn(() => ({
@@ -82,10 +119,6 @@ const baseProps = {
   onToggleQuestionList: jest.fn(),
   onToggleResponse: jest.fn(),
   preNetworkQuestions: {},
-  questionListDisplay: {
-    shouldRenderQuestionTable: false,
-    showEmptyState: true,
-  },
   questionModeEntries: [],
   questionResponsesNonce: 1,
   questionsCacheNonce: 2,
@@ -111,14 +144,17 @@ describe('SurveyResultsDisplayPanels', () => {
     const tree = renderSurveyResultsDisplayPanels({
       ...baseProps,
       activeQuestionToggles: { __questionList__: true },
-      filterSummaryDisplay: {
-        ...baseProps.filterSummaryDisplay,
-        displayedTotalQuestionsCount: 2,
-        displayedTotalResponsesCount: 4,
-      },
-      questionListDisplay: {
-        shouldRenderQuestionTable: true,
-        showEmptyState: false,
+      cacheReadinessDisplay: {
+        ...baseProps.cacheReadinessDisplay,
+        filterSummaryDisplay: {
+          ...baseProps.cacheReadinessDisplay.filterSummaryDisplay,
+          displayedTotalQuestionsCount: 2,
+          displayedTotalResponsesCount: 4,
+        },
+        questionListDisplay: {
+          shouldRenderQuestionTable: true,
+          showEmptyState: false,
+        },
       },
       renderQuestionSummary,
       renderQuestionTable,
