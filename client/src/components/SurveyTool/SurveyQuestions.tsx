@@ -8289,7 +8289,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       styleMap: styles,
       viewingAnswers,
     });
-    const { activeTagModalTag, responseViewClassName, surveyPageClassName, topSectionClassName, useTagModal } = layoutDisplayState;
+    const { activeTagModalTag, surveyPageClassName, useTagModal } = layoutDisplayState;
     const hasRenderedEditableQuestions =
       canEditQuestions &&
       questionPoolReady &&
@@ -8329,11 +8329,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       <div className={surveyPageClassName}>
         <SurveyQuestionsTopStrip
           ref={this.topRef}
-          className={topSectionClassName}
           displayAnswerMode={this.state.displayAnswerMode}
           isDecrypting={this.state.isDecrypting}
           isEditing={this.state.isEditing}
           isSubmitting={this.state.isSubmitting}
+          layoutDisplayState={layoutDisplayState}
           onDecryptEdit={this.handleDecryptEdit}
           onExitEditing={this.handleExitEditing}
           onStartFresh={this.handleStartFresh}
@@ -8348,6 +8348,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         {viewingAnswers ? (
           <SurveyQuestionsResponseView
             isLoadingResponse={this.state.isLoadingResponse}
+            layoutDisplayState={layoutDisplayState}
             noResponse={this.state.noResponse}
             parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
             questionPool={this.state.questionPool}
@@ -8356,7 +8357,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             renderSurveyAnswers={this.renderSurveyAnswers}
             responderAddress={this.props.responderAddress}
             responseLookupWarning={this.state.responseLookupWarning}
-            responseViewClassName={responseViewClassName}
             routeViewDisplayState={routeViewDisplayState}
             singleQuestionMode={this.props.singleQuestionMode}
             userAnswers={this.state.userAnswers}
