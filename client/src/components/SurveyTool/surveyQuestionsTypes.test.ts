@@ -825,6 +825,24 @@ describe('surveyQuestionsTypes', () => {
       visibleQuestionPool: questionPool,
       hiddenMaskedQuestionIds: [],
     });
+
+    const injectedPredicate = jest.fn((prompt) => prompt === 'LOCKED');
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      isMaskedPromptText: injectedPredicate,
+      questionPool: [
+        { id: 'custom', prompt: 'LOCKED' },
+        { id: 'plain', prompt: '[encrypted]' },
+      ],
+      singleQuestionMode: false,
+    })).toEqual({
+      fullQuestionPool: [
+        { id: 'custom', prompt: 'LOCKED' },
+        { id: 'plain', prompt: '[encrypted]' },
+      ],
+      visibleQuestionPool: [{ id: 'plain', prompt: '[encrypted]' }],
+      hiddenMaskedQuestionIds: ['custom'],
+    });
+    expect(injectedPredicate).toHaveBeenCalledWith('LOCKED');
   });
 
   it('builds render readiness while preserving display-answer fallthrough', () => {
