@@ -455,6 +455,29 @@ const readRequestId = async ({ request, url }) => {
   }
 };
 
+const readListResource = async ({ request, url }) => {
+  const fromQuery = trim(url.searchParams.get('resource'));
+  if (fromQuery) return { ok: true, resource: fromQuery };
+  if (request.method.toUpperCase() !== 'POST') return { ok: true, resource: 'docsContext' };
+
+  let raw = '';
+  try {
+    raw = await (typeof request?.clone === 'function' ? request.clone() : request).text();
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!trim(raw)) return { ok: true, resource: 'docsContext' };
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return { ok: false, error: 'Invalid JSON.' };
+  }
+  if (!isObj(body)) return { ok: false, error: 'Invalid JSON.' };
+  return { ok: true, resource: trim(body.resource) || 'docsContext' };
+};
+
 const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
   const url = new URL(request.url);
   const id = await readRequestId({ request, url });
@@ -519,7 +542,9 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
 
 const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, baseHeaders, deps }) => {
   const url = new URL(request.url);
-  const resource = trim(url.searchParams.get('resource')) || 'docsContext';
+  const resolvedResource = await readListResource({ request, url });
+  if (!resolvedResource.ok) return responseJson(deps, { error: resolvedResource.error }, 400, baseHeaders);
+  const resource = resolvedResource.resource;
   const access = await authorizeCloudflareStorageAccess({
     config,
     slug,
