@@ -14,6 +14,7 @@ import {
   resolveSbtPageMiniBurnPermission,
   resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniManualClaimActionRequest,
   resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
   resolveSbtPageMiniMintState,
@@ -255,6 +256,86 @@ describe('sbtPageActionDisplayHelpers', () => {
     });
   });
 
+  it('describes mini-card manual claim action identity without owning execution', () => {
+    expect(resolveSbtPageMiniManualClaimActionRequest({
+      manualPasswordInput: 'mini-code',
+      miniMintActionPlan: {
+        disabled: false,
+        viewKind: 'manual-password-start-input',
+      },
+      mintingStatus: 'idle',
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'mini-mint',
+      inputDisabled: false,
+      inputType: 'text',
+      inputValue: 'mini-code',
+      placeholder: 'Password',
+      shouldRenderInputAction: true,
+      shouldRenderStatus: false,
+      viewKind: 'manual-password-start-input',
+      buttonState: {
+        disabled: false,
+        isPending: false,
+      },
+      contentState: {
+        label: 'Join',
+        shouldRenderLabel: true,
+        shouldRenderPendingIcon: false,
+      },
+    });
+
+    expect(resolveSbtPageMiniManualClaimActionRequest({
+      manualPasswordInput: 'mini-code',
+      miniMintActionPlan: {
+        disabled: true,
+        viewKind: 'manual-password-finish-input',
+      },
+      mintingStatus: 'pending',
+    })).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inputDisabled: true,
+      shouldRenderInputAction: true,
+      viewKind: 'manual-password-finish-input',
+      buttonState: {
+        disabled: true,
+        isPending: true,
+      },
+      contentState: {
+        label: 'Finish',
+        shouldRenderLabel: false,
+        shouldRenderPendingIcon: true,
+      },
+    });
+  });
+
+  it('describes mini-card manual claim status-only requests', () => {
+    expect(resolveSbtPageMiniManualClaimActionRequest({
+      claimCountdown: 12,
+      miniMintActionPlan: { viewKind: 'manual-claim-countdown' },
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'none',
+      shouldRenderInputAction: false,
+      shouldRenderStatus: true,
+      statusText: 'Wait: 12s',
+      viewKind: 'manual-claim-countdown',
+    });
+
+    expect(resolveSbtPageMiniManualClaimActionRequest({
+      miniMintActionPlan: { viewKind: 'manual-claim-success' },
+      successLabel: 'Collected',
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'none',
+      shouldRenderInputAction: false,
+      shouldRenderStatus: true,
+      statusText: 'Collected!',
+      viewKind: 'manual-claim-success',
+    });
+  });
+
   it('describes the mini-card display state without action callbacks', () => {
     const passwordJoin = resolveSbtPageMiniCardDisplayState({
       actionClassName: 'action',
@@ -284,9 +365,42 @@ describe('sbtPageActionDisplayHelpers', () => {
       },
       mintStatusId: 'mintStatus-0xabc',
     });
+    expect(passwordJoin.miniManualClaimActionRequest).toMatchObject({
+      handlerKind: 'none',
+      shouldRenderInputAction: false,
+      viewKind: 'hidden',
+    });
     expect(passwordJoin.miniBurnButtonState).toBeNull();
     expect(passwordJoin.miniBurnContentState).toBeNull();
     expect(passwordJoin.miniTokenActionDisplayState).toBeNull();
+
+    const manualClaim = resolveSbtPageMiniCardDisplayState({
+      actionClassName: 'action',
+      burnButtonClassName: 'burn',
+      claimCountdown: 12,
+      manualPasswordInput: 'mini-code',
+      miniButtonClassName: 'mini',
+      miniMintable: true,
+      mintButtonClassName: 'mint',
+      mintingStatus: 'pending',
+      sbtAddress: '0xABC',
+      sbtInfo: { hasPasswordMint: true, mintingEndTime: 0 },
+      showMiniPasswordInput: true,
+    });
+
+    expect(manualClaim.miniMintActionPlan).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      viewKind: 'manual-password-start-input',
+    });
+    expect(manualClaim.miniManualClaimActionRequest).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inputDisabled: true,
+      inputValue: 'mini-code',
+      shouldRenderInputAction: true,
+      viewKind: 'manual-password-start-input',
+    });
 
     const tokenBurn = resolveSbtPageMiniCardDisplayState({
       account: '0xOwner',

@@ -244,9 +244,17 @@ describe('SBTPage mini-card', () => {
       inertReason: 'disabled',
       viewKind: 'manual-password-start-input',
     });
-    expect(cardNode.props.miniManualClaimButtonState).toMatchObject({
+    expect(cardNode.props.miniManualClaimActionRequest).toMatchObject({
       disabled: true,
-      isPending: true,
+      handlerKind: 'mini-mint',
+      inputDisabled: true,
+      inputValue: 'claim-code',
+      shouldRenderInputAction: true,
+      viewKind: 'manual-password-start-input',
+      buttonState: {
+        disabled: true,
+        isPending: true,
+      },
     });
     expect(passwordInput?.props).toMatchObject({
       disabled: true,
@@ -290,6 +298,12 @@ describe('SBTPage mini-card', () => {
       inertReason: 'status-only',
       isInteractive: false,
       labelKind: 'countdown',
+      viewKind: 'manual-claim-countdown',
+    });
+    expect(cardNode.props.miniManualClaimActionRequest).toMatchObject({
+      handlerKind: 'none',
+      shouldRenderStatus: true,
+      statusText: 'Wait: 12s',
       viewKind: 'manual-claim-countdown',
     });
     expect(flattenText(cardTree)).toContain('Wait: 12s');

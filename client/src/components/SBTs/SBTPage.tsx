@@ -4154,9 +4154,7 @@ renderMintButton() {
         miniBurnContentState,
         miniControlDisplayState,
         miniInviteControlDisplayState,
-        miniManualClaimButtonState,
-        miniManualClaimFinishContentState,
-        miniManualClaimStartContentState,
+        miniManualClaimActionRequest,
         miniMintActionButtonClassName,
         miniMintActionPlan,
         miniOpenMintButtonState,
@@ -4172,6 +4170,7 @@ renderMintButton() {
         burnButtonClassName: styles.burnButton,
         burnLabel: t('burn'),
         burningStatus,
+        claimCountdown,
         groupPasswordInput: this.state.groupPasswordInput,
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
         hasInviteMint: this.state.hasInviteMint,
@@ -4194,12 +4193,10 @@ renderMintButton() {
           burnLabel={t('burn')}
           burnedLabel={t('burned')}
           cardStyle={resolveSbtPageInteractiveCursorStyle()}
-          claimCountdown={claimCountdown}
           groupPasswordInput={this.state.groupPasswordInput || ''}
           hasTokenMini={hasTokenMini}
           imageUrl={imageUrl}
           isMintingActive={isMintingActive}
-          manualPasswordInput={manualPasswordInput}
           miniActionFailureState={miniActionFailureState}
           miniActionFailureStatusStyle={miniActionFailureStatusDisplayState.style}
           miniActionStatusStyle={miniActionStatusDisplayState.style}
@@ -4208,9 +4205,7 @@ renderMintButton() {
           miniBurnContentState={miniBurnContentState}
           miniControlTopMarginStyle={miniControlDisplayState.topMarginStyle}
           miniInviteInputStyle={miniInviteControlDisplayState.inputStyle}
-          miniManualClaimButtonState={miniManualClaimButtonState}
-          miniManualClaimFinishContentState={miniManualClaimFinishContentState}
-          miniManualClaimStartContentState={miniManualClaimStartContentState}
+          miniManualClaimActionRequest={miniManualClaimActionRequest}
           miniMintActionPlan={miniMintActionPlan}
           miniMintActionButtonClassName={miniMintActionButtonClassName}
           miniOpenMintButtonState={miniOpenMintButtonState}

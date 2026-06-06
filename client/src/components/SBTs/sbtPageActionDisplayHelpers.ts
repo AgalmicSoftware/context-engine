@@ -292,6 +292,35 @@ export type SbtPageMiniMintActionPlan = {
   shouldRenderMintArea: boolean;
   viewKind: SbtPageMiniMintActionViewKind;
 };
+type ResolveSbtPageMiniManualClaimActionRequestArgs = {
+  claimCountdown?: unknown;
+  finishLabel?: unknown;
+  manualPasswordInput?: unknown;
+  miniMintActionPlan?: Partial<SbtPageMiniMintActionPlan> | null;
+  mintingStatus?: unknown;
+  startLabel?: unknown;
+  successLabel?: unknown;
+};
+export type SbtPageMiniManualClaimActionRequestViewKind =
+  | 'hidden'
+  | 'manual-claim-countdown'
+  | 'manual-claim-success'
+  | 'manual-password-finish-input'
+  | 'manual-password-start-input';
+export type SbtPageMiniManualClaimActionRequest = {
+  buttonState: SbtPageManualClaimButtonState;
+  contentState: SbtPagePendingButtonContentState;
+  disabled: boolean;
+  handlerKind: 'mini-mint' | 'none';
+  inputDisabled: boolean;
+  inputType: 'text';
+  inputValue: string;
+  placeholder: string;
+  shouldRenderInputAction: boolean;
+  shouldRenderStatus: boolean;
+  statusText: string;
+  viewKind: SbtPageMiniManualClaimActionRequestViewKind;
+};
 type ResolveSbtPageMiniBurnButtonStateArgs = {
   burningStatus?: unknown;
 };
@@ -314,6 +343,7 @@ type ResolveSbtPageMiniCardDisplayStateArgs = {
   burnLabel?: unknown;
   burningStatus?: unknown;
   burnButtonClassName?: unknown;
+  claimCountdown?: unknown;
   groupPasswordInput?: unknown;
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -343,9 +373,7 @@ type SbtPageMiniCardDisplayState = SbtPageMiniMintState & {
   miniBurnContentState: SbtPagePendingButtonContentState | null;
   miniControlDisplayState: SbtPageMiniControlDisplayState;
   miniInviteControlDisplayState: SbtPageMiniControlDisplayState;
-  miniManualClaimButtonState: SbtPageManualClaimButtonState;
-  miniManualClaimFinishContentState: SbtPagePendingButtonContentState;
-  miniManualClaimStartContentState: SbtPagePendingButtonContentState;
+  miniManualClaimActionRequest: SbtPageMiniManualClaimActionRequest;
   miniMintActionButtonClassName: string;
   miniMintActionPlan: SbtPageMiniMintActionPlan;
   miniOpenMintButtonState: SbtPageMiniOpenMintButtonState;
@@ -940,6 +968,75 @@ export const resolveSbtPageManualClaimActionRequest = ({
   return hiddenRequest;
 };
 
+export const resolveSbtPageMiniManualClaimActionRequest = ({
+  claimCountdown = '',
+  finishLabel = 'Finish',
+  manualPasswordInput = '',
+  miniMintActionPlan = null,
+  mintingStatus = '',
+  startLabel = 'Join',
+  successLabel = 'Minted',
+}: ResolveSbtPageMiniManualClaimActionRequestArgs = {}): SbtPageMiniManualClaimActionRequest => {
+  const buttonState = resolveSbtPageManualClaimButtonState({
+    manualPasswordInput,
+    mintingStatus,
+  });
+  const hiddenRequest: SbtPageMiniManualClaimActionRequest = {
+    buttonState,
+    contentState: resolveSbtPagePendingButtonContentState({ label: '' }),
+    disabled: true,
+    handlerKind: 'none',
+    inputDisabled: buttonState.isPending,
+    inputType: 'text',
+    inputValue: String(manualPasswordInput || ''),
+    placeholder: 'Password',
+    shouldRenderInputAction: false,
+    shouldRenderStatus: false,
+    statusText: '',
+    viewKind: 'hidden',
+  };
+  const buildInputAction = (
+    label: unknown,
+    viewKind: 'manual-password-finish-input' | 'manual-password-start-input'
+  ): SbtPageMiniManualClaimActionRequest => ({
+    ...hiddenRequest,
+    contentState: resolveSbtPagePendingButtonContentState({
+      isPending: buttonState.isPending,
+      label,
+    }),
+    disabled: !!miniMintActionPlan?.disabled,
+    handlerKind: 'mini-mint',
+    shouldRenderInputAction: true,
+    viewKind,
+  });
+
+  if (miniMintActionPlan?.viewKind === 'manual-password-start-input') {
+    return buildInputAction(startLabel, 'manual-password-start-input');
+  }
+  if (miniMintActionPlan?.viewKind === 'manual-password-finish-input') {
+    return buildInputAction(finishLabel, 'manual-password-finish-input');
+  }
+  if (miniMintActionPlan?.viewKind === 'manual-claim-countdown') {
+    return {
+      ...hiddenRequest,
+      disabled: false,
+      statusText: `Wait: ${String(claimCountdown || '')}s`,
+      shouldRenderStatus: true,
+      viewKind: 'manual-claim-countdown',
+    };
+  }
+  if (miniMintActionPlan?.viewKind === 'manual-claim-success') {
+    return {
+      ...hiddenRequest,
+      disabled: false,
+      statusText: `${String(successLabel || '')}!`,
+      shouldRenderStatus: true,
+      viewKind: 'manual-claim-success',
+    };
+  }
+  return hiddenRequest;
+};
+
 export const resolveSbtPageMiniOpenMintButtonState = ({
   mintingStatus = '',
 }: ResolveSbtPageMiniOpenMintButtonStateArgs = {}): SbtPageMiniOpenMintButtonState => {
@@ -1012,6 +1109,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
   burnLabel = 'Burn',
   burningStatus = '',
   burnButtonClassName = '',
+  claimCountdown = '',
   groupPasswordInput = '',
   hasGroupPasswordMint = false,
   hasInviteMint = false,
@@ -1073,6 +1171,12 @@ export const resolveSbtPageMiniCardDisplayState = ({
     mintStep,
     showMiniPasswordInput,
   });
+  const miniManualClaimActionRequest = resolveSbtPageMiniManualClaimActionRequest({
+    claimCountdown,
+    manualPasswordInput,
+    miniMintActionPlan,
+    mintingStatus,
+  });
 
   let miniTokenActionDisplayState: SbtPageMiniTokenActionDisplayState | null = null;
   let miniBurnButtonState: SbtPageMiniBurnButtonState | null = null;
@@ -1117,15 +1221,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     miniBurnContentState,
     miniControlDisplayState,
     miniInviteControlDisplayState,
-    miniManualClaimButtonState,
-    miniManualClaimFinishContentState: resolveSbtPagePendingButtonContentState({
-      isPending: miniManualClaimButtonState.isPending,
-      label: 'Finish',
-    }),
-    miniManualClaimStartContentState: resolveSbtPagePendingButtonContentState({
-      isPending: miniManualClaimButtonState.isPending,
-      label: 'Join',
-    }),
+    miniManualClaimActionRequest,
     miniMintActionButtonClassName: buildSbtPageActionButtonClassName({
       actionClassName,
       includeMiniClass: true,
