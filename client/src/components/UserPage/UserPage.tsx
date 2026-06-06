@@ -359,11 +359,6 @@ type GateAccessContextSnapshot = {
   uncertainResources: string[];
 };
 
-type GateAccessStatusByResource = {
-  resourceKey: string;
-  status: string;
-};
-
 type SourceSlugMap = UserPageSourceSlugMap;
 
 type EntityCacheMap = Record<string, UnknownRecord>;
