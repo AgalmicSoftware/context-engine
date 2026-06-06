@@ -205,6 +205,61 @@ describe('SBTPage mini-card', () => {
     expect(miniMintHandler).not.toHaveBeenCalled();
   });
 
+  it('keeps manual mini-card claim pending state inert while preserving parent wiring', () => {
+    const miniMintHandler = jest.fn();
+    const { cardNode } = renderMiniCardNode(
+      {},
+      {
+        manualPasswordInput: 'claim-code',
+        mintingStatus: 'pending',
+        sbtInfo: {
+          name: 'Badge',
+          image: 'https://example.example.test/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: true,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+        },
+        showMiniPasswordInput: true,
+      },
+      (subject) => {
+        subject.miniMintHandler = miniMintHandler;
+      }
+    );
+    const cardTree = SbtPageMiniCard(cardNode.props);
+    const passwordInput = findElementInTree(
+      cardTree,
+      (element) => element?.type === 'input' && element?.props?.placeholder === 'Password'
+    );
+    const actionButton = findElementInTree(
+      cardTree,
+      (element) => element?.type === 'button' && element?.props?.onClick === cardNode.props.onMiniMint
+    );
+    const preventDefault = jest.fn();
+
+    expect(cardNode.props.miniMintActionPlan).toMatchObject({
+      disabled: true,
+      handlerKind: 'mini-mint',
+      inertReason: 'disabled',
+      viewKind: 'manual-password-start-input',
+    });
+    expect(cardNode.props.miniManualClaimButtonState).toMatchObject({
+      disabled: true,
+      isPending: true,
+    });
+    expect(passwordInput?.props).toMatchObject({
+      disabled: true,
+      value: 'claim-code',
+    });
+    expect(actionButton?.props.disabled).toBe(true);
+
+    cardNode.props.onMiniMint({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(miniMintHandler).not.toHaveBeenCalled();
+  });
+
   it('routes mini-card invite and group-password mint clicks through parent handlers', () => {
     const claimWithInviteCode = jest.fn();
     const { cardNode: inviteCardNode } = renderMiniCardNode(
