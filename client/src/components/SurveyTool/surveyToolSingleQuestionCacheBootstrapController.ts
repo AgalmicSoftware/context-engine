@@ -147,6 +147,16 @@ export type CacheBootstrapStopHandlingPlan =
   | CacheBootstrapStopHandlingRetry
   | CacheBootstrapStopHandlingFallback;
 
+export type SingleQuestionPreservedPoolPlan =
+  | {
+    action: 'preserve';
+    statePatch: UnknownRecord & { questionPool: QuestionPayload[] };
+  }
+  | {
+    action: 'skip';
+    statePatch: null;
+  };
+
 export type CacheBootstrapReady = {
   status: 'ready';
   cacheState: CacheState;
@@ -183,6 +193,10 @@ const buildMissingCacheStateStopPlan = (
   retryPlan: null,
   seededHydration,
 });
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
 
 export const buildSingleQuestionSourceRestoreContextPlan = ({
   bootstrapRetryAttempt = 0,
@@ -301,6 +315,38 @@ export const buildSingleQuestionSourceRestoreContextPlan = ({
   return {
     ...common,
     status: 'ready',
+  };
+};
+
+export const buildSingleQuestionPreservedPoolState = ({
+  questionId = '',
+  questionPool = [],
+  extraState = {},
+}: {
+  questionId?: unknown;
+  questionPool?: unknown;
+  extraState?: unknown;
+} = {}): SingleQuestionPreservedPoolPlan => {
+  const normalizedQuestionId = String(questionId || '').trim().toLowerCase();
+  if (!normalizedQuestionId || !Array.isArray(questionPool)) {
+    return { action: 'skip', statePatch: null };
+  }
+
+  const existingQuestion = questionPool.find((item) => (
+    isRecord(item) &&
+    String(item.id || item.questionID || '').trim().toLowerCase() === normalizedQuestionId
+  ));
+  if (!isRecord(existingQuestion)) {
+    return { action: 'skip', statePatch: null };
+  }
+
+  const extraPatch = isRecord(extraState) ? extraState : {};
+  return {
+    action: 'preserve',
+    statePatch: {
+      questionPool: [{ ...existingQuestion, id: normalizedQuestionId }],
+      ...extraPatch,
+    },
   };
 };
 
