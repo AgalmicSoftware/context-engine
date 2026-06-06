@@ -21,6 +21,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
@@ -253,6 +254,34 @@ describe('surveyResultsHelpers state patches', () => {
     })).toEqual({
       filteredQuestionsCount: 0,
     });
+    expect(buildSurveyResultsQuestionFilterQuestions({
+      questionResponses: {
+        Q1: { '0xaaa': { response: true } },
+        q2: { '0xbbb': { response: true } },
+      },
+      networkQuestionsById: {
+        q1: {
+          id: 'q1',
+          creator: '0xaaa',
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      },
+    })).toEqual([
+      {
+        id: 'q1',
+        creator: '0xaaa',
+        prompt: 'Question one',
+        type: 'freeform',
+      },
+      {
+        id: 'q2',
+        creator: '',
+        prompt: '',
+        type: '',
+      },
+    ]);
+    expect(buildSurveyResultsQuestionFilterQuestions()).toEqual([]);
     expect(stringifySurveyResultsAggregatorResponses({
       q1: [
         { responder: '0x1', response: 'already text' },

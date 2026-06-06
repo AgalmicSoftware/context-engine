@@ -88,6 +88,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
@@ -106,6 +107,7 @@ import {
   stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
+  type SurveyResultsFilterQuestionRecord,
   type SurveyResultsStringifiedAggregator,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
@@ -384,12 +386,6 @@ type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
 };
 type SurveyResultsManagedCacheUpdate = {
   namespace?: unknown;
-};
-type SurveyResultsFilterQuestionRecord = SurveyResultsRecord & {
-  creator?: unknown;
-  id?: unknown;
-  prompt?: unknown;
-  type?: unknown;
 };
 type SurveyResultsQuestionFilterCombinedPayload = SurveyResultsRecord & {
   filteredQuestions?: unknown;
@@ -1337,10 +1333,9 @@ class SurveyResults extends Component<any, any> {
       return memo.result;
     }
 
-    const next = Object.keys(questionResponsesRef || {}).map((qId) => {
-      const lower = String(qId || '').toLowerCase();
-      const qData = networkQuestionsById[lower];
-      return qData || { id: lower || qId, creator: '', type: '', prompt: '' };
+    const next = buildSurveyResultsQuestionFilterQuestions({
+      networkQuestionsById,
+      questionResponses: questionResponsesRef,
     });
 
     this._questionFilterQuestionsMemo = {
