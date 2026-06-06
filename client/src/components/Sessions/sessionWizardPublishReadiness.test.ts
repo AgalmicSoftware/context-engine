@@ -140,6 +140,44 @@ describe('resolveSessionWizardPublishReadiness', () => {
     }));
   });
 
+  it('keeps no-worker no-metadata publish readiness blocked without execution ports', () => {
+    const plan = resolveSessionWizardPublishUiPlan({
+      ...baseInput,
+      resolvedWorkerBaseUrl: '',
+      workerMode: 'custom',
+      usesDefaultWorkerUrl: false,
+      deployVerifiedInUi: false,
+      deployWorkerMatchesConfiguredUrl: false,
+      canUseSponsoredAutoDeployNow: false,
+      deployComplete: false,
+      hasPendingDrafts: false,
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      publishBusy: false,
+      publishStep: 0,
+    });
+
+    expect(plan.publishReadiness).toEqual({
+      canUploadMetadataNow: false,
+      uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+      hasManualMetadata: false,
+      hasUploadedMetadata: false,
+      canPublishNow: false,
+      showUploadBlockedReason: true,
+    });
+    expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldUploadMetadata: false,
+      shouldRegisterSession: true,
+    }));
+    expect(plan.publishMetadataDisplayState).toEqual(expect.objectContaining({
+      showArweaveTx: false,
+      showManualMetadataUri: false,
+      showMetadataUri: false,
+    }));
+  });
+
   it('builds a pure publish UI plan for default-worker metadata upload readiness', () => {
     const input = Object.freeze({
       ...baseInput,
