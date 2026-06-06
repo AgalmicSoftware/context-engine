@@ -1,3 +1,5 @@
+import type { SessionWizardPublishReadinessDescriptor } from './sessionWizardPublishReadiness';
+
 export type NormalModeLabelFn = (key: string) => string;
 
 export type NormalModeCardKey = 'metadata' | 'encryption' | 'worker' | 'publish';
@@ -22,9 +24,8 @@ export type NormalModeCardsInput = {
   resolvedWorkerBaseUrl: string;
   workerMode: string;
   deployVerifiedInUi: boolean;
-  canPublishNow: boolean;
   canUseSponsoredAutoDeployNow: boolean;
-  uploadBlockedReason: string;
+  publishReadiness: Pick<SessionWizardPublishReadinessDescriptor, 'canPublishNow' | 'uploadBlockedReason'>;
   t: NormalModeLabelFn;
 };
 
@@ -62,11 +63,14 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     resolvedWorkerBaseUrl,
     workerMode,
     deployVerifiedInUi,
-    canPublishNow,
     canUseSponsoredAutoDeployNow,
-    uploadBlockedReason,
+    publishReadiness,
     t,
   } = opts;
+  const {
+    canPublishNow,
+    uploadBlockedReason,
+  } = publishReadiness;
   const normalizedSessionName = normalizeDisplayString(sessionName);
   const privacyTone: NormalModeCardTone = configuredPrivateGateCount || privateSlugMode
     ? 'ready'
