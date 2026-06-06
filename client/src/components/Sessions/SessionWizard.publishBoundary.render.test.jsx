@@ -20,6 +20,16 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
+const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test') => {
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    draft: {
+      corsWorkerUrl: workerUrl,
+    },
+    deployComplete: true,
+    deployWorkerUrl: workerUrl,
+  }));
+};
+
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
@@ -235,13 +245,7 @@ describe('SessionWizard publish boundary rendering', () => {
     const uploadedTxId = 'd'.repeat(43);
     arweaveScripts.uploadDataToArweave.mockResolvedValue(uploadedTxId);
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      draft: {
-        corsWorkerUrl: 'https://worker.example.test',
-      },
-      deployComplete: true,
-      deployWorkerUrl: 'https://worker.example.test',
-    }));
+    seedVerifiedWorkerCache();
 
     renderLoggedInSessionWizard();
     enableAdvancedMode();
@@ -282,5 +286,50 @@ describe('SessionWizard publish boundary rendering', () => {
       sessionFields: expect.any(Object),
     }));
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
+  });
+
+  it('resets progress and keeps publish retryable after metadata upload failure', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectUpload = () => {};
+    const uploadPromise = new Promise((_, reject) => {
+      rejectUpload = reject;
+    });
+    arweaveScripts.uploadDataToArweave.mockReturnValue(uploadPromise);
+    seedVerifiedWorkerCache();
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Upload Failure Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByTestId('ce-wizard-publish-progress')).toHaveTextContent('Upload Arweave');
+
+    await act(async () => {
+      rejectUpload(new Error('Metadata upload failed upstream.'));
+      try {
+        await uploadPromise;
+      } catch (err) {
+        void err;
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Metadata upload failed upstream.')).toBeInTheDocument();
+    });
+
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('ce-wizard-publish-progress')).not.toBeInTheDocument();
+    expect(publishButton).not.toBeDisabled();
+    consoleErrorSpy.mockRestore();
   });
 });
