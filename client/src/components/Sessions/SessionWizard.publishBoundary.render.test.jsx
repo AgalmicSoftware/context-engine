@@ -229,4 +229,58 @@ describe('SessionWizard publish boundary rendering', () => {
       onTxHash: expect.any(Function),
     }));
   });
+
+  it('passes uploaded metadata through the register boundary without custom deploy execution', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const uploadedTxId = 'd'.repeat(43);
+    arweaveScripts.uploadDataToArweave.mockResolvedValue(uploadedTxId);
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        corsWorkerUrl: 'https://worker.example.test',
+      },
+      deployComplete: true,
+      deployWorkerUrl: 'https://worker.example.test',
+    }));
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Uploaded Metadata Register Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
+    });
+
+    const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+    expect(metadataPayload).toEqual(expect.objectContaining({
+      sessionName: 'Uploaded Metadata Register Boundary Session',
+      slug: 'uploaded-metadata-register-boundary-session',
+    }));
+    expect(uploadFormat).toBe('json');
+    expect(uploadOptions).toEqual(expect.objectContaining({
+      sessionSlug: 'uploaded-metadata-register-boundary-session',
+      workerUrl: expect.any(String),
+    }));
+
+    const registerArgs = mockRegisterSessionOnChain.mock.calls[0][0];
+    expect(registerArgs).toEqual(expect.objectContaining({
+      slug: 'uploaded-metadata-register-boundary-session',
+      metadataURI: `ar://${uploadedTxId}`,
+      sessionFields: expect.any(Object),
+    }));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
+  });
 });
