@@ -3,10 +3,17 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyTool.module.scss';
-import type { SurveyQuestionsRouteViewDisplayState } from './surveyQuestionsTypes.js';
+import type {
+  SurveyQuestionsLayoutDisplayState,
+  SurveyQuestionsRouteViewDisplayState,
+} from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsResponseViewProps = {
   isLoadingResponse?: boolean;
+  layoutDisplayState?: Pick<
+    SurveyQuestionsLayoutDisplayState,
+    'responseViewClassName'
+  >;
   noResponse?: boolean;
   parsedViewAddressAnswers?: any;
   questionPool?: any[];
@@ -23,7 +30,6 @@ type SurveyQuestionsResponseViewProps = {
   ) => React.ReactNode;
   responderAddress?: string;
   responseLookupWarning?: React.ReactNode;
-  responseViewClassName?: string;
   routeViewDisplayState?: Pick<
     SurveyQuestionsRouteViewDisplayState,
     'isOwnResponse' | 'shortenedViewAddress' | 'viewedAddressLower' | 'viewedAddressRaw'
@@ -35,6 +41,7 @@ type SurveyQuestionsResponseViewProps = {
 
 const SurveyQuestionsResponseView = ({
   isLoadingResponse = false,
+  layoutDisplayState,
   noResponse = false,
   parsedViewAddressAnswers = null,
   questionPool = [],
@@ -43,7 +50,6 @@ const SurveyQuestionsResponseView = ({
   renderSurveyAnswers,
   responderAddress,
   responseLookupWarning = '',
-  responseViewClassName,
   routeViewDisplayState,
   singleQuestionMode = false,
   userAnswers = null,
@@ -82,7 +88,7 @@ const SurveyQuestionsResponseView = ({
     (!singleQuestionMode && parsedViewAddressAnswers);
 
   return (
-    <div className={responseViewClassName}>
+    <div className={layoutDisplayState?.responseViewClassName}>
       {viewedAddressRaw && (
         <h2 className={styles.viewAddressHeading}>
           <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>

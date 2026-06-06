@@ -23,7 +23,7 @@ describe('SurveyQuestionsTopStrip', () => {
     const { container } = render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        className="top-strip"
+        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
       />
     );
 
@@ -39,7 +39,7 @@ describe('SurveyQuestionsTopStrip', () => {
       <SurveyQuestionsTopStrip
         {...baseProps}
         ref={ref}
-        className="top-strip"
+        layoutDisplayState={{ topSectionClassName: 'top-strip' }}
       />
     );
 

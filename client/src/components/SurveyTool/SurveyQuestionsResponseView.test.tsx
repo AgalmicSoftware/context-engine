@@ -59,8 +59,9 @@ describe('SurveyQuestionsResponseView', () => {
     const question = { id: 'q1', prompt: 'Question?' };
     const parsedViewAddressAnswers = { q1: 'viewed answer' };
 
-    render(
+    const { container } = render(
       <SurveyQuestionsResponseView
+        layoutDisplayState={{ responseViewClassName: 'response-view' }}
         parsedViewAddressAnswers={parsedViewAddressAnswers}
         questionPool={[question]}
         questionPoolReady
@@ -76,6 +77,7 @@ describe('SurveyQuestionsResponseView', () => {
       />
     );
 
+    expect(container.firstElementChild).toHaveClass('response-view');
     expect(screen.getByRole('link', { name: '0xabc...1234' })).toHaveAttribute('href', '/u/0xabc1234');
     expect(screen.getByText('Response:')).toBeInTheDocument();
     expect(screen.getByTestId('single-answer')).toBeInTheDocument();
