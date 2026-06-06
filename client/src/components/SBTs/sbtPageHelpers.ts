@@ -203,6 +203,7 @@ export {
   resolveSbtPageMiniBurnPermission,
   resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniManualClaimActionRequest,
   resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
   resolveSbtPageMiniMintState,
@@ -222,6 +223,8 @@ export {
 export type {
   SbtPageManualClaimActionRequest,
   SbtPageManualClaimActionRequestViewKind,
+  SbtPageMiniManualClaimActionRequest,
+  SbtPageMiniManualClaimActionRequestViewKind,
   SbtPageMiniMintActionPlan,
   SbtPageMintEndDisplayState,
 } from './sbtPageActionDisplayHelpers';

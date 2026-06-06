@@ -13,6 +13,7 @@ import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import {
   resolveSbtPageStatusButtonContentState,
+  type SbtPageMiniManualClaimActionRequest,
   type SbtPageMiniMintActionPlan,
 } from './sbtPageActionDisplayHelpers';
 
@@ -51,12 +52,10 @@ type SbtPageMiniCardProps = {
   burnLabel: string;
   burnedLabel: string;
   cardStyle?: React.CSSProperties;
-  claimCountdown?: number | string;
   groupPasswordInput?: string;
   hasTokenMini?: boolean;
   imageUrl: string;
   isMintingActive?: boolean;
-  manualPasswordInput?: string;
   miniActionFailureState: SbtPageMiniActionFailureState;
   miniActionFailureStatusStyle?: React.CSSProperties;
   miniActionStatusStyle?: React.CSSProperties;
@@ -65,9 +64,7 @@ type SbtPageMiniCardProps = {
   miniBurnContentState?: SbtPagePendingContentState | null;
   miniControlTopMarginStyle?: React.CSSProperties;
   miniInviteInputStyle?: React.CSSProperties;
-  miniManualClaimButtonState: SbtPageButtonState;
-  miniManualClaimFinishContentState: SbtPagePendingContentState;
-  miniManualClaimStartContentState: SbtPagePendingContentState;
+  miniManualClaimActionRequest: SbtPageMiniManualClaimActionRequest;
   miniMintActionPlan: SbtPageMiniMintActionPlan;
   miniMintActionButtonClassName: string;
   miniOpenMintButtonState: SbtPageButtonState;
@@ -115,12 +112,10 @@ const SbtPageMiniCard = ({
   burnLabel,
   burnedLabel,
   cardStyle,
-  claimCountdown = '',
   groupPasswordInput = '',
   hasTokenMini = false,
   imageUrl,
   isMintingActive = false,
-  manualPasswordInput = '',
   miniActionFailureState,
   miniActionFailureStatusStyle,
   miniActionStatusStyle,
@@ -129,9 +124,7 @@ const SbtPageMiniCard = ({
   miniBurnContentState = null,
   miniControlTopMarginStyle,
   miniInviteInputStyle,
-  miniManualClaimButtonState,
-  miniManualClaimFinishContentState,
-  miniManualClaimStartContentState,
+  miniManualClaimActionRequest,
   miniMintActionPlan,
   miniMintActionButtonClassName,
   miniOpenMintButtonState,
@@ -227,55 +220,35 @@ const SbtPageMiniCard = ({
           </button>
         </div>
       );
-    } else if (miniMintActionPlan.viewKind === 'manual-password-start-input') {
+    } else if (miniManualClaimActionRequest.shouldRenderInputAction) {
       miniMintArea = (
         <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
           <input
-            type="text"
+            type={miniManualClaimActionRequest.inputType}
             className={styles.miniPasswordInput}
-            value={manualPasswordInput}
+            value={miniManualClaimActionRequest.inputValue}
             onChange={onManualPasswordInputChange}
-            placeholder="Password"
-            disabled={miniManualClaimButtonState.isPending}
-            style={miniPasswordControlInputStyle}
+            placeholder={miniManualClaimActionRequest.placeholder}
+            disabled={miniManualClaimActionRequest.inputDisabled}
+            style={miniManualClaimActionRequest.viewKind === 'manual-password-start-input' ? miniPasswordControlInputStyle : undefined}
           />
           <button
             onClick={onMiniMint}
-            disabled={miniMintActionPlan.disabled}
+            disabled={miniManualClaimActionRequest.disabled}
             className={miniMintActionButtonClassName}
           >
-            {renderPendingButtonContent(miniManualClaimStartContentState)}
+            {renderPendingButtonContent(miniManualClaimActionRequest.contentState)}
           </button>
         </div>
       );
-    } else if (miniMintActionPlan.viewKind === 'manual-claim-countdown') {
+    } else if (miniManualClaimActionRequest.viewKind === 'manual-claim-countdown') {
       miniMintArea = (
         <div className={styles.miniActionStatus} style={miniActionStatusStyle}>
-          Wait: {claimCountdown}s
+          {miniManualClaimActionRequest.statusText}
         </div>
       );
-    } else if (miniMintActionPlan.viewKind === 'manual-password-finish-input') {
-      miniMintArea = (
-        <div className={styles.miniMintPasswordArea} style={miniControlTopMarginStyle}>
-          <input
-            type="text"
-            className={styles.miniPasswordInput}
-            value={manualPasswordInput}
-            onChange={onManualPasswordInputChange}
-            placeholder="Password"
-            disabled={miniManualClaimButtonState.isPending}
-          />
-          <button
-            onClick={onMiniMint}
-            disabled={miniMintActionPlan.disabled}
-            className={miniMintActionButtonClassName}
-          >
-            {renderPendingButtonContent(miniManualClaimFinishContentState)}
-          </button>
-        </div>
-      );
-    } else if (miniMintActionPlan.viewKind === 'manual-claim-success') {
-      miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{`${mintedLabel}!`}</div>;
+    } else if (miniManualClaimActionRequest.viewKind === 'manual-claim-success') {
+      miniMintArea = <div className={styles.miniActionStatus} style={miniActionStatusStyle}>{miniManualClaimActionRequest.statusText}</div>;
     } else if (miniMintActionPlan.viewKind === 'open-mint-button') {
       miniMintArea = (
         <button
