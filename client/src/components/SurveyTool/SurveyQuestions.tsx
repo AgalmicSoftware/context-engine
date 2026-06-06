@@ -5183,9 +5183,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       const stopPlanContext = {
         bootstrapRetryAttempt,
         cacheBootstrapPlan,
-        effectiveSingleSlug,
-        questionId,
-        responderAddress,
+        effectiveSingleSlug: cacheBootstrapResult.target.effectiveSingleSlug,
+        questionId: cacheBootstrapResult.target.questionId,
+        responderAddress: cacheBootstrapResult.target.responderAddress,
         runId,
       };
       const stopHandlingPlan = resolveSingleQuestionCacheBootstrapStopHandlingPlan(stopPlanContext);
