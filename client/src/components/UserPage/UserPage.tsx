@@ -71,7 +71,7 @@ import {
   buildUserPageSelectedTabStatePatch,
   buildUserPageSurveyExpansionTogglePatch,
   buildUserPageTooltipTargetIds,
-  buildUserPageUnifiedCacheAggregateMemoKey,
+  buildUserPageUnifiedCacheAggregateMemoPlan,
   buildUserPageUsernameChangeStatePatch,
   buildUserPageUsernameEditCancelStatePatch,
   buildUserPageUsernameEditOpenStatePatch,
@@ -263,12 +263,6 @@ type CacheSourceSnapshot = CacheSourcePresence & {
 };
 
 type UserPageTimerHandle = ReturnType<typeof setTimeout>;
-
-type UnifiedCacheAggregateMemoKeyInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  sourceMembershipSignature?: unknown;
-};
 
 type SectionDeriveSignatureInput = {
   viewAddressLower?: unknown;
@@ -1589,20 +1583,6 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _buildUnifiedCacheAggregateMemoKey = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceMembershipSignature = '',
-  }: UnifiedCacheAggregateMemoKeyInput = {}): string => (
-    buildUserPageUnifiedCacheAggregateMemoKey({
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceMembershipSignature,
-      viewAddressLower,
-    })
-  );
-
   _buildSurveyDeriveSignature = ({
     viewAddressLower = '',
     networkID = '',
@@ -2593,21 +2573,21 @@ class UserPage extends Component<any, any> {
     const gateContext = createGateAccessContext();
 
     try {
-      const aggregateMemoKey = this._buildUnifiedCacheAggregateMemoKey({
+      const aggregateMemoPlan = buildUserPageUnifiedCacheAggregateMemoPlan({
+        currentAggregateMemo: this._unifiedCacheAggregateMemo,
+        currentAggregateMemoKey: this._unifiedCacheAggregateMemoKey,
         viewAddressLower,
         networkID,
+        questionResponsesNonce: this.props.questionResponsesNonce,
+        sbtCacheRevision: this.props.sbtCacheRevision,
         sourceMembershipSignature: sourceSnapshot.membershipSignature,
       });
-      const canReuseAggregate = !!(
-        this._unifiedCacheAggregateMemo &&
-        this._unifiedCacheAggregateMemoKey === aggregateMemoKey
-      );
-      if (canReuseAggregate) {
-        aggregate = this._unifiedCacheAggregateMemo as UnknownRecord;
+      if (aggregateMemoPlan.canReuseAggregate) {
+        aggregate = aggregateMemoPlan.aggregate as UnknownRecord;
       } else {
         aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower }) as UnknownRecord;
         this._unifiedCacheAggregateMemo = aggregate;
-        this._unifiedCacheAggregateMemoKey = aggregateMemoKey;
+        this._unifiedCacheAggregateMemoKey = aggregateMemoPlan.aggregateMemoKey;
       }
       const latestBlockRaw = this.props.latestBlockNumber;
       const latestBlockNum = Number.isFinite(Number(latestBlockRaw)) ? Number(latestBlockRaw) : null;
