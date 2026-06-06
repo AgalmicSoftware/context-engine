@@ -48,6 +48,7 @@ import {
   buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageEncryptedVisibilityStatusRequestPlan,
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
@@ -84,7 +85,6 @@ import {
   getActiveUserPageChainNode,
   getPrioritizedUserPageChainNodes,
   getPrioritizedUserPageNetworkCacheNodes,
-  getUserPageGateResourceKeysToCheck,
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
   hasUserPageResponseSubmissionHints,
@@ -1961,34 +1961,24 @@ class UserPage extends Component<any, any> {
     encryptionAudience = 'gate',
     gateContext = null,
   }: EncryptedVisibilityInput = {}): EncryptedVisibilityResult => {
-    const viewerAccountLower = String(this.props.account || '').trim().toLowerCase();
-    const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
-    const normalizedAudience = String(encryptionAudience || '').trim().toLowerCase();
-    if (isOwnProfileViewer || normalizedAudience === 'self') {
-      const displayState = buildUserPageEncryptedVisibilityDisplayState({
-        encryptionAudience,
-        resourceKey,
-        viewAddressLower,
-        viewerAccount: this.props.account,
-      });
-      return {
-        visible: displayState.visible,
-        canDecryptOtherResponses: displayState.canDecryptOtherResponses,
-      };
-    }
-
-    const resourceKeysToCheck = getUserPageGateResourceKeysToCheck(resourceKey);
-    const statusByResource: GateAccessStatusByResource[] = resourceKeysToCheck.map((key: string) => ({
-      resourceKey: key,
-      status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
-    }));
-    const displayState = buildUserPageEncryptedVisibilityDisplayState({
+    const statusRequestPlan = buildUserPageEncryptedVisibilityStatusRequestPlan({
       encryptionAudience,
       resourceKey,
-      statusByResource,
       viewAddressLower,
       viewerAccount: this.props.account,
     });
+    const displayState = statusRequestPlan.action === 'terminal'
+      ? statusRequestPlan.displayState
+      : buildUserPageEncryptedVisibilityDisplayState({
+          encryptionAudience,
+          resourceKey,
+          statusByResource: statusRequestPlan.resourceKeysToCheck.map((key: string) => ({
+            resourceKey: key,
+            status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
+          })),
+          viewAddressLower,
+          viewerAccount: this.props.account,
+        });
     if (isGateAccessContext(gateContext)) {
       displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
         gateContext.pendingKeys.add(buildUserPageGatePendingKey({ slug, resourceKey: pendingResourceKey }));
