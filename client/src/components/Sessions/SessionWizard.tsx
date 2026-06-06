@@ -4411,7 +4411,6 @@ const SessionWizard = ({
     canUploadMetadataNow,
     uploadBlockedReason,
     canPublishNow,
-    showUploadBlockedReason,
   } = publishUiPlan.publishReadiness;
   const deployStatusLower = toStr(deployStatus).toLowerCase();
   const deployStatusIsError = !!deployStatus &&
@@ -4539,8 +4538,6 @@ const SessionWizard = ({
     contractKey: selectedWizardContract?.key || '',
     sessionSlug: selectedWizardContractSessionSlug,
   }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
-  const publishProgressDisplayState = publishUiPlan.publishProgressDisplayState;
-  const publishMetadataDisplayState = publishUiPlan.publishMetadataDisplayState;
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
@@ -4573,7 +4570,6 @@ const SessionWizard = ({
       advancedBundleFileInputRef={advancedBundleFileInputRef}
       bundleFile={bundleFile}
       bundleMode={bundleMode}
-      canPublishNow={canPublishNow}
       clearSelectedBundleFile={clearSelectedBundleFile}
       clearWorkerSecretFields={clearWorkerSecretFields}
       closeContractViewerModal={closeContractViewerModal}
@@ -4660,9 +4656,8 @@ const SessionWizard = ({
       provider={provider}
       publishAdvancedOpen={publishAdvancedOpen}
       publishBusy={publishBusy}
-      publishMetadataDisplayState={publishMetadataDisplayState}
-      publishProgressDisplayState={publishProgressDisplayState}
       publishStep={publishStep}
+      publishUiPlan={publishUiPlan}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}
       registerTxs={registerTxs}
@@ -4698,7 +4693,6 @@ const SessionWizard = ({
       setWorkerUrlAutoFilled={setWorkerUrlAutoFilled}
       shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
       shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
-      showUploadBlockedReason={showUploadBlockedReason}
       showJsonPreview={showJsonPreview}
       showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
       showNormalModeManualBundleControls={showNormalModeManualBundleControls}
@@ -4717,7 +4711,6 @@ const SessionWizard = ({
       toggleSection={toggleSection}
       updateDraftValue={updateDraftValue}
       updateEncryptionGate={updateEncryptionGate}
-      uploadBlockedReason={uploadBlockedReason}
       visibleWorkerResourceKeys={visibleWorkerResourceKeys}
       workerAllowOrigins={workerAllowOrigins}
       workerMode={workerMode}

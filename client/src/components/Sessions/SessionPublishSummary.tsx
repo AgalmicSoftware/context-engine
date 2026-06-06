@@ -13,17 +13,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
-import type { SessionWizardPublishMetadataDisplayState } from './sessionWizardPublishReadiness';
+import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type PublishSummaryItem = {
   label: string;
   value: React.ReactNode;
-};
-
-type PublishProgressStep = {
-  key: string;
-  label: string;
 };
 
 type RegisterTxEntry = {
@@ -45,7 +40,6 @@ type SessionPublishSummaryProps = {
   normalModePublishSummary: PublishSummaryItem[];
   onPublish: () => void;
   publishBusy: boolean;
-  canPublishNow: boolean;
   publishAdvancedOpen: boolean;
   onTogglePublishAdvanced: () => void;
   showSponsoredBundleFallbackInput: boolean;
@@ -59,15 +53,8 @@ type SessionPublishSummaryProps = {
   bundleFile: File | null;
   localWorkerBundleFallbackFilePath: string;
   sponsoredManualBundleRetryMessage: string;
-  publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
-  showPublishProgress: boolean;
-  activePublishProgressStepLabel: string;
-  publishProgressPercent: number;
-  publishProgressPercentRounded: number;
+  publishUiPlan: SessionWizardPublishUiPlan;
   publishStep: number;
-  publishProgressSteps: PublishProgressStep[];
-  uploadBlockedReason: string;
-  showUploadBlockedReason: boolean;
   renderInfoTooltip: (options: Record<string, unknown>) => React.ReactNode;
   resolvedWorkerBaseUrl: string;
   workerUrlSource: string;
@@ -99,7 +86,6 @@ const SessionPublishSummary = ({
   normalModePublishSummary,
   onPublish,
   publishBusy,
-  canPublishNow,
   publishAdvancedOpen,
   onTogglePublishAdvanced,
   showSponsoredBundleFallbackInput,
@@ -113,15 +99,8 @@ const SessionPublishSummary = ({
   bundleFile,
   localWorkerBundleFallbackFilePath,
   sponsoredManualBundleRetryMessage,
-  publishMetadataDisplayState,
-  showPublishProgress,
-  activePublishProgressStepLabel,
-  publishProgressPercent,
-  publishProgressPercentRounded,
+  publishUiPlan,
   publishStep,
-  publishProgressSteps,
-  uploadBlockedReason,
-  showUploadBlockedReason,
   renderInfoTooltip,
   resolvedWorkerBaseUrl,
   workerUrlSource,
@@ -143,7 +122,26 @@ const SessionPublishSummary = ({
   onCopyAdminUrl,
   adminUrlStatus,
   status,
-}: SessionPublishSummaryProps) => (
+}: SessionPublishSummaryProps) => {
+  const {
+    publishMetadataDisplayState,
+    publishProgressDisplayState,
+    publishReadiness,
+  } = publishUiPlan;
+  const {
+    canPublishNow,
+    showUploadBlockedReason,
+    uploadBlockedReason,
+  } = publishReadiness;
+  const {
+    activePublishProgressStepLabel,
+    publishProgressPercent,
+    publishProgressPercentRounded,
+    publishProgressSteps,
+    showPublishProgress,
+  } = publishProgressDisplayState;
+
+  return (
   <section id="session-wizard-section-publish" className={styles.panel}>
     {wizardMode === 'advanced' ? (
       <button type="button" className={styles.panelHeader} onClick={onToggleCollapsed}>
@@ -501,6 +499,7 @@ const SessionPublishSummary = ({
       </div>
     ) : null}
   </section>
-);
+  );
+};
 
 export default SessionPublishSummary;
