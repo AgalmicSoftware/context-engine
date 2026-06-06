@@ -491,6 +491,13 @@ describe('sbtPageActionDisplayHelpers', () => {
       canOpenMintTx: false,
       disabled: true,
       isPending: true,
+      readinessDescriptor: {
+        canOpenMintTx: false,
+        hasMintTransactionHash: true,
+        isBurnCleared: false,
+        isMinted: false,
+        isPending: true,
+      },
     });
 
     expect(resolveSbtPageOpenMintButtonState({
@@ -500,6 +507,13 @@ describe('sbtPageActionDisplayHelpers', () => {
       canOpenMintTx: false,
       disabled: true,
       isMinted: true,
+      readinessDescriptor: {
+        canOpenMintTx: false,
+        hasMintTransactionHash: false,
+        isBurnCleared: false,
+        isMinted: true,
+        isPending: false,
+      },
       title: undefined,
     });
 
@@ -511,6 +525,13 @@ describe('sbtPageActionDisplayHelpers', () => {
       canOpenMintTx: false,
       disabled: false,
       isMinted: false,
+      readinessDescriptor: {
+        canOpenMintTx: false,
+        hasMintTransactionHash: true,
+        isBurnCleared: true,
+        isMinted: false,
+        isPending: false,
+      },
       title: undefined,
     });
   });
