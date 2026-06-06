@@ -17,7 +17,7 @@ export type SessionWizardPublishDeployWorkerResult = {
   error?: string;
 };
 
-export type SessionWizardPublishDeployPendingSbtsArgs = {
+export type SessionWizardPublishWorkerSignerArgs = {
   workerUrlOverride: string;
   signerAccountOverride: string;
 };
@@ -25,7 +25,7 @@ export type SessionWizardPublishDeployPendingSbtsArgs = {
 export type SessionWizardPublishControllerPorts = {
   deployWorker: () => Promise<SessionWizardPublishDeployWorkerResult | null | undefined>;
   deployPendingSbts?: (
-    args: SessionWizardPublishDeployPendingSbtsArgs
+    args: SessionWizardPublishWorkerSignerArgs
   ) => Promise<SessionWizardPendingDraftLike[] | null | undefined>;
 };
 
@@ -114,12 +114,12 @@ export type SessionWizardPublishMetadataUploadRequestInput = {
 export type SessionWizardPublishMetadataUploadRequest = {
   shouldUploadMetadata: boolean;
   publishStep: number;
-  uploadArgs: SessionWizardPublishDeployPendingSbtsArgs;
+  uploadArgs: SessionWizardPublishWorkerSignerArgs;
 };
 
 export type SessionWizardPublishMetadataUploadControllerPorts = {
   uploadMetadata: (
-    args: SessionWizardPublishDeployPendingSbtsArgs
+    args: SessionWizardPublishWorkerSignerArgs
   ) => Promise<AnyRecord | null | undefined>;
 };
 
