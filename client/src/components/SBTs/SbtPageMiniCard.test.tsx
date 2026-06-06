@@ -3,7 +3,10 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SbtPageMiniCard from './SbtPageMiniCard';
-import type { SbtPageMiniMintActionPlan } from './sbtPageActionDisplayHelpers';
+import type {
+  SbtPageMiniManualClaimActionRequest,
+  SbtPageMiniMintActionPlan,
+} from './sbtPageActionDisplayHelpers';
 
 jest.mock('../Shared/CETooltip', () => ({
   __esModule: true,
@@ -14,12 +17,10 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   burnLabel: 'Burn',
   burnedLabel: 'Burned',
   cardStyle: { cursor: 'pointer' },
-  claimCountdown: 12,
   groupPasswordInput: '',
   hasTokenMini: false,
   imageUrl: 'https://example.test/badge.png',
   isMintingActive: true,
-  manualPasswordInput: '',
   miniActionFailureState: {},
   miniActionFailureStatusStyle: { color: 'red' },
   miniActionStatusStyle: { color: 'green' },
@@ -28,9 +29,7 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
   miniBurnContentState: null,
   miniControlTopMarginStyle: { marginTop: '10px' },
   miniInviteInputStyle: { maxWidth: '140px' },
-  miniManualClaimButtonState: { disabled: false, isPending: false },
-  miniManualClaimFinishContentState: { label: 'Finish', shouldRenderLabel: true },
-  miniManualClaimStartContentState: { label: 'Join', shouldRenderLabel: true },
+  miniManualClaimActionRequest: createMiniManualClaimActionRequest(),
   miniMintActionPlan: createMiniMintActionPlan({
     blockedReason: 'mini-mint-unavailable',
     disabled: true,
@@ -84,6 +83,24 @@ const createMiniMintActionPlan = (
   ...overrides,
 });
 
+const createMiniManualClaimActionRequest = (
+  overrides: Partial<SbtPageMiniManualClaimActionRequest> = {}
+): SbtPageMiniManualClaimActionRequest => ({
+  buttonState: { disabled: true, isPending: false },
+  contentState: { label: '', shouldRenderLabel: false, shouldRenderPendingIcon: false },
+  disabled: true,
+  handlerKind: 'none',
+  inputDisabled: false,
+  inputType: 'text',
+  inputValue: '',
+  placeholder: 'Password',
+  shouldRenderInputAction: false,
+  shouldRenderStatus: false,
+  statusText: '',
+  viewKind: 'hidden',
+  ...overrides,
+});
+
 describe('SbtPageMiniCard', () => {
   it('renders the passive card identity, image, address, and live status', () => {
     render(<SbtPageMiniCard {...createProps()} />);
@@ -99,6 +116,7 @@ describe('SbtPageMiniCard', () => {
     const onShowMiniPasswordInput = jest.fn();
     const onMintUnlimitedWithGroupPassword = jest.fn();
     const onClaimWithInviteCode = jest.fn();
+    const onMiniMint = jest.fn();
 
     const { rerender } = render(
       <SbtPageMiniCard
@@ -148,6 +166,31 @@ describe('SbtPageMiniCard', () => {
     expect(screen.getByPlaceholderText('Invite Code')).toHaveValue('invite-code');
     fireEvent.click(screen.getByRole('button', { name: 'Join' }));
     expect(onClaimWithInviteCode).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <SbtPageMiniCard
+        {...createProps({
+          miniManualClaimActionRequest: createMiniManualClaimActionRequest({
+            buttonState: { disabled: false, isPending: false },
+            contentState: { label: 'Finish', shouldRenderLabel: true },
+            disabled: false,
+            handlerKind: 'mini-mint',
+            inputValue: 'manual-code',
+            shouldRenderInputAction: true,
+            viewKind: 'manual-password-finish-input',
+          }),
+          miniMintActionPlan: createMiniMintActionPlan({
+            handlerKind: 'mini-mint',
+            labelKind: 'finish',
+            viewKind: 'manual-password-finish-input',
+          }),
+          onMiniMint,
+        })}
+      />
+    );
+    expect(screen.getByPlaceholderText('Password')).toHaveValue('manual-code');
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    expect(onMiniMint).toHaveBeenCalledTimes(1);
   });
 
   it('preserves disabled and status states without invoking execution handlers directly', () => {
@@ -155,8 +198,16 @@ describe('SbtPageMiniCard', () => {
     const { rerender } = render(
       <SbtPageMiniCard
         {...createProps({
-          manualPasswordInput: 'manual-code',
-          miniManualClaimButtonState: { disabled: true, isPending: false },
+          miniManualClaimActionRequest: createMiniManualClaimActionRequest({
+            buttonState: { disabled: true, isPending: false },
+            contentState: { label: 'Join', shouldRenderLabel: true },
+            disabled: true,
+            handlerKind: 'mini-mint',
+            inputDisabled: false,
+            inputValue: 'manual-code',
+            shouldRenderInputAction: true,
+            viewKind: 'manual-password-start-input',
+          }),
           miniMintActionPlan: createMiniMintActionPlan({
             disabled: true,
             handlerKind: 'mini-mint',
@@ -177,6 +228,13 @@ describe('SbtPageMiniCard', () => {
     rerender(
       <SbtPageMiniCard
         {...createProps({
+          miniManualClaimActionRequest: createMiniManualClaimActionRequest({
+            disabled: false,
+            handlerKind: 'none',
+            shouldRenderStatus: true,
+            statusText: 'Wait: 12s',
+            viewKind: 'manual-claim-countdown',
+          }),
           miniMintActionPlan: createMiniMintActionPlan({
             handlerKind: 'none',
             inertReason: 'status-only',
