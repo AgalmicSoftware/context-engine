@@ -8388,7 +8388,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           copiedResponseJson={this.state.copiedResponseJson}
           copiedSurveyJson={this.state.copiedSurveyJson}
           hidden={hideEmbeddedDebugUi}
-          isStandalone={this.props.isStandalone}
           jsonPanelDisplayState={jsonPanelDisplayState}
           onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
           onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
@@ -8399,10 +8398,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           questionsJson={questionsJson}
           renderJsonTree={this.jsonTreeDisplay}
           responseJson={responseJson}
-          showQuestionsJson={this.state.showQuestionsJson}
-          showResponseJson={this.state.showResponseJson}
-          showSurveyJson={this.state.showSurveyJson}
-          singleQuestionMode={this.props.singleQuestionMode}
           surveyJson={surveyJson}
         />
         {useTagModal && (
