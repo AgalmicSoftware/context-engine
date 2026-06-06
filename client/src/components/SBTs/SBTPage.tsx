@@ -157,19 +157,14 @@ import {
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageMetadataHydrationMode,
-  resolveSbtPageManualClaimActionRequest,
   resolveSbtPageMiniCardDisplayState,
-  resolveSbtPageMintActionPlan,
-  resolveSbtPageMintFlowDisplayState,
-  resolveSbtPageOpenMintButtonState,
+  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
   resolveSbtPagePasswordExportControlsState,
   resolveSbtPagePasswordExportSelection,
   resolveSbtPagePasswordGenerationButtonState,
   resolveSbtPagePasswordInventoryDisplayState,
-  resolveSbtPagePasswordJoinButtonState,
-  resolveSbtPagePendingButtonContentState,
   resolveSbtPageRecoveryCacheChainId,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
@@ -3649,35 +3644,33 @@ class SBTPage extends Component<any, any> {
 
 renderMintButton() {
   const { sbtInfo, mintStep, claimCountdown, mintingStatus, userHasSBT, burningStatus, manualPasswordInput, lastMintTxHash, groupPasswordInput } = this.state;
-  const mintActionPlan = resolveSbtPageMintActionPlan({
+  const mintButtonDisplayState = resolveSbtPageMintButtonDisplayState({
     burningStatus,
-    nowSeconds: Math.floor(Date.now() / 1000),
-    sbtInfo,
-    userHasSBT,
-  });
-  if (!mintActionPlan.shouldRenderMintButton) return null;
-  const passwordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    claimCountdown,
     groupPasswordInput,
-    mintingStatus,
-  });
-  const passwordJoinContentState = resolveSbtPagePendingButtonContentState({
-    isPending: passwordJoinButtonState.isPending,
-    label: 'Join',
-  });
-  const mintFlowDisplayState = resolveSbtPageMintFlowDisplayState({
     hasGroupPasswordMint: this.state.hasGroupPasswordMint,
     hasInviteMint: this.state.hasInviteMint,
+    lastMintTxHash,
+    manualPasswordInput,
+    mintedLabel: t('minted'),
+    mintLowerLabel: t('mintLower'),
     mintingStatus,
     mintStep,
+    nowSeconds: Math.floor(Date.now() / 1000),
     sbtInfo,
+    sbtMintedSuccessLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
+    userHasSBT,
   });
-  const manualClaimActionRequest = resolveSbtPageManualClaimActionRequest({
-    claimCountdown,
-    manualPasswordInput,
+  const {
+    manualClaimActionRequest,
+    mintActionPlan,
     mintFlowDisplayState,
-    mintingStatus,
-    successLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
-  });
+    openMintButtonContentState,
+    openMintButtonState,
+    passwordJoinButtonState,
+    passwordJoinContentState,
+  } = mintButtonDisplayState;
+  if (!mintActionPlan.shouldRenderMintButton) return null;
   if (mintFlowDisplayState.shouldSuppressMintControls) return null;
   const mintActionButtonClassName = buildSbtPageActionButtonClassName({
     actionClassName: styles.actionButton,
@@ -3736,25 +3729,8 @@ renderMintButton() {
     const {
       canOpenMintTx,
       disabled,
-      isFailure,
-      isIdle,
-      isMinted,
-      isPending,
       title,
-    } = resolveSbtPageOpenMintButtonState({
-      burningStatus,
-      lastMintTxHash,
-      mintLowerLabel: t('mintLower'),
-      mintingStatus,
-    });
-    const openMintButtonContentState = resolveSbtPageStatusButtonContentState({
-      idleLabel: 'Join',
-      isFailure,
-      isIdle,
-      isPending,
-      isSuccess: isMinted,
-      successLabel: t('minted'),
-    });
+    } = openMintButtonState;
     return (
       <SbtPageStatusActionButton
         className={mintActionButtonClassName}
