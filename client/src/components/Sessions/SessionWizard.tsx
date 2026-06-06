@@ -4641,7 +4641,6 @@ const SessionWizard = ({
       provider={provider}
       publishAdvancedOpen={publishAdvancedOpen}
       publishBusy={publishBusy}
-      publishStep={publishStep}
       publishUiPlan={publishUiPlan}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}

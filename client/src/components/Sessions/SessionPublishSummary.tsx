@@ -54,7 +54,6 @@ type SessionPublishSummaryProps = {
   localWorkerBundleFallbackFilePath: string;
   sponsoredManualBundleRetryMessage: string;
   publishUiPlan: SessionWizardPublishUiPlan;
-  publishStep: number;
   renderInfoTooltip: (options: Record<string, unknown>) => React.ReactNode;
   resolvedWorkerBaseUrl: string;
   workerUrlSource: string;
@@ -100,7 +99,6 @@ const SessionPublishSummary = ({
   localWorkerBundleFallbackFilePath,
   sponsoredManualBundleRetryMessage,
   publishUiPlan,
-  publishStep,
   renderInfoTooltip,
   resolvedWorkerBaseUrl,
   workerUrlSource,
@@ -135,6 +133,7 @@ const SessionPublishSummary = ({
   } = publishReadiness;
   const {
     activePublishProgressStepLabel,
+    publishStep,
     publishProgressPercent,
     publishProgressPercentRounded,
     publishProgressSteps,
