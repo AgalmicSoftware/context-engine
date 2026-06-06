@@ -8286,8 +8286,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const submittedStateActive = submitFooterDisplayState.submittedStateActive;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
     const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
-    const showInlineSubmit = submitFooterDisplayState.showInlineSubmit;
-    const showTopInlineSubmit = submitFooterDisplayState.showTopInlineSubmit;
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: this.state.activeTagModalTag,
       isSingleQuestionView,
@@ -8384,7 +8382,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             onShowJsonAtBottom={this.handleShowJsonAtBottom}
             renderedEditableQuestions={renderedEditableQuestions}
             showBackToTopControl={canEditQuestions && !this.props.singleQuestionMode}
-            showInlineSubmit={showInlineSubmit}
             showJsonControl={!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode}
             showLockedQuestionsBanner={
               !hideEmbeddedDebugUi &&
@@ -8392,7 +8389,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               questionPoolReady &&
               !!currentSurveyResponseState
             }
-            showTopInlineSubmit={showTopInlineSubmit}
+            submitDisplayState={submitFooterDisplayState}
             submittedResponseView={submittedResponseView}
             submitResponseButton={submitResponseButton}
           />

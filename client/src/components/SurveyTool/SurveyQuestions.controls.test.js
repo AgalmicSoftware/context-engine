@@ -182,8 +182,8 @@ describe('SurveyQuestions controls', () => {
 
     const panel = getAuthoringPanel(subject);
 
-    expect(panel.props.showInlineSubmit).toBe(false);
-    expect(panel.props.showTopInlineSubmit).toBe(false);
+    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(false);
+    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(false);
     expect(subject.renderQuestion).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'q1' }),
       0,
@@ -202,8 +202,8 @@ describe('SurveyQuestions controls', () => {
     const panel = getAuthoringPanel(subject);
     const button = findSubmitButton(panel.props.submitResponseButton);
 
-    expect(panel.props.showInlineSubmit).toBe(true);
-    expect(panel.props.showTopInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(true);
     expect(button).not.toBeNull();
     expect(button.props.disabled).toBe(false);
 
@@ -226,8 +226,8 @@ describe('SurveyQuestions controls', () => {
     const button = findSubmitButton(panel.props.submitResponseButton);
     const submittedIndicator = findSubmittedIndicator(panel.props.submitResponseButton);
 
-    expect(panel.props.showInlineSubmit).toBe(true);
-    expect(panel.props.showTopInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(true);
     expect(button).not.toBeNull();
     expect(button.props.disabled).toBe(false);
     expect(submittedIndicator).not.toBeNull();
@@ -249,7 +249,7 @@ describe('SurveyQuestions controls', () => {
     const panel = getAuthoringPanel(subject);
     const button = findSubmitButton(panel.props.submitResponseButton);
 
-    expect(panel.props.showInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
     expect(button).not.toBeNull();
     expect(button.props.disabled).toBe(true);
   });
@@ -269,8 +269,8 @@ describe('SurveyQuestions controls', () => {
     const panel = getAuthoringPanel(subject);
     const button = findSubmitButton(panel.props.submitResponseButton);
 
-    expect(panel.props.showInlineSubmit).toBe(true);
-    expect(panel.props.showTopInlineSubmit).toBe(false);
+    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(false);
     expect(button).not.toBeNull();
     expect(button.props.disabled).toBe(true);
   });

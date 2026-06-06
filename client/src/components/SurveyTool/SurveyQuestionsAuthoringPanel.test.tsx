@@ -19,8 +19,10 @@ describe('SurveyQuestionsAuthoringPanel', () => {
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
         renderedEditableQuestions={<div data-testid="editable-question">Question card</div>}
-        showInlineSubmit
-        showTopInlineSubmit
+        submitDisplayState={{
+          showInlineSubmit: true,
+          showTopInlineSubmit: true,
+        }}
         submitResponseButton={<button type="button">Submit responses</button>}
       />
     );
