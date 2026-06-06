@@ -6,6 +6,7 @@ import {
   buildUserPageEncryptedVisibilityStatusRequestPlan,
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
+  buildUserPageGateAccessRequestDescriptor,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
@@ -48,6 +49,40 @@ describe('userPageGateHelpers', () => {
     expect(buildUserPageGatePendingKey({ slug: 'general' })).toBe('::default');
     expect(getUserPageGateResourceKeysToCheck(' response ')).toEqual(['response', 'default']);
     expect(getUserPageGateResourceKeysToCheck()).toEqual(['default']);
+  });
+
+  it('builds gate-access request descriptors without executing sponsored access checks', () => {
+    expect(buildUserPageGateAccessRequestDescriptor({
+      account: ' 0xABC ',
+      networkID: 84532,
+      pendingKey: ' General:: questionResponses ',
+      sbtCacheRevision: 7,
+    })).toEqual({
+      account: '0xABC',
+      cacheKey: '0xabc|84532|7||questionResponses',
+      pendingKey: '::questionResponses',
+      resourceKey: 'questionResponses',
+      sessionSlug: '',
+      sponsoredAccessRequest: {
+        account: '0xABC',
+        resourceKey: 'questionResponses',
+        sessionSlug: '',
+      },
+    });
+    expect(buildUserPageGateAccessRequestDescriptor({
+      pendingKey: 'Beta::',
+    })).toMatchObject({
+      account: '',
+      cacheKey: 'anon||0|beta|default',
+      pendingKey: 'beta::default',
+      resourceKey: 'default',
+      sessionSlug: 'beta',
+      sponsoredAccessRequest: {
+        account: '',
+        resourceKey: 'default',
+        sessionSlug: 'beta',
+      },
+    });
   });
 
   it('builds encrypted visibility display descriptors without mutating inputs', () => {
