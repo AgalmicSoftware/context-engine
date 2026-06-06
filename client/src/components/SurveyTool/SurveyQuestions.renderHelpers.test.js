@@ -448,6 +448,13 @@ describe('SurveyQuestions render helpers', () => {
       audioInputWorkerProps,
     });
     expect(input.props.audioInputWorkerProps).toBe(audioInputWorkerProps);
+    expect(Object.keys(input.props).filter((propName) => propName.startsWith('on')).sort()).toEqual([
+      'onAnswerChange',
+      'onDeferredRatingCommit',
+      'onRatingChange',
+      'onRatingChangeComplete',
+      'onToggleAnswerEncryption',
+    ]);
 
     input.props.onAnswerChange('next answer');
     input.props.onRatingChange(8, { type: 'keydown' });
