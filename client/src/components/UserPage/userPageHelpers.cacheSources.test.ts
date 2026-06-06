@@ -2,7 +2,9 @@ import {
   buildUserPageCacheSourcePresence,
   buildUserPageCacheSourceSnapshot,
   buildUserPageNamespaceSourceMembershipSignature,
+  buildUserPageResponseSectionDeriveMemoPlan,
   buildUserPageResponseSectionDeriveSignature,
+  buildUserPageSbtSectionDeriveMemoPlan,
   buildUserPageSbtSectionDeriveSignature,
   buildUserPageUnifiedCacheAggregateMemoKey,
   buildUserPageUnifiedCacheAggregateMemoPlan,
@@ -205,12 +207,78 @@ describe('userPageHelpers cache source helpers', () => {
 
     expect(buildUserPageResponseSectionDeriveSignature()).toBe('|||0||0|0');
 
+    const responseMemo = {
+      gateSnapshot: { pendingKeys: ['session-a:questionResponses'] },
+      result: { questionResponseInfo: [{ id: 'q1' }] },
+      signature: '0xdef|84532|questions|4|0xabc|5|6',
+    };
+    expect(buildUserPageResponseSectionDeriveMemoPlan({
+      account: ' 0xABC ',
+      currentMemo: responseMemo,
+      networkID: 84532,
+      questionResponsesNonce: 4,
+      responseGateAccessGeneration: 5,
+      responseGateAccessStatusVersion: 6,
+      sourceSignature: 'questions',
+      viewAddressLower: '0xdef',
+    })).toEqual({
+      canReuseMemo: true,
+      gateSnapshot: responseMemo.gateSnapshot,
+      result: responseMemo.result,
+      signature: '0xdef|84532|questions|4|0xabc|5|6',
+    });
+    expect(buildUserPageResponseSectionDeriveMemoPlan({
+      account: ' 0xABC ',
+      currentMemo: responseMemo,
+      force: true,
+      networkID: 84532,
+      questionResponsesNonce: 4,
+      responseGateAccessGeneration: 5,
+      responseGateAccessStatusVersion: 6,
+      sourceSignature: 'questions',
+      viewAddressLower: '0xdef',
+    })).toEqual({
+      canReuseMemo: false,
+      gateSnapshot: null,
+      result: null,
+      signature: '0xdef|84532|questions|4|0xabc|5|6',
+    });
+
     expect(buildUserPageSbtSectionDeriveSignature({
       networkID: 11155420,
       sbtCacheRevision: 9,
       sourceSignature: 'sbt',
       viewAddressLower: '0xaaa',
     })).toBe('0xaaa|11155420|sbt|9');
+
+    const sbtMemo = {
+      result: { sbtList: [{ tokenId: '1' }] },
+      signature: '0xaaa|11155420|sbt|9',
+    };
+    expect(buildUserPageSbtSectionDeriveMemoPlan({
+      currentMemo: sbtMemo,
+      networkID: 11155420,
+      sbtCacheRevision: 9,
+      sourceSignature: 'sbt',
+      viewAddressLower: '0xaaa',
+    })).toEqual({
+      canReuseMemo: true,
+      gateSnapshot: null,
+      result: sbtMemo.result,
+      signature: '0xaaa|11155420|sbt|9',
+    });
+    expect(buildUserPageSbtSectionDeriveMemoPlan({
+      currentMemo: sbtMemo,
+      networkID: 11155420,
+      sbtCacheRevision: 10,
+      sourceSignature: 'sbt',
+      viewAddressLower: '0xaaa',
+    })).toEqual({
+      canReuseMemo: false,
+      gateSnapshot: null,
+      result: null,
+      signature: '0xaaa|11155420|sbt|10',
+    });
     expect(buildUserPageSbtSectionDeriveSignature()).toBe('|||0');
   });
 });

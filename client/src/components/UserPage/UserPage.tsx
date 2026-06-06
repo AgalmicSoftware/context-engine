@@ -62,12 +62,12 @@ import {
   buildUserPageNicknameSaveStatePatch,
   buildUserPageNoSbtVisibleTelemetryState,
   buildUserPageResponseDecryptRequestPlan,
-  buildUserPageResponseSectionDeriveSignature,
+  buildUserPageResponseSectionDeriveMemoPlan,
   buildUserPageCacheRefreshDisplayState,
   buildUserPageCreatedQuestionWrapperClassName,
   buildUserPageHeaderBookmarkClassName,
   buildUserPageSbtSection,
-  buildUserPageSbtSectionDeriveSignature,
+  buildUserPageSbtSectionDeriveMemoPlan,
   buildUserPageSelectedTabStatePatch,
   buildUserPageSurveyExpansionTogglePatch,
   buildUserPageTooltipTargetIds,
@@ -263,12 +263,6 @@ type CacheSourceSnapshot = CacheSourcePresence & {
 };
 
 type UserPageTimerHandle = ReturnType<typeof setTimeout>;
-
-type SectionDeriveSignatureInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  sourceSignature?: unknown;
-};
 
 type QueuedCacheRefreshOptions = {
   force?: unknown;
@@ -1583,51 +1577,6 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _buildSurveyDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageResponseSectionDeriveSignature({
-      account: this.props.account,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
-  _buildQuestionDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageResponseSectionDeriveSignature({
-      account: this.props.account,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
-  _buildSbtDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageSbtSectionDeriveSignature({
-      networkID,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
   clearQueuedCacheRefresh = (): void => {
     if (this._queuedCacheRefreshTimer) {
       clearTimeout(this._queuedCacheRefreshTimer);
@@ -2604,62 +2553,74 @@ class UserPage extends Component<any, any> {
       );
 
       if (!holdSurveyLoading) {
-        const surveySignature = this._buildSurveyDeriveSignature({
+        const surveyMemoPlan = buildUserPageResponseSectionDeriveMemoPlan({
+          account: this.props.account,
+          currentMemo: this._sectionDeriveMemo?.survey,
+          force,
           viewAddressLower,
           networkID,
+          questionResponsesNonce: this.props.questionResponsesNonce,
+          responseGateAccessGeneration: this._responseGateAccessGeneration,
+          responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
           sourceSignature: sourceSnapshot.surveySourcesSignature,
         });
-        const surveyMemo = this._sectionDeriveMemo?.survey;
-        if (!force && surveyMemo && surveyMemo.signature === surveySignature) {
-          surveySection = surveyMemo.result as SurveySectionResult;
-          mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
+        if (surveyMemoPlan.canReuseMemo) {
+          surveySection = surveyMemoPlan.result as SurveySectionResult;
+          mergeGateContextSnapshot(gateContext, surveyMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
           const surveyGateContext = createGateAccessContext();
           surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
           const surveyGateSnapshot = captureGateContextSnapshot(surveyGateContext);
           mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
-            signature: surveySignature,
+            signature: surveyMemoPlan.signature,
             result: surveySection,
             gateSnapshot: surveyGateSnapshot,
           };
         }
       }
       if (!holdQuestionLoading) {
-        const questionSignature = this._buildQuestionDeriveSignature({
+        const questionMemoPlan = buildUserPageResponseSectionDeriveMemoPlan({
+          account: this.props.account,
+          currentMemo: this._sectionDeriveMemo?.question,
+          force,
           viewAddressLower,
           networkID,
+          questionResponsesNonce: this.props.questionResponsesNonce,
+          responseGateAccessGeneration: this._responseGateAccessGeneration,
+          responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
           sourceSignature: sourceSnapshot.questionSourcesSignature,
         });
-        const questionMemo = this._sectionDeriveMemo?.question;
-        if (!force && questionMemo && questionMemo.signature === questionSignature) {
-          questionSection = questionMemo.result as QuestionSectionResult;
-          mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
+        if (questionMemoPlan.canReuseMemo) {
+          questionSection = questionMemoPlan.result as QuestionSectionResult;
+          mergeGateContextSnapshot(gateContext, questionMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
           const questionGateContext = createGateAccessContext();
           questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
           const questionGateSnapshot = captureGateContextSnapshot(questionGateContext);
           mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
-            signature: questionSignature,
+            signature: questionMemoPlan.signature,
             result: questionSection,
             gateSnapshot: questionGateSnapshot,
           };
         }
       }
       if (!holdSbtLoading) {
-        const sbtSignature = this._buildSbtDeriveSignature({
+        const sbtMemoPlan = buildUserPageSbtSectionDeriveMemoPlan({
+          currentMemo: this._sectionDeriveMemo?.sbt,
+          force,
           viewAddressLower,
           networkID,
+          sbtCacheRevision: this.props.sbtCacheRevision,
           sourceSignature: sourceSnapshot.sbtSourcesSignature,
         });
-        const sbtMemo = this._sectionDeriveMemo?.sbt;
-        if (!force && sbtMemo && sbtMemo.signature === sbtSignature) {
-          sbtSection = sbtMemo.result as SbtSectionResult;
+        if (sbtMemoPlan.canReuseMemo) {
+          sbtSection = sbtMemoPlan.result as SbtSectionResult;
         } else {
           sbtSection = this._deriveSbtSection(aggregate, viewAddressLower) as SbtSectionResult;
           this._sectionDeriveMemo.sbt = {
-            signature: sbtSignature,
+            signature: sbtMemoPlan.signature,
             result: sbtSection,
           };
         }
