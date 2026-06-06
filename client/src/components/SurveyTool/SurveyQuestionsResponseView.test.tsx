@@ -66,10 +66,13 @@ describe('SurveyQuestionsResponseView', () => {
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
-        shortenedViewAddress="0xabc...1234"
+        routeViewDisplayState={{
+          isOwnResponse: undefined,
+          shortenedViewAddress: '0xabc...1234',
+          viewedAddressLower: '0xabc1234',
+          viewedAddressRaw: '0xABC1234',
+        }}
         singleQuestionMode
-        viewedAddressLower="0xabc1234"
-        viewedAddressRaw="0xABC1234"
       />
     );
 
@@ -90,11 +93,16 @@ describe('SurveyQuestionsResponseView', () => {
 
     render(
       <SurveyQuestionsResponseView
-        isOwnResponse
         questionPool={[{ id: 'q1' }]}
         questionPoolReady
         renderQuestionAnswer={renderQuestionAnswer}
         renderSurveyAnswers={renderSurveyAnswers}
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          shortenedViewAddress: '',
+          viewedAddressLower: '',
+          viewedAddressRaw: '',
+        }}
         userAnswers={{ responses }}
       />
     );

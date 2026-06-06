@@ -8196,9 +8196,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       viewingAnswers,
     });
     const {
-      viewedAddressRaw,
-      viewedAddressLower,
-      shortenedViewAddress,
       isOwnResponse,
       isSingleQuestionView,
     } = routeViewDisplayState;
@@ -8351,7 +8348,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         {viewingAnswers ? (
           <SurveyQuestionsResponseView
             isLoadingResponse={this.state.isLoadingResponse}
-            isOwnResponse={isOwnResponse}
             noResponse={this.state.noResponse}
             parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
             questionPool={this.state.questionPool}
@@ -8361,12 +8357,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             responderAddress={this.props.responderAddress}
             responseLookupWarning={this.state.responseLookupWarning}
             responseViewClassName={responseViewClassName}
-            shortenedViewAddress={shortenedViewAddress}
+            routeViewDisplayState={routeViewDisplayState}
             singleQuestionMode={this.props.singleQuestionMode}
             userAnswers={this.state.userAnswers}
             viewAddress={this.props.viewAddress}
-            viewedAddressLower={viewedAddressLower}
-            viewedAddressRaw={viewedAddressRaw}
           />
         ) : (
           <SurveyQuestionsAuthoringPanel
