@@ -3,6 +3,7 @@ import {
   buildSessionWizardDeployHelperWorkersDevStatusMessage,
   formatSessionWizardDeployBundleDiagnostics,
   normalizeSessionWizardDeployErrorMessage,
+  resolveSessionWizardDeployStatusDisplayState,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from './sessionWizardDeployErrors';
 
@@ -30,6 +31,39 @@ describe('sessionWizardDeployErrors', () => {
     })).toBe(
       'Worker deployed. workers.dev status: account issue: subdomain unavailable; script issue: script missing route.'
     );
+  });
+
+  it('classifies deploy status display errors without owning deploy execution', () => {
+    expect(resolveSessionWizardDeployStatusDisplayState()).toEqual({
+      deployStatusText: '',
+      isError: false,
+    });
+    expect(resolveSessionWizardDeployStatusDisplayState({
+      deployInFlight: true,
+      deployStatus: 'Uploading worker...',
+    })).toEqual({
+      deployStatusText: 'Uploading worker...',
+      isError: false,
+    });
+    expect(resolveSessionWizardDeployStatusDisplayState({
+      deployStatus: 'Worker deployed.',
+    })).toEqual({
+      deployStatusText: 'Worker deployed.',
+      isError: false,
+    });
+    expect(resolveSessionWizardDeployStatusDisplayState({
+      deployStatus: 'Missing API token.',
+    })).toEqual({
+      deployStatusText: 'Missing API token.',
+      isError: true,
+    });
+    expect(resolveSessionWizardDeployStatusDisplayState({
+      deployStatus: 'Custom URL changed after deploy.',
+      deployVerifiedInUi: true,
+    })).toEqual({
+      deployStatusText: 'Custom URL changed after deploy.',
+      isError: false,
+    });
   });
 
   it('formats bundle diagnostics as a compact summary', () => {
