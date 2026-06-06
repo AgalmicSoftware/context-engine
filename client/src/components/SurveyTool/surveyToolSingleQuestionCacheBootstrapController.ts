@@ -157,11 +157,19 @@ export type SingleQuestionPreservedPoolPlan =
     statePatch: null;
   };
 
+export type SingleQuestionCacheBootstrapTarget = {
+  account: string;
+  effectiveSingleSlug: string;
+  questionId: string;
+  responderAddress: string;
+};
+
 export type CacheBootstrapReady = {
   status: 'ready';
   cacheState: CacheState;
   questionData: QuestionPayload | null;
   recentPayloadForAccount: QuestionPayload | null;
+  target: SingleQuestionCacheBootstrapTarget;
 };
 
 export type CacheBootstrapSeeded = {
@@ -171,10 +179,12 @@ export type CacheBootstrapSeeded = {
   recentPayloadForAccount: QuestionPayload;
   shouldBootstrapViewedResponse: boolean;
   fallbackNetId: string;
+  target: SingleQuestionCacheBootstrapTarget;
 };
 
 export type CacheBootstrapMissing = {
   status: 'missing-cache-state';
+  target: SingleQuestionCacheBootstrapTarget;
 };
 
 export type CacheBootstrapResult =
@@ -459,6 +469,23 @@ const hasObjectKeys = (value: unknown): boolean => (
   && Object.keys(value as UnknownRecord).length > 0
 );
 
+const buildSingleQuestionCacheBootstrapTarget = ({
+  account = '',
+  effectiveSingleSlug = '',
+  questionId = '',
+  responderAddress = '',
+}: {
+  account?: unknown;
+  effectiveSingleSlug?: unknown;
+  questionId?: unknown;
+  responderAddress?: unknown;
+} = {}): SingleQuestionCacheBootstrapTarget => ({
+  account: String(account || ''),
+  effectiveSingleSlug: String(effectiveSingleSlug || ''),
+  questionId: String(questionId || ''),
+  responderAddress: String(responderAddress || ''),
+});
+
 export const resolveSingleQuestionCacheBootstrapStopHandlingPlan = ({
   bootstrapRetryAttempt = 0,
   cacheBootstrapPlan = null,
@@ -571,6 +598,12 @@ export const resolveSingleQuestionCacheBootstrap = async ({
   areQuestionPayloadsEquivalent?: (left: QuestionPayload | null, right: QuestionPayload) => boolean;
   writeQuestionsCache?: (slug: string, cache: QuestionsCache) => Promise<unknown>;
 } = {}): Promise<CacheBootstrapResult> => {
+  const target = buildSingleQuestionCacheBootstrapTarget({
+    account,
+    effectiveSingleSlug,
+    questionId,
+    responderAddress,
+  });
   let qData: QuestionPayload | null = null;
   const recentPayload = readRecentPayload(questionId);
   const recentPayloadForAccount = canUseRecentPayload(recentPayload, account)
@@ -580,7 +613,7 @@ export const resolveSingleQuestionCacheBootstrap = async ({
 
   if (!cacheState) {
     if (!recentPayloadForAccount) {
-      return { status: 'missing-cache-state' };
+      return { status: 'missing-cache-state', target };
     }
 
     const shouldBootstrapViewedResponse = !!responderAddress;
@@ -615,6 +648,7 @@ export const resolveSingleQuestionCacheBootstrap = async ({
       recentPayloadForAccount,
       shouldBootstrapViewedResponse,
       fallbackNetId,
+      target,
     };
   }
 
@@ -646,5 +680,6 @@ export const resolveSingleQuestionCacheBootstrap = async ({
     cacheState,
     questionData: qData,
     recentPayloadForAccount,
+    target,
   };
 };
