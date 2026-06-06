@@ -5037,11 +5037,6 @@ const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
   cacheControllerSnapshot.cacheReadinessInput
 );
 const filterInput = cacheControllerSnapshot.filterInput;
-const {
-  filterSummaryDisplay,
-  questionListDisplay,
-  syncStatusDisplay,
-} = cacheReadinessDisplay;
 
 return (
   <>
@@ -5068,7 +5063,7 @@ return (
       surveyIdAbbreviation={surveyIdAbbreviation}
       surveyTitle={surveyTitle}
       syncStatusNode={renderSurveyResultsSyncStatusPanel({
-          syncStatusDisplay,
+          syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
           syncDetailsOpen: !!this.state.syncDetailsOpen,
           syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
           onToggleSyncDetails: () =>
@@ -5120,10 +5115,10 @@ return (
         activeToggles: this.state.activeToggles,
         alertMessage,
         applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+        cacheReadinessDisplay,
         currentSurveyId,
         effectiveSlug: slug,
         filterLoading,
-        filterSummaryDisplay,
         getFallbackQuestion: this.getStableFallbackQuestion,
         getLockedResponseKey: this.getLockedResponseKey,
         getResponseCardProps: this.getSurveyResultsResponseCardProps,
@@ -5134,7 +5129,6 @@ return (
         onToggleQuestionList: () => this.toggleQuestionSummary('__questionList__'),
         onToggleResponse: this.toggleResponse,
         preNetworkQuestions,
-        questionListDisplay,
         questionModeEntries,
         questionResponsesNonce: this.props.questionResponsesNonce,
         questionsCacheNonce: this.props.questionsCacheNonce,
