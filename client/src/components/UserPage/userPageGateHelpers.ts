@@ -86,6 +86,12 @@ type BuildUserPageGateAccessCheckPlanInput = {
   terminalRecheckMs?: unknown;
   unknownRetryMs?: unknown;
 };
+type BuildUserPageGateAccessRequestDescriptorInput = {
+  account?: unknown;
+  networkID?: unknown;
+  pendingKey?: unknown;
+  sbtCacheRevision?: unknown;
+};
 export type UserPageGateAccessCheckPlanAction =
   | 'execute'
   | 'in-flight'
@@ -107,6 +113,18 @@ export type UserPageGateAccessReadinessDescriptor = {
   isStaleTerminalStatus: boolean;
   isTerminalStatus: boolean;
   isTransientRetryStatus: boolean;
+};
+export type UserPageGateAccessRequestDescriptor = {
+  account: string;
+  cacheKey: string;
+  pendingKey: string;
+  resourceKey: string;
+  sessionSlug: string;
+  sponsoredAccessRequest: {
+    account: string;
+    resourceKey: string;
+    sessionSlug: string;
+  };
 };
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
@@ -180,6 +198,37 @@ export const buildUserPageGatePendingKey = ({
 }: UserPageGatePendingKeyArgs = {}): string => (
   `${normalizeUserPageGateSlug(slug)}::${normalizeUserPageGateResourceKey(resourceKey)}`
 );
+
+export const buildUserPageGateAccessRequestDescriptor = ({
+  account = '',
+  networkID = '',
+  pendingKey = '',
+  sbtCacheRevision = 0,
+}: BuildUserPageGateAccessRequestDescriptorInput = {}): UserPageGateAccessRequestDescriptor => {
+  const normalizedPendingKey = String(pendingKey || '');
+  const [slugRaw, resourceRaw] = normalizedPendingKey.split('::');
+  const sessionSlug = normalizeUserPageGateSlug(slugRaw || '');
+  const resourceKey = normalizeUserPageGateResourceKey(resourceRaw || '');
+  const normalizedAccount = String(account || '').trim();
+  return {
+    account: normalizedAccount,
+    cacheKey: buildUserPageGateAccessCacheKey({
+      account: normalizedAccount,
+      networkID,
+      resourceKey,
+      sbtCacheRevision,
+      slug: sessionSlug,
+    }),
+    pendingKey: buildUserPageGatePendingKey({ slug: sessionSlug, resourceKey }),
+    resourceKey,
+    sessionSlug,
+    sponsoredAccessRequest: {
+      account: normalizedAccount,
+      resourceKey,
+      sessionSlug,
+    },
+  };
+};
 
 export const getUserPageGateResourceKeysToCheck = (resourceKey: unknown = 'default'): string[] => {
   const normalized = normalizeUserPageGateResourceKey(resourceKey);

@@ -51,6 +51,7 @@ import {
   buildUserPageEncryptedVisibilityStatusRequestPlan,
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
+  buildUserPageGateAccessRequestDescriptor,
   buildUserPageGatePendingKey,
   buildUserPageFullProfileModalStatePatch,
   buildUserPageMissingAddressCacheStatePatch,
@@ -1821,10 +1822,13 @@ class UserPage extends Component<any, any> {
     const now = Date.now();
 
     pendingKeys.forEach((pendingKey: unknown) => {
-      const [slugRaw, resourceRaw] = String(pendingKey || '').split('::');
-      const slug = normalizeUserPageGateSlug(slugRaw || '');
-      const resourceKey = String(resourceRaw || '').trim() || 'default';
-      const cacheKey = this._buildGateAccessCacheKey({ slug, resourceKey });
+      const requestDescriptor = buildUserPageGateAccessRequestDescriptor({
+        account,
+        networkID: this.props.network?.id,
+        pendingKey,
+        sbtCacheRevision: this.props.sbtCacheRevision,
+      });
+      const { cacheKey } = requestDescriptor;
       const cached = this._responseGateAccessStatusByKey.get(cacheKey);
       const checkPlan = buildUserPageGateAccessCheckPlan({
         cachedStatus: cached?.status,
@@ -1848,13 +1852,11 @@ class UserPage extends Component<any, any> {
       if (checkPlan.shouldSetCheckingStatus) {
         this._setResponseGateAccessStatus(cacheKey, 'checking', now);
       }
-      const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+      const cfg = getSessionConfigBySlugOrDefault(requestDescriptor.sessionSlug) || {};
       let tracked: ResponseGateAccessCheckPromise | null = null;
       tracked = (checkSponsoredAccess({
         sessionConfig: cfg,
-        sessionSlug: slug,
-        account,
-        resourceKey,
+        ...requestDescriptor.sponsoredAccessRequest,
       }) as Promise<SponsoredAccessResult>)
         .then((result: SponsoredAccessResult) => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
