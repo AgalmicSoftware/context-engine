@@ -4523,28 +4523,6 @@ toggleLockedResponseDetails = (): void => {
   this.setState(toggleSurveyResultsLockedResponseDetailsPatch);
 };
 
-renderLockedResponsesToggle = (
-  lockedModel: SurveyResultsLockedResponsesModel | null = null
-): React.ReactNode => {
-  return SurveyResultsLockedResponsesToggle({
-    isOpen: !!this.state.lockedResponseDetailsOpen,
-    lockedModel,
-    onToggleDetails: this.toggleLockedResponseDetails,
-  });
-};
-
-renderLockedResponsesBanner = (
-  lockedModel: SurveyResultsLockedResponsesModel | null = null
-): React.ReactNode => {
-  return SurveyResultsLockedResponsesBanner({
-    decrypting: !!this.state.lockedResponsesDecrypting,
-    isOpen: !!this.state.lockedResponseDetailsOpen,
-    lockedModel,
-    onDecrypt: this.handleDecryptLockedResponses,
-  });
-};
-
-
 renderQuestionSummary = (
   questionId: string,
   responses: unknown,
@@ -5053,7 +5031,11 @@ return (
       documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
       effectiveSlug={slug}
       isDemoQuestionResults={isDemoQuestionResults}
-      lockedResponsesToggleNode={this.renderLockedResponsesToggle(lockedResponsesModel)}
+      lockedResponsesToggleNode={SurveyResultsLockedResponsesToggle({
+        isOpen: !!this.state.lockedResponseDetailsOpen,
+        lockedModel: lockedResponsesModel,
+        onToggleDetails: this.toggleLockedResponseDetails,
+      })}
       onClose={this.closeModal}
       onDemoResultsViewSelect={this.handleDemoResultsViewSelect}
       onToggleSurveyBookmark={this.toggleSurveyBookmark}
@@ -5122,7 +5104,12 @@ return (
         getFallbackQuestion: this.getStableFallbackQuestion,
         getLockedResponseKey: this.getLockedResponseKey,
         getResponseCardProps: this.getSurveyResultsResponseCardProps,
-        lockedResponsesBannerNode: this.renderLockedResponsesBanner(lockedResponsesModel),
+        lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
+          decrypting: !!this.state.lockedResponsesDecrypting,
+          isOpen: !!this.state.lockedResponseDetailsOpen,
+          lockedModel: lockedResponsesModel,
+          onDecrypt: this.handleDecryptLockedResponses,
+        }),
         network: this.props.network,
         onSurveyViewModeKeyDown: this.handleSurveyViewModeKeyDown,
         onSurveyViewModeToggle: this.handleSurveyViewModeToggle,
