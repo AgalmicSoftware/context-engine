@@ -8281,7 +8281,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
       : null;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
-    const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
     const authoringPanelDisplayState = buildSurveyQuestionsAuthoringPanelDisplayState({
       canEditQuestions,
       hasCurrentSurveyResponseState: !!currentSurveyResponseState,
