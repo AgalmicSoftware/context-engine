@@ -404,6 +404,13 @@ type ReadUserPageAnalysisCacheEntryArgs = {
   networkId?: unknown;
   now?: unknown;
 };
+type BuildUserPageAnalysisCacheReadDescriptorArgs = {
+  addressLower?: unknown;
+  fingerprint?: unknown;
+  forceRefresh?: unknown;
+  networkId?: unknown;
+  sessionSlug?: unknown;
+};
 type BuildUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
   aiContext?: unknown;
@@ -618,6 +625,13 @@ export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   networkId?: unknown;
   result?: unknown;
 };
+export type UserPageAnalysisCacheReadDescriptor = {
+  action: 'read' | 'skip-force-refresh';
+  addressLower: string;
+  fingerprint: string;
+  networkId: string;
+  sessionSlug: string;
+};
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
   value != null && typeof value === 'object' ? value as UserPageUnknownRecord : {}
@@ -651,6 +665,20 @@ export const readUserPageAnalysisCacheEntry = ({
   if (Number(now || 0) >= Number(entryRecord.expiresAt || 0)) return null;
   return entryRecord;
 };
+
+export const buildUserPageAnalysisCacheReadDescriptor = ({
+  addressLower = '',
+  fingerprint = '',
+  forceRefresh = false,
+  networkId = '',
+  sessionSlug = '',
+}: BuildUserPageAnalysisCacheReadDescriptorArgs = {}): UserPageAnalysisCacheReadDescriptor => ({
+  action: forceRefresh ? 'skip-force-refresh' : 'read',
+  addressLower: String(addressLower || '').trim().toLowerCase(),
+  fingerprint: String(fingerprint || ''),
+  networkId: String(networkId || ''),
+  sessionSlug: String(sessionSlug || ''),
+});
 
 export const buildUserPageAnalysisCacheEntry = ({
   addressLower = '',
