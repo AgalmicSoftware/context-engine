@@ -9,6 +9,7 @@ import {
   buildUserPageGateAccessRequestDescriptor,
   buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
+  buildUserPageGateRetryTimerPlan,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
@@ -113,6 +114,44 @@ describe('userPageGateHelpers', () => {
       nextStatus: 'unknown',
       shouldQueueCacheRefresh: true,
       shouldScheduleRetry: true,
+    });
+  });
+
+  it('plans response-gate retry timer coalescing without scheduling timers', () => {
+    expect(buildUserPageGateRetryTimerPlan({
+      delayMs: 30_000,
+      isMounted: false,
+      nowMs: 1000,
+    })).toEqual({
+      action: 'ignore-unmounted',
+      nextDueAt: 31_000,
+      safeDelayMs: 30_000,
+      shouldClearExistingTimer: false,
+      shouldScheduleTimer: false,
+    });
+    expect(buildUserPageGateRetryTimerPlan({
+      currentDueAt: 20_000,
+      delayMs: 30_000,
+      hasCurrentTimer: true,
+      nowMs: 1000,
+    })).toEqual({
+      action: 'keep-existing',
+      nextDueAt: 31_000,
+      safeDelayMs: 30_000,
+      shouldClearExistingTimer: false,
+      shouldScheduleTimer: false,
+    });
+    expect(buildUserPageGateRetryTimerPlan({
+      currentDueAt: 60_000,
+      delayMs: 10_000,
+      hasCurrentTimer: true,
+      nowMs: 1000,
+    })).toEqual({
+      action: 'schedule',
+      nextDueAt: 11_000,
+      safeDelayMs: 10_000,
+      shouldClearExistingTimer: true,
+      shouldScheduleTimer: true,
     });
   });
 
