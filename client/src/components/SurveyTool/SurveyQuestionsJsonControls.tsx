@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import type { SurveyQuestionsJsonPanelDisplayState } from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsJsonControlsProps = {
   copiedQuestionsJson?: boolean;
@@ -8,29 +9,21 @@ type SurveyQuestionsJsonControlsProps = {
   copiedSurveyJson?: boolean;
   hidden?: boolean;
   isStandalone?: boolean;
+  jsonPanelDisplayState?: Partial<SurveyQuestionsJsonPanelDisplayState>;
   onCopyQuestionsJson: () => void;
   onCopyResponseJson: () => void;
   onCopySurveyJson: () => void;
   onToggleQuestionsJson: () => void;
   onToggleResponseJson: () => void;
   onToggleSurveyJson: () => void;
-  questionJsonToggleClassName?: string;
   questionsJson?: unknown;
   renderJsonTree: (json: unknown) => React.ReactNode;
   responseJson?: unknown;
-  responseJsonToggleClassName?: string;
-  showQuestionJsonControls?: boolean;
   showQuestionsJson?: boolean;
-  showQuestionsJsonPanel?: boolean;
   showResponseJson?: boolean;
-  showResponseJsonPanel?: boolean;
   showSurveyJson?: boolean;
-  showSurveyJsonPanel?: boolean;
   singleQuestionMode?: boolean;
   surveyJson?: unknown;
-  surveyJsonPanelClassName?: string;
-  surveyJsonRowClassName?: string;
-  surveyJsonToggleClassName?: string;
 };
 
 const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuestionsJsonControlsProps>(({
@@ -39,33 +32,37 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
   copiedSurveyJson = false,
   hidden = false,
   isStandalone = false,
+  jsonPanelDisplayState = {},
   onCopyQuestionsJson,
   onCopyResponseJson,
   onCopySurveyJson,
   onToggleQuestionsJson,
   onToggleResponseJson,
   onToggleSurveyJson,
-  questionJsonToggleClassName,
   questionsJson,
   renderJsonTree,
   responseJson,
-  responseJsonToggleClassName,
-  showQuestionJsonControls = false,
   showQuestionsJson = false,
-  showQuestionsJsonPanel = false,
   showResponseJson = false,
-  showResponseJsonPanel = false,
   showSurveyJson = false,
-  showSurveyJsonPanel = false,
   singleQuestionMode = false,
   surveyJson,
-  surveyJsonPanelClassName,
-  surveyJsonRowClassName,
-  surveyJsonToggleClassName,
 }, ref): React.ReactElement | null => {
   if (hidden) {
     return null;
   }
+
+  const {
+    questionJsonToggleClassName,
+    responseJsonToggleClassName,
+    showQuestionJsonControls = false,
+    showQuestionsJsonPanel = false,
+    showResponseJsonPanel = false,
+    showSurveyJsonPanel = false,
+    surveyJsonPanelClassName,
+    surveyJsonRowClassName,
+    surveyJsonToggleClassName,
+  } = jsonPanelDisplayState;
 
   return (
     <div ref={ref}>
