@@ -3,6 +3,7 @@ import {
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageEncryptedVisibilityStatusRequestPlan,
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGatePendingKey,
@@ -136,6 +137,74 @@ describe('userPageGateHelpers', () => {
       uncertainResourceKey: 'surveyResponses',
     });
     expect(statusByResource).toEqual(originalStatusByResource);
+  });
+
+  it('plans encrypted visibility status reads around terminal viewer identities', () => {
+    expect(buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience: 'gate',
+      resourceKey: 'questionResponses',
+      viewAddressLower: '0xabc',
+      viewerAccount: '0xABC',
+    })).toEqual({
+      action: 'terminal',
+      displayState: {
+        visible: true,
+        canDecryptOtherResponses: true,
+        uncertain: false,
+        pendingResourceKeys: [],
+        uncertainResourceKey: '',
+      },
+      resourceKeysToCheck: [],
+      terminalReason: 'own-profile',
+    });
+
+    expect(buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience: ' self ',
+      resourceKey: 'questionResponses',
+      viewAddressLower: '0xabc',
+      viewerAccount: '0xdef',
+    })).toEqual({
+      action: 'terminal',
+      displayState: {
+        visible: false,
+        canDecryptOtherResponses: false,
+        uncertain: false,
+        pendingResourceKeys: [],
+        uncertainResourceKey: '',
+      },
+      resourceKeysToCheck: [],
+      terminalReason: 'self-audience',
+    });
+
+    expect(buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience: 'gate',
+      resourceKey: 'questionResponses',
+      viewAddressLower: '0xabc',
+      viewerAccount: '',
+    })).toEqual({
+      action: 'terminal',
+      displayState: {
+        visible: false,
+        canDecryptOtherResponses: false,
+        uncertain: false,
+        pendingResourceKeys: [],
+        uncertainResourceKey: '',
+      },
+      resourceKeysToCheck: [],
+      terminalReason: 'missing-viewer-account',
+    });
+
+    expect(buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience: 'gate',
+      resourceKey: 'questionResponses',
+      viewAddressLower: '0xabc',
+      viewerAccount: '0xdef',
+    })).toEqual({
+      action: 'read-statuses',
+      displayState: null,
+      resourceKeysToCheck: ['questionResponses', 'default'],
+      terminalReason: '',
+    });
   });
 
   it('plans gate-access check scheduling without executing sponsored access checks', () => {
