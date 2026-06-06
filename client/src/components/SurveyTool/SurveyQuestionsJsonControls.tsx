@@ -8,7 +8,6 @@ type SurveyQuestionsJsonControlsProps = {
   copiedResponseJson?: boolean;
   copiedSurveyJson?: boolean;
   hidden?: boolean;
-  isStandalone?: boolean;
   jsonPanelDisplayState?: Partial<SurveyQuestionsJsonPanelDisplayState>;
   onCopyQuestionsJson: () => void;
   onCopyResponseJson: () => void;
@@ -19,10 +18,6 @@ type SurveyQuestionsJsonControlsProps = {
   questionsJson?: unknown;
   renderJsonTree: (json: unknown) => React.ReactNode;
   responseJson?: unknown;
-  showQuestionsJson?: boolean;
-  showResponseJson?: boolean;
-  showSurveyJson?: boolean;
-  singleQuestionMode?: boolean;
   surveyJson?: unknown;
 };
 
@@ -31,7 +26,6 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
   copiedResponseJson = false,
   copiedSurveyJson = false,
   hidden = false,
-  isStandalone = false,
   jsonPanelDisplayState = {},
   onCopyQuestionsJson,
   onCopyResponseJson,
@@ -42,10 +36,6 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
   questionsJson,
   renderJsonTree,
   responseJson,
-  showQuestionsJson = false,
-  showResponseJson = false,
-  showSurveyJson = false,
-  singleQuestionMode = false,
   surveyJson,
 }, ref): React.ReactElement | null => {
   if (hidden) {
@@ -53,11 +43,15 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
   }
 
   const {
+    showFullSurveyJsonControls = false,
     questionJsonToggleClassName,
     responseJsonToggleClassName,
     showQuestionJsonControls = false,
+    showQuestionsJson = false,
+    showResponseJson = false,
     showQuestionsJsonPanel = false,
     showResponseJsonPanel = false,
+    showSurveyJson = false,
     showSurveyJsonPanel = false,
     surveyJsonPanelClassName,
     surveyJsonRowClassName,
@@ -83,7 +77,7 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
             />
           </>
         )}
-        {!isStandalone && !singleQuestionMode && (
+        {showFullSurveyJsonControls && (
           <>
             <JsonToggleButton
               label={showSurveyJson ? 'Hide Survey .json' : 'View Survey .json'}

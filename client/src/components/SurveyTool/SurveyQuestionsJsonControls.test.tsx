@@ -8,10 +8,14 @@ describe('SurveyQuestionsJsonControls', () => {
     <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
   ));
   const buildJsonPanelDisplayState = (overrides = {}) => ({
+    showFullSurveyJsonControls: false,
     showQuestionJsonControls: false,
+    showQuestionsJson: false,
+    showResponseJson: false,
     showSurveyJsonPanel: false,
     showQuestionsJsonPanel: false,
     showResponseJsonPanel: false,
+    showSurveyJson: false,
     surveyJsonRowClassName: undefined,
     surveyJsonToggleClassName: undefined,
     questionJsonToggleClassName: undefined,
@@ -60,10 +64,9 @@ describe('SurveyQuestionsJsonControls', () => {
     render(
       <SurveyQuestionsJsonControls
         {...baseProps}
-        isStandalone={false}
-        singleQuestionMode={false}
-        showResponseJson={false}
-        showSurveyJson={false}
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showFullSurveyJsonControls: true,
+        })}
       />
     );
 
@@ -84,14 +87,14 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         copiedSurveyJson
-        isStandalone={false}
         jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showFullSurveyJsonControls: true,
+          showSurveyJson: true,
           showSurveyJsonPanel: true,
           surveyJsonPanelClassName: 'single-panel',
           surveyJsonRowClassName: 'survey-row',
           surveyJsonToggleClassName: 'survey-toggle',
         })}
-        showSurveyJson
         surveyJson={surveyJson}
       />
     );
@@ -113,19 +116,17 @@ describe('SurveyQuestionsJsonControls', () => {
         {...baseProps}
         copiedQuestionsJson
         copiedResponseJson
-        isStandalone
         jsonPanelDisplayState={buildJsonPanelDisplayState({
           questionJsonToggleClassName: 'question-toggle',
           responseJsonToggleClassName: 'response-toggle',
           showQuestionJsonControls: true,
+          showQuestionsJson: true,
+          showResponseJson: true,
           showQuestionsJsonPanel: true,
           showResponseJsonPanel: true,
         })}
         questionsJson={questionsJson}
         responseJson={responseJson}
-        showQuestionsJson
-        showResponseJson
-        singleQuestionMode
       />
     );
 
