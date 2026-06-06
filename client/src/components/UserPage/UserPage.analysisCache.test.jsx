@@ -348,6 +348,42 @@ describe('UserPage analysis cache and routing', () => {
     }
   });
 
+  it('falls back to AI when the analysisCache read port throws', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const realPeekCache = cacheScripts.peekCacheSync;
+    let analysisReadAttempts = 0;
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug, options) => {
+      if (namespace === 'analysisCache' && analysisReadAttempts === 0) {
+        analysisReadAttempts += 1;
+        throw new Error('analysis read failed');
+      }
+      return realPeekCache(namespace, slug, options);
+    });
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'fallback summary after cache read error',
+      details: 'fallback details',
+      name: 'Fallback Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Fallback Analysis');
+      expect(instance.state.aiAnalysis).toBe('fallback summary after cache read error');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+      expect(analysisReadAttempts).toBe(1);
+    } finally {
+      nowSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   it('forceRefresh bypasses analysisCache and overwrites the cached entry', async () => {
     const cachedAt = 1710000000000;
     const refreshedAt = cachedAt + 5000;

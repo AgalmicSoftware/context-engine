@@ -114,7 +114,7 @@ import {
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
-  readUserPageAnalysisCacheEntry,
+  readUserPageAnalysisCacheThroughPort,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
   resolveUserPageAnalysisModalDisplayState,
@@ -147,10 +147,10 @@ import {
   resolveUserPageUsernameErrorDisplayState,
   shouldApplyUserPageDeepScanResponse,
   shouldRetryUserPageQuestionData,
-  toAnalysisCacheBucket,
   toAnalysisRecord,
   upsertUserPageResponseByRecency,
   writeUserPageSourceSlug,
+  type UserPageAnalysisCacheReadDescriptor,
   type UserPageAnalysisFingerprintInput,
   type UserPageAiSessionScopeContext,
   type UserPageBookmarksCache,
@@ -3000,21 +3000,17 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _readAnalysisCacheEntry = ({
-    sessionSlug,
-    networkId,
-    addressLower,
-    fingerprint,
-  }: UserAnalysisCacheReadArgs): UserAnalysisCacheEntry | null => {
-    const cacheObj = toAnalysisCacheBucket(peekCacheSync('analysisCache', sessionSlug, { clone: false }));
-    return readUserPageAnalysisCacheEntry({
-      addressLower,
-      cacheObj,
+  _readAnalysisCacheEntry = (descriptor: UserPageAnalysisCacheReadDescriptor): UserAnalysisCacheEntry | null => {
+    const cacheRead = readUserPageAnalysisCacheThroughPort({
       cacheVersion: USER_ANALYSIS_CACHE_VERSION,
-      fingerprint,
-      networkId,
       now: Date.now(),
-    }) as UserAnalysisCacheEntry | null;
+      descriptor,
+      peekCache: peekCacheSync,
+    });
+    if (cacheRead.status === 'error') {
+      accountLog.warn('[UserPage] analysis cache read failed:', cacheRead.error);
+    }
+    return cacheRead.entry as UserAnalysisCacheEntry | null;
   };
 
   _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
