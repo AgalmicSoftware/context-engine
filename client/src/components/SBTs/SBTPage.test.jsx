@@ -367,6 +367,77 @@ describe('SBTPage session routing and holder loading', () => {
     expect(claimSpy).not.toHaveBeenCalled();
   });
 
+  it('keeps pending full-view group-password joins disabled and inert', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      groupPasswordInput: 'group-code',
+      hasGroupPasswordMint: true,
+      hasInviteMint: false,
+      mintStep: 0,
+      mintingStatus: 'pending',
+      sbtInfo: {
+        hasPasswordMint: false,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.mintUnlimitedWithGroupPassword = jest.fn();
+
+    const tree = subject.renderMintButton();
+    const groupPasswordAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+
+    expect(groupPasswordAction).not.toBeNull();
+    expect(groupPasswordAction.props.disabled).toBe(true);
+    expect(groupPasswordAction.props.placeholder).toBe('Group Password');
+    expect(groupPasswordAction.props.inputValue).toBe('group-code');
+    expect(groupPasswordAction.props.contentState).toMatchObject({
+      label: 'Join',
+      shouldRenderLabel: false,
+      shouldRenderPendingIcon: true,
+    });
+
+    groupPasswordAction.props.onAction({ preventDefault: jest.fn() });
+
+    expect(subject.mintUnlimitedWithGroupPassword).not.toHaveBeenCalled();
+  });
+
+  it('routes full-view invite joins through the parent invite handler with the current input', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      groupPasswordInput: 'invite-code',
+      hasGroupPasswordMint: false,
+      hasInviteMint: true,
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: {
+        hasPasswordMint: false,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.claimWithInviteCode = jest.fn();
+
+    const tree = subject.renderMintButton();
+    const inviteAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+
+    expect(inviteAction).not.toBeNull();
+    expect(inviteAction.props.disabled).toBe(false);
+    expect(inviteAction.props.placeholder).toBe('Group Password');
+
+    inviteAction.props.onAction({ preventDefault: jest.fn() });
+
+    expect(subject.claimWithInviteCode).toHaveBeenCalledTimes(1);
+    expect(subject.claimWithInviteCode).toHaveBeenCalledWith('invite-code');
+  });
+
   it('keeps holders modal refresh log-driven and shows approximate counts without ownerOf fan-out', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const sbtLower = sbtAddress.toLowerCase();
