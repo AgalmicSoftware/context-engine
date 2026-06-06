@@ -513,6 +513,7 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
@@ -8281,6 +8282,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       : null;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
     const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
+    const authoringPanelDisplayState = buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions,
+      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+      hideEmbeddedDebugUi,
+      questionPoolReady,
+      singleQuestionMode: this.props.singleQuestionMode,
+    });
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: this.state.activeTagModalTag,
       isSingleQuestionView,
@@ -8364,18 +8372,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           />
         ) : (
           <SurveyQuestionsAuthoringPanel
+            displayState={authoringPanelDisplayState}
             lockedQuestionsBanner={lockedQuestionsBanner}
             onScrollToTop={this.handleScrollToTop}
             onShowJsonAtBottom={this.handleShowJsonAtBottom}
             renderedEditableQuestions={renderedEditableQuestions}
-            showBackToTopControl={canEditQuestions && !this.props.singleQuestionMode}
-            showJsonControl={!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode}
-            showLockedQuestionsBanner={
-              !hideEmbeddedDebugUi &&
-              canEditQuestions &&
-              questionPoolReady &&
-              !!currentSurveyResponseState
-            }
             submitDisplayState={submitFooterDisplayState}
             submittedResponseView={submittedResponseView}
             submitResponseButton={submitResponseButton}
