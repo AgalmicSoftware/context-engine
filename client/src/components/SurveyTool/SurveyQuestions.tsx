@@ -383,6 +383,7 @@ import {
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
 import {
+  buildSingleQuestionPreservedPoolState,
   buildSingleQuestionSourceRestoreContextPlan,
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
@@ -5107,15 +5108,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
     const questionId = sourceContextPlan.questionId;
     const preserveCurrentSingleQuestionPool = (extraState = {}) => {
-      const existingPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : [];
-      const existingCurrentQuestion = existingPool.find((item) => (
-        String(item?.id || item?.questionID || '').trim().toLowerCase() === questionId
-      ));
-      if (!existingCurrentQuestion) return false;
-      safeSetState({
-        questionPool: [{ ...existingCurrentQuestion, id: questionId }],
-        ...(extraState && typeof extraState === 'object' ? extraState : {}),
+      const plan = buildSingleQuestionPreservedPoolState({
+        questionId,
+        questionPool: this.state.questionPool,
+        extraState,
       });
+      if (plan.action !== 'preserve') return false;
+      safeSetState(plan.statePatch);
       return true;
     };
 
