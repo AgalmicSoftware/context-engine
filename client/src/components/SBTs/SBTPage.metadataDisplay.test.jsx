@@ -194,9 +194,17 @@ describe('SBTPage metadata display', () => {
 
     expect(() => subject.render()).not.toThrow();
     const actionsSection = findActionsSection(subject.render());
-    expect(actionsSection?.props?.mintSuccessText).toBe('');
-    expect(actionsSection?.props?.burnSuccessText).toBe('');
-    expect(actionsSection?.props?.transactionErrorText).toBe('');
+    expect(actionsSection?.props?.actionFeedbackState).toMatchObject({
+      showBurnSuccess: false,
+      showErrorTransactionHash: false,
+      showMintSuccess: false,
+      showTransactionError: false,
+    });
+    expect(actionsSection?.props?.transactionState).toEqual({
+      lastBurnTxHash: null,
+      lastMintTxHash: null,
+      transactionHash: null,
+    });
   });
 
   it('wires extracted full-view handlers back to the parent shell methods', () => {
