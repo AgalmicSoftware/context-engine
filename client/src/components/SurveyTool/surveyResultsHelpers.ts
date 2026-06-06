@@ -74,6 +74,7 @@ export type SurveyResultsAggregateRow = UnknownRecord & {
 export type SurveyResultsAggregator = Record<string, SurveyResultsAggregateRow[] | unknown>;
 export type SurveyResultsQuestionLookupEntry = UnknownRecord & { type?: unknown };
 export type SurveyResultsQuestionLookup = Record<string, SurveyResultsQuestionLookupEntry | undefined>;
+export type SurveyResultsStringifiedAggregator = Record<string, Record<string, unknown>[]>;
 
 type SurveyQuestionResponseCandidate = {
   index: number;
@@ -140,6 +141,25 @@ export const buildSurveyResultsFilterLoadingStatePatch = ({
   return stateRecord.filterLoading === normalizedNextLoading
     ? null
     : { filterLoading: normalizedNextLoading };
+};
+
+export const stringifySurveyResultsAggregatorResponses = (
+  aggregatorObj: unknown
+): SurveyResultsStringifiedAggregator => {
+  const out: SurveyResultsStringifiedAggregator = {};
+  if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
+  const aggregatorRecord = aggregatorObj as Record<string, unknown>;
+  Object.keys(aggregatorRecord).forEach((questionId) => {
+    const rows = Array.isArray(aggregatorRecord[questionId]) ? aggregatorRecord[questionId] : [];
+    out[questionId] = rows.map((item) => ({
+      ...(item as Record<string, unknown>),
+      response:
+        typeof (item as Record<string, unknown>).response === 'string'
+          ? (item as Record<string, unknown>).response
+          : JSON.stringify((item as Record<string, unknown>).response),
+    }));
+  });
+  return out;
 };
 
 export const buildSurveyResultsQuestionFilterCountPatch = ({

@@ -37,6 +37,7 @@ import {
   normalizeSurveyResponsePayloadByQuestionId,
   pickTimestampMs,
   stableSerializeSignatureValue,
+  stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
 } from './surveyResultsHelpers.js';
 
@@ -252,6 +253,20 @@ describe('surveyResultsHelpers state patches', () => {
     })).toEqual({
       filteredQuestionsCount: 0,
     });
+    expect(stringifySurveyResultsAggregatorResponses({
+      q1: [
+        { responder: '0x1', response: 'already text' },
+        { responder: '0x2', response: { answer: 'choice-a' } },
+      ],
+      q2: 'not-an-array',
+    })).toEqual({
+      q1: [
+        { responder: '0x1', response: 'already text' },
+        { responder: '0x2', response: '{"answer":"choice-a"}' },
+      ],
+      q2: [],
+    });
+    expect(stringifySurveyResultsAggregatorResponses(null)).toEqual({});
     expect(buildSurveyResultsQuestionFilterCountPatch({
       count: 0,
       props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
