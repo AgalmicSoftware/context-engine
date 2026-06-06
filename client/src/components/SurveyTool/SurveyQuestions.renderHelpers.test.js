@@ -510,8 +510,8 @@ describe('SurveyQuestions render helpers', () => {
     const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
 
     expect(controls).not.toBeNull();
-    expect(controls.props.showSurveyJsonPanel).toBe(true);
-    expect(controls.props.showResponseJsonPanel).toBe(false);
+    expect(controls.props.jsonPanelDisplayState.showSurveyJsonPanel).toBe(true);
+    expect(controls.props.jsonPanelDisplayState.showResponseJsonPanel).toBe(false);
     expect(controls.props.surveyJson).toBe(surveyJson);
     expect(controls.props.responseJson).toBeNull();
     expect(subject.getSurveyJson).toHaveBeenCalledTimes(1);

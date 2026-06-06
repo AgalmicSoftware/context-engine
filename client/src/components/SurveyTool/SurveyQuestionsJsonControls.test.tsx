@@ -7,8 +7,21 @@ describe('SurveyQuestionsJsonControls', () => {
   const renderJsonTree = jest.fn((json) => (
     <pre data-testid="json-tree">{JSON.stringify(json)}</pre>
   ));
+  const buildJsonPanelDisplayState = (overrides = {}) => ({
+    showQuestionJsonControls: false,
+    showSurveyJsonPanel: false,
+    showQuestionsJsonPanel: false,
+    showResponseJsonPanel: false,
+    surveyJsonRowClassName: undefined,
+    surveyJsonToggleClassName: undefined,
+    questionJsonToggleClassName: undefined,
+    responseJsonToggleClassName: undefined,
+    surveyJsonPanelClassName: undefined,
+    ...overrides,
+  });
 
   const baseProps = {
+    jsonPanelDisplayState: buildJsonPanelDisplayState(),
     onCopyQuestionsJson: jest.fn(),
     onCopyResponseJson: jest.fn(),
     onCopySurveyJson: jest.fn(),
@@ -33,7 +46,9 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         hidden
-        showQuestionJsonControls
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showQuestionJsonControls: true,
+        })}
       />
     );
 
@@ -70,12 +85,14 @@ describe('SurveyQuestionsJsonControls', () => {
         {...baseProps}
         copiedSurveyJson
         isStandalone={false}
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showSurveyJsonPanel: true,
+          surveyJsonPanelClassName: 'single-panel',
+          surveyJsonRowClassName: 'survey-row',
+          surveyJsonToggleClassName: 'survey-toggle',
+        })}
         showSurveyJson
-        showSurveyJsonPanel
         surveyJson={surveyJson}
-        surveyJsonPanelClassName="single-panel"
-        surveyJsonRowClassName="survey-row"
-        surveyJsonToggleClassName="survey-toggle"
       />
     );
 
@@ -97,15 +114,17 @@ describe('SurveyQuestionsJsonControls', () => {
         copiedQuestionsJson
         copiedResponseJson
         isStandalone
-        questionJsonToggleClassName="question-toggle"
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          questionJsonToggleClassName: 'question-toggle',
+          responseJsonToggleClassName: 'response-toggle',
+          showQuestionJsonControls: true,
+          showQuestionsJsonPanel: true,
+          showResponseJsonPanel: true,
+        })}
         questionsJson={questionsJson}
         responseJson={responseJson}
-        responseJsonToggleClassName="response-toggle"
-        showQuestionJsonControls
         showQuestionsJson
-        showQuestionsJsonPanel
         showResponseJson
-        showResponseJsonPanel
         singleQuestionMode
       />
     );
@@ -129,7 +148,9 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ info: 'Loading viewed response...' }}
-        showResponseJsonPanel
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showResponseJsonPanel: true,
+        })}
       />
     );
 
@@ -139,7 +160,9 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ message: 'No response found for survey from address: 0xabc' }}
-        showResponseJsonPanel
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showResponseJsonPanel: true,
+        })}
       />
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('No response found for survey from address: 0xabc');
@@ -148,7 +171,9 @@ describe('SurveyQuestionsJsonControls', () => {
       <SurveyQuestionsJsonControls
         {...baseProps}
         responseJson={{ responses: [{ questionID: 'q1', answer: 'Other response' }] }}
-        showResponseJsonPanel
+        jsonPanelDisplayState={buildJsonPanelDisplayState({
+          showResponseJsonPanel: true,
+        })}
       />
     );
     expect(screen.getByTestId('json-tree')).toHaveTextContent('Other response');
