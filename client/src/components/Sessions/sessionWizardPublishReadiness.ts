@@ -62,6 +62,26 @@ export type SessionWizardPublishUiPlan = {
   publishProgressDisplayState: SessionWizardPublishProgressDisplayState;
 };
 
+export type SessionWizardPublishRequestPendingDraft = {
+  deployed?: boolean;
+};
+
+export type SessionWizardPublishRequestDescriptorInput = {
+  pendingDraftSnapshot?: readonly SessionWizardPublishRequestPendingDraft[];
+  manualMetadataUrl?: string;
+  workerMode?: string;
+  sponsoredAutoDeployReady?: boolean;
+  deployComplete?: boolean;
+  canUploadMetadataNow?: boolean;
+};
+
+export type SessionWizardPublishRequestDescriptor = {
+  pendingDraftSnapshot: readonly SessionWizardPublishRequestPendingDraft[];
+  hasPendingDrafts: boolean;
+  hasManualMetadata: boolean;
+  publishExecutionPlan: ReturnType<typeof buildSessionWizardPublishExecutionPlan>;
+};
+
 export function resolveSessionWizardPublishReadiness({
   resolvedWorkerBaseUrl,
   workerMode,
@@ -111,6 +131,34 @@ export function resolveSessionWizardPublishReadiness({
     canPublishNow,
     readinessKind,
     showUploadBlockedReason,
+  };
+}
+
+export function resolveSessionWizardPublishRequestDescriptor({
+  pendingDraftSnapshot = [],
+  manualMetadataUrl = '',
+  workerMode = 'default',
+  sponsoredAutoDeployReady = false,
+  deployComplete = false,
+  canUploadMetadataNow = false,
+}: SessionWizardPublishRequestDescriptorInput = {}): SessionWizardPublishRequestDescriptor {
+  const normalizedPendingDraftSnapshot = Array.isArray(pendingDraftSnapshot) ? pendingDraftSnapshot : [];
+  const hasPendingDrafts = normalizedPendingDraftSnapshot.some((entry) => entry?.deployed !== true);
+  const hasManualMetadata = Boolean(normalizeSessionWizardArweaveUri(manualMetadataUrl));
+  const publishExecutionPlan = buildSessionWizardPublishExecutionPlan({
+    workerMode,
+    sponsoredAutoDeployReady,
+    deployComplete,
+    hasPendingDrafts,
+    hasManualMetadata,
+    canUploadMetadataNow,
+  });
+
+  return {
+    pendingDraftSnapshot: normalizedPendingDraftSnapshot,
+    hasPendingDrafts,
+    hasManualMetadata,
+    publishExecutionPlan,
   };
 }
 
