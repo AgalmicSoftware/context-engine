@@ -377,6 +377,129 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
   assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
 });
 
+test('storageRoute reads Cloudflare list resource from POST JSON body', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question body resource', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const uploadBody = await readJson(uploadResponse);
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'questions' }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+
+  const listed = await readJson(listResponse);
+  assert.equal(listResponse.status, 200);
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].storageRef.id, uploadBody.storageRef.id);
+  assert.equal(listed.items[0].storageRef.resource, 'questions');
+});
+
+test('storageRoute gives Cloudflare list query resource precedence over POST body', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question query resource', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const uploadBody = await readJson(uploadResponse);
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/list?resource=questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'docsContext' }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+
+  const listed = await readJson(listResponse);
+  assert.equal(listResponse.status, 200);
+  assert.equal(listed.items.length, 1);
+  assert.equal(listed.items[0].storageRef.id, uploadBody.storageRef.id);
+  assert.equal(listed.items[0].storageRef.resource, 'questions');
+});
+
+test('storageRoute rejects invalid Cloudflare list POST JSON body', async () => {
+  const response = await storageRoute({
+    path: '/storage/list',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/list', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{',
+    }),
+    env: { CE_STORAGE_INDEX_KV: createMockKv() },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal((await readJson(response)).error, 'Invalid JSON.');
+});
+
 test('storageRoute reads legacy KV payloads after an R2 binding is added', async () => {
   const kv = createMockKv();
   const uploadEnv = { CE_STORAGE_INDEX_KV: kv };
