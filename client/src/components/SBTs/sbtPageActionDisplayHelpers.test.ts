@@ -22,6 +22,7 @@ import {
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
+  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
   resolveSbtPageOpenMintButtonState,
   resolveSbtPagePasswordAlertState,
@@ -557,6 +558,47 @@ describe('sbtPageActionDisplayHelpers', () => {
       blockedReason: 'missing-token',
       canOwnerBurn: false,
       shouldRenderBurnButton: false,
+    });
+  });
+
+  it('builds the full mint button display descriptor without dispatch ownership', () => {
+    const hidden = resolveSbtPageMintButtonDisplayState({
+      burningStatus: 'idle',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+      userHasSBT: true,
+    });
+    expect(hidden.mintActionPlan).toEqual({
+      blockedReason: 'already-has-token',
+      shouldRenderMintButton: false,
+    });
+    expect(hidden.openMintButtonState.readinessDescriptor).toMatchObject({
+      canOpenMintTx: false,
+      hasMintTransactionHash: false,
+    });
+
+    const openMint = resolveSbtPageMintButtonDisplayState({
+      burningStatus: 'idle',
+      lastMintTxHash: '0xmint',
+      mintLowerLabel: 'claim',
+      mintedLabel: 'Claimed',
+      mintingStatus: 'success',
+      nowSeconds: 100,
+      sbtInfo: { mintingEndTime: 0 },
+    });
+    expect(openMint.mintActionPlan).toEqual({
+      blockedReason: 'none',
+      shouldRenderMintButton: true,
+    });
+    expect(openMint.mintFlowDisplayState.shouldRenderOpenMintButton).toBe(true);
+    expect(openMint.openMintButtonState).toMatchObject({
+      canOpenMintTx: true,
+      disabled: false,
+      title: 'View claim transaction',
+    });
+    expect(openMint.openMintButtonContentState).toMatchObject({
+      shouldRenderSuccess: true,
+      successLabel: 'Claimed',
     });
   });
 

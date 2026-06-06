@@ -427,6 +427,28 @@ type SbtPageMintActionPlan = {
   blockedReason: SbtPageMintActionBlockedReason;
   shouldRenderMintButton: boolean;
 };
+type ResolveSbtPageMintButtonDisplayStateArgs = ShouldRenderSbtPageMintButtonArgs & {
+  claimCountdown?: unknown;
+  groupPasswordInput?: unknown;
+  hasGroupPasswordMint?: unknown;
+  hasInviteMint?: unknown;
+  lastMintTxHash?: unknown;
+  manualPasswordInput?: unknown;
+  mintedLabel?: unknown;
+  mintLowerLabel?: unknown;
+  mintingStatus?: unknown;
+  mintStep?: unknown;
+  sbtMintedSuccessLabel?: unknown;
+};
+type SbtPageMintButtonDisplayState = {
+  manualClaimActionRequest: SbtPageManualClaimActionRequest;
+  mintActionPlan: SbtPageMintActionPlan;
+  mintFlowDisplayState: SbtPageMintFlowDisplayState;
+  openMintButtonContentState: SbtPageStatusButtonContentState;
+  openMintButtonState: SbtPageOpenMintButtonState;
+  passwordJoinButtonState: SbtPagePasswordJoinButtonState;
+  passwordJoinContentState: SbtPagePendingButtonContentState;
+};
 type SbtPageMiniBurnPermission = {
   canAdminBurn: boolean;
   canBurnMini: boolean;
@@ -967,6 +989,77 @@ export const resolveSbtPageManualClaimActionRequest = ({
     };
   }
   return hiddenRequest;
+};
+
+export const resolveSbtPageMintButtonDisplayState = ({
+  burningStatus = '',
+  claimCountdown = '',
+  groupPasswordInput = '',
+  hasGroupPasswordMint = false,
+  hasInviteMint = false,
+  lastMintTxHash = '',
+  manualPasswordInput = '',
+  mintedLabel = 'Minted',
+  mintLowerLabel = 'mint',
+  mintingStatus = '',
+  mintStep = 0,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  sbtInfo = null,
+  sbtMintedSuccessLabel = 'SBT successfully minted!',
+  userHasSBT = false,
+}: ResolveSbtPageMintButtonDisplayStateArgs = {}): SbtPageMintButtonDisplayState => {
+  const mintActionPlan = resolveSbtPageMintActionPlan({
+    burningStatus,
+    nowSeconds,
+    sbtInfo,
+    userHasSBT,
+  });
+  const passwordJoinButtonState = resolveSbtPagePasswordJoinButtonState({
+    groupPasswordInput,
+    mintingStatus,
+  });
+  const passwordJoinContentState = resolveSbtPagePendingButtonContentState({
+    isPending: passwordJoinButtonState.isPending,
+    label: 'Join',
+  });
+  const mintFlowDisplayState = resolveSbtPageMintFlowDisplayState({
+    hasGroupPasswordMint,
+    hasInviteMint,
+    mintingStatus,
+    mintStep,
+    sbtInfo,
+  });
+  const manualClaimActionRequest = resolveSbtPageManualClaimActionRequest({
+    claimCountdown,
+    manualPasswordInput,
+    mintFlowDisplayState,
+    mintingStatus,
+    successLabel: sbtMintedSuccessLabel,
+  });
+  const openMintButtonState = resolveSbtPageOpenMintButtonState({
+    burningStatus,
+    lastMintTxHash,
+    mintLowerLabel,
+    mintingStatus,
+  });
+  const openMintButtonContentState = resolveSbtPageStatusButtonContentState({
+    idleLabel: 'Join',
+    isFailure: openMintButtonState.isFailure,
+    isIdle: openMintButtonState.isIdle,
+    isPending: openMintButtonState.isPending,
+    isSuccess: openMintButtonState.isMinted,
+    successLabel: mintedLabel,
+  });
+
+  return {
+    manualClaimActionRequest,
+    mintActionPlan,
+    mintFlowDisplayState,
+    openMintButtonContentState,
+    openMintButtonState,
+    passwordJoinButtonState,
+    passwordJoinContentState,
+  };
 };
 
 export const resolveSbtPageMiniManualClaimActionRequest = ({
