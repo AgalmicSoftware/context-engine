@@ -4,6 +4,7 @@ import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
   buildUserPageAnalysisErrorStatePatch,
+  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
   applyUserPageBookmarkNicknameSave,
@@ -3123,6 +3124,21 @@ class UserPage extends Component<any, any> {
       this.props.network?.chainId ??
       ''
     );
+    const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
+      const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
+        sessionSlug: cacheContextToRead.sessionSlug,
+        networkId,
+        addressLower,
+        fingerprint: cacheContextToRead.fingerprint,
+        forceRefresh,
+      });
+      if (cacheReadDescriptor.action !== 'read') return false;
+      const cachedEntry = this._readAnalysisCacheEntry(cacheReadDescriptor);
+      if (!cachedEntry) return false;
+      if (!this._isMounted) return true;
+      this._hydrateAnalysisFromCache(cachedEntry);
+      return true;
+    };
 
     try {
       this.setState(buildUserPageAnalysisResetStatePatch());
@@ -3137,19 +3153,7 @@ class UserPage extends Component<any, any> {
         addressLower,
         networkId,
       });
-      if (!forceRefresh) {
-        const cachedEntry = this._readAnalysisCacheEntry({
-          sessionSlug: cacheContext.sessionSlug,
-          networkId,
-          addressLower,
-          fingerprint: cacheContext.fingerprint,
-        });
-        if (cachedEntry) {
-          if (!this._isMounted) return;
-          this._hydrateAnalysisFromCache(cachedEntry);
-          return;
-        }
-      }
+      if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
 
       if (!this._isMounted) return;
       this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
@@ -3174,19 +3178,7 @@ class UserPage extends Component<any, any> {
           addressLower,
           networkId,
         });
-        if (!forceRefresh) {
-          const cachedEntry = this._readAnalysisCacheEntry({
-            sessionSlug: cacheContext.sessionSlug,
-            networkId,
-            addressLower,
-            fingerprint: cacheContext.fingerprint,
-          });
-          if (cachedEntry) {
-            if (!this._isMounted) return;
-            this._hydrateAnalysisFromCache(cachedEntry);
-            return;
-          }
-        }
+        if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
         const fallbackOpts = buildUserPageAnalysisAiOptions({
           analysisSession: fallbackSession,
           defaultReason: 'fallback-gate-unavailable',

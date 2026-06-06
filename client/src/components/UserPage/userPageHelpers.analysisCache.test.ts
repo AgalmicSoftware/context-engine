@@ -1,5 +1,6 @@
 import {
   buildUserPageAnalysisCacheEntry,
+  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisCacheWritePayload,
   buildUserPageAnalysisCreatedQuestions,
   buildUserPageAnalysisCreatedSurveys,
@@ -162,6 +163,34 @@ describe('userPageHelpers analysis cache helpers', () => {
       ...readArgs,
       fingerprint: 'missing',
     })).toBeNull();
+  });
+
+  it('describes analysis cache read identity without reading cache data', () => {
+    expect(buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: ' 0xABC ',
+      fingerprint: 'fingerprint-a',
+      networkId: 84532,
+      sessionSlug: ' Session-A ',
+    })).toEqual({
+      action: 'read',
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      sessionSlug: ' Session-A ',
+    });
+    expect(buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      forceRefresh: true,
+      networkId: 84532,
+      sessionSlug: 'session-a',
+    })).toEqual({
+      action: 'skip-force-refresh',
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      sessionSlug: 'session-a',
+    });
   });
 
   it('builds analysis cache entries and prunes expired siblings during writes', () => {
