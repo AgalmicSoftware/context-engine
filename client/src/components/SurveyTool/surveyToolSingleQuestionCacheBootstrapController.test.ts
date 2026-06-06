@@ -1,4 +1,5 @@
 import {
+  buildSingleQuestionPreservedPoolState,
   buildSingleQuestionSourceRestoreContextPlan,
   buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
@@ -256,6 +257,47 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       isLoadingResponse: true,
     });
     expect(mergeSurveyResponseState).toHaveBeenCalledTimes(1);
+  });
+
+  it('plans preserved current question state by normalized question identity', () => {
+    expect(buildSingleQuestionPreservedPoolState({
+      questionId: 'Q1',
+      questionPool: [
+        { id: 'q-other', prompt: 'Other' },
+        { questionID: 'Q1', prompt: 'Current shell', transient: true },
+      ],
+      extraState: { isLoadingResponse: false },
+    })).toEqual({
+      action: 'preserve',
+      statePatch: {
+        questionPool: [{
+          questionID: 'Q1',
+          id: 'q1',
+          prompt: 'Current shell',
+          transient: true,
+        }],
+        isLoadingResponse: false,
+      },
+    });
+  });
+
+  it('skips preserved current question state when identity is missing', () => {
+    expect(buildSingleQuestionPreservedPoolState({
+      questionId: 'missing',
+      questionPool: [{ id: 'q1', prompt: 'Current shell' }],
+      extraState: { isLoadingResponse: false },
+    })).toEqual({
+      action: 'skip',
+      statePatch: null,
+    });
+
+    expect(buildSingleQuestionPreservedPoolState({
+      questionId: '',
+      questionPool: [{ id: 'q1', prompt: 'Current shell' }],
+    })).toEqual({
+      action: 'skip',
+      statePatch: null,
+    });
   });
 
   it('plans retry stop handling without scheduling retries or applying state', () => {

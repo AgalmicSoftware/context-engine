@@ -359,6 +359,62 @@ describe('SurveyQuestions runtime helpers', () => {
     }));
   });
 
+  it('preserves the current single-question shell when cache bootstrap cannot bind a network', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(null);
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue(null);
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      questionID: 'Q1',
+      account: '0xabc',
+      loginComplete: true,
+      provider: { kind: 'mock-provider' },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ questionID: 'Q1', prompt: 'Current shell', type: 'freeform' }],
+      pileQuestions: [],
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      isLoadingResponse: true,
+      autoDecryptEnabled: false,
+    };
+    subject.updateSingleQuestionDebug = jest.fn();
+    subject.clearSingleQuestionBootstrapRetry = jest.fn();
+    subject.scheduleSingleQuestionBootstrapRetry = jest.fn(() => false);
+    subject.updateJsonPreview = jest.fn();
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.prefillSingleQuestionResponse = jest.fn();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+
+    await subject.fetchSingleQuestionData();
+
+    expect(subject.state.questionPool).toEqual([{
+      questionID: 'Q1',
+      id: 'q1',
+      prompt: 'Current shell',
+      type: 'freeform',
+    }]);
+    expect(subject.state.isLoadingResponse).toBe(false);
+    expect(getQuestionDataSpy).not.toHaveBeenCalled();
+    expect(getResponseSpy).not.toHaveBeenCalled();
+    expect(subject.prefillSingleQuestionResponse).not.toHaveBeenCalled();
+  });
+
   it('ignores stale recent decrypted payloads and keeps bootstrap on the normal metadata path', async () => {
     const now = 1_700_000_000_000;
     jest.spyOn(Date, 'now').mockReturnValue(now);
