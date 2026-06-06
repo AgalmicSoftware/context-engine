@@ -431,6 +431,12 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       },
       questionData,
       recentPayloadForAccount: null,
+      target: {
+        account: '',
+        effectiveSingleSlug: 'edge',
+        questionId: 'q1',
+        responderAddress: '',
+      },
     });
   });
 
@@ -464,6 +470,12 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
     }
 
     expect(result.questionData!.prompt).toBe('newer');
+    expect(result.target).toEqual({
+      account: '0xabc',
+      effectiveSingleSlug: 'edge',
+      questionId: 'q1',
+      responderAddress: '',
+    });
     expect(writeQuestionsCache).toHaveBeenCalledTimes(1);
   });
 
@@ -508,6 +520,12 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       id: 'q1',
       prompt: 'current',
       tags: ['stable'],
+    });
+    expect(result.target).toEqual({
+      account: '0xabc',
+      effectiveSingleSlug: 'edge',
+      questionId: 'q1',
+      responderAddress: '',
     });
     expect(pickBetterQuestionPayload).toHaveBeenCalledWith(
       cachedQuestion,
@@ -588,7 +606,15 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       effectiveSingleSlug: 'edge',
       resolveCacheState: jest.fn().mockResolvedValue(null),
       readRecentPayload: jest.fn().mockReturnValue(null),
-    })).resolves.toEqual({ status: 'missing-cache-state' });
+    })).resolves.toEqual({
+      status: 'missing-cache-state',
+      target: {
+        account: '',
+        effectiveSingleSlug: 'edge',
+        questionId: 'q1',
+        responderAddress: '',
+      },
+    });
   });
 
   it("returns 'seeded-from-recent' with fallbackNetId when cache is missing but recent payload exists", async () => {
@@ -614,6 +640,12 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
     expect(result.shouldBootstrapViewedResponse).toBe(true);
     expect(result.fallbackNetId).toBe('84532');
     expect(result.cacheState).not.toBeNull();
+    expect(result.target).toEqual({
+      account: '',
+      effectiveSingleSlug: 'edge',
+      questionId: 'q1',
+      responderAddress: '0xresp',
+    });
   });
 
   it("returns 'seeded-from-recent' with null cacheState when fallbackNetId is empty", async () => {
@@ -633,6 +665,12 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
 
     expect(result.fallbackNetId).toBe('');
     expect(result.cacheState).toBeNull();
+    expect(result.target).toEqual({
+      account: '',
+      effectiveSingleSlug: 'edge',
+      questionId: 'q1',
+      responderAddress: '',
+    });
   });
 
   it('seeds recent payload into cache when cached qData is missing for the questionId', async () => {
