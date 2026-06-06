@@ -177,6 +177,22 @@ describe('UserPage cache refresh gate access', () => {
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
   });
 
+  it('keeps the nearest response-gate retry timer when later retries are requested', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+
+    instance.scheduleResponseGateRetry(30_000);
+    instance.scheduleResponseGateRetry(60_000);
+
+    jest.advanceTimersByTime(29_999);
+    expect(queueSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+  });
+
   it('schedules a delayed refresh when error gate access is still within retry TTL', () => {
     jest.useFakeTimers();
     const account = '0x00000000000000000000000000000000000000bb';
