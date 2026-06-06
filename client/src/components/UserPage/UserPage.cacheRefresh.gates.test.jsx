@@ -191,6 +191,9 @@ describe('UserPage cache refresh gate access', () => {
     jest.advanceTimersByTime(1);
     expect(queueSpy).toHaveBeenCalledTimes(1);
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+
+    jest.advanceTimersByTime(30_000);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
   });
 
   it('schedules a delayed refresh when error gate access is still within retry TTL', () => {
