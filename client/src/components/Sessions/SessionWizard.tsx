@@ -247,6 +247,7 @@ import {
   readSessionWizardNewSessionBannerDismissed,
   writeSessionWizardNewSessionBannerDismissed,
 } from './sessionWizardRouteState';
+import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
 import {
   getSessionWizardSecretFieldTestId,
   readSessionWizardTooltipsEnabled,
@@ -4348,47 +4349,20 @@ const SessionWizard = ({
   const normalizedAppliedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current
   );
-  const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = !!toStr(currentWorkerSecrets?.openaiKey).trim();
-  const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
-  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
-  const hasNewSessionLitRequirementCovered = (
-    !newSessionRequiresLitCredential ||
-    !!toStr(currentWorkerSecrets?.litAccountApiKey).trim()
-  );
-  const hasNewSessionFundingRequirementCovered = !!(
-    toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
-    toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
-  );
-  const hasNewSessionDeployRequirementCovered = !!toStr(
-    normalizedAppliedSponsoredBundle?.deployGrantToken
-  ).trim();
-  const sponsoredBundleCoversNewSessionRequirements = (
-    sponsoredBundleStatusTone === 'success' &&
-    hasNewSessionAiRequirementCovered &&
-    hasNewSessionArweaveRequirementCovered &&
-    hasNewSessionLitRequirementCovered &&
-    hasNewSessionFundingRequirementCovered &&
-    hasNewSessionDeployRequirementCovered
-  );
-  // Sponsored links should suppress the generic requirements banner while
-  // preload is in flight, or after success when the applied bundle covers the
-  // publish prerequisites. Faucet-only bundles still leave /new in manual setup
-  // mode because Publish needs sponsored deploy access as well.
-  const sponsoredBundleOwnsNewSessionEntryFlow = hasSponsoredBundleLink && (
-    !sponsoredBundleStatus ||
-    sponsoredBundleStatusTone === 'info' ||
-    sponsoredBundleCoversNewSessionRequirements
-  );
-  const isNewSessionBannerDismissedForCurrentContext = (
-    !!newSessionBannerDismissalContextKey &&
-    newSessionBannerDismissedContext === newSessionBannerDismissalContextKey
-  );
-  const shouldRespectPersistedNewSessionBannerDismissal = !hasSponsoredBundleLink;
-  const showNewSessionRequirementsBanner = isNewSessionWizardRoute &&
-    !isNewSessionBannerDismissedForCurrentContext &&
-    !(shouldRespectPersistedNewSessionBannerDismissal && persistedNewSessionBannerDismissed) &&
-    !sponsoredBundleOwnsNewSessionEntryFlow;
+  const {
+    newSessionRequiresLitCredential,
+    showNewSessionRequirementsBanner,
+  } = resolveSessionWizardNewSessionRequirementsDisplayState({
+    cloudflareWorkerSbtGateMode,
+    currentWorkerSecrets,
+    hasSponsoredBundleLink,
+    isNewSessionWizardRoute,
+    newSessionBannerDismissalContextKey,
+    newSessionBannerDismissedContext,
+    normalizedAppliedSponsoredBundle,
+    persistedNewSessionBannerDismissed,
+    sponsoredBundleStatus,
+  });
   const publishUiPlan = resolveSessionWizardPublishUiPlan({
     resolvedWorkerBaseUrl,
     workerMode,
