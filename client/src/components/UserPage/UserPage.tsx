@@ -1657,19 +1657,6 @@ class UserPage extends Component<any, any> {
     this._refreshAllDataFromCache(refreshOpts);
   };
 
-  _buildGateAccessCacheKey = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => {
-    return buildUserPageGateAccessCacheKey({
-      account: this.props.account,
-      networkID: this.props.network?.id,
-      resourceKey,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      slug,
-    });
-  };
-
   _setResponseGateAccessStatus = (
     cacheKey: unknown,
     status: unknown,
@@ -1700,7 +1687,13 @@ class UserPage extends Component<any, any> {
   }: GateAccessKeyInput = {}): string => {
     const account = String(this.props.account || '').trim();
     if (!account) return 'needs-wallet';
-    const key = this._buildGateAccessCacheKey({ slug, resourceKey });
+    const key = buildUserPageGateAccessCacheKey({
+      account: this.props.account,
+      networkID: this.props.network?.id,
+      resourceKey,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      slug,
+    });
     const cached = this._responseGateAccessStatusByKey.get(key);
     return cached?.status || 'missing';
   };

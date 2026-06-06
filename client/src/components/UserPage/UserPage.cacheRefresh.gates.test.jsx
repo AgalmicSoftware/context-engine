@@ -7,7 +7,21 @@ import {
   REGISTRY_CACHE_KEY,
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
-import { buildUserPageGatePendingKey } from './userPageHelpers';
+import {
+  buildUserPageGateAccessCacheKey,
+  buildUserPageGatePendingKey,
+} from './userPageHelpers';
+
+const buildGateAccessCacheKey = (
+  instance,
+  { slug = '', resourceKey = '' } = {}
+) => buildUserPageGateAccessCacheKey({
+  account: instance.props.account,
+  networkID: instance.props.network?.id,
+  resourceKey,
+  sbtCacheRevision: instance.props.sbtCacheRevision,
+  slug,
+});
 
 describe('UserPage cache refresh gate access', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -16,7 +30,7 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -46,7 +60,7 @@ describe('UserPage cache refresh gate access', () => {
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -84,7 +98,7 @@ describe('UserPage cache refresh gate access', () => {
           questionResponses: { encrypted: true },
         },
       });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'rxc',
       resourceKey: 'questionResponses',
     });
@@ -157,7 +171,7 @@ describe('UserPage cache refresh gate access', () => {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -205,7 +219,7 @@ describe('UserPage cache refresh gate access', () => {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -234,7 +248,7 @@ describe('UserPage cache refresh gate access', () => {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });

@@ -1,5 +1,6 @@
 /** @file UserPage.encryptedVisibility.test.jsx */
 import UserPage from './UserPage';
+import { buildUserPageGateAccessCacheKey } from './userPageHelpers';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 
@@ -53,6 +54,17 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
+const buildGateAccessCacheKey = (
+  instance,
+  { slug = '', resourceKey = '' } = {}
+) => buildUserPageGateAccessCacheKey({
+  account: instance.props.account,
+  networkID: instance.props.network?.id,
+  resourceKey,
+  sbtCacheRevision: instance.props.sbtCacheRevision,
+  slug,
+});
+
 describe('UserPage encrypted response visibility', () => {
   beforeEach(() => {
     checkSponsoredAccess.mockResolvedValue({
@@ -71,8 +83,8 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const deniedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
-    const defaultNoGateKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'default' });
+    const deniedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
+    const defaultNoGateKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'default' });
     instance._responseGateAccessStatusByKey.set(deniedKey, { status: 'denied', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(defaultNoGateKey, { status: 'no-gate', ts: Date.now() });
 
@@ -172,8 +184,8 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const deniedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
-    const defaultNoGateKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'default' });
+    const deniedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
+    const defaultNoGateKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'default' });
     instance._responseGateAccessStatusByKey.set(deniedKey, { status: 'denied', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(defaultNoGateKey, { status: 'no-gate', ts: Date.now() });
 
@@ -225,8 +237,8 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const deniedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'surveyResponses' });
-    const defaultNoGateKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'default' });
+    const deniedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'surveyResponses' });
+    const defaultNoGateKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'default' });
     instance._responseGateAccessStatusByKey.set(deniedKey, { status: 'denied', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(defaultNoGateKey, { status: 'no-gate', ts: Date.now() });
 
@@ -297,7 +309,7 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const grantedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
+    const grantedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
     instance._responseGateAccessStatusByKey.set(grantedKey, { status: 'granted', ts: Date.now() });
 
     const dataByNamespace = {
@@ -356,10 +368,10 @@ describe('UserPage encrypted response visibility', () => {
     const otherAddress = '0x00000000000000000000000000000000000000cc';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const openGrantedKey = instance._buildGateAccessCacheKey({ slug: 'open-session', resourceKey: 'questionResponses' });
-    const openDefaultKey = instance._buildGateAccessCacheKey({ slug: 'open-session', resourceKey: 'default' });
-    const closedDeniedKey = instance._buildGateAccessCacheKey({ slug: 'closed-session', resourceKey: 'questionResponses' });
-    const closedDefaultKey = instance._buildGateAccessCacheKey({ slug: 'closed-session', resourceKey: 'default' });
+    const openGrantedKey = buildGateAccessCacheKey(instance, { slug: 'open-session', resourceKey: 'questionResponses' });
+    const openDefaultKey = buildGateAccessCacheKey(instance, { slug: 'open-session', resourceKey: 'default' });
+    const closedDeniedKey = buildGateAccessCacheKey(instance, { slug: 'closed-session', resourceKey: 'questionResponses' });
+    const closedDefaultKey = buildGateAccessCacheKey(instance, { slug: 'closed-session', resourceKey: 'default' });
     instance._responseGateAccessStatusByKey.set(openGrantedKey, { status: 'granted', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(openDefaultKey, { status: 'no-gate', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(closedDeniedKey, { status: 'denied', ts: Date.now() });
@@ -433,8 +445,8 @@ describe('UserPage encrypted response visibility', () => {
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
     const staleTs = Date.now() - (61 * 1000);
-    const grantedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
-    const defaultNoGateKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'default' });
+    const grantedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
+    const defaultNoGateKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'default' });
     instance._responseGateAccessStatusByKey.set(grantedKey, { status: 'granted', ts: staleTs });
     instance._responseGateAccessStatusByKey.set(defaultNoGateKey, { status: 'no-gate', ts: staleTs });
     checkSponsoredAccess.mockResolvedValue({
@@ -492,8 +504,8 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const defaultGrantedKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'default' });
-    const resourceNoGateKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
+    const defaultGrantedKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'default' });
+    const resourceNoGateKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
     instance._responseGateAccessStatusByKey.set(defaultGrantedKey, { status: 'granted', ts: Date.now() });
     instance._responseGateAccessStatusByKey.set(resourceNoGateKey, { status: 'no-gate', ts: Date.now() });
 
@@ -541,7 +553,7 @@ describe('UserPage encrypted response visibility', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
     const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
-    const unknownKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
+    const unknownKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
     instance._responseGateAccessStatusByKey.set(unknownKey, { status: 'unknown', ts: Date.now() - 31000 });
 
     const dataByNamespace = {
@@ -600,7 +612,7 @@ describe('UserPage encrypted response visibility', () => {
       hasUncertainUserData: false,
       hasUncertainGateAccess: true,
     };
-    const unknownKey = instance._buildGateAccessCacheKey({ slug: 'edge', resourceKey: 'questionResponses' });
+    const unknownKey = buildGateAccessCacheKey(instance, { slug: 'edge', resourceKey: 'questionResponses' });
     instance._responseGateAccessStatusByKey.set(unknownKey, { status: 'unknown', ts: Date.now() });
 
     const dataByNamespace = {
