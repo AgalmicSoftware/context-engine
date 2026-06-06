@@ -92,6 +92,11 @@ type BuildUserPageGateAccessRequestDescriptorInput = {
   pendingKey?: unknown;
   sbtCacheRevision?: unknown;
 };
+type BuildUserPageGateAccessSettlementPlanInput = {
+  resultStatus?: unknown;
+  previousStatus?: unknown;
+  shouldPreserveStatusWhileRevalidating?: unknown;
+};
 export type UserPageGateAccessCheckPlanAction =
   | 'execute'
   | 'in-flight'
@@ -125,6 +130,11 @@ export type UserPageGateAccessRequestDescriptor = {
     resourceKey: string;
     sessionSlug: string;
   };
+};
+export type UserPageGateAccessSettlementPlan = {
+  nextStatus: string;
+  shouldQueueCacheRefresh: boolean;
+  shouldScheduleRetry: boolean;
 };
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
@@ -227,6 +237,27 @@ export const buildUserPageGateAccessRequestDescriptor = ({
       resourceKey,
       sessionSlug,
     },
+  };
+};
+
+export const buildUserPageGateAccessSettlementPlan = ({
+  resultStatus = 'unknown',
+  previousStatus = 'missing',
+  shouldPreserveStatusWhileRevalidating = false,
+}: BuildUserPageGateAccessSettlementPlanInput = {}): UserPageGateAccessSettlementPlan => {
+  const nextStatus = String(resultStatus || 'unknown');
+  const priorStatus = String(previousStatus || 'missing');
+  return {
+    nextStatus,
+    shouldQueueCacheRefresh: (
+      nextStatus !== priorStatus ||
+      !shouldPreserveStatusWhileRevalidating
+    ),
+    shouldScheduleRetry: (
+      nextStatus === 'unknown' ||
+      nextStatus === 'error' ||
+      nextStatus === 'unresolved'
+    ),
   };
 };
 

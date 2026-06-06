@@ -50,6 +50,7 @@ import {
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGateAccessRequestDescriptor,
+  buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
   buildUserPageFullProfileModalStatePatch,
   buildUserPageMissingAddressCacheStatePatch,
@@ -1810,29 +1811,31 @@ class UserPage extends Component<any, any> {
       }
       const cfg = getSessionConfigBySlugOrDefault(requestDescriptor.sessionSlug) || {};
       let tracked: ResponseGateAccessCheckPromise | null = null;
+      const settleGateAccessStatus = (resultStatus: unknown = 'unknown'): void => {
+        const settlementPlan = buildUserPageGateAccessSettlementPlan({
+          previousStatus,
+          resultStatus,
+          shouldPreserveStatusWhileRevalidating,
+        });
+        this._setResponseGateAccessStatus(cacheKey, settlementPlan.nextStatus, Date.now());
+        if (settlementPlan.shouldScheduleRetry) {
+          this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
+        }
+        if (settlementPlan.shouldQueueCacheRefresh) {
+          this.queueCacheRefresh({ markLoading: false });
+        }
+      };
       tracked = (checkSponsoredAccess({
         sessionConfig: cfg,
         ...requestDescriptor.sponsoredAccessRequest,
       }) as Promise<SponsoredAccessResult>)
         .then((result: SponsoredAccessResult) => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
-          const nextStatus = String(result?.status || 'unknown');
-          this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
-          if (nextStatus === 'unknown' || nextStatus === 'error' || nextStatus === 'unresolved') {
-            this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
-          }
-          if (nextStatus !== previousStatus || !shouldPreserveStatusWhileRevalidating) {
-            this.queueCacheRefresh({ markLoading: false });
-          }
+          settleGateAccessStatus(result?.status);
         })
         .catch(() => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
-          const nextStatus = 'unknown';
-          this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
-          this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
-          if (nextStatus !== previousStatus || !shouldPreserveStatusWhileRevalidating) {
-            this.queueCacheRefresh({ markLoading: false });
-          }
+          settleGateAccessStatus();
         })
         .finally(() => {
           if (this._responseGateAccessInFlightByKey.get(cacheKey) === tracked) {

@@ -7,6 +7,7 @@ import {
   buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
   buildUserPageGateAccessRequestDescriptor,
+  buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
@@ -82,6 +83,36 @@ describe('userPageGateHelpers', () => {
         resourceKey: 'default',
         sessionSlug: 'beta',
       },
+    });
+  });
+
+  it('plans gate-access result settlement without scheduling timers or cache refreshes', () => {
+    expect(buildUserPageGateAccessSettlementPlan({
+      previousStatus: 'granted',
+      resultStatus: 'granted',
+      shouldPreserveStatusWhileRevalidating: true,
+    })).toEqual({
+      nextStatus: 'granted',
+      shouldQueueCacheRefresh: false,
+      shouldScheduleRetry: false,
+    });
+    expect(buildUserPageGateAccessSettlementPlan({
+      previousStatus: 'granted',
+      resultStatus: 'error',
+      shouldPreserveStatusWhileRevalidating: true,
+    })).toEqual({
+      nextStatus: 'error',
+      shouldQueueCacheRefresh: true,
+      shouldScheduleRetry: true,
+    });
+    expect(buildUserPageGateAccessSettlementPlan({
+      previousStatus: 'unknown',
+      resultStatus: '',
+      shouldPreserveStatusWhileRevalidating: false,
+    })).toEqual({
+      nextStatus: 'unknown',
+      shouldQueueCacheRefresh: true,
+      shouldScheduleRetry: true,
     });
   });
 
