@@ -9,8 +9,6 @@ import {
   FormGroup,
   Label,
   Input,
-  Card,
-  CardBody,
   ModalHeader,
   ModalBody,
   ModalFooter,
@@ -29,13 +27,13 @@ import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
-import FullQuestionHeader from './FullQuestionHeader';
 import GatedPromptNotice from './GatedPromptNotice';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import { renderSurveyQuestionsFullQuestionGatedPromptCard } from './SurveyQuestionsFullQuestionGatedPromptCard';
 import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
@@ -3117,20 +3115,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     question,
     cardIcons,
   }) => (
-    <Card key={cardKey} className={styles.fullQuestionCard}>
-      <CardBody className={`${styles.questionTitleBody} ${styles.fullQuestionBody}`}>
-        <FullQuestionHeader>
-          {this.renderPromptWithManualDecrypt(question)}
-          {cardIcons}
-        </FullQuestionHeader>
-        {this.renderGatedPromptNotice({
-          question,
-          tooltipIdSuffix: 'full',
-          fallbackId: cardKey || 'gated',
-        })}
-        {this.renderQuestionTagDropdownRow(question)}
-      </CardBody>
-    </Card>
+    renderSurveyQuestionsFullQuestionGatedPromptCard({
+      cardKey,
+      promptContent: this.renderPromptWithManualDecrypt(question),
+      cardIcons,
+      gatedPromptNotice: this.renderGatedPromptNotice({
+        question,
+        tooltipIdSuffix: 'full',
+        fallbackId: cardKey || 'gated',
+      }),
+      tagDropdownRow: this.renderQuestionTagDropdownRow(question),
+    })
   );
 
   renderQuestionMaskedPromptCard = ({
