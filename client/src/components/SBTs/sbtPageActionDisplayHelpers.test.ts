@@ -11,6 +11,7 @@ import {
   resolveSbtPageMiniActionStatusDisplayState,
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
+  resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMiniControlDisplayState,
   resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
@@ -250,6 +251,81 @@ describe('sbtPageActionDisplayHelpers', () => {
       handlerKind: 'mini-mint',
       shouldRenderMintArea: true,
       viewKind: 'open-mint-button',
+    });
+  });
+
+  it('describes the mini-card display state without action callbacks', () => {
+    const passwordJoin = resolveSbtPageMiniCardDisplayState({
+      actionClassName: 'action',
+      burnButtonClassName: 'burn',
+      groupPasswordInput: 'group-code',
+      hasGroupPasswordMint: true,
+      miniButtonClassName: 'mini',
+      miniMintable: true,
+      mintButtonClassName: 'mint',
+      mintingStatus: 'idle',
+      sbtAddress: '0xABC',
+      sbtInfo: { mintingEndTime: 0 },
+    });
+
+    expect(passwordJoin).toMatchObject({
+      hasTokenMini: false,
+      isMintingActive: true,
+      miniBurnActionButtonClassName: 'action burn mini',
+      miniMintActionButtonClassName: 'action mint mini',
+      miniMintActionPlan: {
+        handlerKind: 'show-password-input',
+        viewKind: 'group-password-disclosure',
+      },
+      miniPasswordJoinButtonState: {
+        disabled: false,
+        isPending: false,
+      },
+      mintStatusId: 'mintStatus-0xabc',
+    });
+    expect(passwordJoin.miniBurnButtonState).toBeNull();
+    expect(passwordJoin.miniBurnContentState).toBeNull();
+    expect(passwordJoin.miniTokenActionDisplayState).toBeNull();
+
+    const tokenBurn = resolveSbtPageMiniCardDisplayState({
+      account: '0xOwner',
+      actionClassName: 'action',
+      burnButtonClassName: 'burn',
+      burnLabel: 'Burn',
+      miniButtonClassName: 'mini',
+      mintButtonClassName: 'mint',
+      mintingStatus: 'success',
+      sbtAddress: '0xABC',
+      sbtInfo: {
+        admin: '0xAdmin',
+        burnAuth: 1,
+        mintingEndTime: 0,
+      },
+      userHasSBT: true,
+    });
+
+    expect(tokenBurn).toMatchObject({
+      hasTokenMini: true,
+      miniBurnActionPlan: {
+        blockedReason: 'none',
+        shouldRenderMiniBurnButton: true,
+      },
+      miniBurnButtonState: {
+        disabled: false,
+        isPending: false,
+      },
+      miniBurnContentState: {
+        label: 'Burn',
+        shouldRenderLabel: true,
+        shouldRenderPendingIcon: false,
+      },
+      miniMintActionPlan: {
+        blockedReason: 'already-has-token',
+        viewKind: 'hidden',
+      },
+      miniTokenActionDisplayState: {
+        shouldRenderBurnButton: true,
+      },
     });
   });
 
