@@ -15,6 +15,7 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
@@ -529,6 +530,60 @@ describe('surveyResultsHelpers state patches', () => {
       filteredResponsesCount: 3,
       questionResultsHydrated: true,
     });
+  });
+});
+
+describe('surveyResultsHelpers individual response aggregation', () => {
+  it('aggregates individual survey responses by normalized latest question rows', () => {
+    const aggregator = buildSurveyResultsIndividualResponseAggregator([
+      {
+        responder: '0xAAA',
+        response: {
+          timestamp: '2025-01-02T00:00:00.000Z',
+          responses: [
+            {
+              questionID: 'Q1',
+              answer: { value: 'old' },
+              timestamp: '2025-01-01T00:00:00.000Z',
+            },
+            {
+              questionID: 'Q1',
+              answer: { value: 'new' },
+              timestamp: '2025-01-03T00:00:00.000Z',
+            },
+            {
+              questionId: 'Q2',
+              answer: { value: 'second' },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(aggregator.q1).toEqual([
+      {
+        responder: '0xaaa',
+        questionId: 'q1',
+        response: {
+          questionID: 'Q1',
+          answer: { value: 'new' },
+          timestamp: '2025-01-03T00:00:00.000Z',
+        },
+        timestamp: Date.parse('2025-01-03T00:00:00.000Z'),
+      },
+    ]);
+    expect(aggregator.q2).toEqual([
+      {
+        responder: '0xaaa',
+        questionId: 'q2',
+        response: {
+          questionId: 'Q2',
+          answer: { value: 'second' },
+        },
+        timestamp: Date.parse('2025-01-02T00:00:00.000Z'),
+      },
+    ]);
+    expect(buildSurveyResultsIndividualResponseAggregator(null)).toEqual({});
   });
 });
 

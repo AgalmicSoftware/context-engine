@@ -72,6 +72,7 @@ export type SurveyResultsAggregateRow = UnknownRecord & {
 };
 
 export type SurveyResultsAggregator = Record<string, SurveyResultsAggregateRow[] | unknown>;
+export type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 export type SurveyResultsQuestionLookupEntry = UnknownRecord & { type?: unknown };
 export type SurveyResultsQuestionLookup = Record<string, SurveyResultsQuestionLookupEntry | undefined>;
 export type SurveyResultsStringifiedAggregator = Record<string, Record<string, unknown>[]>;
@@ -690,6 +691,42 @@ export const normalizeSurveyResponsePayloadByQuestionId = (payload: unknown): un
     ...source,
     responses: normalizedResponses,
   };
+};
+
+export const buildSurveyResultsIndividualResponseAggregator = (
+  individualResponses: unknown
+): SurveyResultsIndividualAggregator => {
+  const responseRows = Array.isArray(individualResponses)
+    ? individualResponses as SurveyResultsAggregateRow[]
+    : [];
+  if (responseRows.length === 0) return {};
+
+  const aggregator: SurveyResultsIndividualAggregator = {};
+
+  responseRows.forEach((response) => {
+    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
+      response.response
+    ) as SurveyResultsSurveyResponsePayload | null;
+    if (!parsedResponse || !Array.isArray(parsedResponse.responses)) return;
+
+    parsedResponse.responses.forEach((answerItem) => {
+      const questionId = getSurveyResponseQuestionId(answerItem);
+      if (!questionId) return;
+
+      if (!aggregator[questionId]) {
+        aggregator[questionId] = [];
+      }
+
+      aggregator[questionId].push({
+        responder: String(response.responder || '').toLowerCase(),
+        questionId,
+        response: answerItem,
+        timestamp: getSurveyResponseAggregateTimestampMs(answerItem, parsedResponse),
+      });
+    });
+  });
+
+  return aggregator;
 };
 
 const normalizeTsToMs = (val: unknown): number => {
