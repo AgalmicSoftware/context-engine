@@ -10,7 +10,9 @@ import {
   buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
   buildUserPageGateRetryTimerPlan,
+  buildUserPageQuestionResponseSourceDescriptor,
   buildUserPageResponseDecryptSurveyBindings,
+  buildUserPageSurveyResponseSourceDescriptor,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
@@ -51,6 +53,113 @@ describe('userPageGateHelpers', () => {
     expect(buildUserPageGatePendingKey({ slug: 'general' })).toBe('::default');
     expect(getUserPageGateResourceKeysToCheck(' response ')).toEqual(['response', 'default']);
     expect(getUserPageGateResourceKeysToCheck()).toEqual(['default']);
+  });
+
+  it('describes gated survey response source identity without reading cache', () => {
+    expect(buildUserPageSurveyResponseSourceDescriptor({
+      surveyId: ' Survey-A ',
+      surveyResponseSourceSlugByKey: {
+        ' survey-a |0xabc': 'ignored-raw-key',
+        'survey-a|0xabc': 'response-key-slug',
+      },
+      surveyResponseSourceSlugById: {
+        'survey-a': 'response-id-slug',
+      },
+      surveySourceSlugById: {
+        'survey-a': 'survey-id-slug',
+      },
+      viewAddressLower: ' 0xABC ',
+    })).toEqual({
+      fallbackSlug: 'response-key-slug',
+      responseSourceKey: 'survey-a|0xabc',
+      sourceSlug: 'response-key-slug',
+    });
+
+    expect(buildUserPageSurveyResponseSourceDescriptor({
+      surveyId: 'survey-a',
+      surveyResponseSourceSlugById: {
+        'survey-a': 'response-id-slug',
+      },
+      surveySourceSlugById: {
+        'survey-a': 'survey-id-slug',
+      },
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      fallbackSlug: 'response-id-slug',
+      responseSourceKey: 'survey-a|0xabc',
+      sourceSlug: 'response-id-slug',
+    });
+
+    expect(buildUserPageSurveyResponseSourceDescriptor({
+      surveyId: 'missing',
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      fallbackSlug: '',
+      responseSourceKey: 'missing|0xabc',
+      sourceSlug: '',
+    });
+  });
+
+  it('describes gated question response source identity through the existing question resolver', () => {
+    const getSessionSlugByName = jest.fn((name) => (
+      name === 'Mapped Session' ? 'mapped-session' : null
+    ));
+
+    expect(buildUserPageQuestionResponseSourceDescriptor({
+      getSessionSlugByName,
+      questionData: {
+        id: 'q1',
+        sessionName: 'Mapped Session',
+      },
+      questionId: ' Q1 ',
+      questionResponseSourceSlugByKey: {
+        'q1|0xabc': 'response-key-slug',
+      },
+      questionResponseSourceSlugById: {
+        q1: 'response-id-slug',
+      },
+      questionSourceSlugById: {
+        q1: 'question-id-slug',
+      },
+      viewAddressLower: ' 0xABC ',
+    })).toEqual({
+      fallbackSlug: 'response-key-slug',
+      responseSourceKey: 'q1|0xabc',
+      sourceSlug: 'mapped-session',
+    });
+    expect(getSessionSlugByName).toHaveBeenCalledWith('Mapped Session');
+
+    expect(buildUserPageQuestionResponseSourceDescriptor({
+      questionData: {
+        id: 'q2',
+        sessionSlug: ' Explicit-Session ',
+      },
+      questionId: 'q2',
+      questionResponseSourceSlugById: {
+        q2: 'response-id-slug',
+      },
+      questionSourceSlugById: {
+        q2: 'question-id-slug',
+      },
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      fallbackSlug: 'response-id-slug',
+      responseSourceKey: 'q2|0xabc',
+      sourceSlug: 'Explicit-Session',
+    });
+
+    expect(buildUserPageQuestionResponseSourceDescriptor({
+      questionData: {},
+      questionId: 'q3',
+      questionSourceSlugById: {
+        q3: 'question-id-slug',
+      },
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      fallbackSlug: 'question-id-slug',
+      responseSourceKey: 'q3|0xabc',
+      sourceSlug: 'question-id-slug',
+    });
   });
 
   it('builds gate-access request descriptors without executing sponsored access checks', () => {

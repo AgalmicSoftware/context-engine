@@ -52,6 +52,7 @@ import {
   buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
   buildUserPageGateRetryTimerPlan,
+  buildUserPageQuestionResponseSourceDescriptor,
   buildUserPageFullProfileModalStatePatch,
   buildUserPageMissingAddressCacheStatePatch,
   buildUserPageMissingAddressCacheStateUpdate,
@@ -63,6 +64,7 @@ import {
   buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseSectionDeriveMemoPlan,
   buildUserPageCacheRefreshDisplayState,
+  buildUserPageSurveyResponseSourceDescriptor,
   buildUserPageCreatedQuestionWrapperClassName,
   buildUserPageHeaderBookmarkClassName,
   buildUserPageSbtSection,
@@ -2113,13 +2115,14 @@ class UserPage extends Component<any, any> {
         : null;
       if (!surveyResponses) return;
       const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
-      const responseSourceKey = `${surveyIdLower}|${viewAddressKey}`;
-      const sourceSlug = (
-        surveyResponseSourceSlugByKey[responseSourceKey] ||
-        surveyResponseSourceSlugById[surveyIdLower] ||
-        surveySourceSlugById[surveyIdLower] ||
-        ''
-      );
+      const sourceDescriptor = buildUserPageSurveyResponseSourceDescriptor({
+        surveyId: surveyIdLower,
+        surveyResponseSourceSlugById,
+        surveyResponseSourceSlugByKey,
+        surveySourceSlugById,
+        viewAddressLower: viewAddressKey,
+      });
+      const sourceSlug = sourceDescriptor.sourceSlug;
 
       const detailedQuestionArray: SurveyQuestionResponseDetail[] = [];
       let hasNonBlank = false;
@@ -2329,16 +2332,16 @@ class UserPage extends Component<any, any> {
         prompt: userResponseObject?.prompt || 'Unknown Prompt',
       });
 
-      const responseSourceKey = `${qid}|${viewAddressKey}`;
-      const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
-        fallbackSlug:
-          questionResponseSourceSlugByKey[responseSourceKey] ||
-          questionResponseSourceSlugById[qid] ||
-          questionSourceSlugById[qid] ||
-          '',
+      const sourceDescriptor = buildUserPageQuestionResponseSourceDescriptor({
         getSessionSlugByName,
         questionData: qData,
+        questionId: qid,
+        questionResponseSourceSlugById,
+        questionResponseSourceSlugByKey,
+        questionSourceSlugById,
+        viewAddressLower: viewAddressKey,
       });
+      const sourceSlug = sourceDescriptor.sourceSlug;
       const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
       const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
       const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);

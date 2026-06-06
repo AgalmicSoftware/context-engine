@@ -2,6 +2,7 @@ import {
   toAnalysisRecord,
   type UserPageUnknownRecord,
 } from './userPageCoreHelpers';
+import { resolveUserPageQuestionSourceSessionSlug } from './userPageAnalysisSessionHelpers';
 import { isMaskedQuestionPayload } from '../../utilities/survey/questionRouting.js';
 
 type UserPageGateAccessCacheKeyArgs = {
@@ -76,6 +77,22 @@ type BuildUserPageEncryptedVisibilityStatusRequestPlanInput = {
   resourceKey?: unknown;
   viewAddressLower?: unknown;
   viewerAccount?: unknown;
+};
+type BuildUserPageSurveyResponseSourceDescriptorInput = {
+  surveyId?: unknown;
+  surveyResponseSourceSlugById?: unknown;
+  surveyResponseSourceSlugByKey?: unknown;
+  surveySourceSlugById?: unknown;
+  viewAddressLower?: unknown;
+};
+type BuildUserPageQuestionResponseSourceDescriptorInput = {
+  getSessionSlugByName?: ((sessionName: unknown) => unknown) | null;
+  questionData?: unknown;
+  questionId?: unknown;
+  questionResponseSourceSlugById?: unknown;
+  questionResponseSourceSlugByKey?: unknown;
+  questionSourceSlugById?: unknown;
+  viewAddressLower?: unknown;
 };
 type BuildUserPageGateAccessCheckPlanInput = {
   cachedStatus?: unknown;
@@ -159,6 +176,11 @@ export type UserPageResponseDecryptSurveyBindings = {
   surveyId: string;
   acceptedSurveyIds: string[];
 };
+export type UserPageGatedResponseSourceDescriptor = {
+  fallbackSlug: string;
+  responseSourceKey: string;
+  sourceSlug: string;
+};
 export type UserPageResponseDecryptRequestPlan = {
   account: string;
   blockedReason: '' | 'missing-account' | 'missing-question' | 'missing-response';
@@ -199,6 +221,66 @@ export const normalizeUserPageSourceSlugForSignature = (rawSlug: unknown): strin
 export const normalizeUserPageGateResourceKey = (resourceKey: unknown): string => (
   String(resourceKey || '').trim() || 'default'
 );
+
+const readUserPageSourceSlug = (sourceSlugById: unknown, key: unknown): string => {
+  const sourceMap = toAnalysisRecord(sourceSlugById);
+  const rawKey = String(key || '').trim();
+  const lowerKey = rawKey.toLowerCase();
+  return String(sourceMap[rawKey] || sourceMap[lowerKey] || '');
+};
+
+export const buildUserPageSurveyResponseSourceDescriptor = ({
+  surveyId = '',
+  surveyResponseSourceSlugById = null,
+  surveyResponseSourceSlugByKey = null,
+  surveySourceSlugById = null,
+  viewAddressLower = '',
+}: BuildUserPageSurveyResponseSourceDescriptorInput = {}): UserPageGatedResponseSourceDescriptor => {
+  const surveyIdLower = String(surveyId || '').trim().toLowerCase();
+  const viewAddressKey = String(viewAddressLower || '').trim().toLowerCase();
+  const responseSourceKey = `${surveyIdLower}|${viewAddressKey}`;
+  const fallbackSlug = (
+    readUserPageSourceSlug(surveyResponseSourceSlugByKey, responseSourceKey) ||
+    readUserPageSourceSlug(surveyResponseSourceSlugById, surveyIdLower) ||
+    readUserPageSourceSlug(surveySourceSlugById, surveyIdLower)
+  );
+  return {
+    fallbackSlug,
+    responseSourceKey,
+    sourceSlug: fallbackSlug,
+  };
+};
+
+export const buildUserPageQuestionResponseSourceDescriptor = ({
+  getSessionSlugByName = null,
+  questionData = null,
+  questionId = '',
+  questionResponseSourceSlugById = null,
+  questionResponseSourceSlugByKey = null,
+  questionSourceSlugById = null,
+  viewAddressLower = '',
+}: BuildUserPageQuestionResponseSourceDescriptorInput = {}): UserPageGatedResponseSourceDescriptor => {
+  const questionIdLower = String(questionId || '').trim().toLowerCase();
+  const viewAddressKey = String(viewAddressLower || '').trim().toLowerCase();
+  const responseSourceKey = `${questionIdLower}|${viewAddressKey}`;
+  const fallbackSlug = (
+    readUserPageSourceSlug(questionResponseSourceSlugByKey, responseSourceKey) ||
+    readUserPageSourceSlug(questionResponseSourceSlugById, questionIdLower) ||
+    readUserPageSourceSlug(questionSourceSlugById, questionIdLower)
+  );
+  const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
+    fallbackSlug,
+    getSessionSlugByName: typeof getSessionSlugByName === 'function'
+      ? getSessionSlugByName
+      : () => null,
+    questionData,
+  });
+  return {
+    fallbackSlug,
+    responseSourceKey,
+    sourceSlug,
+  };
+};
 
 export const buildUserPageGateAccessCacheKey = ({
   account = '',
