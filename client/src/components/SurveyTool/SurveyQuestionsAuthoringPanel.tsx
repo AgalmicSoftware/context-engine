@@ -2,16 +2,17 @@ import React from 'react';
 import { faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 import { JsonIconButton } from '../Shared/Json/JsonControls';
-import type { SurveyQuestionsSubmitFooterDisplayState } from './surveyQuestionsTypes.js';
+import type {
+  SurveyQuestionsAuthoringPanelDisplayState,
+  SurveyQuestionsSubmitFooterDisplayState,
+} from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsAuthoringPanelProps = {
+  displayState?: Partial<SurveyQuestionsAuthoringPanelDisplayState>;
   lockedQuestionsBanner?: React.ReactNode;
   onScrollToTop: () => void;
   onShowJsonAtBottom: () => void;
   renderedEditableQuestions?: React.ReactNode;
-  showBackToTopControl?: boolean;
-  showJsonControl?: boolean;
-  showLockedQuestionsBanner?: boolean;
   submitDisplayState?: Partial<Pick<
     SurveyQuestionsSubmitFooterDisplayState,
     'showInlineSubmit' | 'showTopInlineSubmit'
@@ -21,17 +22,20 @@ type SurveyQuestionsAuthoringPanelProps = {
 };
 
 const SurveyQuestionsAuthoringPanel = ({
+  displayState = {},
   lockedQuestionsBanner = null,
   onScrollToTop,
   onShowJsonAtBottom,
   renderedEditableQuestions = null,
-  showBackToTopControl = false,
-  showJsonControl = false,
-  showLockedQuestionsBanner = false,
   submitDisplayState = {},
   submittedResponseView = null,
   submitResponseButton = null,
 }: SurveyQuestionsAuthoringPanelProps): React.ReactElement => {
+  const {
+    showBackToTopControl = false,
+    showJsonControl = false,
+    showLockedQuestionsBanner = false,
+  } = displayState;
   const {
     showInlineSubmit = false,
     showTopInlineSubmit = false,

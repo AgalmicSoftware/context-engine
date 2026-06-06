@@ -103,6 +103,12 @@ export type SurveyQuestionsSubmitFooterDisplayState = {
   showTopInlineSubmit: boolean;
 };
 
+export type SurveyQuestionsAuthoringPanelDisplayState = {
+  showBackToTopControl: boolean;
+  showJsonControl: boolean;
+  showLockedQuestionsBanner: boolean;
+};
+
 export type SurveyQuestionsPrimarySubmitPlan = {
   action: 'inert' | 'navigate' | 'submit';
   reason: string;
@@ -728,6 +734,34 @@ export const buildSurveyQuestionsSubmitAuxIconClassName = (
 ) => {
   const className = `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
   return className || undefined;
+};
+
+export const buildSurveyQuestionsAuthoringPanelDisplayState = ({
+  canEditQuestions = false,
+  hasCurrentSurveyResponseState = false,
+  hideEmbeddedDebugUi = false,
+  questionPoolReady = false,
+  singleQuestionMode = false,
+}: {
+  canEditQuestions?: unknown;
+  hasCurrentSurveyResponseState?: unknown;
+  hideEmbeddedDebugUi?: unknown;
+  questionPoolReady?: unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsAuthoringPanelDisplayState => {
+  const showAuthoringControls = !!canEditQuestions && !singleQuestionMode;
+  const showDebugAuthoringControls = !hideEmbeddedDebugUi && showAuthoringControls;
+
+  return {
+    showBackToTopControl: showAuthoringControls,
+    showJsonControl: showDebugAuthoringControls,
+    showLockedQuestionsBanner: !!(
+      !hideEmbeddedDebugUi &&
+      canEditQuestions &&
+      questionPoolReady &&
+      hasCurrentSurveyResponseState
+    ),
+  };
 };
 
 export const buildSurveyQuestionsJsonPanelDisplayState = ({
