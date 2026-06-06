@@ -4214,14 +4214,6 @@ renderMintButton() {
       const miniOpenMintButtonState = resolveSbtPageMiniOpenMintButtonState({
         mintingStatus,
       });
-      const miniOpenMintButtonContentState = resolveSbtPageStatusButtonContentState({
-        idleLabel: 'Join',
-        isFailure: miniOpenMintButtonState.isFailure,
-        isIdle: miniOpenMintButtonState.isIdle,
-        isPending: miniOpenMintButtonState.isPending,
-        isSuccess: miniOpenMintButtonState.isSuccess,
-        successLabel: t('minted'),
-      });
       const miniActionFailureState = resolveSbtPageMiniActionFailureState({
         burningStatus,
         hasTokenMini,
@@ -4316,7 +4308,7 @@ renderMintButton() {
           miniManualClaimStartContentState={miniManualClaimStartContentState}
           miniMintActionPlan={miniMintActionPlan}
           miniMintActionButtonClassName={miniMintActionButtonClassName}
-          miniOpenMintButtonContentState={miniOpenMintButtonContentState}
+          miniOpenMintButtonState={miniOpenMintButtonState}
           miniPasswordControlInputStyle={miniPasswordControlDisplayState.inputStyle}
           miniPasswordJoinButtonState={miniPasswordJoinButtonState}
           miniPasswordJoinContentState={miniPasswordJoinContentState}
