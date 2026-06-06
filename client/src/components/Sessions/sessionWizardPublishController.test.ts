@@ -1,6 +1,7 @@
 import {
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
+  runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
@@ -308,6 +309,93 @@ describe('resolveSessionWizardPublishMetadataUploadRequest', () => {
         signerAccountOverride: '0x00000000000000000000000000000000000000bb',
       },
     });
+  });
+});
+
+describe('runSessionWizardPublishMetadataUploadController', () => {
+  const buildUploadRequest = (overrides = {}) => ({
+    shouldUploadMetadata: true,
+    publishStep: 3,
+    uploadArgs: {
+      workerUrlOverride: 'https://worker.example.test',
+      signerAccountOverride: '0x00000000000000000000000000000000000000aa',
+    },
+    ...overrides,
+  });
+
+  it('keeps skipped upload requests inert without calling fake ports or state callbacks', async () => {
+    const uploadMetadata = jest.fn();
+    const setPublishStep = jest.fn();
+
+    await expect(runSessionWizardPublishMetadataUploadController({
+      request: buildUploadRequest({ shouldUploadMetadata: false }),
+      ports: {
+        uploadMetadata,
+      },
+      callbacks: {
+        setPublishStep,
+      },
+    })).resolves.toEqual({
+      status: 'skipped',
+      uploadResult: null,
+    });
+
+    expect(uploadMetadata).not.toHaveBeenCalled();
+    expect(setPublishStep).not.toHaveBeenCalled();
+  });
+
+  it('hands exact upload args to the fake port after the parent-owned progress callback', async () => {
+    const events: string[] = [];
+    const uploadResult = {
+      metadataUri: 'ar://uploaded-metadata',
+      onChainFields: { name: 'Writers Room' },
+    };
+    const uploadMetadata = jest.fn(async (args) => {
+      events.push(`uploadMetadata:${args.workerUrlOverride}:${args.signerAccountOverride}`);
+      return uploadResult;
+    });
+    const setPublishStep = jest.fn((step) => {
+      events.push(`setPublishStep:${step}`);
+    });
+
+    await expect(runSessionWizardPublishMetadataUploadController({
+      request: buildUploadRequest(),
+      ports: {
+        uploadMetadata,
+      },
+      callbacks: {
+        setPublishStep,
+      },
+    })).resolves.toEqual({
+      status: 'completed',
+      uploadResult,
+    });
+
+    expect(events).toEqual([
+      'setPublishStep:3',
+      'uploadMetadata:https://worker.example.test:0x00000000000000000000000000000000000000aa',
+    ]);
+    expect(Object.keys(uploadMetadata.mock.calls[0][0])).toEqual([
+      'workerUrlOverride',
+      'signerAccountOverride',
+    ]);
+  });
+
+  it('preserves thrown upload errors without route, register, wallet, or contract callbacks', async () => {
+    const error = new Error('metadata upload rejected');
+    const callbacks = {
+      setPublishStep: jest.fn(),
+    };
+
+    await expect(runSessionWizardPublishMetadataUploadController({
+      request: buildUploadRequest(),
+      ports: {
+        uploadMetadata: jest.fn().mockRejectedValue(error),
+      },
+      callbacks,
+    })).rejects.toBe(error);
+
+    expect(Object.keys(callbacks)).toEqual(['setPublishStep']);
   });
 });
 
