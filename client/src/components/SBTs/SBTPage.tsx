@@ -157,7 +157,7 @@ import {
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageMetadataHydrationMode,
-  resolveSbtPageManualClaimButtonState,
+  resolveSbtPageManualClaimActionRequest,
   resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMintActionPlan,
   resolveSbtPageMintFlowDisplayState,
@@ -3660,21 +3660,9 @@ renderMintButton() {
     groupPasswordInput,
     mintingStatus,
   });
-  const manualClaimButtonState = resolveSbtPageManualClaimButtonState({
-    manualPasswordInput,
-    mintingStatus,
-  });
   const passwordJoinContentState = resolveSbtPagePendingButtonContentState({
     isPending: passwordJoinButtonState.isPending,
     label: 'Join',
-  });
-  const manualClaimStartContentState = resolveSbtPagePendingButtonContentState({
-    isPending: manualClaimButtonState.isPending,
-    label: 'Start Claim',
-  });
-  const manualClaimFinishContentState = resolveSbtPagePendingButtonContentState({
-    isPending: manualClaimButtonState.isPending,
-    label: 'Finish Claim',
   });
   const mintFlowDisplayState = resolveSbtPageMintFlowDisplayState({
     hasGroupPasswordMint: this.state.hasGroupPasswordMint,
@@ -3682,6 +3670,13 @@ renderMintButton() {
     mintingStatus,
     mintStep,
     sbtInfo,
+  });
+  const manualClaimActionRequest = resolveSbtPageManualClaimActionRequest({
+    claimCountdown,
+    manualPasswordInput,
+    mintFlowDisplayState,
+    mintingStatus,
+    successLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
   });
   if (mintFlowDisplayState.shouldSuppressMintControls) return null;
   const mintActionButtonClassName = buildSbtPageActionButtonClassName({
@@ -3785,20 +3780,20 @@ renderMintButton() {
     );
   }
 
-  if (mintFlowDisplayState.shouldRenderManualClaimStart) {
+  if (manualClaimActionRequest.shouldRenderInputAction) {
     return (
       <SbtPageMintInputAction
         buttonClassName={mintActionButtonClassName}
-        contentState={manualClaimStartContentState}
-        disabled={manualClaimButtonState.disabled}
-        inputType="text"
-        inputValue={manualPasswordInput || ''}
+        contentState={manualClaimActionRequest.contentState}
+        disabled={manualClaimActionRequest.disabled}
+        inputType={manualClaimActionRequest.inputType}
+        inputValue={manualClaimActionRequest.inputValue}
         onInputChange={this.handleManualPasswordInputChange}
-        placeholder="Claim Code"
+        placeholder={manualClaimActionRequest.placeholder}
         onAction={(event) => runSbtPageMintActionController({
-            disabled: manualClaimButtonState.disabled,
+            disabled: manualClaimActionRequest.disabled,
             event,
-            mintArgs: [true],
+            mintArgs: manualClaimActionRequest.mintArgs,
             plan: mintActionPlan,
             ports: {
               dispatchMint: this.handleMint,
@@ -3807,37 +3802,15 @@ renderMintButton() {
       />
     );
   }
-  if (mintFlowDisplayState.shouldRenderClaimCountdown) {
+  if (manualClaimActionRequest.viewKind === 'manual-claim-countdown') {
     return (
       <div className={styles.mintProcess}>
-        <p className={styles.claimCountdown}>Waiting period: {claimCountdown} seconds</p>
+        <p className={styles.claimCountdown}>{manualClaimActionRequest.statusText}</p>
       </div>
     );
   }
-  if (mintFlowDisplayState.shouldRenderManualClaimFinish) {
-    return (
-      <SbtPageMintInputAction
-        buttonClassName={mintActionButtonClassName}
-        contentState={manualClaimFinishContentState}
-        disabled={manualClaimButtonState.disabled}
-        inputType="text"
-        inputValue={manualPasswordInput || ''}
-        onInputChange={this.handleManualPasswordInputChange}
-        placeholder="Claim Code"
-        onAction={(event) => runSbtPageMintActionController({
-            disabled: manualClaimButtonState.disabled,
-            event,
-            mintArgs: [true],
-            plan: mintActionPlan,
-            ports: {
-              dispatchMint: this.handleMint,
-            },
-          })}
-      />
-    );
-  }
-  if (mintFlowDisplayState.shouldRenderClaimSuccess) {
-    return <div className={styles.mintProcess}><p className={styles.mintSuccess}>{`${t('sbt')} successfully ${t('mintedLower')}!`}</p></div>;
+  if (manualClaimActionRequest.viewKind === 'manual-claim-success') {
+    return <div className={styles.mintProcess}><p className={styles.mintSuccess}>{manualClaimActionRequest.statusText}</p></div>;
   }
   return null;
 }
