@@ -52,10 +52,14 @@ export type SurveyQuestionsFullLoadingProgressState = {
 };
 
 export type SurveyQuestionsJsonPanelDisplayState = {
+  showFullSurveyJsonControls: boolean;
   showQuestionJsonControls: boolean;
+  showQuestionsJson: boolean;
   showSurveyJsonPanel: boolean;
   showQuestionsJsonPanel: boolean;
+  showResponseJson: boolean;
   showResponseJsonPanel: boolean;
+  showSurveyJson: boolean;
   surveyJsonRowClassName: string | undefined;
   surveyJsonToggleClassName: string | undefined;
   questionJsonToggleClassName: string | undefined;
@@ -744,6 +748,7 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
   styleMap?: Record<string, string>;
 } = {}): SurveyQuestionsJsonPanelDisplayState => {
   const showQuestionJsonControls = !!(singleQuestionMode || isStandalone);
+  const showFullSurveyJsonControls = !isStandalone && !singleQuestionMode;
   const showSurveyJsonPanel = !!showSurveyJson && !isStandalone && !singleQuestionMode;
   const showQuestionsJsonPanel = !!showQuestionsJson && showQuestionJsonControls;
   const showResponseJsonPanel = !!showResponseJson;
@@ -762,10 +767,14 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
   ].filter(Boolean).join(' ') || undefined;
 
   return {
+    showFullSurveyJsonControls,
     showQuestionJsonControls,
+    showQuestionsJson: !!showQuestionsJson,
     showSurveyJsonPanel,
     showQuestionsJsonPanel,
+    showResponseJson: !!showResponseJson,
     showResponseJsonPanel,
+    showSurveyJson: !!showSurveyJson,
     surveyJsonRowClassName,
     surveyJsonToggleClassName,
     questionJsonToggleClassName,
