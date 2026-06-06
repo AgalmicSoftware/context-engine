@@ -8245,18 +8245,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     const submitResponseButton = (
       <SurveyQuestionsSubmitFooter
+        displayState={submitFooterDisplayState}
         isSingleQuestionView={isSingleQuestionView}
         isSubmitting={this.state.isSubmitting}
         onPrimarySubmitClick={this.handlePrimarySubmitClick}
         onRevertPendingChanges={this.handleRevertPendingChanges}
         pendingEditCount={_pendingStats.total}
         responseUrl={this.state.responseUrl}
-        showSubmitAux={submitFooterDisplayState.showSubmitAux}
         submitButtonText={submitButtonText}
-        submitDisabled={submitFooterDisplayState.submitDisabled}
-        submittedIndicatorActive={submitFooterDisplayState.submittedIndicatorActive}
         submissionError={this.state.submissionError}
-        uploadStatusText={submitFooterDisplayState.uploadStatusText}
       />
     );
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({

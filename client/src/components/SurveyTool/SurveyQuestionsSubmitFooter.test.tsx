@@ -31,8 +31,8 @@ describe('SurveyQuestionsSubmitFooter', () => {
     render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{ showSubmitAux: true }}
         pendingEditCount={2}
-        showSubmitAux
       />
     );
 
@@ -48,9 +48,11 @@ describe('SurveyQuestionsSubmitFooter', () => {
     const { rerender } = render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          submitDisabled: true,
+          uploadStatusText: 'Encrypting...',
+        }}
         isSubmitting
-        submitDisabled
-        uploadStatusText="Encrypting..."
       />
     );
 
@@ -61,9 +63,11 @@ describe('SurveyQuestionsSubmitFooter', () => {
     rerender(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          submittedIndicatorActive: true,
+        }}
         responseUrl="https://example.test/response"
-        showSubmitAux
-        submittedIndicatorActive
       />
     );
 
@@ -98,10 +102,12 @@ describe('SurveyQuestionsSubmitFooter', () => {
     render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          uploadStatusText: 'Uploading...',
+        }}
         isSubmitting
         pendingEditCount={3}
-        showSubmitAux
-        uploadStatusText="Uploading..."
       />
     );
 
@@ -115,12 +121,14 @@ describe('SurveyQuestionsSubmitFooter', () => {
     render(
       <SurveyQuestionsSubmitFooter
         {...baseProps}
+        displayState={{
+          showSubmitAux: true,
+          submittedIndicatorActive: true,
+        }}
         isSingleQuestionView
         pendingEditCount={1}
         responseUrl="https://example.test/question-response"
-        showSubmitAux
         submitButtonText="SUBMIT"
-        submittedIndicatorActive
       />
     );
 

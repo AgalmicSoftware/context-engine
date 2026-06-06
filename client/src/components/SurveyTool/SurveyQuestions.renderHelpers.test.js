@@ -556,7 +556,7 @@ describe('SurveyQuestions render helpers', () => {
     expect(authoringPanel).not.toBeNull();
     expect(footer).not.toBeNull();
     expect(footer.props.pendingEditCount).toBe(2);
-    expect(footer.props.uploadStatusText).toBe('Encrypting...');
+    expect(footer.props.displayState.uploadStatusText).toBe('Encrypting...');
   });
 
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
