@@ -141,6 +141,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
   return null;
 };
 
+const getNodeTypeName = (node: TreeNode): string => {
+  const type = node?.type;
+  if (!type) return '';
+  if (typeof type === 'string') return type;
+  return String(type.displayName || type.name || '');
+};
+
 const collectTreeNodes = (
   node: TreeNode,
   predicate: TreePredicate,
@@ -307,6 +314,54 @@ describe('SurveyResults locked responses banner', () => {
     expect(decryptButton?.props?.disabled).toBe(true);
     expect(decryptButton?.props?.onClick).toBe(subject.handleDecryptLockedResponses);
     expect(treeHasText(decryptButton, 'Decrypt')).toBe(true);
+  });
+
+  it('keeps parent-rendered locked toggle and banner wired to parent handlers', () => {
+    const subject = createSubject({ isOpen: true });
+    const lockedModel = {
+      lockedCount: 3,
+      gateDetails: [],
+      hasGenericGateMessage: true,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.getScopedQuestionNetworkDataSync = jest.fn(() => ({ questions: {} }));
+    subject.getMemoizedQuestionFilterQuestions = jest.fn(() => []);
+    subject.getMemoizedAggregatorEntries = jest.fn(() => []);
+    subject.getMemoizedLockedResponsesModel = jest.fn(() => lockedModel);
+    subject.toggleLockedResponseDetails = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.state = {
+      ...subject.state,
+      lockedResponseDetailsOpen: true,
+      lockedResponsesDecrypting: false,
+      surveyViewMode: 'aggregate',
+      viewMode: 'survey',
+    };
+
+    const tree = subject.render();
+    const header = findElement(tree, (element) => getNodeTypeName(element) === 'SurveyResultsModalHeader');
+    const toggle = findElement(
+      header?.props?.lockedResponsesToggleNode,
+      (element) => element?.props?.['data-testid'] === 'ce-results-locked-toggle'
+    );
+    const decryptButton = findElement(
+      tree,
+      (element) => element?.props?.['data-testid'] === 'ce-results-decrypt-btn'
+    );
+
+    expect(header).toBeTruthy();
+    expect(subject.getMemoizedLockedResponsesModel).toHaveBeenCalledWith({});
+    expect(toggle).toBeTruthy();
+    expect(toggle.props['aria-expanded']).toBe(true);
+    expect(toggle.props['aria-label']).toBe('Hide 3 locked responses');
+    expect(decryptButton).toBeTruthy();
+    expect(decryptButton.props.disabled).toBe(false);
+
+    toggle.props.onClick();
+    decryptButton.props.onClick();
+
+    expect(subject.toggleLockedResponseDetails).toHaveBeenCalledTimes(1);
+    expect(subject.handleDecryptLockedResponses).toHaveBeenCalledTimes(1);
   });
 
   it('resolves SBT details from configured session gates before falling back to generic copy', () => {
