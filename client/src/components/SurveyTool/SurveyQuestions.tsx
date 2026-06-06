@@ -517,6 +517,7 @@ import {
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsPrimarySubmitPlan,
+  buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitFooterDisplayState,
   buildSurveyQuestionsSubmitReadinessDescriptor,
@@ -8131,27 +8132,33 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   render() {
     bumpSurveyPerfCounter('renderCount');
-    const surveyIndex =
-      this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-    const currentSurveyResponseState =
-      this.state.surveysResponseState && this.state.surveysResponseState.length > surveyIndex
-        ? this.state.surveysResponseState[surveyIndex]
-        : null;
-    const questionPoolReady =
-      this.state.questionPool &&
-      Array.isArray(this.state.questionPool) &&
-      this.state.questionPool.length > 0;
+    const maskedQuestionVisibility = this.getMemoizedMaskedQuestionVisibility(
+      this.state.questionPool,
+      this.props.singleQuestionMode
+    );
+    const renderReadiness = buildSurveyQuestionsRenderReadinessDescriptor({
+      displayAnswerMode: this.state.displayAnswerMode,
+      fullQuestionPool: maskedQuestionVisibility.fullQuestionPool,
+      hiddenMaskedQuestionIds: maskedQuestionVisibility.hiddenMaskedQuestionIds,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isStandalone: this.props.isStandalone,
+      parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+      questionPool: this.state.questionPool,
+      singleQuestionMode: this.props.singleQuestionMode,
+      surveyIndex: this.props.surveyIndex,
+      surveysResponseState: this.state.surveysResponseState,
+      visibleQuestionPool: maskedQuestionVisibility.visibleQuestionPool,
+    });
     const {
+      surveyIndex,
+      currentSurveyResponseState,
+      questionPoolReady,
       fullQuestionPool,
       visibleQuestionPool,
       hiddenMaskedQuestionIds,
-    } = this.getMemoizedMaskedQuestionVisibility(this.state.questionPool, this.props.singleQuestionMode);
-    const gatedEmptyStateReady =
-      !this.props.singleQuestionMode &&
-      fullQuestionPool.length > 0 &&
-      visibleQuestionPool.length === 0 &&
-      !!this.props.isQuestionCacheReady;
-    const hasHiddenMaskedQuestions = hiddenMaskedQuestionIds.length > 0;
+      gatedEmptyStateReady,
+      hasHiddenMaskedQuestions,
+    } = renderReadiness;
     const fullLoadingProgress = buildSurveyQuestionsFullLoadingProgressState({
       questionScanProgress: this.props.questionScanProgress,
       progressSlug:
@@ -8160,18 +8167,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         '',
     });
 
-    if (
-      !currentSurveyResponseState ||
-      (this.props.singleQuestionMode && !questionPoolReady && !this.state.displayAnswerMode) ||
-      (!this.props.singleQuestionMode && !this.props.isStandalone && !questionPoolReady && !this.state.displayAnswerMode)
-    ) {
-      if (this.state.displayAnswerMode && this.state.parsedViewAddressAnswers) {
-        // fall-through to render below
-      } else {
-        return (
-          <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
-        );
-      }
+    if (renderReadiness.shouldShowLoadingState) {
+      return (
+        <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
+      );
     }
 
     const viewingAnswers = this.state.displayAnswerMode;
