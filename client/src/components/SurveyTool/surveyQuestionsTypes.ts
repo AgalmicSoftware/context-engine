@@ -418,13 +418,18 @@ export const isSurveyQuestionsMaskedPromptText = (prompt: unknown): boolean => (
 );
 
 export const buildSurveyQuestionsMaskedQuestionVisibility = ({
+  isMaskedPromptText = isSurveyQuestionsMaskedPromptText,
   questionPool = null,
   singleQuestionMode = false,
 }: {
+  isMaskedPromptText?: (prompt: unknown) => boolean;
   questionPool?: unknown;
   singleQuestionMode?: unknown;
 } = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
   const fullQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const isPromptMasked = typeof isMaskedPromptText === 'function'
+    ? isMaskedPromptText
+    : isSurveyQuestionsMaskedPromptText;
   if (singleQuestionMode) {
     return {
       fullQuestionPool,
@@ -440,7 +445,7 @@ export const buildSurveyQuestionsMaskedQuestionVisibility = ({
       ? question as UnknownRecord
       : {};
     const masked = (
-      isSurveyQuestionsMaskedPromptText(questionRecord.prompt) &&
+      isPromptMasked(questionRecord.prompt) &&
       !questionRecord.promptDecrypted
     );
     if (!masked) {
