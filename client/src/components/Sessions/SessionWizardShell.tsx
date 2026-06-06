@@ -28,7 +28,6 @@ const SessionWizardShell = ({
   advancedBundleFileInputRef,
   bundleFile,
   bundleMode,
-  canPublishNow,
   clearSelectedBundleFile,
   clearWorkerSecretFields,
   closeContractViewerModal,
@@ -116,9 +115,8 @@ const SessionWizardShell = ({
   provider,
   publishAdvancedOpen,
   publishBusy,
-  publishMetadataDisplayState,
-  publishProgressDisplayState,
   publishStep,
+  publishUiPlan,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
   registerTxs,
@@ -154,7 +152,6 @@ const SessionWizardShell = ({
   setWorkerUrlAutoFilled,
   shouldShowDeployHelperUrlInput,
   shouldUseSponsoredAutoDeployFlow,
-  showUploadBlockedReason,
   showJsonPreview,
   showNewSessionRequirementsBanner,
   showNormalModeManualBundleControls,
@@ -173,7 +170,6 @@ const SessionWizardShell = ({
   toggleSection,
   updateDraftValue,
   updateEncryptionGate,
-  uploadBlockedReason,
   visibleWorkerResourceKeys,
   workerAllowOrigins,
   workerMode,
@@ -354,7 +350,6 @@ const SessionWizardShell = ({
         normalModePublishSummary={normalModePublishSummary}
         onPublish={onPublish}
         publishBusy={publishBusy}
-        canPublishNow={canPublishNow}
         publishAdvancedOpen={publishAdvancedOpen}
         onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
         showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
@@ -368,15 +363,8 @@ const SessionWizardShell = ({
         bundleFile={bundleFile}
         localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
         sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-        publishMetadataDisplayState={publishMetadataDisplayState}
-        showPublishProgress={publishProgressDisplayState.showPublishProgress}
-        activePublishProgressStepLabel={publishProgressDisplayState.activePublishProgressStepLabel}
-        publishProgressPercent={publishProgressDisplayState.publishProgressPercent}
-        publishProgressPercentRounded={publishProgressDisplayState.publishProgressPercentRounded}
+        publishUiPlan={publishUiPlan}
         publishStep={publishStep}
-        publishProgressSteps={publishProgressDisplayState.publishProgressSteps}
-        uploadBlockedReason={uploadBlockedReason}
-        showUploadBlockedReason={showUploadBlockedReason}
         renderInfoTooltip={renderSessionWizardInfoTooltip}
         resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
         workerUrlSource={workerUrlSource}

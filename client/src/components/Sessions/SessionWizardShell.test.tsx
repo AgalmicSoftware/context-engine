@@ -64,8 +64,8 @@ jest.mock('./WorkerPanel', () => (props: any) => (
 jest.mock('./SessionPublishSummary', () => (props: any) => (
   <section
     data-testid="shell-publish"
-    data-metadata-label={props.publishMetadataDisplayState?.metadataUriLabel || ''}
-    data-metadata-uri={props.publishMetadataDisplayState?.metadataUri || ''}
+    data-metadata-label={props.publishUiPlan?.publishMetadataDisplayState?.metadataUriLabel || ''}
+    data-metadata-uri={props.publishUiPlan?.publishMetadataDisplayState?.metadataUri || ''}
     data-worker-source={props.workerUrlSource || ''}
   >
     <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
@@ -74,7 +74,7 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
       type="button"
       data-testid="ce-wizard-publish"
       onClick={props.onPublish}
-      disabled={props.publishBusy || !props.canPublishNow}
+      disabled={props.publishBusy || !props.publishUiPlan?.publishReadiness?.canPublishNow}
     >
       publish
     </button>
@@ -101,7 +101,6 @@ const baseProps = () => ({
   advancedBundleFileInputRef: React.createRef<HTMLInputElement>(),
   bundleFile: null,
   bundleMode: 'url',
-  canPublishNow: true,
   clearSelectedBundleFile: jest.fn(),
   clearWorkerSecretFields: jest.fn(),
   closeContractViewerModal: jest.fn(),
@@ -193,22 +192,41 @@ const baseProps = () => ({
   provider: null,
   publishAdvancedOpen: false,
   publishBusy: false,
-  publishMetadataDisplayState: {
-    effectiveMetadataGatewayUrl: '',
-    effectiveMetadataTxId: '',
-    manualMetadataDisplayUri: '',
-    metadataUri: 'ar://metadata-tx',
-    metadataUriLabel: 'Metadata URI',
-    showArweaveTx: false,
-    showManualMetadataUri: false,
-    showMetadataUri: true,
-  },
-  publishProgressDisplayState: {
-    activePublishProgressStepLabel: '',
-    publishProgressPercent: 0,
-    publishProgressPercentRounded: 0,
-    publishProgressSteps: [],
-    showPublishProgress: false,
+  publishUiPlan: {
+    publishExecutionPlan: {
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldRegisterSession: true,
+      shouldUploadMetadata: false,
+      stepNumbers: {},
+      steps: [],
+    },
+    publishMetadataDisplayState: {
+      effectiveMetadataGatewayUrl: '',
+      effectiveMetadataTxId: '',
+      manualMetadataDisplayUri: '',
+      metadataUri: 'ar://metadata-tx',
+      metadataUriLabel: 'Metadata URI',
+      showArweaveTx: false,
+      showManualMetadataUri: false,
+      showMetadataUri: true,
+    },
+    publishProgressDisplayState: {
+      activePublishProgressStepLabel: '',
+      publishProgressPercent: 0,
+      publishProgressPercentRounded: 0,
+      publishProgressSteps: [],
+      showPublishProgress: false,
+    },
+    publishReadiness: {
+      canPublishNow: true,
+      canUploadMetadataNow: true,
+      hasManualMetadata: false,
+      hasUploadedMetadata: false,
+      readinessKind: 'worker-upload',
+      showUploadBlockedReason: false,
+      uploadBlockedReason: '',
+    },
   },
   publishStep: 0,
   publishedPendingSbtLinks: [],
@@ -253,7 +271,6 @@ const baseProps = () => ({
   showSharedWorkerChoice: false,
   showSponsoredBundleFallbackInput: false,
   showSponsoredDeployAccessNotice: false,
-  showUploadBlockedReason: false,
   signBootstrapAdminAction: jest.fn(),
   sponsoredBundleStatus: {
     message: 'Sponsored bundle loaded.',
@@ -268,7 +285,6 @@ const baseProps = () => ({
   toggleSection: jest.fn(),
   updateDraftValue: jest.fn(),
   updateEncryptionGate: jest.fn(),
-  uploadBlockedReason: '',
   visibleWorkerResourceKeys: [],
   workerAllowOrigins: '',
   workerMode: 'custom',
@@ -366,7 +382,14 @@ describe('SessionWizardShell', () => {
   it('preserves section visibility and publish disabled state', () => {
     const props = baseProps();
     props.showNewSessionRequirementsBanner = false;
-    props.canPublishNow = false;
+    props.publishUiPlan = {
+      ...props.publishUiPlan,
+      publishReadiness: {
+        ...props.publishUiPlan.publishReadiness,
+        canPublishNow: false,
+        readinessKind: 'blocked',
+      },
+    };
     props.collapsedSections = {
       encryption: true,
       metadata: true,
