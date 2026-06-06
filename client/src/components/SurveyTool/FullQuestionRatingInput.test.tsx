@@ -33,6 +33,27 @@ describe('FullQuestionRatingInput', () => {
     expect(onChangeComplete).toHaveBeenCalled();
   });
 
+  it('does not emit slider updates when disabled', () => {
+    const onChange = jest.fn();
+    const onChangeComplete = jest.fn();
+    render(
+      <FullQuestionRatingInput
+        value={6}
+        disabled
+        onChange={onChange}
+        onChangeComplete={onChangeComplete}
+      />
+    );
+
+    const slider = screen.getByRole('slider');
+    fireEvent.mouseDown(slider);
+    fireEvent.change(slider, { target: { value: '8' } });
+    fireEvent.mouseUp(slider, { currentTarget: { value: '8' } });
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onChangeComplete).not.toHaveBeenCalled();
+  });
+
   it('resolves the fixed rating slider width', () => {
     expect(resolveFullQuestionRatingSliderStyle()).toEqual({ width: '200px' });
   });
