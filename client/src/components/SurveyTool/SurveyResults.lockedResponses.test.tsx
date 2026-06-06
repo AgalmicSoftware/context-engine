@@ -29,6 +29,10 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import {
+  SurveyResultsLockedResponsesBanner,
+  SurveyResultsLockedResponsesToggle,
+} from './SurveyResultsLockedResponsesPanel';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
@@ -198,19 +202,28 @@ describe('SurveyResults locked responses banner', () => {
       lockedResponseDetailsOpen: false,
     };
 
-    const toggle = subject.renderLockedResponsesToggle({
-      lockedCount: 6,
-      gateDetails: [
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          href: 'https://example.com/sbt/0x1111111111111111111111111111111111111111',
-          label: 'Session Access Pass',
-        },
-      ],
+    const toggle = SurveyResultsLockedResponsesToggle({
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 6,
+        gateDetails: [
+          {
+            address: '0x1111111111111111111111111111111111111111',
+            href: 'https://example.com/sbt/0x1111111111111111111111111111111111111111',
+            label: 'Session Access Pass',
+          },
+        ],
+      },
+      onToggleDetails: subject.toggleLockedResponseDetails,
     });
-    const detailCard = subject.renderLockedResponsesBanner({
-      lockedCount: 6,
-      gateDetails: [],
+    const detailCard = SurveyResultsLockedResponsesBanner({
+      decrypting: subject.state.lockedResponsesDecrypting,
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 6,
+        gateDetails: [],
+      },
+      onDecrypt: subject.handleDecryptLockedResponses,
     });
 
     const summaryToggle = findElement(
@@ -233,15 +246,20 @@ describe('SurveyResults locked responses banner', () => {
       lockedResponseDetailsOpen: true,
     };
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 2,
-      gateDetails: [
-        {
-          address: '0x2222222222222222222222222222222222222222',
-          href: 'https://example.com/sbt/0x2222222222222222222222222222222222222222',
-          label: 'Contributor SBT',
-        },
-      ],
+    const tree = SurveyResultsLockedResponsesBanner({
+      decrypting: subject.state.lockedResponsesDecrypting,
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 2,
+        gateDetails: [
+          {
+            address: '0x2222222222222222222222222222222222222222',
+            href: 'https://example.com/sbt/0x2222222222222222222222222222222222222222',
+            label: 'Contributor SBT',
+          },
+        ],
+      },
+      onDecrypt: subject.handleDecryptLockedResponses,
     });
     const decryptButton = findElement(
       tree,
@@ -271,9 +289,14 @@ describe('SurveyResults locked responses banner', () => {
       lockedResponseDetailsOpen: true,
     };
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 1,
-      gateDetails: [],
+    const tree = SurveyResultsLockedResponsesBanner({
+      decrypting: subject.state.lockedResponsesDecrypting,
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 1,
+        gateDetails: [],
+      },
+      onDecrypt: subject.handleDecryptLockedResponses,
     });
     const decryptButton = findElement(
       tree,
@@ -391,16 +414,20 @@ describe('SurveyResults locked responses banner', () => {
       lockedResponseDetailsOpen: true,
     };
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 1,
-      gateDetails: [
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          href: `${sbtBasePath()}/0x1111111111111111111111111111111111111111`,
-          label: 'Contributor Pass',
-        },
-      ],
-      hasGenericGateMessage: true,
+    const tree = SurveyResultsLockedResponsesBanner({
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 1,
+        gateDetails: [
+          {
+            address: '0x1111111111111111111111111111111111111111',
+            href: `${sbtBasePath()}/0x1111111111111111111111111111111111111111`,
+            label: 'Contributor Pass',
+          },
+        ],
+        hasGenericGateMessage: true,
+      },
+      onDecrypt: subject.handleDecryptLockedResponses,
     });
 
     expect(treeHasText(tree, 'Contributor Pass')).toBe(true);
@@ -414,10 +441,14 @@ describe('SurveyResults locked responses banner', () => {
       lockedResponseDetailsOpen: true,
     };
 
-    const tree = subject.renderLockedResponsesBanner({
-      lockedCount: 1,
-      gateDetails: [],
-      hasGenericGateMessage: true,
+    const tree = SurveyResultsLockedResponsesBanner({
+      isOpen: subject.state.lockedResponseDetailsOpen,
+      lockedModel: {
+        lockedCount: 1,
+        gateDetails: [],
+        hasGenericGateMessage: true,
+      },
+      onDecrypt: subject.handleDecryptLockedResponses,
     });
 
     expect(treeHasText(tree, 'Locked responses require an eligible group. Connect an eligible account to decrypt.')).toBe(true);
