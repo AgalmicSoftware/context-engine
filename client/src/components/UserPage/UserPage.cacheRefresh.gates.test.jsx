@@ -82,6 +82,30 @@ describe('UserPage cache refresh gate access', () => {
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false });
   });
 
+  it('settles rejected gate access checks as unknown without applying state directly', async () => {
+    const account = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ account });
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+    const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
+    const cacheKey = buildGateAccessCacheKey(instance, {
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+    checkSponsoredAccess.mockRejectedValue(new Error('gate unavailable'));
+
+    instance._queueResponseGateAccessChecks(
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(checkSponsoredAccess).toHaveBeenCalledTimes(1);
+    expect(instance._responseGateAccessStatusByKey.get(cacheKey)?.status).toBe('unknown');
+    expect(retrySpy).toHaveBeenCalledWith(30000);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false });
+    expect(instance.setState).not.toHaveBeenCalled();
+  });
+
   it('keeps response-gate access checks strict when only a demo-session config exists', async () => {
     const priorRegistryCache = localStorage.getItem(REGISTRY_CACHE_KEY);
     localStorage.removeItem(REGISTRY_CACHE_KEY);
