@@ -8071,23 +8071,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     );
   };
 
-  hasEncryptedAnswers = () => {
-    const stats =
-      (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats())
-      || null;
-    if (stats) return Number(stats.encrypted || 0) > 0;
-
-    // Fallback (should rarely run): preserve old behavior if stats unavailable
-    const idx = 0;
-    const slice = this.state.surveysResponseState?.[idx];
-    if (!slice) return false;
-    const anyEncAnswer = !!Object.values(slice.answers || {}).some(a => a && a.encrypted);
-    const anyEncAdditional = !!Object.values(slice.additionalComments || {}).some(a => a && a.encrypted);
-    return anyEncAnswer || anyEncAdditional;
-  };
-
-
-
   renderSurveyAnswers = (responses, isOwnResponse) => {
     return (
       <SurveyQuestionsSurveyAnswersView
@@ -8234,7 +8217,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const submitHasEncryptedAnswers =
       this.state.isSubmitting &&
       this.state.currentStep === 1
-        ? this.hasEncryptedAnswers()
+        ? Number(_pendingStats.encrypted || 0) > 0
         : false;
     const submitHasMaskedCurrentQuestionPayload =
       !this.state.isSubmitting &&
