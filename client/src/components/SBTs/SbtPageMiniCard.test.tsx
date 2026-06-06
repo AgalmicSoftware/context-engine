@@ -42,7 +42,7 @@ const createProps = (overrides: Record<string, unknown> = {}) => ({
     viewKind: 'hidden',
   }),
   miniMintActionButtonClassName: 'mint-button',
-  miniOpenMintButtonContentState: { idleLabel: 'Join', shouldRenderIdleLabel: true },
+  miniOpenMintButtonState: { disabled: false, isIdle: true, isPending: false },
   miniPasswordControlInputStyle: { maxWidth: '100px' },
   miniPasswordJoinButtonState: { disabled: false, isPending: false },
   miniPasswordJoinContentState: { label: 'Join', shouldRenderLabel: true },

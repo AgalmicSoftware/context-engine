@@ -11,7 +11,10 @@ import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
-import type { SbtPageMiniMintActionPlan } from './sbtPageActionDisplayHelpers';
+import {
+  resolveSbtPageStatusButtonContentState,
+  type SbtPageMiniMintActionPlan,
+} from './sbtPageActionDisplayHelpers';
 
 type SbtPagePendingContentState = {
   failureLabel?: string;
@@ -27,7 +30,10 @@ type SbtPagePendingContentState = {
 
 type SbtPageButtonState = {
   disabled?: boolean;
+  isFailure?: boolean;
+  isIdle?: boolean;
   isPending?: boolean;
+  isSuccess?: boolean;
 };
 
 type SbtPageMiniActionFailureState = {
@@ -64,7 +70,7 @@ type SbtPageMiniCardProps = {
   miniManualClaimStartContentState: SbtPagePendingContentState;
   miniMintActionPlan: SbtPageMiniMintActionPlan;
   miniMintActionButtonClassName: string;
-  miniOpenMintButtonContentState: SbtPagePendingContentState;
+  miniOpenMintButtonState: SbtPageButtonState;
   miniPasswordControlInputStyle?: React.CSSProperties;
   miniPasswordJoinButtonState: SbtPageButtonState;
   miniPasswordJoinContentState: SbtPagePendingContentState;
@@ -128,7 +134,7 @@ const SbtPageMiniCard = ({
   miniManualClaimStartContentState,
   miniMintActionPlan,
   miniMintActionButtonClassName,
-  miniOpenMintButtonContentState,
+  miniOpenMintButtonState,
   miniPasswordControlInputStyle,
   miniPasswordJoinButtonState,
   miniPasswordJoinContentState,
@@ -155,6 +161,14 @@ const SbtPageMiniCard = ({
   showMiniSbtAddress = false,
 }: SbtPageMiniCardProps): React.ReactElement => {
   let miniMintArea: React.ReactNode = null;
+  const miniOpenMintButtonContentState = resolveSbtPageStatusButtonContentState({
+    idleLabel: 'Join',
+    isFailure: miniOpenMintButtonState.isFailure,
+    isIdle: miniOpenMintButtonState.isIdle,
+    isPending: miniOpenMintButtonState.isPending,
+    isSuccess: miniOpenMintButtonState.isSuccess,
+    successLabel: mintedLabel,
+  });
 
   if (!hasTokenMini && miniMintActionPlan.shouldRenderMintArea) {
     if (
