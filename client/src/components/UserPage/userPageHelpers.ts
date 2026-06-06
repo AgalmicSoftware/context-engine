@@ -421,6 +421,11 @@ type WriteUserPageAnalysisCacheThroughPortArgs = BuildUserPageAnalysisCacheEntry
   peekCache?: UserPageAnalysisCacheReadPort | null;
   writeCache?: UserPageAnalysisCacheWritePort | null;
 };
+type ReadUserPageAnalysisCreatedSurveyCachesThroughPortArgs = {
+  networkID?: unknown;
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+  sessionSlug?: unknown;
+};
 type BuildUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
   aiContext?: unknown;
@@ -664,6 +669,14 @@ export type UserPageAnalysisCacheWritePortResult = {
   payload: UserPageUnknownRecord | null;
   status: 'written' | 'skipped' | 'error';
 };
+export type UserPageAnalysisCreatedSurveyCacheReadResult = {
+  error?: unknown;
+  networkID: string;
+  questionsCache: unknown;
+  sessionSlug: string;
+  status: 'read' | 'skipped' | 'error';
+  surveysCache: unknown;
+};
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
   value != null && typeof value === 'object' ? value as UserPageUnknownRecord : {}
@@ -893,6 +906,43 @@ export const writeUserPageAnalysisCacheThroughPort = async ({
       entry,
       error,
       payload,
+      status: 'error',
+    };
+  }
+};
+
+export const readUserPageAnalysisCreatedSurveyCachesThroughPort = ({
+  networkID = '',
+  peekCache = null,
+  sessionSlug = '',
+}: ReadUserPageAnalysisCreatedSurveyCachesThroughPortArgs = {}): UserPageAnalysisCreatedSurveyCacheReadResult => {
+  const resolvedNetworkID = String(networkID || '');
+  const resolvedSessionSlug = String(sessionSlug || '');
+  const baseResult = {
+    networkID: resolvedNetworkID,
+    questionsCache: {},
+    sessionSlug: resolvedSessionSlug,
+    surveysCache: {},
+  };
+  if (!resolvedNetworkID || typeof peekCache !== 'function') {
+    return {
+      ...baseResult,
+      status: 'skipped',
+    };
+  }
+  try {
+    const surveysCache = peekCache('surveysCache', resolvedSessionSlug, { clone: false }) || {};
+    const questionsCache = peekCache('questionsCache', resolvedSessionSlug, { clone: false }) || {};
+    return {
+      ...baseResult,
+      questionsCache,
+      status: 'read',
+      surveysCache,
+    };
+  } catch (error) {
+    return {
+      ...baseResult,
+      error,
       status: 'error',
     };
   }
