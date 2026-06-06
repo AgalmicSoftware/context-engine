@@ -482,4 +482,36 @@ describe('sbtPageActionDisplayHelpers', () => {
       showTransactionError: true,
     });
   });
+
+  it('keeps open-mint transaction actions disabled or hidden when status is not viewable', () => {
+    expect(resolveSbtPageOpenMintButtonState({
+      lastMintTxHash: '0xmint',
+      mintingStatus: 'pending',
+    })).toMatchObject({
+      canOpenMintTx: false,
+      disabled: true,
+      isPending: true,
+    });
+
+    expect(resolveSbtPageOpenMintButtonState({
+      lastMintTxHash: '',
+      mintingStatus: 'success',
+    })).toMatchObject({
+      canOpenMintTx: false,
+      disabled: true,
+      isMinted: true,
+      title: undefined,
+    });
+
+    expect(resolveSbtPageOpenMintButtonState({
+      burningStatus: 'success',
+      lastMintTxHash: '0xmint',
+      mintingStatus: 'success',
+    })).toMatchObject({
+      canOpenMintTx: false,
+      disabled: false,
+      isMinted: false,
+      title: undefined,
+    });
+  });
 });
