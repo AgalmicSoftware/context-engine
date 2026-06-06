@@ -275,6 +275,7 @@ import {
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
+  resolveSessionWizardWorkerUrlSourceState,
 } from './sessionWizardWorkerRuntimeSupport';
 import {
   buildSessionWizardGateOptions,
@@ -4263,21 +4264,20 @@ const SessionWizard = ({
   const displayedWorkerUrl = hideNormalModeDefaultWorkerUrl
     ? ''
     : (toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl);
-  const usesDefaultWorkerUrl = !!visibleConfiguredWorkerUrl && !!defaultWorkerUrl && visibleConfiguredWorkerUrl === defaultWorkerUrl;
-  const deployWorkerMatchesConfiguredUrl = !!visibleConfiguredWorkerUrl &&
-    !!deployedWorkerUrl &&
-    visibleConfiguredWorkerUrl === deployedWorkerUrl;
   const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
   const showWorkerUrlField = customWorkerSelected && deployVerifiedInUi;
-  const workerUrlSource = !resolvedWorkerBaseUrl
-    ? 'missing (set worker URL)'
-    : (workerMode === 'default' || usesDefaultWorkerUrl)
-      ? 'default worker'
-      : deployVerifiedInUi && deployWorkerMatchesConfiguredUrl
-        ? 'deployed worker URL (verified this run)'
-        : deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
-          ? 'custom worker URL changed after deploy (re-deploy to verify)'
-          : 'custom worker URL (not verified in this run)';
+  const {
+    deployWorkerMatchesConfiguredUrl,
+    usesDefaultWorkerUrl,
+    workerUrlSource,
+  } = resolveSessionWizardWorkerUrlSourceState({
+    defaultWorkerUrl,
+    deployedWorkerUrl,
+    deployVerifiedInUi,
+    resolvedWorkerBaseUrl,
+    visibleConfiguredWorkerUrl,
+    workerMode,
+  });
   const currentWorkerSecrets = getCurrentWorkerSecrets();
   const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
     wizardMode,
