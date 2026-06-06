@@ -463,7 +463,7 @@ describe('UserPage analysis cache and routing', () => {
       activeSessionSlug: 'primary-session',
     });
 
-    expect(instance.getBookmarksSlug()).toBe('primary-session');
+    expect(instance.getActiveSessionSlug()).toBe('primary-session');
     expect(instance._getDeepScanPrioritySlugs()).toEqual(['primary-session', '', 'edge']);
   });
 

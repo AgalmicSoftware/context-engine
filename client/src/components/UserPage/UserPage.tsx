@@ -842,11 +842,9 @@ class UserPage extends Component<any, any> {
     sessionSlug: this.props.sessionSlug,
   }) || '';
 
-  getBookmarksSlug = (): string => this.getActiveSessionSlug();
-
   getBookmarksCache = (): UserPageBookmarksCache => {
     try {
-      const slug = this.getBookmarksSlug();
+      const slug = this.getActiveSessionSlug();
       const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
       return normalizeUserPageBookmarksCache(parsed);
     } catch (_) {
@@ -855,7 +853,7 @@ class UserPage extends Component<any, any> {
   };
 
   persistBookmarksCache = (cacheObj: unknown, source: unknown = ''): void => {
-    const slug = this.getBookmarksSlug();
+    const slug = this.getActiveSessionSlug();
     void (writeCache as (
       namespace: string,
       slug?: string,
@@ -889,7 +887,7 @@ class UserPage extends Component<any, any> {
   handleManagedCacheUpdate = (event: ManagedCacheUpdateEvent = null): void => {
     if (!this._isMounted) return;
     const cacheUpdate = resolveUserPageManagedCacheUpdate({
-      bookmarksSlug: this.getBookmarksSlug(),
+      bookmarksSlug: this.getActiveSessionSlug(),
       namespace: event?.namespace,
       slug: event?.slug,
     });
