@@ -1,4 +1,5 @@
 import {
+  resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishMetadataDisplayState,
   resolveSessionWizardPublishReadiness,
   resolveSessionWizardPublishUiPlan,
@@ -366,5 +367,67 @@ describe('resolveSessionWizardPublishReadiness', () => {
       showManualMetadataUri: false,
       showMetadataUri: false,
     });
+  });
+});
+
+describe('resolveSessionWizardPublishRequestDescriptor', () => {
+  it('pins publish request identity without deploy, upload, register, or route ports', () => {
+    const pendingDraftSnapshot = Object.freeze([
+      Object.freeze({ id: 'already-deployed', deployed: true }),
+      Object.freeze({ id: 'needs-deploy', deployed: false }),
+      Object.freeze({ id: 'missing-flag' }),
+    ]);
+
+    const descriptor = resolveSessionWizardPublishRequestDescriptor({
+      pendingDraftSnapshot,
+      manualMetadataUrl: ` https://arweave.net/${txId} `,
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: true,
+      deployComplete: false,
+      canUploadMetadataNow: true,
+    });
+
+    expect(descriptor).toEqual({
+      pendingDraftSnapshot,
+      hasPendingDrafts: true,
+      hasManualMetadata: true,
+      publishExecutionPlan: {
+        shouldAutoDeployWorker: true,
+        shouldDeployPendingSbts: true,
+        shouldUploadMetadata: false,
+        shouldRegisterSession: true,
+        steps: ['deploy-worker', 'deploy-sbts', 'register-session', 'done'],
+        stepNumbers: {
+          'deploy-worker': 1,
+          'deploy-sbts': 2,
+          'register-session': 3,
+          done: 4,
+        },
+      },
+    });
+  });
+
+  it('keeps uploaded metadata fallback behavior aligned with the existing upload plan', () => {
+    const descriptor = resolveSessionWizardPublishRequestDescriptor({
+      pendingDraftSnapshot: [],
+      manualMetadataUrl: '',
+      workerMode: 'default',
+      sponsoredAutoDeployReady: false,
+      deployComplete: false,
+      canUploadMetadataNow: true,
+    });
+
+    expect(descriptor).toEqual(expect.objectContaining({
+      pendingDraftSnapshot: [],
+      hasPendingDrafts: false,
+      hasManualMetadata: false,
+      publishExecutionPlan: expect.objectContaining({
+        shouldAutoDeployWorker: false,
+        shouldDeployPendingSbts: false,
+        shouldUploadMetadata: true,
+        shouldRegisterSession: true,
+        steps: ['upload-metadata', 'register-session', 'done'],
+      }),
+    }));
   });
 });

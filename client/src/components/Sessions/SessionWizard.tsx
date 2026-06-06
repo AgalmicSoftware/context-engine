@@ -113,7 +113,6 @@ import {
 } from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
-  buildSessionWizardPublishExecutionPlan,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
@@ -127,7 +126,10 @@ import {
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
-import { resolveSessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
+import {
+  resolveSessionWizardPublishRequestDescriptor,
+  resolveSessionWizardPublishUiPlan,
+} from './sessionWizardPublishReadiness';
 import {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
@@ -312,7 +314,10 @@ export {
   resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
-export { resolveSessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
+export {
+  resolveSessionWizardPublishRequestDescriptor,
+  resolveSessionWizardPublishUiPlan,
+} from './sessionWizardPublishReadiness';
 export {
   resolveDeployWorkerState,
   resolveSessionWizardWorkerBaseUrl,
@@ -3621,8 +3626,6 @@ const SessionWizard = ({
     setPublishBusy(true);
     try {
       const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
-      const hasPendingDrafts = pendingDraftSnapshot.some((entry) => entry.deployed !== true);
-      const hasManualMetadata = Boolean(normalizeArweaveUri(manualMetadataUrl));
       const currentWorkerSecrets = getCurrentWorkerSecrets();
       const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
         wizardMode,
@@ -3634,14 +3637,15 @@ const SessionWizard = ({
         hasBundleFile: !!bundleFile,
         normalModeBundleUrlOverride,
       });
-      const publishExecutionPlan = buildSessionWizardPublishExecutionPlan({
+      const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
+        pendingDraftSnapshot,
+        manualMetadataUrl,
         workerMode,
         sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
         deployComplete,
-        hasPendingDrafts,
-        hasManualMetadata,
         canUploadMetadataNow,
       });
+      const { publishExecutionPlan } = publishRequestDescriptor;
       const publishStepNumbers = publishExecutionPlan.stepNumbers;
       let uploadResult = null;
       let workerUrlOverride = '';
@@ -3682,7 +3686,7 @@ const SessionWizard = ({
         input: {
           publishExecutionPlan,
           deployedPendingDrafts,
-          pendingDraftSnapshot,
+          pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
           sessionSlug: draft?.slug,
         },
         ports: {
