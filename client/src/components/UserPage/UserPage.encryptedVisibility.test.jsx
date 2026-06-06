@@ -116,6 +116,58 @@ describe('UserPage encrypted response visibility', () => {
     expect(instance.state.hasUncertainGateAccess).toBe(false);
   });
 
+  it('hides encrypted question content without gate checks when the viewer has no account', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress, account: '' });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      sbtCache: [],
+      userCache: [],
+      questionsCache: [{
+        slug: 'edge',
+        data: {
+          [networkID]: {
+            questions: {
+              q1: {
+                id: 'q1',
+                creator: viewAddress,
+                prompt: '[encrypted]',
+                type: 'freeform',
+                promptEncrypted: '{"v":2}',
+              },
+            },
+            questionResponses: {
+              q1: {
+                [viewAddress]: JSON.stringify({
+                  answer: {
+                    value: '*',
+                    encrypted: true,
+                    encryptedPortion: '{"v":2}',
+                    encryptionAudience: 'gate',
+                  },
+                }),
+              },
+            },
+          },
+        },
+      }],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.questionResponseInfo).toHaveLength(0);
+    expect(instance.state.questionCreationInfo).toHaveLength(0);
+    expect(instance.state.loadingQuestions).toBe(false);
+    expect(instance.state.hasUncertainGateAccess).toBe(false);
+    expect(checkSponsoredAccess).not.toHaveBeenCalled();
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
+  });
+
   it('keeps question responses visible when only additional comments are encrypted and gate access is denied', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
