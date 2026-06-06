@@ -8408,29 +8408,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           copiedSurveyJson={this.state.copiedSurveyJson}
           hidden={hideEmbeddedDebugUi}
           isStandalone={this.props.isStandalone}
+          jsonPanelDisplayState={jsonPanelDisplayState}
           onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
           onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
           onCopySurveyJson={() => this.copyJsonToClipboard(surveyJson, 'survey')}
           onToggleQuestionsJson={this.toggleShowQuestionsJson}
           onToggleResponseJson={this.toggleShowResponseJson}
           onToggleSurveyJson={this.toggleShowSurveyJson}
-          questionJsonToggleClassName={jsonPanelDisplayState.questionJsonToggleClassName}
           questionsJson={questionsJson}
           renderJsonTree={this.jsonTreeDisplay}
           responseJson={responseJson}
-          responseJsonToggleClassName={jsonPanelDisplayState.responseJsonToggleClassName}
-          showQuestionJsonControls={jsonPanelDisplayState.showQuestionJsonControls}
           showQuestionsJson={this.state.showQuestionsJson}
-          showQuestionsJsonPanel={jsonPanelDisplayState.showQuestionsJsonPanel}
           showResponseJson={this.state.showResponseJson}
-          showResponseJsonPanel={jsonPanelDisplayState.showResponseJsonPanel}
           showSurveyJson={this.state.showSurveyJson}
-          showSurveyJsonPanel={jsonPanelDisplayState.showSurveyJsonPanel}
           singleQuestionMode={this.props.singleQuestionMode}
           surveyJson={surveyJson}
-          surveyJsonPanelClassName={jsonPanelDisplayState.surveyJsonPanelClassName}
-          surveyJsonRowClassName={jsonPanelDisplayState.surveyJsonRowClassName}
-          surveyJsonToggleClassName={jsonPanelDisplayState.surveyJsonToggleClassName}
         />
         {useTagModal && (
           <TagModal
