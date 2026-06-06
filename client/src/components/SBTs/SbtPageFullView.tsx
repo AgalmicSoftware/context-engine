@@ -11,7 +11,7 @@ import { Alert } from 'reactstrap';
 
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import { getChainLabelById } from '../../utilities/web3/contractScripts.js';
-import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
+import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
 import {
@@ -449,26 +449,24 @@ export const renderSbtPageFullView = ({
               actionFeedbackState={actionFeedbackState}
               burnButton={burnButton}
               burnLabel={actionLabels.burn}
-              burnSuccessHref={actionFeedbackState.showBurnSuccess ? getExplorerLink(lastBurnTxHash) : ''}
-              burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
               burnedLowerLabel={actionLabels.burnedLower}
               copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
               errorCopyIconState={errorCopyIconState}
               errorMessage={error as React.ReactNode}
-              isOpen={actionsSectionToggleState.isOpen}
+              getExplorerLink={getExplorerLink}
               mintButton={mintButton}
               mintLabel={actionLabels.mint}
-              mintSuccessHref={actionFeedbackState.showMintSuccess ? getExplorerLink(lastMintTxHash) : ''}
-              mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
               mintedLowerLabel={actionLabels.mintedLower}
               onCopyError={copyErrorToClipboard}
               onToggle={toggleActions}
               sbtLabel={sbtLabel}
               sectionHeaderClassName={sectionHeaderClassName}
-              shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
-              shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
-              transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? getExplorerLink(transactionHash) : ''}
-              transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
+              toggleState={actionsSectionToggleState}
+              transactionState={{
+                lastBurnTxHash,
+                lastMintTxHash,
+                transactionHash,
+              }}
             />
             {userIsSbtAdmin && (
               <div className={styles.adminSection}>
