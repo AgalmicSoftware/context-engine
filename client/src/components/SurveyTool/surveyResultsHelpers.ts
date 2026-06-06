@@ -75,6 +75,12 @@ export type SurveyResultsAggregator = Record<string, SurveyResultsAggregateRow[]
 export type SurveyResultsQuestionLookupEntry = UnknownRecord & { type?: unknown };
 export type SurveyResultsQuestionLookup = Record<string, SurveyResultsQuestionLookupEntry | undefined>;
 export type SurveyResultsStringifiedAggregator = Record<string, Record<string, unknown>[]>;
+export type SurveyResultsFilterQuestionRecord = UnknownRecord & {
+  creator?: unknown;
+  id?: unknown;
+  prompt?: unknown;
+  type?: unknown;
+};
 
 type SurveyQuestionResponseCandidate = {
   index: number;
@@ -160,6 +166,21 @@ export const stringifySurveyResultsAggregatorResponses = (
     }));
   });
   return out;
+};
+
+export const buildSurveyResultsQuestionFilterQuestions = ({
+  networkQuestionsById = {},
+  questionResponses = {},
+}: {
+  networkQuestionsById?: Record<string, SurveyResultsFilterQuestionRecord>;
+  questionResponses?: unknown;
+} = {}): SurveyResultsFilterQuestionRecord[] => {
+  const responseRecord = Object(questionResponses || {}) as Record<string, unknown>;
+  return Object.keys(responseRecord).map((questionId) => {
+    const lowerQuestionId = String(questionId || '').toLowerCase();
+    const questionData = networkQuestionsById[lowerQuestionId];
+    return questionData || { id: lowerQuestionId || questionId, creator: '', type: '', prompt: '' };
+  });
 };
 
 export const buildSurveyResultsQuestionFilterCountPatch = ({
