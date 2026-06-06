@@ -5,14 +5,7 @@ import { faBookmark } from '@fortawesome/free-solid-svg-icons';
 
 import { getShortenedQuestionID } from 'utilities/ui/displayHelpers.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
-
-type SurveyResultsQuestionTableEntry = {
-  prompt?: string;
-  questionId: string;
-  responsesCount?: number;
-  sessionSlug?: string;
-  type?: string;
-};
+import type { SurveyResultsQuestionTableEntry } from './surveyResultsSummaryModels';
 
 type SurveyResultsQuestionTableProps = {
   bookmarkedQuestionIDs?: string[];
