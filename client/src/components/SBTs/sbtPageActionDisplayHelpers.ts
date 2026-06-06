@@ -80,7 +80,15 @@ type SbtPageOpenMintButtonState = {
   isIdle: boolean;
   isMinted: boolean;
   isPending: boolean;
+  readinessDescriptor: SbtPageOpenMintReadinessDescriptor;
   title?: string;
+};
+type SbtPageOpenMintReadinessDescriptor = {
+  canOpenMintTx: boolean;
+  hasMintTransactionHash: boolean;
+  isBurnCleared: boolean;
+  isMinted: boolean;
+  isPending: boolean;
 };
 type ResolveSbtPagePasswordJoinButtonStateArgs = {
   groupPasswordInput?: unknown;
@@ -677,7 +685,8 @@ export const resolveSbtPageOpenMintButtonState = ({
   mintLowerLabel = 'mint',
   mintingStatus = '',
 }: ResolveSbtPageOpenMintButtonStateArgs = {}): SbtPageOpenMintButtonState => {
-  const isMinted = mintingStatus === 'success' && burningStatus !== 'success';
+  const isBurnCleared = burningStatus === 'success';
+  const isMinted = mintingStatus === 'success' && !isBurnCleared;
   const canOpenMintTx = !!(isMinted && lastMintTxHash);
   const isPending = mintingStatus === 'pending';
   return {
@@ -687,6 +696,13 @@ export const resolveSbtPageOpenMintButtonState = ({
     isIdle: mintingStatus === 'idle',
     isMinted,
     isPending,
+    readinessDescriptor: {
+      canOpenMintTx,
+      hasMintTransactionHash: !!lastMintTxHash,
+      isBurnCleared,
+      isMinted,
+      isPending,
+    },
     title: canOpenMintTx ? `View ${String(mintLowerLabel || 'mint')} transaction` : undefined,
   };
 };
