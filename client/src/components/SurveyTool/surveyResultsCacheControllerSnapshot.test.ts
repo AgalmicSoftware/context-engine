@@ -142,4 +142,72 @@ describe('surveyResultsCacheControllerSnapshot', () => {
       viewMode: 'survey',
     });
   });
+
+  it('preserves survey-mode identity, readiness, and polling inputs as passive descriptors', () => {
+    const snapshot = buildSurveyResultsCacheControllerSnapshot({
+      activeSessionSlug: 'alpha-session',
+      currentSurveyId: 42,
+      currentSurveyIdForUrl: 'route-survey-42',
+      currentViewModeForUrl: 'survey',
+      hasRefreshQuestionMetadata: true,
+      hasRefreshQuestionResponses: true,
+      hasRefreshSurveyResponsesByID: true,
+      networkLatestBlock: 180,
+      questionLocalBlock: 150,
+      questionResponsesNonce: 'qr-nonce',
+      questionsCacheNonce: 'q-nonce',
+      questionResultsHydrated: false,
+      refreshTargetQuestionBlock: 160,
+      refreshTargetResponseBlock: 170,
+      refreshTargetSurveyBlock: 175,
+      responseLocalBlock: 140,
+      sbtCacheRevision: 'sbt-revision',
+      surveyLocalBlock: 130,
+      surveyResultsHydrated: true,
+      surveyViewMode: 'individual',
+      totalQuestionsCount: 8,
+      totalResponsesCount: 21,
+      viewMode: 'survey',
+    });
+
+    expect(snapshot.selectedIdentityInput).toEqual({
+      activeSessionSlug: 'alpha-session',
+      currentSurveyId: '42',
+      currentSurveyIdForUrl: 'route-survey-42',
+      currentViewModeForUrl: 'survey',
+      viewMode: 'survey',
+    });
+    expect(snapshot.selectedResultInput).toEqual({
+      activeSessionSlug: 'alpha-session',
+      currentSurveyId: '42',
+      questionResponsesNonce: 'qr-nonce',
+      questionsCacheNonce: 'q-nonce',
+      sbtCacheRevision: 'sbt-revision',
+    });
+    expect(snapshot.cacheReadinessInput).toMatchObject({
+      questionResultsHydrated: false,
+      surveyResultsHydrated: true,
+      surveyViewMode: 'individual',
+      totalQuestionsCount: 8,
+      totalResponsesCount: 21,
+      viewMode: 'survey',
+    });
+    expect(snapshot.pollingInput).toEqual({
+      networkLatestBlock: 180,
+      questionLocalBlock: 150,
+      refreshTargetQuestionBlock: 160,
+      refreshTargetResponseBlock: 170,
+      refreshTargetSurveyBlock: 175,
+      responseLocalBlock: 140,
+      surveyLocalBlock: 130,
+    });
+    expect(snapshot.manualRefreshInput).toEqual({
+      canDispatch: true,
+      canRefreshQuestions: false,
+      canRefreshSurvey: true,
+      status: 'survey',
+      surveyId: '42',
+      viewMode: 'survey',
+    });
+  });
 });
