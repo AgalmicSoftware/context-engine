@@ -4,6 +4,7 @@ import {
   resolveSessionWizardWorkerFaucetConfigFromDraft,
   resolveSessionWizardWorkerRpcUrlFromDraft,
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
+  resolveSessionWizardWorkerUrlSourceState,
 } from './sessionWizardWorkerRuntimeSupport';
 import { getSessionWizardDefaultWorkerUrl } from './sessionWizardWorkerDefaults';
 
@@ -15,6 +16,53 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
       deployComplete: false,
       workerMode: 'default',
     })).toBe('');
+  });
+
+  it('describes worker URL source display without owning deploy execution', () => {
+    expect(resolveSessionWizardWorkerUrlSourceState({
+      resolvedWorkerBaseUrl: '',
+    })).toEqual({
+      deployWorkerMatchesConfiguredUrl: false,
+      usesDefaultWorkerUrl: false,
+      workerUrlSource: 'missing (set worker URL)',
+    });
+
+    expect(resolveSessionWizardWorkerUrlSourceState({
+      defaultWorkerUrl: 'https://default.example',
+      resolvedWorkerBaseUrl: 'https://default.example',
+      visibleConfiguredWorkerUrl: 'https://default.example',
+      workerMode: 'custom',
+    })).toEqual({
+      deployWorkerMatchesConfiguredUrl: false,
+      usesDefaultWorkerUrl: true,
+      workerUrlSource: 'default worker',
+    });
+
+    expect(resolveSessionWizardWorkerUrlSourceState({
+      deployedWorkerUrl: 'https://deployed.example',
+      deployVerifiedInUi: true,
+      resolvedWorkerBaseUrl: 'https://deployed.example',
+      visibleConfiguredWorkerUrl: 'https://deployed.example',
+      workerMode: 'custom',
+    })).toEqual({
+      deployWorkerMatchesConfiguredUrl: true,
+      usesDefaultWorkerUrl: false,
+      workerUrlSource: 'deployed worker URL (verified this run)',
+    });
+
+    expect(resolveSessionWizardWorkerUrlSourceState({
+      deployedWorkerUrl: 'https://old-deploy.example',
+      deployVerifiedInUi: true,
+      resolvedWorkerBaseUrl: 'https://custom.example',
+      visibleConfiguredWorkerUrl: 'https://custom.example',
+      workerMode: 'custom',
+    }).workerUrlSource).toBe('custom worker URL changed after deploy (re-deploy to verify)');
+
+    expect(resolveSessionWizardWorkerUrlSourceState({
+      resolvedWorkerBaseUrl: 'https://custom.example',
+      visibleConfiguredWorkerUrl: 'https://custom.example',
+      workerMode: 'custom',
+    }).workerUrlSource).toBe('custom worker URL (not verified in this run)');
   });
 
   it('resolves worker rpc urls and url maps from draft path providers', () => {
