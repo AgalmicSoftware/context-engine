@@ -26,6 +26,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      readinessKind: 'worker-upload',
       showUploadBlockedReason: false,
     });
   });
@@ -41,6 +42,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       canUploadMetadataNow: false,
       uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
       canPublishNow: false,
+      readinessKind: 'blocked',
       showUploadBlockedReason: true,
     }));
 
@@ -54,6 +56,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       canUploadMetadataNow: false,
       uploadBlockedReason: 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.',
       canPublishNow: false,
+      readinessKind: 'blocked',
     }));
 
     expect(resolveSessionWizardPublishReadiness({
@@ -65,6 +68,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
     })).toEqual(expect.objectContaining({
       canUploadMetadataNow: true,
       canPublishNow: true,
+      readinessKind: 'worker-upload',
     }));
   });
 
@@ -80,6 +84,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: true,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      readinessKind: 'manual-metadata',
     }));
 
     expect(resolveSessionWizardPublishReadiness({
@@ -91,6 +96,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: true,
       canPublishNow: true,
+      readinessKind: 'uploaded-metadata',
     }));
   });
 
@@ -108,6 +114,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: true,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      readinessKind: 'manual-metadata',
     }));
 
     expect(resolveSessionWizardPublishReadiness({
@@ -123,6 +130,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: true,
       canPublishNow: true,
+      readinessKind: 'uploaded-metadata',
     }));
   });
 
@@ -137,6 +145,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      readinessKind: 'sponsored-auto-deploy',
     }));
   });
 
@@ -163,6 +172,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: false,
       canPublishNow: false,
+      readinessKind: 'blocked',
       showUploadBlockedReason: true,
     });
     expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
@@ -199,6 +209,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: false,
       hasUploadedMetadata: true,
       canPublishNow: true,
+      readinessKind: 'uploaded-metadata',
     }));
     expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
       shouldAutoDeployWorker: false,
@@ -253,6 +264,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       hasManualMetadata: true,
       hasUploadedMetadata: false,
       canPublishNow: true,
+      readinessKind: 'manual-metadata',
     }));
     expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({
       shouldUploadMetadata: false,
@@ -288,6 +300,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
     expect(plan.publishReadiness).toEqual(expect.objectContaining({
       canUploadMetadataNow: false,
       canPublishNow: true,
+      readinessKind: 'sponsored-auto-deploy',
       uploadBlockedReason: 'Set a worker URL before uploading metadata.',
     }));
     expect(plan.publishExecutionPlan).toEqual(expect.objectContaining({

@@ -22,8 +22,16 @@ export type SessionWizardPublishReadinessDescriptor = {
   hasManualMetadata: boolean;
   hasUploadedMetadata: boolean;
   canPublishNow: boolean;
+  readinessKind: SessionWizardPublishReadinessKind;
   showUploadBlockedReason: boolean;
 };
+
+export type SessionWizardPublishReadinessKind =
+  | 'blocked'
+  | 'manual-metadata'
+  | 'sponsored-auto-deploy'
+  | 'uploaded-metadata'
+  | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   deployComplete?: boolean;
@@ -84,6 +92,15 @@ export function resolveSessionWizardPublishReadiness({
     hasManualMetadata ||
     hasUploadedMetadata
   );
+  const readinessKind: SessionWizardPublishReadinessKind = hasManualMetadata
+    ? 'manual-metadata'
+    : hasUploadedMetadata
+      ? 'uploaded-metadata'
+      : canUploadMetadataNow
+        ? 'worker-upload'
+        : canUseSponsoredAutoDeployNow
+          ? 'sponsored-auto-deploy'
+          : 'blocked';
   const showUploadBlockedReason = !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
 
   return {
@@ -92,6 +109,7 @@ export function resolveSessionWizardPublishReadiness({
     hasManualMetadata,
     hasUploadedMetadata,
     canPublishNow,
+    readinessKind,
     showUploadBlockedReason,
   };
 }
