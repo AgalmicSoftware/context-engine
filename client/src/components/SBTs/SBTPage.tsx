@@ -4167,7 +4167,6 @@ renderMintButton() {
         return <div className={styles.error}>Error: {error}</div>;
       }
 
-      const sbtName = sbtNameText;
       const showMiniSbtAddress = isCryptoMode();
       const {
         hasTokenMini,
@@ -4305,7 +4304,7 @@ renderMintButton() {
             },
           })}
           sbtAddress={sbtAddressForDisplay}
-          sbtName={sbtName}
+          sbtName={sbtNameText}
           shouldRenderEndedIndicator={shouldRenderEndedIndicator}
           shouldRenderLiveIndicator={shouldRenderLiveIndicator}
           showLockIcon={!!(sbtInfo.hasPasswordMint || this.state.hasGroupPasswordMint)}
