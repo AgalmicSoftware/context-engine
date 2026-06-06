@@ -440,6 +440,98 @@ describe('UserPage encrypted response visibility', () => {
     expect(instance.state.questionResponseInfo[0].id).toBe('q1');
   });
 
+  it('uses the viewer-response source slug when evaluating encrypted survey visibility', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const otherAddress = '0x00000000000000000000000000000000000000cc';
+    const networkID = '84532';
+    const instance = makeInstance({ viewAddress, account: '0x00000000000000000000000000000000000000bb' });
+    const openGrantedKey = buildGateAccessCacheKey(instance, { slug: 'open-session', resourceKey: 'surveyResponses' });
+    const openDefaultKey = buildGateAccessCacheKey(instance, { slug: 'open-session', resourceKey: 'default' });
+    const closedDeniedKey = buildGateAccessCacheKey(instance, { slug: 'closed-session', resourceKey: 'surveyResponses' });
+    const closedDefaultKey = buildGateAccessCacheKey(instance, { slug: 'closed-session', resourceKey: 'default' });
+    instance._responseGateAccessStatusByKey.set(openGrantedKey, { status: 'granted', ts: Date.now() });
+    instance._responseGateAccessStatusByKey.set(openDefaultKey, { status: 'no-gate', ts: Date.now() });
+    instance._responseGateAccessStatusByKey.set(closedDeniedKey, { status: 'denied', ts: Date.now() });
+    instance._responseGateAccessStatusByKey.set(closedDefaultKey, { status: 'no-gate', ts: Date.now() });
+
+    const dataByNamespace = {
+      surveysCache: [
+        {
+          slug: 'closed-session',
+          data: {
+            [networkID]: {
+              surveys: {
+                s1: {
+                  id: 's1',
+                  title: 'Survey 1',
+                  creator: viewAddress,
+                  questionIDs: ['q1'],
+                },
+              },
+              surveyResponses: {
+                s1: {
+                  [otherAddress]: JSON.stringify({
+                    responses: [{
+                      questionID: 'q1',
+                      answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+                    }],
+                  }),
+                },
+              },
+            },
+          },
+        },
+        {
+          slug: 'open-session',
+          data: {
+            [networkID]: {
+              surveys: {},
+              surveyResponses: {
+                s1: {
+                  [viewAddress]: JSON.stringify({
+                    responses: [{
+                      questionID: 'q1',
+                      answer: { value: '*', encrypted: true, encryptionAudience: 'gate' },
+                    }],
+                  }),
+                },
+              },
+            },
+          },
+        },
+      ],
+      sbtCache: [],
+      userCache: [],
+      questionsCache: [{
+        slug: 'closed-session',
+        data: {
+          [networkID]: {
+            questions: {
+              q1: {
+                id: 'q1',
+                creator: viewAddress,
+                prompt: '[encrypted]',
+                type: 'freeform',
+                promptEncrypted: '{"v":2}',
+              },
+            },
+            questionResponses: {},
+          },
+        },
+      }],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.surveyResponseInfo).toHaveLength(1);
+    expect(instance.state.surveyResponseInfo[0].id).toBe('s1');
+    expect(instance.state.detailedSurveyResponses.s1).toHaveLength(1);
+    expect(instance.state.detailedSurveyResponses.s1[0].canDecryptOtherResponses).toBe(true);
+  });
+
   it('revalidates stale terminal gate statuses during encrypted visibility refresh', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
