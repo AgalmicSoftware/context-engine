@@ -24,6 +24,19 @@ type WorkerBaseUrlParams = {
   networkId?: unknown;
   allowNormalModeSharedHostedWorker?: boolean;
 };
+type ResolveSessionWizardWorkerUrlSourceStateArgs = {
+  defaultWorkerUrl?: unknown;
+  deployedWorkerUrl?: unknown;
+  deployVerifiedInUi?: unknown;
+  resolvedWorkerBaseUrl?: unknown;
+  visibleConfiguredWorkerUrl?: unknown;
+  workerMode?: unknown;
+};
+export type SessionWizardWorkerUrlSourceState = {
+  deployWorkerMatchesConfiguredUrl: boolean;
+  usesDefaultWorkerUrl: boolean;
+  workerUrlSource: string;
+};
 
 export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
   draft,
@@ -49,6 +62,37 @@ export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
     fallbackWorkerUrl,
     workerMode: (wizardMode === 'normal' && !allowNormalModeSharedHostedWorker) ? 'custom' : workerMode,
   });
+};
+
+export const resolveSessionWizardWorkerUrlSourceState = ({
+  defaultWorkerUrl = '',
+  deployedWorkerUrl = '',
+  deployVerifiedInUi = false,
+  resolvedWorkerBaseUrl = '',
+  visibleConfiguredWorkerUrl = '',
+  workerMode = '',
+}: ResolveSessionWizardWorkerUrlSourceStateArgs = {}): SessionWizardWorkerUrlSourceState => {
+  const usesDefaultWorkerUrl = !!visibleConfiguredWorkerUrl &&
+    !!defaultWorkerUrl &&
+    visibleConfiguredWorkerUrl === defaultWorkerUrl;
+  const deployWorkerMatchesConfiguredUrl = !!visibleConfiguredWorkerUrl &&
+    !!deployedWorkerUrl &&
+    visibleConfiguredWorkerUrl === deployedWorkerUrl;
+  const workerUrlSource = !resolvedWorkerBaseUrl
+    ? 'missing (set worker URL)'
+    : (workerMode === 'default' || usesDefaultWorkerUrl)
+      ? 'default worker'
+      : deployVerifiedInUi && deployWorkerMatchesConfiguredUrl
+        ? 'deployed worker URL (verified this run)'
+        : deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
+          ? 'custom worker URL changed after deploy (re-deploy to verify)'
+          : 'custom worker URL (not verified in this run)';
+
+  return {
+    deployWorkerMatchesConfiguredUrl,
+    usesDefaultWorkerUrl,
+    workerUrlSource,
+  };
 };
 
 const resolveSessionWizardWorkerRuntimeChainId = ({
