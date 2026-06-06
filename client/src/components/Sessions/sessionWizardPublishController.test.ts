@@ -1,4 +1,5 @@
 import {
+  resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
@@ -254,6 +255,59 @@ describe('runSessionWizardPublishController', () => {
         setPublishStep: jest.fn(),
       },
     })).rejects.toBe(error);
+  });
+});
+
+describe('resolveSessionWizardPublishMetadataUploadRequest', () => {
+  it('describes upload dispatch identity without owning upload, route, wallet, or state effects', () => {
+    const request = resolveSessionWizardPublishMetadataUploadRequest({
+      publishExecutionPlan: buildPlan({
+        shouldUploadMetadata: true,
+        stepNumbers: {
+          'upload-metadata': 4,
+        },
+      }),
+      workerUrlOverride: 'https://worker.example.test',
+      signerAccountOverride: '0x00000000000000000000000000000000000000aa',
+    });
+
+    expect(request).toEqual({
+      shouldUploadMetadata: true,
+      publishStep: 4,
+      uploadArgs: {
+        workerUrlOverride: 'https://worker.example.test',
+        signerAccountOverride: '0x00000000000000000000000000000000000000aa',
+      },
+    });
+    expect(Object.keys(request)).toEqual([
+      'shouldUploadMetadata',
+      'publishStep',
+      'uploadArgs',
+    ]);
+    expect(Object.keys(request.uploadArgs)).toEqual([
+      'workerUrlOverride',
+      'signerAccountOverride',
+    ]);
+  });
+
+  it('keeps no-upload plans inert while preserving the would-be request identity', () => {
+    expect(resolveSessionWizardPublishMetadataUploadRequest({
+      publishExecutionPlan: buildPlan({
+        shouldUploadMetadata: false,
+        stepNumbers: {
+          'upload-metadata': 2,
+        },
+      }),
+      workerUrlOverride: 'https://unused-worker.example.test',
+      signerAccountOverride: '0x00000000000000000000000000000000000000bb',
+    })).toEqual({
+      shouldUploadMetadata: false,
+      publishStep: 2,
+      uploadArgs: {
+        workerUrlOverride: 'https://unused-worker.example.test',
+        signerAccountOverride: '0x00000000000000000000000000000000000000bb',
+      },
+    });
   });
 });
 
