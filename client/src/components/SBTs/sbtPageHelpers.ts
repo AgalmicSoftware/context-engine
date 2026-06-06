@@ -196,6 +196,7 @@ export {
   resolveSbtPageBurnButtonState,
   resolveSbtPageBurnStatusButtonState,
   resolveSbtPageManualClaimButtonState,
+  resolveSbtPageManualClaimActionRequest,
   resolveSbtPageMiniActionFailureState,
   resolveSbtPageMiniActionStatusDisplayState,
   resolveSbtPageMiniBurnButtonState,
@@ -219,6 +220,8 @@ export {
   shouldRenderSbtPageMintButton,
 } from './sbtPageActionDisplayHelpers';
 export type {
+  SbtPageManualClaimActionRequest,
+  SbtPageManualClaimActionRequestViewKind,
   SbtPageMiniMintActionPlan,
   SbtPageMintEndDisplayState,
 } from './sbtPageActionDisplayHelpers';
