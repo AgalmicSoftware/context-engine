@@ -80,6 +80,26 @@ describe('SurveyQuestionsJsonControls', () => {
     expect(renderJsonTree).not.toHaveBeenCalled();
   });
 
+  it('keeps full-survey toggles visible for direct callers without a display descriptor', () => {
+    render(
+      <SurveyQuestionsJsonControls
+        onCopyQuestionsJson={baseProps.onCopyQuestionsJson}
+        onCopyResponseJson={baseProps.onCopyResponseJson}
+        onCopySurveyJson={baseProps.onCopySurveyJson}
+        onToggleQuestionsJson={baseProps.onToggleQuestionsJson}
+        onToggleResponseJson={baseProps.onToggleResponseJson}
+        onToggleSurveyJson={baseProps.onToggleSurveyJson}
+        renderJsonTree={renderJsonTree}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'View Survey .json' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View Response .json' }));
+
+    expect(baseProps.onToggleSurveyJson).toHaveBeenCalledTimes(1);
+    expect(baseProps.onToggleResponseJson).toHaveBeenCalledTimes(1);
+  });
+
   it('renders expanded survey JSON and copy actions', () => {
     const surveyJson = { id: 'survey-1', questionIDs: ['q1'] };
 
