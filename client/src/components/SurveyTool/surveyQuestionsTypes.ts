@@ -103,6 +103,18 @@ export type SurveyQuestionsSubmitFooterDisplayState = {
   showTopInlineSubmit: boolean;
 };
 
+export type SurveyQuestionsSubmitReadinessDescriptor = {
+  currentStep: number;
+  encryptedPendingEditCount: number;
+  hasEncryptedAnswers: boolean;
+  hasMaskedCurrentQuestionPayload: boolean;
+  isSubmitting: boolean;
+  pendingEditCount: number;
+  shouldCheckMaskedCurrentQuestionPayload: boolean;
+  singleQuestionMode: boolean;
+  uploadPhase: 'encrypting' | 'uploading';
+};
+
 export type SurveyQuestionsAuthoringPanelDisplayState = {
   showBackToTopControl: boolean;
   showJsonControl: boolean;
@@ -1023,6 +1035,52 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     genericShowInlineSubmit,
     showInlineSubmit,
     showTopInlineSubmit: showInlineSubmit && !isSingle,
+  };
+};
+
+const normalizeSubmitReadinessCount = (value: unknown): number => {
+  const count = Number(value || 0);
+  return Number.isFinite(count) ? count : 0;
+};
+
+export const buildSurveyQuestionsSubmitReadinessDescriptor = ({
+  currentStep = 0,
+  isSubmitting = false,
+  pendingStats = null,
+  resolveMaskedCurrentQuestionPayload,
+  singleQuestionMode = false,
+}: {
+  currentStep?: unknown;
+  isSubmitting?: unknown;
+  pendingStats?: { total?: unknown; encrypted?: unknown } | null;
+  resolveMaskedCurrentQuestionPayload?: () => unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsSubmitReadinessDescriptor => {
+  const normalizedCurrentStep = normalizeSubmitReadinessCount(currentStep);
+  const normalizedPendingStats = pendingStats || {};
+  const pendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.total);
+  const encryptedPendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.encrypted);
+  const submitting = !!isSubmitting;
+  const isSingleQuestion = !!singleQuestionMode;
+  const shouldCheckMaskedCurrentQuestionPayload = !submitting && isSingleQuestion;
+  const hasMaskedCurrentQuestionPayload = shouldCheckMaskedCurrentQuestionPayload
+    ? !!resolveMaskedCurrentQuestionPayload?.()
+    : false;
+  const hasEncryptedAnswers =
+    submitting &&
+    normalizedCurrentStep === 1 &&
+    encryptedPendingEditCount > 0;
+
+  return {
+    currentStep: normalizedCurrentStep,
+    encryptedPendingEditCount,
+    hasEncryptedAnswers,
+    hasMaskedCurrentQuestionPayload,
+    isSubmitting: submitting,
+    pendingEditCount,
+    shouldCheckMaskedCurrentQuestionPayload,
+    singleQuestionMode: isSingleQuestion,
+    uploadPhase: hasEncryptedAnswers ? 'encrypting' : 'uploading',
   };
 };
 
