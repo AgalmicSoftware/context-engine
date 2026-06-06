@@ -8101,6 +8101,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     bumpSurveyPerfCounter('maskedVisibilityPoolSizeOnMiss', fullQuestionPool.length);
 
     const value = buildSurveyQuestionsMaskedQuestionVisibility({
+      isMaskedPromptText: this.isMaskedPromptText,
       questionPool: fullQuestionPool,
       singleQuestionMode: isSingleQuestionMode,
     });
