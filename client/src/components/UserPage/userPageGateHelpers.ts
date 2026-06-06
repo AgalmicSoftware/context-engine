@@ -95,9 +95,18 @@ export type UserPageGateAccessCheckPlan = {
   action: UserPageGateAccessCheckPlanAction;
   cachedAgeMs: number;
   previousStatus: string;
+  readinessDescriptor: UserPageGateAccessReadinessDescriptor;
   retryDelayMs: number;
   shouldPreserveStatusWhileRevalidating: boolean;
   shouldSetCheckingStatus: boolean;
+};
+export type UserPageGateAccessReadinessDescriptor = {
+  hasCachedEntry: boolean;
+  hasInFlight: boolean;
+  isRetryDelayActive: boolean;
+  isStaleTerminalStatus: boolean;
+  isTerminalStatus: boolean;
+  isTransientRetryStatus: boolean;
 };
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
@@ -329,6 +338,33 @@ const USER_PAGE_GATE_TRANSIENT_RETRY_STATUSES = new Set<string>([
   'unresolved',
 ]);
 
+const buildUserPageGateAccessReadinessDescriptor = ({
+  cachedAgeMs,
+  hasCached,
+  hasInFlight,
+  previousStatus,
+  retryMs,
+  terminalMs,
+}: {
+  cachedAgeMs: number;
+  hasCached: boolean;
+  hasInFlight: boolean;
+  previousStatus: string;
+  retryMs: number;
+  terminalMs: number;
+}): UserPageGateAccessReadinessDescriptor => {
+  const isTerminalStatus = USER_PAGE_GATE_TERMINAL_STATUSES.has(previousStatus);
+  const isTransientRetryStatus = USER_PAGE_GATE_TRANSIENT_RETRY_STATUSES.has(previousStatus);
+  return {
+    hasCachedEntry: hasCached,
+    hasInFlight,
+    isRetryDelayActive: hasCached && isTransientRetryStatus && cachedAgeMs < retryMs,
+    isStaleTerminalStatus: hasCached && isTerminalStatus && cachedAgeMs >= terminalMs,
+    isTerminalStatus,
+    isTransientRetryStatus,
+  };
+};
+
 export const buildUserPageGateAccessCheckPlan = ({
   cachedStatus = 'missing',
   cachedTs = 0,
@@ -346,6 +382,14 @@ export const buildUserPageGateAccessCheckPlan = ({
   const terminalMs = Math.max(0, Number(terminalRecheckMs) || 0);
   const retryMs = Math.max(0, Number(unknownRetryMs) || 0);
   const hasCached = !!hasCachedEntry;
+  const readinessDescriptor = buildUserPageGateAccessReadinessDescriptor({
+    cachedAgeMs,
+    hasCached,
+    hasInFlight: !!hasInFlight,
+    previousStatus,
+    retryMs,
+    terminalMs,
+  });
 
   if (
     hasCached &&
@@ -356,6 +400,7 @@ export const buildUserPageGateAccessCheckPlan = ({
       action: 'skip',
       cachedAgeMs,
       previousStatus,
+      readinessDescriptor,
       retryDelayMs: 0,
       shouldPreserveStatusWhileRevalidating: false,
       shouldSetCheckingStatus: false,
@@ -371,6 +416,7 @@ export const buildUserPageGateAccessCheckPlan = ({
       action: 'schedule-retry',
       cachedAgeMs,
       previousStatus,
+      readinessDescriptor,
       retryDelayMs: retryMs - cachedAgeMs,
       shouldPreserveStatusWhileRevalidating: false,
       shouldSetCheckingStatus: false,
@@ -382,6 +428,7 @@ export const buildUserPageGateAccessCheckPlan = ({
       action: 'in-flight',
       cachedAgeMs,
       previousStatus,
+      readinessDescriptor,
       retryDelayMs: 0,
       shouldPreserveStatusWhileRevalidating: false,
       shouldSetCheckingStatus: false,
@@ -397,6 +444,7 @@ export const buildUserPageGateAccessCheckPlan = ({
     action: 'execute',
     cachedAgeMs,
     previousStatus,
+    readinessDescriptor,
     retryDelayMs: 0,
     shouldPreserveStatusWhileRevalidating,
     shouldSetCheckingStatus: !shouldPreserveStatusWhileRevalidating,
