@@ -535,6 +535,12 @@ export type UserPageUnifiedCacheAggregateMemoPlan = {
   aggregate: unknown;
   canReuseAggregate: boolean;
 };
+export type UserPageSectionDeriveMemoPlan = {
+  canReuseMemo: boolean;
+  gateSnapshot: unknown;
+  result: unknown;
+  signature: string;
+};
 type UserPageResponseNonceRefreshDecision = {
   isOwnProfile: boolean;
   options: UserPageResponseNonceRefreshOptions;
@@ -587,12 +593,22 @@ type BuildUserPageResponseSectionDeriveSignatureArgs = {
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageResponseSectionDeriveMemoPlanArgs =
+  BuildUserPageResponseSectionDeriveSignatureArgs & {
+    currentMemo?: unknown;
+    force?: unknown;
+  };
 type BuildUserPageSbtSectionDeriveSignatureArgs = {
   networkID?: unknown;
   sbtCacheRevision?: unknown;
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageSbtSectionDeriveMemoPlanArgs =
+  BuildUserPageSbtSectionDeriveSignatureArgs & {
+    currentMemo?: unknown;
+    force?: unknown;
+  };
 export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   version?: unknown;
   fingerprint?: unknown;
@@ -901,6 +917,36 @@ export const buildUserPageResponseSectionDeriveSignature = ({
   ].join('|')
 );
 
+export const buildUserPageResponseSectionDeriveMemoPlan = ({
+  account = '',
+  currentMemo = null,
+  force = false,
+  networkID = '',
+  questionResponsesNonce = 0,
+  responseGateAccessGeneration = 0,
+  responseGateAccessStatusVersion = 0,
+  sourceSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageResponseSectionDeriveMemoPlanArgs = {}): UserPageSectionDeriveMemoPlan => {
+  const signature = buildUserPageResponseSectionDeriveSignature({
+    account,
+    networkID,
+    questionResponsesNonce,
+    responseGateAccessGeneration,
+    responseGateAccessStatusVersion,
+    sourceSignature,
+    viewAddressLower,
+  });
+  const memo = toAnalysisRecord(currentMemo);
+  const canReuseMemo = !!(!force && currentMemo && memo.signature === signature);
+  return {
+    canReuseMemo,
+    gateSnapshot: canReuseMemo ? memo.gateSnapshot : null,
+    result: canReuseMemo ? memo.result : null,
+    signature,
+  };
+};
+
 export const buildUserPageSbtSectionDeriveSignature = ({
   viewAddressLower = '',
   networkID = '',
@@ -914,6 +960,30 @@ export const buildUserPageSbtSectionDeriveSignature = ({
     String(sbtCacheRevision || 0),
   ].join('|')
 );
+
+export const buildUserPageSbtSectionDeriveMemoPlan = ({
+  currentMemo = null,
+  force = false,
+  networkID = '',
+  sbtCacheRevision = 0,
+  sourceSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageSbtSectionDeriveMemoPlanArgs = {}): UserPageSectionDeriveMemoPlan => {
+  const signature = buildUserPageSbtSectionDeriveSignature({
+    networkID,
+    sbtCacheRevision,
+    sourceSignature,
+    viewAddressLower,
+  });
+  const memo = toAnalysisRecord(currentMemo);
+  const canReuseMemo = !!(!force && currentMemo && memo.signature === signature);
+  return {
+    canReuseMemo,
+    gateSnapshot: null,
+    result: canReuseMemo ? memo.result : null,
+    signature,
+  };
+};
 
 export const resolveUserPageResponseNonceRefresh = ({
   account = '',
