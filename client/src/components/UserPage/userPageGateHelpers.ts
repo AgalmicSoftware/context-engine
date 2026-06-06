@@ -51,10 +51,29 @@ export type UserPageEncryptedVisibilityDisplayState = {
   pendingResourceKeys: string[];
   uncertainResourceKey: string;
 };
+export type UserPageEncryptedVisibilityStatusRequestPlan =
+  | {
+    action: 'terminal';
+    displayState: UserPageEncryptedVisibilityDisplayState;
+    resourceKeysToCheck: [];
+    terminalReason: 'own-profile' | 'self-audience' | 'missing-viewer-account';
+  }
+  | {
+    action: 'read-statuses';
+    displayState: null;
+    resourceKeysToCheck: string[];
+    terminalReason: '';
+  };
 type BuildUserPageEncryptedVisibilityDisplayStateInput = {
   encryptionAudience?: unknown;
   resourceKey?: unknown;
   statusByResource?: UserPageGateAccessStatusByResource[];
+  viewAddressLower?: unknown;
+  viewerAccount?: unknown;
+};
+type BuildUserPageEncryptedVisibilityStatusRequestPlanInput = {
+  encryptionAudience?: unknown;
+  resourceKey?: unknown;
   viewAddressLower?: unknown;
   viewerAccount?: unknown;
 };
@@ -157,6 +176,67 @@ export const getUserPageGateResourceKeysToCheck = (resourceKey: unknown = 'defau
   const normalized = normalizeUserPageGateResourceKey(resourceKey);
   if (normalized === 'default') return ['default'];
   return [normalized, 'default'];
+};
+
+export const buildUserPageEncryptedVisibilityStatusRequestPlan = ({
+  encryptionAudience = 'gate',
+  resourceKey = 'default',
+  viewAddressLower = '',
+  viewerAccount = '',
+}: BuildUserPageEncryptedVisibilityStatusRequestPlanInput = {}): UserPageEncryptedVisibilityStatusRequestPlan => {
+  const viewerAccountLower = String(viewerAccount || '').trim().toLowerCase();
+  const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
+
+  if (isOwnProfileViewer) {
+    return {
+      action: 'terminal',
+      displayState: buildUserPageEncryptedVisibilityDisplayState({
+        encryptionAudience,
+        resourceKey,
+        viewAddressLower,
+        viewerAccount,
+      }),
+      resourceKeysToCheck: [],
+      terminalReason: 'own-profile',
+    };
+  }
+
+  const normalizedAudience = String(encryptionAudience || '').trim().toLowerCase();
+  if (normalizedAudience === 'self') {
+    return {
+      action: 'terminal',
+      displayState: buildUserPageEncryptedVisibilityDisplayState({
+        encryptionAudience,
+        resourceKey,
+        viewAddressLower,
+        viewerAccount,
+      }),
+      resourceKeysToCheck: [],
+      terminalReason: 'self-audience',
+    };
+  }
+
+  if (!viewerAccountLower) {
+    return {
+      action: 'terminal',
+      displayState: {
+        visible: false,
+        canDecryptOtherResponses: false,
+        uncertain: false,
+        pendingResourceKeys: [],
+        uncertainResourceKey: '',
+      },
+      resourceKeysToCheck: [],
+      terminalReason: 'missing-viewer-account',
+    };
+  }
+
+  return {
+    action: 'read-statuses',
+    displayState: null,
+    resourceKeysToCheck: getUserPageGateResourceKeysToCheck(resourceKey),
+    terminalReason: '',
+  };
 };
 
 export const buildUserPageEncryptedVisibilityDisplayState = ({
