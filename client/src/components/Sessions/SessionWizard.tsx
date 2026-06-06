@@ -81,6 +81,9 @@ import {
 import {
   resolveWorkerSecretsSnapshot,
 } from './sessionWizardSecrets.js';
+import {
+  resolveSessionWizardDeployStatusDisplayState,
+} from './sessionWizardDeployErrors';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -4398,11 +4401,12 @@ const SessionWizard = ({
   const {
     canUploadMetadataNow,
   } = publishUiPlan.publishReadiness;
-  const deployStatusLower = toStr(deployStatus).toLowerCase();
-  const deployStatusIsError = !!deployStatus &&
-    !deployInFlight &&
-    !deployVerifiedInUi &&
-    !deployStatusLower.includes('worker deployed');
+  const deployStatusDisplayState = resolveSessionWizardDeployStatusDisplayState({
+    deployInFlight,
+    deployStatus,
+    deployVerifiedInUi,
+  });
+  const deployStatusIsError = deployStatusDisplayState.isError;
   const pendingDraftCount = normalizedPendingSbtDrafts.length;
   const sessionDetailsComplete = !!toStr(draft?.sessionName).trim() && !!toStr(draft?.sessionInfo).trim();
   const configuredPrivateGateCount = encryptionGates.filter(

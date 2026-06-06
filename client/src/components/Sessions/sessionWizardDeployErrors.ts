@@ -5,6 +5,15 @@ import {
 } from './sessionWizardPublishFlow';
 
 type SessionWizardDeployRecord = Record<string, unknown>;
+type ResolveSessionWizardDeployStatusDisplayStateArgs = {
+  deployInFlight?: unknown;
+  deployStatus?: unknown;
+  deployVerifiedInUi?: unknown;
+};
+export type SessionWizardDeployStatusDisplayState = {
+  deployStatusText: string;
+  isError: boolean;
+};
 
 const asDeployRecord = (value: unknown): SessionWizardDeployRecord => (
   value !== null && typeof value === 'object' ? value as SessionWizardDeployRecord : {}
@@ -92,6 +101,22 @@ export const withSessionWizardDeployHelperWorkersDevStatus = (
   const workersDevStatus = buildSessionWizardDeployHelperWorkersDevStatusMessage(deployResponse);
   if (!workersDevStatus) return base;
   return base ? `${base} ${workersDevStatus}` : workersDevStatus;
+};
+
+export const resolveSessionWizardDeployStatusDisplayState = ({
+  deployInFlight = false,
+  deployStatus = '',
+  deployVerifiedInUi = false,
+}: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
+  const deployStatusText = toStr(deployStatus);
+  const deployStatusLower = deployStatusText.toLowerCase();
+  return {
+    deployStatusText,
+    isError: !!deployStatusText &&
+      !deployInFlight &&
+      !deployVerifiedInUi &&
+      !deployStatusLower.includes('worker deployed'),
+  };
 };
 
 export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: unknown = {}): string => {
