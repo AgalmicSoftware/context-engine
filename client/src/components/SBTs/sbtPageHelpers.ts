@@ -200,6 +200,7 @@ export {
   resolveSbtPageMiniActionStatusDisplayState,
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
+  resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMiniControlDisplayState,
   resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
