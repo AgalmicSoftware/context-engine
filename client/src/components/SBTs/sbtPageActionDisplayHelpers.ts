@@ -102,7 +102,7 @@ type ResolveSbtPagePendingButtonContentStateArgs = {
   isPending?: unknown;
   label?: unknown;
 };
-type SbtPagePendingButtonContentState = {
+export type SbtPagePendingButtonContentState = {
   label: string;
   shouldRenderLabel: boolean;
   shouldRenderPendingIcon: boolean;
@@ -157,9 +157,38 @@ type ResolveSbtPageManualClaimButtonStateArgs = {
   manualPasswordInput?: unknown;
   mintingStatus?: unknown;
 };
-type SbtPageManualClaimButtonState = {
+export type SbtPageManualClaimButtonState = {
   disabled: boolean;
   isPending: boolean;
+};
+type ResolveSbtPageManualClaimActionRequestArgs = {
+  claimCountdown?: unknown;
+  finishLabel?: unknown;
+  manualPasswordInput?: unknown;
+  mintFlowDisplayState?: Partial<SbtPageMintFlowDisplayState> | null;
+  mintingStatus?: unknown;
+  startLabel?: unknown;
+  successLabel?: unknown;
+};
+export type SbtPageManualClaimActionRequestViewKind =
+  | 'hidden'
+  | 'manual-claim-countdown'
+  | 'manual-claim-success'
+  | 'manual-password-finish-input'
+  | 'manual-password-start-input';
+export type SbtPageManualClaimActionRequest = {
+  buttonState: SbtPageManualClaimButtonState;
+  contentState: SbtPagePendingButtonContentState;
+  disabled: boolean;
+  handlerKind: 'handle-mint-force-refresh' | 'none';
+  inputType: 'text';
+  inputValue: string;
+  mintArgs: [true];
+  placeholder: string;
+  shouldRenderInputAction: boolean;
+  shouldRenderStatus: boolean;
+  statusText: string;
+  viewKind: SbtPageManualClaimActionRequestViewKind;
 };
 type ResolveSbtPageMiniOpenMintButtonStateArgs = {
   mintingStatus?: unknown;
@@ -834,6 +863,81 @@ export const resolveSbtPageManualClaimButtonState = ({
     disabled: isPending || String(manualPasswordInput || '').trim() === '',
     isPending,
   };
+};
+
+export const resolveSbtPageManualClaimActionRequest = ({
+  claimCountdown = '',
+  finishLabel = 'Finish Claim',
+  manualPasswordInput = '',
+  mintFlowDisplayState = null,
+  mintingStatus = '',
+  startLabel = 'Start Claim',
+  successLabel = '',
+}: ResolveSbtPageManualClaimActionRequestArgs = {}): SbtPageManualClaimActionRequest => {
+  const buttonState = resolveSbtPageManualClaimButtonState({
+    manualPasswordInput,
+    mintingStatus,
+  });
+  const buildInputAction = (
+    label: unknown,
+    viewKind: 'manual-password-finish-input' | 'manual-password-start-input'
+  ): SbtPageManualClaimActionRequest => ({
+    buttonState,
+    contentState: resolveSbtPagePendingButtonContentState({
+      isPending: buttonState.isPending,
+      label,
+    }),
+    disabled: buttonState.disabled,
+    handlerKind: 'handle-mint-force-refresh',
+    inputType: 'text',
+    inputValue: String(manualPasswordInput || ''),
+    mintArgs: [true],
+    placeholder: 'Claim Code',
+    shouldRenderInputAction: true,
+    shouldRenderStatus: false,
+    statusText: '',
+    viewKind,
+  });
+  const hiddenRequest: SbtPageManualClaimActionRequest = {
+    buttonState,
+    contentState: resolveSbtPagePendingButtonContentState({ label: '' }),
+    disabled: true,
+    handlerKind: 'none',
+    inputType: 'text',
+    inputValue: String(manualPasswordInput || ''),
+    mintArgs: [true],
+    placeholder: 'Claim Code',
+    shouldRenderInputAction: false,
+    shouldRenderStatus: false,
+    statusText: '',
+    viewKind: 'hidden',
+  };
+
+  if (mintFlowDisplayState?.shouldRenderManualClaimStart) {
+    return buildInputAction(startLabel, 'manual-password-start-input');
+  }
+  if (mintFlowDisplayState?.shouldRenderClaimCountdown) {
+    return {
+      ...hiddenRequest,
+      disabled: false,
+      statusText: `Waiting period: ${String(claimCountdown || '')} seconds`,
+      shouldRenderStatus: true,
+      viewKind: 'manual-claim-countdown',
+    };
+  }
+  if (mintFlowDisplayState?.shouldRenderManualClaimFinish) {
+    return buildInputAction(finishLabel, 'manual-password-finish-input');
+  }
+  if (mintFlowDisplayState?.shouldRenderClaimSuccess) {
+    return {
+      ...hiddenRequest,
+      disabled: false,
+      statusText: String(successLabel || ''),
+      shouldRenderStatus: true,
+      viewKind: 'manual-claim-success',
+    };
+  }
+  return hiddenRequest;
 };
 
 export const resolveSbtPageMiniOpenMintButtonState = ({

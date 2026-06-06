@@ -6,6 +6,7 @@ import {
   resolveSbtPageBurnActionPlan,
   resolveSbtPageBurnButtonState,
   resolveSbtPageBurnStatusButtonState,
+  resolveSbtPageManualClaimActionRequest,
   resolveSbtPageManualClaimButtonState,
   resolveSbtPageMiniActionFailureState,
   resolveSbtPageMiniActionStatusDisplayState,
@@ -609,6 +610,79 @@ describe('sbtPageActionDisplayHelpers', () => {
         isPending: false,
       },
       title: undefined,
+    });
+  });
+
+  it('describes manual claim action identity without owning mint execution', () => {
+    expect(resolveSbtPageManualClaimActionRequest({
+      manualPasswordInput: 'claim-code',
+      mintFlowDisplayState: { shouldRenderManualClaimStart: true },
+      mintingStatus: 'idle',
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'handle-mint-force-refresh',
+      inputType: 'text',
+      inputValue: 'claim-code',
+      mintArgs: [true],
+      placeholder: 'Claim Code',
+      shouldRenderInputAction: true,
+      shouldRenderStatus: false,
+      viewKind: 'manual-password-start-input',
+      buttonState: {
+        disabled: false,
+        isPending: false,
+      },
+      contentState: {
+        label: 'Start Claim',
+        shouldRenderLabel: true,
+        shouldRenderPendingIcon: false,
+      },
+    });
+
+    expect(resolveSbtPageManualClaimActionRequest({
+      manualPasswordInput: 'claim-code',
+      mintFlowDisplayState: { shouldRenderManualClaimFinish: true },
+      mintingStatus: 'pending',
+    })).toMatchObject({
+      disabled: true,
+      handlerKind: 'handle-mint-force-refresh',
+      shouldRenderInputAction: true,
+      viewKind: 'manual-password-finish-input',
+      buttonState: {
+        disabled: true,
+        isPending: true,
+      },
+      contentState: {
+        label: 'Finish Claim',
+        shouldRenderLabel: false,
+        shouldRenderPendingIcon: true,
+      },
+    });
+  });
+
+  it('describes manual claim countdown and success as status-only requests', () => {
+    expect(resolveSbtPageManualClaimActionRequest({
+      claimCountdown: 12,
+      mintFlowDisplayState: { shouldRenderClaimCountdown: true },
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'none',
+      shouldRenderInputAction: false,
+      shouldRenderStatus: true,
+      statusText: 'Waiting period: 12 seconds',
+      viewKind: 'manual-claim-countdown',
+    });
+
+    expect(resolveSbtPageManualClaimActionRequest({
+      mintFlowDisplayState: { shouldRenderClaimSuccess: true },
+      successLabel: 'SBT successfully minted!',
+    })).toMatchObject({
+      disabled: false,
+      handlerKind: 'none',
+      shouldRenderInputAction: false,
+      shouldRenderStatus: true,
+      statusText: 'SBT successfully minted!',
+      viewKind: 'manual-claim-success',
     });
   });
 });
