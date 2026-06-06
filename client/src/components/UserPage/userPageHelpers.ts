@@ -157,6 +157,7 @@ export {
   buildUserPageGateAccessRequestDescriptor,
   buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
+  buildUserPageGateRetryTimerPlan,
   buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseDecryptSurveyBindings,
   getUserPageGateResourceKeysToCheck,
@@ -179,6 +180,7 @@ export type {
   UserPageGateAccessRequestDescriptor,
   UserPageGateAccessSettlementPlan,
   UserPageGateAccessStatusByResource,
+  UserPageGateRetryTimerPlan,
   UserPageResponseDecryptRequestPlan,
   UserPageResponseDecryptSurveyBindings,
 } from './userPageGateHelpers';

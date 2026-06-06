@@ -52,6 +52,7 @@ import {
   buildUserPageGateAccessRequestDescriptor,
   buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
+  buildUserPageGateRetryTimerPlan,
   buildUserPageFullProfileModalStatePatch,
   buildUserPageMissingAddressCacheStatePatch,
   buildUserPageMissingAddressCacheStateUpdate,
@@ -1666,22 +1667,25 @@ class UserPage extends Component<any, any> {
   };
 
   scheduleResponseGateRetry = (delayMs: unknown = USERPAGE_GATE_UNKNOWN_RETRY_MS): void => {
-    if (!this._isMounted) return;
-    const safeDelay = Math.max(1000, Number(delayMs) || USERPAGE_GATE_UNKNOWN_RETRY_MS);
-    const nextDueAt = Date.now() + safeDelay;
-    if (this._responseGateRetryTimer && this._responseGateRetryDueAt > 0) {
-      if (this._responseGateRetryDueAt <= nextDueAt) {
-        return;
-      }
+    const retryTimerPlan = buildUserPageGateRetryTimerPlan({
+      currentDueAt: this._responseGateRetryDueAt,
+      delayMs,
+      fallbackDelayMs: USERPAGE_GATE_UNKNOWN_RETRY_MS,
+      hasCurrentTimer: !!this._responseGateRetryTimer,
+      isMounted: this._isMounted,
+      nowMs: Date.now(),
+    });
+    if (!retryTimerPlan.shouldScheduleTimer) return;
+    if (retryTimerPlan.shouldClearExistingTimer) {
       this.clearResponseGateRetryTimer();
     }
-    this._responseGateRetryDueAt = nextDueAt;
+    this._responseGateRetryDueAt = retryTimerPlan.nextDueAt;
     this._responseGateRetryTimer = setTimeout(() => {
       this._responseGateRetryTimer = null;
       this._responseGateRetryDueAt = 0;
       if (!this._isMounted) return;
       this.queueCacheRefresh({ markLoading: false, bypassSignature: true });
-    }, safeDelay);
+    }, retryTimerPlan.safeDelayMs);
   };
 
   queueCacheRefresh = ({
