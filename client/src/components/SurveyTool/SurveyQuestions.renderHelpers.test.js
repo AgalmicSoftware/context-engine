@@ -12,6 +12,7 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
+import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -519,6 +520,43 @@ describe('SurveyQuestions render helpers', () => {
     controls.props.onCopySurveyJson();
 
     expect(subject.copyJsonToClipboard).toHaveBeenCalledWith(surveyJson, 'survey');
+  });
+
+  it('derives encrypted submit status from pending edit stats during render', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 2, encrypted: 1 }));
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      currentStep: 1,
+      isDirty: true,
+      isSubmitting: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question' }],
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: true } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const authoringPanel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
+    const footer = findFirstNodeByType(authoringPanel?.props?.submitResponseButton, SurveyQuestionsSubmitFooter);
+
+    expect(authoringPanel).not.toBeNull();
+    expect(footer).not.toBeNull();
+    expect(footer.props.pendingEditCount).toBe(2);
+    expect(footer.props.uploadStatusText).toBe('Encrypting...');
   });
 
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
