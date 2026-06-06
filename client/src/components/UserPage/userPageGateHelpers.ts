@@ -97,6 +97,14 @@ type BuildUserPageGateAccessSettlementPlanInput = {
   previousStatus?: unknown;
   shouldPreserveStatusWhileRevalidating?: unknown;
 };
+type BuildUserPageGateRetryTimerPlanInput = {
+  currentDueAt?: unknown;
+  delayMs?: unknown;
+  fallbackDelayMs?: unknown;
+  hasCurrentTimer?: unknown;
+  isMounted?: unknown;
+  nowMs?: unknown;
+};
 export type UserPageGateAccessCheckPlanAction =
   | 'execute'
   | 'in-flight'
@@ -135,6 +143,13 @@ export type UserPageGateAccessSettlementPlan = {
   nextStatus: string;
   shouldQueueCacheRefresh: boolean;
   shouldScheduleRetry: boolean;
+};
+export type UserPageGateRetryTimerPlan = {
+  action: 'ignore-unmounted' | 'keep-existing' | 'schedule';
+  nextDueAt: number;
+  safeDelayMs: number;
+  shouldClearExistingTimer: boolean;
+  shouldScheduleTimer: boolean;
 };
 export type UserPageDecryptableResponseField = UserPageUnknownRecord & {
   encrypted: boolean;
@@ -258,6 +273,44 @@ export const buildUserPageGateAccessSettlementPlan = ({
       nextStatus === 'error' ||
       nextStatus === 'unresolved'
     ),
+  };
+};
+
+export const buildUserPageGateRetryTimerPlan = ({
+  currentDueAt = 0,
+  delayMs = 30 * 1000,
+  fallbackDelayMs = 30 * 1000,
+  hasCurrentTimer = false,
+  isMounted = true,
+  nowMs = Date.now(),
+}: BuildUserPageGateRetryTimerPlanInput = {}): UserPageGateRetryTimerPlan => {
+  const safeDelayMs = Math.max(1000, Number(delayMs) || Number(fallbackDelayMs) || 30 * 1000);
+  const nextDueAt = Number(nowMs || 0) + safeDelayMs;
+  const existingDueAt = Number(currentDueAt || 0);
+  if (!isMounted) {
+    return {
+      action: 'ignore-unmounted',
+      nextDueAt,
+      safeDelayMs,
+      shouldClearExistingTimer: false,
+      shouldScheduleTimer: false,
+    };
+  }
+  if (hasCurrentTimer && existingDueAt > 0 && existingDueAt <= nextDueAt) {
+    return {
+      action: 'keep-existing',
+      nextDueAt,
+      safeDelayMs,
+      shouldClearExistingTimer: false,
+      shouldScheduleTimer: false,
+    };
+  }
+  return {
+    action: 'schedule',
+    nextDueAt,
+    safeDelayMs,
+    shouldClearExistingTimer: !!hasCurrentTimer && existingDueAt > 0,
+    shouldScheduleTimer: true,
   };
 };
 
