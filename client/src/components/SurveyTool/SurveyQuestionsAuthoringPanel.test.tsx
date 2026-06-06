@@ -36,8 +36,10 @@ describe('SurveyQuestionsAuthoringPanel', () => {
     render(
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
-        showBackToTopControl
-        showJsonControl
+        displayState={{
+          showBackToTopControl: true,
+          showJsonControl: true,
+        }}
       />
     );
 
@@ -63,8 +65,10 @@ describe('SurveyQuestionsAuthoringPanel', () => {
     rerender(
       <SurveyQuestionsAuthoringPanel
         {...baseProps}
+        displayState={{
+          showLockedQuestionsBanner: true,
+        }}
         lockedQuestionsBanner={<div data-testid="locked-banner">Locked prompts</div>}
-        showLockedQuestionsBanner
         submittedResponseView={null}
       />
     );
