@@ -582,14 +582,11 @@ type UserAnalysisCacheEntry = UnknownRecord & {
   result?: unknown;
 };
 
-type UserAnalysisCacheReadArgs = {
+type UserAnalysisCacheWriteArgs = {
   sessionSlug: string;
   networkId: string;
   addressLower: string;
   fingerprint: string;
-};
-
-type UserAnalysisCacheWriteArgs = UserAnalysisCacheReadArgs & {
   aiContext: UserAnalysisAiContext;
   result: unknown;
 };
