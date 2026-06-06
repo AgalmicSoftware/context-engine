@@ -4,6 +4,47 @@ import SessionPublishSummary from './SessionPublishSummary';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
+  publishExecutionPlan: {
+    shouldAutoDeployWorker: false,
+    shouldDeployPendingSbts: false,
+    shouldRegisterSession: true,
+    shouldUploadMetadata: false,
+    stepNumbers: {},
+    steps: [],
+    ...(overrides.publishExecutionPlan || {}),
+  },
+  publishMetadataDisplayState: {
+    effectiveMetadataGatewayUrl: '',
+    effectiveMetadataTxId: '',
+    manualMetadataDisplayUri: '',
+    metadataUri: '',
+    metadataUriLabel: '',
+    showArweaveTx: false,
+    showManualMetadataUri: false,
+    showMetadataUri: false,
+    ...(overrides.publishMetadataDisplayState || {}),
+  },
+  publishProgressDisplayState: {
+    activePublishProgressStepLabel: '',
+    publishProgressPercent: 0,
+    publishProgressPercentRounded: 0,
+    publishProgressSteps: [],
+    showPublishProgress: false,
+    ...(overrides.publishProgressDisplayState || {}),
+  },
+  publishReadiness: {
+    canPublishNow: true,
+    canUploadMetadataNow: true,
+    hasManualMetadata: false,
+    hasUploadedMetadata: false,
+    readinessKind: 'worker-upload',
+    showUploadBlockedReason: false,
+    uploadBlockedReason: '',
+    ...(overrides.publishReadiness || {}),
+  },
+});
+
 const buildProps = (
   overrides: Partial<React.ComponentProps<typeof SessionPublishSummary>> = {}
 ): React.ComponentProps<typeof SessionPublishSummary> => ({
@@ -14,7 +55,6 @@ const buildProps = (
   normalModePublishSummary: [],
   onPublish: jest.fn(),
   publishBusy: false,
-  canPublishNow: true,
   publishAdvancedOpen: false,
   onTogglePublishAdvanced: jest.fn(),
   showSponsoredBundleFallbackInput: false,
@@ -28,24 +68,8 @@ const buildProps = (
   bundleFile: null,
   localWorkerBundleFallbackFilePath: '',
   sponsoredManualBundleRetryMessage: '',
-  publishMetadataDisplayState: {
-    effectiveMetadataGatewayUrl: '',
-    effectiveMetadataTxId: '',
-    manualMetadataDisplayUri: '',
-    metadataUri: '',
-    metadataUriLabel: '',
-    showArweaveTx: false,
-    showManualMetadataUri: false,
-    showMetadataUri: false,
-  },
-  showPublishProgress: false,
-  activePublishProgressStepLabel: '',
-  publishProgressPercent: 0,
-  publishProgressPercentRounded: 0,
+  publishUiPlan: buildPublishUiPlan(),
   publishStep: 0,
-  publishProgressSteps: [],
-  uploadBlockedReason: '',
-  showUploadBlockedReason: false,
   renderInfoTooltip: () => null,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
@@ -80,7 +104,6 @@ describe('SessionPublishSummary', () => {
           wizardMode: 'normal',
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
-          canPublishNow: true,
         })}
       />
     );
@@ -96,7 +119,6 @@ describe('SessionPublishSummary', () => {
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
           publishBusy: true,
-          canPublishNow: true,
         })}
       />
     );
@@ -108,9 +130,14 @@ describe('SessionPublishSummary', () => {
     const { rerender } = render(
       <SessionPublishSummary
         {...buildProps({
-          canPublishNow: false,
-          showUploadBlockedReason: true,
-          uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+          publishUiPlan: buildPublishUiPlan({
+            publishReadiness: {
+              canPublishNow: false,
+              readinessKind: 'blocked',
+              showUploadBlockedReason: true,
+              uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+            },
+          }),
         })}
       />
     );
@@ -121,9 +148,14 @@ describe('SessionPublishSummary', () => {
     rerender(
       <SessionPublishSummary
         {...buildProps({
-          canPublishNow: false,
-          showUploadBlockedReason: false,
-          uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+          publishUiPlan: buildPublishUiPlan({
+            publishReadiness: {
+              canPublishNow: false,
+              readinessKind: 'blocked',
+              showUploadBlockedReason: false,
+              uploadBlockedReason: 'Set a worker URL before uploading metadata.',
+            },
+          }),
         })}
       />
     );
@@ -135,17 +167,21 @@ describe('SessionPublishSummary', () => {
     render(
       <SessionPublishSummary
         {...buildProps({
-          showPublishProgress: true,
           publishBusy: true,
-          activePublishProgressStepLabel: 'Upload Arweave',
-          publishProgressPercent: 42.4,
-          publishProgressPercentRounded: 42,
+          publishUiPlan: buildPublishUiPlan({
+            publishProgressDisplayState: {
+              activePublishProgressStepLabel: 'Upload Arweave',
+              publishProgressPercent: 42.4,
+              publishProgressPercentRounded: 42,
+              publishProgressSteps: [
+                { key: 'deploy-worker', label: 'Deploy Worker' },
+                { key: 'upload-metadata', label: 'Upload Arweave' },
+                { key: 'register-session', label: 'Register On-chain' },
+              ],
+              showPublishProgress: true,
+            },
+          }),
           publishStep: 2,
-          publishProgressSteps: [
-            { key: 'deploy-worker', label: 'Deploy Worker' },
-            { key: 'upload-metadata', label: 'Upload Arweave' },
-            { key: 'register-session', label: 'Register On-chain' },
-          ],
         })}
       />
     );
@@ -167,29 +203,34 @@ describe('SessionPublishSummary', () => {
     render(
       <SessionPublishSummary
         {...buildProps({
-          activePublishProgressStepLabel: 'Done',
           adminUrl: 'https://context.example.test/admin/readiness-session',
           adminUrlStatus: 'Admin URL copied.',
           onCopyAdminUrl,
           onPublish,
-          publishMetadataDisplayState: {
-            effectiveMetadataGatewayUrl: 'https://arweave.example.test/metadata-tx',
-            effectiveMetadataTxId: 'metadata-tx',
-            manualMetadataDisplayUri: '',
-            metadataUri: 'ar://metadata-tx',
-            metadataUriLabel: 'Metadata URI',
-            showArweaveTx: true,
-            showManualMetadataUri: false,
-            showMetadataUri: true,
-          },
           publishBusy: false,
-          publishProgressPercent: 100,
-          publishProgressPercentRounded: 100,
-          publishProgressSteps: [
-            { key: 'upload-metadata', label: 'Upload Arweave' },
-            { key: 'register-session', label: 'Register On-chain' },
-            { key: 'done', label: 'Done' },
-          ],
+          publishUiPlan: buildPublishUiPlan({
+            publishMetadataDisplayState: {
+              effectiveMetadataGatewayUrl: 'https://arweave.example.test/metadata-tx',
+              effectiveMetadataTxId: 'metadata-tx',
+              manualMetadataDisplayUri: '',
+              metadataUri: 'ar://metadata-tx',
+              metadataUriLabel: 'Metadata URI',
+              showArweaveTx: true,
+              showManualMetadataUri: false,
+              showMetadataUri: true,
+            },
+            publishProgressDisplayState: {
+              activePublishProgressStepLabel: 'Done',
+              publishProgressPercent: 100,
+              publishProgressPercentRounded: 100,
+              publishProgressSteps: [
+                { key: 'upload-metadata', label: 'Upload Arweave' },
+                { key: 'register-session', label: 'Register On-chain' },
+                { key: 'done', label: 'Done' },
+              ],
+              showPublishProgress: true,
+            },
+          }),
           publishStep: 3,
           registerExplorerBaseUrl: 'https://optimism-sepolia.blockscout.com',
           registerTxs: [
@@ -197,7 +238,6 @@ describe('SessionPublishSummary', () => {
             { action: 'setSessionFields', hash: '0xregister2' },
           ],
           sessionUrl: 'https://context.example.test/session/readiness-session',
-          showPublishProgress: true,
           status: 'Published session readiness-session.',
         })}
       />
@@ -303,17 +343,19 @@ describe('SessionPublishSummary', () => {
           onManualMaxFeePerGasGweiChange,
           onManualMaxPriorityFeePerGasGweiChange,
           onPublish,
-          publishMetadataDisplayState: {
-            effectiveMetadataGatewayUrl: '',
-            effectiveMetadataTxId: '',
-            manualMetadataDisplayUri: 'normalized:ar://manual-tx',
-            metadataUri: 'ar://uploaded-tx',
-            metadataUriLabel: 'Uploaded metadata URI',
-            showArweaveTx: false,
-            showManualMetadataUri: true,
-            showMetadataUri: true,
-          },
           publishAdvancedOpen: true,
+          publishUiPlan: buildPublishUiPlan({
+            publishMetadataDisplayState: {
+              effectiveMetadataGatewayUrl: '',
+              effectiveMetadataTxId: '',
+              manualMetadataDisplayUri: 'normalized:ar://manual-tx',
+              metadataUri: 'ar://uploaded-tx',
+              metadataUriLabel: 'Uploaded metadata URI',
+              showArweaveTx: false,
+              showManualMetadataUri: true,
+              showMetadataUri: true,
+            },
+          }),
         })}
       />
     );
