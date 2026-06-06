@@ -447,6 +447,7 @@ describe('SurveyQuestions render helpers', () => {
       singleQuestionMode: true,
       audioInputWorkerProps,
     });
+    expect(input.props.audioInputWorkerProps).toBe(audioInputWorkerProps);
 
     input.props.onAnswerChange('next answer');
     input.props.onRatingChange(8, { type: 'keydown' });
