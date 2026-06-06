@@ -516,6 +516,7 @@ import {
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsMaskedQuestionVisibility,
   buildSurveyQuestionsPrimarySubmitPlan,
   buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsRouteViewDisplayState,
@@ -524,6 +525,7 @@ import {
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
+  isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -2414,7 +2416,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return isMaskedQuestionPayload(cached);
   };
 
-  isMaskedPromptText = (prompt) => String(prompt || '').trim() === '[encrypted]';
+  isMaskedPromptText = (prompt) => isSurveyQuestionsMaskedPromptText(prompt);
 
   getQuestionFetchCandidateSlugs = (questionId, preferredSlug = '', opts = {}) => {
     const sanitize = (s) => (
@@ -8098,29 +8100,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     bumpSurveyPerfCounter('maskedVisibilityMemoMissCount');
     bumpSurveyPerfCounter('maskedVisibilityPoolSizeOnMiss', fullQuestionPool.length);
 
-    let visibleQuestionPool = fullQuestionPool;
-    let hiddenMaskedQuestionIds = [];
-    if (!isSingleQuestionMode) {
-      visibleQuestionPool = [];
-      hiddenMaskedQuestionIds = [];
-      fullQuestionPool.forEach((question) => {
-        const masked = this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted;
-        if (!masked) {
-          visibleQuestionPool.push(question);
-          return;
-        }
-        const qid = String(question?.id || '').trim().toLowerCase();
-        if (qid) hiddenMaskedQuestionIds.push(qid);
-      });
-    }
+    const value = buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool: fullQuestionPool,
+      singleQuestionMode: isSingleQuestionMode,
+    });
+    const { visibleQuestionPool, hiddenMaskedQuestionIds } = value;
     bumpSurveyPerfCounter('maskedVisibilityVisibleCountOnMiss', visibleQuestionPool.length);
     bumpSurveyPerfCounter('maskedVisibilityHiddenCountOnMiss', hiddenMaskedQuestionIds.length);
 
-    const value = {
-      fullQuestionPool,
-      visibleQuestionPool,
-      hiddenMaskedQuestionIds,
-    };
     const nextMemoByMode = memoByMode
       ? { ...memoByMode, [modeKey]: value }
       : { [modeKey]: value };
