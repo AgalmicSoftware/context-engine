@@ -1,4 +1,5 @@
 import {
+  buildSurveyResultsQuestionTableEntries,
   buildSurveyResultsFreeformSummaryModel,
   buildSurveyResultsMultichoiceSummaryModel,
   getSurveyResultsLatestResponsesByResponder,
@@ -36,6 +37,68 @@ describe('surveyResultsSummaryModels', () => {
     expect(getSurveyResultsLatestResponsesByResponder(rows)).toEqual([
       rows[1],
       rows[2],
+    ]);
+  });
+
+  it('builds sorted question-table entries from network metadata and latest responders', () => {
+    const entries = buildSurveyResultsQuestionTableEntries({
+      questionMap: {
+        Q1: [
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'old' } },
+            timestamp: '2025-01-01T00:00:00.000Z',
+          },
+          {
+            responder: '0xaaa',
+            response: { answer: { value: 'new' } },
+            timestamp: '2025-01-02T00:00:00.000Z',
+          },
+          {
+            responder: '0xbbb',
+            response: { answer: { value: 'only' } },
+            timestamp: '2025-01-01T00:00:00.000Z',
+          },
+        ],
+        q2: [
+          {
+            responder: '0xccc',
+            response: { answer: { value: 'other' } },
+            timestamp: '2025-01-01T00:00:00.000Z',
+          },
+        ],
+      },
+      networkQuestions: {
+        q1: {
+          prompt: 'First prompt',
+          sessionSlug: 'alpha',
+          type: 'freeform',
+        },
+        q2: {
+          prompt: 'Second prompt',
+          sessionSlug: 'beta',
+          type: 'binary',
+        },
+      },
+      sortAsc: true,
+      sortBy: 'responses',
+    });
+
+    expect(entries).toEqual([
+      {
+        questionId: 'q2',
+        prompt: 'Second prompt',
+        responsesCount: 1,
+        sessionSlug: 'beta',
+        type: 'binary',
+      },
+      {
+        questionId: 'Q1',
+        prompt: 'First prompt',
+        responsesCount: 2,
+        sessionSlug: 'alpha',
+        type: 'freeform',
+      },
     ]);
   });
 

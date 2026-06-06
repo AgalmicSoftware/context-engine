@@ -119,7 +119,8 @@ import {
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
 import {
-  getSurveyResultsLatestResponsesByResponder,
+  buildSurveyResultsQuestionTableEntries,
+  type SurveyResultsQuestionTableEntry,
 } from './surveyResultsSummaryModels';
 import {
   renderSurveyResultsSyncStatusPanel,
@@ -298,13 +299,6 @@ type SurveyResultsQuestionExportRecord = {
   prompt: unknown;
   tags: unknown[];
   type: unknown;
-};
-type SurveyResultsQuestionTableEntry = {
-  prompt: string;
-  questionId: string;
-  responsesCount: number;
-  sessionSlug: string;
-  type: string;
 };
 type SurveyResultsQuestionFilterQuestionsMemo = {
   questionResponsesRef: unknown;
@@ -4073,10 +4067,6 @@ getMemoizedPolisQuestionResponses = (
   return result;
 };
 
-getLatestResponsesByResponder = getSurveyResultsLatestResponsesByResponder as (
-  responses?: unknown
-) => SurveyResultsSummaryResponseRow[];
-
 getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
   containerClassName: styles.surveyResultsResponseCard,
   bodyClassName: styles.surveyResultsResponseCardBody,
@@ -4594,31 +4584,11 @@ if (
   return memo.result;
 }
 
-const questionRecord = Object(questionMap || {}) as Record<string, unknown>;
-const networkQuestionRecord = Object(networkQuestions || {}) as Record<string, SurveyResultsRecord | undefined>;
-const entries = Object.keys(questionRecord).map((qId) => {
-  const responses = questionRecord[qId] || [];
-  const lowerQ = qId.toLowerCase();
-  const qData = networkQuestionRecord[lowerQ] || {};
-  return {
-    questionId: qId,
-    responsesCount: this.getLatestResponsesByResponder(responses).length,
-    type: (qData.type || '') as string,
-    prompt: (qData.prompt || '') as string,
-    sessionSlug: (qData.sessionSlug || '') as string,
-  };
-});
-
-entries.sort((a, b) => {
-  let cmp = 0;
-  if (questionIdSortBy === 'responses') {
-    cmp = a.responsesCount - b.responsesCount;
-  } else if (questionIdSortBy === 'type') {
-    cmp = a.type.localeCompare(b.type);
-  } else if (questionIdSortBy === 'prompt') {
-    cmp = a.prompt.localeCompare(b.prompt);
-  }
-  return questionIdSortAsc ? cmp : -cmp;
+const entries = buildSurveyResultsQuestionTableEntries({
+  networkQuestions,
+  questionMap,
+  sortAsc: questionIdSortAsc,
+  sortBy: questionIdSortBy,
 });
 
 this._questionTableEntriesMemo = {
