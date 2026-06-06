@@ -5056,7 +5056,7 @@ return (
       demoResultsViewMode={demoResultsViewMode}
       demoResultsViewOptions={demoResultsViewOptions}
       documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
-      effectiveSlug={this.getEffectiveSlug()}
+      effectiveSlug={slug}
       isDemoQuestionResults={isDemoQuestionResults}
       lockedResponsesToggleNode={this.renderLockedResponsesToggle(lockedResponsesModel)}
       onClose={this.closeModal}
@@ -5091,7 +5091,7 @@ return (
           data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
         >
           <SurveyResultsDemoSurface
-            activeSlug={this.getEffectiveSlug()}
+            activeSlug={slug}
             atlasNodeId={this.state.demoResultsAtlasNodeId}
             defaultTags={this.props.defaultTags}
             filterState={this.props.filterState || this.state.filterState}
@@ -5121,7 +5121,7 @@ return (
         alertMessage,
         applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
         currentSurveyId,
-        effectiveSlug: this.getEffectiveSlug(),
+        effectiveSlug: slug,
         filterLoading,
         filterSummaryDisplay,
         getFallbackQuestion: this.getStableFallbackQuestion,
