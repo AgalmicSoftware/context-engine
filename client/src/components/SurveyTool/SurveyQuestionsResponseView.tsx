@@ -3,10 +3,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyTool.module.scss';
+import type { SurveyQuestionsRouteViewDisplayState } from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsResponseViewProps = {
   isLoadingResponse?: boolean;
-  isOwnResponse?: unknown;
   noResponse?: boolean;
   parsedViewAddressAnswers?: any;
   questionPool?: any[];
@@ -24,17 +24,17 @@ type SurveyQuestionsResponseViewProps = {
   responderAddress?: string;
   responseLookupWarning?: React.ReactNode;
   responseViewClassName?: string;
-  shortenedViewAddress?: React.ReactNode;
+  routeViewDisplayState?: Pick<
+    SurveyQuestionsRouteViewDisplayState,
+    'isOwnResponse' | 'shortenedViewAddress' | 'viewedAddressLower' | 'viewedAddressRaw'
+  >;
   singleQuestionMode?: unknown;
   userAnswers?: any;
   viewAddress?: string;
-  viewedAddressLower?: string;
-  viewedAddressRaw?: string;
 };
 
 const SurveyQuestionsResponseView = ({
   isLoadingResponse = false,
-  isOwnResponse,
   noResponse = false,
   parsedViewAddressAnswers = null,
   questionPool = [],
@@ -44,12 +44,10 @@ const SurveyQuestionsResponseView = ({
   responderAddress,
   responseLookupWarning = '',
   responseViewClassName,
-  shortenedViewAddress = '',
+  routeViewDisplayState,
   singleQuestionMode = false,
   userAnswers = null,
   viewAddress,
-  viewedAddressLower = '',
-  viewedAddressRaw = '',
 }: SurveyQuestionsResponseViewProps): React.ReactElement => {
   if (isLoadingResponse) {
     return (
@@ -73,6 +71,10 @@ const SurveyQuestionsResponseView = ({
     );
   }
 
+  const isOwnResponse = routeViewDisplayState?.isOwnResponse;
+  const shortenedViewAddress = routeViewDisplayState?.shortenedViewAddress || '';
+  const viewedAddressLower = routeViewDisplayState?.viewedAddressLower || '';
+  const viewedAddressRaw = routeViewDisplayState?.viewedAddressRaw || '';
   const firstQuestion = Array.isArray(questionPool) ? questionPool[0] : undefined;
   const hasAnswerData =
     (singleQuestionMode && questionPoolReady && firstQuestion && (isOwnResponse || parsedViewAddressAnswers)) ||
