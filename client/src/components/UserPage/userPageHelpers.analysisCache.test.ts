@@ -11,6 +11,7 @@ import {
   buildUserPageSbtSection,
   formatAnalysisCacheAge,
   isPlainAnalysisObject,
+  readUserPageAnalysisCacheThroughPort,
   readUserPageAnalysisCacheEntry,
   readUserPageDirectNetworkCacheBucket,
   resolveUserPageAnalysisCacheStatusState,
@@ -190,6 +191,90 @@ describe('userPageHelpers analysis cache helpers', () => {
       fingerprint: 'fingerprint-a',
       networkId: '84532',
       sessionSlug: 'session-a',
+    });
+  });
+
+  it('reads analysis cache entries through an injected port without owning state', () => {
+    const now = 1710000000000;
+    const validEntry = {
+      version: 1,
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      address: '0xabc',
+      expiresAt: now + 1000,
+      result: { summary: 'cached' },
+    };
+    const descriptor = buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: ' 0xABC ',
+      fingerprint: 'fingerprint-a',
+      networkId: 84532,
+      sessionSlug: 'session-a',
+    });
+    const peekCache = jest.fn(() => ({
+      84532: {
+        '0xabc': {
+          'fingerprint-a': validEntry,
+        },
+      },
+    }));
+
+    expect(readUserPageAnalysisCacheThroughPort({
+      cacheVersion: 1,
+      descriptor,
+      now,
+      peekCache,
+    })).toEqual({
+      descriptor,
+      entry: validEntry,
+      status: 'hit',
+    });
+    expect(peekCache).toHaveBeenCalledWith('analysisCache', 'session-a', { clone: false });
+
+    expect(readUserPageAnalysisCacheThroughPort({
+      cacheVersion: 1,
+      descriptor: {
+        ...descriptor,
+        fingerprint: 'missing',
+      },
+      now,
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'miss',
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor: {
+        ...descriptor,
+        action: 'skip-force-refresh',
+      },
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'skipped',
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor: {
+        ...descriptor,
+        sessionSlug: '',
+      },
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'skipped',
+    });
+
+    const thrown = new Error('cache read failed');
+    const throwingPeek = jest.fn(() => {
+      throw thrown;
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor,
+      peekCache: throwingPeek,
+    })).toEqual({
+      descriptor,
+      entry: null,
+      error: thrown,
+      status: 'error',
     });
   });
 

@@ -411,6 +411,12 @@ type BuildUserPageAnalysisCacheReadDescriptorArgs = {
   networkId?: unknown;
   sessionSlug?: unknown;
 };
+type ReadUserPageAnalysisCacheThroughPortArgs = {
+  cacheVersion?: unknown;
+  descriptor?: UserPageAnalysisCacheReadDescriptor | null;
+  now?: unknown;
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+};
 type BuildUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
   aiContext?: unknown;
@@ -632,6 +638,17 @@ export type UserPageAnalysisCacheReadDescriptor = {
   networkId: string;
   sessionSlug: string;
 };
+export type UserPageAnalysisCacheReadPort = (
+  namespace: string,
+  slug?: string,
+  options?: { clone?: boolean }
+) => unknown;
+export type UserPageAnalysisCacheReadPortResult = {
+  descriptor: UserPageAnalysisCacheReadDescriptor;
+  entry: UserPageAnalysisCacheEntry | null;
+  error?: unknown;
+  status: 'hit' | 'miss' | 'skipped' | 'error';
+};
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
   value != null && typeof value === 'object' ? value as UserPageUnknownRecord : {}
@@ -679,6 +696,56 @@ export const buildUserPageAnalysisCacheReadDescriptor = ({
   networkId: String(networkId || ''),
   sessionSlug: String(sessionSlug || ''),
 });
+
+export const readUserPageAnalysisCacheThroughPort = ({
+  cacheVersion = 1,
+  descriptor = null,
+  now = Date.now(),
+  peekCache = null,
+}: ReadUserPageAnalysisCacheThroughPortArgs = {}): UserPageAnalysisCacheReadPortResult => {
+  const readDescriptor = descriptor || buildUserPageAnalysisCacheReadDescriptor();
+  const baseResult = {
+    descriptor: readDescriptor,
+    entry: null,
+  };
+  if (
+    readDescriptor.action !== 'read' ||
+    !readDescriptor.sessionSlug ||
+    !readDescriptor.networkId ||
+    !readDescriptor.addressLower ||
+    !readDescriptor.fingerprint ||
+    typeof peekCache !== 'function'
+  ) {
+    return {
+      ...baseResult,
+      status: 'skipped',
+    };
+  }
+  try {
+    const cacheObj = toAnalysisCacheBucket(
+      peekCache('analysisCache', readDescriptor.sessionSlug, { clone: false })
+    );
+    const entry = readUserPageAnalysisCacheEntry({
+      addressLower: readDescriptor.addressLower,
+      cacheObj,
+      cacheVersion,
+      fingerprint: readDescriptor.fingerprint,
+      networkId: readDescriptor.networkId,
+      now,
+    });
+    return {
+      ...baseResult,
+      entry,
+      status: entry ? 'hit' : 'miss',
+    };
+  } catch (error) {
+    return {
+      ...baseResult,
+      error,
+      status: 'error',
+    };
+  }
+};
 
 export const buildUserPageAnalysisCacheEntry = ({
   addressLower = '',
