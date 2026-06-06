@@ -4409,8 +4409,6 @@ const SessionWizard = ({
   });
   const {
     canUploadMetadataNow,
-    uploadBlockedReason,
-    canPublishNow,
   } = publishUiPlan.publishReadiness;
   const deployStatusLower = toStr(deployStatus).toLowerCase();
   const deployStatusIsError = !!deployStatus &&
@@ -4432,9 +4430,8 @@ const SessionWizard = ({
     resolvedWorkerBaseUrl,
     workerMode,
     deployVerifiedInUi,
-    canPublishNow,
     canUseSponsoredAutoDeployNow,
-    uploadBlockedReason,
+    publishReadiness: publishUiPlan.publishReadiness,
     t,
   });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
