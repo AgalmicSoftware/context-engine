@@ -50,8 +50,12 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
-        showViewAnswersButton
-        viewAnswersButtonText=" View 0xabc answers"
+        routeViewDisplayState={{
+          isOwnResponse: false,
+          isSingleQuestionView: false,
+          showViewAnswersButton: true,
+          viewAnswersButtonText: ' View 0xabc answers',
+        }}
       />
     );
 
@@ -67,10 +71,17 @@ describe('SurveyQuestionsTopStrip', () => {
     render(
       <SurveyQuestionsTopStrip
         {...baseProps}
+        displayAnswerMode
         isEditing
         responseUrl="https://example.com/submitted-response"
-        showUserResponseNotice
-        submittedStateActive
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          isSingleQuestionView: false,
+          showViewAnswersButton: false,
+          viewAnswersButtonText: '',
+        }}
+        submitDisplayState={{ submittedStateActive: true }}
+        userHasResponse
         userResponseEncrypted
       />
     );
@@ -87,5 +98,25 @@ describe('SurveyQuestionsTopStrip', () => {
       'href',
       'https://example.com/submitted-response'
     );
+  });
+
+  it('hides the existing-response notice when route display state is not own survey answers', () => {
+    render(
+      <SurveyQuestionsTopStrip
+        {...baseProps}
+        displayAnswerMode
+        routeViewDisplayState={{
+          isOwnResponse: true,
+          isSingleQuestionView: true,
+          showViewAnswersButton: false,
+          viewAnswersButtonText: '',
+        }}
+        submitDisplayState={{ submittedStateActive: true }}
+        userHasResponse
+        userResponseEncrypted
+      />
+    );
+
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).not.toBeInTheDocument();
   });
 });
