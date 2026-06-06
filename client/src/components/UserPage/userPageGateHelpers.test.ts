@@ -303,6 +303,30 @@ describe('userPageGateHelpers', () => {
     }));
   });
 
+  it('revalidates stale terminal gate statuses while preserving their visible state', () => {
+    const nowMs = 200_000;
+    const staleTs = nowMs - 120_000;
+
+    ['granted', 'denied', 'no-gate'].forEach((cachedStatus) => {
+      expect(buildUserPageGateAccessCheckPlan({
+        cachedStatus,
+        cachedTs: staleTs,
+        hasCachedEntry: true,
+        hasInFlight: false,
+        nowMs,
+        terminalRecheckMs: 60_000,
+        unknownRetryMs: 30_000,
+      })).toEqual({
+        action: 'execute',
+        cachedAgeMs: 120_000,
+        previousStatus: cachedStatus,
+        retryDelayMs: 0,
+        shouldPreserveStatusWhileRevalidating: true,
+        shouldSetCheckingStatus: false,
+      });
+    });
+  });
+
   it('detects encrypted response fields and payload audiences', () => {
     expect(isUserPageEncryptedResponseField(null)).toBe(false);
     expect(isUserPageEncryptedResponseField({ value: '*' })).toBe(false);
