@@ -211,6 +211,56 @@ for (const resource of ['questions', 'surveys', 'responses']) {
   });
 }
 
+for (const contentType of ['application/json; charset=utf-8', 'application/ld+json']) {
+  test(`storageRoute serializes Cloudflare JSON object uploads for ${contentType}`, async () => {
+    const r2 = createMockR2();
+    const kv = createMockKv();
+    const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+    const uploadResponse = await storageRoute({
+      path: '/storage/upload',
+      method: 'POST',
+      request: new Request('https://worker.example/storage/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: { title: 'JSON payload', count: 1 },
+          contentType,
+          resource: 'questions',
+        }),
+      }),
+      env,
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
+      slug: 'session-a',
+      uploaderAddress: '0xabc',
+      baseHeaders: {},
+      deps: {
+        json,
+        randomBytes: fixedRandomBytes,
+        now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      },
+    });
+
+    const uploadBody = await readJson(uploadResponse);
+    assert.equal(uploadResponse.status, 200);
+    assert.equal(uploadBody.storageRef.contentType, contentType);
+
+    const readResponse = await storageRoute({
+      path: '/storage/read',
+      method: 'GET',
+      request: new Request(`https://worker.example/storage/read?id=${encodeURIComponent(uploadBody.storageRef.id)}`),
+      env,
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
+      slug: 'session-a',
+      uploaderAddress: '0xabc',
+      baseHeaders: {},
+      deps: { json },
+    });
+
+    assert.equal(readResponse.status, 200);
+    assert.equal(await readResponse.text(), '{"title":"JSON payload","count":1}');
+  });
+}
+
 test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavailable', async () => {
   const kv = createMockKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
