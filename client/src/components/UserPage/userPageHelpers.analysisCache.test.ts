@@ -12,6 +12,7 @@ import {
   formatAnalysisCacheAge,
   isPlainAnalysisObject,
   readUserPageAnalysisCacheThroughPort,
+  readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheEntry,
   readUserPageDirectNetworkCacheBucket,
   resolveUserPageAnalysisCacheStatusState,
@@ -429,6 +430,59 @@ describe('userPageHelpers analysis cache helpers', () => {
     })).resolves.toMatchObject({
       error: thrown,
       status: 'error',
+    });
+  });
+
+  it('reads created-survey analysis caches through an injected port', () => {
+    const surveysCache = { 84532: { surveys: { s1: { id: 's1' } } } };
+    const questionsCache = { 84532: { questions: { q1: { id: 'q1' } } } };
+    const peekCache = jest.fn((namespace: string) => (
+      namespace === 'surveysCache' ? surveysCache : questionsCache
+    ));
+
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: 84532,
+      peekCache,
+      sessionSlug: '',
+    })).toEqual({
+      networkID: '84532',
+      questionsCache,
+      sessionSlug: '',
+      status: 'read',
+      surveysCache,
+    });
+    expect(peekCache.mock.calls).toEqual([
+      ['surveysCache', '', { clone: false }],
+      ['questionsCache', '', { clone: false }],
+    ]);
+
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: '',
+      peekCache,
+      sessionSlug: 'edge',
+    })).toEqual({
+      networkID: '',
+      questionsCache: {},
+      sessionSlug: 'edge',
+      status: 'skipped',
+      surveysCache: {},
+    });
+
+    const thrown = new Error('created survey cache read failed');
+    const throwingPeek = jest.fn(() => {
+      throw thrown;
+    });
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: 84532,
+      peekCache: throwingPeek,
+      sessionSlug: 'edge',
+    })).toEqual({
+      error: thrown,
+      networkID: '84532',
+      questionsCache: {},
+      sessionSlug: 'edge',
+      status: 'error',
+      surveysCache: {},
     });
   });
 

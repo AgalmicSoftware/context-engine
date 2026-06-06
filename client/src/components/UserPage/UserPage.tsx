@@ -112,6 +112,7 @@ import {
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
+  readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheThroughPort,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
@@ -3080,13 +3081,19 @@ class UserPage extends Component<any, any> {
     try {
       const networkID = this.props.network?.id?.toString();
       const slug = (this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug);
-      const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
-      const questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-      surveysCreated = buildUserPageAnalysisCreatedSurveys({
+      const createdSurveyCacheRead = readUserPageAnalysisCreatedSurveyCachesThroughPort({
         networkID,
-        questionsCache,
+        peekCache: peekCacheSync,
+        sessionSlug: slug,
+      });
+      if (createdSurveyCacheRead.status === 'error') {
+        throw createdSurveyCacheRead.error;
+      }
+      surveysCreated = buildUserPageAnalysisCreatedSurveys({
+        networkID: createdSurveyCacheRead.networkID,
+        questionsCache: createdSurveyCacheRead.questionsCache,
         surveyCreationInfo: this.state.surveyCreationInfo,
-        surveysCache,
+        surveysCache: createdSurveyCacheRead.surveysCache,
       });
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
 
