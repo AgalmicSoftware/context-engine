@@ -8183,15 +8183,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       (viewingAnswers && this.state.questionPool && Array.isArray(this.state.questionPool));
     const jsonPreview = canBuildJsonPreview ? (this.state.jsonPreview || {}) : null;
 
-    const {
-      viewedAddressRaw,
-      viewedAddressLower,
-      shortenedViewAddress,
-      isOwnResponse,
-      isSingleQuestionView,
-      showViewAnswersButton,
-      viewAnswersButtonText,
-    } = buildSurveyQuestionsRouteViewDisplayState({
+    const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: this.props.account,
       isEditing: this.state.isEditing,
       isStandalone: this.props.isStandalone,
@@ -8203,6 +8195,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       viewAddress: this.props.viewAddress,
       viewingAnswers,
     });
+    const {
+      viewedAddressRaw,
+      viewedAddressLower,
+      shortenedViewAddress,
+      isOwnResponse,
+      isSingleQuestionView,
+    } = routeViewDisplayState;
 
     // Submit button label block (centralized)
     const _pendingStats = this.getPendingStatsSnapshot();
@@ -8283,7 +8282,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const responseJson = jsonPanelDisplayState.showResponseJsonPanel
       ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
       : null;
-    const submittedStateActive = submitFooterDisplayState.submittedStateActive;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
     const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
@@ -8335,6 +8333,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         <SurveyQuestionsTopStrip
           ref={this.topRef}
           className={topSectionClassName}
+          displayAnswerMode={this.state.displayAnswerMode}
           isDecrypting={this.state.isDecrypting}
           isEditing={this.state.isEditing}
           isSubmitting={this.state.isSubmitting}
@@ -8343,16 +8342,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           onStartFresh={this.handleStartFresh}
           onToggleDisplayAnswerMode={this.toggleDisplayAnswerMode}
           responseUrl={this.state.responseUrl}
-          showUserResponseNotice={
-            this.state.userHasResponse &&
-            isOwnResponse &&
-            !isSingleQuestionView &&
-            this.state.displayAnswerMode
-          }
-          showViewAnswersButton={showViewAnswersButton}
-          submittedStateActive={submittedStateActive}
+          routeViewDisplayState={routeViewDisplayState}
+          submitDisplayState={submitFooterDisplayState}
+          userHasResponse={this.state.userHasResponse}
           userResponseEncrypted={this.state.userResponseEncrypted}
-          viewAnswersButtonText={viewAnswersButtonText}
         />
 
         {viewingAnswers ? (
