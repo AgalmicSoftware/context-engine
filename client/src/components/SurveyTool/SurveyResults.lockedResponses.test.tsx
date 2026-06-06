@@ -354,8 +354,10 @@ describe('SurveyResults locked responses banner', () => {
     expect(toggle).toBeTruthy();
     expect(toggle.props['aria-expanded']).toBe(true);
     expect(toggle.props['aria-label']).toBe('Hide 3 locked responses');
+    expect(toggle.props.onClick).toBe(subject.toggleLockedResponseDetails);
     expect(decryptButton).toBeTruthy();
     expect(decryptButton.props.disabled).toBe(false);
+    expect(decryptButton.props.onClick).toBe(subject.handleDecryptLockedResponses);
 
     toggle.props.onClick();
     decryptButton.props.onClick();
