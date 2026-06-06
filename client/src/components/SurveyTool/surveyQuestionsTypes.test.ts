@@ -40,6 +40,7 @@ import {
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsPrimarySubmitPlan,
+  buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
@@ -788,6 +789,51 @@ describe('surveyQuestionsTypes', () => {
       pendingIds: [],
       pendingCount: 0,
       isIncomplete: false,
+    });
+  });
+
+  it('builds render readiness while preserving display-answer fallthrough', () => {
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      displayAnswerMode: true,
+      parsedViewAddressAnswers: { answers: {} },
+      questionPool: [],
+      singleQuestionMode: true,
+      surveyIndex: 2,
+      surveysResponseState: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      surveyIndex: 0,
+      currentSurveyResponseState: null,
+      questionPoolReady: false,
+      canFallThroughDisplayAnswerMode: true,
+      shouldShowLoadingState: false,
+      gatedEmptyStateReady: false,
+      hasHiddenMaskedQuestions: false,
+    });
+  });
+
+  it('describes gated empty-state readiness from masked question visibility', () => {
+    const responseSlice = { answers: {} };
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      fullQuestionPool: [{ id: 'q1' }, { id: 'q2' }],
+      hiddenMaskedQuestionIds: ['q1', 2],
+      isQuestionCacheReady: true,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+      singleQuestionMode: false,
+      surveyIndex: 1,
+      surveysResponseState: [{ answers: { q0: 'skip' } }, responseSlice],
+      visibleQuestionPool: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      surveyIndex: 1,
+      currentSurveyResponseState: responseSlice,
+      questionPoolReady: true,
+      gatedEmptyStateReady: true,
+      hasHiddenMaskedQuestions: true,
+      hiddenMaskedQuestionIds: ['q1', '2'],
+      shouldShowLoadingState: false,
     });
   });
 
