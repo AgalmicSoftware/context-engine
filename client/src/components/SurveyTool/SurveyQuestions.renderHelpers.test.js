@@ -9,6 +9,7 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
@@ -404,6 +405,63 @@ describe('SurveyQuestions render helpers', () => {
     expect(findFirstNodeByType(tree, SurveyQuestionsLockAudienceControl)).not.toBeNull();
     expect(dropdown).toBeTruthy();
     expect(dropdown.props.tags).toEqual(['governance']);
+  });
+
+  it('keeps full-question response input execution handlers parent-owned with stable arguments', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 5,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const audioInputWorkerProps = { workerReady: true };
+    const sliderFlush = jest.fn();
+    subject.getAudioInputWorkerProps = jest.fn(() => audioInputWorkerProps);
+    subject.handleAnswer = jest.fn();
+    subject.flushDraftPersistAfterSliderChange = sliderFlush;
+    subject.toggleAnswerEncryption = jest.fn();
+    subject.state = {
+      ...subject.state,
+      isSubmitting: true,
+    };
+
+    const question = { id: 'q-response', type: 'rating', prompt: 'Rate this' };
+    const answer = { value: 4, encrypted: false };
+    const input = subject.renderFullQuestionResponseInput({
+      question,
+      qIndex: 2,
+      surveyIndex: 5,
+      answer,
+      glowAnswer: true,
+    });
+
+    expect(input?.type).toBe(SurveyQuestionsFullQuestionResponseInput);
+    expect(input?.props).toMatchObject({
+      question,
+      qIndex: 2,
+      answer,
+      glowAnswer: true,
+      isSubmitting: true,
+      singleQuestionMode: true,
+      audioInputWorkerProps,
+    });
+
+    input.props.onAnswerChange('next answer');
+    input.props.onRatingChange(8, { type: 'keydown' });
+    input.props.onDeferredRatingCommit(6);
+    input.props.onRatingChangeComplete();
+    input.props.onToggleAnswerEncryption(true);
+
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(1, 5, 'q-response', 'next answer');
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(2, 5, 'q-response', 8, { persistDraft: true });
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(3, 5, 'q-response', 6, {
+      persistDraft: false,
+      afterUpdate: sliderFlush,
+    });
+    expect(sliderFlush).toHaveBeenCalledTimes(1);
+    expect(subject.toggleAnswerEncryption).toHaveBeenCalledWith(5, 'q-response', true);
   });
 
   it('renders full-question card links through the shared header helper', () => {
