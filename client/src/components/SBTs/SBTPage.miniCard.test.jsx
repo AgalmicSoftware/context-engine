@@ -260,6 +260,46 @@ describe('SBTPage mini-card', () => {
     expect(miniMintHandler).not.toHaveBeenCalled();
   });
 
+  it('keeps manual mini-card claim countdown display inert while reusing parent action ports', () => {
+    const miniMintHandler = jest.fn();
+    const { cardNode } = renderMiniCardNode(
+      {},
+      {
+        claimCountdown: 12,
+        mintStep: 1,
+        sbtInfo: {
+          name: 'Badge',
+          image: 'https://example.example.test/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: true,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+        },
+      },
+      (subject) => {
+        subject.miniMintHandler = miniMintHandler;
+      }
+    );
+    const cardTree = SbtPageMiniCard(cardNode.props);
+    const preventDefault = jest.fn();
+
+    expect(cardNode.props.miniMintActionPlan).toMatchObject({
+      disabled: false,
+      handlerKind: 'none',
+      inertReason: 'status-only',
+      isInteractive: false,
+      labelKind: 'countdown',
+      viewKind: 'manual-claim-countdown',
+    });
+    expect(flattenText(cardTree)).toContain('Wait: 12s');
+
+    cardNode.props.onMiniMint({ preventDefault });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(miniMintHandler).not.toHaveBeenCalled();
+  });
+
   it('routes mini-card invite and group-password mint clicks through parent handlers', () => {
     const claimWithInviteCode = jest.fn();
     const { cardNode: inviteCardNode } = renderMiniCardNode(
