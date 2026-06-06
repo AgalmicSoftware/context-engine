@@ -519,6 +519,7 @@ import {
   buildSurveyQuestionsPrimarySubmitPlan,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
@@ -8206,26 +8207,23 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           suffix: _suffix,
           pendingStats: _pendingStats,
         });
-    const submitHasEncryptedAnswers =
-      this.state.isSubmitting &&
-      this.state.currentStep === 1
-        ? Number(_pendingStats.encrypted || 0) > 0
-        : false;
-    const submitHasMaskedCurrentQuestionPayload =
-      !this.state.isSubmitting &&
-      this.props.singleQuestionMode
-        ? this.hasMaskedCurrentQuestionPayload()
-        : false;
+    const submitReadiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: this.state.currentStep,
+      isSubmitting: this.state.isSubmitting,
+      pendingStats: _pendingStats,
+      resolveMaskedCurrentQuestionPayload: this.hasMaskedCurrentQuestionPayload,
+      singleQuestionMode: this.props.singleQuestionMode,
+    });
     const submitFooterDisplayState = buildSurveyQuestionsSubmitFooterDisplayState({
       currentStep: this.state.currentStep,
-      hasEncryptedAnswers: submitHasEncryptedAnswers,
-      hasMaskedCurrentQuestionPayload: submitHasMaskedCurrentQuestionPayload,
+      hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
+      hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
       isDirty: this.state.isDirty,
       isEditing: this.state.isEditing,
       isLoadingResponse: this.state.isLoadingResponse,
       isSingleQuestionView,
       isSubmitting: this.state.isSubmitting,
-      pendingEditCount: _pendingStats.total,
+      pendingEditCount: submitReadiness.pendingEditCount,
       responseUrl: this.state.responseUrl,
       singleQuestionMode: this.props.singleQuestionMode,
       startFresh: this.state.startFresh,
@@ -8242,7 +8240,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         isSubmitting={this.state.isSubmitting}
         onPrimarySubmitClick={this.handlePrimarySubmitClick}
         onRevertPendingChanges={this.handleRevertPendingChanges}
-        pendingEditCount={_pendingStats.total}
+        pendingEditCount={submitReadiness.pendingEditCount}
         responseUrl={this.state.responseUrl}
         submitButtonText={submitButtonText}
         submissionError={this.state.submissionError}

@@ -46,6 +46,7 @@ import {
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
   buildViewingResponseModeState,
@@ -652,6 +653,69 @@ describe('surveyQuestionsTypes', () => {
       showInlineSubmit: true,
       showTopInlineSubmit: true,
     });
+  });
+
+  it('describes submit readiness for encrypted upload status and masked single-question payloads', () => {
+    const maskedResolver = jest.fn(() => true);
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 1,
+      isSubmitting: true,
+      pendingStats: { total: 3, encrypted: 2 },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: true,
+    })).toEqual({
+      currentStep: 1,
+      encryptedPendingEditCount: 2,
+      hasEncryptedAnswers: true,
+      hasMaskedCurrentQuestionPayload: false,
+      isSubmitting: true,
+      pendingEditCount: 3,
+      shouldCheckMaskedCurrentQuestionPayload: false,
+      singleQuestionMode: true,
+      uploadPhase: 'encrypting',
+    });
+    expect(maskedResolver).not.toHaveBeenCalled();
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 0,
+      isSubmitting: false,
+      pendingStats: { total: '1', encrypted: '0' },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: true,
+    })).toEqual({
+      currentStep: 0,
+      encryptedPendingEditCount: 0,
+      hasEncryptedAnswers: false,
+      hasMaskedCurrentQuestionPayload: true,
+      isSubmitting: false,
+      pendingEditCount: 1,
+      shouldCheckMaskedCurrentQuestionPayload: true,
+      singleQuestionMode: true,
+      uploadPhase: 'uploading',
+    });
+    expect(maskedResolver).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps submit readiness unmasked outside single-question mode', () => {
+    const maskedResolver = jest.fn(() => true);
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 'not-a-step',
+      isSubmitting: false,
+      pendingStats: { total: 2, encrypted: 'not-a-count' },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: false,
+    })).toMatchObject({
+      currentStep: 0,
+      encryptedPendingEditCount: 0,
+      hasEncryptedAnswers: false,
+      hasMaskedCurrentQuestionPayload: false,
+      pendingEditCount: 2,
+      shouldCheckMaskedCurrentQuestionPayload: false,
+      uploadPhase: 'uploading',
+    });
+    expect(maskedResolver).not.toHaveBeenCalled();
   });
 
   it('builds SurveyQuestions single-question submit display state without route affordances', () => {
