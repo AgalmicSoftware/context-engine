@@ -124,6 +124,7 @@ import {
 import {
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
+  runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
 } from './sessionWizardPublishController';
@@ -3676,12 +3677,16 @@ const SessionWizard = ({
         workerUrlOverride,
         signerAccountOverride: resolvedPublisher,
       });
-      if (metadataUploadRequest.shouldUploadMetadata) {
-        setPublishStep(metadataUploadRequest.publishStep);
-        uploadResult = await handleUploadMetadata(
-          metadataUploadRequest.uploadArgs
-        );
-      }
+      const metadataUploadControllerResult = await runSessionWizardPublishMetadataUploadController({
+        request: metadataUploadRequest,
+        ports: {
+          uploadMetadata: (args) => handleUploadMetadata(args),
+        },
+        callbacks: {
+          setPublishStep,
+        },
+      });
+      uploadResult = metadataUploadControllerResult.uploadResult;
       setPublishStep(publishStepNumbers['register-session']);
       await handleRegisterGroup({
         metadataUriOverride: uploadResult?.metadataUri,

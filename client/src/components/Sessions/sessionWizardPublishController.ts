@@ -117,6 +117,21 @@ export type SessionWizardPublishMetadataUploadRequest = {
   uploadArgs: SessionWizardPublishDeployPendingSbtsArgs;
 };
 
+export type SessionWizardPublishMetadataUploadControllerPorts = {
+  uploadMetadata: (
+    args: SessionWizardPublishDeployPendingSbtsArgs
+  ) => Promise<AnyRecord | null | undefined>;
+};
+
+export type SessionWizardPublishMetadataUploadControllerCallbacks = {
+  setPublishStep: (step: number) => void;
+};
+
+export type SessionWizardPublishMetadataUploadControllerResult = {
+  status: 'completed' | 'skipped';
+  uploadResult: AnyRecord | null;
+};
+
 const getPublishStepNumber = (
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike,
   stepKey: string
@@ -198,6 +213,30 @@ export const resolveSessionWizardPublishMetadataUploadRequest = ({
     signerAccountOverride: toStr(signerAccountOverride),
   },
 });
+
+export const runSessionWizardPublishMetadataUploadController = async ({
+  request,
+  ports,
+  callbacks,
+}: {
+  request: SessionWizardPublishMetadataUploadRequest;
+  ports: SessionWizardPublishMetadataUploadControllerPorts;
+  callbacks: SessionWizardPublishMetadataUploadControllerCallbacks;
+}): Promise<SessionWizardPublishMetadataUploadControllerResult> => {
+  if (!request.shouldUploadMetadata) {
+    return {
+      status: 'skipped',
+      uploadResult: null,
+    };
+  }
+
+  callbacks.setPublishStep(request.publishStep);
+  const uploadResult = await ports.uploadMetadata(request.uploadArgs) || null;
+  return {
+    status: 'completed',
+    uploadResult,
+  };
+};
 
 export const runSessionWizardRegisterStepController = async ({
   input,
