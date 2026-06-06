@@ -8,8 +8,6 @@ import {
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
   applyUserPageBookmarkNicknameSave,
-  buildUserPageAnalysisCacheEntry,
-  buildUserPageAnalysisCacheWritePayload,
   buildUserPageCacheRefreshOptions,
   buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
@@ -149,6 +147,7 @@ import {
   shouldRetryUserPageQuestionData,
   toAnalysisRecord,
   upsertUserPageResponseByRecency,
+  writeUserPageAnalysisCacheThroughPort,
   writeUserPageSourceSlug,
   type UserPageAnalysisCacheReadDescriptor,
   type UserPageAnalysisFingerprintInput,
@@ -3033,30 +3032,23 @@ class UserPage extends Component<any, any> {
     aiContext,
     result,
   }: UserAnalysisCacheWriteArgs): Promise<UserAnalysisCacheEntry> => {
-    const cachedAt = Date.now();
-    const entry = buildUserPageAnalysisCacheEntry({
+    const cacheWrite = await writeUserPageAnalysisCacheThroughPort({
       addressLower,
       aiContext,
-      fingerprint,
       cacheVersion: USER_ANALYSIS_CACHE_VERSION,
-      cachedAt,
+      cachedAt: Date.now(),
+      fingerprint,
       networkId,
+      peekCache: peekCacheSync,
       result,
       sessionSlug,
       ttlMs: USER_ANALYSIS_TTL_MS,
-    }) as UserAnalysisCacheEntry;
-
-    const current = peekCacheSync('analysisCache', sessionSlug, { clone: false });
-    const next = buildUserPageAnalysisCacheWritePayload({
-      addressLower,
-      cachedAt,
-      currentCache: current,
-      entry,
-      fingerprint,
-      networkId,
+      writeCache: writeCacheTyped,
     });
-    await writeCacheTyped('analysisCache', sessionSlug, next);
-    return entry;
+    if (cacheWrite.status === 'error') {
+      throw cacheWrite.error;
+    }
+    return cacheWrite.entry as UserAnalysisCacheEntry;
   };
 
   analyzeUser = async (forceRefresh: unknown = false): Promise<void> => {

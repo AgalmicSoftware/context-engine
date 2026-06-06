@@ -18,6 +18,7 @@ import {
   sortUserAnalysisKeys,
   toAnalysisCacheBucket,
   toAnalysisRecord,
+  writeUserPageAnalysisCacheThroughPort,
 } from './userPageHelpers';
 
 describe('userPageHelpers analysis cache helpers', () => {
@@ -342,6 +343,92 @@ describe('userPageHelpers analysis cache helpers', () => {
         },
       },
       other: { untouched: true },
+    });
+  });
+
+  it('writes analysis cache entries through injected ports without owning analysis state', async () => {
+    const cachedAt = 1710000000000;
+    const staleSibling = { fingerprint: 'stale', expiresAt: cachedAt - 1 };
+    const liveSibling = { fingerprint: 'live', expiresAt: cachedAt + 1 };
+    const currentCache = {
+      84532: {
+        '0xabc': {
+          stale: staleSibling,
+          live: liveSibling,
+        },
+      },
+      other: { untouched: true },
+    };
+    const peekCache = jest.fn(() => currentCache);
+    const writeCache = jest.fn(async () => true);
+
+    const result = await writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      aiContext: { provider: 'openai', model: 'gpt-5' },
+      cachedAt,
+      cacheVersion: 2,
+      fingerprint: 'fingerprint-new',
+      networkId: '84532',
+      peekCache,
+      result: { summary: 'fresh summary' },
+      sessionSlug: 'edge',
+      ttlMs: 1000,
+      writeCache,
+    });
+
+    expect(result.status).toBe('written');
+    expect(result.entry).toMatchObject({
+      version: 2,
+      fingerprint: 'fingerprint-new',
+      cachedAt,
+      expiresAt: cachedAt + 1000,
+      address: '0xabc',
+      networkId: '84532',
+      result: {
+        summary: 'fresh summary',
+      },
+    });
+    expect(result.payload).toEqual({
+      84532: {
+        '0xabc': {
+          live: liveSibling,
+          'fingerprint-new': result.entry,
+        },
+      },
+      other: { untouched: true },
+    });
+    expect(peekCache).toHaveBeenCalledWith('analysisCache', 'edge', { clone: false });
+    expect(writeCache).toHaveBeenCalledWith('analysisCache', 'edge', result.payload);
+
+    const skipped = await writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      fingerprint: '',
+      networkId: '84532',
+      peekCache,
+      sessionSlug: 'edge',
+      writeCache,
+    });
+    expect(skipped).toEqual({
+      entry: null,
+      payload: null,
+      status: 'skipped',
+    });
+
+    const thrown = new Error('write failed');
+    const throwingWrite = jest.fn(async () => {
+      throw thrown;
+    });
+    await expect(writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      cachedAt,
+      fingerprint: 'fingerprint-new',
+      networkId: '84532',
+      peekCache,
+      sessionSlug: 'edge',
+      writeCache: throwingWrite,
+    })).resolves.toMatchObject({
+      error: thrown,
+      status: 'error',
     });
   });
 

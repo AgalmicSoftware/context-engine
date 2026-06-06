@@ -242,6 +242,42 @@ describe('UserPage analysis cache and routing', () => {
     }
   });
 
+  it('keeps fresh analysis visible when the analysisCache write port throws', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { instance, slug } = makeAnalysisCacheInstance();
+    const writeSpy = jest
+      .spyOn(instance, '_writeAnalysisCacheEntry')
+      .mockRejectedValue(new Error('analysis write failed'));
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'fresh summary despite write failure',
+      details: 'fresh details despite write failure',
+      name: 'Fresh Despite Write Failure',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenCalledWith(expect.objectContaining({
+        sessionSlug: slug,
+        result: expect.objectContaining({
+          summary: 'fresh summary despite write failure',
+        }),
+      }));
+      expect(instance.state.analysisName).toBe('Fresh Despite Write Failure');
+      expect(instance.state.aiAnalysis).toBe('fresh summary despite write failure');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+      expect(instance.state.analysisError).toBe('');
+    } finally {
+      nowSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   it('hydrates unchanged analysis input from analysisCache without calling AI', async () => {
     const cachedAt = 1710000000000;
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
