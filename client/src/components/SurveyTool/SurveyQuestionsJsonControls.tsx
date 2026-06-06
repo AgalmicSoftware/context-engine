@@ -57,6 +57,10 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
     surveyJsonRowClassName,
     surveyJsonToggleClassName,
   } = jsonPanelDisplayState;
+  const showFullSurveyControls =
+    'showFullSurveyJsonControls' in jsonPanelDisplayState
+      ? !!showFullSurveyJsonControls
+      : !showQuestionJsonControls;
 
   return (
     <div ref={ref}>
@@ -77,7 +81,7 @@ const SurveyQuestionsJsonControls = React.forwardRef<HTMLDivElement, SurveyQuest
             />
           </>
         )}
-        {showFullSurveyJsonControls && (
+        {showFullSurveyControls && (
           <>
             <JsonToggleButton
               label={showSurveyJson ? 'Hide Survey .json' : 'View Survey .json'}
