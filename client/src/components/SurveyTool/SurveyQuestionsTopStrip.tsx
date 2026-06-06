@@ -6,16 +6,20 @@ import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SurveyQuestionsUserResponseNotice from './SurveyQuestionsUserResponseNotice';
 import type {
+  SurveyQuestionsLayoutDisplayState,
   SurveyQuestionsRouteViewDisplayState,
   SurveyQuestionsSubmitFooterDisplayState,
 } from './surveyQuestionsTypes.js';
 
 type SurveyQuestionsTopStripProps = {
-  className?: string;
   displayAnswerMode?: boolean;
   isDecrypting?: boolean;
   isEditing?: boolean;
   isSubmitting?: boolean;
+  layoutDisplayState?: Pick<
+    SurveyQuestionsLayoutDisplayState,
+    'topSectionClassName'
+  >;
   onDecryptEdit: () => void;
   onExitEditing: () => void;
   onStartFresh: () => void;
@@ -34,11 +38,11 @@ type SurveyQuestionsTopStripProps = {
 };
 
 const SurveyQuestionsTopStrip = React.forwardRef<HTMLDivElement, SurveyQuestionsTopStripProps>(({
-  className,
   displayAnswerMode = false,
   isDecrypting = false,
   isEditing = false,
   isSubmitting = false,
+  layoutDisplayState,
   onDecryptEdit,
   onExitEditing,
   onStartFresh,
@@ -56,7 +60,7 @@ const SurveyQuestionsTopStrip = React.forwardRef<HTMLDivElement, SurveyQuestions
     !!displayAnswerMode;
 
   return (
-    <div ref={ref} className={className}>
+    <div ref={ref} className={layoutDisplayState?.topSectionClassName}>
       {routeViewDisplayState?.showViewAnswersButton ? (
         <Button onClick={onToggleDisplayAnswerMode} id={styles.answerSurveyButton}>
           <FontAwesomeIcon icon={faArrowLeft} id={styles.encryptIcon} />
