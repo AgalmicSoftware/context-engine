@@ -12,6 +12,10 @@ const encoder = new TextEncoder();
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
+const isJsonContentType = (contentType) => {
+  const mediaType = trim(contentType).split(';', 1)[0].trim().toLowerCase();
+  return mediaType === 'application/json' || mediaType.endsWith('+json');
+};
 
 const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
 const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
@@ -113,7 +117,7 @@ const readJsonPayload = async (request) => {
   if (!isObj(raw)) return { ok: false, error: 'Invalid JSON.' };
   const data = Object.prototype.hasOwnProperty.call(raw, 'data') ? raw.data : '';
   const contentType = trim(raw.contentType) || (typeof data === 'string' ? 'text/plain' : 'application/json');
-  const serialized = contentType === 'application/json' && typeof data !== 'string'
+  const serialized = isJsonContentType(contentType) && typeof data !== 'string'
     ? JSON.stringify(data)
     : toStr(data);
   return {
