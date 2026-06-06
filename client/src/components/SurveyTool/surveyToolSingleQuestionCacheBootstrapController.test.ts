@@ -467,6 +467,59 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
     expect(writeQuestionsCache).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps equivalent recent payloads read-only when cached question data is current', async () => {
+    const writeQuestionsCache = jest.fn();
+    const cachedQuestion = {
+      id: 'q1',
+      prompt: 'current',
+      tags: ['stable'],
+    };
+    const pickBetterQuestionPayload = jest.fn((current) => current);
+    const areQuestionPayloadsEquivalent = jest.fn(() => true);
+
+    const result = await resolveSingleQuestionCacheBootstrap({
+      questionId: 'q1',
+      effectiveSingleSlug: 'edge',
+      account: '0xabc',
+      resolveCacheState: jest.fn().mockResolvedValue({
+        netIdStr: '84532',
+        questionsCache: {
+          '84532': {
+            questions: {
+              q1: cachedQuestion,
+            },
+          },
+        },
+      }),
+      readRecentPayload: jest.fn().mockReturnValue({ prompt: 'current', tags: ['stable'] }),
+      canUseRecentPayload: jest.fn().mockReturnValue(true),
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+      writeQuestionsCache,
+    });
+
+    expect(result.status).toBe('ready');
+    if (result.status !== 'ready') {
+      throw new Error(`expected ready, got ${result.status}`);
+    }
+
+    expect(result.questionData).toEqual(cachedQuestion);
+    expect(result.recentPayloadForAccount).toEqual({
+      id: 'q1',
+      prompt: 'current',
+      tags: ['stable'],
+    });
+    expect(pickBetterQuestionPayload).toHaveBeenCalledWith(
+      cachedQuestion,
+      result.recentPayloadForAccount
+    );
+    expect(areQuestionPayloadsEquivalent).toHaveBeenCalledWith(
+      cachedQuestion,
+      cachedQuestion
+    );
+    expect(writeQuestionsCache).not.toHaveBeenCalled();
+  });
+
   it('restores encrypted gated recent question payloads over stale cached shells', async () => {
     const writeQuestionsCache = jest.fn();
     const questionsCache = {
