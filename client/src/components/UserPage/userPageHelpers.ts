@@ -417,6 +417,10 @@ type ReadUserPageAnalysisCacheThroughPortArgs = {
   now?: unknown;
   peekCache?: UserPageAnalysisCacheReadPort | null;
 };
+type WriteUserPageAnalysisCacheThroughPortArgs = BuildUserPageAnalysisCacheEntryArgs & {
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+  writeCache?: UserPageAnalysisCacheWritePort | null;
+};
 type BuildUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
   aiContext?: unknown;
@@ -643,11 +647,22 @@ export type UserPageAnalysisCacheReadPort = (
   slug?: string,
   options?: { clone?: boolean }
 ) => unknown;
+export type UserPageAnalysisCacheWritePort = (
+  namespace: string,
+  slug?: string,
+  value?: unknown
+) => Promise<unknown>;
 export type UserPageAnalysisCacheReadPortResult = {
   descriptor: UserPageAnalysisCacheReadDescriptor;
   entry: UserPageAnalysisCacheEntry | null;
   error?: unknown;
   status: 'hit' | 'miss' | 'skipped' | 'error';
+};
+export type UserPageAnalysisCacheWritePortResult = {
+  entry: UserPageAnalysisCacheEntry | null;
+  error?: unknown;
+  payload: UserPageUnknownRecord | null;
+  status: 'written' | 'skipped' | 'error';
 };
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
@@ -815,6 +830,72 @@ export const buildUserPageAnalysisCacheWritePayload = ({
   networkBucket[addressKey] = addressBucket;
   next[networkKey] = networkBucket;
   return next;
+};
+
+export const writeUserPageAnalysisCacheThroughPort = async ({
+  addressLower = '',
+  aiContext = {},
+  cachedAt = Date.now(),
+  cacheVersion = 1,
+  fingerprint = '',
+  networkId = '',
+  peekCache = null,
+  result = {},
+  sessionSlug = '',
+  ttlMs = 24 * 60 * 60 * 1000,
+  writeCache = null,
+}: WriteUserPageAnalysisCacheThroughPortArgs = {}): Promise<UserPageAnalysisCacheWritePortResult> => {
+  let entry: UserPageAnalysisCacheEntry | null = null;
+  let payload: UserPageUnknownRecord | null = null;
+  if (
+    !String(sessionSlug || '') ||
+    !String(networkId || '') ||
+    !String(addressLower || '') ||
+    !String(fingerprint || '') ||
+    typeof peekCache !== 'function' ||
+    typeof writeCache !== 'function'
+  ) {
+    return {
+      entry,
+      payload,
+      status: 'skipped',
+    };
+  }
+  try {
+    entry = buildUserPageAnalysisCacheEntry({
+      addressLower,
+      aiContext,
+      cachedAt,
+      cacheVersion,
+      fingerprint,
+      networkId,
+      result,
+      sessionSlug,
+      ttlMs,
+    });
+    const current = peekCache('analysisCache', String(sessionSlug || ''), { clone: false });
+    payload = buildUserPageAnalysisCacheWritePayload({
+      addressLower,
+      cachedAt,
+      currentCache: current,
+      entry,
+      fingerprint,
+      networkId,
+    });
+    await writeCache('analysisCache', String(sessionSlug || ''), payload);
+    return {
+      entry,
+      payload,
+      status: 'written',
+    };
+  } catch (error) {
+    return {
+      entry,
+      error,
+      payload,
+      status: 'error',
+    };
+  }
 };
 
 export const buildUserPageNamespaceSourceMembershipSignature = ({
