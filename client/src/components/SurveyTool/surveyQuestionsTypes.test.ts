@@ -39,6 +39,7 @@ import {
   buildSurveyQuestionsJsonPanelDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsMaskedQuestionVisibility,
   buildSurveyQuestionsPrimarySubmitPlan,
   buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsLockAudienceGateClassName,
@@ -51,6 +52,7 @@ import {
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
   buildViewingResponseModeState,
+  isSurveyQuestionsMaskedPromptText,
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
@@ -789,6 +791,39 @@ describe('surveyQuestionsTypes', () => {
       pendingIds: [],
       pendingCount: 0,
       isIncomplete: false,
+    });
+  });
+
+  it('builds masked question visibility without owning render memoization', () => {
+    const encryptedPrompt = { id: 'Q1', prompt: '[encrypted]' };
+    const decryptedPrompt = { id: 'Q2', prompt: '[encrypted]', promptDecrypted: true };
+    const plainPrompt = { id: 'Q3', prompt: 'Plain prompt' };
+    const anonymousMaskedPrompt = { prompt: '[encrypted]' };
+    const questionPool = [
+      encryptedPrompt,
+      decryptedPrompt,
+      plainPrompt,
+      anonymousMaskedPrompt,
+      null,
+    ];
+
+    expect(isSurveyQuestionsMaskedPromptText(' [encrypted] ')).toBe(true);
+    expect(isSurveyQuestionsMaskedPromptText('[Encrypted]')).toBe(false);
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: false,
+    })).toEqual({
+      fullQuestionPool: questionPool,
+      visibleQuestionPool: [decryptedPrompt, plainPrompt, null],
+      hiddenMaskedQuestionIds: ['q1'],
+    });
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: true,
+    })).toEqual({
+      fullQuestionPool: questionPool,
+      visibleQuestionPool: questionPool,
+      hiddenMaskedQuestionIds: [],
     });
   });
 

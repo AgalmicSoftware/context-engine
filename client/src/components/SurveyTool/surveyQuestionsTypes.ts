@@ -128,6 +128,12 @@ export type SurveyQuestionsRenderReadinessDescriptor = {
   shouldShowLoadingState: boolean;
 };
 
+export type SurveyQuestionsMaskedQuestionVisibilityState = {
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+};
+
 export type SurveyQuestionsAuthoringPanelDisplayState = {
   showBackToTopControl: boolean;
   showJsonControl: boolean;
@@ -404,6 +410,51 @@ export const buildSurveyQuestionPoolLoadState = ({
     pendingIds,
     pendingCount,
     isIncomplete: expectedIds.length > 0 && pendingCount > 0,
+  };
+};
+
+export const isSurveyQuestionsMaskedPromptText = (prompt: unknown): boolean => (
+  String(prompt || '').trim() === '[encrypted]'
+);
+
+export const buildSurveyQuestionsMaskedQuestionVisibility = ({
+  questionPool = null,
+  singleQuestionMode = false,
+}: {
+  questionPool?: unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
+  const fullQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  if (singleQuestionMode) {
+    return {
+      fullQuestionPool,
+      visibleQuestionPool: fullQuestionPool,
+      hiddenMaskedQuestionIds: [],
+    };
+  }
+
+  const visibleQuestionPool: unknown[] = [];
+  const hiddenMaskedQuestionIds: string[] = [];
+  fullQuestionPool.forEach((question) => {
+    const questionRecord = question !== null && typeof question === 'object'
+      ? question as UnknownRecord
+      : {};
+    const masked = (
+      isSurveyQuestionsMaskedPromptText(questionRecord.prompt) &&
+      !questionRecord.promptDecrypted
+    );
+    if (!masked) {
+      visibleQuestionPool.push(question);
+      return;
+    }
+    const questionId = String(questionRecord.id || '').trim().toLowerCase();
+    if (questionId) hiddenMaskedQuestionIds.push(questionId);
+  });
+
+  return {
+    fullQuestionPool,
+    visibleQuestionPool,
+    hiddenMaskedQuestionIds,
   };
 };
 
