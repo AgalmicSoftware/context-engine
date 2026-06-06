@@ -82,6 +82,7 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
@@ -108,6 +109,7 @@ import {
   toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
   type SurveyResultsFilterQuestionRecord,
+  type SurveyResultsIndividualAggregator,
   type SurveyResultsStringifiedAggregator,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
@@ -347,7 +349,6 @@ type SurveyResultsQuestionFilterHandle = {
   handleApplyFilters: (usePendingState?: unknown) => void;
   handleClearFilters: () => void;
 };
-type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 type SurveyResultsAggregatorEntry = [string, unknown];
 type SurveyResultsResponseCardClassNames = {
   aggregatorContainerClassName: string;
@@ -3964,40 +3965,6 @@ void runSurveyResultsSurveyQuestionBookmarkWriteController({
 this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value));
 };
 
-transformIndividualResponsesToAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {
-  const responseRows = individualResponses as SurveyResultsSummaryResponseRow[];
-  if (!individualResponses || responseRows.length === 0) {
-    return {};
-  }
-
-  const aggregator: SurveyResultsIndividualAggregator = {};
-
-  responseRows.forEach((response) => {
-    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
-      response.response
-    ) as SurveyResultsSurveyResponsePayload | null; // Already an object
-    if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach((answerItem) => {
-        const qIdLower = getSurveyResponseQuestionId(answerItem);
-        if (!qIdLower) return;
-
-        if (!aggregator[qIdLower]) {
-          aggregator[qIdLower] = [];
-        }
-
-        aggregator[qIdLower].push({
-          responder: String(response.responder || '').toLowerCase(), // normalize storage
-          questionId: qIdLower,
-          response: answerItem,
-          timestamp: getSurveyResponseAggregateTimestampMs(answerItem, parsedResponse),
-        });
-      });
-    }
-  });
-
-  return aggregator;
-}
-
 getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {
   const responsesRef = Array.isArray(individualResponses)
     ? individualResponses as SurveyResultsSummaryResponseRow[]
@@ -4006,7 +3973,7 @@ getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResults
   if (memo.responsesRef === responsesRef) {
     return memo.result;
   }
-  const next = this.transformIndividualResponsesToAggregator(responsesRef);
+  const next = buildSurveyResultsIndividualResponseAggregator(responsesRef);
   this._individualResponsesAggregatorMemo = {
     responsesRef,
     result: next,
