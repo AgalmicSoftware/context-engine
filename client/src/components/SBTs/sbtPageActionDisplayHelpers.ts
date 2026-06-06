@@ -348,6 +348,7 @@ type ResolveSbtPageMiniCardDisplayStateArgs = {
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
   manualPasswordInput?: unknown;
+  mintedLabel?: unknown;
   miniButtonClassName?: unknown;
   miniMintable?: unknown;
   mintButtonClassName?: unknown;
@@ -1114,6 +1115,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
   hasGroupPasswordMint = false,
   hasInviteMint = false,
   manualPasswordInput = '',
+  mintedLabel = 'Minted',
   miniButtonClassName = '',
   miniMintable = false,
   mintButtonClassName = '',
@@ -1176,6 +1178,7 @@ export const resolveSbtPageMiniCardDisplayState = ({
     manualPasswordInput,
     miniMintActionPlan,
     mintingStatus,
+    successLabel: mintedLabel,
   });
 
   let miniTokenActionDisplayState: SbtPageMiniTokenActionDisplayState | null = null;
