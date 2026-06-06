@@ -6,11 +6,13 @@ import {
   cacheScripts,
   render,
   createSubject,
+  flattenText,
   findElementInTree,
   treeIncludesText,
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
+import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 
 describe('SBTPage session routing and holder loading', () => {
@@ -188,6 +190,181 @@ describe('SBTPage session routing and holder loading', () => {
     mintButton.props.onClick({ preventDefault: jest.fn() });
     expect(subject.handleMint).toHaveBeenCalledTimes(1);
     expect(subject.handleMint).toHaveBeenCalledWith(true);
+  });
+
+  it('opens the prior open-mint transaction instead of dispatching another mint', () => {
+    const mintTxHash = '0x1111111111111111111111111111111111111111111111111111111111111111';
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      lastMintTxHash: mintTxHash,
+      mintStep: 0,
+      mintingStatus: 'success',
+      sbtInfo: {
+        hasPasswordMint: false,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.handleMint = jest.fn();
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    const tree = subject.renderMintButton();
+    const mintButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
+
+    expect(mintButton).not.toBeNull();
+    expect(mintButton.props.title).toBe('View collect transaction');
+    mintButton.props.onClick({ preventDefault: jest.fn() });
+
+    expect(openSpy).toHaveBeenCalledWith(
+      `https://sepolia.etherscan.io/tx/${mintTxHash}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(subject.handleMint).not.toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+
+  it('routes manual claim start and finish buttons through the parent mint handler with force refresh', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      manualPasswordInput: 'claim-code',
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: {
+        hasPasswordMint: true,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.handleMint = jest.fn();
+
+    const startTree = subject.renderMintButton();
+    const startAction = findElementInTree(startTree, (node) => node?.type === SbtPageMintInputAction);
+    expect(startAction).not.toBeNull();
+    expect(startAction.props.placeholder).toBe('Claim Code');
+    expect(startAction.props.contentState.label).toBe('Start Claim');
+    startAction.props.onAction({ preventDefault: jest.fn() });
+
+    subject.state = {
+      ...subject.state,
+      mintStep: 2,
+    };
+    const finishTree = subject.renderMintButton();
+    const finishAction = findElementInTree(finishTree, (node) => node?.type === SbtPageMintInputAction);
+    expect(finishAction).not.toBeNull();
+    expect(finishAction.props.placeholder).toBe('Claim Code');
+    expect(finishAction.props.contentState.label).toBe('Finish Claim');
+    finishAction.props.onAction({ preventDefault: jest.fn() });
+
+    expect(subject.handleMint).toHaveBeenCalledTimes(2);
+    expect(subject.handleMint).toHaveBeenNthCalledWith(1, true);
+    expect(subject.handleMint).toHaveBeenNthCalledWith(2, true);
+  });
+
+  it('keeps pending manual claim disabled and inert in the full mint view', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      manualPasswordInput: 'claim-code',
+      mintStep: 0,
+      mintingStatus: 'pending',
+      sbtInfo: {
+        hasPasswordMint: true,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.handleMint = jest.fn();
+
+    const tree = subject.renderMintButton();
+    const claimAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+
+    expect(claimAction).not.toBeNull();
+    expect(claimAction.props.disabled).toBe(true);
+    expect(claimAction.props.inputValue).toBe('claim-code');
+    expect(claimAction.props.contentState).toMatchObject({
+      label: 'Start Claim',
+      shouldRenderLabel: false,
+      shouldRenderPendingIcon: true,
+    });
+
+    claimAction.props.onAction({ preventDefault: jest.fn() });
+
+    expect(subject.handleMint).not.toHaveBeenCalled();
+  });
+
+  it('renders manual claim countdown as status-only full-view content', () => {
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      claimCountdown: 12,
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      manualPasswordInput: 'claim-code',
+      mintStep: 1,
+      mintingStatus: 'idle',
+      sbtInfo: {
+        hasPasswordMint: true,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    subject.handleMint = jest.fn();
+
+    const tree = subject.renderMintButton();
+
+    expect(flattenText(tree)).toContain('Waiting period: 12 seconds');
+    expect(findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction)).toBeNull();
+    expect(findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton)).toBeNull();
+    expect(subject.handleMint).not.toHaveBeenCalled();
+  });
+
+  it('blocks open mint execution at login when no account is connected', async () => {
+    const toggleLoginModal = jest.fn();
+    const subject = createSubject({
+      account: '',
+      toggleLoginModal,
+    });
+    subject.state = {
+      ...subject.state,
+      burningStatus: 'idle',
+      hasGroupPasswordMint: false,
+      hasInviteMint: false,
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: {
+        hasPasswordMint: false,
+        mintingEndTime: 0,
+      },
+      userHasSBT: false,
+    };
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xmint' });
+
+    const result = await subject.handleMint(true);
+
+    expect(result).toBe(false);
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(claimSpy).not.toHaveBeenCalled();
   });
 
   it('keeps holders modal refresh log-driven and shows approximate counts without ownerOf fan-out', async () => {
