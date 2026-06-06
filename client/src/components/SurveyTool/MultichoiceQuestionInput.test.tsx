@@ -49,6 +49,23 @@ describe('MultichoiceQuestionInput', () => {
     expect(onChange).toHaveBeenCalledWith(['Beta']);
   });
 
+  it('does not emit value changes when disabled', () => {
+    const onChange = jest.fn();
+    render(
+      <MultichoiceQuestionInput
+        questionId="q1"
+        options={['Alpha', 'Beta']}
+        selectedValues={['Alpha']}
+        disabled
+        onChange={onChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('builds multichoice option classes', () => {
     expect(buildMultichoiceOptionClassName({
       baseClassName: 'option',
