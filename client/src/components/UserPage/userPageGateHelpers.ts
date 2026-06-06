@@ -109,6 +109,11 @@ type BuildUserPageGateAccessRequestDescriptorInput = {
   pendingKey?: unknown;
   sbtCacheRevision?: unknown;
 };
+type DispatchUserPageGateAccessCheckThroughPortInput = {
+  checkGateAccess?: UserPageGateAccessCheckPort | null;
+  requestDescriptor?: UserPageGateAccessRequestDescriptor | null;
+  sessionConfig?: Record<string, unknown> | null;
+};
 type BuildUserPageGateAccessSettlementPlanInput = {
   resultStatus?: unknown;
   previousStatus?: unknown;
@@ -156,6 +161,34 @@ export type UserPageGateAccessRequestDescriptor = {
     sessionSlug: string;
   };
 };
+export type UserPageGateAccessCheckPortRequest = {
+  account: string;
+  resourceKey: string;
+  sessionConfig?: Record<string, unknown> | null;
+  sessionSlug: string;
+};
+export type UserPageGateAccessCheckPort = (
+  request: UserPageGateAccessCheckPortRequest
+) => Promise<unknown>;
+export type UserPageGateAccessDispatchResult =
+  | {
+    action: 'skip';
+    cacheKey: string;
+    pendingKey: string;
+    promise: null;
+    reason: 'missing-descriptor' | 'missing-port';
+    requestDescriptor: UserPageGateAccessRequestDescriptor | null;
+    sponsoredAccessRequest: null;
+  }
+  | {
+    action: 'dispatch';
+    cacheKey: string;
+    pendingKey: string;
+    promise: Promise<unknown>;
+    reason: '';
+    requestDescriptor: UserPageGateAccessRequestDescriptor;
+    sponsoredAccessRequest: UserPageGateAccessCheckPortRequest;
+  };
 export type UserPageGateAccessSettlementPlan = {
   nextStatus: string;
   shouldQueueCacheRefresh: boolean;
@@ -334,6 +367,48 @@ export const buildUserPageGateAccessRequestDescriptor = ({
       resourceKey,
       sessionSlug,
     },
+  };
+};
+
+export const dispatchUserPageGateAccessCheckThroughPort = ({
+  checkGateAccess = null,
+  requestDescriptor = null,
+  sessionConfig = {},
+}: DispatchUserPageGateAccessCheckThroughPortInput = {}): UserPageGateAccessDispatchResult => {
+  if (!requestDescriptor) {
+    return {
+      action: 'skip',
+      cacheKey: '',
+      pendingKey: '',
+      promise: null,
+      reason: 'missing-descriptor',
+      requestDescriptor: null,
+      sponsoredAccessRequest: null,
+    };
+  }
+  if (typeof checkGateAccess !== 'function') {
+    return {
+      action: 'skip',
+      cacheKey: requestDescriptor.cacheKey,
+      pendingKey: requestDescriptor.pendingKey,
+      promise: null,
+      reason: 'missing-port',
+      requestDescriptor,
+      sponsoredAccessRequest: null,
+    };
+  }
+  const sponsoredAccessRequest: UserPageGateAccessCheckPortRequest = {
+    sessionConfig,
+    ...requestDescriptor.sponsoredAccessRequest,
+  };
+  return {
+    action: 'dispatch',
+    cacheKey: requestDescriptor.cacheKey,
+    pendingKey: requestDescriptor.pendingKey,
+    promise: checkGateAccess(sponsoredAccessRequest),
+    reason: '',
+    requestDescriptor,
+    sponsoredAccessRequest,
   };
 };
 
