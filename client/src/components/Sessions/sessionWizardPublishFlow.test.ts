@@ -528,6 +528,7 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(displayState).toEqual(expect.objectContaining({
       activePublishProgressStepLabel: 'Register On-chain',
+      publishStep: 4,
       publishProgressPercentRounded: Math.round(displayState.publishProgressPercent),
       publishProgressSteps: [
         { key: 'deploy-worker', label: 'Deploy Worker' },
@@ -548,6 +549,7 @@ describe('sessionWizardPublishFlow', () => {
       publishSteps: ['register-session', 'done'],
     })).toEqual({
       activePublishProgressStepLabel: 'Register On-chain',
+      publishStep: 0,
       publishProgressPercent: 0,
       publishProgressPercentRounded: 0,
       publishProgressSteps: [
