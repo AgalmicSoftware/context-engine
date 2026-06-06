@@ -103,8 +103,10 @@ import {
   normalizeSurveyResponsePayloadByQuestionId,
   pickTimestampMs,
   stableSerializeSignatureValue,
+  stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
+  type SurveyResultsStringifiedAggregator,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -351,7 +353,6 @@ type SurveyResultsQuestionFilterHandle = {
 };
 type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 type SurveyResultsAggregatorEntry = [string, unknown];
-type SurveyResultsStringifiedAggregator = Record<string, SurveyResultsRecord[]>;
 type SurveyResultsResponseCardClassNames = {
   aggregatorContainerClassName: string;
   aggregatorFreeformAnswerClassName: string;
@@ -4062,7 +4063,7 @@ getMemoizedPolisQuestionResponses = (
     return memo.result as SurveyResultsStringifiedAggregator;
   }
   const result = measureSync('ce.surveyResults.render.polisPayload', () =>
-    this.stringifyAggregatorResponses(sourceRef)
+    stringifySurveyResultsAggregatorResponses(sourceRef)
   ) as SurveyResultsStringifiedAggregator;
   this._polisQuestionResponsesMemo = {
     selected: true,
@@ -4661,25 +4662,6 @@ return (
   />
 );
 };
-
-// Add this helper inside the SurveyResults class
-stringifyAggregatorResponses = (aggregatorObj: unknown): SurveyResultsStringifiedAggregator => {
-const out: SurveyResultsStringifiedAggregator = {};
-if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
-const aggregatorRecord = aggregatorObj as Record<string, unknown>;
-Object.keys(aggregatorRecord).forEach((qId) => {
-  const arr = Array.isArray(aggregatorRecord[qId]) ? aggregatorRecord[qId] : [];
-  out[qId] = arr.map((item) => ({
-    ...(item as SurveyResultsRecord),
-    response:
-      typeof (item as SurveyResultsRecord).response === 'string'
-        ? (item as SurveyResultsRecord).response
-        : JSON.stringify((item as SurveyResultsRecord).response),
-  }));
-});
-return out;
-};
-
 
 scrollToQuestion = (questionId: unknown): void => {
 const domId = getSurveyResultsQuestionCardDomId(questionId as string | undefined);
