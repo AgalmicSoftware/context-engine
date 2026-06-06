@@ -402,6 +402,22 @@ describe('sbtPageActionDisplayHelpers', () => {
       viewKind: 'manual-password-start-input',
     });
 
+    const manualClaimSuccess = resolveSbtPageMiniCardDisplayState({
+      manualPasswordInput: 'mini-code',
+      mintedLabel: 'Collected',
+      miniMintable: true,
+      mintStep: 3,
+      sbtAddress: '0xABC',
+      sbtInfo: { hasPasswordMint: true, mintingEndTime: 0 },
+      showMiniPasswordInput: true,
+    });
+    expect(manualClaimSuccess.miniManualClaimActionRequest).toMatchObject({
+      handlerKind: 'none',
+      shouldRenderStatus: true,
+      statusText: 'Collected!',
+      viewKind: 'manual-claim-success',
+    });
+
     const tokenBurn = resolveSbtPageMiniCardDisplayState({
       account: '0xOwner',
       actionClassName: 'action',

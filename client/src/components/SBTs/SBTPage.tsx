@@ -4175,6 +4175,7 @@ renderMintButton() {
         hasGroupPasswordMint: this.state.hasGroupPasswordMint,
         hasInviteMint: this.state.hasInviteMint,
         manualPasswordInput,
+        mintedLabel: t('minted'),
         miniButtonClassName: styles.miniButton,
         miniMintable,
         mintButtonClassName: styles.mintButton,
