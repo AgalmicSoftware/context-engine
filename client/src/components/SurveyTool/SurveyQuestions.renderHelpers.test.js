@@ -742,7 +742,7 @@ describe('SurveyQuestions render helpers', () => {
     const panel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
 
     expect(panel).not.toBeNull();
-    expect(panel.props.showLockedQuestionsBanner).toBe(true);
+    expect(panel.props.displayState.showLockedQuestionsBanner).toBe(true);
     expect(panel.props.lockedQuestionsBanner).toBe(lockedBanner);
     expect(panel.props.renderedEditableQuestions).toBeNull();
     expect(subject.renderQuestion).not.toHaveBeenCalled();

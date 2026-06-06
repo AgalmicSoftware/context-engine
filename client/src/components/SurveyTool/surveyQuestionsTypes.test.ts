@@ -32,6 +32,7 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
@@ -141,6 +142,44 @@ describe('surveyQuestionsTypes', () => {
     })).toEqual({ width: '92%' });
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, true)).toBe('icon single-submit-icon');
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, false)).toBe('icon');
+  });
+
+  it('builds SurveyQuestions authoring panel display state without moving parent-owned actions', () => {
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: false,
+      questionPoolReady: true,
+      singleQuestionMode: false,
+    })).toEqual({
+      showBackToTopControl: true,
+      showJsonControl: true,
+      showLockedQuestionsBanner: true,
+    });
+
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: true,
+      questionPoolReady: true,
+      singleQuestionMode: false,
+    })).toEqual({
+      showBackToTopControl: true,
+      showJsonControl: false,
+      showLockedQuestionsBanner: false,
+    });
+
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: false,
+      questionPoolReady: true,
+      singleQuestionMode: true,
+    })).toEqual({
+      showBackToTopControl: false,
+      showJsonControl: false,
+      showLockedQuestionsBanner: true,
+    });
   });
 
   it('builds SurveyQuestions full loading progress state for scan progress', () => {
