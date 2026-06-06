@@ -115,6 +115,19 @@ export type SurveyQuestionsSubmitReadinessDescriptor = {
   uploadPhase: 'encrypting' | 'uploading';
 };
 
+export type SurveyQuestionsRenderReadinessDescriptor = {
+  surveyIndex: number;
+  currentSurveyResponseState: ResponseSlice | null;
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+  questionPoolReady: boolean;
+  gatedEmptyStateReady: boolean;
+  hasHiddenMaskedQuestions: boolean;
+  canFallThroughDisplayAnswerMode: boolean;
+  shouldShowLoadingState: boolean;
+};
+
 export type SurveyQuestionsAuthoringPanelDisplayState = {
   showBackToTopControl: boolean;
   showJsonControl: boolean;
@@ -391,6 +404,81 @@ export const buildSurveyQuestionPoolLoadState = ({
     pendingIds,
     pendingCount,
     isIncomplete: expectedIds.length > 0 && pendingCount > 0,
+  };
+};
+
+export const buildSurveyQuestionsRenderReadinessDescriptor = ({
+  displayAnswerMode = false,
+  fullQuestionPool = null,
+  hiddenMaskedQuestionIds = null,
+  isQuestionCacheReady = false,
+  isStandalone = false,
+  parsedViewAddressAnswers = null,
+  questionPool = null,
+  singleQuestionMode = false,
+  surveyIndex = 0,
+  surveysResponseState = null,
+  visibleQuestionPool = null,
+}: {
+  displayAnswerMode?: unknown;
+  fullQuestionPool?: unknown;
+  hiddenMaskedQuestionIds?: unknown;
+  isQuestionCacheReady?: unknown;
+  isStandalone?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  questionPool?: unknown;
+  singleQuestionMode?: unknown;
+  surveyIndex?: unknown;
+  surveysResponseState?: unknown;
+  visibleQuestionPool?: unknown;
+} = {}): SurveyQuestionsRenderReadinessDescriptor => {
+  const isSingleQuestion = !!singleQuestionMode;
+  const standalone = !!isStandalone;
+  const normalizedSurveyIndex = standalone || isSingleQuestion
+    ? 0
+    : Number(surveyIndex || 0);
+  const responses = Array.isArray(surveysResponseState) ? surveysResponseState : [];
+  const currentSurveyResponseState = responses.length > normalizedSurveyIndex
+    ? (responses[normalizedSurveyIndex] as ResponseSlice)
+    : null;
+  const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const normalizedFullQuestionPool = Array.isArray(fullQuestionPool)
+    ? fullQuestionPool
+    : normalizedQuestionPool;
+  const normalizedVisibleQuestionPool = Array.isArray(visibleQuestionPool)
+    ? visibleQuestionPool
+    : normalizedQuestionPool;
+  const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds)
+    ? hiddenMaskedQuestionIds.map((questionId) => String(questionId))
+    : [];
+  const questionPoolReady = normalizedQuestionPool.length > 0;
+  const canFallThroughDisplayAnswerMode = !!displayAnswerMode && !!parsedViewAddressAnswers;
+  const shouldShowLoadingState = !!(
+    (
+      !currentSurveyResponseState ||
+      (isSingleQuestion && !questionPoolReady && !displayAnswerMode) ||
+      (!isSingleQuestion && !standalone && !questionPoolReady && !displayAnswerMode)
+    ) &&
+    !canFallThroughDisplayAnswerMode
+  );
+  const gatedEmptyStateReady = !!(
+    !isSingleQuestion &&
+    normalizedFullQuestionPool.length > 0 &&
+    normalizedVisibleQuestionPool.length === 0 &&
+    isQuestionCacheReady
+  );
+
+  return {
+    surveyIndex: normalizedSurveyIndex,
+    currentSurveyResponseState,
+    fullQuestionPool: normalizedFullQuestionPool,
+    visibleQuestionPool: normalizedVisibleQuestionPool,
+    hiddenMaskedQuestionIds: normalizedHiddenMaskedQuestionIds,
+    questionPoolReady,
+    gatedEmptyStateReady,
+    hasHiddenMaskedQuestions: normalizedHiddenMaskedQuestionIds.length > 0,
+    canFallThroughDisplayAnswerMode,
+    shouldShowLoadingState,
   };
 };
 
