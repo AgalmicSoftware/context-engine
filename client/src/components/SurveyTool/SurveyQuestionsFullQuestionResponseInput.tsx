@@ -5,7 +5,11 @@ import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import { buildSurveyQuestionsFullQuestionResponseInputDescriptor } from './surveyQuestionsFullQuestionResponseInputState';
+import {
+  buildSurveyQuestionsFullQuestionResponseInputActionDescriptor,
+  buildSurveyQuestionsFullQuestionResponseInputDescriptor,
+  shouldDispatchSurveyQuestionsFullQuestionResponseInputAction,
+} from './surveyQuestionsFullQuestionResponseInputState';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -56,6 +60,71 @@ const SurveyQuestionsFullQuestionResponseInput = ({
     singleQuestionMode,
   });
 
+  const emitAnswerChange = (nextValue: unknown, event?: unknown) => {
+    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'answer-change',
+      nextValue,
+      event,
+    });
+    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
+    if (action.kind !== 'answer-change') return;
+    if (action.event === undefined) {
+      onAnswerChange?.(action.nextValue);
+    } else {
+      onAnswerChange?.(action.nextValue, action.event);
+    }
+  };
+
+  const emitRatingChange = (nextValue: number, event?: unknown) => {
+    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'rating-change',
+      nextValue,
+      event,
+    });
+    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
+    if (action.kind !== 'rating-change') return;
+    onRatingChange?.(action.nextValue, action.event);
+  };
+
+  const emitDeferredRatingCommit = (nextValue: number) => {
+    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'rating-commit',
+      nextValue,
+    });
+    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
+    if (action.kind !== 'rating-commit') return;
+    onDeferredRatingCommit?.(action.nextValue);
+  };
+
+  const emitRatingChangeComplete = (event?: unknown) => {
+    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'rating-change-complete',
+      event,
+    });
+    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
+    if (action.kind !== 'rating-change-complete') return;
+    if (action.event === undefined) {
+      onRatingChangeComplete?.();
+    } else {
+      onRatingChangeComplete?.(action.event);
+    }
+  };
+
+  const emitAnswerEncryptionToggle = (nextEncryptedState: boolean) => {
+    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
+      inputDescriptor,
+      kind: 'answer-encryption-toggle',
+      nextEncryptedState,
+    });
+    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
+    if (action.kind !== 'answer-encryption-toggle') return;
+    onToggleAnswerEncryption?.(action.nextEncryptedState);
+  };
+
   switch (inputDescriptor.kind) {
     case 'multichoice': {
       return (
@@ -65,7 +134,7 @@ const SurveyQuestionsFullQuestionResponseInput = ({
           selectedValues={inputDescriptor.selectedValues}
           isSingleSelect={inputDescriptor.isSingleSelect}
           disabled={inputDescriptor.disabled}
-          onChange={(newAnswer) => onAnswerChange?.(newAnswer)}
+          onChange={emitAnswerChange}
         />
       );
     }
@@ -74,14 +143,14 @@ const SurveyQuestionsFullQuestionResponseInput = ({
         <DeferredRatingSlider
           value={inputDescriptor.ratingValue}
           disabled={inputDescriptor.disabled}
-          onCommit={onDeferredRatingCommit}
+          onCommit={emitDeferredRatingCommit}
         />
       ) : (
         <FullQuestionRatingInput
           value={inputDescriptor.ratingValue}
           disabled={inputDescriptor.disabled}
-          onChange={onRatingChange}
-          onChangeComplete={onRatingChangeComplete}
+          onChange={emitRatingChange}
+          onChangeComplete={emitRatingChangeComplete}
         />
       );
     }
@@ -90,7 +159,7 @@ const SurveyQuestionsFullQuestionResponseInput = ({
         <BinaryChoiceInput
           questionId={inputDescriptor.questionId}
           value={inputDescriptor.value}
-          onChange={(option) => onAnswerChange?.(option)}
+          onChange={emitAnswerChange}
           disabled={inputDescriptor.disabled}
           showIcons
         />
@@ -101,8 +170,8 @@ const SurveyQuestionsFullQuestionResponseInput = ({
           qIndex={inputDescriptor.qIndex}
           {...audioInputWorkerProps}
           placeholder={inputDescriptor.placeholder}
-          updateFunction={(nextAnswerValue: unknown) => onAnswerChange?.(nextAnswerValue)}
-          toggleEncryption={(nextEncryptedState: boolean) => onToggleAnswerEncryption?.(nextEncryptedState)}
+          updateFunction={emitAnswerChange}
+          toggleEncryption={emitAnswerEncryptionToggle}
           value={inputDescriptor.value}
           encrypted={inputDescriptor.encrypted}
           dataTestId={inputDescriptor.dataTestId}
