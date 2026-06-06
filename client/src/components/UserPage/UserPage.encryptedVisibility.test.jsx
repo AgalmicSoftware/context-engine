@@ -477,6 +477,12 @@ describe('UserPage encrypted response visibility', () => {
 
     instance._refreshAllDataFromCache({ force: true, markLoading: true });
 
+    expect(instance.state.questionResponseInfo).toHaveLength(1);
+    expect(instance.state.questionResponseInfo[0].canDecryptOtherResponses).toBe(true);
+    expect(instance.state.questionCreationInfo).toHaveLength(1);
+    expect(instance.state.loadingQuestions).toBe(false);
+    expect(instance.state.hasUncertainGateAccess).toBe(false);
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
     expect(checkSponsoredAccess).toHaveBeenCalled();
     const requestedResources = checkSponsoredAccess.mock.calls.map(([arg]) => arg?.resourceKey);
     expect(requestedResources).toEqual(expect.arrayContaining(['questionResponses', 'default']));
