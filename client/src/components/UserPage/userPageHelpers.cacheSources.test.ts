@@ -5,6 +5,7 @@ import {
   buildUserPageResponseSectionDeriveSignature,
   buildUserPageSbtSectionDeriveSignature,
   buildUserPageUnifiedCacheAggregateMemoKey,
+  buildUserPageUnifiedCacheAggregateMemoPlan,
   readUserPageCacheSourcePresence,
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
@@ -162,6 +163,35 @@ describe('userPageHelpers cache source helpers', () => {
     })).toBe('0xabc|84532|2|3|surveys|questions');
 
     expect(buildUserPageUnifiedCacheAggregateMemoKey()).toBe('||0|0|');
+
+    const aggregate = { combinedQuestions: { q1: { id: 'q1' } } };
+    expect(buildUserPageUnifiedCacheAggregateMemoPlan({
+      currentAggregateMemo: aggregate,
+      currentAggregateMemoKey: '0xabc|84532|2|3|surveys|questions',
+      networkID: 84532,
+      questionResponsesNonce: 2,
+      sbtCacheRevision: 3,
+      sourceMembershipSignature: 'surveys|questions',
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      aggregate,
+      aggregateMemoKey: '0xabc|84532|2|3|surveys|questions',
+      canReuseAggregate: true,
+    });
+
+    expect(buildUserPageUnifiedCacheAggregateMemoPlan({
+      currentAggregateMemo: aggregate,
+      currentAggregateMemoKey: 'old-key',
+      networkID: 84532,
+      questionResponsesNonce: 2,
+      sbtCacheRevision: 4,
+      sourceMembershipSignature: 'surveys|questions',
+      viewAddressLower: '0xabc',
+    })).toEqual({
+      aggregate: null,
+      aggregateMemoKey: '0xabc|84532|2|4|surveys|questions',
+      canReuseAggregate: false,
+    });
 
     expect(buildUserPageResponseSectionDeriveSignature({
       account: ' 0xABC ',

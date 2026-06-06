@@ -530,6 +530,11 @@ export type UserPageCacheRefreshRequestDescriptor = {
   hasSbtSources: boolean;
   hasSurveySources: boolean;
 };
+export type UserPageUnifiedCacheAggregateMemoPlan = {
+  aggregateMemoKey: string;
+  aggregate: unknown;
+  canReuseAggregate: boolean;
+};
 type UserPageResponseNonceRefreshDecision = {
   isOwnProfile: boolean;
   options: UserPageResponseNonceRefreshOptions;
@@ -568,6 +573,11 @@ type BuildUserPageUnifiedCacheAggregateMemoKeyArgs = {
   sourceMembershipSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageUnifiedCacheAggregateMemoPlanArgs =
+  BuildUserPageUnifiedCacheAggregateMemoKeyArgs & {
+    currentAggregateMemo?: unknown;
+    currentAggregateMemoKey?: unknown;
+  };
 type BuildUserPageResponseSectionDeriveSignatureArgs = {
   account?: unknown;
   networkID?: unknown;
@@ -843,6 +853,33 @@ export const buildUserPageUnifiedCacheAggregateMemoKey = ({
     String(sourceMembershipSignature || ''),
   ].join('|')
 );
+
+export const buildUserPageUnifiedCacheAggregateMemoPlan = ({
+  currentAggregateMemo = null,
+  currentAggregateMemoKey = '',
+  networkID = '',
+  questionResponsesNonce = 0,
+  sbtCacheRevision = 0,
+  sourceMembershipSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageUnifiedCacheAggregateMemoPlanArgs = {}): UserPageUnifiedCacheAggregateMemoPlan => {
+  const aggregateMemoKey = buildUserPageUnifiedCacheAggregateMemoKey({
+    networkID,
+    questionResponsesNonce,
+    sbtCacheRevision,
+    sourceMembershipSignature,
+    viewAddressLower,
+  });
+  const canReuseAggregate = !!(
+    currentAggregateMemo &&
+    String(currentAggregateMemoKey || '') === aggregateMemoKey
+  );
+  return {
+    aggregate: canReuseAggregate ? currentAggregateMemo : null,
+    aggregateMemoKey,
+    canReuseAggregate,
+  };
+};
 
 export const buildUserPageResponseSectionDeriveSignature = ({
   viewAddressLower = '',
