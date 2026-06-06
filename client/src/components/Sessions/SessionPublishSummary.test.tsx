@@ -27,6 +27,7 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
   },
   publishProgressDisplayState: {
     activePublishProgressStepLabel: '',
+    publishStep: 0,
     publishProgressPercent: 0,
     publishProgressPercentRounded: 0,
     publishProgressSteps: [],
@@ -69,7 +70,6 @@ const buildProps = (
   localWorkerBundleFallbackFilePath: '',
   sponsoredManualBundleRetryMessage: '',
   publishUiPlan: buildPublishUiPlan(),
-  publishStep: 0,
   renderInfoTooltip: () => null,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
@@ -171,6 +171,7 @@ describe('SessionPublishSummary', () => {
           publishUiPlan: buildPublishUiPlan({
             publishProgressDisplayState: {
               activePublishProgressStepLabel: 'Upload Arweave',
+              publishStep: 2,
               publishProgressPercent: 42.4,
               publishProgressPercentRounded: 42,
               publishProgressSteps: [
@@ -181,7 +182,6 @@ describe('SessionPublishSummary', () => {
               showPublishProgress: true,
             },
           }),
-          publishStep: 2,
         })}
       />
     );
@@ -221,6 +221,7 @@ describe('SessionPublishSummary', () => {
             },
             publishProgressDisplayState: {
               activePublishProgressStepLabel: 'Done',
+              publishStep: 3,
               publishProgressPercent: 100,
               publishProgressPercentRounded: 100,
               publishProgressSteps: [
@@ -231,7 +232,6 @@ describe('SessionPublishSummary', () => {
               showPublishProgress: true,
             },
           }),
-          publishStep: 3,
           registerExplorerBaseUrl: 'https://optimism-sepolia.blockscout.com',
           registerTxs: [
             { action: 'createSession', hash: '0xregister1' },

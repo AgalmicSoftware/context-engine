@@ -115,7 +115,6 @@ const SessionWizardShell = ({
   provider,
   publishAdvancedOpen,
   publishBusy,
-  publishStep,
   publishUiPlan,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
@@ -364,7 +363,6 @@ const SessionWizardShell = ({
         localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
         sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
         publishUiPlan={publishUiPlan}
-        publishStep={publishStep}
         renderInfoTooltip={renderSessionWizardInfoTooltip}
         resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
         workerUrlSource={workerUrlSource}

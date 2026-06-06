@@ -455,6 +455,7 @@ export type SessionWizardPublishProgressStep = {
 
 export type SessionWizardPublishProgressDisplayState = {
   activePublishProgressStepLabel: string;
+  publishStep: number;
   publishProgressPercent: number;
   publishProgressPercentRounded: number;
   publishProgressSteps: SessionWizardPublishProgressStep[];
@@ -503,11 +504,12 @@ export const resolveSessionWizardPublishProgressDisplayState = ({
     publishSteps,
     sbtsLabel,
   });
+  const currentPublishStep = Math.max(0, Number(publishStep || 0));
   const activePublishProgressStep = publishProgressSteps[
-    Math.max(0, Math.min((publishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
+    Math.max(0, Math.min((currentPublishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
   ] || publishProgressSteps[0] || null;
   const publishProgressPercent = getSessionWizardPublishProgressPercent({
-    publishStep,
+    publishStep: currentPublishStep,
     publishBusy,
     totalSteps: publishProgressSteps.length,
     elapsedMs,
@@ -515,9 +517,10 @@ export const resolveSessionWizardPublishProgressDisplayState = ({
 
   return {
     activePublishProgressStepLabel: activePublishProgressStep?.label || 'Preparing',
+    publishStep: currentPublishStep,
     publishProgressPercent,
     publishProgressPercentRounded: Math.round(publishProgressPercent),
     publishProgressSteps,
-    showPublishProgress: !!publishBusy || Number(publishStep || 0) > 0,
+    showPublishProgress: !!publishBusy || currentPublishStep > 0,
   };
 };
