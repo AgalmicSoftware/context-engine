@@ -124,7 +124,6 @@ import {
 } from './SurveyResultsPanels';
 import {
   isSurveyResultsStateSynced,
-  type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
 import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
@@ -1107,10 +1106,6 @@ class SurveyResults extends Component<any, any> {
     this._surveysCacheChangeNonce += 1;
   };
 
-  getIsSyncedForState = (stateSnapshot: SurveyResultsSyncStateLike = this.state): boolean => (
-    isSurveyResultsStateSynced(stateSnapshot)
-  );
-
   /**
    * Resolve the effective session slug for cache + RPC calls.
    * Priority: explicit sessionSlug → Redux active slug → cache scan → general ('').
@@ -1617,8 +1612,8 @@ class SurveyResults extends Component<any, any> {
       pendingStatePatch[key] = value;
       hasPendingStatePatch = true;
     };
-    const wasSynced = this.getIsSyncedForState(prevState);
-    const isSyncedNow = this.getIsSyncedForState(this.state);
+    const wasSynced = isSurveyResultsStateSynced(prevState);
+    const isSyncedNow = isSurveyResultsStateSynced(this.state);
     if (!wasSynced && isSyncedNow) {
       this._syncLoadingStartedAt = null;
     } else if (!isSyncedNow && this._syncLoadingStartedAt === null) {
@@ -1668,7 +1663,7 @@ class SurveyResults extends Component<any, any> {
       queueStatePatch('demoResultsViewMode', 'raw');
       queueStatePatch('demoResultsAtlasNodeId', null);
       // Reset then re-seed sync timer if currently loading
-      const isSyncedOnOpen = this.getIsSyncedForState(this.state);
+      const isSyncedOnOpen = isSurveyResultsStateSynced(this.state);
       this._syncLoadingStartedAt = isSyncedOnOpen ? null : Date.now();
       this.updateLocalStoragePollingState();
       // Re-open should re-emit current filter state so URL/query filter sync is restored.
