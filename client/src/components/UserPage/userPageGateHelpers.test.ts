@@ -13,6 +13,7 @@ import {
   buildUserPageQuestionResponseSourceDescriptor,
   buildUserPageResponseDecryptSurveyBindings,
   buildUserPageSurveyResponseSourceDescriptor,
+  dispatchUserPageGateAccessCheckThroughPort,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
@@ -194,6 +195,103 @@ describe('userPageGateHelpers', () => {
         sessionSlug: 'beta',
       },
     });
+  });
+
+  it('dispatches gate access checks through an injected port without owning settlement', async () => {
+    const sessionConfig = { slug: 'edge', sponsoredKeys: { questionResponses: { encrypted: true } } };
+    const requestDescriptor = buildUserPageGateAccessRequestDescriptor({
+      account: ' 0xABC ',
+      networkID: 84532,
+      pendingKey: ' Edge:: questionResponses ',
+      sbtCacheRevision: 7,
+    });
+    const gateResult = { status: 'granted', resourceKey: 'questionResponses' };
+    const checkGateAccess = jest.fn(() => Promise.resolve(gateResult));
+
+    const dispatchResult = dispatchUserPageGateAccessCheckThroughPort({
+      checkGateAccess,
+      requestDescriptor,
+      sessionConfig,
+    });
+
+    expect(dispatchResult.action).toBe('dispatch');
+    expect(dispatchResult.cacheKey).toBe('0xabc|84532|7|edge|questionResponses');
+    expect(dispatchResult.pendingKey).toBe('edge::questionResponses');
+    expect(dispatchResult.requestDescriptor).toBe(requestDescriptor);
+    expect(dispatchResult.sponsoredAccessRequest).toEqual({
+      account: '0xABC',
+      resourceKey: 'questionResponses',
+      sessionConfig,
+      sessionSlug: 'edge',
+    });
+    expect(checkGateAccess).toHaveBeenCalledTimes(1);
+    expect(checkGateAccess).toHaveBeenCalledWith(dispatchResult.sponsoredAccessRequest);
+    await expect(dispatchResult.promise).resolves.toBe(gateResult);
+    expect(Object.keys(dispatchResult).sort()).toEqual([
+      'action',
+      'cacheKey',
+      'pendingKey',
+      'promise',
+      'reason',
+      'requestDescriptor',
+      'sponsoredAccessRequest',
+    ]);
+  });
+
+  it('skips gate access dispatch without a descriptor or injected port', () => {
+    const requestDescriptor = buildUserPageGateAccessRequestDescriptor({
+      account: '0xABC',
+      networkID: 84532,
+      pendingKey: 'edge::questionResponses',
+      sbtCacheRevision: 7,
+    });
+    const checkGateAccess = jest.fn();
+
+    expect(dispatchUserPageGateAccessCheckThroughPort({
+      checkGateAccess,
+      requestDescriptor: null,
+    })).toEqual({
+      action: 'skip',
+      cacheKey: '',
+      pendingKey: '',
+      promise: null,
+      reason: 'missing-descriptor',
+      requestDescriptor: null,
+      sponsoredAccessRequest: null,
+    });
+    expect(dispatchUserPageGateAccessCheckThroughPort({
+      requestDescriptor,
+    })).toEqual({
+      action: 'skip',
+      cacheKey: '0xabc|84532|7|edge|questionResponses',
+      pendingKey: 'edge::questionResponses',
+      promise: null,
+      reason: 'missing-port',
+      requestDescriptor,
+      sponsoredAccessRequest: null,
+    });
+    expect(checkGateAccess).not.toHaveBeenCalled();
+  });
+
+  it('returns rejected gate access port promises without catching side effects', async () => {
+    const requestDescriptor = buildUserPageGateAccessRequestDescriptor({
+      account: '0xABC',
+      networkID: 84532,
+      pendingKey: 'edge::questionResponses',
+      sbtCacheRevision: 7,
+    });
+    const error = new Error('gate unavailable');
+    const checkGateAccess = jest.fn(() => Promise.reject(error));
+
+    const dispatchResult = dispatchUserPageGateAccessCheckThroughPort({
+      checkGateAccess,
+      requestDescriptor,
+      sessionConfig: {},
+    });
+
+    expect(dispatchResult.action).toBe('dispatch');
+    expect(checkGateAccess).toHaveBeenCalledTimes(1);
+    await expect(dispatchResult.promise).rejects.toBe(error);
   });
 
   it('plans gate-access result settlement without scheduling timers or cache refreshes', () => {

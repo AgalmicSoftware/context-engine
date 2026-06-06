@@ -116,6 +116,7 @@ import {
   readBoolishUserPageTelemetryFlag,
   readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheThroughPort,
+  dispatchUserPageGateAccessCheckThroughPort,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
   resolveUserPageAnalysisModalDisplayState,
@@ -1751,10 +1752,13 @@ class UserPage extends Component<any, any> {
           this.queueCacheRefresh({ markLoading: false });
         }
       };
-      tracked = (checkSponsoredAccess({
+      const dispatchResult = dispatchUserPageGateAccessCheckThroughPort({
+        checkGateAccess: checkSponsoredAccess,
+        requestDescriptor,
         sessionConfig: cfg,
-        ...requestDescriptor.sponsoredAccessRequest,
-      }) as Promise<SponsoredAccessResult>)
+      });
+      if (dispatchResult.action !== 'dispatch') return;
+      tracked = (dispatchResult.promise as Promise<SponsoredAccessResult>)
         .then((result: SponsoredAccessResult) => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
           settleGateAccessStatus(result?.status);
