@@ -20,6 +20,11 @@ const CLOUDFLARE_WORKER_GATE_CONFIG = {
 };
 
 const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
+const fixedGetRandomValues = (target) => {
+  target.set(fixedRandomBytes());
+  return target;
+};
+const shortRandomBytes = () => Uint8Array.from({ length: 31 }, (_, index) => index + 1);
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
   status,
@@ -375,6 +380,109 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 
   assert.equal(readResponse.status, 200);
   assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Aliased KV storage works', ok: true });
+});
+
+test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question from Web Crypto entropy?', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      getRandomValues: fixedGetRandomValues,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  const uploadBody = await readJson(uploadResponse);
+  assert.equal(uploadResponse.status, 200);
+  assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+  assert.equal(uploadBody.storageRef.id, CF_ID);
+  assert.equal(kv.store.has(`ce-storage-payload:session-a:${CF_ID}`), true);
+});
+
+test('storageRoute fails closed when Cloudflare storage ref entropy is unavailable', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question without entropy?', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      getRandomValues: null,
+    },
+  });
+
+  const body = await readJson(uploadResponse);
+  assert.equal(uploadResponse.status, 500);
+  assert.match(body.error, /Secure randomness is required/);
+  assert.equal(r2.store.size, 0);
+  assert.equal(kv.store.size, 0);
+});
+
+test('storageRoute rejects short injected Cloudflare storage ref entropy without Web Crypto fallback', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { prompt: 'Question with short entropy?', ok: true },
+        contentType: 'application/json',
+        resource: 'questions',
+      }),
+    }),
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: shortRandomBytes,
+      getRandomValues: null,
+    },
+  });
+
+  const body = await readJson(uploadResponse);
+  assert.equal(uploadResponse.status, 500);
+  assert.match(body.error, /Secure randomness is required/);
+  assert.equal(r2.store.size, 0);
+  assert.equal(kv.store.size, 0);
 });
 
 test('storageRoute reads Cloudflare list resource from POST JSON body', async () => {

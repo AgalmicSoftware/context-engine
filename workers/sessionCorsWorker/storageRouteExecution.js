@@ -43,30 +43,20 @@ const bytesToBase64url = (bytes) => {
   bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
-const fillDeterministicBytes = (seed) => {
-  const source = encoder.encode(trim(seed) || `ts-${Date.now()}-${Math.random()}`);
+const buildCloudflareStorageId = ({ randomBytes, getRandomValues: getRandomValuesDep } = {}) => {
   const bytes = new Uint8Array(32);
-  for (let index = 0; index < bytes.length; index += 1) {
-    bytes[index] = source[index % source.length] ^ ((index * 31) & 0xff);
-  }
-  return bytes;
-};
-const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: getRandomValuesDep, now = Date.now } = {}) => {
-  const bytes = new Uint8Array(32);
-  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes() : null;
+  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes(32) : null;
   const getRandomValues = typeof getRandomValuesDep === 'function'
     ? getRandomValuesDep
+    : getRandomValuesDep === null
+      ? null
     : globalThis?.crypto?.getRandomValues?.bind(globalThis.crypto);
   if (suppliedBytes && suppliedBytes.length >= 32) {
     bytes.set(new Uint8Array(suppliedBytes).slice(0, 32));
   } else if (typeof getRandomValues === 'function') {
     getRandomValues(bytes);
   } else {
-    bytes.set(fillDeterministicBytes(
-      typeof randomUUID === 'function'
-        ? randomUUID()
-        : `ts-${now()}-${Math.random().toString(36).slice(2)}`
-    ));
+    throw new Error('Secure randomness is required for Cloudflare storage references.');
   }
   // Contract pointer fields are bytes32. Keeping Cloudflare refs to the same
   // 32-byte base64url shape lets existing bytes32 helpers round-trip the id
@@ -379,12 +369,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
 
-  const id = buildCloudflareStorageId({
-    randomBytes: deps?.randomBytes,
-    randomUUID: deps?.randomUUID,
-    getRandomValues: deps?.getRandomValues,
-    now: deps?.now,
-  });
+  let id = '';
+  try {
+    id = buildCloudflareStorageId({
+      randomBytes: deps?.randomBytes,
+      getRandomValues: deps?.getRandomValues,
+    });
+  } catch {
+    return responseJson(deps, { error: 'Secure randomness is required for Cloudflare storage references.' }, 500, baseHeaders);
+  }
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }
