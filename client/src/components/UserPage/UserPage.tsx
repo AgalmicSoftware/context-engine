@@ -10,9 +10,9 @@ import {
   buildUserPageAnalysisCacheEntry,
   buildUserPageAnalysisCacheWritePayload,
   buildUserPageCacheRefreshOptions,
+  buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
   buildUserPageRefreshTelemetrySnapshot,
-  buildUserPageCacheSourcePresence,
   buildUserPageAnalysisCreatedQuestions,
   buildUserPageAnalysisCreatedSurveys,
   buildUserPageAnalysisCandidateLogRows,
@@ -31,9 +31,7 @@ import {
   buildUserPageBookmarkToggleStatePatch,
   buildUserPageAiSessionScopeContext,
   buildUserPageBooleanTogglePatch,
-  buildUserPageCacheRefreshInputSignature,
   buildUserPageCacheRefreshStatePatch,
-  buildUserPageCacheLoadingHoldFlags,
   buildUserPageCopiedStatePatch,
   buildUserPageDeepScanReportSignature,
   buildUserPageDeepScanReportStatus,
@@ -332,15 +330,6 @@ type GateAccessKeyInput = {
 type GateAccessStatusEntry = {
   status: string;
   ts: number;
-};
-
-type CacheRefreshInputSignatureInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  hasSurveySources?: unknown;
-  hasQuestionSources?: unknown;
-  hasSbtSources?: unknown;
-  sourceMembershipSignature?: unknown;
 };
 
 type SponsoredAccessResult = {
@@ -1763,39 +1752,6 @@ class UserPage extends Component<any, any> {
     this._responseGateAccessStatusByKey.set(key, { status: nextStatus, ts: nowTs });
   };
 
-  _buildCacheRefreshInputSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    hasSurveySources = false,
-    hasQuestionSources = false,
-    hasSbtSources = false,
-    sourceMembershipSignature = '',
-  }: CacheRefreshInputSignatureInput = {}): string => {
-    const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
-      ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
-      : 0;
-    return buildUserPageCacheRefreshInputSignature({
-      account: this.props.account,
-      gateRecheckEpoch,
-      hasQuestionSources,
-      hasSbtSources,
-      hasSurveySources,
-      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
-      hasUncertainUserData: this.state.hasUncertainUserData,
-      isQuestionCacheReady: this.props.isQuestionCacheReady,
-      isResponsesCacheReady: this.props.isResponsesCacheReady,
-      isSBTCacheReady: this.props.isSBTCacheReady,
-      isSurveyCacheReady: this.props.isSurveyCacheReady,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceMembershipSignature,
-      viewAddressLower,
-    });
-  };
-
   _resetResponseGateAccess = (): void => {
     this._responseGateAccessGeneration += 1;
     this._responseGateAccessStatusVersion += 1;
@@ -2553,50 +2509,51 @@ class UserPage extends Component<any, any> {
       return;
     }
 
-    const viewAddressLower = String(viewAddress || '').toLowerCase();
     const surveysReady = !!this.props.isSurveyCacheReady;
     const questionsReady = !!this.props.isQuestionCacheReady;
     const responsesReady = !!this.props.isResponsesCacheReady;
     const sbtReady = !!this.props.isSBTCacheReady;
 
     const sourceSnapshot = this._readCacheSourceSnapshot();
-    const sourcePresence = buildUserPageCacheSourcePresence(sourceSnapshot);
-    const hasSurveySources = sourceSnapshot.hasSurveySources;
-    const hasQuestionSources = sourceSnapshot.hasQuestionSources;
-    const hasSbtSources = sourceSnapshot.hasSbtSources;
-
-    const refreshInputSignature = this._buildCacheRefreshInputSignature({
-      viewAddressLower,
+    const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
+      ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
+      : 0;
+    const cacheRefreshDescriptor = buildUserPageCacheRefreshRequestDescriptor({
+      account: this.props.account,
+      bypassSignature,
+      currentInputSignature: this._lastCacheRefreshInputSignature,
+      force,
+      gateRecheckEpoch,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      isSurveyCacheReady: this.props.isSurveyCacheReady,
+      markLoading,
       networkID,
-      hasSurveySources,
-      hasQuestionSources,
-      hasSbtSources,
-      sourceMembershipSignature: sourceSnapshot.membershipSignature,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      responseGateAccessGeneration: this._responseGateAccessGeneration,
+      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sourceSnapshot,
+      viewAddress,
     });
-    if (
-      !force &&
-      !markLoading &&
-      !bypassSignature &&
-      refreshInputSignature === this._lastCacheRefreshInputSignature
-    ) {
+    if (cacheRefreshDescriptor.action === 'skip-same-signature') {
       return;
     }
-    this._lastCacheRefreshInputSignature = refreshInputSignature;
+    this._lastCacheRefreshInputSignature = cacheRefreshDescriptor.refreshInputSignature;
 
     const {
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
       holdQuestionLoading,
       holdSbtLoading,
       holdSurveyLoading,
-    } = buildUserPageCacheLoadingHoldFlags({
-      force,
-      hasQuestionSources,
-      hasSbtSources,
-      hasSurveySources,
-      questionsReady,
-      responsesReady,
-      sbtReady,
-      surveysReady,
-    });
+      sourcePresence,
+      viewAddressLower,
+    } = cacheRefreshDescriptor;
 
     this.emitProfileColdDiag('refresh', {
       viewAddress: viewAddressLower,

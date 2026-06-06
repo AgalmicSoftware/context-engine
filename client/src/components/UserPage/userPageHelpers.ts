@@ -489,6 +489,14 @@ type BuildUserPageCacheRefreshInputSignatureArgs = {
   sourceMembershipSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageCacheRefreshRequestDescriptorArgs = BuildUserPageCacheRefreshInputSignatureArgs & {
+  bypassSignature?: unknown;
+  currentInputSignature?: unknown;
+  force?: unknown;
+  markLoading?: unknown;
+  sourceSnapshot?: unknown;
+  viewAddress?: unknown;
+};
 type BuildUserPageCacheLoadingHoldFlagsArgs = {
   force?: unknown;
   hasQuestionSources?: unknown;
@@ -503,6 +511,20 @@ type UserPageQueuedCacheRefreshFlags = {
   bypassSignature: boolean;
   force: boolean;
   markLoading: boolean;
+};
+export type UserPageCacheRefreshRequestDescriptor = {
+  action: 'missing-address' | 'skip-same-signature' | 'refresh';
+  force: boolean;
+  markLoading: boolean;
+  bypassSignature: boolean;
+  networkID: string;
+  refreshInputSignature: string;
+  sourcePresence: UserPageCacheSourcePresence;
+  viewAddressLower: string;
+} & UserPageCacheLoadingHoldFlags & {
+  hasQuestionSources: boolean;
+  hasSbtSources: boolean;
+  hasSurveySources: boolean;
 };
 type UserPageResponseNonceRefreshDecision = {
   isOwnProfile: boolean;
@@ -1000,6 +1022,94 @@ export const buildUserPageCacheRefreshInputSignature = ({
     String(responseGateAccessStatusVersion || 0),
     String(gateRecheckEpoch || 0),
   ].join('|');
+};
+
+export const buildUserPageCacheRefreshRequestDescriptor = ({
+  account = '',
+  bypassSignature = false,
+  currentInputSignature = '',
+  force = false,
+  gateRecheckEpoch = 0,
+  hasUncertainGateAccess = false,
+  hasUncertainUserData = false,
+  isQuestionCacheReady = false,
+  isResponsesCacheReady = false,
+  isSBTCacheReady = false,
+  isSurveyCacheReady = false,
+  markLoading = false,
+  networkID = '',
+  questionResponsesNonce = 0,
+  responseGateAccessGeneration = 0,
+  responseGateAccessStatusVersion = 0,
+  sbtCacheRevision = 0,
+  sourceSnapshot = null,
+  viewAddress = '',
+}: BuildUserPageCacheRefreshRequestDescriptorArgs = {}): UserPageCacheRefreshRequestDescriptor => {
+  const resolvedForce = !!force;
+  const resolvedMarkLoading = !!markLoading;
+  const resolvedBypassSignature = !!bypassSignature;
+  const viewAddressLower = String(viewAddress || '').toLowerCase();
+  const snapshot = toAnalysisRecord(sourceSnapshot);
+  const sourcePresence = buildUserPageCacheSourcePresence(snapshot);
+  const hasSurveySources = !!snapshot.hasSurveySources;
+  const hasQuestionSources = !!snapshot.hasQuestionSources;
+  const hasSbtSources = !!snapshot.hasSbtSources;
+  const refreshInputSignature = viewAddressLower
+    ? buildUserPageCacheRefreshInputSignature({
+      account,
+      gateRecheckEpoch,
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
+      hasUncertainGateAccess,
+      hasUncertainUserData,
+      isQuestionCacheReady,
+      isResponsesCacheReady,
+      isSBTCacheReady,
+      isSurveyCacheReady,
+      networkID,
+      questionResponsesNonce,
+      responseGateAccessGeneration,
+      responseGateAccessStatusVersion,
+      sbtCacheRevision,
+      sourceMembershipSignature: snapshot.membershipSignature,
+      viewAddressLower,
+    })
+    : '';
+  const holdFlags = buildUserPageCacheLoadingHoldFlags({
+    force: resolvedForce,
+    hasQuestionSources,
+    hasSbtSources,
+    hasSurveySources,
+    questionsReady: isQuestionCacheReady,
+    responsesReady: isResponsesCacheReady,
+    sbtReady: isSBTCacheReady,
+    surveysReady: isSurveyCacheReady,
+  });
+  const shouldSkipSameSignature = (
+    !resolvedForce &&
+    !resolvedMarkLoading &&
+    !resolvedBypassSignature &&
+    refreshInputSignature === String(currentInputSignature || '')
+  );
+  return {
+    action: !viewAddressLower
+      ? 'missing-address'
+      : shouldSkipSameSignature
+        ? 'skip-same-signature'
+        : 'refresh',
+    bypassSignature: resolvedBypassSignature,
+    force: resolvedForce,
+    hasQuestionSources,
+    hasSbtSources,
+    hasSurveySources,
+    ...holdFlags,
+    markLoading: resolvedMarkLoading,
+    networkID: String(networkID || ''),
+    refreshInputSignature,
+    sourcePresence,
+    viewAddressLower,
+  };
 };
 
 export const buildUserPageCacheLoadingHoldFlags = ({

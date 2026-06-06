@@ -7,6 +7,7 @@ import {
   buildUserPageAnalysisFingerprint,
   buildUserPageAnalysisCacheWritePayload,
   buildUserPageCacheRefreshOptions,
+  buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
   buildUserPageRefreshTelemetrySnapshot,
   buildUserPageAnalysisCreatedQuestions,
@@ -210,6 +211,73 @@ const makeRow = (overrides: Partial<UserPageDeepScanProgressRow> = {}): UserPage
 });
 
 describe('userPageCacheHelpers', () => {
+  it('describes cache-refresh requests without reading cache data or applying state', () => {
+    const sourceSnapshot = buildUserPageCacheSourceSnapshot({
+      hasQuestionsCache: true,
+      hasSbtCache: false,
+      hasSurveysCache: false,
+      hasUserCache: true,
+      questionsNamespaceSignature: 'questions:alpha',
+      sbtNamespaceSignature: '',
+      surveysNamespaceSignature: '',
+      userNamespaceSignature: 'user:general',
+    });
+    const requestInput = {
+      account: ' 0xABC ',
+      force: false,
+      gateRecheckEpoch: 3,
+      hasUncertainGateAccess: true,
+      hasUncertainUserData: false,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: false,
+      isSBTCacheReady: false,
+      isSurveyCacheReady: false,
+      markLoading: false,
+      networkID: 84532,
+      questionResponsesNonce: 9,
+      responseGateAccessGeneration: 4,
+      responseGateAccessStatusVersion: 5,
+      sbtCacheRevision: 6,
+      sourceSnapshot,
+      viewAddress: '0xUSER',
+    };
+    const descriptor = buildUserPageCacheRefreshRequestDescriptor(requestInput);
+
+    expect(descriptor).toEqual({
+      action: 'refresh',
+      bypassSignature: false,
+      force: false,
+      hasQuestionSources: true,
+      hasSbtSources: true,
+      hasSurveySources: true,
+      holdQuestionLoading: false,
+      holdSbtLoading: false,
+      holdSurveyLoading: false,
+      markLoading: false,
+      networkID: '84532',
+      refreshInputSignature: '0xuser|84532|0xabc|0100|111|||questions:alpha||||user:general|9|6|0|1|4|5|3',
+      sourcePresence: {
+        hasQuestionsCache: true,
+        hasSbtCache: false,
+        hasSurveysCache: false,
+        hasUserCache: true,
+      },
+      viewAddressLower: '0xuser',
+    });
+    expect(buildUserPageCacheRefreshRequestDescriptor({
+      ...requestInput,
+      currentInputSignature: descriptor.refreshInputSignature,
+    }).action).toBe('skip-same-signature');
+    expect(buildUserPageCacheRefreshRequestDescriptor({
+      sourceSnapshot,
+      viewAddress: '',
+    })).toMatchObject({
+      action: 'missing-address',
+      refreshInputSignature: '',
+      viewAddressLower: '',
+    });
+  });
+
   it('reads user-page ownership count maps for viewer ownership signals', () => {
     const entry = {
       countsLoaded: false,
