@@ -4,6 +4,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
+  shouldUploadMetadata?: boolean;
   stepNumbers?: Record<string, number>;
 };
 
@@ -104,6 +105,18 @@ export type SessionWizardRegisterStepControllerResult = {
   registerResult: AnyRecord | null;
 };
 
+export type SessionWizardPublishMetadataUploadRequestInput = {
+  publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
+  workerUrlOverride?: string;
+  signerAccountOverride?: string;
+};
+
+export type SessionWizardPublishMetadataUploadRequest = {
+  shouldUploadMetadata: boolean;
+  publishStep: number;
+  uploadArgs: SessionWizardPublishDeployPendingSbtsArgs;
+};
+
 const getPublishStepNumber = (
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike,
   stepKey: string
@@ -172,6 +185,19 @@ export const runSessionWizardPublishController = async ({
     deployedPendingDrafts,
   };
 };
+
+export const resolveSessionWizardPublishMetadataUploadRequest = ({
+  publishExecutionPlan,
+  workerUrlOverride = '',
+  signerAccountOverride = '',
+}: SessionWizardPublishMetadataUploadRequestInput): SessionWizardPublishMetadataUploadRequest => ({
+  shouldUploadMetadata: !!publishExecutionPlan.shouldUploadMetadata,
+  publishStep: getPublishStepNumber(publishExecutionPlan, 'upload-metadata'),
+  uploadArgs: {
+    workerUrlOverride: toStr(workerUrlOverride),
+    signerAccountOverride: toStr(signerAccountOverride),
+  },
+});
 
 export const runSessionWizardRegisterStepController = async ({
   input,
