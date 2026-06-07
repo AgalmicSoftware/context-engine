@@ -26,6 +26,7 @@ import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualRespo
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import SurveyResultsSyncDetailsDisplay, {
   SurveyResultsSyncTrackRow,
 } from './SurveyResultsSyncDetailsDisplay';
@@ -43,6 +44,7 @@ type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
 const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
   SurveyResultsQuestionListPanel,
   SurveyResultsSyncDetailsDisplay,
   SurveyResultsSyncTrackRow,
@@ -169,6 +171,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
