@@ -1,9 +1,8 @@
 import React from 'react';
 
-import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRouteSection';
 import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
-import SurveyQuestionsResponseRouteSection from './SurveyQuestionsResponseRouteSection';
+import SurveyQuestionsRouteBodySection from './SurveyQuestionsRouteBodySection';
 import SurveyQuestionsTagModalSlot from './SurveyQuestionsTagModalSlot';
 import SurveyQuestionsTopRouteSection from './SurveyQuestionsTopRouteSection';
 import type {
@@ -163,20 +162,16 @@ const SurveyQuestionsRouteSurface = ({
         topStripProps={topStripProps}
       />
 
-      {viewingAnswers ? (
-        <SurveyQuestionsResponseRouteSection
-          layoutDisplayState={layoutDisplayState}
-          responseViewProps={responseViewProps}
-          routeViewDisplayState={routeViewDisplayState}
-        />
-      ) : (
-        <SurveyQuestionsAuthoringRouteSection
-          authoringPanelProps={authoringPanelProps}
-          submittedResponseViewProps={submittedResponseViewProps}
-          submitDisplayState={submitDisplayState}
-          submitFooterProps={submitFooterProps}
-        />
-      )}
+      <SurveyQuestionsRouteBodySection
+        authoringPanelProps={authoringPanelProps}
+        layoutDisplayState={layoutDisplayState}
+        responseViewProps={responseViewProps}
+        routeViewDisplayState={routeViewDisplayState}
+        submittedResponseViewProps={submittedResponseViewProps}
+        submitDisplayState={submitDisplayState}
+        submitFooterProps={submitFooterProps}
+        viewingAnswers={viewingAnswers}
+      />
 
       <SurveyQuestionsJsonRouteSection
         bottomRef={jsonControlsProps.bottomRef}
