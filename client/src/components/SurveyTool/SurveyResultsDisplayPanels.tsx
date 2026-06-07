@@ -18,7 +18,7 @@ type SurveyResultsResponseListEntry = SurveyResultsRecord & {
   surveyId?: unknown;
 };
 
-type SurveyResultsDisplayPanelsArgs = {
+export type SurveyResultsDisplayPanelsArgs = {
   account?: string;
   activeQuestionToggles?: SurveyResultsRecord;
   activeToggles?: SurveyResultsRecord;

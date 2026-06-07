@@ -18,23 +18,16 @@ export type SurveyResultsReportSurfaceDisplayPlan = {
   isDemoAlternateResultsView?: boolean;
 };
 
-export type SurveyResultsReportSurfaceDisplayProps = {
-  demoSurfaceProps?: SurveyResultsDemoSurfaceProps | null;
+export type SurveyResultsReportSurfaceProps = {
   displayPanelsProps: SurveyResultsDisplayPanelsArgs;
   htmlReportModalProps: SurveyResultsHtmlReportExportModalProps;
   isOpen?: boolean;
   modalHeaderProps: Omit<SurveyResultsModalHeaderProps, 'onClose'>;
+  onCloseResultsModal: () => void;
   reportSurfaceDisplayPlan?: SurveyResultsReportSurfaceDisplayPlan;
   styleMap: Record<string, string>;
+  demoSurfaceProps?: SurveyResultsDemoSurfaceProps | null;
 };
-
-export type SurveyResultsReportSurfaceExecutionProps = {
-  onCloseResultsModal: () => void;
-};
-
-export type SurveyResultsReportSurfaceProps =
-  SurveyResultsReportSurfaceDisplayProps &
-  SurveyResultsReportSurfaceExecutionProps;
 
 const SurveyResultsReportSurface = ({
   demoSurfaceProps = null,
