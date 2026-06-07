@@ -2,7 +2,7 @@ import React from 'react';
 
 import TagModal from '../TagPage/TagModal';
 import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
-import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
+import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
 import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
@@ -257,8 +257,8 @@ const SurveyQuestionsRouteSurface = ({
         />
       )}
 
-      <SurveyQuestionsJsonControls
-        ref={jsonControlsProps.bottomRef}
+      <SurveyQuestionsJsonRouteSection
+        bottomRef={jsonControlsProps.bottomRef}
         copiedQuestionsJson={jsonControlsProps.copiedQuestionsJson}
         copiedResponseJson={jsonControlsProps.copiedResponseJson}
         copiedSurveyJson={jsonControlsProps.copiedSurveyJson}
