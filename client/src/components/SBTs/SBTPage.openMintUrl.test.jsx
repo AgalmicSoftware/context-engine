@@ -1,9 +1,14 @@
 import SBTPage from './SBTPage';
+import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import { ethers } from 'ethers';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SbtPageAdminSection,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -37,6 +42,12 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {

@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import SBTPage from './SBTPage';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
@@ -10,6 +11,10 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
 
 const mockIsCryptoMode = jest.fn(() => true);
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SbtPageMoreDetailsSection,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -43,6 +48,12 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -64,6 +75,12 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
+    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+      if (!resolvedTreeComponentCache.has(node)) {
+        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+      }
+      return treeIncludesText(resolvedTreeComponentCache.get(node), text);
+    }
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
