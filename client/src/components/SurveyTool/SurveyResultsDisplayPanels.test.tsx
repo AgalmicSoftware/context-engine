@@ -2,6 +2,7 @@ import React from 'react';
 
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
+import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
@@ -11,6 +12,7 @@ import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 const RESOLVABLE_COMPONENTS = new Set([
+  SurveyResultsIndividualResponseBody,
   SurveyResultsQuestionListPanel,
   SurveyResultsQuestionSummariesPanel,
 ]);
@@ -367,9 +369,9 @@ describe('SurveyResultsDisplayPanels', () => {
     });
     const individualList = findFirstNodeByType(tree, SurveyResultsIndividualResponsesList);
     const responseBody = individualList.props.renderResponseBody(individualList.props.responses[0], 0);
+    const emptyMessage = findFirstNodeByType(responseBody, 'p');
 
-    expect(responseBody.type).toBe('p');
-    expect(responseBody.props.children).toBe('No question-level responses found for this user.');
+    expect(emptyMessage?.props?.children).toBe('No question-level responses found for this user.');
     expect(getLockedResponseKey).not.toHaveBeenCalled();
     expect(applyDecryptedOverrideToResponse).not.toHaveBeenCalled();
     expect(getResponseCardProps).not.toHaveBeenCalled();
