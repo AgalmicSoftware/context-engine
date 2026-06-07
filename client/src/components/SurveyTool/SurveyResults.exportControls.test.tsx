@@ -675,6 +675,63 @@ describe('SurveyResults export/view controls', () => {
     expect(snapshot.sections.atlas.available).toBe(true);
   });
 
+  it('routes the enabled report download control to parent-owned report execution', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Download Route Session',
+      sessionSlug: 'download-route',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+    subject.downloadHtmlReport = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+
+    subject.state = {
+      ...subject.state,
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Can the parent own report execution?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+
+    render(
+      <MemoryRouter>
+        {subject.renderHtmlReportExportModal()}
+      </MemoryRouter>
+    );
+
+    const downloadButton = screen.getByTestId('ce-surveyresults-html-report-download');
+    expect(downloadButton).not.toBeDisabled();
+
+    fireEvent.click(downloadButton);
+
+    expect(subject.downloadHtmlReport).toHaveBeenCalledTimes(1);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+  });
+
   it('builds a redacted HTML report snapshot from hydrated SurveyResults state', () => {
     const subject = createSubject({
       viewMode: 'questions',
