@@ -38,25 +38,40 @@ describe('SessionPublishActionControls', () => {
   });
 
   it('keeps publish disabled while busy or not ready', () => {
+    const onPublish = jest.fn();
+    const onTogglePublishAdvanced = jest.fn();
     const { rerender } = render(
       <SessionPublishActionControls
         {...buildProps({
+          onPublish,
+          onTogglePublishAdvanced,
           publishBusy: true,
         })}
       />
     );
 
-    expect(screen.getByRole('button', { name: /Publishing/i })).toBeDisabled();
+    const busyPublishButton = screen.getByRole('button', { name: /Publishing/i });
+    expect(busyPublishButton).toBeDisabled();
+    fireEvent.click(busyPublishButton);
+    expect(onPublish).not.toHaveBeenCalled();
 
     rerender(
       <SessionPublishActionControls
         {...buildProps({
+          onPublish,
+          onTogglePublishAdvanced,
           canPublishNow: false,
         })}
       />
     );
 
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).toBeDisabled();
+    const blockedPublishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+    expect(blockedPublishButton).toBeDisabled();
+    fireEvent.click(blockedPublishButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Advanced publish settings' }));
+
+    expect(onPublish).not.toHaveBeenCalled();
+    expect(onTogglePublishAdvanced).toHaveBeenCalledTimes(1);
   });
 
   it('routes advanced settings separately from publish execution', () => {
