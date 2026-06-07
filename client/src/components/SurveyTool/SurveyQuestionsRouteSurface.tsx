@@ -5,7 +5,7 @@ import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRout
 import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsResponseRouteSection from './SurveyQuestionsResponseRouteSection';
-import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
+import SurveyQuestionsTopRouteSection from './SurveyQuestionsTopRouteSection';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
   SurveyQuestionsFullLoadingProgressState,
@@ -154,39 +154,15 @@ const SurveyQuestionsRouteSurface = ({
     );
   }
 
-  const topStripLayoutDisplayState = {
-    topSectionClassName: layoutDisplayState.topSectionClassName,
-  };
-  const topStripRouteViewDisplayState = {
-    isOwnResponse: routeViewDisplayState.isOwnResponse,
-    isSingleQuestionView: routeViewDisplayState.isSingleQuestionView,
-    showViewAnswersButton: routeViewDisplayState.showViewAnswersButton,
-    viewAnswersButtonText: routeViewDisplayState.viewAnswersButtonText || '',
-  };
-  const topStripSubmitDisplayState = {
-    submittedStateActive: !!submitDisplayState.submittedStateActive,
-  };
-
   const activeTagModalTag = layoutDisplayState.activeTagModalTag || null;
 
   return (
     <div className={layoutDisplayState.surveyPageClassName}>
-      <SurveyQuestionsTopStrip
-        ref={topStripProps.topRef}
-        displayAnswerMode={topStripProps.displayAnswerMode}
-        isDecrypting={topStripProps.isDecrypting}
-        isEditing={topStripProps.isEditing}
-        isSubmitting={topStripProps.isSubmitting}
-        layoutDisplayState={topStripLayoutDisplayState}
-        onDecryptEdit={topStripProps.onDecryptEdit || noop}
-        onExitEditing={topStripProps.onExitEditing || noop}
-        onStartFresh={topStripProps.onStartFresh || noop}
-        onToggleDisplayAnswerMode={topStripProps.onToggleDisplayAnswerMode || noop}
-        responseUrl={topStripProps.responseUrl}
-        routeViewDisplayState={topStripRouteViewDisplayState}
-        submitDisplayState={topStripSubmitDisplayState}
-        userHasResponse={topStripProps.userHasResponse}
-        userResponseEncrypted={topStripProps.userResponseEncrypted}
+      <SurveyQuestionsTopRouteSection
+        layoutDisplayState={layoutDisplayState}
+        routeViewDisplayState={routeViewDisplayState}
+        submitDisplayState={submitDisplayState}
+        topStripProps={topStripProps}
       />
 
       {viewingAnswers ? (
