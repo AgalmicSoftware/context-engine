@@ -4,12 +4,10 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
   faCaretUp,
-  faCog,
-  faSpinner,
-  faUpload,
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
+import SessionPublishActionControls from './SessionPublishActionControls';
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
@@ -151,62 +149,24 @@ const SessionPublishSummary = ({
                 </div>
               ))}
             </div>
-            <div className={styles.publishActionCluster}>
-              <Button
-                onClick={onPublish}
-                className={styles.publishPrimaryButton}
-                data-testid={E2E_TESTIDS.WIZARD_PUBLISH}
-                disabled={publishBusy || !canPublishNow}
-              >
-                {publishBusy ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin /> Publishing…
-                  </>
-                ) : (
-                  <>
-                    <FontAwesomeIcon icon={faUpload} /> Deploy Session
-                  </>
-                )}
-              </Button>
-              <button
-                type="button"
-                className={`${styles.publishSettingsButton} ${publishAdvancedOpen ? styles.publishSettingsButtonActive : ''}`}
-                onClick={onTogglePublishAdvanced}
-                title="Advanced publish settings"
-                aria-label="Advanced publish settings"
-              >
-                <FontAwesomeIcon icon={faCog} />
-              </button>
-            </div>
+            <SessionPublishActionControls
+              canPublishNow={canPublishNow}
+              isNormalMode
+              onPublish={onPublish}
+              onTogglePublishAdvanced={onTogglePublishAdvanced}
+              publishAdvancedOpen={publishAdvancedOpen}
+              publishBusy={publishBusy}
+            />
           </div>
         ) : (
-          <div className={styles.publishRow}>
-            <Button
-              onClick={onPublish}
-              className={styles.primaryButton}
-              data-testid={E2E_TESTIDS.WIZARD_PUBLISH}
-              disabled={publishBusy || !canPublishNow}
-            >
-              {publishBusy ? (
-                <>
-                  <FontAwesomeIcon icon={faSpinner} spin /> Publishing…
-                </>
-              ) : (
-                <>
-                  <FontAwesomeIcon icon={faUpload} /> Publish
-                </>
-              )}
-            </Button>
-            <button
-              type="button"
-              className={`${styles.iconButton} ${publishAdvancedOpen ? styles.iconButtonActive : ''}`}
-              onClick={onTogglePublishAdvanced}
-              title="Advanced publish settings"
-              aria-label="Advanced publish settings"
-            >
-              <FontAwesomeIcon icon={faCog} />
-            </button>
-          </div>
+          <SessionPublishActionControls
+            canPublishNow={canPublishNow}
+            isNormalMode={false}
+            onPublish={onPublish}
+            onTogglePublishAdvanced={onTogglePublishAdvanced}
+            publishAdvancedOpen={publishAdvancedOpen}
+            publishBusy={publishBusy}
+          />
         )}
 
         {showSponsoredBundleFallbackInput ? (
