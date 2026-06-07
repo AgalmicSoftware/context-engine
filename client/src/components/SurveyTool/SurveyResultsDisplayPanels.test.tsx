@@ -344,4 +344,102 @@ describe('SurveyResultsDisplayPanels', () => {
     expect(getResponseCardProps).toHaveBeenCalledTimes(1);
     expect(onToggleResponse).not.toHaveBeenCalled();
   });
+
+  it('renders the empty individual response body without key or response-card work', () => {
+    const applyDecryptedOverrideToResponse = jest.fn(({ response }) => response);
+    const getLockedResponseKey = jest.fn(() => 'unused-key');
+    const getResponseCardProps = jest.fn(() => ({
+      containerClassName: 'response-card',
+      bodyClassName: 'response-body',
+    }));
+    const tree = renderSurveyResultsDisplayPanels({
+      ...baseProps,
+      applyDecryptedOverrideToResponse,
+      getLockedResponseKey,
+      getResponseCardProps,
+      responses: [{
+        responder: '0xEMPTY',
+        surveyId: 'survey-1',
+        response: { notResponses: true },
+      }],
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    });
+    const individualList = findFirstNodeByType(tree, SurveyResultsIndividualResponsesList);
+    const responseBody = individualList.props.renderResponseBody(individualList.props.responses[0], 0);
+
+    expect(responseBody.type).toBe('p');
+    expect(responseBody.props.children).toBe('No question-level responses found for this user.');
+    expect(getLockedResponseKey).not.toHaveBeenCalled();
+    expect(applyDecryptedOverrideToResponse).not.toHaveBeenCalled();
+    expect(getResponseCardProps).not.toHaveBeenCalled();
+  });
+
+  it('preserves still-locked response metadata while falling back to the current survey id', () => {
+    const lockedAnswer = {
+      questionId: 'q-locked',
+      answer: {
+        encrypted: true,
+        hash: 'answer-hash',
+        value: '[locked]',
+      },
+      additional: {
+        encrypted: true,
+        hash: 'additional-hash',
+        value: '[locked note]',
+      },
+    };
+    const applyDecryptedOverrideToResponse = jest.fn(({ response }) => response);
+    const getLockedResponseKey = jest.fn(() => 'locked-response-key');
+    const tree = renderSurveyResultsDisplayPanels({
+      ...baseProps,
+      account: '0xowner',
+      applyDecryptedOverrideToResponse,
+      currentSurveyId: 'survey-current',
+      getLockedResponseKey,
+      preNetworkQuestions: {
+        'q-locked': {
+          id: 'q-locked',
+          prompt: 'Locked question',
+          sessionSlug: 'locked-session',
+          type: 'freeform',
+        },
+      },
+      responses: [{
+        responder: '0xOTHER',
+        response: {
+          responses: [lockedAnswer],
+        },
+      }],
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    });
+    const individualList = findFirstNodeByType(tree, SurveyResultsIndividualResponsesList);
+    const responseBody = individualList.props.renderResponseBody(individualList.props.responses[0], 0);
+    const responseCard = findFirstNodeByType(responseBody, SingleQuestionResponse);
+
+    expect(responseCard?.props?.question.prompt).toBe('Locked question');
+    expect(responseCard?.props?.response.answer).toEqual({
+      encrypted: true,
+      hash: 'answer-hash',
+      value: '[locked]',
+    });
+    expect(responseCard?.props?.response.additional).toEqual({
+      encrypted: true,
+      hash: 'additional-hash',
+      value: '[locked note]',
+    });
+    expect(responseCard?.props?.isOwnResponse).toBe(false);
+    expect(responseCard?.props?.activeSessionSlug).toBe('locked-session');
+    expect(getLockedResponseKey).toHaveBeenCalledWith({
+      responder: '0xOTHER',
+      questionId: 'q-locked',
+      surveyId: 'survey-current',
+      response: lockedAnswer,
+    });
+    expect(applyDecryptedOverrideToResponse).toHaveBeenCalledWith({
+      response: lockedAnswer,
+      key: 'locked-response-key',
+    });
+  });
 });
