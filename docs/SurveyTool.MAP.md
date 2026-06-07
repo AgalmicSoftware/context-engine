@@ -49,7 +49,8 @@
   - `SurveyResultsQuestionListCard.tsx`: **56 lines**
   - `SurveyResultsExportControls.tsx`: **97 lines**
   - `SurveyResultsFilterExportControls.tsx`: **196 lines**
-  - `SurveyResultsHtmlReportExportModal.tsx`: **282 lines**
+  - `SurveyResultsHtmlReportExportModal.tsx`: **271 lines**
+  - `SurveyResultsHtmlReportActionControls.tsx`: **48 lines**
   - `surveyResultsHtmlReportDownloadRequest.ts`: **56 lines**
   - `surveyResultsExportController.ts`: **125 lines**
   - `surveyResultsExportDisplayHelpers.ts`: **555 lines**
@@ -162,6 +163,7 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyResultsExportControls.tsx  [export dropdown/button presentation]
         -> SurveyResultsFilterExportControls.tsx  [filter/export control strip presentation]
         -> SurveyResultsHtmlReportExportModal.tsx  [HTML report export modal presentation]
+           -> SurveyResultsHtmlReportActionControls.tsx  [HTML report close/download action controls]
         -> surveyResultsExportController.ts  [export generation/download plan orchestration]
         -> surveyResultsExportDisplayHelpers.ts  [export labels/readiness plans and demo analysis artifact composition]
         -> surveyResultsHtmlReportDownloadRequest.ts  [HTML/PDF report download request identity]
@@ -228,7 +230,8 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyResultsQuestionTableRow.tsx` | Question result table row presentation | Renders question row links, prompt/type/count cells, bookmark icon state, and View action wiring from explicit props while leaving row derivation, sorting state, bookmark mutation, and scroll/view behavior in `SurveyResults` |
 | `SurveyResultsExportControls.tsx` | Export controls presentation | Renders export area collapse, type dropdown, and download button from explicit props while leaving export type state in `SurveyResults` and export execution in `surveyResultsExportController.ts` |
 | `SurveyResultsFilterExportControls.tsx` | Filter/export control strip presentation | Renders SBT filtering, question filtering, and export controls from explicit props while leaving filter state mutation, storage-key derivation, SBT/question filter handlers, export payload generation, and download execution in `SurveyResults` |
-| `SurveyResultsHtmlReportExportModal.tsx` | HTML report export modal presentation | Renders export-format selection, section availability, demo-mode toggle, analysis-generation affordance, and download/cancel controls from explicit display props and named execution callback props while leaving snapshot construction, AI generation, export rendering, and browser download execution in `SurveyResults` |
+| `SurveyResultsHtmlReportExportModal.tsx` | HTML report export modal presentation | Renders export-format selection, section availability, demo-mode toggle, analysis-generation affordance, and delegates close/download controls to `SurveyResultsHtmlReportActionControls.tsx` from explicit display props and named execution callback props while leaving snapshot construction, AI generation, export rendering, and browser download execution in `SurveyResults` |
+| `SurveyResultsHtmlReportActionControls.tsx` | HTML report action controls | Renders the Cancel and Download buttons from explicit readiness/label props while forwarding only the parent-owned close and report-download callbacks; it does not render reports, capture DOM/PDF, download files, generate analysis, read/write cache, or mutate state |
 | `surveyResultsExportController.ts` | Results export orchestration | Runs export generation/download plans, invokes injected content generators and browser download ports, and maps invalid/empty export alerts without owning export payload generation, route, cache, fetch, or decrypt behavior |
 | `surveyResultsExportDisplayHelpers.ts` | Results export display, report readiness/settlement, and demo analysis artifact planning | Builds export labels, generation/download descriptors, control display descriptors, HTML report section availability/readiness plans, blocked/ready download attempt descriptors, success/failure patch descriptors, and demo analysis artifacts from parent-provided analysis payloads/timestamps without owning AI generation, cache reads/writes, artifact persistence, render execution, PDF/HTML generation, browser download, route, or state application |
 | `surveyResultsHtmlReportDownloadRequest.ts` | HTML/PDF report download request identity | Builds pure filename, export kind, and render-option descriptors from parent-built snapshots, selected sections, and format without rendering HTML, capturing DOM/PDF output, downloading files, generating analysis, reading/writing cache, or mutating state |
