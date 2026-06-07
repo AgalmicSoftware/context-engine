@@ -1,10 +1,8 @@
 import React from 'react';
 
+import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
-import {
-  renderSurveyResultsFilterSummary,
-} from './SurveyResultsPanels';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
@@ -131,13 +129,13 @@ export const renderSurveyResultsDisplayPanels = ({
       viewMode={viewMode}
     />
 
-    {renderSurveyResultsFilterSummary({
-      displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount ?? 0,
-      displayedTotalResponsesCount: filterSummaryDisplay.displayedTotalResponsesCount ?? 0,
-      normalizedFilteredQuestionsCount: filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0,
-      normalizedFilteredResponsesCount: filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0,
-      showFilteredCountSpinner: !!filterSummaryDisplay.showFilteredCountSpinner,
-    })}
+    <SurveyResultsFilterSummary
+      displayedTotalQuestionsCount={filterSummaryDisplay.displayedTotalQuestionsCount ?? 0}
+      displayedTotalResponsesCount={filterSummaryDisplay.displayedTotalResponsesCount ?? 0}
+      normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
+      normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
+      showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
+    />
 
     {filterControlsNode}
 
