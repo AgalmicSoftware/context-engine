@@ -5,9 +5,11 @@ import {
   faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import SbtPageActionFeedbackDisplay from './SbtPageActionFeedbackDisplay';
+import {
+  resolveSbtPageActionFeedbackDisplayDescriptor,
+} from './sbtPageActionFeedbackDisplayState';
 
 type SbtPageActionFeedbackState = {
   showBurnSuccess?: boolean;
@@ -77,17 +79,19 @@ const SbtPageActionsSection = ({
     shouldRenderClosedIcon = false,
     shouldRenderOpenIcon = false,
   } = toggleState;
-  const {
-    lastBurnTxHash = '',
-    lastMintTxHash = '',
-    transactionHash = '',
-  } = transactionState;
-  const burnSuccessHref = actionFeedbackState.showBurnSuccess ? getExplorerLink(lastBurnTxHash) : '';
-  const burnSuccessText = actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : '';
-  const mintSuccessHref = actionFeedbackState.showMintSuccess ? getExplorerLink(lastMintTxHash) : '';
-  const mintSuccessText = actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : '';
-  const transactionErrorHref = actionFeedbackState.showErrorTransactionHash ? getExplorerLink(transactionHash) : '';
-  const transactionErrorText = actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : '';
+  const feedbackDisplayDescriptor = resolveSbtPageActionFeedbackDisplayDescriptor({
+    actionFeedbackState,
+    errorMessage,
+    getExplorerLink,
+    labels: {
+      burnLabel,
+      burnedLowerLabel,
+      mintLabel,
+      mintedLowerLabel,
+      sbtLabel,
+    },
+    transactionState,
+  });
 
   return (
     <div className={styles.actionsSection}>
@@ -101,37 +105,12 @@ const SbtPageActionsSection = ({
           {mintButton}
           {burnButton}
           <SbtPageActionFeedbackDisplay
-            burnSuccess={{
-              message: `${sbtLabel} successfully ${burnedLowerLabel}!`,
-              show: actionFeedbackState.showBurnSuccess,
-              txLabel: `${burnLabel} Tx Hash:`,
-              txLink: {
-                href: burnSuccessHref,
-                text: burnSuccessText,
-              },
-            }}
+            burnSuccess={feedbackDisplayDescriptor.burnSuccess}
             copyErrorButtonStyle={copyErrorButtonStyle}
             errorCopyIconState={errorCopyIconState}
-            mintSuccess={{
-              message: `${sbtLabel} successfully ${mintedLowerLabel}!`,
-              show: actionFeedbackState.showMintSuccess,
-              txLabel: `${mintLabel} Tx Hash:`,
-              txLink: {
-                href: mintSuccessHref,
-                text: mintSuccessText,
-              },
-            }}
+            mintSuccess={feedbackDisplayDescriptor.mintSuccess}
             onCopyError={onCopyError}
-            transactionError={{
-              errorMessage,
-              show: actionFeedbackState.showTransactionError,
-              txLink: actionFeedbackState.showErrorTransactionHash
-                ? {
-                    href: transactionErrorHref,
-                    text: transactionErrorText,
-                  }
-                : null,
-            }}
+            transactionError={feedbackDisplayDescriptor.transactionError}
           />
         </div>
       )}
