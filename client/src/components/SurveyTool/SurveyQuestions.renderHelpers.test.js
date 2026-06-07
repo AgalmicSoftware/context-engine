@@ -7,13 +7,11 @@ import GatedPromptNotice from './GatedPromptNotice';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
-import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -68,6 +66,8 @@ const findFirstNodeByType = (node, targetType) => {
   if (node?.type === targetType) return node;
   return findFirstNodeByType(node?.props?.children, targetType);
 };
+
+const findRouteSurface = (node) => findFirstNodeByType(node, SurveyQuestionsRouteSurface);
 
 const nodeHasClassName = (node, className) => {
   const value = node?.props?.className;
@@ -532,10 +532,11 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+    const surface = findRouteSurface(tree);
+    const controls = surface?.props?.jsonControlsProps;
 
     expect(controls).not.toBeNull();
-    expect(controls.props.responseJson).toEqual({
+    expect(controls.responseJson).toEqual({
       message: 'No response found for survey from address: 0xdef',
     });
     expect(subject.getResponseJson).not.toHaveBeenCalled();
@@ -573,17 +574,18 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+    const surface = findRouteSurface(tree);
+    const controls = surface?.props?.jsonControlsProps;
 
     expect(controls).not.toBeNull();
-    expect(controls.props.jsonPanelDisplayState.showSurveyJsonPanel).toBe(true);
-    expect(controls.props.jsonPanelDisplayState.showResponseJsonPanel).toBe(false);
-    expect(controls.props.surveyJson).toBe(surveyJson);
-    expect(controls.props.responseJson).toBeNull();
+    expect(controls.jsonPanelDisplayState.showSurveyJsonPanel).toBe(true);
+    expect(controls.jsonPanelDisplayState.showResponseJsonPanel).toBe(false);
+    expect(controls.surveyJson).toBe(surveyJson);
+    expect(controls.responseJson).toBeNull();
     expect(subject.getSurveyJson).toHaveBeenCalledTimes(1);
     expect(subject.getResponseJson).not.toHaveBeenCalled();
 
-    controls.props.onCopySurveyJson();
+    controls.onCopySurveyJson();
 
     expect(subject.copyJsonToClipboard).toHaveBeenCalledWith(surveyJson, 'survey');
   });
@@ -616,13 +618,11 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const authoringPanel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
-    const footer = findFirstNodeByType(authoringPanel?.props?.submitResponseButton, SurveyQuestionsSubmitFooter);
+    const surface = findRouteSurface(tree);
 
-    expect(authoringPanel).not.toBeNull();
-    expect(footer).not.toBeNull();
-    expect(footer.props.pendingEditCount).toBe(2);
-    expect(footer.props.displayState.uploadStatusText).toBe('Encrypting...');
+    expect(surface).not.toBeNull();
+    expect(surface.props.submitFooterProps.pendingEditCount).toBe(2);
+    expect(surface.props.submitDisplayState.uploadStatusText).toBe('Encrypting...');
   });
 
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
@@ -805,12 +805,13 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const panel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
+    const surface = findRouteSurface(tree);
+    const authoringPanelProps = surface?.props?.authoringPanelProps;
 
-    expect(panel).not.toBeNull();
-    expect(panel.props.displayState.showLockedQuestionsBanner).toBe(true);
-    expect(panel.props.lockedQuestionsBanner).toBe(lockedBanner);
-    expect(panel.props.renderedEditableQuestions).toBeNull();
+    expect(surface).not.toBeNull();
+    expect(authoringPanelProps.displayState.showLockedQuestionsBanner).toBe(true);
+    expect(authoringPanelProps.lockedQuestionsBanner).toBe(lockedBanner);
+    expect(authoringPanelProps.renderedEditableQuestions).toBeNull();
     expect(subject.renderQuestion).not.toHaveBeenCalled();
     expect(subject.getMemoizedLockedQuestionGateDetails).toHaveBeenCalledWith(['q-locked']);
     expect(subject.renderLockedQuestionsPanel).toHaveBeenCalledWith({

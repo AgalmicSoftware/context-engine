@@ -25,7 +25,6 @@ import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
-import TagModal from '../TagPage/TagModal';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import GatedPromptNotice from './GatedPromptNotice';
 import QuestionDecryptControl from './QuestionDecryptControl';
@@ -36,17 +35,11 @@ import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionC
 import { renderSurveyQuestionsFullQuestionGatedPromptCard } from './SurveyQuestionsFullQuestionGatedPromptCard';
 import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
-import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
-import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
-import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
-import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
-import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
-import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -8157,7 +8150,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     if (renderReadiness.shouldShowLoadingState) {
       return (
-        <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
+        <SurveyQuestionsRouteSurface
+          renderReadiness={renderReadiness}
+          loadingProgressState={fullLoadingProgress}
+        />
       );
     }
 
@@ -8220,19 +8216,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       userHasResponse: this.state.userHasResponse,
     });
 
-    const submitResponseButton = (
-      <SurveyQuestionsSubmitFooter
-        displayState={submitFooterDisplayState}
-        isSingleQuestionView={isSingleQuestionView}
-        isSubmitting={this.state.isSubmitting}
-        onPrimarySubmitClick={this.handlePrimarySubmitClick}
-        onRevertPendingChanges={this.handleRevertPendingChanges}
-        pendingEditCount={submitReadiness.pendingEditCount}
-        responseUrl={this.state.responseUrl}
-        submitButtonText={submitButtonText}
-        submissionError={this.state.submissionError}
-      />
-    );
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
       jsonPreview,
@@ -8276,7 +8259,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       styleMap: styles,
       viewingAnswers,
     });
-    const { activeTagModalTag, surveyPageClassName, useTagModal } = layoutDisplayState;
     const hasRenderedEditableQuestions =
       canEditQuestions &&
       questionPoolReady &&
@@ -8294,100 +8276,96 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
-    const submittedResponseView = (
-      <SurveyQuestionsSubmittedResponseView
-        isOwnResponse={isOwnResponse}
-        isVisible={
-          !viewingAnswers &&
-          this.state.userHasResponse &&
-          !this.state.startFresh &&
-          !this.state.isEditing
-        }
-        questionPool={this.state.questionPool}
-        questionPoolReady={questionPoolReady}
-        renderQuestionAnswer={this.renderQuestionAnswer}
-        renderSurveyAnswers={this.renderSurveyAnswers}
-        singleQuestionMode={this.props.singleQuestionMode}
-        userAnswers={this.state.userAnswers}
-      />
-    );
 
     return (
-      <div className={surveyPageClassName}>
-        <SurveyQuestionsTopStrip
-          ref={this.topRef}
-          displayAnswerMode={this.state.displayAnswerMode}
-          isDecrypting={this.state.isDecrypting}
-          isEditing={this.state.isEditing}
-          isSubmitting={this.state.isSubmitting}
-          layoutDisplayState={layoutDisplayState}
-          onDecryptEdit={this.handleDecryptEdit}
-          onExitEditing={this.handleExitEditing}
-          onStartFresh={this.handleStartFresh}
-          onToggleDisplayAnswerMode={this.toggleDisplayAnswerMode}
-          responseUrl={this.state.responseUrl}
-          routeViewDisplayState={routeViewDisplayState}
-          submitDisplayState={submitFooterDisplayState}
-          userHasResponse={this.state.userHasResponse}
-          userResponseEncrypted={this.state.userResponseEncrypted}
-        />
-
-        {viewingAnswers ? (
-          <SurveyQuestionsResponseView
-            isLoadingResponse={this.state.isLoadingResponse}
-            layoutDisplayState={layoutDisplayState}
-            noResponse={this.state.noResponse}
-            parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
-            questionPool={this.state.questionPool}
-            questionPoolReady={questionPoolReady}
-            renderQuestionAnswer={this.renderQuestionAnswer}
-            renderSurveyAnswers={this.renderSurveyAnswers}
-            responderAddress={this.props.responderAddress}
-            responseLookupWarning={this.state.responseLookupWarning}
-            routeViewDisplayState={routeViewDisplayState}
-            singleQuestionMode={this.props.singleQuestionMode}
-            userAnswers={this.state.userAnswers}
-            viewAddress={this.props.viewAddress}
-          />
-        ) : (
-          <SurveyQuestionsAuthoringPanel
-            displayState={authoringPanelDisplayState}
-            lockedQuestionsBanner={lockedQuestionsBanner}
-            onScrollToTop={this.handleScrollToTop}
-            onShowJsonAtBottom={this.handleShowJsonAtBottom}
-            renderedEditableQuestions={renderedEditableQuestions}
-            submitDisplayState={submitFooterDisplayState}
-            submittedResponseView={submittedResponseView}
-            submitResponseButton={submitResponseButton}
-          />
-        )}
-
-        <SurveyQuestionsJsonControls
-          ref={this.bottomRef}
-          copiedQuestionsJson={this.state.copiedQuestionsJson}
-          copiedResponseJson={this.state.copiedResponseJson}
-          copiedSurveyJson={this.state.copiedSurveyJson}
-          hidden={hideEmbeddedDebugUi}
-          jsonPanelDisplayState={jsonPanelDisplayState}
-          onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
-          onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
-          onCopySurveyJson={() => this.copyJsonToClipboard(surveyJson, 'survey')}
-          onToggleQuestionsJson={this.toggleShowQuestionsJson}
-          onToggleResponseJson={this.toggleShowResponseJson}
-          onToggleSurveyJson={this.toggleShowSurveyJson}
-          questionsJson={questionsJson}
-          renderJsonTree={this.jsonTreeDisplay}
-          responseJson={responseJson}
-          surveyJson={surveyJson}
-        />
-        {useTagModal && (
-          <TagModal
-            isOpen={!!activeTagModalTag}
-            toggle={this.closeQuestionTagModal}
-            activeTag={activeTagModalTag || null}
-          />
-        )}
-      </div>
+      <SurveyQuestionsRouteSurface
+        renderReadiness={renderReadiness}
+        loadingProgressState={fullLoadingProgress}
+        layoutDisplayState={layoutDisplayState}
+        routeViewDisplayState={routeViewDisplayState}
+        submitDisplayState={submitFooterDisplayState}
+        viewingAnswers={viewingAnswers}
+        topStripProps={{
+          topRef: this.topRef,
+          displayAnswerMode: this.state.displayAnswerMode,
+          isDecrypting: this.state.isDecrypting,
+          isEditing: this.state.isEditing,
+          isSubmitting: this.state.isSubmitting,
+          onDecryptEdit: this.handleDecryptEdit,
+          onExitEditing: this.handleExitEditing,
+          onStartFresh: this.handleStartFresh,
+          onToggleDisplayAnswerMode: this.toggleDisplayAnswerMode,
+          responseUrl: this.state.responseUrl,
+          userHasResponse: this.state.userHasResponse,
+          userResponseEncrypted: this.state.userResponseEncrypted,
+        }}
+        responseViewProps={{
+          isLoadingResponse: this.state.isLoadingResponse,
+          noResponse: this.state.noResponse,
+          parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+          questionPool: this.state.questionPool,
+          questionPoolReady,
+          renderQuestionAnswer: this.renderQuestionAnswer,
+          renderSurveyAnswers: this.renderSurveyAnswers,
+          responderAddress: this.props.responderAddress,
+          responseLookupWarning: this.state.responseLookupWarning,
+          singleQuestionMode: this.props.singleQuestionMode,
+          userAnswers: this.state.userAnswers,
+          viewAddress: this.props.viewAddress,
+        }}
+        authoringPanelProps={{
+          displayState: authoringPanelDisplayState,
+          lockedQuestionsBanner,
+          onScrollToTop: this.handleScrollToTop,
+          onShowJsonAtBottom: this.handleShowJsonAtBottom,
+          renderedEditableQuestions,
+        }}
+        submittedResponseViewProps={{
+          isOwnResponse,
+          isVisible:
+            !viewingAnswers &&
+            this.state.userHasResponse &&
+            !this.state.startFresh &&
+            !this.state.isEditing,
+          questionPool: this.state.questionPool,
+          questionPoolReady,
+          renderQuestionAnswer: this.renderQuestionAnswer,
+          renderSurveyAnswers: this.renderSurveyAnswers,
+          singleQuestionMode: this.props.singleQuestionMode,
+          userAnswers: this.state.userAnswers,
+        }}
+        submitFooterProps={{
+          isSingleQuestionView,
+          isSubmitting: this.state.isSubmitting,
+          onPrimarySubmitClick: this.handlePrimarySubmitClick,
+          onRevertPendingChanges: this.handleRevertPendingChanges,
+          pendingEditCount: submitReadiness.pendingEditCount,
+          responseUrl: this.state.responseUrl,
+          submitButtonText,
+          submissionError: this.state.submissionError,
+        }}
+        jsonControlsProps={{
+          bottomRef: this.bottomRef,
+          copiedQuestionsJson: this.state.copiedQuestionsJson,
+          copiedResponseJson: this.state.copiedResponseJson,
+          copiedSurveyJson: this.state.copiedSurveyJson,
+          hidden: hideEmbeddedDebugUi,
+          jsonPanelDisplayState,
+          onCopyQuestionsJson: () => this.copyJsonToClipboard(questionsJson, 'questions'),
+          onCopyResponseJson: () => this.copyJsonToClipboard(responseJson, 'response'),
+          onCopySurveyJson: () => this.copyJsonToClipboard(surveyJson, 'survey'),
+          onToggleQuestionsJson: this.toggleShowQuestionsJson,
+          onToggleResponseJson: this.toggleShowResponseJson,
+          onToggleSurveyJson: this.toggleShowSurveyJson,
+          questionsJson,
+          renderJsonTree: this.jsonTreeDisplay,
+          responseJson,
+          surveyJson,
+        }}
+        tagModalProps={{
+          onClose: this.closeQuestionTagModal,
+        }}
+      />
     );
   }
 }
