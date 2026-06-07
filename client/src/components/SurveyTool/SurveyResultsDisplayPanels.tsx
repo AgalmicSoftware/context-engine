@@ -5,7 +5,7 @@ import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualRespo
 import {
   renderSurveyResultsFilterSummary,
 } from './SurveyResultsPanels';
-import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
@@ -196,30 +196,17 @@ export const renderSurveyResultsDisplayPanels = ({
 
     {lockedResponsesBannerNode}
 
-    {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-      <SurveyResultsQuestionListCard
-        isOpen={!!activeQuestionToggles.__questionList__}
-        onToggle={onToggleQuestionList}
-        questionTableNode={questionListDisplay.shouldRenderQuestionTable ? renderQuestionTable() : null}
-        showEmptyState={questionListDisplay.showEmptyState}
-        styleMap={styleMap}
-        tableWrapperRef={tableWrapperRef}
-        title=" View & Sort Questions"
-        trailingLabelStyle={trailingLabelStyle}
-      />
-    )}
-
-    {viewMode === 'questions' && (
-      <SurveyResultsQuestionListCard
-        isOpen={!!activeQuestionToggles.__questionList__}
-        onToggle={onToggleQuestionList}
-        questionTableNode={questionListDisplay.shouldRenderQuestionTable ? renderQuestionTable() : null}
-        showEmptyState={questionListDisplay.showEmptyState}
-        styleMap={styleMap}
-        title="View & Sort Questions"
-        trailingLabelStyle={trailingLabelStyle}
-      />
-    )}
+    <SurveyResultsQuestionListPanel
+      activeQuestionToggles={activeQuestionToggles}
+      onToggleQuestionList={onToggleQuestionList}
+      questionListDisplay={questionListDisplay}
+      renderQuestionTable={renderQuestionTable}
+      styleMap={styleMap}
+      surveyViewMode={surveyViewMode}
+      tableWrapperRef={tableWrapperRef}
+      trailingLabelStyle={trailingLabelStyle}
+      viewMode={viewMode}
+    />
 
     {renderSurveyResultsFilterSummary({
       displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount ?? 0,
