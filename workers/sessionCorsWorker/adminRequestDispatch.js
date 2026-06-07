@@ -162,6 +162,15 @@ export const dispatchAdminRequest = async ({
     return deps?.json?.({ ok: true }, 200, headers);
   }
 
+  if (action === 'secret-presence') {
+    const existingSecrets = (await deps?.getSessionSecrets?.(env, targetSlug)) || {};
+    return deps?.json?.({
+      ok: true,
+      sessionSlug: targetSlug,
+      secrets: buildSecretPresenceManifest(existingSecrets),
+    }, 200, headers);
+  }
+
   if (action === 'lit-chipotle-status') {
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };

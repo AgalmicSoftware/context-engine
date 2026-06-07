@@ -235,6 +235,60 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
   });
 });
 
+test('dispatchAdminRequest returns allowed-key secret presence without exposing values', async () => {
+  let putCalled = false;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({}),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'secret-presence',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { adminAddress: '0xabc' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({
+        openaiKey: 'sk-existing',
+        anthropicKey: '   ',
+        customRpcUrl: 'https://rpc.example.test',
+        arweaveJwk: { kty: 'RSA' },
+        ignoredSecret: 'do-not-report',
+      }),
+      putSessionSecrets: async () => {
+        putCalled = true;
+      },
+    }),
+  });
+
+  assert.equal(putCalled, false);
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      sessionSlug: 'session-a',
+      secrets: {
+        openaiKey: true,
+        anthropicKey: false,
+        openrouterKey: false,
+        customRpcUrl: true,
+        customRpcKey: false,
+        arweaveJwk: true,
+        faucetPrivateKey: false,
+        litAccountApiKey: false,
+        litUsageApiKey: false,
+      },
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+  assert.doesNotMatch(JSON.stringify(result.body), /sk-existing|rpc\.example|do-not-report|RSA/);
+});
+
 test('dispatchAdminRequest reads Lit Chipotle status from worker config plus session secrets', async () => {
   const result = await dispatchAdminRequest({
     request: {

@@ -90,9 +90,13 @@ import {
 import {
   ADMIN_SECRET_CARDS,
   buildAdminSecretRemoveTestId,
+  getAdminSecretCardStatus,
   getAdminSecretFieldInputType,
   getAdminSecretFieldLabel,
   getAdminSecretFieldRows,
+  getAdminSecretFieldStatusLabel,
+  normalizeAdminSecretPresence,
+  normalizeAdminSecretPresencePatch,
 } from './adminPageSecretCardHelpers';
 import type { AdminTestResults } from './adminPageTestResultHelpers';
 import { renderAdminTestResult } from './adminPageTestResultHelpers';
@@ -155,6 +159,12 @@ export const __adminPageTestUtils = {
   buildHealthAuthMismatchState,
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
+};
+
+const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; workerUrl?: unknown } = {}) => {
+  const normalizedSlug = normalizeSlug(slug);
+  const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
+  return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
 };
 
 const AdminPage = ({
@@ -248,6 +258,9 @@ const AdminPage = ({
   });
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
+  const [storedSecretPresence, setStoredSecretPresence] = useState<Record<string, boolean>>({});
+  const [secretPresenceStatus, setSecretPresenceStatus] = useState<'idle' | 'loading' | 'partial' | 'loaded' | 'error'>('idle');
+  const [secretPresenceMessage, setSecretPresenceMessage] = useState('');
   const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
   const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
   const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
@@ -255,6 +268,8 @@ const AdminPage = ({
   const arweaveResourceRequestRef = useRef(0);
   const faucetResourceRequestRef = useRef(0);
   const litResourceRequestRef = useRef(0);
+  const secretPresenceRequestRef = useRef(0);
+  const secretPresenceTargetKeyRef = useRef('');
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
@@ -611,6 +626,9 @@ const AdminPage = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
+    setStoredSecretPresence({});
+    setSecretPresenceStatus('idle');
+    setSecretPresenceMessage('');
     setLitResource(buildAdminLitNotConfiguredResource());
     setShowTestsPanel(false);
   }, [selectedSlug]);
@@ -1077,6 +1095,72 @@ const AdminPage = ({
   }, [
     selectedConfigWorkerUrl,
     signAdminAction,
+    workerUrl,
+  ]);
+
+  const mergeStoredSecretPresenceFromPayload = useCallback((payload: Record<string, unknown> = {}) => {
+    const patch = normalizeAdminSecretPresencePatch(payload);
+    setStoredSecretPresence((prev) => {
+      const next = { ...prev, ...patch };
+      return secretPresenceStatus === 'loaded'
+        ? normalizeAdminSecretPresence(next)
+        : next;
+    });
+    if (secretPresenceStatus !== 'loaded') {
+      setSecretPresenceStatus('partial');
+    }
+  }, [secretPresenceStatus]);
+
+  const refreshSecretPresence = useCallback(async () => {
+    let baseUrl = '';
+    let requestId = 0;
+    let targetKey = '';
+    try {
+      if (!selectedConfig) throw new Error('Select a session.');
+      const slug = normalizeSlug(selectedSlug);
+      baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+      if (!baseUrl) throw new Error('Worker URL is missing.');
+      targetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
+      requestId = secretPresenceRequestRef.current + 1;
+      secretPresenceRequestRef.current = requestId;
+      setSecretPresenceStatus('loading');
+      setSecretPresenceMessage('Checking stored secret status…');
+      const { data } = await postSignedAdminRequest({
+        action: 'secret-presence',
+        body: { sessionSlug: slug },
+        path: '/admin/secret-presence',
+        workerUrl: baseUrl,
+      });
+      if (
+        requestId !== secretPresenceRequestRef.current ||
+        targetKey !== secretPresenceTargetKeyRef.current
+      ) {
+        return;
+      }
+      setStoredSecretPresence(normalizeAdminSecretPresence(data?.secrets));
+      setSecretPresenceStatus('loaded');
+      setSecretPresenceMessage('Stored secret status refreshed.');
+    } catch (err) {
+      if (
+        requestId &&
+        (
+          requestId !== secretPresenceRequestRef.current ||
+          targetKey !== secretPresenceTargetKeyRef.current
+        )
+      ) {
+        return;
+      }
+      setSecretPresenceStatus('error');
+      setSecretPresenceMessage(normalizeAdminWorkerFetchError({
+        error: err,
+        workerBase: baseUrl || normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
+      }));
+    }
+  }, [
+    postSignedAdminRequest,
+    selectedConfig,
+    selectedConfigWorkerUrl,
+    selectedSlug,
     workerUrl,
   ]);
 
@@ -1922,7 +2006,6 @@ const AdminPage = ({
     }
   };
 
-  const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
     : metadataLatestBlockStatus;
@@ -3112,6 +3195,16 @@ const AdminPage = ({
                                 >
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
+                              </div>
+                              <div className={styles.secretFieldStatus}>
+                                {getAdminSecretFieldStatusLabel({
+                                  fieldKey: secretFieldKey,
+                                  secrets,
+                                  clearedSecretKeys,
+                                  storedSecretPresence,
+                                  secretPresenceStatus,
+                                  workerSecretsDirty,
+                                })}
                               </div>
                               {secretFieldKey === 'litAccountApiKey' ? (
                                 <div className={styles.warningNote}>
