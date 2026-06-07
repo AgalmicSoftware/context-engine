@@ -10,10 +10,6 @@ import {
   FormText,
   InputGroup,
   InputGroupText,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
   Collapse
 } from 'reactstrap';
 
@@ -250,11 +246,13 @@ import {
   type SessionResultsReportQuestion,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
+import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
 import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
-import { renderSurveyResultsHtmlReportExportModal } from './SurveyResultsHtmlReportExportModal';
-import SurveyResultsDemoSurface from './SurveyResultsDemoSurface';
-import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import {
+  renderSurveyResultsHtmlReportExportModal,
+  type SurveyResultsHtmlReportExportModalProps,
+} from './SurveyResultsHtmlReportExportModal';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 
@@ -4785,7 +4783,7 @@ try {
 }
 };
 
-renderHtmlReportExportModal = (): React.ReactNode => {
+getHtmlReportModalProps = (): SurveyResultsHtmlReportExportModalProps => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
@@ -4800,7 +4798,7 @@ const isDemoSession = this.isHtmlReportDemoSession();
 const isDemoMode = this.isHtmlReportDemoModeActive();
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
 
-return renderSurveyResultsHtmlReportExportModal({
+return {
   analysisGenerating: this.state.htmlReportAnalysisGenerating,
   analysisPayload,
   analysisProgress: this.state.htmlReportAnalysisProgress,
@@ -4822,7 +4820,11 @@ return renderSurveyResultsHtmlReportExportModal({
   selectedSections: readinessPlan.selectedSections,
   snapshot,
   styleMap: styles,
-});
+};
+}
+
+renderHtmlReportExportModal = (): React.ReactNode => {
+return renderSurveyResultsHtmlReportExportModal(this.getHtmlReportModalProps());
 }
 
 render() {
@@ -4923,173 +4925,161 @@ const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
   cacheControllerSnapshot.cacheReadinessInput
 );
 const filterInput = cacheControllerSnapshot.filterInput;
+const syncStatusNode = renderSurveyResultsSyncStatusPanel({
+  syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
+  syncDetailsOpen: !!this.state.syncDetailsOpen,
+  syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
+  onToggleSyncDetails: () =>
+    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+      prevState,
+      stateKey: 'syncDetailsOpen',
+    })),
+  onManualRefresh: () => this.handleManualRefresh(),
+  miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+  miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+  remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
+});
+const filterControlsNode = renderSurveyResultsFilterExportControls({
+  activeSessionSlug: filterInput.activeSessionSlug,
+  aggregateQuestionResponses: this.state.aggregateQuestionResponses,
+  currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
+  currentViewModeForUrl: filterInput.currentViewModeForUrl,
+  defaultTags: this.props.defaultTags,
+  exportControlsDisplay,
+  filterState: filterInput.filterState,
+  isFilterActive,
+  isQuestionCacheReady: filterInput.isQuestionCacheReady,
+  isSBTCacheReady: filterInput.isSBTCacheReady,
+  network: this.props.network,
+  onClearFilters: this.handleClearFiltersFromParent,
+  onDownload: this.downloadCSV,
+  onExportHtmlReport: this.openHtmlReportExportModal,
+  onExportTypeChange: this.handleExportTypeChange,
+  onFilterActivityChange: this.handleFilterActivityChange,
+  onQuestionFilter: this.handleQuestionFilter,
+  onQuestionFilterCountUpdate: this.handleQuestionFilterCountUpdate,
+  onSbtFilter: this.handleFilteredResponses,
+  onSetFilterLoading: this.setFilterLoading,
+  onToggleExportArea: this.toggleExportArea,
+  onToggleQuestionFilter: this.toggleQuestionFilter,
+  provider: this.props.provider,
+  questionFilterQuestions,
+  questionFilterRef: this.questionFilterRef,
+  questionResponses: this.state.questionResponses,
+  questionResponsesNonce: filterInput.questionResponsesNonce,
+  questionsCacheNonce: filterInput.questionsCacheNonce,
+  responses: this.state.responses,
+  sbtCacheRevision: filterInput.sbtCacheRevision,
+  showQuestionFilter: filterInput.showQuestionFilter,
+  storageKeyPrefix: filterInput.storageKeyPrefix,
+  styleMap: styles,
+  surveyViewMode,
+  viewMode,
+});
+const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
+  account: this.props.account,
+  activeQuestionToggles: this.state.activeQuestionToggles,
+  activeToggles: this.state.activeToggles,
+  alertMessage,
+  applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+  cacheReadinessDisplay,
+  currentSurveyId,
+  effectiveSlug: slug,
+  filterControlsNode,
+  filterLoading,
+  getFallbackQuestion: this.getStableFallbackQuestion,
+  getLockedResponseKey: this.getLockedResponseKey,
+  getResponseCardProps: this.getSurveyResultsResponseCardProps,
+  lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
+    decrypting: !!this.state.lockedResponsesDecrypting,
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel: lockedResponsesModel,
+    onDecrypt: this.handleDecryptLockedResponses,
+  }),
+  network: this.props.network,
+  onSurveyViewModeKeyDown: this.handleSurveyViewModeKeyDown,
+  onSurveyViewModeToggle: this.handleSurveyViewModeToggle,
+  onToggleQuestionList: () => this.toggleQuestionSummary('__questionList__'),
+  onToggleResponse: this.toggleResponse,
+  preNetworkQuestions,
+  questionModeEntries,
+  questionResponsesNonce: this.props.questionResponsesNonce,
+  questionsCacheNonce: this.props.questionsCacheNonce,
+  renderQuestionSummary: (qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions),
+  renderQuestionTable: () => this.renderQuestionIDsTable(
+    sbtFilteredAggregatorQuestionResponses,
+    preNetworkQuestions
+  ),
+  responses: sbtFilteredResponses,
+  sbtCacheRevision: this.props.sbtCacheRevision,
+  styleMap: styles,
+  surveyAggregateEntries,
+  surveyViewMode,
+  tableWrapperRef: this.questionIdTableRef,
+  toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
+  trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+  viewMode,
+};
+const demoSurfaceProps = isDemoAlternateResultsView
+  ? {
+      activeSlug: slug,
+      atlasNodeId: this.state.demoResultsAtlasNodeId,
+      defaultTags: this.props.defaultTags,
+      filterState: this.props.filterState || this.state.filterState,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      network: this.props.network,
+      networkChainId: this.props.networkChainId,
+      onAtlasModalClose: this.handleDemoAtlasModalClose,
+      onAtlasNodeOpen: this.handleDemoAtlasOpen,
+      questionResponses: this.getMemoizedPolisQuestionResponses(
+        true,
+        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+      ),
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      questionScanProgress: this.props.questionScanProgress,
+      viewKey: demoResultsViewMode,
+    }
+  : null;
 
 return (
-  <>
-  <Modal
+  <SurveyResultsReportSurface
+    demoSurfaceProps={demoSurfaceProps}
+    displayPanelsProps={displayPanelsProps}
+    htmlReportModalProps={this.getHtmlReportModalProps()}
     isOpen={isActuallyOpen}
-    toggle={this.closeModal}
-    className={styles.resultsModal}
-  >
-    <SurveyResultsModalHeader
-      bookmarkedSurveyIDs={this.state.bookmarkedSurveyIDs}
-      currentSurveyId={currentSurveyId}
-      demoResultsViewMode={demoResultsViewMode}
-      demoResultsViewOptions={demoResultsViewOptions}
-      documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
-      effectiveSlug={slug}
-      isDemoQuestionResults={isDemoQuestionResults}
-      lockedResponsesToggleNode={SurveyResultsLockedResponsesToggle({
+    modalHeaderProps={{
+      bookmarkedSurveyIDs: this.state.bookmarkedSurveyIDs,
+      currentSurveyId,
+      demoResultsViewMode,
+      demoResultsViewOptions,
+      documentLinkIconStyle: SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
+      effectiveSlug: slug,
+      isDemoQuestionResults,
+      lockedResponsesToggleNode: SurveyResultsLockedResponsesToggle({
         isOpen: !!this.state.lockedResponseDetailsOpen,
         lockedModel: lockedResponsesModel,
         onToggleDetails: this.toggleLockedResponseDetails,
-      })}
-      onClose={this.closeModal}
-      onDemoResultsViewSelect={this.handleDemoResultsViewSelect}
-      onToggleSurveyBookmark={this.toggleSurveyBookmark}
-      styleMap={styles}
-      surveyBookmarkStyle={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
-      surveyDocumentURLs={Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : []}
-      surveyIdAbbreviation={surveyIdAbbreviation}
-      surveyTitle={surveyTitle}
-      syncStatusNode={renderSurveyResultsSyncStatusPanel({
-          syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
-          syncDetailsOpen: !!this.state.syncDetailsOpen,
-          syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
-          onToggleSyncDetails: () =>
-            this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
-              prevState,
-              stateKey: 'syncDetailsOpen',
-            })),
-          onManualRefresh: () => this.handleManualRefresh(),
-          miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-          miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-          remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-        })}
-      viewMode={viewMode}
-    />
-
-    <ModalBody className={styles.modalBody}>
-      {isDemoAlternateResultsView ? (
-        <div
-          className={styles.demoResultsSurface}
-          data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
-        >
-          <SurveyResultsDemoSurface
-            activeSlug={slug}
-            atlasNodeId={this.state.demoResultsAtlasNodeId}
-            defaultTags={this.props.defaultTags}
-            filterState={this.props.filterState || this.state.filterState}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            network={this.props.network}
-            networkChainId={this.props.networkChainId}
-            onAtlasModalClose={this.handleDemoAtlasModalClose}
-            onAtlasNodeOpen={this.handleDemoAtlasOpen}
-            questionResponses={this.getMemoizedPolisQuestionResponses(
-              true,
-              this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
-                ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
-                : (this.state.sbtFilteredAggregatorQuestionResponses || {})
-            )}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            questionScanProgress={this.props.questionScanProgress}
-            viewKey={demoResultsViewMode}
-          />
-        </div>
-      ) : (
-        <>
-      {renderSurveyResultsDisplayPanels({
-        account: this.props.account,
-        activeQuestionToggles: this.state.activeQuestionToggles,
-        activeToggles: this.state.activeToggles,
-        alertMessage,
-        applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
-        cacheReadinessDisplay,
-        currentSurveyId,
-        effectiveSlug: slug,
-        filterLoading,
-        getFallbackQuestion: this.getStableFallbackQuestion,
-        getLockedResponseKey: this.getLockedResponseKey,
-        getResponseCardProps: this.getSurveyResultsResponseCardProps,
-        lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
-          decrypting: !!this.state.lockedResponsesDecrypting,
-          isOpen: !!this.state.lockedResponseDetailsOpen,
-          lockedModel: lockedResponsesModel,
-          onDecrypt: this.handleDecryptLockedResponses,
-        }),
-        network: this.props.network,
-        onSurveyViewModeKeyDown: this.handleSurveyViewModeKeyDown,
-        onSurveyViewModeToggle: this.handleSurveyViewModeToggle,
-        onToggleQuestionList: () => this.toggleQuestionSummary('__questionList__'),
-        onToggleResponse: this.toggleResponse,
-        preNetworkQuestions,
-        questionModeEntries,
-        questionResponsesNonce: this.props.questionResponsesNonce,
-        questionsCacheNonce: this.props.questionsCacheNonce,
-        renderQuestionSummary: (qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions),
-        renderQuestionTable: () => this.renderQuestionIDsTable(
-          sbtFilteredAggregatorQuestionResponses,
-          preNetworkQuestions
-        ),
-        responses: sbtFilteredResponses,
-        sbtCacheRevision: this.props.sbtCacheRevision,
-        styleMap: styles,
-        surveyAggregateEntries,
-        surveyViewMode,
-        tableWrapperRef: this.questionIdTableRef,
-        toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
-        trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-        viewMode,
-        filterControlsNode: renderSurveyResultsFilterExportControls({
-          activeSessionSlug: filterInput.activeSessionSlug,
-          aggregateQuestionResponses: this.state.aggregateQuestionResponses,
-          currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
-          currentViewModeForUrl: filterInput.currentViewModeForUrl,
-          defaultTags: this.props.defaultTags,
-          exportControlsDisplay,
-          filterState: filterInput.filterState,
-          isFilterActive,
-          isQuestionCacheReady: filterInput.isQuestionCacheReady,
-          isSBTCacheReady: filterInput.isSBTCacheReady,
-          network: this.props.network,
-          onClearFilters: this.handleClearFiltersFromParent,
-          onDownload: this.downloadCSV,
-          onExportHtmlReport: this.openHtmlReportExportModal,
-          onExportTypeChange: this.handleExportTypeChange,
-          onFilterActivityChange: this.handleFilterActivityChange,
-          onQuestionFilter: this.handleQuestionFilter,
-          onQuestionFilterCountUpdate: this.handleQuestionFilterCountUpdate,
-          onSbtFilter: this.handleFilteredResponses,
-          onSetFilterLoading: this.setFilterLoading,
-          onToggleExportArea: this.toggleExportArea,
-          onToggleQuestionFilter: this.toggleQuestionFilter,
-          provider: this.props.provider,
-          questionFilterQuestions,
-          questionFilterRef: this.questionFilterRef,
-          questionResponses: this.state.questionResponses,
-          questionResponsesNonce: filterInput.questionResponsesNonce,
-          questionsCacheNonce: filterInput.questionsCacheNonce,
-          responses: this.state.responses,
-          sbtCacheRevision: filterInput.sbtCacheRevision,
-          showQuestionFilter: filterInput.showQuestionFilter,
-          storageKeyPrefix: filterInput.storageKeyPrefix,
-          styleMap: styles,
-          surveyViewMode,
-          viewMode,
-        }),
-      })}
-        </>
-      )}
-
-    </ModalBody>
-
-    <ModalFooter>
-      {/* Additional footer actions if needed */}
-    </ModalFooter>
-  </Modal>
-  {this.renderHtmlReportExportModal()}
-  </>
+      }),
+      onDemoResultsViewSelect: this.handleDemoResultsViewSelect,
+      onToggleSurveyBookmark: this.toggleSurveyBookmark,
+      styleMap: styles,
+      surveyBookmarkStyle: SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
+      surveyDocumentURLs: Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : [],
+      surveyIdAbbreviation,
+      surveyTitle,
+      syncStatusNode,
+      viewMode,
+    }}
+    onCloseResultsModal={this.closeModal}
+    reportSurfaceDisplayPlan={{
+      demoResultsViewMode,
+      isDemoAlternateResultsView,
+    }}
+    styleMap={styles}
+  />
 );
 }
 }
