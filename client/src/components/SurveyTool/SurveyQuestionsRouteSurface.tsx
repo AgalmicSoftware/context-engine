@@ -1,10 +1,10 @@
 import React from 'react';
 
-import TagModal from '../TagPage/TagModal';
 import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRouteSection';
 import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsResponseRouteSection from './SurveyQuestionsResponseRouteSection';
+import SurveyQuestionsTagModalSlot from './SurveyQuestionsTagModalSlot';
 import SurveyQuestionsTopRouteSection from './SurveyQuestionsTopRouteSection';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
@@ -154,8 +154,6 @@ const SurveyQuestionsRouteSurface = ({
     );
   }
 
-  const activeTagModalTag = layoutDisplayState.activeTagModalTag || null;
-
   return (
     <div className={layoutDisplayState.surveyPageClassName}>
       <SurveyQuestionsTopRouteSection
@@ -198,13 +196,10 @@ const SurveyQuestionsRouteSurface = ({
         responseJson={jsonControlsProps.responseJson}
         surveyJson={jsonControlsProps.surveyJson}
       />
-      {layoutDisplayState.useTagModal && (
-        <TagModal
-          isOpen={!!activeTagModalTag}
-          toggle={tagModalProps.onClose || noop}
-          activeTag={activeTagModalTag}
-        />
-      )}
+      <SurveyQuestionsTagModalSlot
+        layoutDisplayState={layoutDisplayState}
+        tagModalProps={tagModalProps}
+      />
     </div>
   );
 };
