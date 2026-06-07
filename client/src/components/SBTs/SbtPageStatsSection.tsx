@@ -10,6 +10,7 @@ import {
 
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
+import SbtPageStatsScanProgressDisplay from './SbtPageStatsScanProgressDisplay';
 
 type SbtPageStatsSectionProps = {
   adminAddressDisplay: React.ReactNode;
@@ -91,26 +92,13 @@ const SbtPageStatsSection = ({
             <FontAwesomeIcon icon={faUser} />
           </button>
         </p>
-        {showScanProgress && (
-          <div className={styles.scanProgress}>
-            <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
-            <div className={styles.scanProgressContent}>
-              <span className={styles.scanProgressText}>{scanProgressText}</span>
-              {scanProgressSessionText ? (
-                <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-              ) : null}
-              <div
-                className={styles.scanProgressBar}
-                role="progressbar"
-                aria-valuenow={scanProgressPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
-              </div>
-            </div>
-          </div>
-        )}
+        <SbtPageStatsScanProgressDisplay
+          scanProgressFillStyle={scanProgressFillStyle}
+          scanProgressPct={scanProgressPct}
+          scanProgressSessionText={scanProgressSessionText}
+          scanProgressText={scanProgressText}
+          showScanProgress={showScanProgress}
+        />
         {mintEndDisplay}
         <p>
           <span className={styles.label}>Burnable by:</span> {burnLabel}
