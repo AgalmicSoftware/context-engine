@@ -8,7 +8,13 @@
 - Current lengths:
   - `SurveyTool.tsx`: **1,265 lines**
   - `SurveyQuestions.tsx`: **8,378 lines**
-  - `SurveyQuestionsRouteSurface.tsx`: **289 lines**
+  - `SurveyQuestionsRouteSurface.tsx`: **202 lines**
+  - `SurveyQuestionsTopRouteSection.tsx`: **74 lines**
+  - `SurveyQuestionsRouteBodySection.tsx`: **110 lines**
+  - `SurveyQuestionsAuthoringRouteSection.tsx`: **105 lines**
+  - `SurveyQuestionsResponseRouteSection.tsx`: **73 lines**
+  - `SurveyQuestionsJsonRouteSection.tsx`: **65 lines**
+  - `SurveyQuestionsTagModalSlot.tsx`: **34 lines**
   - `SurveyQuestionsAuthoringPanel.tsx`: **70 lines**
   - `SurveyQuestionsFullQuestionContentSections.tsx`: **80 lines**
   - `SurveyQuestionsFullQuestionDisplay.tsx`: **233 lines**
@@ -28,9 +34,11 @@
   - `surveyQuestionsTypes.ts`: **1,237 lines**
   - `surveyToolSingleQuestionCacheBootstrapController.ts`: **604 lines**
   - `surveyToolDecryptFlow.js`: **2,015 lines**
-  - `SurveyResults.tsx`: **5,212 lines**
+  - `SurveyResults.tsx`: **5,113 lines**
   - `SurveyResultsDemoSurface.tsx`: **104 lines**
-  - `SurveyResultsDisplayPanels.tsx`: **286 lines**
+  - `SurveyResultsDisplayPanels.tsx`: **260 lines**
+  - `SurveyResultsQuestionListPanel.tsx`: **51 lines**
+  - `SurveyResultsQuestionSummariesPanel.tsx`: **51 lines**
   - `SurveyResultsQuestionSummary.tsx`: **283 lines**
   - `SurveyResultsQuestionTable.tsx`: **128 lines**
   - `SurveyResultsModalHeader.tsx`: **137 lines**
@@ -79,13 +87,19 @@ SurveyTool.tsx  [top-level wrapper]
   -> SurveySelector.tsx  [survey/questions selector + filter + results]
      -> QuestionsDashboard.tsx  [question list in "questions" mode]
      -> SurveyQuestions.tsx  [shared full response runtime]
-        -> SurveyQuestionsRouteSurface.tsx  [route-level loading/top-strip/body/json/tag-modal surface]
-           -> SurveyQuestionsAuthoringPanel.tsx  [editable question presentation]
-           -> SurveyQuestionsJsonControls.tsx  [bottom JSON controls]
-           -> SurveyQuestionsResponseView.tsx  [viewed-response presentation]
-           -> SurveyQuestionsSubmittedResponseView.tsx  [submitted-response display]
-           -> SurveyQuestionsSubmitFooter.tsx  [submit/footer display]
-           -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
+        -> SurveyQuestionsRouteSurface.tsx  [route-level loading surface + section coordinator]
+           -> SurveyQuestionsTopRouteSection.tsx  [route toggle + response notice strip slot]
+              -> SurveyQuestionsTopStrip.tsx  [route toggle + response notice strip]
+           -> SurveyQuestionsRouteBodySection.tsx  [viewed-response vs authoring route body]
+              -> SurveyQuestionsAuthoringRouteSection.tsx  [authoring panel + submitted-response/footer slots]
+                 -> SurveyQuestionsAuthoringPanel.tsx  [editable question presentation]
+                 -> SurveyQuestionsSubmittedResponseView.tsx  [submitted-response display]
+                 -> SurveyQuestionsSubmitFooter.tsx  [submit/footer display]
+              -> SurveyQuestionsResponseRouteSection.tsx  [viewed-response wrapper]
+                 -> SurveyQuestionsResponseView.tsx  [viewed-response presentation]
+           -> SurveyQuestionsJsonRouteSection.tsx  [bottom JSON route section]
+              -> SurveyQuestionsJsonControls.tsx  [bottom JSON controls]
+           -> SurveyQuestionsTagModalSlot.tsx  [tag modal route slot]
         -> SurveyQuestionsFullQuestionContentSections.tsx  [full-question answer/comment display slots]
         -> SurveyQuestionsFullQuestionDisplay.tsx  [full-question card display assembly]
         -> SurveyQuestionsFullQuestionGatedPromptCard.tsx  [full-question gated-prompt card chrome]
@@ -102,6 +116,8 @@ SurveyTool.tsx  [top-level wrapper]
         -> SurveyPileViewMode.tsx  [pile/card UX variant, extends SurveyQuestions]
      -> SurveyResults.tsx  [survey/question results runtime]
         -> SurveyResultsDisplayPanels.tsx  [results display panel ordering]
+           -> SurveyResultsQuestionListPanel.tsx  [survey/question-mode question list panel]
+           -> SurveyResultsQuestionSummariesPanel.tsx  [survey aggregate/question summary panel]
         -> SurveyResultsDemoSurface.tsx  [demo alternate-results surface display]
         -> SurveyResultsModalHeader.tsx  [modal title, links, bookmark, sync/header presentation]
         -> SurveyResultsPanels.tsx  [typed sync-status plan rendering and filter-summary panel helpers]
@@ -149,7 +165,13 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit computation, encryption/decrypt execution, live route/navigation state, cache/storage/worker/wallet interactions, retry scheduling, and submission execution while delegating route-level loading/top-strip/answer-vs-authoring/JSON/tag-modal composition to `SurveyQuestionsRouteSurface.tsx`, full-question card display assembly to `SurveyQuestionsFullQuestionDisplay.tsx`, full-question answer/comment display slot assembly to `SurveyQuestionsFullQuestionContentSections.tsx`, response-input display/action descriptors to `surveyQuestionsFullQuestionResponseInputState.ts`, gated-prompt card chrome to `SurveyQuestionsFullQuestionGatedPromptCard.tsx`, shared full/pile slider display to `SurveyQuestionsFullQuestionSliderSection.tsx`, primary-submit inert/navigation/dispatch plan execution, pending-stat fallback normalization, submit-readiness descriptors, submitted-response URL planning, submit-start/status sequencing, stale-submit cleanup, and post-submit completion/status state handoff to `surveyQuestionsSubmitController.ts` / `surveyQuestionsTypes.ts`; delegates single-question source-restore context, cache-bootstrap status decisions, stop-handling descriptors, seeded hydration patch shape, and current-question preservation state planning to `surveyToolSingleQuestionCacheBootstrapController.ts`; delegates question-decrypt attempt-start, busy-token ownership, stale/newer-token completion, failure status planning, and bulk survey decrypt source/stale status planning to `surveyToolDecryptFlow.js` |
-| `SurveyQuestionsRouteSurface.tsx` | Route-level presentation surface | Renders loading, top-strip, viewed-response vs authoring route body, JSON controls, submitted-response slot, submit footer slot, and tag modal from parent-provided descriptors, render nodes, and callbacks while leaving route state, submit, decrypt, cache, fetch/retry, worker/audio, response persistence, and state mutation in `SurveyQuestions` |
+| `SurveyQuestionsRouteSurface.tsx` | Route-level presentation coordinator | Renders loading and delegates top-strip, viewed-response vs authoring route body, JSON controls, submitted-response slot, submit footer slot, and tag modal placement to route section components from parent-provided descriptors, render nodes, and callbacks while leaving route state, submit, decrypt, cache, fetch/retry, worker/audio, response persistence, and state mutation in `SurveyQuestions` |
+| `SurveyQuestionsTopRouteSection.tsx` | Route top-strip section | Adapts route/top-strip display descriptors into the existing toggle and submitted-response notice slot while leaving route state and response action handlers in `SurveyQuestions` |
+| `SurveyQuestionsRouteBodySection.tsx` | Route body branch | Chooses viewed-response vs authoring route body from explicit props while leaving response state, question rendering, submit, decrypt, cache, route, and mutation behavior in `SurveyQuestions` |
+| `SurveyQuestionsAuthoringRouteSection.tsx` | Authoring route body section | Places the authoring panel, submitted-response slot, and submit footer from descriptors/render nodes while leaving submit execution, JSON generation, question rendering, and response state in `SurveyQuestions` |
+| `SurveyQuestionsResponseRouteSection.tsx` | Viewed-response route body section | Renders the viewed-response branch from parent-provided response descriptors and render callbacks while leaving answer rendering, decrypt, cache, fetch/retry, and route state in `SurveyQuestions` |
+| `SurveyQuestionsJsonRouteSection.tsx` | Bottom JSON route section | Adapts parent-provided JSON display state, tree renderer, copy callbacks, and toggle callbacks into the bottom JSON controls while leaving JSON generation, copy side effects, and toggle state in `SurveyQuestions` |
+| `SurveyQuestionsTagModalSlot.tsx` | Route tag modal slot | Renders the active tag modal from parent-owned visibility and close callback while leaving tag state mutation in `SurveyQuestions` |
 | `SurveyQuestionsAuthoringPanel.tsx` | Editable question presentation | Renders the edit-mode question list shell, JSON/back-to-top controls, locked banner, submit node placement, and submitted-response fallback from explicit props while leaving submit, JSON generation, question rendering, and gate/decrypt behavior in `SurveyQuestions` |
 | `SurveyQuestionsFullQuestionContentSections.tsx` | Full-question answer/comment display slot assembly | Chooses main-answer and additional-comment display slots from parent-provided render callbacks while leaving answer rendering, decrypt execution, cache, route, submit, and mutation behavior in `SurveyQuestions` |
 | `SurveyQuestionsFullQuestionDisplay.tsx` | Full-question card display assembly | Wires the parent-provided card shell, footer icons, slider section, answer/comment renderers, and decrypt-control renderers from explicit display state while leaving answer mutation, decrypt execution, submit, cache, storage, route, and gate behavior in `SurveyQuestions` |
@@ -171,7 +193,9 @@ SurveyTool.tsx  [top-level wrapper]
 | `surveyToolDecryptFlow.js` | Decrypt planning and state helpers | Builds decrypt display state, task keys, source baselines, success/failure/stale state patches, question-decrypt attempt/status plans, and bulk survey decrypt source/stale status plans while `SurveyQuestions` keeps real decrypt invocation, wallet/provider behavior, cache, storage, and UI side effects parent-owned |
 | `SurveyPileViewMode.tsx` | Pile-mode controller | Owns pile load/filter/window coordination and pile-specific render/action UX while delegating shared semantics to `SurveyQuestions` |
 | `SurveyResults.tsx` | Survey/question results runtime | Owns result hydration, filter state, locked-response decrypt execution, cache polling, export payload generation/download execution, route/session state, polling/timers, manual-refresh latest-block lookup/target state/polling follow-up, network block reads, non-analysis concrete cache API reads, cache API selection/port provisioning, broad cache writes/persistence, analysis read generation fallback, filter-bookmark cache reads/feedback timer/state/logging, survey/question bookmark cache reads/logging/state application, refresh/status state application ports, AI generation, analysis artifact merge execution, generated-artifact completion execution, and result mutation behavior while delegating display panel ordering to `SurveyResultsDisplayPanels.tsx`, demo alternate-results surface rendering to `SurveyResultsDemoSurface.tsx`, export orchestration to `surveyResultsExportController.ts`, export display, HTML report readiness, and demo artifact planning to `surveyResultsExportDisplayHelpers.ts`, filter/export control presentation to `SurveyResultsFilterExportControls.tsx`, HTML report export modal presentation to `SurveyResultsHtmlReportExportModal.tsx`, filter/status display planning to `surveyResultsFilterStatusController.ts`, sync-status progress display planning to `surveyResultsSyncStatusController.ts`, typed sync-status plan rendering to `SurveyResultsPanels.tsx`, composed cache/readiness display planning to `surveyResultsCacheReadinessDisplayPlan.ts`, cache-controller input packaging to `surveyResultsCacheControllerSnapshot.ts`, manual-refresh injected-port dispatch decisions to `surveyResultsManualRefreshController.ts`, queued-refresh injected-port dispatch decisions to `surveyResultsQueuedRefreshController.ts`, selected-question fallback planning to `surveyResultsFallbackQuestionHelpers.ts`, selected-question fallback injected write dispatch to `surveyResultsFallbackQuestionWriteController.ts`, read-only selected-question metadata decisions to `surveyResultsQuestionMetadataReadController.ts`, scoped question-network cache read/status decisions to `surveyResultsQuestionNetworkReadController.ts`, filter, survey/question bookmark, and analysis artifact cache-write eligibility/pre-readiness planning to `surveyResultsCacheWriteEligibilityPlan.ts`, typed analysis artifact cache key/read request/selection contracts to `surveyResultsAnalysisArtifactCachePorts.ts`, analysis artifact read dispatch to `surveyResultsAnalysisArtifactReadController.ts`, generated-artifact completion planning to `surveyResultsAnalysisGeneratedArtifactCompletionPlan.ts`, typed analysis artifact lifecycle/failure-recovery planning to `surveyResultsAnalysisLifecyclePlan.ts`, analysis lifecycle status/order dispatch to `surveyResultsAnalysisLifecycleController.ts`, analysis artifact injected write dispatch to `surveyResultsAnalysisArtifactWriteController.ts`, filter-bookmark injected write dispatch to `surveyResultsFilterBookmarkWriteController.ts`, survey/question bookmark injected write dispatch to `surveyResultsSurveyQuestionBookmarkWriteController.ts`, refresh/status sequence planning to `surveyResultsHelpers.ts`, selected-question summary display assembly to `SurveyResultsQuestionSummary.tsx`, and question-summary metadata/status planning to `surveyResultsQuestionSummaryStatusController.ts` |
-| `SurveyResultsDisplayPanels.tsx` | Results display panel ordering | Renders the status, view-mode toggle, locked banner placement, question list, filter summary, aggregate/question summary list, and individual response panels from explicit props while leaving fetch, decrypt execution, filter state, route/session state, export/download execution, cache, polling, and mutation behavior in `SurveyResults` |
+| `SurveyResultsDisplayPanels.tsx` | Results display panel ordering | Renders the status, view-mode toggle, locked banner placement, filter summary, individual response panels, and delegates question-list and summary-list display panels from explicit props while leaving fetch, decrypt execution, filter state, route/session state, export/download execution, cache, polling, and mutation behavior in `SurveyResults` |
+| `SurveyResultsQuestionListPanel.tsx` | Survey/question-mode question list panel | Chooses the survey aggregate question-list card vs direct question-mode card from cache/readiness display descriptors while leaving table derivation, toggles, and scroll behavior in `SurveyResults` |
+| `SurveyResultsQuestionSummariesPanel.tsx` | Survey aggregate/question summary panel | Chooses aggregate survey summaries vs question-mode summaries from explicit entries/render callbacks while leaving selected-summary rendering, decrypt overrides, filter state, and cache behavior in `SurveyResults` |
 | `SurveyResultsDemoSurface.tsx` | Demo alternate-results surface display | Renders report, atlas, breakdown, and risk-matrix demo surfaces from parent-prepared props while leaving demo view selection, Polis data preparation, atlas node state, route/session state, cache, analysis generation, export/download execution, and mutation behavior in `SurveyResults` |
 | `SurveyResultsModalHeader.tsx` | Results modal header presentation | Renders title, survey ID/document links, bookmark, demo-view controls, locked-response toggle slot, and sync-status slot from explicit props |
 | `SurveyResultsPanels.tsx` | Results panel presentation helpers | Renders sync-status progress panel directly from `SurveyResultsSyncStatusDisplayPlan` plus filter summary UI from explicit props while leaving display-plan construction in controller helpers and handlers/state in `SurveyResults` |
