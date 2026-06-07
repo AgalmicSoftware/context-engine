@@ -115,6 +115,7 @@ const renderAdminPage = async ({
 };
 
 const getWorkerSecretsPanel = () => screen.getByText('Worker secrets').closest('section');
+const getSecretCardButton = (panel, label) => within(panel).getByRole('button', { name: label });
 const getSecretInputByLabel = (labelText) => (
   screen.getByText(labelText).parentElement.querySelector('input,textarea')
 );
@@ -181,6 +182,268 @@ describe('AdminPage worker secrets controls', () => {
     web3ProviderSpy?.mockRestore();
   });
 
+  it('does not label blank write-only worker secret inputs as empty before presence is checked', async () => {
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+
+    expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Unknown')).toBeInTheDocument();
+    expect(within(getSecretCardButton(workerSecretsPanel, 'RPC')).getByText('Unknown')).toBeInTheDocument();
+    expect(within(getSecretCardButton(workerSecretsPanel, 'Arweave')).getByText('Unknown')).toBeInTheDocument();
+    expect(within(getSecretCardButton(workerSecretsPanel, 'Faucet')).getByText('Unknown')).toBeInTheDocument();
+    expect(within(getSecretCardButton(workerSecretsPanel, 'Lit')).getByText('Unknown')).toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByText('Empty')).not.toBeInTheDocument();
+  });
+
+  it('loads worker secret presence through a signed admin action without exposing secret values', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
+      }
+      if (String(url).endsWith('/admin/secret-presence')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: 'edge',
+            secrets: {
+              openaiKey: true,
+              anthropicKey: false,
+              openrouterKey: false,
+              customRpcUrl: true,
+              customRpcKey: false,
+              arweaveJwk: false,
+              faucetPrivateKey: true,
+              litAccountApiKey: false,
+              litUsageApiKey: true,
+            },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    await clickAndSettle(within(workerSecretsPanel).getByRole('button', { name: 'Refresh secret status' }));
+
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Configured')).toBeInTheDocument();
+      expect(within(getSecretCardButton(workerSecretsPanel, 'RPC')).getByText('Configured')).toBeInTheDocument();
+      expect(within(getSecretCardButton(workerSecretsPanel, 'Arweave')).getByText('Empty')).toBeInTheDocument();
+      expect(within(getSecretCardButton(workerSecretsPanel, 'Faucet')).getByText('Configured')).toBeInTheDocument();
+      expect(within(getSecretCardButton(workerSecretsPanel, 'Lit')).getByText('Configured')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Stored secret status refreshed.')).toBeInTheDocument();
+
+    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/secret-presence'));
+    expect(adminCall).toBeDefined();
+    const payload = JSON.parse(adminCall[1].body);
+    expect(payload).toEqual(expect.objectContaining({
+      action: 'secret-presence',
+      sessionSlug: 'edge',
+      slug: 'edge',
+    }));
+    expect(payload.secrets).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toMatch(/sk-|secret-value|rpc\.example/);
+  });
+
+  it('resets worker secret presence when the worker URL changes', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
+      }
+      if (String(url).endsWith('/admin/secret-presence')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: 'edge',
+            secrets: { openaiKey: true },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    await clickAndSettle(within(workerSecretsPanel).getByRole('button', { name: 'Refresh secret status' }));
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Configured')).toBeInTheDocument();
+    });
+
+    await clickAndSettle(screen.getByRole('button', { name: 'Edit worker URL' }));
+    await act(async () => {
+      fireEvent.change(screen.getByDisplayValue('https://worker.example.test'), {
+        target: { value: 'https://other-worker.example.test' },
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Unknown')).toBeInTheDocument();
+      expect(screen.getByText(/Stored secret status not checked/)).toBeInTheDocument();
+    });
+  });
+
+  it('resets worker secret presence when the general session worker URL changes', async () => {
+    sessionEntries = [[
+      '',
+      buildSessionConfig({
+        slug: 'general',
+        sessionName: 'General Session',
+      }),
+    ]];
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
+      }
+      if (String(url).endsWith('/admin/secret-presence')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: '',
+            secrets: { openaiKey: true },
+          }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    await clickAndSettle(within(workerSecretsPanel).getByRole('button', { name: 'Refresh secret status' }));
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Configured')).toBeInTheDocument();
+    });
+
+    await clickAndSettle(screen.getByRole('button', { name: 'Edit worker URL' }));
+    await act(async () => {
+      fireEvent.change(screen.getByDisplayValue('https://worker.example.test'), {
+        target: { value: 'https://other-worker.example.test' },
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Unknown')).toBeInTheDocument();
+      expect(screen.getByText(/Stored secret status not checked/)).toBeInTheDocument();
+    });
+  });
+
+  it('ignores stale worker secret presence responses after the worker URL changes', async () => {
+    let resolvePresence;
+    const presencePromise = new Promise((resolve) => {
+      resolvePresence = resolve;
+    });
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
+      }
+      if (String(url).endsWith('/admin/secret-presence')) {
+        return presencePromise;
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    await clickAndSettle(within(workerSecretsPanel).getByRole('button', { name: 'Refresh secret status' }));
+    await waitFor(() => {
+      expect(screen.getByText('Checking stored secret status…')).toBeInTheDocument();
+    });
+
+    await clickAndSettle(screen.getByRole('button', { name: 'Edit worker URL' }));
+    await act(async () => {
+      fireEvent.change(screen.getByDisplayValue('https://worker.example.test'), {
+        target: { value: 'https://other-worker.example.test' },
+      });
+      resolvePresence({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          sessionSlug: 'edge',
+          secrets: { openaiKey: true },
+        }),
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Unknown')).toBeInTheDocument();
+      expect(screen.queryByText('Stored secret status refreshed.')).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps saved worker secret presence when a stale refresh returns after save', async () => {
+    let resolvePresence;
+    const presencePromise = new Promise((resolve) => {
+      resolvePresence = resolve;
+    });
+    global.fetch = jest.fn((url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return Promise.resolve({ ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) });
+      }
+      if (String(url).endsWith('/admin/secret-presence')) {
+        return presencePromise;
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ ok: true }) });
+    });
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    await clickAndSettle(within(workerSecretsPanel).getByRole('button', { name: 'Refresh secret status' }));
+    await waitFor(() => {
+      expect(screen.getByText('Checking stored secret status…')).toBeInTheDocument();
+    });
+
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
+    fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
+      target: { value: 'sk-saved-after-refresh' },
+    });
+
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
+    await waitFor(() => {
+      expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Configured')).toBeInTheDocument();
+      expect(screen.getByText('Stored secret status updated from saved changes.')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      resolvePresence({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          sessionSlug: 'edge',
+          secrets: { openaiKey: false },
+        }),
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(within(getSecretCardButton(workerSecretsPanel, 'AI')).getByText('Configured')).toBeInTheDocument();
+      expect(screen.queryByText('Stored secret status refreshed.')).not.toBeInTheDocument();
+    });
+  });
+
   it('saves worker secrets through the signed admin route and reports success', async () => {
     global.fetch = jest.fn((url) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
@@ -203,6 +466,10 @@ describe('AdminPage worker secrets controls', () => {
     await waitFor(() => {
       expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
     });
+    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'AI' })).getByText('Configured')).toBeInTheDocument();
+    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'RPC' })).getByText('Unknown')).toBeInTheDocument();
+    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'Arweave' })).getByText('Unknown')).toBeInTheDocument();
+    expect(within(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' })).getByText('Unknown')).toBeInTheDocument();
 
     expect(global.fetch).toHaveBeenCalledWith('https://worker.example.test/admin/set-secrets', expect.objectContaining({
       method: 'POST',
