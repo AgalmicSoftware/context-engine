@@ -2,6 +2,7 @@ import React from 'react';
 
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
+import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
@@ -182,12 +183,20 @@ describe('SurveyResultsDisplayPanels', () => {
     const status = findFirstNodeByType(tree, SurveyResultsStatusMessages);
     const toggle = findFirstNodeByType(tree, SurveyResultsSurveyViewModeToggle);
     const questionList = findFirstNodeByType(tree, SurveyResultsQuestionListCard);
+    const filterSummary = findFirstNodeByType(tree, SurveyResultsFilterSummary);
     const summaries = findFirstNodeByType(tree, SurveyResultsQuestionSummariesList);
 
     expect(status?.props?.styleMap).toBe(defaultStyleMap);
     expect(toggle?.props?.isAggregate).toBe(true);
     expect(questionList?.props?.title).toBe(' View & Sort Questions');
     expect(questionList?.props?.questionTableNode.type).toBe('table');
+    expect(filterSummary?.props).toEqual(expect.objectContaining({
+      displayedTotalQuestionsCount: 2,
+      displayedTotalResponsesCount: 4,
+      normalizedFilteredQuestionsCount: 0,
+      normalizedFilteredResponsesCount: 0,
+      showFilteredCountSpinner: false,
+    }));
     expect(summaries?.props?.entries).toEqual([['q1', [{ answer: 'yes' }]]]);
 
     questionList.props.onToggle();
