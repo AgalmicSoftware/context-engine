@@ -2,8 +2,6 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
-  faChevronDown,
-  faChevronUp,
   faInfinity,
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
@@ -20,7 +18,9 @@ import {
   renderSbtPageHolderModal,
 } from './SBTPageModals';
 import SbtPageActionsSection from './SbtPageActionsSection';
+import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   buildSbtPageSectionHeaderClassName,
@@ -468,28 +468,19 @@ export const renderSbtPageFullView = ({
                 transactionHash,
               }}
             />
-            {userIsSbtAdmin && (
-              <div className={styles.adminSection}>
-                <h2 className={sectionHeaderClassName} onClick={toggleAdminSection}>
-                  ADMIN{' '}
-                  {adminSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                  {adminSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-                </h2>
-                {adminSectionToggleState.isOpen && (
-                  <div className={styles.adminContainer}>
-                    {adminActions}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className={styles.moreDetailsSection}>
-              <h2 className={sectionHeaderClassName} onClick={toggleMoreDetails}>
-                MORE{' '}
-                {moreDetailsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
-                {moreDetailsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
-              </h2>
-              {moreDetailsSectionToggleState.isOpen && relevantInfo}
-            </div>
+            <SbtPageAdminSection
+              adminActions={adminActions}
+              isAdmin={userIsSbtAdmin}
+              onToggle={toggleAdminSection}
+              sectionHeaderClassName={sectionHeaderClassName}
+              toggleState={adminSectionToggleState}
+            />
+            <SbtPageMoreDetailsSection
+              onToggle={toggleMoreDetails}
+              relevantInfo={relevantInfo}
+              sectionHeaderClassName={sectionHeaderClassName}
+              toggleState={moreDetailsSectionToggleState}
+            />
           </div>
         </div>
       ) : (
