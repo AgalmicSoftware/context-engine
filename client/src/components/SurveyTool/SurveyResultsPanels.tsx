@@ -1,9 +1,9 @@
 import React from 'react';
-import { Progress } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SurveyResults.module.scss';
+import SurveyResultsSyncDetailsDisplay from './SurveyResultsSyncDetailsDisplay';
 import type {
   SurveyResultsSyncStatusDisplayPlan,
 } from './surveyResultsSyncStatusController';
@@ -18,21 +18,6 @@ type SurveyResultsSyncStatusPanelArgs = {
   miniProgressStyle: React.CSSProperties;
   remainingSpinnerStyle: React.CSSProperties;
 };
-
-const renderSurveyResultsSyncBarText = (
-  barText: string,
-  showRemainingSpinner: boolean,
-  remainingSpinnerStyle: React.CSSProperties
-): React.ReactNode => (
-  showRemainingSpinner ? (
-    <>
-      {barText}{' '}
-      <FontAwesomeIcon icon={faSpinner} spin style={remainingSpinnerStyle} />
-    </>
-  ) : (
-    barText
-  )
-);
 
 export const renderSurveyResultsSyncStatusPanel = ({
   syncStatusDisplay,
@@ -50,9 +35,6 @@ export const renderSurveyResultsSyncStatusPanel = ({
     syncStatusText,
     showLongSyncNotice,
     showQuickRefresh,
-    viewMode,
-    question,
-    response,
   } = syncStatusDisplay;
 
   return (
@@ -85,74 +67,14 @@ export const renderSurveyResultsSyncStatusPanel = ({
         <FontAwesomeIcon icon={faSyncAlt} />
       </button>
     )}
-    <div
-      className={styles.syncStatus__details}
-      style={syncDetailsStyle}
-    >
-      <div className={styles.miniBarContainer}>
-        {viewMode === 'questions' && (
-          <div className={styles.miniBarLine}>
-            <div className={styles.miniBarLabel}>Questions:</div>
-            {question.showSpinner ? (
-              <>
-                <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
-                <div className={styles.miniBarFraction}>Loading...</div>
-              </>
-            ) : (
-              <>
-                <Progress
-                  value={question.progress}
-                  color={question.color}
-                  style={miniProgressStyle}
-                  className={styles.miniProgress}
-                />
-                <div className={styles.miniBarFraction}>
-                  {renderSurveyResultsSyncBarText(
-                    question.label,
-                    question.showRemainingSpinner,
-                    remainingSpinnerStyle
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        <div className={styles.miniBarLine}>
-          <div className={styles.miniBarLabel}>Responses:</div>
-          {response.showSpinner ? (
-            <>
-              <FontAwesomeIcon icon={faSpinner} spin style={miniBarSpinnerStyle} />
-              <div className={styles.miniBarFraction}>Loading...</div>
-            </>
-          ) : (
-            <>
-              <Progress
-                value={response.progress}
-                color={response.color}
-                style={miniProgressStyle}
-                className={styles.miniProgress}
-              />
-              <div className={styles.miniBarFraction}>
-                {renderSurveyResultsSyncBarText(
-                  response.label,
-                  response.showRemainingSpinner,
-                  remainingSpinnerStyle
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-      <div
-        className={styles.syncStatus__refreshAction}
-        onClick={onManualRefresh}
-        title="Refresh Data from Cache/Chain"
-      >
-        <FontAwesomeIcon icon={faSyncAlt} />
-        <span>Refresh Now</span>
-      </div>
-    </div>
+    <SurveyResultsSyncDetailsDisplay
+      miniBarSpinnerStyle={miniBarSpinnerStyle}
+      miniProgressStyle={miniProgressStyle}
+      onManualRefresh={onManualRefresh}
+      remainingSpinnerStyle={remainingSpinnerStyle}
+      syncDetailsStyle={syncDetailsStyle}
+      syncStatusDisplay={syncStatusDisplay}
+    />
   </div>
   );
 };
