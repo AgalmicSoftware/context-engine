@@ -32,6 +32,7 @@ import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysis
 import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsExportDisplayHelpers';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import {
@@ -160,6 +161,11 @@ const createAnalysisArtifact = (inputSignature = 'input-sig') => ({
   version: 1,
 });
 
+const RESOLVABLE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
+]);
+const resolvedComponentCache = new WeakMap();
+
 const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
   const stack: TreeNode[] = [node];
   while (stack.length > 0) {
@@ -173,6 +179,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_COMPONENTS.has(current.type)) {
+      if (!resolvedComponentCache.has(current)) {
+        resolvedComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -191,6 +204,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_COMPONENTS.has(node.type)) {
+    if (!resolvedComponentCache.has(node)) {
+      resolvedComponentCache.set(node, node.type(node.props || {}));
+    }
+    return collectTreeNodes(resolvedComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
