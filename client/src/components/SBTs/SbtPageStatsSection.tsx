@@ -4,66 +4,48 @@ import {
   faChevronDown,
   faChevronUp,
   faQuestionCircle,
-  faSpinner,
-  faUser,
 } from '@fortawesome/free-solid-svg-icons';
 
 import CETooltip from '../Shared/CETooltip';
 import styles from './SBTPage.module.scss';
-import SbtPageStatsScanProgressDisplay from './SbtPageStatsScanProgressDisplay';
+import SbtPageHolderStatusDisplay from './SbtPageHolderStatusDisplay';
+import type {
+  SbtPageHolderCountStatus,
+  SbtPageHolderScanProgressDisplay,
+} from './SbtPageHolderStatusDisplay';
 
 type SbtPageStatsSectionProps = {
   adminAddressDisplay: React.ReactNode;
   burnLabel: string;
   creatorAddressDisplay: React.ReactNode;
-  isInitialLoading: boolean;
   isOpen: boolean;
-  isRefreshing: boolean;
-  maxTokensDisplay: string | number;
-  mintedCountTitle?: string;
-  mintedLabel: string;
+  holderCountStatus: SbtPageHolderCountStatus;
+  holderScanProgressDisplay: SbtPageHolderScanProgressDisplay;
   mintEndDisplay?: React.ReactNode;
-  netMinted: string | number;
   networkLabel: React.ReactNode;
   onOpenMintedModal: React.MouseEventHandler<HTMLButtonElement>;
   onToggle: React.MouseEventHandler<HTMLHeadingElement>;
   questionIconStyle?: React.CSSProperties;
-  refreshIndicatorStyle?: React.CSSProperties;
-  scanProgressFillStyle?: React.CSSProperties;
-  scanProgressPct: number;
-  scanProgressSessionText?: string | null;
-  scanProgressText?: string | null;
   sectionHeaderClassName: string;
   shouldRenderClosedIcon: boolean;
   shouldRenderOpenIcon: boolean;
-  showScanProgress: boolean;
 };
 
 const SbtPageStatsSection = ({
   adminAddressDisplay,
   burnLabel,
   creatorAddressDisplay,
-  isInitialLoading,
   isOpen,
-  isRefreshing,
-  maxTokensDisplay,
-  mintedCountTitle,
-  mintedLabel,
+  holderCountStatus,
+  holderScanProgressDisplay,
   mintEndDisplay,
-  netMinted,
   networkLabel,
   onOpenMintedModal,
   onToggle,
   questionIconStyle,
-  refreshIndicatorStyle,
-  scanProgressFillStyle,
-  scanProgressPct,
-  scanProgressSessionText = null,
-  scanProgressText = '',
   sectionHeaderClassName,
   shouldRenderClosedIcon,
   shouldRenderOpenIcon,
-  showScanProgress,
 }: SbtPageStatsSectionProps): React.ReactElement => (
   <div className={styles.statsSection}>
     <h2 className={sectionHeaderClassName} onClick={onToggle}>
@@ -73,31 +55,10 @@ const SbtPageStatsSection = ({
     </h2>
     {isOpen && (
       <div className={styles.stats}>
-        <p>
-          <span className={styles.label}>{`${mintedLabel}:`}</span>
-          {isInitialLoading ? (
-            <FontAwesomeIcon icon={faSpinner} spin />
-          ) : (
-            <span title={mintedCountTitle}>
-              {`${netMinted} / ${maxTokensDisplay}`}
-            </span>
-          )}
-          {isRefreshing && (
-            <span style={refreshIndicatorStyle} title="Refreshing...">
-              <FontAwesomeIcon icon={faSpinner} spin />
-            </span>
-          )}
-
-          <button onClick={onOpenMintedModal} className={styles.expandButton}>
-            <FontAwesomeIcon icon={faUser} />
-          </button>
-        </p>
-        <SbtPageStatsScanProgressDisplay
-          scanProgressFillStyle={scanProgressFillStyle}
-          scanProgressPct={scanProgressPct}
-          scanProgressSessionText={scanProgressSessionText}
-          scanProgressText={scanProgressText}
-          showScanProgress={showScanProgress}
+        <SbtPageHolderStatusDisplay
+          countStatus={holderCountStatus}
+          onOpenMintedModal={onOpenMintedModal}
+          scanProgressDisplay={holderScanProgressDisplay}
         />
         {mintEndDisplay}
         <p>
