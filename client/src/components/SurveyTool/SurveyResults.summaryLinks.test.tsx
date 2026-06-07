@@ -38,6 +38,7 @@ import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
 import {
   buildSurveyResultsFreeformSummaryModel,
@@ -50,6 +51,10 @@ type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsQuestionSummariesPanel,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -146,6 +151,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
+      if (!resolvedTreeComponentCache.has(current)) {
+        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedTreeComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
