@@ -33,6 +33,8 @@ import {
   SurveyResultsFreeformAggregatorSummary,
   SurveyResultsMultichoiceAggregatorSummary,
 } from './SurveyResultsAggregatorSummaries';
+import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
+import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
@@ -52,6 +54,8 @@ type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
 const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsFilterSummary,
+  SurveyResultsIndividualResponseBody,
   SurveyResultsQuestionSummariesPanel,
 ]);
 const resolvedTreeComponentCache = new WeakMap();
@@ -176,6 +180,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
