@@ -1,9 +1,8 @@
 import React from 'react';
 import { SurveyQuestions } from './SurveyQuestions';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import {
   findElement,
   findFirstNodeByType,
@@ -46,19 +45,11 @@ const createReadySubject = ({
   return subject;
 };
 
-const getAuthoringPanel = (subject) => {
-  const panel = findFirstNodeByType(subject.render(), SurveyQuestionsAuthoringPanel);
-  expect(panel).not.toBeNull();
-  return panel;
+const getRouteSurface = (subject) => {
+  const surface = findFirstNodeByType(subject.render(), SurveyQuestionsRouteSurface);
+  expect(surface).not.toBeNull();
+  return surface;
 };
-
-const findSubmitButton = (node) => (
-  findElement(node, (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT)
-);
-
-const findSubmittedIndicator = (node) => (
-  findElement(node, (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)
-);
 
 describe('SurveyQuestions controls', () => {
   afterEach(() => {
@@ -180,10 +171,10 @@ describe('SurveyQuestions controls', () => {
   it('keeps submit controls hidden until a survey has pending edits or submitted state', () => {
     const subject = createReadySubject();
 
-    const panel = getAuthoringPanel(subject);
+    const surface = getRouteSurface(subject);
 
-    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(false);
-    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(false);
+    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(false);
+    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(false);
     expect(subject.renderQuestion).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'q1' }),
       0,
@@ -199,15 +190,13 @@ describe('SurveyQuestions controls', () => {
     });
     subject.handlePrimarySubmitClick = jest.fn();
 
-    const panel = getAuthoringPanel(subject);
-    const button = findSubmitButton(panel.props.submitResponseButton);
+    const surface = getRouteSurface(subject);
 
-    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(true);
-    expect(button).not.toBeNull();
-    expect(button.props.disabled).toBe(false);
+    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.submitDisabled).toBe(false);
 
-    button.props.onClick();
+    surface.props.submitFooterProps.onPrimarySubmitClick();
 
     expect(subject.handlePrimarySubmitClick).toHaveBeenCalledTimes(1);
   });
@@ -222,17 +211,14 @@ describe('SurveyQuestions controls', () => {
     subject.getPendingEditStats = jest.fn(() => ({ total: 0 }));
     subject.encryptAndUpload = jest.fn();
 
-    const panel = getAuthoringPanel(subject);
-    const button = findSubmitButton(panel.props.submitResponseButton);
-    const submittedIndicator = findSubmittedIndicator(panel.props.submitResponseButton);
+    const surface = getRouteSurface(subject);
 
-    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(true);
-    expect(button).not.toBeNull();
-    expect(button.props.disabled).toBe(false);
-    expect(submittedIndicator).not.toBeNull();
+    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.submitDisabled).toBe(false);
+    expect(surface.props.submitDisplayState.submittedIndicatorActive).toBe(true);
 
-    button.props.onClick();
+    surface.props.submitFooterProps.onPrimarySubmitClick();
 
     expect(subject._submitGuard).toBe(false);
     expect(subject.encryptAndUpload).not.toHaveBeenCalled();
@@ -246,12 +232,10 @@ describe('SurveyQuestions controls', () => {
       },
     });
 
-    const panel = getAuthoringPanel(subject);
-    const button = findSubmitButton(panel.props.submitResponseButton);
+    const surface = getRouteSurface(subject);
 
-    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(button).not.toBeNull();
-    expect(button.props.disabled).toBe(true);
+    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.submitDisabled).toBe(true);
   });
 
   it('disables single-question submit when the active prompt is still masked', () => {
@@ -266,13 +250,11 @@ describe('SurveyQuestions controls', () => {
       question: { id: 'q1', type: 'freeform', prompt: '[encrypted]' },
     });
 
-    const panel = getAuthoringPanel(subject);
-    const button = findSubmitButton(panel.props.submitResponseButton);
+    const surface = getRouteSurface(subject);
 
-    expect(panel.props.submitDisplayState.showInlineSubmit).toBe(true);
-    expect(panel.props.submitDisplayState.showTopInlineSubmit).toBe(false);
-    expect(button).not.toBeNull();
-    expect(button.props.disabled).toBe(true);
+    expect(surface.props.submitDisplayState.showInlineSubmit).toBe(true);
+    expect(surface.props.submitDisplayState.showTopInlineSubmit).toBe(false);
+    expect(surface.props.submitDisplayState.submitDisabled).toBe(true);
   });
 
   it('starts primary submit only when pending edits are available', () => {
