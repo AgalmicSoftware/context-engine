@@ -6,6 +6,9 @@ import {
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
+import {
+  buildSurveyResultsAlertMessagePatch,
+} from './surveyResultsHelpers';
 
 export type SurveyResultsExportOption = {
   label: string;
@@ -270,6 +273,26 @@ export type SurveyResultsHtmlReportReadinessPlan = {
   selectedSections: Required<SessionResultsSectionSelection>;
 };
 
+export type SurveyResultsHtmlReportDownloadStatePatch = {
+  alertMessage?: string;
+  htmlReportModalOpen?: boolean;
+};
+
+export type SurveyResultsHtmlReportDownloadAttemptPlan =
+  | {
+    blockedReason: '';
+    statePatch: null;
+    status: 'ready';
+  }
+  | {
+    blockedReason:
+      | 'not-authorized'
+      | 'no-exportable-sections'
+      | 'unavailable-selected-sections';
+    statePatch: SurveyResultsHtmlReportDownloadStatePatch;
+    status: 'blocked';
+  };
+
 export type SurveyResultsHtmlReportReadinessPlanInput = {
   analysisGenerating?: unknown;
   isAuthorized?: unknown;
@@ -378,6 +401,54 @@ export const buildSurveyResultsHtmlReportReadinessPlan = ({
     selectedSections: normalizedSelectedSections,
   };
 };
+
+export const buildSurveyResultsHtmlReportDownloadAttemptPlan = ({
+  isAuthorized = false,
+  readinessPlan,
+}: {
+  isAuthorized?: boolean;
+  readinessPlan: Pick<
+    SurveyResultsHtmlReportReadinessPlan,
+    'hasExportableSections' | 'hasUnavailableSelectedSections'
+  >;
+}): SurveyResultsHtmlReportDownloadAttemptPlan => {
+  if (!isAuthorized) {
+    return {
+      blockedReason: 'not-authorized',
+      statePatch: buildSurveyResultsAlertMessagePatch('Connect a wallet with permission to view these results before export.'),
+      status: 'blocked',
+    };
+  }
+  if (!readinessPlan.hasExportableSections) {
+    return {
+      blockedReason: 'no-exportable-sections',
+      statePatch: buildSurveyResultsAlertMessagePatch('Select at least one available report section before export.'),
+      status: 'blocked',
+    };
+  }
+  if (readinessPlan.hasUnavailableSelectedSections) {
+    return {
+      blockedReason: 'unavailable-selected-sections',
+      statePatch: buildSurveyResultsAlertMessagePatch('Generate selected analysis views before downloading the report.'),
+      status: 'blocked',
+    };
+  }
+
+  return {
+    blockedReason: '',
+    statePatch: null,
+    status: 'ready',
+  };
+};
+
+export const buildSurveyResultsHtmlReportDownloadSuccessPatch = (): SurveyResultsHtmlReportDownloadStatePatch => ({
+  alertMessage: '',
+  htmlReportModalOpen: false,
+});
+
+export const buildSurveyResultsHtmlReportDownloadFailurePatch = (): SurveyResultsHtmlReportDownloadStatePatch => (
+  buildSurveyResultsAlertMessagePatch('Unable to export the HTML report.')
+);
 
 export const buildSurveyResultsDemoAnalysisArtifact = ({
   analysisPayload,
