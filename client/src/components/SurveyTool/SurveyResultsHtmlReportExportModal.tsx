@@ -28,7 +28,7 @@ type SurveyResultsHtmlReportSectionRow = {
   reason?: React.ReactNode;
 };
 
-type SurveyResultsHtmlReportExportModalProps = {
+export type SurveyResultsHtmlReportExportModalDisplayProps = {
   analysisGenerating?: boolean;
   analysisPayload: SurveyResultsRecord;
   analysisProgress?: string;
@@ -40,17 +40,24 @@ type SurveyResultsHtmlReportExportModalProps = {
   isDemoSession?: boolean;
   isOpen?: boolean;
   needsAnalysisGeneration?: boolean;
+  sectionRows: SurveyResultsHtmlReportSectionRow[];
+  selectedSections: Record<string, unknown>;
+  snapshot: SurveyResultsRecord;
+  styleMap: Record<string, string>;
+};
+
+export type SurveyResultsHtmlReportExecutionProps = {
   onClose: () => void;
   onDownload: () => void;
   onFormatChange: (format: SessionResultsExportFormat) => void;
   onGenerateAnalysis: () => void;
   onToggleDemoMode: () => void;
   onToggleSection: (key: any) => void;
-  sectionRows: SurveyResultsHtmlReportSectionRow[];
-  selectedSections: Record<string, unknown>;
-  snapshot: SurveyResultsRecord;
-  styleMap: Record<string, string>;
 };
+
+export type SurveyResultsHtmlReportExportModalProps =
+  SurveyResultsHtmlReportExportModalDisplayProps &
+  SurveyResultsHtmlReportExecutionProps;
 
 export const HTML_REPORT_EXPORT_FORMATS: readonly {
   description: string;
