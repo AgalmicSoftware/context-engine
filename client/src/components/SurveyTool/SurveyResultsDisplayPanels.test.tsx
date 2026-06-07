@@ -4,9 +4,15 @@ import SingleQuestionResponse from './SingleQuestionResponse';
 import { renderSurveyResultsDisplayPanels } from './SurveyResultsDisplayPanels';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
+
+const RESOLVABLE_COMPONENTS = new Set([
+  SurveyResultsQuestionListPanel,
+]);
+const resolvedComponentCache = new WeakMap();
 
 const findFirstNodeByType = (node, type) => {
   const stack = [node];
@@ -21,6 +27,13 @@ const findFirstNodeByType = (node, type) => {
     }
     if (typeof current !== 'object') continue;
     if (current.type === type) return current;
+    if (RESOLVABLE_COMPONENTS.has(current.type)) {
+      if (!resolvedComponentCache.has(current)) {
+        resolvedComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedComponentCache.get(current));
+      continue;
+    }
     const children = current.props?.children;
     if (children !== undefined) stack.push(children);
   }
