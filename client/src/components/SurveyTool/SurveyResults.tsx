@@ -194,6 +194,9 @@ import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
 import {
+  buildSurveyResultsHtmlReportDownloadRequest,
+} from './surveyResultsHtmlReportDownloadRequest';
+import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
 import {
@@ -226,8 +229,6 @@ import {
   buildSessionResultsAnalysisInputSignature,
   buildSessionResultsAnalysisPrompt,
   buildRedactedSessionResultsSnapshot,
-  buildSessionResultsHtmlReportFilename,
-  buildSessionResultsPdfReportFilename,
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
@@ -3590,22 +3591,19 @@ if (readinessPlan.hasUnavailableSelectedSections) {
 
 try {
   const format = this.state.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
-  const html = renderSessionResultsHtmlReport(snapshot, {
+  const downloadRequest = buildSurveyResultsHtmlReportDownloadRequest({
     format,
-    sections: selectedSections,
+    selectedSections,
+    snapshot,
   });
-  const baseFilenameArgs = {
-    exportedAt: snapshot.exportedAt,
-    name: snapshot.session.name,
-    slug: snapshot.session.slug,
-  };
-  if (format === SESSION_RESULTS_EXPORT_FORMAT_PDF) {
+  const html = renderSessionResultsHtmlReport(snapshot, downloadRequest.renderOptions);
+  if (downloadRequest.kind === 'pdf') {
     await downloadSessionResultsPdfReport({
       html,
-      filename: buildSessionResultsPdfReportFilename(baseFilenameArgs),
+      filename: downloadRequest.filename,
     });
   } else {
-    downloadSessionResultsHtmlReport(html, buildSessionResultsHtmlReportFilename(baseFilenameArgs));
+    downloadSessionResultsHtmlReport(html, downloadRequest.filename);
   }
   this.setState({
     htmlReportModalOpen: false,

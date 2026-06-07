@@ -7,7 +7,6 @@ import {
 } from '../../utilities/sessionResultsExport';
 import {
   buildSurveyResultsHtmlReportDownloadRequest,
-  buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
 
 const buildSnapshot = (): SessionResultsHtmlSnapshot => ({
@@ -109,89 +108,6 @@ describe('buildSurveyResultsHtmlReportDownloadRequest', () => {
     expect(request.renderOptions).toEqual({
       format: SESSION_RESULTS_EXPORT_FORMAT_PDF,
       sections: selectedSections,
-    });
-  });
-});
-
-describe('buildSurveyResultsHtmlReportDownloadExecutionPlan', () => {
-  it('blocks unauthorized downloads before describing render/download execution', () => {
-    const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      isAuthorized: false,
-      selectedSections,
-      snapshot: buildSnapshot(),
-    });
-
-    expect(plan.status).toBe('blocked');
-    expect(plan.blockedReason).toBe('not-authorized');
-    expect(plan.downloadRequest).toBeNull();
-    expect(plan.statePatch).toEqual({
-      alertMessage: 'Connect a wallet with permission to view these results before export.',
-    });
-    expect(plan.readinessPlan.canDownload).toBe(false);
-  });
-
-  it('blocks unavailable selected analysis sections without building a download request', () => {
-    const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      isAuthorized: true,
-      selectedSections: {
-        ...selectedSections,
-        riskMatrix: true,
-      },
-      snapshot: buildSnapshot(),
-    });
-
-    expect(plan.status).toBe('blocked');
-    expect(plan.blockedReason).toBe('unavailable-selected-sections');
-    expect(plan.downloadRequest).toBeNull();
-    expect(plan.statePatch).toEqual({
-      alertMessage: 'Generate selected analysis views before downloading the report.',
-    });
-    expect(plan.readinessPlan.needsAnalysisGeneration).toBe(true);
-  });
-
-  it('blocks pending analysis generation before describing render/download execution', () => {
-    const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      analysisGenerating: true,
-      isAuthorized: true,
-      selectedSections,
-      snapshot: buildSnapshot(),
-    });
-
-    expect(plan.status).toBe('blocked');
-    expect(plan.blockedReason).toBe('analysis-generating');
-    expect(plan.downloadRequest).toBeNull();
-    expect(plan.statePatch).toEqual({
-      alertMessage: 'Wait for analysis generation to finish before downloading the report.',
-    });
-    expect(plan.readinessPlan.canDownload).toBe(false);
-  });
-
-  it('describes ready PDF render/download identity without executing report work', () => {
-    const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      format: SESSION_RESULTS_EXPORT_FORMAT_PDF,
-      isAuthorized: true,
-      selectedSections,
-      snapshot: buildSnapshot(),
-    });
-
-    expect(plan).toEqual(expect.objectContaining({
-      blockedReason: '',
-      statePatch: null,
-      status: 'ready',
-    }));
-    expect(plan.readinessPlan.canDownload).toBe(true);
-    expect(plan.downloadRequest).toEqual({
-      filename: 'contextEngine_sessionReport_demo-session_2026-05-25T18_30_00_000Z.pdf',
-      filenameIdentity: {
-        exportedAt: '2026-05-25T18:30:00.000Z',
-        name: 'Demo Session',
-        slug: 'demo-session',
-      },
-      kind: 'pdf',
-      renderOptions: {
-        format: SESSION_RESULTS_EXPORT_FORMAT_PDF,
-        sections: selectedSections,
-      },
     });
   });
 });
