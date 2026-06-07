@@ -21,7 +21,7 @@ const SurveyResultsFilterSummary = ({
 }: SurveyResultsFilterSummaryProps): React.ReactElement => (
   <div className={styles.filterSummaryBox}>
     <p className={styles.filterSummaryText}>
-      Questions: <strong>{displayedTotalQuestionsCount}</strong>{' \u200e  '}
+      Questions: <strong>{displayedTotalQuestionsCount}</strong>{' '}
       Filtered:{' '}
       <strong>
         {showFilteredCountSpinner ? (
@@ -31,7 +31,7 @@ const SurveyResultsFilterSummary = ({
         )}
       </strong>
       <br />
-      Responses: <strong>{displayedTotalResponsesCount}</strong>{' \u200e  '}
+      Responses: <strong>{displayedTotalResponsesCount}</strong>{' '}
       Filtered:{' '}
       <strong>
         {showFilteredCountSpinner ? (

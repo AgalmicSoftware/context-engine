@@ -3,9 +3,6 @@ import { render, screen } from '@testing-library/react';
 
 import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 
-const normalizeSummaryText = (text = ''): string =>
-  text.replace(/\u200e/g, '').replace(/\s+/g, ' ').trim();
-
 describe('SurveyResultsFilterSummary', () => {
   it('renders total and filtered question/response counts', () => {
     const { container } = render(
@@ -18,10 +15,9 @@ describe('SurveyResultsFilterSummary', () => {
       />
     );
     const summaryText = container.querySelector('p');
-    const normalizedSummaryText = normalizeSummaryText(summaryText?.textContent || '');
 
-    expect(normalizedSummaryText).toContain('Questions: 12 Filtered: 5');
-    expect(normalizedSummaryText).toContain('Responses: 34 Filtered: 8');
+    expect(summaryText).toHaveTextContent('Questions: 12 Filtered: 5');
+    expect(summaryText).toHaveTextContent('Responses: 34 Filtered: 8');
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText('34')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
