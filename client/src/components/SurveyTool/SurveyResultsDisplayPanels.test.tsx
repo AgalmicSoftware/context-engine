@@ -6,11 +6,13 @@ import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualRespo
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 const RESOLVABLE_COMPONENTS = new Set([
   SurveyResultsQuestionListPanel,
+  SurveyResultsQuestionSummariesPanel,
 ]);
 const resolvedComponentCache = new WeakMap();
 
