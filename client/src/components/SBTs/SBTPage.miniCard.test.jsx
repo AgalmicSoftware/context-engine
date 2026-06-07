@@ -1,5 +1,6 @@
 import SBTPage from './SBTPage';
 import SbtPageMiniCard from './SbtPageMiniCard';
+import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
 import styles from './SBTPage.module.scss';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -40,9 +41,20 @@ const createSubject = (props = {}) => {
   return subject;
 };
 
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SbtPageMiniCardDisplay,
+]);
+const resolvedTreeComponentCache = new WeakMap();
+
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
