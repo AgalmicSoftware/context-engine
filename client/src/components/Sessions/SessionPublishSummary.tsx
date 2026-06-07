@@ -4,15 +4,14 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
   faCaretUp,
-  faCheck,
   faCog,
   faCopy,
-  faExclamationCircle,
   faSpinner,
   faUpload,
 } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
+import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -131,14 +130,6 @@ const SessionPublishSummary = ({
     showUploadBlockedReason,
     uploadBlockedReason,
   } = publishReadiness;
-  const {
-    activePublishProgressStepLabel,
-    publishStep,
-    publishProgressPercent,
-    publishProgressPercentRounded,
-    publishProgressSteps,
-    showPublishProgress,
-  } = publishProgressDisplayState;
 
   return (
   <section id="session-wizard-section-publish" className={styles.panel}>
@@ -272,53 +263,10 @@ const SessionPublishSummary = ({
           </>
         ) : null}
 
-        {showPublishProgress ? (
-          <div className={styles.publishProgressCard} data-testid="ce-wizard-publish-progress">
-            <div className={styles.publishProgressHeader}>
-              <div className={styles.publishProgressCopy}>
-                <span className={styles.publishProgressEyebrow}>
-                  {publishBusy ? 'Publishing Session' : 'Publish Complete'}
-                </span>
-                <strong className={styles.publishProgressStage}>
-                  {activePublishProgressStepLabel || 'Preparing'}
-                </strong>
-              </div>
-              <span className={styles.publishProgressPercent}>{publishProgressPercentRounded}%</span>
-            </div>
-            <div
-              className={styles.publishProgressBar}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={publishProgressPercentRounded}
-              aria-valuetext={`${publishProgressPercentRounded}% ${activePublishProgressStepLabel || 'Preparing'}`}
-            >
-              <div
-                className={styles.publishProgressFill}
-                style={{ width: `${publishProgressPercent}%` }}
-              />
-            </div>
-            <div className={styles.progressIndicator}>
-              {publishProgressSteps.map((step, index) => {
-                const stepNumber = index + 1;
-                const isActive = publishStep === stepNumber && (publishBusy || step.key !== 'done');
-                const isComplete = publishStep > stepNumber || (step.key === 'done' && publishStep >= stepNumber);
-                return (
-                  <div
-                    key={step.key}
-                    className={`${publishStep >= stepNumber ? styles.stepCompleted : styles.step} ${isActive ? styles.stepActive : ''}`}
-                  >
-                    <FontAwesomeIcon
-                      icon={isActive ? faSpinner : isComplete ? faCheck : faExclamationCircle}
-                      spin={isActive}
-                    />
-                    <span>{step.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
+        <SessionPublishProgressPanel
+          progressDisplayState={publishProgressDisplayState}
+          publishBusy={publishBusy}
+        />
 
         {showUploadBlockedReason ? (
           <div className={styles.statusNote}>

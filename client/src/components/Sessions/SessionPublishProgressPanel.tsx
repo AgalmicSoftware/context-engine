@@ -11,15 +11,16 @@ import type { SessionWizardPublishProgressDisplayState } from './sessionWizardPu
 
 type SessionPublishProgressPanelProps = {
   progressDisplayState: SessionWizardPublishProgressDisplayState;
+  publishBusy: boolean;
 };
 
 const SessionPublishProgressPanel = ({
   progressDisplayState,
+  publishBusy,
 }: SessionPublishProgressPanelProps): React.ReactElement | null => {
   const {
     activePublishProgressStepLabel,
-    publishProgressAriaValueText,
-    publishProgressEyebrow,
+    publishStep,
     publishProgressPercent,
     publishProgressPercentRounded,
     publishProgressSteps,
@@ -33,7 +34,7 @@ const SessionPublishProgressPanel = ({
       <div className={styles.publishProgressHeader}>
         <div className={styles.publishProgressCopy}>
           <span className={styles.publishProgressEyebrow}>
-            {publishProgressEyebrow}
+            {publishBusy ? 'Publishing Session' : 'Publish Complete'}
           </span>
           <strong className={styles.publishProgressStage}>
             {activePublishProgressStepLabel || 'Preparing'}
@@ -47,7 +48,7 @@ const SessionPublishProgressPanel = ({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={publishProgressPercentRounded}
-        aria-valuetext={publishProgressAriaValueText}
+        aria-valuetext={`${publishProgressPercentRounded}% ${activePublishProgressStepLabel || 'Preparing'}`}
       >
         <div
           className={styles.publishProgressFill}
@@ -55,13 +56,14 @@ const SessionPublishProgressPanel = ({
         />
       </div>
       <div className={styles.progressIndicator}>
-        {publishProgressSteps.map((step) => {
-          const isActive = step.state === 'active';
-          const isComplete = step.state === 'complete';
+        {publishProgressSteps.map((step, index) => {
+          const stepNumber = index + 1;
+          const isActive = publishStep === stepNumber && (publishBusy || step.key !== 'done');
+          const isComplete = publishStep > stepNumber || (step.key === 'done' && publishStep >= stepNumber);
           return (
             <div
               key={step.key}
-              className={`${step.state !== 'pending' ? styles.stepCompleted : styles.step} ${isActive ? styles.stepActive : ''}`}
+              className={`${publishStep >= stepNumber ? styles.stepCompleted : styles.step} ${isActive ? styles.stepActive : ''}`}
             >
               <FontAwesomeIcon
                 icon={isActive ? faSpinner : isComplete ? faCheck : faExclamationCircle}
