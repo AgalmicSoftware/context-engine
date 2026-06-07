@@ -7,7 +7,6 @@ import {
   Label,
   Modal,
   ModalBody,
-  ModalFooter,
   ModalHeader,
   Table,
 } from 'reactstrap';
@@ -18,6 +17,7 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsExportFormat,
 } from '../../utilities/sessionResultsExport';
+import { renderSurveyResultsHtmlReportActionControls } from './SurveyResultsHtmlReportActionControls';
 
 type SurveyResultsRecord = Record<string, any>;
 
@@ -259,24 +259,13 @@ export const renderSurveyResultsHtmlReportExportModal = ({
           </Alert>
         )}
       </ModalBody>
-      <ModalFooter className={styleMap.htmlReportModalFooter}>
-        <Button
-          color="secondary"
-          onClick={onClose}
-          className={styleMap.htmlReportCancelButton}
-        >
-          Cancel
-        </Button>
-        <Button
-          color="primary"
-          onClick={onDownload}
-          disabled={!canDownload}
-          className={styleMap.htmlReportDownloadButton}
-          data-testid="ce-surveyresults-html-report-download"
-        >
-          {downloadLabel}
-        </Button>
-      </ModalFooter>
+      {renderSurveyResultsHtmlReportActionControls({
+        canDownload,
+        downloadLabel,
+        onClose,
+        onDownload,
+        styleMap,
+      })}
     </Modal>
   );
 };
