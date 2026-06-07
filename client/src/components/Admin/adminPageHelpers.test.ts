@@ -17,6 +17,7 @@ describe('adminPageHelpers', () => {
     expect(normalizeSlug(' general ')).toBe('');
     expect(normalizeSlug(' Edge Session ')).toBe('edgesession');
     expect(normalizeWorkerUrl('https://worker.example.test///')).toBe('https://worker.example.test');
+    expect(normalizeWorkerUrl('https://worker.example.test/admin/secret-presence')).toBe('https://worker.example.test');
     expect(normalizeAiProvider('Anthropic')).toBe('anthropic');
     expect(normalizeAiProvider('unknown', 'custom')).toBe('custom');
     expect(inferAiProviderFromModel('claude-3-7-sonnet')).toBe('anthropic');

@@ -1,6 +1,6 @@
 import { getChainById } from '../../variables/chains.js';
-import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { normalizeSlug as canonicalizeSlug, toStr } from '../../utilities/shared/primitives.js';
+import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
   const message = error && typeof error === 'object' && 'message' in error
@@ -35,7 +35,7 @@ export const countSessionsForChain = (entries: unknown = [], chainId: unknown = 
   }).length;
 };
 
-export const normalizeWorkerUrl = (url: unknown): string => normalizeBaseUrl(url);
+export const normalizeWorkerUrl = (url: unknown): string => normalizeWorkerBaseUrl(url);
 
 export const normalizeAiProvider = (raw: unknown, fallback: unknown = 'openai'): string => {
   const provider = toStr(raw).trim().toLowerCase();

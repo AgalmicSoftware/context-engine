@@ -1037,6 +1037,17 @@ $card-shadow: tokens.$ce-card-shadow;
   gap: 12px;
 }
 
+.secretStatusBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.secretStatusBar .statusNote {
+  flex: 1 1 auto;
+}
+
 .secretOptionCard {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1095,6 +1106,13 @@ $card-shadow: tokens.$ce-card-shadow;
 
 .secretInput {
   flex: 1 1 auto;
+}
+
+.secretFieldStatus {
+  margin-top: 6px;
+  color: rgba(244, 247, 255, 0.64);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .secretRemoveButton,
