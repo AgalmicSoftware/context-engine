@@ -51,13 +51,13 @@ type SbtPageBurnActionBlockedReason =
   | 'missing-sbt'
   | 'missing-token'
   | 'owner-burn-disabled';
-type SbtPageBurnActionPlan = SbtPageBurnButtonState & {
+export type SbtPageBurnActionPlan = SbtPageBurnButtonState & {
   blockedReason: SbtPageBurnActionBlockedReason;
 };
 type ResolveSbtPageBurnStatusButtonStateArgs = {
   burningStatus?: unknown;
 };
-type SbtPageBurnStatusButtonState = {
+export type SbtPageBurnStatusButtonState = {
   disabled: boolean;
   isFailure: boolean;
   isIdle: boolean;
@@ -116,7 +116,7 @@ type ResolveSbtPageStatusButtonContentStateArgs = {
   isSuccess?: unknown;
   successLabel?: unknown;
 };
-type SbtPageStatusButtonContentState = {
+export type SbtPageStatusButtonContentState = {
   failureLabel: string;
   idleLabel: string;
   shouldRenderFailure: boolean;
@@ -440,7 +440,7 @@ type ResolveSbtPageMintButtonDisplayStateArgs = ShouldRenderSbtPageMintButtonArg
   mintStep?: unknown;
   sbtMintedSuccessLabel?: unknown;
 };
-type SbtPageMintButtonDisplayState = {
+export type SbtPageMintButtonDisplayState = {
   manualClaimActionRequest: SbtPageManualClaimActionRequest;
   mintActionPlan: SbtPageMintActionPlan;
   mintFlowDisplayState: SbtPageMintFlowDisplayState;

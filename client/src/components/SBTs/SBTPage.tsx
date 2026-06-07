@@ -31,16 +31,16 @@ import {
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import SbtPageAdminActions from './SbtPageAdminActions';
+import {
+  SbtPageBurnActionSurface,
+  SbtPageMintActionSurface,
+} from './SbtPageFullActionButtons';
 import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
-import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
-import SbtPageStatusActionButton from './SbtPageStatusActionButton';
 import {
-  runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
   runSbtPageMiniMintActionController,
-  runSbtPageMintActionController,
 } from './sbtPageActionController';
 import {
   appendSbtPageBookmark,
@@ -3661,134 +3661,28 @@ renderMintButton() {
     sbtMintedSuccessLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
     userHasSBT,
   });
-  const {
-    manualClaimActionRequest,
-    mintActionPlan,
-    mintFlowDisplayState,
-    openMintButtonContentState,
-    openMintButtonState,
-    passwordJoinButtonState,
-    passwordJoinContentState,
-  } = mintButtonDisplayState;
-  if (!mintActionPlan.shouldRenderMintButton) return null;
-  if (mintFlowDisplayState.shouldSuppressMintControls) return null;
   const mintActionButtonClassName = buildSbtPageActionButtonClassName({
     actionClassName: styles.actionButton,
     variantClassName: styles.mintButton,
   });
 
-  // Unlimited (signature) path - hide inputs after success
-  if (mintFlowDisplayState.shouldRenderGroupPasswordJoin) {
-    return (
-      <SbtPageMintInputAction
-        buttonClassName={mintActionButtonClassName}
-        contentState={passwordJoinContentState}
-        disabled={passwordJoinButtonState.disabled}
-        inputType="password"
-        inputValue={groupPasswordInput || ''}
-        onInputChange={this.handleGroupPasswordInputChange}
-        placeholder="Group Password"
-        onAction={(event) => runSbtPageMintActionController({
-            disabled: passwordJoinButtonState.disabled,
-            event,
-            plan: mintActionPlan,
-            ports: {
-              dispatchMint: this.mintUnlimitedWithGroupPassword,
-            },
-          })}
-      />
-    );
-  }
-
-  // Limited group-password - hide inputs after success
-  if (mintFlowDisplayState.shouldRenderInviteJoin) {
-    return (
-      <SbtPageMintInputAction
-        buttonClassName={mintActionButtonClassName}
-        contentState={passwordJoinContentState}
-        disabled={passwordJoinButtonState.disabled}
-        inputType="password"
-        inputValue={groupPasswordInput || ''}
-        onInputChange={this.handleGroupPasswordInputChange}
-        placeholder="Group Password"
-        onAction={(event) => runSbtPageMintActionController({
-            disabled: passwordJoinButtonState.disabled,
-            event,
-            mintArgs: [this.state.groupPasswordInput],
-            plan: mintActionPlan,
-            ports: {
-              dispatchMint: this.claimWithInviteCode,
-            },
-          })}
-      />
-    );
-  }
-
-  // Legacy per-claim-code flow
-  if (mintFlowDisplayState.shouldRenderOpenMintButton) {
-    const {
-      canOpenMintTx,
-      disabled,
-      title,
-    } = openMintButtonState;
-    return (
-      <SbtPageStatusActionButton
-        className={mintActionButtonClassName}
-        contentState={openMintButtonContentState}
-        disabled={disabled}
-        onClick={(event) => runSbtPageMintActionController({
-          canOpenMintTx,
-          disabled,
-          event,
-          mintArgs: [true],
-          plan: mintActionPlan,
-          ports: {
-            dispatchMint: this.handleMint,
-            openMintTransaction: () => window.open(
-              this.getExplorerLink(lastMintTxHash),
-              '_blank',
-              'noopener,noreferrer'
-            ),
-          },
-        })}
-        title={title}
-      />
-    );
-  }
-
-  if (manualClaimActionRequest.shouldRenderInputAction) {
-    return (
-      <SbtPageMintInputAction
-        buttonClassName={mintActionButtonClassName}
-        contentState={manualClaimActionRequest.contentState}
-        disabled={manualClaimActionRequest.disabled}
-        inputType={manualClaimActionRequest.inputType}
-        inputValue={manualClaimActionRequest.inputValue}
-        onInputChange={this.handleManualPasswordInputChange}
-        placeholder={manualClaimActionRequest.placeholder}
-        onAction={(event) => runSbtPageMintActionController({
-            disabled: manualClaimActionRequest.disabled,
-            event,
-            mintArgs: manualClaimActionRequest.mintArgs,
-            plan: mintActionPlan,
-            ports: {
-              dispatchMint: this.handleMint,
-            },
-          })}
-      />
-    );
-  }
-  if (manualClaimActionRequest.viewKind === 'manual-claim-countdown') {
-    return (
-      <div className={styles.mintProcess}>
-        <p className={styles.claimCountdown}>{manualClaimActionRequest.statusText}</p>
-      </div>
-    );
-  }
-  if (manualClaimActionRequest.viewKind === 'manual-claim-success') {
-    return <div className={styles.mintProcess}><p className={styles.mintSuccess}>{manualClaimActionRequest.statusText}</p></div>;
-  }
-  return null;
+  return (
+    <SbtPageMintActionSurface
+      buttonClassName={mintActionButtonClassName}
+      displayState={mintButtonDisplayState}
+      groupPasswordInput={groupPasswordInput || ''}
+      onClaimWithInviteCode={this.claimWithInviteCode}
+      onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
+      onManualPasswordInputChange={this.handleManualPasswordInputChange}
+      onMint={this.handleMint}
+      onMintUnlimitedWithGroupPassword={this.mintUnlimitedWithGroupPassword}
+      onOpenMintTransaction={() => window.open(
+        this.getExplorerLink(lastMintTxHash),
+        '_blank',
+        'noopener,noreferrer'
+      )}
+    />
+  );
 }
 
 
@@ -3824,18 +3718,12 @@ renderMintButton() {
     }
 
     return (
-      <SbtPageStatusActionButton
-        className={burnActionButtonClassName}
+      <SbtPageBurnActionSurface
+        buttonClassName={burnActionButtonClassName}
         contentState={burnButtonContentState}
-        disabled={burnStatusButtonState.disabled}
-        onClick={(event) => runSbtPageBurnActionController({
-          disabled: burnStatusButtonState.disabled,
-          event,
-          plan: burnActionPlan,
-          ports: {
-            dispatchBurn: this.handleBurn,
-          },
-        })}
+        displayState={burnStatusButtonState}
+        onBurn={this.handleBurn}
+        plan={burnActionPlan}
       />
     );
   };
