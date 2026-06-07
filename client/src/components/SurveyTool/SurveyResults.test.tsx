@@ -26,6 +26,9 @@ import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualRespo
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
+import SurveyResultsSyncDetailsDisplay, {
+  SurveyResultsSyncTrackRow,
+} from './SurveyResultsSyncDetailsDisplay';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -41,6 +44,8 @@ const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
 const RESOLVABLE_TREE_COMPONENTS = new Set([
   SurveyResultsQuestionListPanel,
+  SurveyResultsSyncDetailsDisplay,
+  SurveyResultsSyncTrackRow,
 ]);
 const resolvedTreeComponentCache = new WeakMap();
 
@@ -197,6 +202,12 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedTreeComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
 };
 
