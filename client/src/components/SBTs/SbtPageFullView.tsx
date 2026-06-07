@@ -22,6 +22,10 @@ import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageStatsSection from './SbtPageStatsSection';
+import type {
+  SbtPageHolderCountStatus,
+  SbtPageHolderScanProgressDisplay,
+} from './SbtPageHolderStatusDisplay';
 import {
   buildSbtPageSectionHeaderClassName,
   resolveSbtPageActionFeedbackState,
@@ -377,6 +381,22 @@ export const renderSbtPageFullView = ({
   const actionsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showActions });
   const adminSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showAdminSection });
   const moreDetailsSectionToggleState = resolveSbtPageSectionToggleDisplayState({ open: showMoreDetails });
+  const holderCountStatus: SbtPageHolderCountStatus = {
+    isInitialLoading,
+    isRefreshing,
+    maxTokensDisplay,
+    mintedCountTitle,
+    mintedLabel,
+    netMinted,
+    refreshIndicatorStyle: resolveSbtPageRefreshIndicatorStyle(),
+  };
+  const holderScanProgressDisplay: SbtPageHolderScanProgressDisplay = {
+    scanProgressFillStyle,
+    scanProgressPct,
+    scanProgressSessionText,
+    scanProgressText,
+    showScanProgress,
+  };
   const sectionHeaderClassName = buildSbtPageSectionHeaderClassName({
     baseClassName: styles.sectionHeader,
     roundedClassName: styles.roundedHeader,
@@ -423,27 +443,17 @@ export const renderSbtPageFullView = ({
               adminAddressDisplay={renderAddressLink(adminAddress, 'admin')}
               burnLabel={burnLabel}
               creatorAddressDisplay={renderAddressLink(creatorAddress, 'creator')}
-              isInitialLoading={isInitialLoading}
               isOpen={statsSectionToggleState.isOpen}
-              isRefreshing={isRefreshing}
-              maxTokensDisplay={maxTokensDisplay}
-              mintedCountTitle={mintedCountTitle}
-              mintedLabel={mintedLabel}
+              holderCountStatus={holderCountStatus}
+              holderScanProgressDisplay={holderScanProgressDisplay}
               mintEndDisplay={mintEndDisplay}
-              netMinted={netMinted}
               networkLabel={getChainLabelById(sbtInfo?.chainID || networkId)}
               onOpenMintedModal={openMintedModal}
               onToggle={toggleStats}
               questionIconStyle={resolveSbtPageQuestionIconStyle()}
-              refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
-              scanProgressFillStyle={scanProgressFillStyle}
-              scanProgressPct={scanProgressPct}
-              scanProgressSessionText={scanProgressSessionText}
-              scanProgressText={scanProgressText}
               sectionHeaderClassName={sectionHeaderClassName}
               shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
               shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
-              showScanProgress={showScanProgress}
             />
             <SbtPageActionsSection
               actionFeedbackState={actionFeedbackState}
