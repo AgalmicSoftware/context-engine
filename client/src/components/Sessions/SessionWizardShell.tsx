@@ -6,10 +6,8 @@ import EncryptionPanel from './EncryptionPanel';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionPublishSummary from './SessionPublishSummary';
 import SessionWizardHeader from './SessionWizardHeader';
+import SessionWizardIntroStatusRail from './SessionWizardIntroStatusRail';
 import SessionWizardModals from './SessionWizardModals';
-import SessionWizardNormalModeRail from './SessionWizardNormalModeRail';
-import SessionWizardRequirementsBanner from './SessionWizardRequirementsBanner';
-import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import WorkerPanel from './WorkerPanel';
 
@@ -196,28 +194,20 @@ const SessionWizardShell = ({
       wizardMode={wizardMode}
     />
 
-    {showNewSessionRequirementsBanner ? (
-      <SessionWizardRequirementsBanner
-        fundingRequirementHref={newSessionFundingRequirementHref}
-        fundingRequirementLabel={newSessionFundingRequirementLabel}
-        newSessionRequiresLitCredential={newSessionRequiresLitCredential}
-        onDismiss={onDismissNewSessionRequirementsBanner}
-      />
-    ) : null}
-
-    <SessionWizardSponsoredStatus
-      onRetry={onRetrySponsoredBundle}
-      status={sponsoredBundleStatus}
+    <SessionWizardIntroStatusRail
+      activeNormalModeIndex={activeNormalModeIndex}
+      collapsedSections={collapsedSections}
+      fundingRequirementHref={newSessionFundingRequirementHref}
+      fundingRequirementLabel={newSessionFundingRequirementLabel}
+      isNormalMode={isNormalMode}
+      newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      normalModeCards={normalModeCards}
+      onDismissRequirements={onDismissNewSessionRequirementsBanner}
+      onFocusNormalModeSection={focusNormalModeSection}
+      onRetrySponsoredBundle={onRetrySponsoredBundle}
+      showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
+      sponsoredBundleStatus={sponsoredBundleStatus}
     />
-
-    {isNormalMode && (
-      <SessionWizardNormalModeRail
-        activeNormalModeIndex={activeNormalModeIndex}
-        collapsedSections={collapsedSections}
-        normalModeCards={normalModeCards}
-        onFocusSection={focusNormalModeSection}
-      />
-    )}
 
     {(!isNormalMode || !collapsedSections.encryption) && (
       <EncryptionPanel
