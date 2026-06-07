@@ -50,7 +50,7 @@
   - `SurveyResultsExportControls.tsx`: **97 lines**
   - `SurveyResultsFilterExportControls.tsx`: **196 lines**
   - `SurveyResultsHtmlReportExportModal.tsx`: **271 lines**
-  - `SurveyResultsHtmlReportActionControls.tsx`: **48 lines**
+  - `SurveyResultsHtmlReportActionControls.tsx`: **50 lines**
   - `surveyResultsHtmlReportDownloadRequest.ts`: **56 lines**
   - `surveyResultsExportController.ts`: **125 lines**
   - `surveyResultsExportDisplayHelpers.ts`: **555 lines**
