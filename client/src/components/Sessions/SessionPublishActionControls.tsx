@@ -10,14 +10,21 @@ import {
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-type SessionPublishActionControlsProps = {
+export type SessionPublishActionControlsDisplayProps = {
   canPublishNow: boolean;
   isNormalMode: boolean;
-  onPublish: () => void;
-  onTogglePublishAdvanced: () => void;
   publishAdvancedOpen: boolean;
   publishBusy: boolean;
 };
+
+export type SessionPublishActionExecutionProps = {
+  onPublish: () => void;
+  onTogglePublishAdvanced: () => void;
+};
+
+export type SessionPublishActionControlsProps =
+  SessionPublishActionControlsDisplayProps &
+  SessionPublishActionExecutionProps;
 
 const SessionPublishActionControls = ({
   canPublishNow,
