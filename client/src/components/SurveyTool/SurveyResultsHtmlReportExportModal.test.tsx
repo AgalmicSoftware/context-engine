@@ -162,6 +162,12 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toBeDisabled();
     expect(screen.getByTestId('ce-surveyresults-html-report-download')).toHaveTextContent('Download Single HTML');
     expect(screen.queryByTestId('ce-surveyresults-html-report-demo-mode')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-generate-analysis'));
+    fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-download'));
+
+    expect(baseProps.onGenerateAnalysis).not.toHaveBeenCalled();
+    expect(baseProps.onDownload).not.toHaveBeenCalled();
   });
 
   it('builds download labels for every export format', () => {
