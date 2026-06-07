@@ -12,8 +12,24 @@ import {
   createReadCachePayload,
   setupSBTPageTestLifecycle,
 } from './SBTPage.testUtils';
+import {
+  SbtPageBurnActionSurface,
+  SbtPageMintActionSurface,
+} from './SbtPageFullActionButtons';
 import SbtPageMintInputAction from './SbtPageMintInputAction';
 import SbtPageStatusActionButton from './SbtPageStatusActionButton';
+
+const renderBurnActionSurfaceTree = (tree) => {
+  const surface = findElementInTree(tree, (node) => node?.type === SbtPageBurnActionSurface);
+  expect(surface).not.toBeNull();
+  return SbtPageBurnActionSurface(surface.props);
+};
+
+const renderMintActionSurfaceTree = (tree) => {
+  const surface = findElementInTree(tree, (node) => node?.type === SbtPageMintActionSurface);
+  expect(surface).not.toBeNull();
+  return SbtPageMintActionSurface(surface.props);
+};
 
 describe('SBTPage session routing and holder loading', () => {
   setupSBTPageTestLifecycle();
@@ -157,7 +173,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleBurn = jest.fn();
 
     const tree = subject.renderBurnButton();
-    const burnButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
+    const burnTree = renderBurnActionSurfaceTree(tree);
+    const burnButton = findElementInTree(burnTree, (node) => node?.type === SbtPageStatusActionButton);
 
     expect(burnButton).not.toBeNull();
     burnButton.props.onClick({ preventDefault: jest.fn() });
@@ -184,7 +201,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleMint = jest.fn();
 
     const tree = subject.renderMintButton();
-    const mintButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
+    const mintTree = renderMintActionSurfaceTree(tree);
+    const mintButton = findElementInTree(mintTree, (node) => node?.type === SbtPageStatusActionButton);
 
     expect(mintButton).not.toBeNull();
     mintButton.props.onClick({ preventDefault: jest.fn() });
@@ -215,7 +233,8 @@ describe('SBTPage session routing and holder loading', () => {
     const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 
     const tree = subject.renderMintButton();
-    const mintButton = findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton);
+    const mintTree = renderMintActionSurfaceTree(tree);
+    const mintButton = findElementInTree(mintTree, (node) => node?.type === SbtPageStatusActionButton);
 
     expect(mintButton).not.toBeNull();
     expect(mintButton.props.title).toBe('View collect transaction');
@@ -251,7 +270,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleMint = jest.fn();
 
     const startTree = subject.renderMintButton();
-    const startAction = findElementInTree(startTree, (node) => node?.type === SbtPageMintInputAction);
+    const startSurfaceTree = renderMintActionSurfaceTree(startTree);
+    const startAction = findElementInTree(startSurfaceTree, (node) => node?.type === SbtPageMintInputAction);
     expect(startAction).not.toBeNull();
     expect(startAction.props.placeholder).toBe('Claim Code');
     expect(startAction.props.contentState.label).toBe('Start Claim');
@@ -262,7 +282,8 @@ describe('SBTPage session routing and holder loading', () => {
       mintStep: 2,
     };
     const finishTree = subject.renderMintButton();
-    const finishAction = findElementInTree(finishTree, (node) => node?.type === SbtPageMintInputAction);
+    const finishSurfaceTree = renderMintActionSurfaceTree(finishTree);
+    const finishAction = findElementInTree(finishSurfaceTree, (node) => node?.type === SbtPageMintInputAction);
     expect(finishAction).not.toBeNull();
     expect(finishAction.props.placeholder).toBe('Claim Code');
     expect(finishAction.props.contentState.label).toBe('Finish Claim');
@@ -294,7 +315,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleMint = jest.fn();
 
     const tree = subject.renderMintButton();
-    const claimAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+    const mintTree = renderMintActionSurfaceTree(tree);
+    const claimAction = findElementInTree(mintTree, (node) => node?.type === SbtPageMintInputAction);
 
     expect(claimAction).not.toBeNull();
     expect(claimAction.props.disabled).toBe(true);
@@ -332,10 +354,11 @@ describe('SBTPage session routing and holder loading', () => {
     subject.handleMint = jest.fn();
 
     const tree = subject.renderMintButton();
+    const mintTree = renderMintActionSurfaceTree(tree);
 
-    expect(flattenText(tree)).toContain('Waiting period: 12 seconds');
-    expect(findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction)).toBeNull();
-    expect(findElementInTree(tree, (node) => node?.type === SbtPageStatusActionButton)).toBeNull();
+    expect(flattenText(mintTree)).toContain('Waiting period: 12 seconds');
+    expect(findElementInTree(mintTree, (node) => node?.type === SbtPageMintInputAction)).toBeNull();
+    expect(findElementInTree(mintTree, (node) => node?.type === SbtPageStatusActionButton)).toBeNull();
     expect(subject.handleMint).not.toHaveBeenCalled();
   });
 
@@ -388,7 +411,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.mintUnlimitedWithGroupPassword = jest.fn();
 
     const tree = subject.renderMintButton();
-    const groupPasswordAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+    const mintTree = renderMintActionSurfaceTree(tree);
+    const groupPasswordAction = findElementInTree(mintTree, (node) => node?.type === SbtPageMintInputAction);
 
     expect(groupPasswordAction).not.toBeNull();
     expect(groupPasswordAction.props.disabled).toBe(true);
@@ -426,7 +450,8 @@ describe('SBTPage session routing and holder loading', () => {
     subject.claimWithInviteCode = jest.fn();
 
     const tree = subject.renderMintButton();
-    const inviteAction = findElementInTree(tree, (node) => node?.type === SbtPageMintInputAction);
+    const mintTree = renderMintActionSurfaceTree(tree);
+    const inviteAction = findElementInTree(mintTree, (node) => node?.type === SbtPageMintInputAction);
 
     expect(inviteAction).not.toBeNull();
     expect(inviteAction.props.disabled).toBe(false);
