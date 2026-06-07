@@ -11,7 +11,7 @@ import styles from './SBTPage.module.scss';
 
 export type SbtPageActionTransactionLinkDisplay = {
   href: string;
-  text: React.ReactNode;
+  text: string;
 };
 
 export type SbtPageActionSuccessFeedbackDisplay = {

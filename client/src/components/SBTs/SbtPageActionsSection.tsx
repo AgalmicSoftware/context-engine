@@ -1,16 +1,13 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCheck,
   faChevronDown,
   faChevronUp,
-  faCopy,
-  faExclamationTriangle,
 } from '@fortawesome/free-solid-svg-icons';
-import { Alert } from 'reactstrap';
 
 import { getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
+import SbtPageActionFeedbackDisplay from './SbtPageActionFeedbackDisplay';
 
 type SbtPageActionFeedbackState = {
   showBurnSuccess?: boolean;
@@ -103,61 +100,39 @@ const SbtPageActionsSection = ({
         <div className={styles.actions}>
           {mintButton}
           {burnButton}
-          {actionFeedbackState.showMintSuccess && (
-            <div className={styles.mintProcess}>
-              <p className={styles.mintSuccess}>
-                {`${sbtLabel} successfully ${mintedLowerLabel}!`}
-                <br />
-                {`${mintLabel} Tx Hash:`}{' '}
-                <a
-                  href={mintSuccessHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {mintSuccessText}
-                </a>
-              </p>
-            </div>
-          )}
-          {actionFeedbackState.showBurnSuccess && (
-            <div className={styles.mintProcess}>
-              <p className={styles.mintSuccess}>
-                {`${sbtLabel} successfully ${burnedLowerLabel}!`}
-                <br />
-                {`${burnLabel} Tx Hash:`}{' '}
-                <a
-                  href={burnSuccessHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {burnSuccessText}
-                </a>
-              </p>
-            </div>
-          )}
-          {actionFeedbackState.showTransactionError && (
-            <Alert color="danger" className={styles.txErrorAlert} fade={false}>
-              <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {errorMessage}
-              <button
-                onClick={onCopyError}
-                aria-label="Copy error message"
-                title="Copy error message"
-                style={copyErrorButtonStyle}
-              >
-                {errorCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                {errorCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-              </button>
-              {actionFeedbackState.showErrorTransactionHash && (
-                <>
-                  <br />
-                  Tx Hash:{' '}
-                  <a href={transactionErrorHref} target="_blank" rel="noopener noreferrer">
-                    {transactionErrorText}
-                  </a>
-                </>
-              )}
-            </Alert>
-          )}
+          <SbtPageActionFeedbackDisplay
+            burnSuccess={{
+              message: `${sbtLabel} successfully ${burnedLowerLabel}!`,
+              show: actionFeedbackState.showBurnSuccess,
+              txLabel: `${burnLabel} Tx Hash:`,
+              txLink: {
+                href: burnSuccessHref,
+                text: burnSuccessText,
+              },
+            }}
+            copyErrorButtonStyle={copyErrorButtonStyle}
+            errorCopyIconState={errorCopyIconState}
+            mintSuccess={{
+              message: `${sbtLabel} successfully ${mintedLowerLabel}!`,
+              show: actionFeedbackState.showMintSuccess,
+              txLabel: `${mintLabel} Tx Hash:`,
+              txLink: {
+                href: mintSuccessHref,
+                text: mintSuccessText,
+              },
+            }}
+            onCopyError={onCopyError}
+            transactionError={{
+              errorMessage,
+              show: actionFeedbackState.showTransactionError,
+              txLink: actionFeedbackState.showErrorTransactionHash
+                ? {
+                    href: transactionErrorHref,
+                    text: transactionErrorText,
+                  }
+                : null,
+            }}
+          />
         </div>
       )}
     </div>
