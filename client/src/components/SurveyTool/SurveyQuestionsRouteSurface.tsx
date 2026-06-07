@@ -1,12 +1,10 @@
 import React from 'react';
 
 import TagModal from '../TagPage/TagModal';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
+import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRouteSection';
 import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
 import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
-import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
-import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
@@ -178,33 +176,6 @@ const SurveyQuestionsRouteSurface = ({
     submittedStateActive: !!submitDisplayState.submittedStateActive,
   };
 
-  const submitResponseButton = (
-    <SurveyQuestionsSubmitFooter
-      displayState={submitDisplayState}
-      isSingleQuestionView={submitFooterProps.isSingleQuestionView}
-      isSubmitting={submitFooterProps.isSubmitting}
-      onPrimarySubmitClick={submitFooterProps.onPrimarySubmitClick || noop}
-      onRevertPendingChanges={submitFooterProps.onRevertPendingChanges || noop}
-      pendingEditCount={submitFooterProps.pendingEditCount}
-      responseUrl={submitFooterProps.responseUrl}
-      submitButtonText={submitFooterProps.submitButtonText}
-      submissionError={submitFooterProps.submissionError}
-    />
-  );
-
-  const submittedResponseView = (
-    <SurveyQuestionsSubmittedResponseView
-      isOwnResponse={submittedResponseViewProps.isOwnResponse}
-      isVisible={submittedResponseViewProps.isVisible}
-      questionPool={submittedResponseViewProps.questionPool}
-      questionPoolReady={submittedResponseViewProps.questionPoolReady}
-      renderQuestionAnswer={submittedResponseViewProps.renderQuestionAnswer || (() => null)}
-      renderSurveyAnswers={submittedResponseViewProps.renderSurveyAnswers || (() => null)}
-      singleQuestionMode={submittedResponseViewProps.singleQuestionMode}
-      userAnswers={submittedResponseViewProps.userAnswers}
-    />
-  );
-
   const activeTagModalTag = layoutDisplayState.activeTagModalTag || null;
 
   return (
@@ -245,15 +216,11 @@ const SurveyQuestionsRouteSurface = ({
           viewAddress={responseViewProps.viewAddress}
         />
       ) : (
-        <SurveyQuestionsAuthoringPanel
-          displayState={authoringPanelProps.displayState}
-          lockedQuestionsBanner={authoringPanelProps.lockedQuestionsBanner}
-          onScrollToTop={authoringPanelProps.onScrollToTop || noop}
-          onShowJsonAtBottom={authoringPanelProps.onShowJsonAtBottom || noop}
-          renderedEditableQuestions={authoringPanelProps.renderedEditableQuestions}
+        <SurveyQuestionsAuthoringRouteSection
+          authoringPanelProps={authoringPanelProps}
+          submittedResponseViewProps={submittedResponseViewProps}
           submitDisplayState={submitDisplayState}
-          submittedResponseView={submittedResponseView}
-          submitResponseButton={submitResponseButton}
+          submitFooterProps={submitFooterProps}
         />
       )}
 
