@@ -4,7 +4,7 @@ import TagModal from '../TagPage/TagModal';
 import SurveyQuestionsAuthoringRouteSection from './SurveyQuestionsAuthoringRouteSection';
 import SurveyQuestionsJsonRouteSection from './SurveyQuestionsJsonRouteSection';
 import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
-import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
+import SurveyQuestionsResponseRouteSection from './SurveyQuestionsResponseRouteSection';
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
@@ -157,20 +157,11 @@ const SurveyQuestionsRouteSurface = ({
   const topStripLayoutDisplayState = {
     topSectionClassName: layoutDisplayState.topSectionClassName,
   };
-  const responseLayoutDisplayState = {
-    responseViewClassName: layoutDisplayState.responseViewClassName,
-  };
   const topStripRouteViewDisplayState = {
     isOwnResponse: routeViewDisplayState.isOwnResponse,
     isSingleQuestionView: routeViewDisplayState.isSingleQuestionView,
     showViewAnswersButton: routeViewDisplayState.showViewAnswersButton,
     viewAnswersButtonText: routeViewDisplayState.viewAnswersButtonText || '',
-  };
-  const responseRouteViewDisplayState = {
-    isOwnResponse: routeViewDisplayState.isOwnResponse,
-    shortenedViewAddress: routeViewDisplayState.shortenedViewAddress || '',
-    viewedAddressLower: routeViewDisplayState.viewedAddressLower || '',
-    viewedAddressRaw: routeViewDisplayState.viewedAddressRaw || '',
   };
   const topStripSubmitDisplayState = {
     submittedStateActive: !!submitDisplayState.submittedStateActive,
@@ -199,21 +190,10 @@ const SurveyQuestionsRouteSurface = ({
       />
 
       {viewingAnswers ? (
-        <SurveyQuestionsResponseView
-          isLoadingResponse={responseViewProps.isLoadingResponse}
-          layoutDisplayState={responseLayoutDisplayState}
-          noResponse={responseViewProps.noResponse}
-          parsedViewAddressAnswers={responseViewProps.parsedViewAddressAnswers}
-          questionPool={responseViewProps.questionPool}
-          questionPoolReady={responseViewProps.questionPoolReady}
-          renderQuestionAnswer={responseViewProps.renderQuestionAnswer || (() => null)}
-          renderSurveyAnswers={responseViewProps.renderSurveyAnswers || (() => null)}
-          responderAddress={responseViewProps.responderAddress}
-          responseLookupWarning={responseViewProps.responseLookupWarning}
-          routeViewDisplayState={responseRouteViewDisplayState}
-          singleQuestionMode={responseViewProps.singleQuestionMode}
-          userAnswers={responseViewProps.userAnswers}
-          viewAddress={responseViewProps.viewAddress}
+        <SurveyQuestionsResponseRouteSection
+          layoutDisplayState={layoutDisplayState}
+          responseViewProps={responseViewProps}
+          routeViewDisplayState={routeViewDisplayState}
         />
       ) : (
         <SurveyQuestionsAuthoringRouteSection
