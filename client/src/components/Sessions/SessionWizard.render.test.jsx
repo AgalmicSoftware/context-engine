@@ -574,6 +574,7 @@ describe('SessionWizard rendered validation', () => {
     const sourceFiles = [
       './SessionWizard',
       './SessionPublishSummary',
+      './SessionPublishResultLinks',
       './SessionWizardModals',
     ];
     const anchors = sourceFiles.flatMap((ref) => {
