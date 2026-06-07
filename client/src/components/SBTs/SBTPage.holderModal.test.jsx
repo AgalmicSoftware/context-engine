@@ -82,6 +82,7 @@ const getNodeTypeName = (node) => {
 };
 
 const RESOLVABLE_SBT_PAGE_COMPONENTS = new Set([
+  'SbtPageHolderStatusDisplay',
   'SbtPageIdentityPanel',
   'SbtPageStatsSection',
 ]);
