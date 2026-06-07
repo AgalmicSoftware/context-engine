@@ -137,6 +137,9 @@ import {
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsHtmlReportDownloadAttemptPlan,
+  buildSurveyResultsHtmlReportDownloadFailurePatch,
+  buildSurveyResultsHtmlReportDownloadSuccessPatch,
   buildSurveyResultsHtmlReportReadinessPlan,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
@@ -3576,16 +3579,12 @@ const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
   selectedSections,
   snapshot,
 });
-if (!isAuthorized) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Connect a wallet with permission to view these results before export.'));
-  return;
-}
-if (!readinessPlan.hasExportableSections) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Select at least one available report section before export.'));
-  return;
-}
-if (readinessPlan.hasUnavailableSelectedSections) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Generate selected analysis views before downloading the report.'));
+const downloadAttemptPlan = buildSurveyResultsHtmlReportDownloadAttemptPlan({
+  isAuthorized,
+  readinessPlan,
+});
+if (downloadAttemptPlan.status === 'blocked') {
+  this.setState(downloadAttemptPlan.statePatch);
   return;
 }
 
@@ -3605,13 +3604,10 @@ try {
   } else {
     downloadSessionResultsHtmlReport(html, downloadRequest.filename);
   }
-  this.setState({
-    htmlReportModalOpen: false,
-    alertMessage: '',
-  });
+  this.setState(buildSurveyResultsHtmlReportDownloadSuccessPatch());
 } catch (error) {
   surveyLog.error('[SurveyResults.downloadHtmlReport] Failed to export HTML report:', error);
-  this.setState(buildSurveyResultsAlertMessagePatch('Unable to export the HTML report.'));
+  this.setState(buildSurveyResultsHtmlReportDownloadFailurePatch());
 }
 }
 
