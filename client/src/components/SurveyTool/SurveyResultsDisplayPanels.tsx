@@ -1,6 +1,6 @@
 import React from 'react';
 
-import SingleQuestionResponse from './SingleQuestionResponse';
+import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import {
   renderSurveyResultsFilterSummary,
@@ -12,7 +12,6 @@ import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeTogg
 import type {
   SurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
-import { getSurveyResponseQuestionId } from './surveyResultsHelpers.js';
 
 type SurveyResultsRecord = Record<string, any>;
 type SurveyResultsEntry = [string, unknown];
@@ -56,82 +55,6 @@ type SurveyResultsDisplayPanelsArgs = {
   toggleKnobStyle?: React.CSSProperties;
   trailingLabelStyle?: React.CSSProperties;
   viewMode?: string;
-};
-
-const renderIndividualResponseBody = ({
-  account = '',
-  applyDecryptedOverrideToResponse,
-  currentSurveyId = '',
-  effectiveSlug = '',
-  getFallbackQuestion,
-  getLockedResponseKey,
-  getResponseCardProps,
-  network,
-  preNetworkQuestions = {},
-  questionResponsesNonce,
-  questionsCacheNonce,
-  response = { responder: '' },
-  sbtCacheRevision,
-  styleMap,
-}: {
-  account?: string;
-  applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
-  currentSurveyId?: string;
-  effectiveSlug?: string;
-  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
-  getLockedResponseKey: (args: SurveyResultsRecord) => string;
-  getResponseCardProps: () => SurveyResultsRecord;
-  network?: SurveyResultsRecord | null;
-  preNetworkQuestions?: Record<string, SurveyResultsRecord>;
-  questionResponsesNonce?: unknown;
-  questionsCacheNonce?: unknown;
-  response?: SurveyResultsResponseListEntry;
-  sbtCacheRevision?: unknown;
-  styleMap: Record<string, string>;
-}): React.ReactNode => {
-  const parsedResponse = response.response as SurveyResultsRecord | undefined;
-  const responseRows = Array.isArray(parsedResponse?.responses)
-    ? parsedResponse?.responses as SurveyResultsRecord[]
-    : [];
-
-  if (responseRows.length === 0) {
-    return <p>No question-level responses found for this user.</p>;
-  }
-
-  return responseRows.map((answerItem: SurveyResultsRecord, aIndex: number) => {
-    const questionId = getSurveyResponseQuestionId(answerItem);
-    const questionData = preNetworkQuestions[questionId] || getFallbackQuestion(questionId, 'individual');
-    const responseKey = getLockedResponseKey({
-      responder: response?.responder,
-      questionId,
-      surveyId: response?.surveyId || currentSurveyId,
-      response: answerItem,
-    });
-    const displayResponse = applyDecryptedOverrideToResponse({
-      response: answerItem,
-      key: responseKey,
-    });
-    return (
-      <div key={aIndex} className={styleMap.surveyResultsOverride}>
-        <SingleQuestionResponse
-          aggregatorResponseMode={false}
-          question={questionData}
-          response={displayResponse}
-          mode="fullscreen"
-          isOwnResponse={
-            account?.toLowerCase() ===
-            response.responder?.toLowerCase()
-          }
-          network={network}
-          activeSessionSlug={questionData?.sessionSlug || effectiveSlug}
-          questionResponsesNonce={questionResponsesNonce}
-          questionsCacheNonce={questionsCacheNonce}
-          sbtCacheRevision={sbtCacheRevision}
-          {...getResponseCardProps()}
-        />
-      </div>
-    );
-  });
 };
 
 export const renderSurveyResultsDisplayPanels = ({
@@ -225,22 +148,24 @@ export const renderSurveyResultsDisplayPanels = ({
         effectiveSlug={effectiveSlug}
         filterLoading={filterLoading}
         onToggleResponse={onToggleResponse}
-        renderResponseBody={(response: SurveyResultsResponseListEntry) => renderIndividualResponseBody({
-          account,
-          applyDecryptedOverrideToResponse,
-          currentSurveyId,
-          effectiveSlug,
-          getFallbackQuestion,
-          getLockedResponseKey,
-          getResponseCardProps,
-          network,
-          preNetworkQuestions,
-          questionResponsesNonce,
-          questionsCacheNonce,
-          response,
-          sbtCacheRevision,
-          styleMap,
-        })}
+        renderResponseBody={(response: SurveyResultsResponseListEntry) => (
+          <SurveyResultsIndividualResponseBody
+            account={account}
+            applyDecryptedOverrideToResponse={applyDecryptedOverrideToResponse}
+            currentSurveyId={currentSurveyId}
+            effectiveSlug={effectiveSlug}
+            getFallbackQuestion={getFallbackQuestion}
+            getLockedResponseKey={getLockedResponseKey}
+            getResponseCardProps={getResponseCardProps}
+            network={network}
+            preNetworkQuestions={preNetworkQuestions}
+            questionResponsesNonce={questionResponsesNonce}
+            questionsCacheNonce={questionsCacheNonce}
+            response={response}
+            sbtCacheRevision={sbtCacheRevision}
+            styleMap={styleMap}
+          />
+        )}
         responses={responses}
         styleMap={styleMap}
       />
