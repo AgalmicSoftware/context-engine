@@ -22,6 +22,7 @@ const RESOLVABLE_SURVEY_TOOL_COMPONENTS = new Set([
   'SurveyQuestionsResponseView',
   'SurveyQuestionsRouteSurface',
   'SurveyQuestionsSubmitFooter',
+  'SurveyQuestionsTagModalSlot',
   'SurveyQuestionsTopRouteSection',
   'SurveyQuestionsTopStrip',
   'SurveyQuestionsUserResponseNotice',

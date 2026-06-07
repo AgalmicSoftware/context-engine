@@ -1,9 +1,18 @@
 import React from 'react';
 
 import TagModal from '../TagPage/TagModal';
-import type { SurveyQuestionsTagModalSlotProps } from './surveyQuestionsRouteSurfaceTypes.js';
+import type { SurveyQuestionsLayoutDisplayState } from './surveyQuestionsTypes.js';
 
 const noop = () => {};
+
+type SurveyQuestionsRouteTagModalProps = {
+  onClose?: () => void;
+};
+
+type SurveyQuestionsTagModalSlotProps = {
+  layoutDisplayState?: Partial<SurveyQuestionsLayoutDisplayState>;
+  tagModalProps?: SurveyQuestionsRouteTagModalProps;
+};
 
 const SurveyQuestionsTagModalSlot = ({
   layoutDisplayState = {},
