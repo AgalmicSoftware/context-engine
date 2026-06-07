@@ -9,39 +9,30 @@ import {
 
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import type { SessionWizardPublishActionDisplayState } from './sessionWizardPublishReadiness';
 
-export type SessionPublishActionControlsDisplayProps = {
-  displayState: SessionWizardPublishActionDisplayState;
-};
-
-export type SessionPublishActionExecutionProps = {
+type SessionPublishActionControlsProps = {
+  canPublishNow: boolean;
+  isNormalMode: boolean;
   onPublish: () => void;
   onTogglePublishAdvanced: () => void;
+  publishAdvancedOpen: boolean;
+  publishBusy: boolean;
 };
 
-export type SessionPublishActionControlsProps =
-  SessionPublishActionControlsDisplayProps &
-  SessionPublishActionExecutionProps;
-
 const SessionPublishActionControls = ({
-  displayState,
+  canPublishNow,
+  isNormalMode,
   onPublish,
   onTogglePublishAdvanced,
+  publishAdvancedOpen,
+  publishBusy,
 }: SessionPublishActionControlsProps): React.ReactElement => {
-  const {
-    displayMode,
-    publishBusy,
-    publishButtonDisabled,
-    publishButtonLabel,
-    settingsButtonActive,
-  } = displayState;
-  const isNormalMode = displayMode === 'normal';
   const containerClassName = isNormalMode ? styles.publishActionCluster : styles.publishRow;
   const primaryButtonClassName = isNormalMode ? styles.publishPrimaryButton : styles.primaryButton;
   const settingsButtonClassName = isNormalMode
-    ? `${styles.publishSettingsButton} ${settingsButtonActive ? styles.publishSettingsButtonActive : ''}`
-    : `${styles.iconButton} ${settingsButtonActive ? styles.iconButtonActive : ''}`;
+    ? `${styles.publishSettingsButton} ${publishAdvancedOpen ? styles.publishSettingsButtonActive : ''}`
+    : `${styles.iconButton} ${publishAdvancedOpen ? styles.iconButtonActive : ''}`;
+  const publishLabel = isNormalMode ? 'Deploy Session' : 'Publish';
 
   return (
     <div className={containerClassName}>
@@ -49,7 +40,7 @@ const SessionPublishActionControls = ({
         onClick={onPublish}
         className={primaryButtonClassName}
         data-testid={E2E_TESTIDS.WIZARD_PUBLISH}
-        disabled={publishButtonDisabled}
+        disabled={publishBusy || !canPublishNow}
       >
         {publishBusy ? (
           <>
@@ -57,7 +48,7 @@ const SessionPublishActionControls = ({
           </>
         ) : (
           <>
-            <FontAwesomeIcon icon={faUpload} /> {publishButtonLabel}
+            <FontAwesomeIcon icon={faUpload} /> {publishLabel}
           </>
         )}
       </Button>

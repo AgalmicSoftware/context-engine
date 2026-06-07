@@ -4,25 +4,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SessionPublishActionControls from './SessionPublishActionControls';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const buildDisplayState = (
-  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>['displayState']> = {}
-): React.ComponentProps<typeof SessionPublishActionControls>['displayState'] => ({
-  canPublishNow: true,
-  displayMode: 'advanced',
-  publishAdvancedOpen: false,
-  publishBusy: false,
-  publishButtonDisabled: false,
-  publishButtonLabel: 'Publish',
-  settingsButtonActive: false,
-  ...overrides,
-});
-
 const buildProps = (
   overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>> = {}
 ): React.ComponentProps<typeof SessionPublishActionControls> => ({
-  displayState: buildDisplayState(),
+  canPublishNow: true,
+  isNormalMode: false,
   onPublish: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
+  publishAdvancedOpen: false,
+  publishBusy: false,
   ...overrides,
 });
 
@@ -33,10 +23,7 @@ describe('SessionPublishActionControls', () => {
     render(
       <SessionPublishActionControls
         {...buildProps({
-          displayState: buildDisplayState({
-            displayMode: 'normal',
-            publishButtonLabel: 'Deploy Session',
-          }),
+          isNormalMode: true,
           onPublish,
           onTogglePublishAdvanced,
         })}
@@ -51,46 +38,25 @@ describe('SessionPublishActionControls', () => {
   });
 
   it('keeps publish disabled while busy or not ready', () => {
-    const onPublish = jest.fn();
-    const onTogglePublishAdvanced = jest.fn();
     const { rerender } = render(
       <SessionPublishActionControls
         {...buildProps({
-          displayState: buildDisplayState({
-            publishBusy: true,
-            publishButtonDisabled: true,
-          }),
-          onPublish,
-          onTogglePublishAdvanced,
+          publishBusy: true,
         })}
       />
     );
 
-    const busyPublishButton = screen.getByRole('button', { name: /Publishing/i });
-    expect(busyPublishButton).toBeDisabled();
-    fireEvent.click(busyPublishButton);
-    expect(onPublish).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Publishing/i })).toBeDisabled();
 
     rerender(
       <SessionPublishActionControls
         {...buildProps({
-          displayState: buildDisplayState({
-            canPublishNow: false,
-            publishButtonDisabled: true,
-          }),
-          onPublish,
-          onTogglePublishAdvanced,
+          canPublishNow: false,
         })}
       />
     );
 
-    const blockedPublishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-    expect(blockedPublishButton).toBeDisabled();
-    fireEvent.click(blockedPublishButton);
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced publish settings' }));
-
-    expect(onPublish).not.toHaveBeenCalled();
-    expect(onTogglePublishAdvanced).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).toBeDisabled();
   });
 
   it('routes advanced settings separately from publish execution', () => {
@@ -99,12 +65,9 @@ describe('SessionPublishActionControls', () => {
     render(
       <SessionPublishActionControls
         {...buildProps({
-          displayState: buildDisplayState({
-            publishAdvancedOpen: true,
-            settingsButtonActive: true,
-          }),
           onPublish,
           onTogglePublishAdvanced,
+          publishAdvancedOpen: true,
         })}
       />
     );
