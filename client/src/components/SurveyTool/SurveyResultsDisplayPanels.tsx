@@ -6,7 +6,7 @@ import {
   renderSurveyResultsFilterSummary,
 } from './SurveyResultsPanels';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
-import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
 import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 import type {
@@ -246,23 +246,15 @@ export const renderSurveyResultsDisplayPanels = ({
       />
     )}
 
-    {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-      <SurveyResultsQuestionSummariesList
-        entries={surveyAggregateEntries}
-        filterLoading={filterLoading}
-        renderQuestionSummary={renderQuestionSummary}
-        styleMap={styleMap}
-      />
-    )}
-
-    {viewMode === 'questions' && (
-      <SurveyResultsQuestionSummariesList
-        entries={questionModeEntries}
-        filterLoading={filterLoading}
-        renderQuestionSummary={renderQuestionSummary}
-        styleMap={styleMap}
-      />
-    )}
+    <SurveyResultsQuestionSummariesPanel
+      filterLoading={filterLoading}
+      questionModeEntries={questionModeEntries}
+      renderQuestionSummary={renderQuestionSummary}
+      styleMap={styleMap}
+      surveyAggregateEntries={surveyAggregateEntries}
+      surveyViewMode={surveyViewMode}
+      viewMode={viewMode}
+    />
   </>
   );
 };
