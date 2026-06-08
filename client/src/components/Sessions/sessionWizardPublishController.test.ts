@@ -1,6 +1,7 @@
 import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterArgsDescriptor,
+  resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -585,6 +586,68 @@ describe('resolveSessionWizardRegisterArgsDescriptor', () => {
       metadataUriMissing: true,
       registerArgs: expect.objectContaining({
         metadataURI: '',
+      }),
+    }));
+  });
+});
+
+describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
+  it('describes post-register URLs, status reset, and refresh lookup args without owning effects', () => {
+    const providerLike = { kind: 'provider' };
+
+    const descriptor = resolveSessionWizardRegisterSuccessSettlementDescriptor({
+      registrySlug: ' writers-room ',
+      sessionIdHexValue: '0x00000000000000000000000000000001',
+      registryChainId: '84532',
+      sessionNetworkChainId: '11155420',
+      providerLike,
+      account: '0x00000000000000000000000000000000000000aa',
+      origin: 'https://context.example',
+    });
+
+    expect(descriptor).toEqual({
+      formattedSessionId: '00000000-0000-0000-0000-000000000001',
+      sessionUrl: 'https://context.example/session/writers-room',
+      adminUrl: 'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&chainId=84532',
+      adminUrlStatus: '',
+      nextSessionIdStatus: 'Generated a new session ID for your next session.',
+      registryRefreshArgs: {
+        chainId: 84532,
+        slug: 'writers-room',
+        providerLike,
+        account: '0x00000000000000000000000000000000000000aa',
+      },
+    });
+    expect(Object.keys(descriptor)).toEqual([
+      'formattedSessionId',
+      'sessionUrl',
+      'adminUrl',
+      'adminUrlStatus',
+      'nextSessionIdStatus',
+      'registryRefreshArgs',
+    ]);
+    expect(Object.keys(descriptor.registryRefreshArgs)).toEqual([
+      'chainId',
+      'slug',
+      'providerLike',
+      'account',
+    ]);
+  });
+
+  it('falls back to raw session IDs and the session chain for malformed registry input', () => {
+    expect(resolveSessionWizardRegisterSuccessSettlementDescriptor({
+      registrySlug: '',
+      sessionIdHexValue: 'not-a-uuid',
+      registryChainId: '',
+      sessionNetworkChainId: 11155420,
+      origin: 'https://context.example',
+    })).toEqual(expect.objectContaining({
+      formattedSessionId: 'not-a-uuid',
+      sessionUrl: '',
+      adminUrl: 'https://context.example/admin?sessionId=not-a-uuid&chainId=11155420',
+      registryRefreshArgs: expect.objectContaining({
+        chainId: 11155420,
+        slug: '',
       }),
     }));
   });

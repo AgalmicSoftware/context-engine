@@ -126,6 +126,7 @@ import {
 } from './sessionWizardPublishFlow';
 import {
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
@@ -264,8 +265,6 @@ import {
   resolveSessionHeaderImageFormat,
 } from './sessionWizardUiSupport';
 import {
-  buildSessionWizardAdminUrl as buildAdminUrl,
-  buildSessionWizardSessionUrl as buildSessionUrl,
   getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
   normalizeSessionWizardArweaveUri as normalizeArweaveUri,
   normalizeSessionWizardSlug as normalizeSlug,
@@ -3567,26 +3566,28 @@ const SessionWizard = ({
           setStatus,
         },
       });
-      const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionIdHexValue) || sessionIdHexValue;
-      setSessionUrl(buildSessionUrl({ slug: registrySlug }));
-      const adminLink = buildAdminUrl({
-        sessionId: formattedSessionId,
-        chainId: registryChainIdValue,
+      const registerSuccessSettlement = resolveSessionWizardRegisterSuccessSettlementDescriptor({
+        registrySlug,
+        sessionIdHexValue,
+        registryChainId: registryChainIdValue,
+        sessionNetworkChainId: draft.networkChainId,
+        providerLike: provider,
+        account,
       });
-      setAdminUrl(adminLink);
-      setAdminUrlStatus('');
+      setSessionUrl(registerSuccessSettlement.sessionUrl);
+      setAdminUrl(registerSuccessSettlement.adminUrl);
+      setAdminUrlStatus(registerSuccessSettlement.adminUrlStatus);
       clearSessionWizardCache();
       const nextSessionId = generateSessionId();
       setSessionId(nextSessionId);
-      setSessionIdStatus('Generated a new session ID for your next session.');
+      setSessionIdStatus(registerSuccessSettlement.nextSessionIdStatus);
       try {
-        const refreshed = await sessionRegistryUtils.fetchSessionFromRegistry({
-          chainId: Number(registryChainId || draft.networkChainId || 0),
-          slug: registrySlug,
-          providerLike: provider,
-          account,
-          lit: getGlobalLitHooks(),
-        });
+        const refreshed = await sessionRegistryUtils.fetchSessionFromRegistry(
+          {
+            ...registerSuccessSettlement.registryRefreshArgs,
+            lit: getGlobalLitHooks(),
+          }
+        );
         if (refreshed) {
           sessionRegistryUtils.upsertSessionRegistryCache({ config: refreshed });
         }
