@@ -14,6 +14,24 @@ export type SbtListChipProgressVisibilityMeta = {
   visible?: unknown;
 };
 
+export type SbtListChipProgressStatus = {
+  chipRemainingText?: unknown;
+  hasLatest?: unknown;
+  progressPct?: unknown;
+};
+
+export type SbtListChipProgressStyle = Record<string, string | number | undefined> & {
+  background?: string;
+};
+
+export type SbtListChipProgressDisplayPlan = {
+  indeterminate: boolean;
+  progressText: string;
+  progressWidth: string;
+  showProgress: boolean;
+  style?: SbtListChipProgressStyle;
+};
+
 export type SbtListChipProgressVisibilityAction =
   | { type: 'remove'; slug: string }
   | { type: 'initialize'; slug: string; visible: boolean }
@@ -37,6 +55,11 @@ type ResolveSbtListChipProgressVisibilityPlanArgs = {
   metaBySlug?: Record<string, SbtListChipProgressVisibilityMeta | undefined> | null;
   minVisibleMs?: unknown;
   nowMs?: unknown;
+};
+
+type BuildSbtListChipProgressDisplayPlanArgs = {
+  isLoading?: unknown;
+  status?: SbtListChipProgressStatus | null;
 };
 
 const asRecord = <TValue = unknown>(value: unknown): Record<string, TValue> => (
@@ -91,6 +114,34 @@ export const buildSbtListChipProgressDesiredVisibilityBySlug = ({
   });
 
   return out;
+};
+
+export const buildSbtListChipProgressDisplayPlan = ({
+  isLoading = false,
+  status = null,
+}: BuildSbtListChipProgressDisplayPlanArgs = {}): SbtListChipProgressDisplayPlan => {
+  const hasStatus = !!status;
+  const hasLatest = !!status?.hasLatest;
+  const showProgress = hasStatus && !!isLoading;
+  const progressWidth = showProgress
+    ? (hasLatest
+      ? `${Math.max(6, Number(status?.progressPct || 0))}%`
+      : '35%')
+    : '0%';
+  const style = showProgress
+    ? {
+      '--ce-chip-progress-width': progressWidth,
+      background: `linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) ${progressWidth}, rgba(0,0,0,0.22) ${progressWidth}, rgba(0,0,0,0.22) 100%)`,
+    }
+    : undefined;
+
+  return {
+    indeterminate: !hasLatest,
+    progressText: String(status?.chipRemainingText || ''),
+    progressWidth,
+    showProgress,
+    style,
+  };
 };
 
 export const resolveSbtListChipProgressVisibilityPlan = ({
