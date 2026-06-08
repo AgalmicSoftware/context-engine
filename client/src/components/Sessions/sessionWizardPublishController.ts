@@ -1,5 +1,6 @@
 import type { AnyRecord } from '../shellTypes';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { normalizeSessionWizardArweaveUri } from './sessionWizardUrlSupport';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
@@ -110,6 +111,30 @@ export type SessionWizardRegisterStepControllerCallbacks = {
 export type SessionWizardRegisterStepControllerResult = {
   status: 'completed';
   registerResult: AnyRecord | null;
+};
+
+export type SessionWizardRegisterArgsDescriptorInput = {
+  providerLike?: unknown;
+  registryChainId?: unknown;
+  sessionNetworkChainId?: unknown;
+  registryAddress?: unknown;
+  registrySlug?: unknown;
+  sessionIdHexValue?: unknown;
+  metadataUriOverride?: unknown;
+  manualMetadataUrl?: unknown;
+  metadataUrl?: unknown;
+  gateSelectionsSnapshot?: unknown;
+  sessionFieldsOverride?: unknown;
+  pendingOnChainFields?: unknown;
+  manualGasLimit?: unknown;
+  manualGasPriceGwei?: unknown;
+  manualMaxFeePerGasGwei?: unknown;
+  manualMaxPriorityFeePerGasGwei?: unknown;
+};
+
+export type SessionWizardRegisterArgsDescriptor = {
+  metadataUriMissing: boolean;
+  registerArgs: AnyRecord;
 };
 
 export type SessionWizardPublishMetadataUploadRequestInput = {
@@ -270,6 +295,52 @@ export const resolveSessionWizardRegisterStepRequest = ({
     sessionFieldsOverride: uploadResult?.onChainFields,
   },
 });
+
+export const resolveSessionWizardRegisterArgsDescriptor = ({
+  providerLike,
+  registryChainId,
+  sessionNetworkChainId,
+  registryAddress,
+  registrySlug,
+  sessionIdHexValue,
+  metadataUriOverride,
+  manualMetadataUrl,
+  metadataUrl,
+  gateSelectionsSnapshot,
+  sessionFieldsOverride,
+  pendingOnChainFields,
+  manualGasLimit,
+  manualGasPriceGwei,
+  manualMaxFeePerGasGwei,
+  manualMaxPriorityFeePerGasGwei,
+}: SessionWizardRegisterArgsDescriptorInput): SessionWizardRegisterArgsDescriptor => {
+  const metadataURI = normalizeSessionWizardArweaveUri(metadataUriOverride)
+    || normalizeSessionWizardArweaveUri(manualMetadataUrl)
+    || toStr(metadataUrl);
+  const sessionFields = sessionFieldsOverride !== undefined
+    ? (sessionFieldsOverride || {})
+    : pendingOnChainFields;
+
+  return {
+    metadataUriMissing: !metadataURI,
+    registerArgs: {
+      providerLike,
+      chainId: Number(registryChainId || sessionNetworkChainId || 0),
+      registryAddress,
+      slug: toStr(registrySlug).trim(),
+      sessionId: toStr(sessionIdHexValue).trim(),
+      sessionChainId: Number(sessionNetworkChainId || 0),
+      metadataURI,
+      encryptedMetadataURI: '',
+      gateSelections: gateSelectionsSnapshot,
+      sessionFields,
+      gasLimitOverride: manualGasLimit,
+      gasPriceGwei: manualGasPriceGwei,
+      maxFeePerGasGwei: manualMaxFeePerGasGwei,
+      maxPriorityFeePerGasGwei: manualMaxPriorityFeePerGasGwei,
+    },
+  };
+};
 
 export const runSessionWizardRegisterStepController = async ({
   input,

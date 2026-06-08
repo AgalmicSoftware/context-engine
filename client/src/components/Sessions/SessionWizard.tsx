@@ -126,6 +126,7 @@ import {
 } from './sessionWizardPublishFlow';
 import {
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -3512,11 +3513,6 @@ const SessionWizard = ({
       const sessionIdHexValue = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
       if (!sessionIdHexValue) throw new Error('Session ID (UUID) is required.');
       if (!registryAddress) throw new Error('Registry address is not configured for this chain.');
-      const effectiveMetadataUrl =
-        normalizeArweaveUri(metadataUriOverride) ||
-        normalizeArweaveUri(manualMetadataUrl) ||
-        metadataUrl;
-      if (!effectiveMetadataUrl) throw new Error('Upload metadata or provide a manual Arweave URI.');
       const registryChainIdValue = Number(registryChainId || draft.networkChainId || 0);
       try {
         const registryRead = sessionRegistryUtils.getRegistryContract(registryChainIdValue);
@@ -3538,28 +3534,30 @@ const SessionWizard = ({
         if (err?.message) throw err;
       }
 
-      const gateSelectionsSnapshot = buildGateSelectionsSnapshot();
-      const effectiveSessionFields = sessionFieldsOverride !== undefined
-        ? (sessionFieldsOverride || {})
-        : pendingOnChainFields;
+      const registerArgsDescriptor = resolveSessionWizardRegisterArgsDescriptor({
+        providerLike: provider,
+        registryChainId: registryChainIdValue,
+        sessionNetworkChainId: draft.networkChainId,
+        registryAddress,
+        registrySlug,
+        sessionIdHexValue,
+        metadataUriOverride,
+        manualMetadataUrl,
+        metadataUrl,
+        gateSelectionsSnapshot: buildGateSelectionsSnapshot(),
+        sessionFieldsOverride,
+        pendingOnChainFields,
+        manualGasLimit,
+        manualGasPriceGwei,
+        manualMaxFeePerGasGwei,
+        manualMaxPriorityFeePerGasGwei,
+      });
+      if (registerArgsDescriptor.metadataUriMissing) {
+        throw new Error('Upload metadata or provide a manual Arweave URI.');
+      }
       await runSessionWizardRegisterStepController({
         input: {
-          registerArgs: {
-            providerLike: provider,
-            chainId: registryChainIdValue,
-            registryAddress,
-            slug: registrySlug,
-            sessionId: sessionIdHexValue,
-            sessionChainId: Number(draft.networkChainId || 0),
-            metadataURI: effectiveMetadataUrl,
-            encryptedMetadataURI: '',
-            gateSelections: gateSelectionsSnapshot,
-            sessionFields: effectiveSessionFields,
-            gasLimitOverride: manualGasLimit,
-            gasPriceGwei: manualGasPriceGwei,
-            maxFeePerGasGwei: manualMaxFeePerGasGwei,
-            maxPriorityFeePerGasGwei: manualMaxPriorityFeePerGasGwei,
-          },
+          registerArgs: registerArgsDescriptor.registerArgs,
         },
         ports: {
           registerSessionOnChain,

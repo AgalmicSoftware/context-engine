@@ -1,5 +1,6 @@
 import {
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -453,6 +454,139 @@ describe('resolveSessionWizardRegisterStepRequest', () => {
         sessionFieldsOverride: undefined,
       },
     });
+  });
+});
+
+describe('resolveSessionWizardRegisterArgsDescriptor', () => {
+  const arweaveTxId = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNO12';
+
+  it('builds the on-chain register payload while preserving parent-owned execution ports', () => {
+    const gateSelections = {
+      default: {
+        mode: 'all',
+        sbts: [],
+      },
+    };
+    const sessionFieldsOverride = {
+      name: 'Writers Room',
+      workerUrl: 'https://worker.example.test',
+    };
+
+    const descriptor = resolveSessionWizardRegisterArgsDescriptor({
+      providerLike: { kind: 'provider' },
+      registryChainId: '84532',
+      sessionNetworkChainId: '11155420',
+      registryAddress: '0x0000000000000000000000000000000000000abc',
+      registrySlug: ' writers-room ',
+      sessionIdHexValue: ' 0x00000000000000000000000000000001 ',
+      metadataUriOverride: `https://arweave.net/${arweaveTxId}`,
+      manualMetadataUrl: 'ar://manual-metadata',
+      metadataUrl: 'ar://uploaded-metadata',
+      gateSelectionsSnapshot: gateSelections,
+      sessionFieldsOverride,
+      pendingOnChainFields: {
+        name: 'Pending Fields',
+      },
+      manualGasLimit: '1200000',
+      manualGasPriceGwei: '',
+      manualMaxFeePerGasGwei: '2',
+      manualMaxPriorityFeePerGasGwei: '1',
+    });
+
+    expect(descriptor).toEqual({
+      metadataUriMissing: false,
+      registerArgs: {
+        providerLike: { kind: 'provider' },
+        chainId: 84532,
+        registryAddress: '0x0000000000000000000000000000000000000abc',
+        slug: 'writers-room',
+        sessionId: '0x00000000000000000000000000000001',
+        sessionChainId: 11155420,
+        metadataURI: `ar://${arweaveTxId}`,
+        encryptedMetadataURI: '',
+        gateSelections,
+        sessionFields: sessionFieldsOverride,
+        gasLimitOverride: '1200000',
+        gasPriceGwei: '',
+        maxFeePerGasGwei: '2',
+        maxPriorityFeePerGasGwei: '1',
+      },
+    });
+    expect(Object.keys(descriptor.registerArgs)).toEqual([
+      'providerLike',
+      'chainId',
+      'registryAddress',
+      'slug',
+      'sessionId',
+      'sessionChainId',
+      'metadataURI',
+      'encryptedMetadataURI',
+      'gateSelections',
+      'sessionFields',
+      'gasLimitOverride',
+      'gasPriceGwei',
+      'maxFeePerGasGwei',
+      'maxPriorityFeePerGasGwei',
+    ]);
+  });
+
+  it('falls back to manual or uploaded metadata and pending session fields', () => {
+    expect(resolveSessionWizardRegisterArgsDescriptor({
+      registryChainId: '',
+      sessionNetworkChainId: 11155420,
+      metadataUriOverride: '',
+      manualMetadataUrl: ' ar://manual-metadata ',
+      metadataUrl: 'ar://uploaded-metadata',
+      sessionFieldsOverride: undefined,
+      pendingOnChainFields: {
+        name: 'Pending Fields',
+      },
+    })).toEqual(expect.objectContaining({
+      metadataUriMissing: false,
+      registerArgs: expect.objectContaining({
+        chainId: 11155420,
+        sessionChainId: 11155420,
+        metadataURI: 'ar://manual-metadata',
+        sessionFields: {
+          name: 'Pending Fields',
+        },
+      }),
+    }));
+
+    expect(resolveSessionWizardRegisterArgsDescriptor({
+      registryChainId: '',
+      sessionNetworkChainId: 11155420,
+      metadataUriOverride: '',
+      manualMetadataUrl: '',
+      metadataUrl: 'ar://uploaded-metadata',
+      sessionFieldsOverride: null,
+      pendingOnChainFields: {
+        name: 'Pending Fields',
+      },
+    })).toEqual(expect.objectContaining({
+      metadataUriMissing: false,
+      registerArgs: expect.objectContaining({
+        metadataURI: 'ar://uploaded-metadata',
+        sessionFields: {},
+      }),
+    }));
+  });
+
+  it('reports missing metadata without throwing or calling side-effect ports', () => {
+    expect(resolveSessionWizardRegisterArgsDescriptor({
+      registryChainId: 11155420,
+      sessionNetworkChainId: 11155420,
+      metadataUriOverride: '',
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      gateSelectionsSnapshot: [],
+      pendingOnChainFields: {},
+    })).toEqual(expect.objectContaining({
+      metadataUriMissing: true,
+      registerArgs: expect.objectContaining({
+        metadataURI: '',
+      }),
+    }));
   });
 });
 
