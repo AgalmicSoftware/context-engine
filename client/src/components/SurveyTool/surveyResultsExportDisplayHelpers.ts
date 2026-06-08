@@ -313,6 +313,7 @@ export type SurveyResultsHtmlReportDownloadAttemptPlan =
     blockedReason:
       | 'not-authorized'
       | 'no-exportable-sections'
+      | 'analysis-generating'
       | 'unavailable-selected-sections';
     statePatch: SurveyResultsHtmlReportDownloadStatePatch;
     status: 'blocked';
@@ -499,9 +500,11 @@ export const buildSurveyResultsHtmlReportExportModalDescriptor = ({
 };
 
 export const buildSurveyResultsHtmlReportDownloadAttemptPlan = ({
+  analysisGenerating = false,
   isAuthorized = false,
   readinessPlan,
 }: {
+  analysisGenerating?: unknown;
   isAuthorized?: boolean;
   readinessPlan: Pick<
     SurveyResultsHtmlReportReadinessPlan,
@@ -519,6 +522,13 @@ export const buildSurveyResultsHtmlReportDownloadAttemptPlan = ({
     return {
       blockedReason: 'no-exportable-sections',
       statePatch: buildSurveyResultsAlertMessagePatch('Select at least one available report section before export.'),
+      status: 'blocked',
+    };
+  }
+  if (analysisGenerating) {
+    return {
+      blockedReason: 'analysis-generating',
+      statePatch: buildSurveyResultsAlertMessagePatch('Wait for analysis generation to finish before downloading the report.'),
       status: 'blocked',
     };
   }

@@ -1175,6 +1175,60 @@ describe('SurveyResults export/view controls', () => {
     expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
   });
 
+  it('blocks direct report download execution while analysis generation is pending', async () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+      sessionName: 'Pending Export Session',
+      sessionSlug: 'pending-export',
+      network: { id: 11155420 },
+      account: '0x9999999999999999999999999999999999999999',
+      loginComplete: true,
+    }));
+    subject.state = {
+      ...subject.state,
+      htmlReportAnalysisGenerating: true,
+      htmlReportAnalysisProgress: 'Generating Risk Matrix (1/1)',
+      htmlReportModalOpen: true,
+      htmlReportExportedAt: '2026-05-25T18:30:00.000Z',
+      viewMode: 'questions',
+      totalQuestionsCount: 1,
+      totalResponsesCount: 1,
+      filteredResponsesCount: 1,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xabc', response: { answer: { value: 'Agree' } } }],
+      },
+      sbtFilteredResponses: [],
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: {
+        id: 'q1',
+        prompt: 'Can direct pending exports download?',
+        type: 'binary',
+        options: ['Agree', 'Disagree'],
+      },
+    }));
+    subject.fetchResponses = jest.fn();
+    subject.fetchSurveyModeResponses = jest.fn();
+    subject.fetchQuestionModeResponses = jest.fn();
+    subject.decryptLockedResponses = jest.fn();
+    subject.readSessionResultsAnalysisArtifactFromCache = jest.fn();
+    subject.writeSessionResultsAnalysisArtifactToCache = jest.fn();
+
+    await subject.downloadHtmlReport();
+
+    expect(subject.state.alertMessage).toBe('Wait for analysis generation to finish before downloading the report.');
+    expect(subject.state.htmlReportModalOpen).toBe(true);
+    expect(downloadSessionResultsHtmlReport).not.toHaveBeenCalled();
+    expect(downloadSessionResultsPdfReport).not.toHaveBeenCalled();
+    expect(callAI).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.fetchSurveyModeResponses).not.toHaveBeenCalled();
+    expect(subject.fetchQuestionModeResponses).not.toHaveBeenCalled();
+    expect(subject.decryptLockedResponses).not.toHaveBeenCalled();
+    expect(subject.readSessionResultsAnalysisArtifactFromCache).not.toHaveBeenCalled();
+    expect(subject.writeSessionResultsAnalysisArtifactToCache).not.toHaveBeenCalled();
+  });
+
   it('recovers from stale selected analysis state after the report artifact becomes available', async () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',

@@ -102,6 +102,7 @@ export const buildSurveyResultsHtmlReportDownloadExecutionPlan = ({
     snapshot,
   });
   const downloadAttemptPlan = buildSurveyResultsHtmlReportDownloadAttemptPlan({
+    analysisGenerating,
     isAuthorized,
     readinessPlan,
   });
