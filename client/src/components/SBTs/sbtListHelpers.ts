@@ -97,6 +97,13 @@ export type {
   SbtPassiveLatestLookupStateBySlug,
 } from './sbtListPassiveLatestLookupHelpers';
 export {
+  resolveSbtListRegistryRetryPlan,
+} from './sbtListRegistryLifecycleHelpers';
+export type {
+  SbtListRegistryRetryPlan,
+  SbtListRegistryRetrySnapshot,
+} from './sbtListRegistryLifecycleHelpers';
+export {
   buildSbtListExpandedCardShellClassName,
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
