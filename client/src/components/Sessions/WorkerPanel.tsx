@@ -13,6 +13,7 @@ import {
 } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 
 const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
 const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
@@ -91,8 +92,7 @@ export type WorkerPanelProps = {
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
   deployInFlight: boolean;
-  deployStatus?: string;
-  deployStatusIsError: boolean;
+  deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
   renderField: (key: unknown, value: unknown, path: unknown, opts?: Record<string, unknown>) => React.ReactNode;
@@ -154,8 +154,7 @@ const WorkerPanel = ({
   setDeployForm,
   handleDeployWorker,
   deployInFlight,
-  deployStatus,
-  deployStatusIsError,
+  deployStatusDisplayState,
   showWorkerUrlField,
   displayedWorkerUrl,
   renderField,
@@ -301,8 +300,7 @@ const WorkerPanel = ({
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
             deployInFlight={deployInFlight}
-            deployStatus={deployStatus}
-            deployStatusIsError={deployStatusIsError}
+            deployStatusDisplayState={deployStatusDisplayState}
           />
 
           <WorkerConnectionSection

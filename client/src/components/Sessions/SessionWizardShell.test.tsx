@@ -126,8 +126,10 @@ const baseProps = () => ({
   deployForm: {},
   deployHelperUrl: 'https://deploy.example.test',
   deployInFlight: false,
-  deployStatus: '',
-  deployStatusIsError: false,
+  deployStatusDisplayState: {
+    deployStatusText: '',
+    isError: false,
+  },
   deployWorkerUrl: '',
   devPersistWorkerSecrets: false,
   displayedWorkerUrl: 'https://worker.example.test',

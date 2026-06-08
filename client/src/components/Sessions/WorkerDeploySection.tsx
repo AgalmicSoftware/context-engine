@@ -4,6 +4,7 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
+import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 
 type RenderInfoTooltip = (props: {
   id?: string;
@@ -52,8 +53,7 @@ export type WorkerDeploySectionProps = {
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
   deployInFlight: boolean;
-  deployStatus?: string;
-  deployStatusIsError: boolean;
+  deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
 };
 
 const WorkerDeploySection = ({
@@ -88,12 +88,18 @@ const WorkerDeploySection = ({
   setDeployForm,
   handleDeployWorker,
   deployInFlight,
-  deployStatus,
-  deployStatusIsError,
+  deployStatusDisplayState,
 }: WorkerDeploySectionProps) => {
   const renderTooltip = typeof renderInfoTooltip === 'function'
     ? renderInfoTooltip
     : () => null;
+  const {
+    deployStatusText,
+    isError: deployStatusIsError,
+  } = deployStatusDisplayState || {
+    deployStatusText: '',
+    isError: false,
+  };
 
   if (workerMode === 'default') {
     return null;
@@ -314,9 +320,9 @@ const WorkerDeploySection = ({
               Deploy worker
             </Button>
           </div>
-          {deployStatus && (
+          {deployStatusText && (
             <div className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`} data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}>
-              {deployStatus}
+              {deployStatusText}
             </div>
           )}
         </div>

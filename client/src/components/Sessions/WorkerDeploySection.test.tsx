@@ -39,8 +39,10 @@ const buildWorkerDeploySectionProps = (
   setDeployForm: () => {},
   handleDeployWorker: () => {},
   deployInFlight: false,
-  deployStatus: '',
-  deployStatusIsError: false,
+  deployStatusDisplayState: {
+    deployStatusText: '',
+    isError: false,
+  },
   ...props,
 });
 
@@ -107,6 +109,19 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
 
     openSpy.mockRestore();
+  });
+
+  it('renders deploy status from the display descriptor', () => {
+    renderWorkerDeploySection({
+      deployStatusDisplayState: {
+        deployStatusText: 'Missing API token.',
+        isError: true,
+      },
+    });
+
+    const status = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS);
+    expect(status).toHaveTextContent('Missing API token.');
+    expect(status.className).toContain('copyStatusError');
   });
 
   it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
