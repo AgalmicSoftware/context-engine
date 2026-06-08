@@ -58,6 +58,13 @@ export type SessionWizardPublishCompletionControllerInput = {
   sessionSlug?: unknown;
 };
 
+export type SessionWizardPublishCompletionRequestInput = {
+  publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
+  deployedPendingDrafts?: SessionWizardPendingDraftLike[] | null;
+  pendingDraftSnapshot?: SessionWizardPendingDraftLike[] | null;
+  sessionSlug?: unknown;
+};
+
 export type SessionWizardPublishCompletionControllerPorts = {
   normalizePendingDrafts: (
     drafts: SessionWizardPendingDraftLike[]
@@ -296,6 +303,18 @@ export const runSessionWizardRegisterStepController = async ({
     registerResult,
   };
 };
+
+export const resolveSessionWizardPublishCompletionRequest = ({
+  publishExecutionPlan,
+  deployedPendingDrafts = [],
+  pendingDraftSnapshot = [],
+  sessionSlug = '',
+}: SessionWizardPublishCompletionRequestInput): SessionWizardPublishCompletionControllerInput => ({
+  publishExecutionPlan,
+  deployedPendingDrafts: Array.isArray(deployedPendingDrafts) ? deployedPendingDrafts : [],
+  pendingDraftSnapshot: Array.isArray(pendingDraftSnapshot) ? pendingDraftSnapshot : [],
+  sessionSlug: toStr(sessionSlug).trim(),
+});
 
 export const runSessionWizardPublishCompletionController = ({
   input,

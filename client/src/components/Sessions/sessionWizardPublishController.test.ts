@@ -1,4 +1,5 @@
 import {
+  resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -451,6 +452,50 @@ describe('resolveSessionWizardRegisterStepRequest', () => {
         metadataUriOverride: undefined,
         sessionFieldsOverride: undefined,
       },
+    });
+  });
+});
+
+describe('resolveSessionWizardPublishCompletionRequest', () => {
+  it('describes completion controller input without owning completion callbacks', () => {
+    const deployedPendingDrafts = [{ id: 'deployed-draft', deployed: true }];
+    const pendingDraftSnapshot = [{ id: 'snapshot-draft', deployed: false }];
+    const publishExecutionPlan = buildPlan({
+      stepNumbers: {
+        done: 5,
+      },
+    });
+
+    expect(resolveSessionWizardPublishCompletionRequest({
+      publishExecutionPlan,
+      deployedPendingDrafts,
+      pendingDraftSnapshot,
+      sessionSlug: ' writers-room ',
+    })).toEqual({
+      publishExecutionPlan,
+      deployedPendingDrafts,
+      pendingDraftSnapshot,
+      sessionSlug: 'writers-room',
+    });
+  });
+
+  it('keeps malformed completion draft inputs inert', () => {
+    const publishExecutionPlan = buildPlan({
+      stepNumbers: {
+        done: 2,
+      },
+    });
+
+    expect(resolveSessionWizardPublishCompletionRequest({
+      publishExecutionPlan,
+      deployedPendingDrafts: null,
+      pendingDraftSnapshot: null,
+      sessionSlug: null,
+    })).toEqual({
+      publishExecutionPlan,
+      deployedPendingDrafts: [],
+      pendingDraftSnapshot: [],
+      sessionSlug: '',
     });
   });
 });
