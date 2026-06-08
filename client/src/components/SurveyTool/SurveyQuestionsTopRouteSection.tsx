@@ -1,35 +1,9 @@
 import React from 'react';
 
 import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
-import type {
-  SurveyQuestionsLayoutDisplayState,
-  SurveyQuestionsRouteViewDisplayState,
-  SurveyQuestionsSubmitFooterDisplayState,
-} from './surveyQuestionsTypes.js';
+import type { SurveyQuestionsTopRouteSectionProps } from './surveyQuestionsRouteSurfaceTypes.js';
 
 const noop = () => {};
-
-type SurveyQuestionsRouteTopStripProps = {
-  topRef?: React.Ref<HTMLDivElement>;
-  displayAnswerMode?: boolean;
-  isDecrypting?: boolean;
-  isEditing?: boolean;
-  isSubmitting?: boolean;
-  onDecryptEdit?: () => void;
-  onExitEditing?: () => void;
-  onStartFresh?: () => void;
-  onToggleDisplayAnswerMode?: () => void;
-  responseUrl?: string;
-  userHasResponse?: boolean;
-  userResponseEncrypted?: boolean;
-};
-
-type SurveyQuestionsTopRouteSectionProps = {
-  layoutDisplayState?: Partial<SurveyQuestionsLayoutDisplayState>;
-  routeViewDisplayState?: Partial<SurveyQuestionsRouteViewDisplayState>;
-  submitDisplayState?: Partial<SurveyQuestionsSubmitFooterDisplayState>;
-  topStripProps?: SurveyQuestionsRouteTopStripProps;
-};
 
 const SurveyQuestionsTopRouteSection = ({
   layoutDisplayState = {},
