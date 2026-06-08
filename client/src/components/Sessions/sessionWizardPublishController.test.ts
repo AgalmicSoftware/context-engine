@@ -3,6 +3,7 @@ import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterArgsDescriptor,
+  resolveSessionWizardRegisterDuplicateCheckDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
@@ -632,6 +633,51 @@ describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
       sessionIdHexValue: '0x00000000000000000000000000000003',
       registryChainIdValue: 84532,
       statusMessage: 'Registry address is not configured for this chain.',
+    });
+  });
+});
+
+describe('resolveSessionWizardRegisterDuplicateCheckDescriptor', () => {
+  it('describes registry duplicate-check inputs and existing duplicate messages without owning contract reads', () => {
+    const descriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+      registryChainId: '84532',
+      registrySlug: ' writers-room ',
+      sessionIdHexValue: ' 0x00000000000000000000000000000001 ',
+    });
+
+    expect(descriptor).toEqual({
+      chainId: 84532,
+      registrySlug: 'writers-room',
+      sessionIdHexValue: '0x00000000000000000000000000000001',
+      shouldCheckSlug: true,
+      shouldCheckSessionId: true,
+      slugDuplicateMessage: 'Session slug already exists on-chain: writers-room',
+      sessionIdDuplicateMessage: 'Session ID already exists on-chain. Generate a new session ID.',
+    });
+    expect(Object.keys(descriptor)).toEqual([
+      'chainId',
+      'registrySlug',
+      'sessionIdHexValue',
+      'shouldCheckSlug',
+      'shouldCheckSessionId',
+      'slugDuplicateMessage',
+      'sessionIdDuplicateMessage',
+    ]);
+  });
+
+  it('keeps empty duplicate-check targets inert for callers that own registry execution', () => {
+    expect(resolveSessionWizardRegisterDuplicateCheckDescriptor({
+      registryChainId: '',
+      registrySlug: '',
+      sessionIdHexValue: '',
+    })).toEqual({
+      chainId: 0,
+      registrySlug: '',
+      sessionIdHexValue: '',
+      shouldCheckSlug: false,
+      shouldCheckSessionId: false,
+      slugDuplicateMessage: 'Session slug already exists on-chain: ',
+      sessionIdDuplicateMessage: 'Session ID already exists on-chain. Generate a new session ID.',
     });
   });
 });
