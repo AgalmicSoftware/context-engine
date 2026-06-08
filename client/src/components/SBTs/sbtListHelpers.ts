@@ -111,6 +111,17 @@ export type {
   SbtListRealtimeProgressRetentionPlan,
 } from './sbtListRealtimeProgressHelpers';
 export {
+  buildSbtListChipProgressDesiredVisibilityBySlug,
+  resolveSbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export type {
+  SbtListChipProgressBooleanBySlug,
+  SbtListChipProgressChipState,
+  SbtListChipProgressVisibilityAction,
+  SbtListChipProgressVisibilityMeta,
+  SbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export {
   resolveSbtListRegistryRetryPlan,
 } from './sbtListRegistryLifecycleHelpers';
 export type {

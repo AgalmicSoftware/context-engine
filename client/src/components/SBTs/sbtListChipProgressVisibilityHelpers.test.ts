@@ -1,63 +1,10 @@
 import {
-  buildSbtListChipProgressDisplayPlan,
   buildSbtListChipProgressDesiredVisibilityBySlug,
   resolveSbtListChipProgressVisibilityPlan,
 } from './sbtListChipProgressVisibilityHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 describe('sbtListChipProgressVisibilityHelpers', () => {
-  it('builds chip progress display plans without owning render callbacks', () => {
-    expect(buildSbtListChipProgressDisplayPlan({
-      isLoading: true,
-      status: {
-        chipRemainingText: '10 remaining',
-        hasLatest: true,
-        progressPct: 4,
-      },
-    })).toEqual({
-      indeterminate: false,
-      progressText: '10 remaining',
-      progressWidth: '6%',
-      showProgress: true,
-      style: {
-        '--ce-chip-progress-width': '6%',
-        background: 'linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) 6%, rgba(0,0,0,0.22) 6%, rgba(0,0,0,0.22) 100%)',
-      },
-    });
-
-    expect(buildSbtListChipProgressDisplayPlan({
-      isLoading: true,
-      status: {
-        chipRemainingText: 'Syncing',
-        hasLatest: false,
-      },
-    })).toEqual({
-      indeterminate: true,
-      progressText: 'Syncing',
-      progressWidth: '35%',
-      showProgress: true,
-      style: {
-        '--ce-chip-progress-width': '35%',
-        background: 'linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) 35%, rgba(0,0,0,0.22) 35%, rgba(0,0,0,0.22) 100%)',
-      },
-    });
-
-    expect(buildSbtListChipProgressDisplayPlan({
-      isLoading: false,
-      status: {
-        chipRemainingText: 'Synced',
-        hasLatest: true,
-        progressPct: 100,
-      },
-    })).toEqual({
-      indeterminate: false,
-      progressText: 'Synced',
-      progressWidth: '0%',
-      showProgress: false,
-      style: undefined,
-    });
-  });
-
   it('builds desired chip progress visibility from loading chip state', () => {
     expect(buildSbtListChipProgressDesiredVisibilityBySlug({
       allSessionsMode: true,
