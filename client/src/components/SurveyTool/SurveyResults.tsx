@@ -134,11 +134,9 @@ import {
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
-  buildSurveyResultsHtmlReportDownloadAttemptPlan,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
   buildSurveyResultsHtmlReportExportModalDescriptor,
-  buildSurveyResultsHtmlReportReadinessPlan,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
@@ -195,7 +193,7 @@ import {
   runSurveyResultsQueuedRefreshController,
 } from './surveyResultsQueuedRefreshController';
 import {
-  buildSurveyResultsHtmlReportDownloadRequest,
+  buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
 import {
   getSurveyResultsQuestionCardDomId,
@@ -3572,29 +3570,21 @@ downloadHtmlReport = async (): Promise<void> => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
-const isAuthorized = this.isHtmlReportExportAuthorized();
-const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+const format = this.state.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
+const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
   analysisGenerating: this.state.htmlReportAnalysisGenerating,
-  isAuthorized,
+  format,
+  isAuthorized: this.isHtmlReportExportAuthorized(),
   selectedSections,
   snapshot,
 });
-const downloadAttemptPlan = buildSurveyResultsHtmlReportDownloadAttemptPlan({
-  isAuthorized,
-  readinessPlan,
-});
-if (downloadAttemptPlan.status === 'blocked') {
-  this.setState(downloadAttemptPlan.statePatch);
+if (downloadPlan.status === 'blocked') {
+  this.setState(downloadPlan.statePatch);
   return;
 }
 
 try {
-  const format = this.state.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
-  const downloadRequest = buildSurveyResultsHtmlReportDownloadRequest({
-    format,
-    selectedSections,
-    snapshot,
-  });
+  const { downloadRequest } = downloadPlan;
   const html = renderSessionResultsHtmlReport(snapshot, downloadRequest.renderOptions);
   if (downloadRequest.kind === 'pdf') {
     await downloadSessionResultsPdfReport({
