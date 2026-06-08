@@ -115,6 +115,7 @@ import {
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListRemainingHiddenRegistrySessionSlugs,
+  resolveSbtListReadinessDisplayPlan,
   resolveSbtListRealtimeProgressRetentionPlan,
   resolveSbtListSelectedSessionUniverseSlugs,
   resolveSbtListSelectedHiddenRegistrySessionSlugs,
@@ -2390,27 +2391,49 @@ const SBTsList = ({
     expiredList.filter((sbt: SbtListItem) => !featuredItemKeySet.has(buildSbtItemKey(sbt)))
   ), [buildSbtItemKey, expiredList, featuredItemKeySet]);
 
-  const sectionHeaderSpinnerVisible = emptySectionSpinnerActive;
-  const initialLoadingActive = allSessionsMode
-    ? (!initialLoadCompletedRef.current)
-    : (!initialLoadCompletedRef.current && !isSBTCacheReady);
-  const sectionReadinessPending = !isSBTCacheReady;
-  const showSectionBodyLoadingHint = (
-    sectionHeaderSpinnerVisible ||
-    sectionSessionDiscoveryPending ||
-    sectionSessionSearchFlag ||
-    initialLoadingActive ||
-    sectionReadinessPending ||
-    revisionSyncPending
-  );
-  const canShowSectionEmptyState = (
-    !showSectionBodyLoadingHint &&
-    initialLoadCompletedRef.current &&
-    isSBTCacheReady
-  );
-  const showFeaturedSectionLoadingHint = displayedFeatured.length === 0 && !canShowSectionEmptyState;
-  const showLiveSectionLoadingHint = mintingLiveListWithoutFeatured.length === 0 && !canShowSectionEmptyState;
-  const showExpiredSectionLoadingHint = expiredListWithoutFeatured.length === 0 && !canShowSectionEmptyState;
+  const initialLoadCompleted = initialLoadCompletedRef.current;
+  const {
+    sectionHeaderSpinnerVisible,
+    showExpiredSectionLoadingHint,
+    showFeaturedSectionLoadingHint,
+    showInitialLoader,
+    showLiveSectionLoadingHint,
+    showUniverseSpinner,
+  } = useMemo(() => (
+    resolveSbtListReadinessDisplayPlan({
+      allSessionsMode,
+      availableSessionSlugCount: availableSessionSlugs.length,
+      displayedFeaturedCount: displayedFeatured.length,
+      displayedSessionUniverseSlugs,
+      emptySectionSpinnerActive,
+      expiredCount: expiredListWithoutFeatured.length,
+      initialLoadCompleted,
+      isSBTCacheReady,
+      loading,
+      mintingLiveCount: mintingLiveListWithoutFeatured.length,
+      refreshing,
+      revisionSyncPending,
+      sectionSessionDiscoveryPending,
+      sectionSessionSearchFlag,
+      sessionUniverseRegistryPending,
+    })
+  ), [
+    allSessionsMode,
+    availableSessionSlugs.length,
+    displayedFeatured.length,
+    displayedSessionUniverseSlugs,
+    emptySectionSpinnerActive,
+    expiredListWithoutFeatured.length,
+    initialLoadCompleted,
+    isSBTCacheReady,
+    loading,
+    mintingLiveListWithoutFeatured.length,
+    refreshing,
+    revisionSyncPending,
+    sectionSessionDiscoveryPending,
+    sectionSessionSearchFlag,
+    sessionUniverseRegistryPending,
+  ]);
 
   useEffect(() => {
     const researchStep = readSbtListSyncBarResearchBlockStep();
@@ -2447,12 +2470,6 @@ const SBTsList = ({
     sbtRealtimeCoverageBySlug,
     sessionChipStateBySlug,
   ]);
-
-  // Initial full-page loader logic
-  const shouldDeferInitialLoaderForUniverse =
-    allSessionsMode &&
-    displayedSessionUniverseSlugs.length > 0;
-  const showInitialLoader = initialLoadingActive && !shouldDeferInitialLoaderForUniverse;
 
   if (showInitialLoader) {
     return (
@@ -2814,14 +2831,6 @@ const SBTsList = ({
       } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
     };
 
-    const showUniverseSpinner =
-      loading ||
-      refreshing ||
-      sectionSessionDiscoveryPending ||
-      sectionSessionSearchFlag ||
-      !isSBTCacheReady ||
-      sessionUniverseRegistryPending ||
-      availableSessionSlugs.length === 0;
     const canShowMoreSessions =
       isListModeScopeEnabled &&
       !showMoreSessions &&

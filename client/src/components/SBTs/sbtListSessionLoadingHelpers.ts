@@ -91,6 +91,20 @@ export type SbtListSectionLoadingState = {
   shouldKeepSectionSpinnersOn: boolean;
 };
 
+export type SbtListReadinessDisplayPlan = {
+  canShowSectionEmptyState: boolean;
+  initialLoadingActive: boolean;
+  sectionHeaderSpinnerVisible: boolean;
+  sectionReadinessPending: boolean;
+  shouldDeferInitialLoaderForUniverse: boolean;
+  showExpiredSectionLoadingHint: boolean;
+  showFeaturedSectionLoadingHint: boolean;
+  showInitialLoader: boolean;
+  showLiveSectionLoadingHint: boolean;
+  showSectionBodyLoadingHint: boolean;
+  showUniverseSpinner: boolean;
+};
+
 type BuildSbtListSessionLoadingStatusArgs = {
   allSessionsMode?: boolean;
   alwaysShow?: boolean;
@@ -149,6 +163,24 @@ type ResolveSbtListSectionLoadingStateArgs = {
   sessionUniverseRegistryPending?: unknown;
 };
 
+type ResolveSbtListReadinessDisplayPlanArgs = {
+  allSessionsMode?: unknown;
+  availableSessionSlugCount?: unknown;
+  displayedFeaturedCount?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  emptySectionSpinnerActive?: unknown;
+  expiredCount?: unknown;
+  initialLoadCompleted?: unknown;
+  isSBTCacheReady?: unknown;
+  loading?: unknown;
+  mintingLiveCount?: unknown;
+  refreshing?: unknown;
+  revisionSyncPending?: unknown;
+  sectionSessionDiscoveryPending?: unknown;
+  sectionSessionSearchFlag?: unknown;
+  sessionUniverseRegistryPending?: unknown;
+};
+
 type BuildSbtListSessionProgressSnapshotArgs = {
   allSessionsMode?: unknown;
   bridgeMs?: unknown;
@@ -176,6 +208,16 @@ const labelSbtListLoadingStatusBySlug = (
   ...status,
   slug: status.slugLabel,
 });
+
+const normalizeSbtListReadinessCount = (value: unknown): number => {
+  const count = Number(value || 0);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+};
+
+const countSbtListUniverseSlugs = (value: unknown): number => {
+  if (Array.isArray(value)) return value.length;
+  return normalizeSbtListReadinessCount(value);
+};
 
 export const buildSbtListSessionLoadingStatus = ({
   allSessionsMode = false,
@@ -369,6 +411,69 @@ export const resolveSbtListSectionLoadingState = ({
       refreshing ||
       sectionSessionDiscoveryPending ||
       sectionSessionSearchFlag
+    ),
+  };
+};
+
+export const resolveSbtListReadinessDisplayPlan = ({
+  allSessionsMode = false,
+  availableSessionSlugCount = 0,
+  displayedFeaturedCount = 0,
+  displayedSessionUniverseSlugs = [],
+  emptySectionSpinnerActive = false,
+  expiredCount = 0,
+  initialLoadCompleted = false,
+  isSBTCacheReady = false,
+  loading = false,
+  mintingLiveCount = 0,
+  refreshing = false,
+  revisionSyncPending = false,
+  sectionSessionDiscoveryPending = false,
+  sectionSessionSearchFlag = false,
+  sessionUniverseRegistryPending = false,
+}: ResolveSbtListReadinessDisplayPlanArgs = {}): SbtListReadinessDisplayPlan => {
+  const initialLoadingActive = !!allSessionsMode
+    ? !initialLoadCompleted
+    : (!initialLoadCompleted && !isSBTCacheReady);
+  const sectionHeaderSpinnerVisible = !!emptySectionSpinnerActive;
+  const sectionReadinessPending = !isSBTCacheReady;
+  const showSectionBodyLoadingHint = !!(
+    sectionHeaderSpinnerVisible ||
+    sectionSessionDiscoveryPending ||
+    sectionSessionSearchFlag ||
+    initialLoadingActive ||
+    sectionReadinessPending ||
+    revisionSyncPending
+  );
+  const canShowSectionEmptyState = !!(
+    !showSectionBodyLoadingHint &&
+    initialLoadCompleted &&
+    isSBTCacheReady
+  );
+  const shouldDeferInitialLoaderForUniverse = !!(
+    allSessionsMode &&
+    countSbtListUniverseSlugs(displayedSessionUniverseSlugs) > 0
+  );
+
+  return {
+    canShowSectionEmptyState,
+    initialLoadingActive,
+    sectionHeaderSpinnerVisible,
+    sectionReadinessPending,
+    shouldDeferInitialLoaderForUniverse,
+    showExpiredSectionLoadingHint: normalizeSbtListReadinessCount(expiredCount) === 0 && !canShowSectionEmptyState,
+    showFeaturedSectionLoadingHint: normalizeSbtListReadinessCount(displayedFeaturedCount) === 0 && !canShowSectionEmptyState,
+    showInitialLoader: initialLoadingActive && !shouldDeferInitialLoaderForUniverse,
+    showLiveSectionLoadingHint: normalizeSbtListReadinessCount(mintingLiveCount) === 0 && !canShowSectionEmptyState,
+    showSectionBodyLoadingHint,
+    showUniverseSpinner: !!(
+      loading ||
+      refreshing ||
+      sectionSessionDiscoveryPending ||
+      sectionSessionSearchFlag ||
+      !isSBTCacheReady ||
+      sessionUniverseRegistryPending ||
+      normalizeSbtListReadinessCount(availableSessionSlugCount) === 0
     ),
   };
 };
