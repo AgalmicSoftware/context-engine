@@ -1,6 +1,8 @@
 import {
+  appendSessionWizardRegisterTxEntry,
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterArgsDescriptor,
+  resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
@@ -650,6 +652,78 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
         slug: '',
       }),
     }));
+  });
+});
+
+describe('resolveSessionWizardRegisterFailureSettlementDescriptor', () => {
+  it('describes transaction hash recovery and status text for register failures', () => {
+    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
+      error: {
+        transactionHash: '0xaaa',
+        message: 'registry write reverted',
+      },
+    })).toEqual({
+      txEntry: {
+        action: 'createSession',
+        hash: '0xaaa',
+      },
+      errorMessage: 'registry write reverted',
+    });
+  });
+
+  it('falls back to nested transaction hashes and default failure copy', () => {
+    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
+      error: {
+        transaction: {
+          hash: '0xbbb',
+        },
+      },
+    })).toEqual({
+      txEntry: {
+        action: 'createSession',
+        hash: '0xbbb',
+      },
+      errorMessage: 'Failed to register session.',
+    });
+  });
+
+  it('keeps malformed errors inert without creating tx entries', () => {
+    expect(resolveSessionWizardRegisterFailureSettlementDescriptor({
+      error: 'failed',
+    })).toEqual({
+      txEntry: null,
+      errorMessage: 'Failed to register session.',
+    });
+  });
+});
+
+describe('appendSessionWizardRegisterTxEntry', () => {
+  it('appends unique register tx entries without mutating previous state', () => {
+    const previousEntries = [{ action: 'createSession', hash: '0xaaa' }];
+    const nextEntries = appendSessionWizardRegisterTxEntry(previousEntries, {
+      action: 'createSession',
+      hash: '0xbbb',
+    });
+
+    expect(nextEntries).toEqual([
+      { action: 'createSession', hash: '0xaaa' },
+      { action: 'createSession', hash: '0xbbb' },
+    ]);
+    expect(nextEntries).not.toBe(previousEntries);
+  });
+
+  it('preserves existing state for duplicate or empty tx entries', () => {
+    const previousEntries = [{ action: 'createSession', hash: '0xaaa' }];
+
+    expect(appendSessionWizardRegisterTxEntry(previousEntries, {
+      action: 'createSession',
+      hash: '0xaaa',
+    })).toBe(previousEntries);
+    expect(appendSessionWizardRegisterTxEntry(previousEntries, null)).toBe(previousEntries);
+    expect(appendSessionWizardRegisterTxEntry('not-array', {
+      action: 'createSession',
+      hash: '',
+    })).toEqual([]);
   });
 });
 
