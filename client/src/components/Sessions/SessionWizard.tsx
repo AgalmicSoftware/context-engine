@@ -125,6 +125,7 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
@@ -3653,7 +3654,6 @@ const SessionWizard = ({
         canUploadMetadataNow,
       });
       const { publishExecutionPlan } = publishRequestDescriptor;
-      const publishStepNumbers = publishExecutionPlan.stepNumbers;
       let uploadResult = null;
       let workerUrlOverride = '';
       let deployedPendingDrafts = [];
@@ -3692,11 +3692,12 @@ const SessionWizard = ({
         },
       });
       uploadResult = metadataUploadControllerResult.uploadResult;
-      setPublishStep(publishStepNumbers['register-session']);
-      await handleRegisterGroup({
-        metadataUriOverride: uploadResult?.metadataUri,
-        sessionFieldsOverride: uploadResult?.onChainFields,
+      const registerStepRequest = resolveSessionWizardRegisterStepRequest({
+        publishExecutionPlan,
+        uploadResult,
       });
+      setPublishStep(registerStepRequest.publishStep);
+      await handleRegisterGroup(registerStepRequest.registerGroupArgs);
       runSessionWizardPublishCompletionController({
         input: {
           publishExecutionPlan,

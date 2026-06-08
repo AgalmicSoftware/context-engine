@@ -132,6 +132,21 @@ export type SessionWizardPublishMetadataUploadControllerResult = {
   uploadResult: AnyRecord | null;
 };
 
+export type SessionWizardRegisterStepRequestInput = {
+  publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
+  uploadResult?: AnyRecord | null;
+};
+
+export type SessionWizardRegisterGroupArgs = {
+  metadataUriOverride?: unknown;
+  sessionFieldsOverride?: unknown;
+};
+
+export type SessionWizardRegisterStepRequest = {
+  publishStep: number;
+  registerGroupArgs: SessionWizardRegisterGroupArgs;
+};
+
 const getPublishStepNumber = (
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike,
   stepKey: string
@@ -237,6 +252,17 @@ export const runSessionWizardPublishMetadataUploadController = async ({
     uploadResult,
   };
 };
+
+export const resolveSessionWizardRegisterStepRequest = ({
+  publishExecutionPlan,
+  uploadResult = null,
+}: SessionWizardRegisterStepRequestInput): SessionWizardRegisterStepRequest => ({
+  publishStep: getPublishStepNumber(publishExecutionPlan, 'register-session'),
+  registerGroupArgs: {
+    metadataUriOverride: uploadResult?.metadataUri,
+    sessionFieldsOverride: uploadResult?.onChainFields,
+  },
+});
 
 export const runSessionWizardRegisterStepController = async ({
   input,
