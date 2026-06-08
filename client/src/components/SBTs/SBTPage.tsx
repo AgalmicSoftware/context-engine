@@ -47,7 +47,6 @@ import {
   appendSbtPageTransactionHash,
   applySbtPageHistorySummaryFallback,
   buildSessionRoutePath,
-  buildSbtPageActionButtonClassName,
   buildSbtPageAddressListSignatureMemoState,
   buildSbtPageAddressChangeResetMintUiPatch,
   buildSbtPageAdminFallbackPatch,
@@ -147,18 +146,16 @@ import {
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageAddressLinkState,
-  resolveSbtPageBurnActionPlan,
-  resolveSbtPageBurnStatusButtonState,
   resolveSbtPageCopyableErrorText,
   resolveSbtPageCopyIconState,
   resolveSbtPageEffectiveSessionSlug,
+  resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageFullViewShellState,
   resolveSbtPageHolderScanActive,
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInteractiveCursorStyle,
   resolveSbtPageMetadataHydrationMode,
   resolveSbtPageMiniCardDisplayState,
-  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
   resolveSbtPagePasswordExportControlsState,
@@ -188,6 +185,7 @@ import {
 import type {
   ReconcileSbtPageHolderRefreshStateArgs,
   ReconciledSbtPageHolderRefreshState,
+  SbtPageFullActionDisplayPlan,
   SbtPageDecodedInviteInput,
   SbtPageUrlAutoMintIntent,
 } from './sbtPageHelpers';
@@ -3640,88 +3638,87 @@ class SBTPage extends Component<any, any> {
     URL.revokeObjectURL(url);
   };
 
-renderMintButton() {
-  const { sbtInfo, mintStep, claimCountdown, mintingStatus, userHasSBT, burningStatus, manualPasswordInput, lastMintTxHash, groupPasswordInput } = this.state;
-  const mintButtonDisplayState = resolveSbtPageMintButtonDisplayState({
-    burningStatus,
-    claimCountdown,
-    groupPasswordInput,
-    hasGroupPasswordMint: this.state.hasGroupPasswordMint,
-    hasInviteMint: this.state.hasInviteMint,
-    lastMintTxHash,
-    manualPasswordInput,
-    mintedLabel: t('minted'),
-    mintLowerLabel: t('mintLower'),
-    mintingStatus,
-    mintStep,
-    nowSeconds: Math.floor(Date.now() / 1000),
-    sbtInfo,
-    sbtMintedSuccessLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
-    userHasSBT,
-  });
-  const mintActionButtonClassName = buildSbtPageActionButtonClassName({
-    actionClassName: styles.actionButton,
-    variantClassName: styles.mintButton,
-  });
-
-  return (
-    <SbtPageMintActionSurface
-      buttonClassName={mintActionButtonClassName}
-      displayState={mintButtonDisplayState}
-      groupPasswordInput={groupPasswordInput || ''}
-      onClaimWithInviteCode={this.claimWithInviteCode}
-      onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
-      onManualPasswordInputChange={this.handleManualPasswordInputChange}
-      onMint={this.handleMint}
-      onMintUnlimitedWithGroupPassword={this.mintUnlimitedWithGroupPassword}
-      onOpenMintTransaction={() => window.open(
-        this.getExplorerLink(lastMintTxHash),
-        '_blank',
-        'noopener,noreferrer'
-      )}
-    />
-  );
-}
-
-
-
-
-  renderBurnButton = (): React.ReactNode => {
-    const { sbtInfo, userHasSBT, burningStatus } = this.state;
-    if (!sbtInfo) return null;
-
-    const burnActionPlan = resolveSbtPageBurnActionPlan({
-      account: this.props.account,
+  resolveFullActionDisplayPlan = (): SbtPageFullActionDisplayPlan => {
+    const {
+      burningStatus,
+      claimCountdown,
+      groupPasswordInput,
+      lastMintTxHash,
+      manualPasswordInput,
+      mintingStatus,
+      mintStep,
       sbtInfo,
       userHasSBT,
-    });
-    const burnStatusButtonState = resolveSbtPageBurnStatusButtonState({
-      burningStatus,
-    });
-    const burnButtonContentState = resolveSbtPageStatusButtonContentState({
-      idleLabel: t('burn'),
-      isFailure: burnStatusButtonState.isFailure,
-      isIdle: burnStatusButtonState.isIdle,
-      isPending: burnStatusButtonState.isPending,
-      isSuccess: burnStatusButtonState.isSuccess,
-      successLabel: t('burned'),
-    });
-    const burnActionButtonClassName = buildSbtPageActionButtonClassName({
-      actionClassName: styles.actionButton,
-      variantClassName: styles.burnButton,
-    });
+    } = this.state;
 
-    if (!burnActionPlan.shouldRenderBurnButton) {
+    return resolveSbtPageFullActionDisplayPlan({
+      account: this.props.account,
+      actionClassName: styles.actionButton,
+      burnedLabel: t('burned'),
+      burningStatus,
+      burnButtonClassName: styles.burnButton,
+      burnLabel: t('burn'),
+      claimCountdown,
+      groupPasswordInput,
+      hasGroupPasswordMint: this.state.hasGroupPasswordMint,
+      hasInviteMint: this.state.hasInviteMint,
+      lastMintTxHash,
+      manualPasswordInput,
+      mintedLabel: t('minted'),
+      mintButtonClassName: styles.mintButton,
+      mintLowerLabel: t('mintLower'),
+      mintingStatus,
+      mintStep,
+      nowSeconds: Math.floor(Date.now() / 1000),
+      sbtInfo,
+      sbtMintedSuccessLabel: `${t('sbt')} successfully ${t('mintedLower')}!`,
+      userHasSBT,
+    });
+  };
+
+  renderMintButton = (
+    actionDisplayPlan: SbtPageFullActionDisplayPlan = this.resolveFullActionDisplayPlan()
+  ): React.ReactNode => {
+    const { groupPasswordInput, lastMintTxHash } = this.state;
+
+    if (!actionDisplayPlan.shouldRenderMintSurface) {
       return null;
     }
 
     return (
+      <SbtPageMintActionSurface
+        buttonClassName={actionDisplayPlan.mintActionButtonClassName}
+        displayState={actionDisplayPlan.mintButtonDisplayState}
+        groupPasswordInput={groupPasswordInput || ''}
+        onClaimWithInviteCode={this.claimWithInviteCode}
+        onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
+        onManualPasswordInputChange={this.handleManualPasswordInputChange}
+        onMint={this.handleMint}
+        onMintUnlimitedWithGroupPassword={this.mintUnlimitedWithGroupPassword}
+        onOpenMintTransaction={() => window.open(
+          this.getExplorerLink(lastMintTxHash),
+          '_blank',
+          'noopener,noreferrer'
+        )}
+      />
+    );
+  };
+
+  renderBurnButton = (
+    actionDisplayPlan: SbtPageFullActionDisplayPlan = this.resolveFullActionDisplayPlan()
+  ): React.ReactNode => {
+    if (!actionDisplayPlan.shouldRenderBurnSurface) {
+      return null;
+    }
+
+
+    return (
       <SbtPageBurnActionSurface
-        buttonClassName={burnActionButtonClassName}
-        contentState={burnButtonContentState}
-        displayState={burnStatusButtonState}
+        buttonClassName={actionDisplayPlan.burnActionButtonClassName}
+        contentState={actionDisplayPlan.burnButtonContentState}
+        displayState={actionDisplayPlan.burnStatusButtonState}
         onBurn={this.handleBurn}
-        plan={burnActionPlan}
+        plan={actionDisplayPlan.burnActionPlan}
       />
     );
   };
@@ -4162,6 +4159,7 @@ renderMintButton() {
     const netHolders = this.getMemoizedNetHoldersList(mintedAddresses, burnedAddresses);
     const scanProgress = this.getEffectiveHolderScanProgress();
     const filterNetwork = this.state.network || this.props.network || null;
+    const fullActionDisplayPlan = this.resolveFullActionDisplayPlan();
     return renderSbtPageFullView({
       actionLabels: {
         burn: t('burn'),
@@ -4249,8 +4247,8 @@ renderMintButton() {
       },
       workerScanInProgress: this.props.sbtScanInProgress,
       workerScanPending: this.props.sbtScanPending,
-      burnButton: this.renderBurnButton(),
-      mintButton: this.renderMintButton(),
+      burnButton: this.renderBurnButton(fullActionDisplayPlan),
+      mintButton: this.renderMintButton(fullActionDisplayPlan),
     });
   }
 }
