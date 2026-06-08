@@ -128,6 +128,7 @@ import {
   appendSessionWizardRegisterTxEntry,
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
+  resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterStepRequest,
@@ -3510,13 +3511,21 @@ const SessionWizard = ({
 
   const handleRegisterGroup = async ({ metadataUriOverride, sessionFieldsOverride } = {}) => {
     try {
-      const rawSlug = toStr(draft.slug).trim();
-      // Empty slug maps to the on-chain "general" session; metadata keeps ''.
-      const registrySlug = sessionRegistryUtils.toRegistrySlug(rawSlug);
-      const sessionIdHexValue = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
-      if (!sessionIdHexValue) throw new Error('Session ID (UUID) is required.');
-      if (!registryAddress) throw new Error('Registry address is not configured for this chain.');
-      const registryChainIdValue = Number(registryChainId || draft.networkChainId || 0);
+      const registerIdentityDescriptor = resolveSessionWizardRegisterIdentityDescriptor({
+        draftSlug: draft.slug,
+        sessionId,
+        registryChainId,
+        sessionNetworkChainId: draft.networkChainId,
+        registryAddress,
+      });
+      if (registerIdentityDescriptor.status === 'blocked') {
+        throw new Error(registerIdentityDescriptor.statusMessage);
+      }
+      const {
+        registrySlug,
+        sessionIdHexValue,
+        registryChainIdValue,
+      } = registerIdentityDescriptor;
       try {
         const registryRead = sessionRegistryUtils.getRegistryContract(registryChainIdValue);
         if (registryRead) {
