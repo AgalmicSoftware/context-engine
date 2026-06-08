@@ -1,14 +1,12 @@
 import React from 'react';
 import {
   Alert,
-  Button,
   FormGroup,
   Input,
   Label,
   Modal,
   ModalBody,
   ModalHeader,
-  Table,
 } from 'reactstrap';
 
 import {
@@ -18,15 +16,12 @@ import {
   type SessionResultsExportFormat,
 } from '../../utilities/sessionResultsExport';
 import { renderSurveyResultsHtmlReportActionControls } from './SurveyResultsHtmlReportActionControls';
+import SurveyResultsHtmlReportAnalysisControls from './SurveyResultsHtmlReportAnalysisControls';
+import SurveyResultsHtmlReportSectionTable, {
+  type SurveyResultsHtmlReportSectionRow,
+} from './SurveyResultsHtmlReportSectionTable';
 
 type SurveyResultsRecord = Record<string, any>;
-
-type SurveyResultsHtmlReportSectionRow = {
-  available: boolean;
-  key: string;
-  label: string;
-  reason?: React.ReactNode;
-};
 
 export type SurveyResultsHtmlReportExportModalDisplayProps = {
   analysisGenerating?: boolean;
@@ -245,62 +240,20 @@ export const renderSurveyResultsHtmlReportExportModal = ({
             </FormGroup>
           </div>
         )}
-        <Table size="sm" responsive className={styleMap.htmlReportSectionTable}>
-          <thead>
-            <tr>
-              <th scope="col">Include</th>
-              <th scope="col">Section</th>
-              <th scope="col">Availability</th>
-              <th scope="col">Why</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionRows.map((row) => (
-              <tr key={row.key}>
-                <td>
-                  <Input
-                    aria-label={`Include ${row.label}`}
-                    checked={!!selectedSections[row.key]}
-                    type="checkbox"
-                    onChange={() => onToggleSection(row.key)}
-                  />
-                </td>
-                <td>{row.label}</td>
-                <td>{row.available ? 'Available' : 'Unavailable'}</td>
-                <td>{row.reason}</td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-        <div className={styleMap.htmlReportOptionGroup}>
-          <h6>Analysis views</h6>
-          <p>
-            {analysisPayload?.eligibility?.counts?.responses} responses,
-            {' '}{analysisPayload?.eligibility?.counts?.participants} participants,
-            {' '}{analysisPayload?.eligibility?.counts?.questions} questions.
-            {' '}AI mode uses synthetic participant IDs.
-          </p>
-          {analysisPayload?.eligibility?.reasons?.length > 0 && (
-            <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
-              {analysisPayload.eligibility.reasons.join(' ')}
-            </Alert>
-          )}
-          {htmlReportAnalysisError && (
-            <Alert color="warning" fade={false} className={styleMap.htmlReportWarning}>
-              {htmlReportAnalysisError}
-            </Alert>
-          )}
-          <Button
-            type="button"
-            color="secondary"
-            onClick={onGenerateAnalysis}
-            disabled={!canGenerateAnalysis}
-            className={styleMap.htmlReportGenerateButton}
-            data-testid="ce-surveyresults-html-report-generate-analysis"
-          >
-            {generateAnalysisLabel}
-          </Button>
-        </div>
+        <SurveyResultsHtmlReportSectionTable
+          onToggleSection={onToggleSection}
+          sectionRows={sectionRows}
+          selectedSections={selectedSections}
+          styleMap={styleMap}
+        />
+        <SurveyResultsHtmlReportAnalysisControls
+          analysisPayload={analysisPayload}
+          canGenerateAnalysis={canGenerateAnalysis}
+          generateAnalysisLabel={generateAnalysisLabel}
+          htmlReportAnalysisError={htmlReportAnalysisError}
+          onGenerateAnalysis={onGenerateAnalysis}
+          styleMap={styleMap}
+        />
         {needsAnalysisGeneration && (
           <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
             Selected analysis sections need generated data before download.
