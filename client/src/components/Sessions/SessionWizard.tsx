@@ -125,6 +125,7 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -3698,13 +3699,14 @@ const SessionWizard = ({
       });
       setPublishStep(registerStepRequest.publishStep);
       await handleRegisterGroup(registerStepRequest.registerGroupArgs);
+      const completionRequest = resolveSessionWizardPublishCompletionRequest({
+        publishExecutionPlan,
+        deployedPendingDrafts,
+        pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
+        sessionSlug: draft?.slug,
+      });
       runSessionWizardPublishCompletionController({
-        input: {
-          publishExecutionPlan,
-          deployedPendingDrafts,
-          pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
-          sessionSlug: draft?.slug,
-        },
+        input: completionRequest,
         ports: {
           normalizePendingDrafts: normalizePendingSbtDrafts,
           buildPublishedPendingSbtLinks,
