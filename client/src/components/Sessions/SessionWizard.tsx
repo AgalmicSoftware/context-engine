@@ -4587,7 +4587,6 @@ const SessionWizard = ({
       persistWorkerSecrets={persistWorkerSecrets}
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
-      publishAdvancedOpen={publishAdvancedOpen}
       publishUiPlan={publishUiPlan}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}

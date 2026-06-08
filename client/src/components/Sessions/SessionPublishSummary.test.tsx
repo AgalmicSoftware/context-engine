@@ -75,7 +75,6 @@ const buildProps = (
   onToggleCollapsed: jest.fn(),
   normalModePublishSummary: [],
   onPublish: jest.fn(),
-  publishAdvancedOpen: false,
   onTogglePublishAdvanced: jest.fn(),
   showSponsoredBundleFallbackInput: false,
   normalModeBundleUrlOverride: '',
@@ -338,8 +337,13 @@ describe('SessionPublishSummary', () => {
         {...buildProps({
           onManualMetadataUrlChange,
           onPublish,
-          publishAdvancedOpen: true,
           resolvedWorkerBaseUrl: 'https://worker.example.test',
+          publishUiPlan: buildPublishUiPlan({
+            publishActionDisplayState: {
+              publishAdvancedOpen: true,
+              settingsButtonActive: true,
+            },
+          }),
           workerUrlSource: 'custom worker URL',
         })}
       />
@@ -377,8 +381,11 @@ describe('SessionPublishSummary', () => {
           onManualMaxFeePerGasGweiChange,
           onManualMaxPriorityFeePerGasGweiChange,
           onPublish,
-          publishAdvancedOpen: true,
           publishUiPlan: buildPublishUiPlan({
+            publishActionDisplayState: {
+              publishAdvancedOpen: true,
+              settingsButtonActive: true,
+            },
             publishMetadataDisplayState: {
               effectiveMetadataGatewayUrl: '',
               effectiveMetadataTxId: '',

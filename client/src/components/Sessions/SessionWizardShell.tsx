@@ -111,7 +111,6 @@ const SessionWizardShell = ({
   persistWorkerSecrets,
   primaryDraftEntries,
   provider,
-  publishAdvancedOpen,
   publishUiPlan,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
@@ -337,7 +336,6 @@ const SessionWizardShell = ({
         onToggleCollapsed={() => toggleSection('publish')}
         normalModePublishSummary={normalModePublishSummary}
         onPublish={onPublish}
-        publishAdvancedOpen={publishAdvancedOpen}
         onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
         showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
         normalModeBundleUrlOverride={normalModeBundleUrlOverride}
