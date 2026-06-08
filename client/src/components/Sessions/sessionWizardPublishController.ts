@@ -166,6 +166,15 @@ export type SessionWizardRegisterSuccessSettlementDescriptor = {
   };
 };
 
+export type SessionWizardRegisterFailureSettlementInput = {
+  error?: unknown;
+};
+
+export type SessionWizardRegisterFailureSettlementDescriptor = {
+  txEntry: SessionWizardRegisterTxEntry | null;
+  errorMessage: string;
+};
+
 export type SessionWizardPublishMetadataUploadRequestInput = {
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
   workerUrlOverride?: string;
@@ -401,6 +410,37 @@ export const runSessionWizardRegisterStepController = async ({
   return {
     status: 'completed',
     registerResult,
+  };
+};
+
+export const appendSessionWizardRegisterTxEntry = (
+  previousEntries: SessionWizardRegisterTxEntry[] | unknown,
+  nextEntry: SessionWizardRegisterTxEntry | null | undefined
+): SessionWizardRegisterTxEntry[] => {
+  const existingEntries = Array.isArray(previousEntries) ? previousEntries : [];
+  const nextHash = nextEntry?.hash;
+  if (!nextHash) return existingEntries;
+  if (existingEntries.some((entry) => entry?.hash === nextHash)) {
+    return existingEntries;
+  }
+  return [
+    ...existingEntries,
+    nextEntry,
+  ];
+};
+
+export const resolveSessionWizardRegisterFailureSettlementDescriptor = ({
+  error,
+}: SessionWizardRegisterFailureSettlementInput): SessionWizardRegisterFailureSettlementDescriptor => {
+  const err = (error && typeof error === 'object') ? error as AnyRecord : {};
+  const transaction = (err.transaction && typeof err.transaction === 'object')
+    ? err.transaction as AnyRecord
+    : {};
+  const txHash = err.transactionHash || transaction.hash || '';
+
+  return {
+    txEntry: txHash ? { action: 'createSession', hash: txHash } : null,
+    errorMessage: toStr(err.message).trim() || 'Failed to register session.',
   };
 };
 
