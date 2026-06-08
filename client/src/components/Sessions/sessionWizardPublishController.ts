@@ -1,6 +1,11 @@
 import type { AnyRecord } from '../shellTypes';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { normalizeSessionWizardArweaveUri } from './sessionWizardUrlSupport';
+import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
+import {
+  buildSessionWizardAdminUrl,
+  buildSessionWizardSessionUrl,
+  normalizeSessionWizardArweaveUri,
+} from './sessionWizardUrlSupport';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
@@ -135,6 +140,30 @@ export type SessionWizardRegisterArgsDescriptorInput = {
 export type SessionWizardRegisterArgsDescriptor = {
   metadataUriMissing: boolean;
   registerArgs: AnyRecord;
+};
+
+export type SessionWizardRegisterSuccessSettlementInput = {
+  registrySlug?: unknown;
+  sessionIdHexValue?: unknown;
+  registryChainId?: unknown;
+  sessionNetworkChainId?: unknown;
+  providerLike?: unknown;
+  account?: unknown;
+  origin?: string;
+};
+
+export type SessionWizardRegisterSuccessSettlementDescriptor = {
+  formattedSessionId: string;
+  sessionUrl: string;
+  adminUrl: string;
+  adminUrlStatus: string;
+  nextSessionIdStatus: string;
+  registryRefreshArgs: {
+    chainId: number;
+    slug: string;
+    providerLike?: unknown;
+    account?: unknown;
+  };
 };
 
 export type SessionWizardPublishMetadataUploadRequestInput = {
@@ -372,6 +401,38 @@ export const runSessionWizardRegisterStepController = async ({
   return {
     status: 'completed',
     registerResult,
+  };
+};
+
+export const resolveSessionWizardRegisterSuccessSettlementDescriptor = ({
+  registrySlug,
+  sessionIdHexValue,
+  registryChainId,
+  sessionNetworkChainId,
+  providerLike,
+  account,
+  origin,
+}: SessionWizardRegisterSuccessSettlementInput): SessionWizardRegisterSuccessSettlementDescriptor => {
+  const normalizedRegistrySlug = toStr(registrySlug).trim();
+  const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionIdHexValue) || toStr(sessionIdHexValue).trim();
+  const refreshChainId = Number(registryChainId || sessionNetworkChainId || 0);
+
+  return {
+    formattedSessionId,
+    sessionUrl: buildSessionWizardSessionUrl({ slug: normalizedRegistrySlug, origin }),
+    adminUrl: buildSessionWizardAdminUrl({
+      sessionId: formattedSessionId,
+      chainId: refreshChainId,
+      origin,
+    }),
+    adminUrlStatus: '',
+    nextSessionIdStatus: 'Generated a new session ID for your next session.',
+    registryRefreshArgs: {
+      chainId: refreshChainId,
+      slug: normalizedRegistrySlug,
+      providerLike,
+      account,
+    },
   };
 };
 
