@@ -129,7 +129,7 @@ import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
-  resolveSessionWizardRegisterArgsDescriptor,
+  resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
@@ -3535,7 +3535,7 @@ const SessionWizard = ({
         if (err?.message) throw err;
       }
 
-      const registerArgsDescriptor = resolveSessionWizardRegisterArgsDescriptor({
+      const registerPreflightDescriptor = resolveSessionWizardRegisterPreflightDescriptor({
         providerLike: provider,
         registryChainId: registryChainIdValue,
         sessionNetworkChainId: draft.networkChainId,
@@ -3553,12 +3553,12 @@ const SessionWizard = ({
         manualMaxFeePerGasGwei,
         manualMaxPriorityFeePerGasGwei,
       });
-      if (registerArgsDescriptor.metadataUriMissing) {
-        throw new Error('Upload metadata or provide a manual Arweave URI.');
+      if (!registerPreflightDescriptor.canRegister) {
+        throw new Error(registerPreflightDescriptor.statusMessage);
       }
       await runSessionWizardRegisterStepController({
         input: {
-          registerArgs: registerArgsDescriptor.registerArgs,
+          registerArgs: registerPreflightDescriptor.registerArgs,
         },
         ports: {
           registerSessionOnChain,

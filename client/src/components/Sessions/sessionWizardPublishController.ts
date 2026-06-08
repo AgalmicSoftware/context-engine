@@ -142,6 +142,16 @@ export type SessionWizardRegisterArgsDescriptor = {
   registerArgs: AnyRecord;
 };
 
+export type SessionWizardRegisterPreflightDescriptorInput =
+  SessionWizardRegisterArgsDescriptorInput & {
+    missingMetadataMessage?: unknown;
+  };
+
+export type SessionWizardRegisterPreflightDescriptor = SessionWizardRegisterArgsDescriptor & {
+  canRegister: boolean;
+  statusMessage: string;
+};
+
 export type SessionWizardRegisterSuccessSettlementInput = {
   registrySlug?: unknown;
   sessionIdHexValue?: unknown;
@@ -377,6 +387,24 @@ export const resolveSessionWizardRegisterArgsDescriptor = ({
       maxFeePerGasGwei: manualMaxFeePerGasGwei,
       maxPriorityFeePerGasGwei: manualMaxPriorityFeePerGasGwei,
     },
+  };
+};
+
+const DEFAULT_REGISTER_MISSING_METADATA_MESSAGE = 'Upload metadata or provide a manual Arweave URI.';
+
+export const resolveSessionWizardRegisterPreflightDescriptor = ({
+  missingMetadataMessage = DEFAULT_REGISTER_MISSING_METADATA_MESSAGE,
+  ...registerArgsInput
+}: SessionWizardRegisterPreflightDescriptorInput): SessionWizardRegisterPreflightDescriptor => {
+  const registerArgsDescriptor = resolveSessionWizardRegisterArgsDescriptor(registerArgsInput);
+  const statusMessage = registerArgsDescriptor.metadataUriMissing
+    ? toStr(missingMetadataMessage) || DEFAULT_REGISTER_MISSING_METADATA_MESSAGE
+    : '';
+
+  return {
+    ...registerArgsDescriptor,
+    canRegister: !registerArgsDescriptor.metadataUriMissing,
+    statusMessage,
   };
 };
 
