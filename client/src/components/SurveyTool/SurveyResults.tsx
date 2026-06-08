@@ -136,7 +136,6 @@ import {
   buildSurveyResultsExportControlsDisplayDescriptor,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
-  buildSurveyResultsHtmlReportExportModalDescriptor,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
@@ -195,6 +194,9 @@ import {
 import {
   buildSurveyResultsHtmlReportDownloadExecutionPlan,
 } from './surveyResultsHtmlReportDownloadRequest';
+import {
+  buildSurveyResultsHtmlReportModalProps,
+} from './surveyResultsHtmlReportModalProps';
 import {
   getSurveyResultsQuestionCardDomId,
 } from './surveyResultsQuestionSummaryStatusController';
@@ -4775,7 +4777,8 @@ const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
 const isAuthorized = this.isHtmlReportExportAuthorized();
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
-const modalDisplayDescriptor = buildSurveyResultsHtmlReportExportModalDescriptor({
+
+return buildSurveyResultsHtmlReportModalProps({
   analysisGenerating: this.state.htmlReportAnalysisGenerating,
   analysisPayload,
   analysisProgress: this.state.htmlReportAnalysisProgress,
@@ -4785,20 +4788,16 @@ const modalDisplayDescriptor = buildSurveyResultsHtmlReportExportModalDescriptor
   isDemoMode: this.isHtmlReportDemoModeActive(),
   isDemoSession: this.isHtmlReportDemoSession(),
   isOpen: this.state.htmlReportModalOpen,
-  selectedSections,
-  snapshot,
-});
-
-return {
-  ...modalDisplayDescriptor,
   onClose: this.closeHtmlReportExportModal,
   onDownload: this.downloadHtmlReport,
   onFormatChange: this.handleHtmlReportFormatChange,
   onGenerateAnalysis: this.generateHtmlReportAnalysisViews,
   onToggleDemoMode: this.toggleHtmlReportDemoMode,
   onToggleSection: this.toggleHtmlReportSection,
+  selectedSections,
+  snapshot,
   styleMap: styles,
-};
+});
 }
 
 renderHtmlReportExportModal = (): React.ReactNode => {
