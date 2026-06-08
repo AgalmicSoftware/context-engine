@@ -10,6 +10,7 @@ import {
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
   resolveSessionWizardPublishProgressDisplayState,
+  resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
@@ -318,6 +319,82 @@ describe('sessionWizardPublishFlow', () => {
       forceManualBundleFile: true,
       hasBundleFile: false,
     })).toBe('url');
+  });
+
+  it('plans sponsored auto-deploy publish surface without deploy or upload ports', () => {
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: true,
+      wizardMode: 'normal',
+      workerMode: 'custom',
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: true,
+        missing: [],
+      },
+      forceManualBundleFile: false,
+      hasBundleFile: false,
+      normalModeDefaultBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+      manualBundleRetryMessage: 'Retry with a local bundle.',
+      missingHostedBundleMessage: 'Bundle URL missing.',
+    })).toEqual({
+      canUseSponsoredAutoDeployNow: true,
+      hasNormalModeBundleUrlOverride: false,
+      normalModeBundleHelpText: expect.stringContaining('GitHub-hosted worker bundle'),
+      normalModeHostedBundleConfigured: true,
+      normalModeManualBundleHelpText: 'Retry with a local bundle.',
+      shouldUseSponsoredAutoDeployFlow: true,
+      showNormalModeManualBundleControls: false,
+      showNormalModeWorkerStep: false,
+      showSponsoredBundleFallbackInput: false,
+      sponsoredAutoDeployBundleMode: 'url',
+      sponsoredAutoDeployMissingBundleUrl: false,
+      sponsoredLocalBundledAssetAvailable: true,
+    });
+  });
+
+  it('plans hosted-bundle fallback visibility for sponsored normal-mode deploys', () => {
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: true,
+      wizardMode: 'normal',
+      workerMode: 'custom',
+      deployForm: { bundleUrl: 'https://stale-advanced.example.test/sessionCorsWorker.bundle.js' },
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: false,
+        missing: ['Worker bundle URL'],
+      },
+      forceManualBundleFile: false,
+      hasBundleFile: false,
+      normalModeDefaultBundleUrl: '',
+      manualBundleRetryMessage: 'Retry with a local bundle.',
+      missingHostedBundleMessage: 'Bundle URL missing.',
+    })).toEqual(expect.objectContaining({
+      canUseSponsoredAutoDeployNow: false,
+      normalModeBundleHelpText: 'Bundle URL missing.',
+      normalModeHostedBundleConfigured: false,
+      normalModeManualBundleHelpText: 'Bundle URL missing.',
+      shouldUseSponsoredAutoDeployFlow: false,
+      showNormalModeManualBundleControls: true,
+      showNormalModeWorkerStep: false,
+      showSponsoredBundleFallbackInput: true,
+      sponsoredAutoDeployBundleMode: 'upload',
+      sponsoredAutoDeployMissingBundleUrl: true,
+      sponsoredLocalBundledAssetAvailable: false,
+    }));
+
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: false,
+      workerMode: 'custom',
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: false,
+        missing: ['Worker bundle URL'],
+      },
+      normalModeDefaultBundleUrl: '',
+    })).toEqual(expect.objectContaining({
+      showNormalModeManualBundleControls: false,
+      showSponsoredBundleFallbackInput: false,
+    }));
   });
 
   it('resolves deploy bundle payloads for URL and validated upload modes', async () => {
