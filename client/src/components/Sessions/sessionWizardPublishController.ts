@@ -165,6 +165,23 @@ export type SessionWizardRegisterArgsDescriptorInput = {
   manualMaxPriorityFeePerGasGwei?: unknown;
 };
 
+export type SessionWizardRegisterIdentityDescriptorInput = {
+  draftSlug?: unknown;
+  sessionId?: unknown;
+  registryChainId?: unknown;
+  sessionNetworkChainId?: unknown;
+  registryAddress?: unknown;
+};
+
+export type SessionWizardRegisterIdentityDescriptor = {
+  status: 'blocked' | 'ready';
+  blockedReason: 'session-id-required' | 'registry-address-required' | '';
+  registrySlug: string;
+  sessionIdHexValue: string;
+  registryChainIdValue: number;
+  statusMessage: string;
+};
+
 export type SessionWizardRegisterArgsDescriptor = {
   metadataUriMissing: boolean;
   registerArgs: AnyRecord;
@@ -441,6 +458,49 @@ export const resolveSessionWizardRegisterStepRequest = ({
     sessionFieldsOverride: uploadResult?.onChainFields,
   },
 });
+
+export const resolveSessionWizardRegisterIdentityDescriptor = ({
+  draftSlug,
+  sessionId,
+  registryChainId,
+  sessionNetworkChainId,
+  registryAddress,
+}: SessionWizardRegisterIdentityDescriptorInput): SessionWizardRegisterIdentityDescriptor => {
+  const registrySlug = sessionRegistryUtils.toRegistrySlug(toStr(draftSlug).trim());
+  const sessionIdHexValue = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
+  const registryChainIdValue = Number(registryChainId || sessionNetworkChainId || 0);
+
+  if (!sessionIdHexValue) {
+    return {
+      status: 'blocked',
+      blockedReason: 'session-id-required',
+      registrySlug,
+      sessionIdHexValue,
+      registryChainIdValue,
+      statusMessage: 'Session ID (UUID) is required.',
+    };
+  }
+
+  if (!registryAddress) {
+    return {
+      status: 'blocked',
+      blockedReason: 'registry-address-required',
+      registrySlug,
+      sessionIdHexValue,
+      registryChainIdValue,
+      statusMessage: 'Registry address is not configured for this chain.',
+    };
+  }
+
+  return {
+    status: 'ready',
+    blockedReason: '',
+    registrySlug,
+    sessionIdHexValue,
+    registryChainIdValue,
+    statusMessage: '',
+  };
+};
 
 export const resolveSessionWizardRegisterArgsDescriptor = ({
   providerLike,
