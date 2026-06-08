@@ -7,6 +7,7 @@ import {
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
+  resolveSessionWizardPublishAdminPreflightDescriptor,
   resolveSessionWizardPublishStartPreflightDescriptor,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
@@ -331,6 +332,39 @@ describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
       status: 'ready',
       blockedReason: '',
       shouldResetPublishState: true,
+      shouldOpenLoginModal: false,
+      statusMessage: '',
+    });
+  });
+});
+
+describe('resolveSessionWizardPublishAdminPreflightDescriptor', () => {
+  it('describes missing publisher state without owning the async admin lookup', () => {
+    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
+      resolvedPublisher: '',
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'publisher-required',
+      signerAccountOverride: '',
+      shouldOpenLoginModal: true,
+      statusMessage: 'Connect your wallet to publish this session.',
+    });
+
+    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
+      resolvedPublisher: null,
+    })).toEqual(expect.objectContaining({
+      status: 'blocked',
+      shouldOpenLoginModal: true,
+    }));
+  });
+
+  it('passes through the resolved publisher for later parent-owned publish ports', () => {
+    expect(resolveSessionWizardPublishAdminPreflightDescriptor({
+      resolvedPublisher: '0x00000000000000000000000000000000000000aa',
+    })).toEqual({
+      status: 'ready',
+      blockedReason: '',
+      signerAccountOverride: '0x00000000000000000000000000000000000000aa',
       shouldOpenLoginModal: false,
       statusMessage: '',
     });
