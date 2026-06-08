@@ -449,6 +449,24 @@ export type SbtPageMintButtonDisplayState = {
   passwordJoinButtonState: SbtPagePasswordJoinButtonState;
   passwordJoinContentState: SbtPagePendingButtonContentState;
 };
+type ResolveSbtPageFullActionDisplayPlanArgs = ResolveSbtPageMintButtonDisplayStateArgs & {
+  account?: unknown;
+  actionClassName?: unknown;
+  burnedLabel?: unknown;
+  burnButtonClassName?: unknown;
+  burnLabel?: unknown;
+  mintButtonClassName?: unknown;
+};
+export type SbtPageFullActionDisplayPlan = {
+  burnActionButtonClassName: string;
+  burnActionPlan: SbtPageBurnActionPlan;
+  burnButtonContentState: SbtPageStatusButtonContentState;
+  burnStatusButtonState: SbtPageBurnStatusButtonState;
+  mintActionButtonClassName: string;
+  mintButtonDisplayState: SbtPageMintButtonDisplayState;
+  shouldRenderBurnSurface: boolean;
+  shouldRenderMintSurface: boolean;
+};
 type SbtPageMiniBurnPermission = {
   canAdminBurn: boolean;
   canBurnMini: boolean;
@@ -1059,6 +1077,81 @@ export const resolveSbtPageMintButtonDisplayState = ({
     openMintButtonState,
     passwordJoinButtonState,
     passwordJoinContentState,
+  };
+};
+
+export const resolveSbtPageFullActionDisplayPlan = ({
+  account = '',
+  actionClassName = '',
+  burnedLabel = 'Burned',
+  burningStatus = '',
+  burnButtonClassName = '',
+  burnLabel = 'Burn',
+  claimCountdown = '',
+  groupPasswordInput = '',
+  hasGroupPasswordMint = false,
+  hasInviteMint = false,
+  lastMintTxHash = '',
+  manualPasswordInput = '',
+  mintedLabel = 'Minted',
+  mintButtonClassName = '',
+  mintLowerLabel = 'mint',
+  mintingStatus = '',
+  mintStep = 0,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  sbtInfo = null,
+  sbtMintedSuccessLabel = 'SBT successfully minted!',
+  userHasSBT = false,
+}: ResolveSbtPageFullActionDisplayPlanArgs = {}): SbtPageFullActionDisplayPlan => {
+  const mintButtonDisplayState = resolveSbtPageMintButtonDisplayState({
+    burningStatus,
+    claimCountdown,
+    groupPasswordInput,
+    hasGroupPasswordMint,
+    hasInviteMint,
+    lastMintTxHash,
+    manualPasswordInput,
+    mintedLabel,
+    mintLowerLabel,
+    mintingStatus,
+    mintStep,
+    nowSeconds,
+    sbtInfo,
+    sbtMintedSuccessLabel,
+    userHasSBT,
+  });
+  const burnActionPlan = resolveSbtPageBurnActionPlan({
+    account,
+    sbtInfo,
+    userHasSBT,
+  });
+  const burnStatusButtonState = resolveSbtPageBurnStatusButtonState({
+    burningStatus,
+  });
+  const burnButtonContentState = resolveSbtPageStatusButtonContentState({
+    idleLabel: burnLabel,
+    isFailure: burnStatusButtonState.isFailure,
+    isIdle: burnStatusButtonState.isIdle,
+    isPending: burnStatusButtonState.isPending,
+    isSuccess: burnStatusButtonState.isSuccess,
+    successLabel: burnedLabel,
+  });
+
+  return {
+    burnActionButtonClassName: buildSbtPageActionButtonClassName({
+      actionClassName,
+      variantClassName: burnButtonClassName,
+    }),
+    burnActionPlan,
+    burnButtonContentState,
+    burnStatusButtonState,
+    mintActionButtonClassName: buildSbtPageActionButtonClassName({
+      actionClassName,
+      variantClassName: mintButtonClassName,
+    }),
+    mintButtonDisplayState,
+    shouldRenderBurnSurface: burnActionPlan.shouldRenderBurnButton,
+    shouldRenderMintSurface: mintButtonDisplayState.mintActionPlan.shouldRenderMintButton,
   };
 };
 

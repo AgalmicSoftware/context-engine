@@ -24,6 +24,7 @@ import {
   resolveSbtPageMintActionPlan,
   resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
+  resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,
   resolveSbtPagePasswordAlertState,
   resolveSbtPagePasswordGenerationButtonState,
@@ -599,6 +600,71 @@ describe('sbtPageActionDisplayHelpers', () => {
     expect(openMint.openMintButtonContentState).toMatchObject({
       shouldRenderSuccess: true,
       successLabel: 'Claimed',
+    });
+  });
+
+  it('builds the full action display plan without execution callbacks', () => {
+    const plan = resolveSbtPageFullActionDisplayPlan({
+      account: '0xOwner',
+      actionClassName: 'action',
+      burnedLabel: 'Removed',
+      burningStatus: 'idle',
+      burnButtonClassName: 'burn',
+      burnLabel: 'Remove',
+      groupPasswordInput: 'group-code',
+      hasGroupPasswordMint: true,
+      mintButtonClassName: 'mint',
+      mintingStatus: 'idle',
+      nowSeconds: 100,
+      sbtInfo: {
+        burnAuth: 1,
+        mintingEndTime: 0,
+      },
+      userHasSBT: true,
+    });
+
+    expect(plan).toMatchObject({
+      burnActionButtonClassName: 'action burn',
+      burnActionPlan: {
+        blockedReason: 'none',
+        shouldRenderBurnButton: true,
+      },
+      burnButtonContentState: {
+        idleLabel: 'Remove',
+        shouldRenderIdleLabel: true,
+        successLabel: 'Removed',
+      },
+      mintActionButtonClassName: 'action mint',
+      mintButtonDisplayState: {
+        mintActionPlan: {
+          blockedReason: 'already-has-token',
+          shouldRenderMintButton: false,
+        },
+        passwordJoinButtonState: {
+          disabled: false,
+          isPending: false,
+        },
+      },
+      shouldRenderBurnSurface: true,
+      shouldRenderMintSurface: false,
+    });
+
+    expect(resolveSbtPageFullActionDisplayPlan({
+      nowSeconds: 100,
+      sbtInfo: null,
+    })).toMatchObject({
+      burnActionPlan: {
+        blockedReason: 'missing-sbt',
+        shouldRenderBurnButton: false,
+      },
+      mintButtonDisplayState: {
+        mintActionPlan: {
+          blockedReason: 'missing-sbt',
+          shouldRenderMintButton: false,
+        },
+      },
+      shouldRenderBurnSurface: false,
+      shouldRenderMintSurface: false,
     });
   });
 
