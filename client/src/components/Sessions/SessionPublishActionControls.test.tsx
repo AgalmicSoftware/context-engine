@@ -4,15 +4,25 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SessionPublishActionControls from './SessionPublishActionControls';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
+const buildDisplayState = (
+  overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>['displayState']> = {}
+): React.ComponentProps<typeof SessionPublishActionControls>['displayState'] => ({
+  canPublishNow: true,
+  displayMode: 'advanced',
+  publishAdvancedOpen: false,
+  publishBusy: false,
+  publishButtonDisabled: false,
+  publishButtonLabel: 'Publish',
+  settingsButtonActive: false,
+  ...overrides,
+});
+
 const buildProps = (
   overrides: Partial<React.ComponentProps<typeof SessionPublishActionControls>> = {}
 ): React.ComponentProps<typeof SessionPublishActionControls> => ({
-  canPublishNow: true,
-  isNormalMode: false,
+  displayState: buildDisplayState(),
   onPublish: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
-  publishAdvancedOpen: false,
-  publishBusy: false,
   ...overrides,
 });
 
@@ -23,7 +33,10 @@ describe('SessionPublishActionControls', () => {
     render(
       <SessionPublishActionControls
         {...buildProps({
-          isNormalMode: true,
+          displayState: buildDisplayState({
+            displayMode: 'normal',
+            publishButtonLabel: 'Deploy Session',
+          }),
           onPublish,
           onTogglePublishAdvanced,
         })}
@@ -43,9 +56,12 @@ describe('SessionPublishActionControls', () => {
     const { rerender } = render(
       <SessionPublishActionControls
         {...buildProps({
+          displayState: buildDisplayState({
+            publishBusy: true,
+            publishButtonDisabled: true,
+          }),
           onPublish,
           onTogglePublishAdvanced,
-          publishBusy: true,
         })}
       />
     );
@@ -58,9 +74,12 @@ describe('SessionPublishActionControls', () => {
     rerender(
       <SessionPublishActionControls
         {...buildProps({
+          displayState: buildDisplayState({
+            canPublishNow: false,
+            publishButtonDisabled: true,
+          }),
           onPublish,
           onTogglePublishAdvanced,
-          canPublishNow: false,
         })}
       />
     );
@@ -80,9 +99,12 @@ describe('SessionPublishActionControls', () => {
     render(
       <SessionPublishActionControls
         {...buildProps({
+          displayState: buildDisplayState({
+            publishAdvancedOpen: true,
+            settingsButtonActive: true,
+          }),
           onPublish,
           onTogglePublishAdvanced,
-          publishAdvancedOpen: true,
         })}
       />
     );
