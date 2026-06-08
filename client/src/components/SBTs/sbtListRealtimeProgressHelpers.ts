@@ -53,7 +53,7 @@ const normalizeSlugSet = (slugs: unknown): Set<string> => {
   return new Set(
     source
       .map((slugRaw) => normalizeSessionSlug(slugRaw || ''))
-      .filter((slug) => !isSbtListSyntheticNoSessionSlug(slug))
+      .filter((slug) => !!slug && !isSbtListSyntheticNoSessionSlug(slug))
   );
 };
 
@@ -69,8 +69,8 @@ export const buildSbtListRealtimeProgressInputPlan = ({
 
   Object.entries(progressRecord).forEach(([slugRaw, progressRaw]) => {
     const slug = normalizeSessionSlug(slugRaw || '');
-    if (isSbtListSyntheticNoSessionSlug(slug)) return;
-    if (slug) propSlugSet.add(slug);
+    if (!slug || isSbtListSyntheticNoSessionSlug(slug)) return;
+    propSlugSet.add(slug);
     const progress = isRealtimeProgressRecord(progressRaw) ? progressRaw : null;
     if (!progress) return;
 
@@ -115,7 +115,7 @@ export const resolveSbtListRealtimeProgressRetentionPlan = ({
 
   Object.entries(source).forEach(([slugRaw, progressRaw]) => {
     const slug = normalizeSessionSlug(slugRaw || '');
-    if (isSbtListSyntheticNoSessionSlug(slug)) return;
+    if (!slug || isSbtListSyntheticNoSessionSlug(slug)) return;
     const progress = isRealtimeProgressRecord(progressRaw) ? progressRaw : null;
     if (!progress) return;
 

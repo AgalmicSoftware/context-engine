@@ -9,10 +9,6 @@ describe('sbtListRealtimeProgressHelpers', () => {
     expect(buildSbtListRealtimeProgressInputPlan({
       nowMs: 1234.9,
       progressBySlug: {
-        '': {
-          currentBlock: '50.2',
-          latestBlock: '75.7',
-        },
         Alpha: {
           currentBlock: '100.8',
           latestBlock: '120.4',
@@ -31,11 +27,6 @@ describe('sbtListRealtimeProgressHelpers', () => {
     })).toEqual({
       propSlugs: ['Alpha', 'beta', 'Gamma'],
       updatesBySlug: {
-        '': {
-          currentBlock: 50,
-          latestBlock: 75,
-          updatedAtMs: 1234,
-        },
         Alpha: {
           currentBlock: 100,
           latestBlock: 120,
@@ -43,7 +34,7 @@ describe('sbtListRealtimeProgressHelpers', () => {
           updatedAtMs: 1234,
         },
       },
-      validSlugs: ['', 'Alpha'],
+      validSlugs: ['Alpha'],
     });
   });
 
