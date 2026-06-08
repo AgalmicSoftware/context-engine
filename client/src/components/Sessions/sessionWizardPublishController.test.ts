@@ -7,6 +7,7 @@ import {
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
+  resolveSessionWizardPublishStartPreflightDescriptor,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
@@ -263,6 +264,76 @@ describe('runSessionWizardPublishController', () => {
         setPublishStep: jest.fn(),
       },
     })).rejects.toBe(error);
+  });
+});
+
+describe('resolveSessionWizardPublishStartPreflightDescriptor', () => {
+  it('keeps busy publish starts inert without resetting state or opening login', () => {
+    expect(resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy: true,
+      draftSlug: 'writers-room',
+      loginComplete: true,
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'busy',
+      shouldResetPublishState: false,
+      shouldOpenLoginModal: false,
+      statusMessage: '',
+    });
+  });
+
+  it('describes slug validation failures with the existing status text', () => {
+    expect(resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy: false,
+      draftSlug: 'Writers Room',
+      loginComplete: true,
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'invalid-slug',
+      shouldResetPublishState: true,
+      shouldOpenLoginModal: false,
+      statusMessage: 'Session slugs must use lowercase letters, numbers, "_" or "-".',
+    });
+  });
+
+  it('describes login-required publish starts without owning modal or status effects', () => {
+    expect(resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy: false,
+      draftSlug: 'writers-room',
+      loginComplete: false,
+      loginInProgress: false,
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'login-required',
+      shouldResetPublishState: true,
+      shouldOpenLoginModal: true,
+      statusMessage: 'Connect your wallet to publish this session.',
+    });
+
+    expect(resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy: false,
+      draftSlug: 'writers-room',
+      loginComplete: false,
+      loginInProgress: true,
+    })).toEqual(expect.objectContaining({
+      shouldOpenLoginModal: true,
+      statusMessage: 'Finish logging in before publishing this session.',
+    }));
+  });
+
+  it('marks valid connected publish starts ready for parent-owned admin resolution', () => {
+    expect(resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy: false,
+      draftSlug: 'writers-room',
+      loginComplete: true,
+      loginInProgress: false,
+    })).toEqual({
+      status: 'ready',
+      blockedReason: '',
+      shouldResetPublishState: true,
+      shouldOpenLoginModal: false,
+      statusMessage: '',
+    });
   });
 });
 

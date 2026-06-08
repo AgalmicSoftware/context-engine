@@ -132,6 +132,7 @@ import {
   resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
+  resolveSessionWizardPublishStartPreflightDescriptor,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
@@ -3608,24 +3609,32 @@ const SessionWizard = ({
   };
 
   const handlePublish = async () => {
-    if (publishBusy) return;
+    const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
+      publishBusy,
+      draftSlug: draft?.slug,
+      loginComplete,
+      loginInProgress,
+    });
+    if (publishStartPreflightDescriptor.status === 'blocked') {
+      if (publishStartPreflightDescriptor.shouldResetPublishState) {
+        setPublishStep(0);
+        setSessionUrl('');
+        setPublishedPendingSbtLinks([]);
+      }
+      if (
+        publishStartPreflightDescriptor.shouldOpenLoginModal &&
+        typeof toggleLoginModal === 'function'
+      ) {
+        toggleLoginModal(true);
+      }
+      if (publishStartPreflightDescriptor.statusMessage) {
+        setStatus(publishStartPreflightDescriptor.statusMessage);
+      }
+      return;
+    }
     setPublishStep(0);
     setSessionUrl('');
     setPublishedPendingSbtLinks([]);
-    const slugValidationError = getSessionSlugValidationError(draft?.slug);
-    if (slugValidationError) {
-      setStatus(slugValidationError);
-      return;
-    }
-    if (loginComplete !== true) {
-      if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-      setStatus(
-        loginInProgress
-          ? 'Finish logging in before publishing this session.'
-          : 'Connect your wallet to publish this session.'
-      );
-      return;
-    }
     const resolvedPublisher = await resolveConnectedAdminAddress();
     if (!resolvedPublisher) {
       if (typeof toggleLoginModal === 'function') toggleLoginModal(true);

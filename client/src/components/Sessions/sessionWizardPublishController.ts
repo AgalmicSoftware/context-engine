@@ -6,6 +6,7 @@ import {
   buildSessionWizardSessionUrl,
   normalizeSessionWizardArweaveUri,
 } from './sessionWizardUrlSupport';
+import { getSessionSlugValidationError } from './sessionWizardSlugValidation';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
@@ -49,6 +50,21 @@ export type SessionWizardPublishControllerResult = {
   status: 'blocked' | 'completed';
   workerUrlOverride: string;
   deployedPendingDrafts: SessionWizardPendingDraftLike[];
+};
+
+export type SessionWizardPublishStartPreflightInput = {
+  publishBusy?: boolean;
+  draftSlug?: unknown;
+  loginComplete?: boolean;
+  loginInProgress?: boolean;
+};
+
+export type SessionWizardPublishStartPreflightDescriptor = {
+  status: 'blocked' | 'ready';
+  blockedReason: 'busy' | 'invalid-slug' | 'login-required' | '';
+  shouldResetPublishState: boolean;
+  shouldOpenLoginModal: boolean;
+  statusMessage: string;
 };
 
 export type SessionWizardPublishCompletionLinksInput = {
@@ -293,6 +309,54 @@ export const runSessionWizardPublishController = async ({
     status: 'completed',
     workerUrlOverride,
     deployedPendingDrafts,
+  };
+};
+
+export const resolveSessionWizardPublishStartPreflightDescriptor = ({
+  publishBusy = false,
+  draftSlug,
+  loginComplete = false,
+  loginInProgress = false,
+}: SessionWizardPublishStartPreflightInput): SessionWizardPublishStartPreflightDescriptor => {
+  if (publishBusy) {
+    return {
+      status: 'blocked',
+      blockedReason: 'busy',
+      shouldResetPublishState: false,
+      shouldOpenLoginModal: false,
+      statusMessage: '',
+    };
+  }
+
+  const slugValidationError = getSessionSlugValidationError(draftSlug);
+  if (slugValidationError) {
+    return {
+      status: 'blocked',
+      blockedReason: 'invalid-slug',
+      shouldResetPublishState: true,
+      shouldOpenLoginModal: false,
+      statusMessage: slugValidationError,
+    };
+  }
+
+  if (loginComplete !== true) {
+    return {
+      status: 'blocked',
+      blockedReason: 'login-required',
+      shouldResetPublishState: true,
+      shouldOpenLoginModal: true,
+      statusMessage: loginInProgress
+        ? 'Finish logging in before publishing this session.'
+        : 'Connect your wallet to publish this session.',
+    };
+  }
+
+  return {
+    status: 'ready',
+    blockedReason: '',
+    shouldResetPublishState: true,
+    shouldOpenLoginModal: false,
+    statusMessage: '',
   };
 };
 
