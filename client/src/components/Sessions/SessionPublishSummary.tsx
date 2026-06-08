@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button, FormGroup, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
@@ -9,10 +8,10 @@ import {
 import styles from './SessionWizard.module.scss';
 import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSettingsPanel';
 import SessionPublishActionControls from './SessionPublishActionControls';
+import SessionPublishBundleFallbackPanel from './SessionPublishBundleFallbackPanel';
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type PublishSummaryItem = {
   label: string;
@@ -171,57 +170,18 @@ const SessionPublishSummary = ({
         )}
 
         {showSponsoredBundleFallbackInput ? (
-          <>
-            <FormGroup className={styles.fieldGroup}>
-              <Label>Manual bundle URL override (optional)</Label>
-              <Input
-                type="url"
-                value={normalModeBundleUrlOverride}
-                placeholder="https://github.com/<org>/<repo>/releases/download/<tag>/sessionCorsWorker.bundle.js"
-                data-testid={E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE}
-                invalid={!!normalModeBundleUrlOverrideValidationError}
-                onChange={(e) => onNormalModeBundleUrlOverrideChange(e.target.value)}
-              />
-              <div className={styles.helperText}>
-                {manualBundleUrlOverrideHelp}
-              </div>
-              {normalModeBundleUrlOverrideValidationError ? (
-                <div className={styles.errorText}>{normalModeBundleUrlOverrideValidationError}</div>
-              ) : null}
-            </FormGroup>
-            <FormGroup className={styles.fieldGroup}>
-              <Label>Worker bundle fallback (optional)</Label>
-              <div className={styles.bundleFileInputRow}>
-                <Input
-                  type="file"
-                  accept=".js,.mjs,.txt"
-                  innerRef={bundleFileInputRef}
-                  data-testid={E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT}
-                  onChange={(e) => {
-                    const file = e.target.files && e.target.files[0];
-                    onBundleFileChange(file || null);
-                  }}
-                />
-                <Button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={onClearBundleFile}
-                  data-testid={E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH}
-                  disabled={!bundleFile}
-                >
-                  Clear bundle file
-                </Button>
-              </div>
-              <div className={styles.helperText}>
-                {sponsoredManualBundleRetryMessage}
-              </div>
-              {bundleFile ? (
-                <div className={styles.helperText}>
-                  Using {bundleFile.name || localWorkerBundleFallbackFilePath} for this publish.
-                </div>
-              ) : null}
-            </FormGroup>
-          </>
+          <SessionPublishBundleFallbackPanel
+            bundleFile={bundleFile}
+            bundleFileInputRef={bundleFileInputRef}
+            localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+            manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+            normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+            normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+            onBundleFileChange={onBundleFileChange}
+            onClearBundleFile={onClearBundleFile}
+            onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
+            sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+          />
         ) : null}
 
         <SessionPublishProgressPanel
