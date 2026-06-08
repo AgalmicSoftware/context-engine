@@ -74,6 +74,7 @@ import {
   buildSbtListCacheReadPlan,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
+  buildSbtListRealtimeProgressInputPlan,
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
@@ -109,6 +110,7 @@ import {
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListRemainingHiddenRegistrySessionSlugs,
+  resolveSbtListRealtimeProgressRetentionPlan,
   resolveSbtListSelectedSessionUniverseSlugs,
   resolveSbtListSelectedHiddenRegistrySessionSlugs,
   resolveSbtListSectionSessionSlugs,
@@ -921,22 +923,6 @@ const SBTsList = ({
     });
   }, [clearChipProgressVisibilityTimeout]);
 
-  const pruneRecentLiveProgress = useCallback((
-    nowMs: number = Date.now(),
-    activeSlugs: Set<string> = new Set()
-  ): boolean => {
-    let changed = false;
-    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug) => {
-      if (activeSlugs.has(slug)) return;
-      const ageMs = nowMs - Number(recentLiveProgressBySlugRef.current[slug]?.updatedAtMs || 0);
-      if (ageMs > SBT_LIVE_PROGRESS_BRIDGE_MS) {
-        delete recentLiveProgressBySlugRef.current[slug];
-        changed = true;
-      }
-    });
-    return changed;
-  }, []);
-
   useEffect(() => {
     return () => {
       clearRefreshSafetyTimeout();
@@ -990,81 +976,66 @@ const SBTsList = ({
   }, [allSessionsMode, hasNoSessionCards, hasNoSessionUniverseItems]);
 
   useLayoutEffect(() => {
-    const liveProgressBySlug: Record<string, unknown> = (
-      sbtScanProgressBySlug &&
-      typeof sbtScanProgressBySlug === 'object'
-    ) ? sbtScanProgressBySlug as Record<string, unknown> : {};
     const nowMs = Date.now();
-    const nextSeen = new Set<string>();
-
-    Object.entries(liveProgressBySlug).forEach(([slugRaw, progressRaw]) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug)) return;
-      const progress = isRecord(progressRaw) ? progressRaw as SbtListLiveProgress : null;
+    const inputPlan = buildSbtListRealtimeProgressInputPlan({
+      nowMs,
+      progressBySlug: sbtScanProgressBySlug,
+    });
+    Object.entries(inputPlan.updatesBySlug).forEach(([slug, progress]) => {
       if (!progress) return;
-
-      const currentBlock = Number(progress.currentBlock || 0);
-      const latestBlock = Number(progress.latestBlock || 0);
-      if (
-        (!Number.isFinite(currentBlock) || currentBlock <= 0) &&
-        (!Number.isFinite(latestBlock) || latestBlock <= 0)
-      ) {
-        return;
-      }
-
       recentLiveProgressBySlugRef.current[slug] = {
         ...recentLiveProgressBySlugRef.current[slug],
         ...progress,
-        currentBlock: Number.isFinite(currentBlock) ? Math.floor(currentBlock) : 0,
-        latestBlock: Number.isFinite(latestBlock) ? Math.floor(latestBlock) : 0,
-        updatedAtMs: nowMs,
-      };
-      nextSeen.add(slug);
+      } as SbtListLiveProgress;
     });
 
-    pruneRecentLiveProgress(nowMs, nextSeen);
-  }, [pruneRecentLiveProgress, sbtScanProgressBySlug]);
+    const retentionPlan = resolveSbtListRealtimeProgressRetentionPlan({
+      activeSlugs: inputPlan.validSlugs,
+      bridgeMs: SBT_LIVE_PROGRESS_BRIDGE_MS,
+      nowMs,
+      progressBySlug: recentLiveProgressBySlugRef.current,
+    });
+    if (retentionPlan.changed) {
+      recentLiveProgressBySlugRef.current = retentionPlan.nextProgressBySlug as SbtListLiveProgressBySlug;
+    }
+  }, [sbtScanProgressBySlug]);
 
   useEffect(() => {
     clearRecentLiveProgressTimeout();
 
-    const activeSlugs = new Set(
-      Object.keys(
-        (sbtScanProgressBySlug && typeof sbtScanProgressBySlug === 'object')
-          ? sbtScanProgressBySlug
-          : {}
-      )
-        .map((slugRaw) => normalizeSessionSlug(slugRaw || ''))
-        .filter((slug) => slug && !isSbtListSyntheticNoSessionSlug(slug))
-    );
     const nowMs = Date.now();
-    if (pruneRecentLiveProgress(nowMs, activeSlugs)) {
+    const inputPlan = buildSbtListRealtimeProgressInputPlan({
+      nowMs,
+      progressBySlug: sbtScanProgressBySlug,
+    });
+    const retentionPlan = resolveSbtListRealtimeProgressRetentionPlan({
+      activeSlugs: inputPlan.propSlugs,
+      bridgeMs: SBT_LIVE_PROGRESS_BRIDGE_MS,
+      nowMs,
+      progressBySlug: recentLiveProgressBySlugRef.current,
+    });
+    if (retentionPlan.changed) {
+      recentLiveProgressBySlugRef.current = retentionPlan.nextProgressBySlug as SbtListLiveProgressBySlug;
       setRecentLiveProgressNowMs(nowMs);
     }
 
-    let soonestExpiryAtMs: number | null = null;
-    Object.keys(recentLiveProgressBySlugRef.current).forEach((slug) => {
-      if (activeSlugs.has(slug)) return;
-      const updatedAtMs = Number(recentLiveProgressBySlugRef.current[slug]?.updatedAtMs || 0);
-      if (!updatedAtMs) return;
-      const expiryAtMs = updatedAtMs + SBT_LIVE_PROGRESS_BRIDGE_MS;
-      if (expiryAtMs <= nowMs) return;
-      soonestExpiryAtMs = soonestExpiryAtMs == null
-        ? expiryAtMs
-        : Math.min(soonestExpiryAtMs, expiryAtMs);
-    });
-
-    if (soonestExpiryAtMs == null) return undefined;
+    if (retentionPlan.nextPruneAtMs == null) return undefined;
     recentLiveProgressTimeoutRef.current = setTimeout(() => {
       const nextNowMs = Date.now();
-      const didPrune = pruneRecentLiveProgress(nextNowMs, activeSlugs);
-      if (didPrune) {
+      const nextRetentionPlan = resolveSbtListRealtimeProgressRetentionPlan({
+        activeSlugs: inputPlan.propSlugs,
+        bridgeMs: SBT_LIVE_PROGRESS_BRIDGE_MS,
+        nowMs: nextNowMs,
+        progressBySlug: recentLiveProgressBySlugRef.current,
+      });
+      if (nextRetentionPlan.changed) {
+        recentLiveProgressBySlugRef.current = nextRetentionPlan.nextProgressBySlug as SbtListLiveProgressBySlug;
         setRecentLiveProgressNowMs(nextNowMs);
       }
-    }, Math.max(0, soonestExpiryAtMs - nowMs) + 10);
+    }, Math.max(0, retentionPlan.nextPruneAtMs - nowMs) + 10);
 
     return clearRecentLiveProgressTimeout;
-  }, [clearRecentLiveProgressTimeout, pruneRecentLiveProgress, sbtScanProgressBySlug]);
+  }, [clearRecentLiveProgressTimeout, sbtScanProgressBySlug]);
 
   const getDisplaySessionConfig = useCallback((slugIn: unknown) => {
     const slug = normalizeSessionSlug(slugIn || '');
