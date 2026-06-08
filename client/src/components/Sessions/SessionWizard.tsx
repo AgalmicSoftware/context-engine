@@ -133,6 +133,7 @@ import {
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   resolveSessionWizardPublishStartPreflightDescriptor,
+  resolveSessionWizardPublishAdminPreflightDescriptor,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
@@ -3636,11 +3637,22 @@ const SessionWizard = ({
     setSessionUrl('');
     setPublishedPendingSbtLinks([]);
     const resolvedPublisher = await resolveConnectedAdminAddress();
-    if (!resolvedPublisher) {
-      if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-      setStatus('Connect your wallet to publish this session.');
+    const publishAdminPreflightDescriptor = resolveSessionWizardPublishAdminPreflightDescriptor({
+      resolvedPublisher,
+    });
+    if (publishAdminPreflightDescriptor.status === 'blocked') {
+      if (
+        publishAdminPreflightDescriptor.shouldOpenLoginModal &&
+        typeof toggleLoginModal === 'function'
+      ) {
+        toggleLoginModal(true);
+      }
+      if (publishAdminPreflightDescriptor.statusMessage) {
+        setStatus(publishAdminPreflightDescriptor.statusMessage);
+      }
       return;
     }
+    const signerAccountOverride = publishAdminPreflightDescriptor.signerAccountOverride;
     setPublishBusy(true);
     try {
       const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
@@ -3670,7 +3682,7 @@ const SessionWizard = ({
       const publishControllerResult = await runSessionWizardPublishController({
         input: {
           publishExecutionPlan,
-          signerAccountOverride: resolvedPublisher,
+          signerAccountOverride,
         },
         ports: {
           deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
@@ -3690,7 +3702,7 @@ const SessionWizard = ({
       const metadataUploadRequest = resolveSessionWizardPublishMetadataUploadRequest({
         publishExecutionPlan,
         workerUrlOverride,
-        signerAccountOverride: resolvedPublisher,
+        signerAccountOverride,
       });
       const metadataUploadControllerResult = await runSessionWizardPublishMetadataUploadController({
         request: metadataUploadRequest,
