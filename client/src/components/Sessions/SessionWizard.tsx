@@ -4350,7 +4350,6 @@ const SessionWizard = ({
     deployStatus,
     deployVerifiedInUi,
   });
-  const deployStatusIsError = deployStatusDisplayState.isError;
   const pendingDraftCount = normalizedPendingSbtDrafts.length;
   const sessionDetailsComplete = !!toStr(draft?.sessionName).trim() && !!toStr(draft?.sessionInfo).trim();
   const configuredPrivateGateCount = encryptionGates.filter(
@@ -4520,8 +4519,7 @@ const SessionWizard = ({
       deployForm={deployForm}
       deployHelperUrl={deployHelperUrl}
       deployInFlight={deployInFlight}
-      deployStatus={deployStatus}
-      deployStatusIsError={deployStatusIsError}
+      deployStatusDisplayState={deployStatusDisplayState}
       deployWorkerUrl={deployWorkerUrl}
       devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
       displayedWorkerUrl={displayedWorkerUrl}
