@@ -190,6 +190,7 @@ export {
 export {
   buildSbtPageActionButtonClassName,
   resolveSbtPageActionFeedbackState,
+  resolveSbtPageAdminActionDisplayPlan,
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageBurnActionPlan,
@@ -223,6 +224,7 @@ export {
   shouldRenderSbtPageMintButton,
 } from './sbtPageActionDisplayHelpers';
 export type {
+  SbtPageAdminActionDisplayPlan,
   SbtPageManualClaimActionRequest,
   SbtPageManualClaimActionRequestViewKind,
   SbtPageFullActionDisplayPlan,
