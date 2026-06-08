@@ -76,6 +76,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
+  buildSbtListPassiveLatestLookupPlan,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
@@ -118,7 +119,12 @@ import {
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
   isSbtListSyntheticNoSessionSlug,
 } from './sbtListHelpers';
-import type { SbtCacheMetaSnapshot, SbtCardDetails } from './sbtListHelpers';
+import type {
+  SbtCacheMetaSnapshot,
+  SbtCardDetails,
+  SbtPassiveLatestLookupInFlightBySlug,
+  SbtPassiveLatestLookupStateBySlug,
+} from './sbtListHelpers';
 
 const sbtLog = createLogger('sbt');
 type UnknownRecord = Record<string, unknown>;
@@ -249,11 +255,6 @@ type SbtSessionChipState = {
   isLoading: boolean;
 };
 type SbtSessionChipStateBySlug = Record<string, SbtSessionChipState | undefined>;
-type SbtPassiveLatestLookupState = {
-  lastRequestedAtBlock?: unknown;
-};
-type SbtPassiveLatestLookupStateBySlug = Record<string, SbtPassiveLatestLookupState | undefined>;
-type SbtPassiveLatestLookupInFlightBySlug = Record<string, boolean | undefined>;
 type SbtListInitDeps = {
   listSlug: string;
   allSessionsMode: boolean;
@@ -2545,43 +2546,22 @@ const SBTsList = ({
 
   useEffect(() => {
     const researchStep = readSbtListSyncBarResearchBlockStep();
-    const loadingTargets = Object.entries(chipLoadingStatusBySlug).reduce<Record<string, number>>((acc, [slugRaw, status]) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug)) return acc;
-      if (!status) return acc;
-      const chipState = sessionChipStateBySlug[slug];
-      if (!chipState?.isLoading) return acc;
-      const snapshot = getSessionProgressSnapshot(slug);
-      if (!snapshot) return acc;
-      if (Number(snapshot.liveLatestBlock || 0) > 0) return acc;
-      if (!!sbtRealtimeCoverageBySlug?.[slug]) return acc;
-      acc[slug] = Math.max(
-        0,
-        Number(snapshot.displayCurrentBlock || 0),
-        Number(snapshot.liveCurrentBlock || 0),
-        Number(snapshot.lastBlock || 0)
-      );
-      return acc;
-    }, {});
+    const passiveLatestLookupPlan = buildSbtListPassiveLatestLookupPlan({
+      chipLoadingStatusBySlug,
+      getSessionProgressSnapshot,
+      lookupInFlightBySlug: passiveLatestLookupInFlightBySlugRef.current,
+      lookupStateBySlug: passiveLatestLookupStateBySlugRef.current,
+      researchStep,
+      sbtRealtimeCoverageBySlug,
+      sessionChipStateBySlug,
+    });
 
-    const loadingSlugs = new Set<string>(Object.keys(loadingTargets));
-    Object.keys(passiveLatestLookupStateBySlugRef.current).forEach((slug) => {
-      if (loadingSlugs.has(slug)) return;
+    passiveLatestLookupPlan.staleSlugs.forEach((slug) => {
       delete passiveLatestLookupStateBySlugRef.current[slug];
       delete passiveLatestLookupInFlightBySlugRef.current[slug];
     });
 
-    Object.entries(loadingTargets).forEach(([slug, currentWatermark]) => {
-      const lookupState = passiveLatestLookupStateBySlugRef.current[slug] || null;
-      const lastRequestedAtBlock = Number(lookupState?.lastRequestedAtBlock || 0);
-      const needsInitialLookup = lookupState == null;
-      const crossedResearchThreshold = (
-        lookupState != null &&
-        Number(currentWatermark || 0) >= (lastRequestedAtBlock + researchStep)
-      );
-      if (!needsInitialLookup && !crossedResearchThreshold) return;
-      if (passiveLatestLookupInFlightBySlugRef.current[slug]) return;
-
+    passiveLatestLookupPlan.requests.forEach(({ slug, currentWatermark }) => {
       passiveLatestLookupStateBySlugRef.current[slug] = {
         lastRequestedAtBlock: Number(currentWatermark || 0),
       };

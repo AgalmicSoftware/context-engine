@@ -86,6 +86,17 @@ export type {
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
 export {
+  buildSbtListPassiveLatestLookupPlan,
+} from './sbtListPassiveLatestLookupHelpers';
+export type {
+  SbtPassiveLatestLookupInFlightBySlug,
+  SbtPassiveLatestLookupPlan,
+  SbtPassiveLatestLookupProgressSnapshot,
+  SbtPassiveLatestLookupRequest,
+  SbtPassiveLatestLookupState,
+  SbtPassiveLatestLookupStateBySlug,
+} from './sbtListPassiveLatestLookupHelpers';
+export {
   buildSbtListExpandedCardShellClassName,
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
