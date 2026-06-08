@@ -58,10 +58,6 @@ import {
   normalizeWorkerUrl as normalizeWorkerAuthUrl,
 } from '../../utilities/worker/workerAuth.js';
 import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
-import {
-  normalizeLitMetadataNetwork,
-  normalizeSessionNaming,
-} from '../../utilities/session/sessionMetadata.js';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
@@ -166,7 +162,6 @@ import {
   normalizeAiModelForProvider,
   normalizeAiModels,
   normalizeAiProvider,
-  resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import {
   buildPendingSbtSelection,
@@ -291,6 +286,10 @@ import {
   normalizeSessionWizardGateIds as normalizeGateIds,
   resolveSessionWizardResourceGate as resolveResourceGate,
 } from './sessionWizardResourceGateSupport';
+import {
+  applySessionWizardMetadataUploadGuards,
+  resolveSessionWizardMetadataPayloadBase,
+} from './sessionWizardMetadataPayload';
 import {
   buildSessionWizardCreateSbtModalLaunchState,
   buildSessionWizardDeferredCreateSbtComponentProps,
@@ -3132,83 +3131,12 @@ const SessionWizard = ({
     return { metadata, encryptedFields, onChainFields };
   };
 
-  const stripSecretFieldsFromMetadata = (metadata) => {
-    if (!metadata || typeof metadata !== 'object') return;
-    if (metadata.ai && typeof metadata.ai === 'object') {
-      delete metadata.ai.providers;
-      delete metadata.ai.mode;
-      delete metadata.ai.provider;
-    }
-    if (metadata.rpc && typeof metadata.rpc === 'object') {
-      delete metadata.rpc;
-    }
-    if (metadata.arweave && typeof metadata.arweave === 'object') {
-      delete metadata.arweave;
-    }
-    if (metadata.faucet && typeof metadata.faucet === 'object') {
-      delete metadata.faucet.privateKey;
-      delete metadata.faucet.encryptedPrivateKey;
-    }
-    if (metadata.encryptedFields && typeof metadata.encryptedFields === 'object') {
-      Object.keys(metadata.encryptedFields).forEach((key) => {
-        if (isSecretFieldPath(key.split('.'))) {
-          delete metadata.encryptedFields[key];
-        }
-      });
-    }
-    if (metadata.encryptedFieldGates && typeof metadata.encryptedFieldGates === 'object') {
-      Object.keys(metadata.encryptedFieldGates).forEach((key) => {
-        if (isSecretFieldPath(key.split('.'))) {
-          delete metadata.encryptedFieldGates[key];
-        }
-      });
-    }
-  };
-
   const buildMetadataPayload = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
-    const metadata = normalizeSessionNaming(normalizeLitMetadataNetwork(deepClone(draft)));
+    const metadata = resolveSessionWizardMetadataPayloadBase({
+      draft,
+      sessionId,
+    });
     const authAccount = toStr(signerAccountOverride || resolvedWalletAccountRef.current || account).trim();
-    metadata.sessionName = toStr(metadata.sessionName || '').trim();
-    metadata.sessionInfo = toStr(metadata.sessionInfo || '').trim();
-    if (!metadata.sessionName) delete metadata.sessionName;
-    if (!metadata.sessionInfo) delete metadata.sessionInfo;
-    metadata.slug = normalizeSlug(metadata.slug);
-    const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(metadata);
-    delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
-    if (resolvedAutoFeature !== undefined) {
-      metadata.autoFeatureSBTsBySessionSlug = resolvedAutoFeature;
-    }
-    const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionId);
-    const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
-    metadata.sessionId = formattedSessionId || toStr(sessionId).trim() || '';
-    if (sessionIdHex) {
-      metadata.sessionIdHex = sessionIdHex;
-    } else {
-      delete metadata.sessionIdHex;
-    }
-    delete metadata.sponsoredSbtAddress;
-    if (metadata.defaultFeaturedSBTs != null) {
-      if (Array.isArray(metadata.defaultFeaturedSBTs)) {
-        metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs
-          .map((entry) => (typeof entry === 'string' ? entry : entry?.address || entry?.sbtAddress))
-          .map((entry) => toStr(entry).trim())
-          .filter(Boolean);
-      } else if (typeof metadata.defaultFeaturedSBTs === 'string') {
-        metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs
-          .split(/[\n,]+/)
-          .map((entry) => entry.trim())
-          .filter(Boolean);
-      } else {
-        metadata.defaultFeaturedSBTs = [];
-      }
-      const seen = new Set();
-      metadata.defaultFeaturedSBTs = metadata.defaultFeaturedSBTs.filter((entry) => {
-        const lower = entry.toLowerCase();
-        if (seen.has(lower)) return false;
-        seen.add(lower);
-        return true;
-      });
-    }
     if (sessionHeaderMode === 'upload') {
       if (sessionHeaderFile) {
         setSessionHeaderStatus('Uploading header image…', 'loading');
@@ -3275,18 +3203,11 @@ const SessionWizard = ({
     if (normalizedBlockLimits) {
       metadata.blockLimits = normalizedBlockLimits;
     }
-    stripSecretFieldsFromMetadata(metadata);
-    // Keep selected Lit gate id for encryption UX, but do not write auth gate authority to metadata.
-    if (metadata.lit && typeof metadata.lit === 'object') {
-      metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
-    }
-    // Keep per-member budget fields hidden until semantics and enforcement are implemented.
-    metadata.perMemberSpendLimits = {
-      ...(metadata.perMemberSpendLimits || {}),
-      ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',
-      arweave: gateSelections.arweave?.perMemberLimit || metadata.perMemberSpendLimits?.arweave || '',
-      txGas: gateSelections.txGas?.perMemberLimit || metadata.perMemberSpendLimits?.txGas || '',
-    };
+    applySessionWizardMetadataUploadGuards({
+      metadata,
+      defaultGateId,
+      gateSelections,
+    });
     const result = await applyEncryption(metadata);
     result.metadata = sanitizeSessionWizardMetadataPayload(result.metadata, {
       fieldOrder: METADATA_FIELD_ORDER,
