@@ -3,8 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import SbtPageAdminActions from './SbtPageAdminActions';
 
-const createProps = (
-  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>> = {}
+const createDisplayPlan = (
+  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>['displayPlan']> = {}
 ) => ({
   adminBurnButtonContentState: {
     failureLabel: 'Burn Failed',
@@ -17,7 +17,42 @@ const createProps = (
   },
   adminBurnStatusButtonState: {
     disabled: false,
+    isFailure: false,
+    isIdle: true,
+    isPending: false,
+    isSuccess: false,
   },
+  adminGeneratedPasswordList: ['claim-one'],
+  cachedPasswordList: [],
+  canAdminBurn: true,
+  combinedPasswords: ['claim-one'],
+  effectiveIncludePreviousPasswords: false,
+  hasPasswordMint: true,
+  isInvite: false,
+  onlyCachedPasswords: false,
+  passwordExportControlsState: {
+    effectiveIncludePreviousPasswordsChecked: false,
+    renderIncludePreviousCheckbox: true,
+    showCachedPasswordsIncludedNote: false,
+  },
+  passwordGenerationButtonState: {
+    disabled: false,
+  },
+  passwordInventoryDisplayState: {
+    shouldRenderGeneratedPasswordList: true,
+    shouldRenderNoMoreInvitesEmptyState: false,
+    shouldRenderPasswordGenerationSection: true,
+    shouldRenderPreviousPasswordsSection: false,
+  },
+  passwordsToExport: ['claim-one'],
+  showNoMoreInvites: false,
+  showPasswordGen: true,
+  ...overrides,
+});
+
+const createProps = (
+  overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>> = {}
+) => ({
   buildInviteLink: (code: string) => `https://session.example.test/join?code=${encodeURIComponent(code)}`,
   burnLabel: 'Burn',
   burnSearchInput: '0xabc',
@@ -25,8 +60,7 @@ const createProps = (
     address: '0x00000000000000000000000000000000000000a1',
     tokenId: '7',
   },
-  canAdminBurn: true,
-  combinedPasswords: ['claim-one'],
+  displayPlan: createDisplayPlan(),
   exportFormat: 'json',
   onAdminBurn: jest.fn(),
   onBurnSearchChange: jest.fn(),
@@ -41,21 +75,7 @@ const createProps = (
     shouldRenderCopiedIcon: false,
     shouldRenderDefaultIcon: true,
   },
-  passwordExportControlsState: {
-    effectiveIncludePreviousPasswordsChecked: false,
-    renderIncludePreviousCheckbox: true,
-    showCachedPasswordsIncludedNote: false,
-  },
-  passwordGenerationButtonState: {
-    disabled: false,
-  },
   passwordGenerationCount: '3',
-  passwordInventoryDisplayState: {
-    shouldRenderGeneratedPasswordList: true,
-    shouldRenderNoMoreInvitesEmptyState: false,
-    shouldRenderPasswordGenerationSection: true,
-    shouldRenderPreviousPasswordsSection: false,
-  },
   sbtLabel: 'SBT',
   ...overrides,
 });
@@ -141,14 +161,20 @@ describe('SbtPageAdminActions', () => {
     render(
       <SbtPageAdminActions
         {...createProps({
-          adminBurnStatusButtonState: {
-            disabled: true,
-          },
+          displayPlan: createDisplayPlan({
+            adminBurnStatusButtonState: {
+              disabled: true,
+              isFailure: false,
+              isIdle: true,
+              isPending: false,
+              isSuccess: false,
+            },
+            passwordGenerationButtonState: {
+              disabled: true,
+            },
+          }),
           onAdminBurn,
           onGenerateAdminInvites,
-          passwordGenerationButtonState: {
-            disabled: true,
-          },
         })}
       />
     );
@@ -166,16 +192,88 @@ describe('SbtPageAdminActions', () => {
     expect(onGenerateAdminInvites).not.toHaveBeenCalled();
   });
 
+  it('renders pending and failure admin burn state from the display contract', () => {
+    const { rerender } = render(
+      <SbtPageAdminActions
+        {...createProps({
+          openMintAutoJoinUrl: '',
+          displayPlan: createDisplayPlan({
+            adminBurnButtonContentState: {
+              failureLabel: 'Burn Failed',
+              idleLabel: 'Burn SBT',
+              shouldRenderFailure: false,
+              shouldRenderIdleLabel: false,
+              shouldRenderPendingIcon: true,
+              shouldRenderSuccess: false,
+              successLabel: 'Burned',
+            },
+            adminBurnStatusButtonState: {
+              disabled: true,
+              isFailure: false,
+              isIdle: false,
+              isPending: true,
+              isSuccess: false,
+            },
+            passwordInventoryDisplayState: {
+              shouldRenderGeneratedPasswordList: false,
+              shouldRenderNoMoreInvitesEmptyState: false,
+              shouldRenderPasswordGenerationSection: false,
+              shouldRenderPreviousPasswordsSection: false,
+            },
+          }),
+        })}
+      />
+    );
+
+    expect(screen.getAllByRole('button')[0]).toBeDisabled();
+
+    rerender(
+      <SbtPageAdminActions
+        {...createProps({
+          openMintAutoJoinUrl: '',
+          displayPlan: createDisplayPlan({
+            adminBurnButtonContentState: {
+              failureLabel: 'Burn Failed',
+              idleLabel: 'Burn SBT',
+              shouldRenderFailure: true,
+              shouldRenderIdleLabel: false,
+              shouldRenderPendingIcon: false,
+              shouldRenderSuccess: false,
+              successLabel: 'Burned',
+            },
+            adminBurnStatusButtonState: {
+              disabled: true,
+              isFailure: true,
+              isIdle: false,
+              isPending: false,
+              isSuccess: false,
+            },
+            passwordInventoryDisplayState: {
+              shouldRenderGeneratedPasswordList: false,
+              shouldRenderNoMoreInvitesEmptyState: false,
+              shouldRenderPasswordGenerationSection: false,
+              shouldRenderPreviousPasswordsSection: false,
+            },
+          }),
+        })}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Burn Failed' })).toBeDisabled();
+  });
+
   it('renders previous-password and no-more-invite states from display plans', () => {
     const { rerender } = render(
       <SbtPageAdminActions
         {...createProps({
-          passwordInventoryDisplayState: {
-            shouldRenderGeneratedPasswordList: false,
-            shouldRenderNoMoreInvitesEmptyState: false,
-            shouldRenderPasswordGenerationSection: false,
-            shouldRenderPreviousPasswordsSection: true,
-          },
+          displayPlan: createDisplayPlan({
+            passwordInventoryDisplayState: {
+              shouldRenderGeneratedPasswordList: false,
+              shouldRenderNoMoreInvitesEmptyState: false,
+              shouldRenderPasswordGenerationSection: false,
+              shouldRenderPreviousPasswordsSection: true,
+            },
+          }),
         })}
       />
     );
@@ -189,15 +287,17 @@ describe('SbtPageAdminActions', () => {
     rerender(
       <SbtPageAdminActions
         {...createProps({
-          canAdminBurn: false,
-          combinedPasswords: [],
           openMintAutoJoinUrl: '',
-          passwordInventoryDisplayState: {
-            shouldRenderGeneratedPasswordList: false,
-            shouldRenderNoMoreInvitesEmptyState: true,
-            shouldRenderPasswordGenerationSection: false,
-            shouldRenderPreviousPasswordsSection: false,
-          },
+          displayPlan: createDisplayPlan({
+            canAdminBurn: false,
+            combinedPasswords: [],
+            passwordInventoryDisplayState: {
+              shouldRenderGeneratedPasswordList: false,
+              shouldRenderNoMoreInvitesEmptyState: true,
+              shouldRenderPasswordGenerationSection: false,
+              shouldRenderPreviousPasswordsSection: false,
+            },
+          }),
         })}
       />
     );

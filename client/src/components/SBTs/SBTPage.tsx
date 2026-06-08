@@ -3814,7 +3814,7 @@ class SBTPage extends Component<any, any> {
       sbtInfo,
       sbtLabel: t('sbt'),
     });
-    const { combinedPasswords, isInvite } = adminActionDisplayPlan;
+    const { isInvite } = adminActionDisplayPlan;
 
     const resolvedSbtAddress = resolveSbtAddress(this.props.SBTAddress);
     const sbtAddr = typeof resolvedSbtAddress === 'string'
@@ -3841,14 +3841,11 @@ class SBTPage extends Component<any, any> {
     });
 
     return SbtPageAdminActions({
-      adminBurnButtonContentState: adminActionDisplayPlan.adminBurnButtonContentState,
-      adminBurnStatusButtonState: adminActionDisplayPlan.adminBurnStatusButtonState,
       buildInviteLink,
       burnLabel: t('burn'),
       burnSearchInput,
       burnSearchResultRecord,
-      canAdminBurn: adminActionDisplayPlan.canAdminBurn,
-      combinedPasswords,
+      displayPlan: adminActionDisplayPlan,
       exportFormat,
       onAdminBurn: this.handleAdminBurn,
       onBurnSearchChange: this.handleBurnSearchChange,
@@ -3860,10 +3857,7 @@ class SBTPage extends Component<any, any> {
       onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
       openMintAutoJoinUrl,
       openMintUrlCopyIconState,
-      passwordExportControlsState: adminActionDisplayPlan.passwordExportControlsState,
-      passwordGenerationButtonState: adminActionDisplayPlan.passwordGenerationButtonState,
       passwordGenerationCount,
-      passwordInventoryDisplayState: adminActionDisplayPlan.passwordInventoryDisplayState,
       sbtLabel: t('sbt'),
     });
   };
