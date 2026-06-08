@@ -3,6 +3,7 @@ import {
   SURVEY_RESULTS_EXPORT_OPTIONS,
   SURVEY_RESULTS_EXPORT_TYPES,
   buildSurveyResultsDemoAnalysisArtifact,
+  buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
   buildSurveyResultsExportDownloadPlan,
   buildSurveyResultsExportGenerationPlan,
@@ -138,6 +139,36 @@ describe('surveyResultsExportDisplayHelpers', () => {
       exportOptions: SURVEY_RESULTS_EXPORT_OPTIONS,
       exportTypeLabel: '',
     });
+  });
+
+  it('builds export base filenames from mode and export type descriptors', () => {
+    expect(buildSurveyResultsExportBaseFileName({
+      exportType: SURVEY_RESULTS_EXPORT_TYPES.CSV_QUESTIONS,
+      surveyIdShort: 'abc-def',
+      viewMode: 'survey',
+    })).toBe('contextEngine_surveyQuestions_abc-def');
+
+    expect(buildSurveyResultsExportBaseFileName({
+      exportType: SURVEY_RESULTS_EXPORT_TYPES.JSON_QUESTIONS_AND_RESPONSES,
+      surveyIdShort: 'abc-def',
+      viewMode: 'survey',
+    })).toBe('contextEngine_surveyResults_abc-def');
+
+    expect(buildSurveyResultsExportBaseFileName({
+      exportType: SURVEY_RESULTS_EXPORT_TYPES.JSON_QUESTIONS,
+      viewMode: 'questions',
+    })).toBe('contextEngine_filteredQuestions');
+
+    expect(buildSurveyResultsExportBaseFileName({
+      exportType: SURVEY_RESULTS_EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
+      viewMode: 'questions',
+    })).toBe('contextEngine_questionResults');
+
+    expect(buildSurveyResultsExportBaseFileName({
+      exportType: SURVEY_RESULTS_EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
+      surveyIdShort: '',
+      viewMode: 'survey',
+    })).toBe('contextEngine_surveyResults_all');
   });
 
   it('builds an HTML report readiness plan from snapshot and selected-section identity', () => {

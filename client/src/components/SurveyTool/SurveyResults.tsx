@@ -132,6 +132,7 @@ import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsDemoAnalysisArtifact,
+  buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
   buildSurveyResultsHtmlReportDownloadAttemptPlan,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
@@ -3612,20 +3613,14 @@ try {
 
 getExportBaseFileName = (exportType: unknown = this.state.exportType): string => {
 const { viewMode, surveyId } = this.state;
-const questionsOnly =
-  exportType === EXPORT_TYPES.CSV_QUESTIONS ||
-  exportType === EXPORT_TYPES.JSON_QUESTIONS;
-
-if (viewMode === 'survey') {
-  const surveyIdShort = surveyId
-    ? getShortenedSurveyID(surveyId, false, null, true)
-    : 'all';
-  return questionsOnly
-    ? `contextEngine_surveyQuestions_${surveyIdShort}`
-    : `contextEngine_surveyResults_${surveyIdShort}`;
-}
-
-return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
+const surveyIdShort = surveyId
+  ? getShortenedSurveyID(surveyId, false, null, true)
+  : 'all';
+return buildSurveyResultsExportBaseFileName({
+  exportType,
+  surveyIdShort,
+  viewMode,
+});
 }
 
 downloadCSV = (): void => {

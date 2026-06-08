@@ -249,6 +249,28 @@ export const buildSurveyResultsExportControlsDisplayDescriptor = ({
   exportTypeLabel: getSurveyResultsExportTypeLabel(exportType),
 });
 
+export const buildSurveyResultsExportBaseFileName = ({
+  exportType = '',
+  surveyIdShort = 'all',
+  viewMode = '',
+}: {
+  exportType?: unknown;
+  surveyIdShort?: unknown;
+  viewMode?: unknown;
+} = {}): string => {
+  const questionsOnly =
+    exportType === SURVEY_RESULTS_EXPORT_TYPES.CSV_QUESTIONS ||
+    exportType === SURVEY_RESULTS_EXPORT_TYPES.JSON_QUESTIONS;
+
+  if (viewMode === 'survey') {
+    return questionsOnly
+      ? `contextEngine_surveyQuestions_${String(surveyIdShort || 'all')}`
+      : `contextEngine_surveyResults_${String(surveyIdShort || 'all')}`;
+  }
+
+  return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
+};
+
 export type SurveyResultsHtmlReportSectionAvailability = {
   argumentMap: boolean;
   atlas: boolean;
