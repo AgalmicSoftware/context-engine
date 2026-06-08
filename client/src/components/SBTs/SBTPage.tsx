@@ -168,6 +168,7 @@ import {
   resolveSbtPageRecoveryCacheChainId,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
+  resolveSbtPageRefreshLifecyclePlan,
   reconcileSbtPageHolderRefreshState,
   resolveSbtPageCachedGroupPasswordHash,
   resolveSbtPageChainMetadataReadNeeds,
@@ -2813,21 +2814,18 @@ class SBTPage extends Component<any, any> {
         burnedAddresses: burnedAddresses.length,
         mintedTokensOverride
       });
-      if (
-        shouldRefreshCounts &&
-        usingCentralHydration &&
-        !parentOwnsInitialRefresh &&
-        (!refreshOptions || !refreshOptions.forceCounts)
-      ) {
+      const refreshLifecyclePlan = resolveSbtPageRefreshLifecyclePlan({
+        eventScanTried: this._eventScanTried[metaKey],
+        parentOwnsInitialRefresh,
+        refreshOptions,
+        shouldRefreshCounts,
+        usingCentralHydration,
+      });
+      if (refreshLifecyclePlan.shouldPromoteToForcedCountsRefresh) {
         const onProgress = makeProgressHandler(resolvedSlug);
         refreshOptions = onProgress ? { forceCounts: true, onProgress } : { forceCounts: true };
       }
-      if (
-        shouldRefreshCounts &&
-        usingCentralHydration &&
-        !parentOwnsInitialRefresh &&
-        !this._eventScanTried[metaKey]
-      ) {
+      if (refreshLifecyclePlan.shouldRunEventScanRefresh) {
         if (!isCurrentLoad()) return;
         this._eventScanTried[metaKey] = true;
         try { await this.refreshSbtDataWithSlug(sbtAddressOriginalCase, refreshOptions, resolvedSlug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
