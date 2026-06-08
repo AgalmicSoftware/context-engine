@@ -75,6 +75,8 @@ export type {
   SbtSessionGroupLists,
 } from './sbtListSessionUniverseHelpers';
 export {
+  buildSbtListChipLoadingStatusBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
@@ -84,6 +86,9 @@ export type {
   SbtListSessionChipState,
   SbtListSessionChipStateBySlug,
   SbtListSessionLoadingStatus,
+  SbtListSessionLoadingStatusBySlug,
+  SbtListSessionLoadingStatusOptions,
+  SbtListSessionLoadingStatusResolver,
   SbtListSessionLoadingStatusSnapshot,
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
