@@ -14,12 +14,16 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsExportFormat,
+  type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import { renderSurveyResultsHtmlReportActionControls } from './SurveyResultsHtmlReportActionControls';
 import SurveyResultsHtmlReportAnalysisControls from './SurveyResultsHtmlReportAnalysisControls';
 import SurveyResultsHtmlReportSectionTable, {
   type SurveyResultsHtmlReportSectionRow,
 } from './SurveyResultsHtmlReportSectionTable';
+import type {
+  SurveyResultsHtmlReportSectionKey,
+} from './surveyResultsExportDisplayHelpers';
 
 type SurveyResultsRecord = Record<string, any>;
 
@@ -36,7 +40,7 @@ export type SurveyResultsHtmlReportExportModalDisplayProps = {
   isOpen?: boolean;
   needsAnalysisGeneration?: boolean;
   sectionRows: SurveyResultsHtmlReportSectionRow[];
-  selectedSections: Record<string, unknown>;
+  selectedSections: SessionResultsSectionSelection;
   snapshot: SurveyResultsRecord;
   styleMap: Record<string, string>;
 };
@@ -47,7 +51,7 @@ export type SurveyResultsHtmlReportExecutionProps = {
   onFormatChange: (format: SessionResultsExportFormat) => void;
   onGenerateAnalysis: () => void;
   onToggleDemoMode: () => void;
-  onToggleSection: (key: any) => void;
+  onToggleSection: (key: SurveyResultsHtmlReportSectionKey) => void;
 };
 
 export type SurveyResultsHtmlReportExportModalProps =

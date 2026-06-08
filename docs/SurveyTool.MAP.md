@@ -52,10 +52,10 @@
   - `SurveyResultsQuestionListCard.tsx`: **56 lines**
   - `SurveyResultsExportControls.tsx`: **97 lines**
   - `SurveyResultsFilterExportControls.tsx`: **196 lines**
-  - `SurveyResultsHtmlReportExportModal.tsx`: **280 lines**
+  - `SurveyResultsHtmlReportExportModal.tsx`: **284 lines**
   - `SurveyResultsHtmlReportActionControls.tsx`: **50 lines**
   - `SurveyResultsHtmlReportAnalysisControls.tsx`: **57 lines**
-  - `SurveyResultsHtmlReportSectionTable.tsx`: **56 lines**
+  - `SurveyResultsHtmlReportSectionTable.tsx`: **59 lines**
   - `surveyResultsHtmlReportDownloadRequest.ts`: **131 lines**
   - `surveyResultsExportController.ts`: **125 lines**
   - `surveyResultsExportDisplayHelpers.ts`: **661 lines**
@@ -244,7 +244,7 @@ SurveyTool.tsx  [top-level wrapper]
 | `SurveyResultsExportControls.tsx` | Export controls presentation | Renders export area collapse, type dropdown, and download button from explicit props while leaving export type state in `SurveyResults` and export execution in `surveyResultsExportController.ts` |
 | `SurveyResultsFilterExportControls.tsx` | Filter/export control strip presentation | Renders SBT filtering, question filtering, and export controls from explicit props while leaving filter state mutation, storage-key derivation, SBT/question filter handlers, export payload generation, and download execution in `SurveyResults` |
 | `SurveyResultsHtmlReportExportModal.tsx` | HTML report export modal presentation | Builds pure action-label/session/exporter display decisions, renders export-format selection and demo-mode toggle, and delegates section availability, analysis-generation affordance, and close/download controls to display components from explicit display props and named execution callback props while leaving snapshot construction, AI generation, export rendering, and browser download execution in `SurveyResults` |
-| `SurveyResultsHtmlReportSectionTable.tsx` | HTML report section table display | Renders selected-section checkboxes, availability labels, and reason text from parent-provided section rows while forwarding only the named section-toggle callback; it does not build snapshots, generate analysis, render reports, download files, read/write cache, or mutate state |
+| `SurveyResultsHtmlReportSectionTable.tsx` | HTML report section table display | Renders selected-section checkboxes, availability labels, and reason text from parent-provided typed section rows while forwarding only the named section-toggle callback for known report-section keys; it does not build snapshots, generate analysis, render reports, download files, read/write cache, or mutate state |
 | `SurveyResultsHtmlReportAnalysisControls.tsx` | HTML report analysis action display | Renders analysis eligibility counts, reasons, errors, and the Generate Analysis button from parent display-plan values while forwarding only the parent-owned generation callback; it does not call AI, merge artifacts, read/write cache, render reports, download files, or mutate state |
 | `SurveyResultsHtmlReportActionControls.tsx` | HTML report action controls | Renders the Cancel and Download buttons from explicit readiness/label props while forwarding only the parent-owned close and report-download callbacks; it does not render reports, capture DOM/PDF, download files, generate analysis, read/write cache, or mutate state |
 | `surveyResultsExportController.ts` | Results export orchestration | Runs export generation/download plans, invokes injected content generators and browser download ports, and maps invalid/empty export alerts without owning export payload generation, route, cache, fetch, or decrypt behavior |
