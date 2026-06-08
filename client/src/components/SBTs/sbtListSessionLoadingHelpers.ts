@@ -1,7 +1,10 @@
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import type { SbtListHelperRecord } from './sbtListCardDetailsHelpers';
 import type { SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
-import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers';
+import {
+  dedupeNormalizedSbtListSlugs,
+  isSbtListSyntheticNoSessionSlug,
+} from './sbtListSessionUniverseHelpers';
 
 export type SbtListLiveProgressSnapshot = SbtListHelperRecord & {
   currentBlock?: unknown;
@@ -60,6 +63,18 @@ export type SbtListSessionLoadingStatus = {
   statusLabel: string;
 };
 
+export type SbtListSessionLoadingStatusBySlug = Record<string, SbtListSessionLoadingStatus | undefined>;
+
+export type SbtListSessionLoadingStatusOptions = {
+  alwaysShow?: boolean;
+  forceShow?: boolean;
+};
+
+export type SbtListSessionLoadingStatusResolver = (
+  slug: unknown,
+  options?: SbtListSessionLoadingStatusOptions
+) => SbtListSessionLoadingStatus | null | undefined;
+
 export type SbtListSessionChipState = {
   hasCards: boolean;
   hasLoadedOnce: boolean;
@@ -76,6 +91,21 @@ type BuildSbtListSessionLoadingStatusArgs = {
   formatBlockCount?: (value: unknown) => string;
   loading?: boolean;
   snapshot?: SbtListSessionLoadingStatusSnapshot | null;
+};
+
+type BuildSbtListInitialLoaderStatusesArgs = {
+  fallbackSlug?: unknown;
+  loaderSessionSlugs?: unknown;
+  resolveStatus?: SbtListSessionLoadingStatusResolver;
+  windowAvailable?: boolean;
+};
+
+type BuildSbtListChipLoadingStatusBySlugArgs = {
+  allSessionsMode?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  isListModeScopeEnabled?: unknown;
+  resolveStatus?: SbtListSessionLoadingStatusResolver;
+  selectedSessionUniverseSlugs?: Set<unknown> | unknown[];
 };
 
 type BuildSbtListSessionChipStateBySlugArgs = {
@@ -107,6 +137,19 @@ type BuildSbtListSessionProgressSnapshotArgs = {
   scanInProgressRaw?: unknown;
   slug?: unknown;
 };
+
+const normalizeSbtListStatusSlug = (slug: unknown): string => normalizeSessionSlug(slug || '');
+
+const isSbtListLoadingStatus = (
+  status: SbtListSessionLoadingStatus | null | undefined
+): status is SbtListSessionLoadingStatus => !!status;
+
+const labelSbtListLoadingStatusBySlug = (
+  status: SbtListSessionLoadingStatus
+): SbtListSessionLoadingStatus => ({
+  ...status,
+  slug: status.slugLabel,
+});
 
 export const buildSbtListSessionLoadingStatus = ({
   allSessionsMode = false,
@@ -182,6 +225,58 @@ export const buildSbtListSessionLoadingStatus = ({
     scanInProgress,
     deferred,
   };
+};
+
+export const buildSbtListInitialLoaderStatuses = ({
+  fallbackSlug = '',
+  loaderSessionSlugs = [],
+  resolveStatus = () => null,
+  windowAvailable = true,
+}: BuildSbtListInitialLoaderStatusesArgs = {}): SbtListSessionLoadingStatus[] => {
+  if (!windowAvailable) return [];
+
+  const statuses = (Array.isArray(loaderSessionSlugs) ? loaderSessionSlugs : [])
+    .map((slug) => resolveStatus(slug))
+    .filter(isSbtListLoadingStatus)
+    .map(labelSbtListLoadingStatusBySlug);
+
+  const normalizedFallbackSlug = normalizeSbtListStatusSlug(fallbackSlug);
+  if (!statuses.length && normalizedFallbackSlug) {
+    const fallback = resolveStatus(normalizedFallbackSlug, { forceShow: true });
+    if (fallback) statuses.push(labelSbtListLoadingStatusBySlug(fallback));
+  }
+
+  return statuses;
+};
+
+export const buildSbtListChipLoadingStatusBySlug = ({
+  allSessionsMode = false,
+  displayedSessionUniverseSlugs = [],
+  isListModeScopeEnabled = false,
+  resolveStatus = () => null,
+  selectedSessionUniverseSlugs = [],
+}: BuildSbtListChipLoadingStatusBySlugArgs = {}): SbtListSessionLoadingStatusBySlug => {
+  if (!allSessionsMode) return {};
+
+  const selectedSlugs = selectedSessionUniverseSlugs instanceof Set
+    ? Array.from(selectedSessionUniverseSlugs)
+    : (Array.isArray(selectedSessionUniverseSlugs) ? selectedSessionUniverseSlugs : []);
+  const selectedSlugSet = new Set(selectedSlugs.map(normalizeSbtListStatusSlug));
+  const chipSlugs = dedupeNormalizedSbtListSlugs(
+    Array.isArray(displayedSessionUniverseSlugs) ? displayedSessionUniverseSlugs : []
+  );
+  const out: SbtListSessionLoadingStatusBySlug = {};
+
+  chipSlugs.forEach((slug) => {
+    const normalizedSlug = normalizeSbtListStatusSlug(slug);
+    if (isListModeScopeEnabled && !selectedSlugSet.has(normalizedSlug)) return;
+
+    const status = resolveStatus(normalizedSlug, { alwaysShow: true });
+    if (!status) return;
+    out[normalizedSlug] = status;
+  });
+
+  return out;
 };
 
 export const buildSbtListSessionChipStateBySlug = ({

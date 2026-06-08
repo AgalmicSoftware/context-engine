@@ -72,8 +72,10 @@ import {
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
+  buildSbtListChipLoadingStatusBySlug,
   buildSbtListChipProgressDisplayPlan,
   buildSbtListChipProgressDesiredVisibilityBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRealtimeProgressInputPlan,
@@ -1461,18 +1463,12 @@ const SBTsList = ({
   ]);
 
   const loadingSessionStatuses = useMemo(() => {
-    if (typeof window === 'undefined') return [];
-    const uniqueSlugs = loaderSessionSlugs;
-    const statuses: SbtSessionLoadingStatus[] = uniqueSlugs
-      .map((slug) => deriveSessionLoadingStatus(slug))
-      .filter((status): status is SbtSessionLoadingStatus => !!status)
-      .map((status) => ({ ...status, slug: status.slugLabel }));
-    const fallbackSlug = normalizeSessionSlug(listSlug || '');
-    if (!statuses.length && fallbackSlug) {
-      const fallback = deriveSessionLoadingStatus(fallbackSlug, { forceShow: true });
-      if (fallback) statuses.push({ ...fallback, slug: fallback.slugLabel });
-    }
-    return statuses;
+    return buildSbtListInitialLoaderStatuses({
+      fallbackSlug: listSlug,
+      loaderSessionSlugs,
+      resolveStatus: deriveSessionLoadingStatus,
+      windowAvailable: typeof window !== 'undefined',
+    }) as SbtSessionLoadingStatus[];
   }, [
     deriveSessionLoadingStatus,
     loaderSessionSlugs,
@@ -1480,22 +1476,13 @@ const SBTsList = ({
   ]);
 
   const chipLoadingStatusBySlug = useMemo(() => {
-    if (!allSessionsMode) return {};
-    const out: SbtSessionLoadingStatusBySlug = {};
-    const chipSlugs = dedupeNormalizedSbtListSlugs(displayedSessionUniverseSlugs);
-    chipSlugs.forEach((slug) => {
-      const normalizedSlug = normalizeSessionSlug(slug || '');
-      if (
-        isListModeScopeEnabled &&
-        !selectedSessionUniverseSlugSet.has(normalizedSlug)
-      ) {
-        return;
-      }
-      const status = deriveSessionLoadingStatus(normalizedSlug, { alwaysShow: true });
-      if (!status) return;
-      out[normalizedSlug] = status;
-    });
-    return out;
+    return buildSbtListChipLoadingStatusBySlug({
+      allSessionsMode,
+      displayedSessionUniverseSlugs,
+      isListModeScopeEnabled,
+      resolveStatus: deriveSessionLoadingStatus,
+      selectedSessionUniverseSlugs: selectedSessionUniverseSlugSet,
+    }) as SbtSessionLoadingStatusBySlug;
   }, [
     allSessionsMode,
     deriveSessionLoadingStatus,
