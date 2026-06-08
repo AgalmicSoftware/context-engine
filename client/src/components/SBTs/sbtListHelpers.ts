@@ -87,6 +87,8 @@ export type {
   SbtListSessionLoadingStatusSnapshot,
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
+export { collectSbtListLinkedScopedEntries } from './sbtListScopedEntryHelpers';
+export type { SbtListScopedEntryOptions } from './sbtListScopedEntryHelpers';
 export {
   buildSbtListPassiveLatestLookupPlan,
 } from './sbtListPassiveLatestLookupHelpers';
