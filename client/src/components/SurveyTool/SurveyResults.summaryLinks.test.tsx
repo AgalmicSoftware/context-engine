@@ -42,6 +42,7 @@ import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
 import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
 import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
@@ -59,6 +60,7 @@ type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
 const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
   SurveyResultsAggregatorEmptyState,
   SurveyResultsFreeformSummaryDisplay,
   SurveyResultsFilterSummary,
