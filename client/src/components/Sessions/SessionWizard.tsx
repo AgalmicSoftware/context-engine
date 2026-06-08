@@ -118,8 +118,8 @@ import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   getSessionWizardNormalModeBundleUrlOverrideValidationError,
   resolveSessionWizardBundleUrlForMode,
-  resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   shouldForceSessionWizardNormalModeManualBundleRetry,
@@ -315,6 +315,7 @@ export {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
@@ -4299,59 +4300,32 @@ const SessionWizard = ({
     workerSecrets,
     deployForm,
   });
-  const shouldUseSponsoredAutoDeployFlow = (
-    toStr(workerMode).trim() !== 'default' &&
-    sponsoredAutoDeployState.ready
-  );
-  const hasManualBundleFallbackFile = !!bundleFile;
-  const sponsoredAutoDeployBundleMode = resolveSessionWizardDeployBundleMode({
+  const {
+    canUseSponsoredAutoDeployNow,
+    normalModeBundleHelpText,
+    normalModeManualBundleHelpText,
+    shouldUseSponsoredAutoDeployFlow,
+    showNormalModeManualBundleControls,
+    showNormalModeWorkerStep,
+    showSponsoredBundleFallbackInput,
+  } = resolveSessionWizardSponsoredPublishSurfaceState({
+    isNormalMode,
     wizardMode,
+    workerMode,
     bundleMode,
-    bundleUrl: deployForm.bundleUrl,
-    sponsoredAutoDeployReady: shouldUseSponsoredAutoDeployFlow,
+    deployForm,
+    sponsoredAutoDeployState,
     forceManualBundleFile,
-    hasBundleFile: hasManualBundleFallbackFile,
+    hasBundleFile: !!bundleFile,
     normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl: normalModeBundleUrl,
+    manualBundleRetryMessage: NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
+    missingHostedBundleMessage: NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE,
   });
-  const showNormalModeWorkerStep = !(
-    sponsoredAutoDeployState.active &&
-    toStr(workerMode).trim() !== 'default'
-  );
-  const sponsoredLocalBundledAssetAvailable = (
-    sponsoredAutoDeployBundleMode !== 'upload' ||
-    hasManualBundleFallbackFile
-  );
-  const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
-  const hasNormalModeBundleUrlOverride = !!toStr(normalModeBundleUrlOverride).trim();
-  const sponsoredAutoDeployMissingBundleUrl = (
-    sponsoredAutoDeployState.active &&
-    sponsoredAutoDeployState.missing.includes('Worker bundle URL')
-  );
-  const showSponsoredBundleFallbackInput = (
-    isNormalMode &&
-    !showNormalModeWorkerStep &&
-    (
-      forceManualBundleFile ||
-      hasManualBundleFallbackFile ||
-      hasNormalModeBundleUrlOverride ||
-      sponsoredAutoDeployMissingBundleUrl
-    )
-  );
   const normalModeBundleUrlOverrideValidationError = useMemo(
     () => getSessionWizardNormalModeBundleUrlOverrideValidationError(normalModeBundleUrlOverride),
     [normalModeBundleUrlOverride]
   );
-  const normalModeHostedBundleConfigured = !!toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim();
-  const showNormalModeManualBundleControls = (
-    isNormalMode &&
-    (forceManualBundleFile || !normalModeHostedBundleConfigured)
-  );
-  const normalModeBundleHelpText = normalModeHostedBundleConfigured
-    ? 'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.'
-    : NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE;
-  const normalModeManualBundleHelpText = normalModeHostedBundleConfigured
-    ? NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE
-    : NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE;
   const currentSessionWizardPathname = (
     typeof window === 'undefined' || !window.location ? '' : window.location.pathname
   );
