@@ -3,6 +3,7 @@ import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
+  resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
@@ -587,6 +588,90 @@ describe('resolveSessionWizardRegisterArgsDescriptor', () => {
     })).toEqual(expect.objectContaining({
       metadataUriMissing: true,
       registerArgs: expect.objectContaining({
+        metadataURI: '',
+      }),
+    }));
+  });
+});
+
+describe('resolveSessionWizardRegisterPreflightDescriptor', () => {
+  it('marks metadata-backed register requests ready without owning register execution', () => {
+    const descriptor = resolveSessionWizardRegisterPreflightDescriptor({
+      providerLike: { kind: 'provider' },
+      registryChainId: '84532',
+      sessionNetworkChainId: '11155420',
+      registryAddress: '0x0000000000000000000000000000000000000abc',
+      registrySlug: ' writers-room ',
+      sessionIdHexValue: ' 0x00000000000000000000000000000001 ',
+      metadataUriOverride: 'ar://uploaded-metadata',
+      gateSelectionsSnapshot: {
+        default: {
+          mode: 'any',
+          sbts: [],
+        },
+      },
+      sessionFieldsOverride: {
+        name: 'Writers Room',
+      },
+    });
+
+    expect(descriptor).toEqual(expect.objectContaining({
+      canRegister: true,
+      metadataUriMissing: false,
+      statusMessage: '',
+      registerArgs: expect.objectContaining({
+        chainId: 84532,
+        registryAddress: '0x0000000000000000000000000000000000000abc',
+        slug: 'writers-room',
+        sessionId: '0x00000000000000000000000000000001',
+        sessionChainId: 11155420,
+        metadataURI: 'ar://uploaded-metadata',
+        sessionFields: {
+          name: 'Writers Room',
+        },
+      }),
+    }));
+    expect(Object.keys(descriptor)).toEqual([
+      'metadataUriMissing',
+      'registerArgs',
+      'canRegister',
+      'statusMessage',
+    ]);
+  });
+
+  it('describes missing-metadata preflight with the existing status text and no side-effect ports', () => {
+    const descriptor = resolveSessionWizardRegisterPreflightDescriptor({
+      registryChainId: 11155420,
+      sessionNetworkChainId: 11155420,
+      metadataUriOverride: '',
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      pendingOnChainFields: {},
+    });
+
+    expect(descriptor).toEqual(expect.objectContaining({
+      canRegister: false,
+      metadataUriMissing: true,
+      statusMessage: 'Upload metadata or provide a manual Arweave URI.',
+      registerArgs: expect.objectContaining({
+        metadataURI: '',
+      }),
+    }));
+  });
+
+  it('allows callers to override the blocked metadata message without changing register args', () => {
+    expect(resolveSessionWizardRegisterPreflightDescriptor({
+      registryChainId: 11155420,
+      sessionNetworkChainId: 11155420,
+      metadataUriOverride: '',
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      missingMetadataMessage: 'Provide metadata first.',
+    })).toEqual(expect.objectContaining({
+      canRegister: false,
+      statusMessage: 'Provide metadata first.',
+      registerArgs: expect.objectContaining({
+        chainId: 11155420,
         metadataURI: '',
       }),
     }));
