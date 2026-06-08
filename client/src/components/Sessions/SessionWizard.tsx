@@ -4335,6 +4335,8 @@ const SessionWizard = ({
     effectiveMetadataTxId,
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
+    isNormalMode,
+    publishAdvancedOpen,
     publishBusy,
     publishStep,
     publishStepElapsedMs,

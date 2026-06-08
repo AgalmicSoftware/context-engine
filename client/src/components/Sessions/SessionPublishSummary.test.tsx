@@ -4,37 +4,8 @@ import SessionPublishSummary from './SessionPublishSummary';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
-  publishExecutionPlan: {
-    shouldAutoDeployWorker: false,
-    shouldDeployPendingSbts: false,
-    shouldRegisterSession: true,
-    shouldUploadMetadata: false,
-    stepNumbers: {},
-    steps: [],
-    ...(overrides.publishExecutionPlan || {}),
-  },
-  publishMetadataDisplayState: {
-    effectiveMetadataGatewayUrl: '',
-    effectiveMetadataTxId: '',
-    manualMetadataDisplayUri: '',
-    metadataUri: '',
-    metadataUriLabel: '',
-    showArweaveTx: false,
-    showManualMetadataUri: false,
-    showMetadataUri: false,
-    ...(overrides.publishMetadataDisplayState || {}),
-  },
-  publishProgressDisplayState: {
-    activePublishProgressStepLabel: '',
-    publishStep: 0,
-    publishProgressPercent: 0,
-    publishProgressPercentRounded: 0,
-    publishProgressSteps: [],
-    showPublishProgress: false,
-    ...(overrides.publishProgressDisplayState || {}),
-  },
-  publishReadiness: {
+const buildPublishUiPlan = (overrides: Record<string, any> = {}) => {
+  const publishReadiness = {
     canPublishNow: true,
     canUploadMetadataNow: true,
     hasManualMetadata: false,
@@ -43,8 +14,55 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => ({
     showUploadBlockedReason: false,
     uploadBlockedReason: '',
     ...(overrides.publishReadiness || {}),
-  },
-});
+  };
+  const actionDisplayOverrides = overrides.publishActionDisplayState || {};
+  const displayMode = actionDisplayOverrides.displayMode || 'advanced';
+  const publishBusy = actionDisplayOverrides.publishBusy || false;
+  const canPublishNow = actionDisplayOverrides.canPublishNow ?? publishReadiness.canPublishNow;
+  const publishAdvancedOpen = actionDisplayOverrides.publishAdvancedOpen || false;
+  return {
+    publishActionDisplayState: {
+      canPublishNow,
+      displayMode,
+      publishAdvancedOpen,
+      publishBusy,
+      publishButtonDisabled: publishBusy || !canPublishNow,
+      publishButtonLabel: displayMode === 'normal' ? 'Deploy Session' : 'Publish',
+      settingsButtonActive: publishAdvancedOpen,
+      ...actionDisplayOverrides,
+    },
+    publishExecutionPlan: {
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldRegisterSession: true,
+      shouldUploadMetadata: false,
+      stepNumbers: {},
+      steps: [],
+      ...(overrides.publishExecutionPlan || {}),
+    },
+    publishMetadataDisplayState: {
+      effectiveMetadataGatewayUrl: '',
+      effectiveMetadataTxId: '',
+      manualMetadataDisplayUri: '',
+      metadataUri: '',
+      metadataUriLabel: '',
+      showArweaveTx: false,
+      showManualMetadataUri: false,
+      showMetadataUri: false,
+      ...(overrides.publishMetadataDisplayState || {}),
+    },
+    publishProgressDisplayState: {
+      activePublishProgressStepLabel: '',
+      publishStep: 0,
+      publishProgressPercent: 0,
+      publishProgressPercentRounded: 0,
+      publishProgressSteps: [],
+      showPublishProgress: false,
+      ...(overrides.publishProgressDisplayState || {}),
+    },
+    publishReadiness,
+  };
+};
 
 const buildProps = (
   overrides: Partial<React.ComponentProps<typeof SessionPublishSummary>> = {}
@@ -104,6 +122,12 @@ describe('SessionPublishSummary', () => {
           wizardMode: 'normal',
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
+          publishUiPlan: buildPublishUiPlan({
+            publishActionDisplayState: {
+              displayMode: 'normal',
+              publishButtonLabel: 'Deploy Session',
+            },
+          }),
         })}
       />
     );
@@ -119,6 +143,14 @@ describe('SessionPublishSummary', () => {
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
           publishBusy: true,
+          publishUiPlan: buildPublishUiPlan({
+            publishActionDisplayState: {
+              displayMode: 'normal',
+              publishBusy: true,
+              publishButtonDisabled: true,
+              publishButtonLabel: 'Deploy Session',
+            },
+          }),
         })}
       />
     );
