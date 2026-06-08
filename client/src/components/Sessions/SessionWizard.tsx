@@ -129,6 +129,7 @@ import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
+  resolveSessionWizardRegisterDuplicateCheckDescriptor,
   resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
@@ -3528,18 +3529,29 @@ const SessionWizard = ({
         registryChainIdValue,
       } = registerIdentityDescriptor;
       try {
-        const registryRead = sessionRegistryUtils.getRegistryContract(registryChainIdValue);
+        const registerDuplicateCheckDescriptor = resolveSessionWizardRegisterDuplicateCheckDescriptor({
+          registryChainId: registryChainIdValue,
+          registrySlug,
+          sessionIdHexValue,
+        });
+        const registryRead = sessionRegistryUtils.getRegistryContract(registerDuplicateCheckDescriptor.chainId);
         if (registryRead) {
-          if (typeof registryRead.sessionExists === 'function') {
-            const slugExists = await registryRead.sessionExists(registrySlug);
+          if (
+            registerDuplicateCheckDescriptor.shouldCheckSlug &&
+            typeof registryRead.sessionExists === 'function'
+          ) {
+            const slugExists = await registryRead.sessionExists(registerDuplicateCheckDescriptor.registrySlug);
             if (slugExists) {
-              throw new Error(`Session slug already exists on-chain: ${registrySlug}`);
+              throw new Error(registerDuplicateCheckDescriptor.slugDuplicateMessage);
             }
           }
-          if (typeof registryRead.sessionIdExists === 'function') {
-            const idExists = await registryRead.sessionIdExists(sessionIdHexValue);
+          if (
+            registerDuplicateCheckDescriptor.shouldCheckSessionId &&
+            typeof registryRead.sessionIdExists === 'function'
+          ) {
+            const idExists = await registryRead.sessionIdExists(registerDuplicateCheckDescriptor.sessionIdHexValue);
             if (idExists) {
-              throw new Error('Session ID already exists on-chain. Generate a new session ID.');
+              throw new Error(registerDuplicateCheckDescriptor.sessionIdDuplicateMessage);
             }
           }
         }
