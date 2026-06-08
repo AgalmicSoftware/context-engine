@@ -2392,6 +2392,23 @@ const SBTsList = ({
   ), [buildSbtItemKey, expiredList, featuredItemKeySet]);
 
   const initialLoadCompleted = initialLoadCompletedRef.current;
+  const readinessDisplayPlan = resolveSbtListReadinessDisplayPlan({
+    allSessionsMode,
+    availableSessionSlugCount: availableSessionSlugs.length,
+    displayedFeaturedCount: displayedFeatured.length,
+    displayedSessionUniverseSlugs,
+    emptySectionSpinnerActive,
+    expiredCount: expiredListWithoutFeatured.length,
+    initialLoadCompleted,
+    isSBTCacheReady,
+    loading,
+    mintingLiveCount: mintingLiveListWithoutFeatured.length,
+    refreshing,
+    revisionSyncPending,
+    sectionSessionDiscoveryPending,
+    sectionSessionSearchFlag,
+    sessionUniverseRegistryPending,
+  });
   const {
     sectionHeaderSpinnerVisible,
     showExpiredSectionLoadingHint,
@@ -2399,41 +2416,7 @@ const SBTsList = ({
     showInitialLoader,
     showLiveSectionLoadingHint,
     showUniverseSpinner,
-  } = useMemo(() => (
-    resolveSbtListReadinessDisplayPlan({
-      allSessionsMode,
-      availableSessionSlugCount: availableSessionSlugs.length,
-      displayedFeaturedCount: displayedFeatured.length,
-      displayedSessionUniverseSlugs,
-      emptySectionSpinnerActive,
-      expiredCount: expiredListWithoutFeatured.length,
-      initialLoadCompleted,
-      isSBTCacheReady,
-      loading,
-      mintingLiveCount: mintingLiveListWithoutFeatured.length,
-      refreshing,
-      revisionSyncPending,
-      sectionSessionDiscoveryPending,
-      sectionSessionSearchFlag,
-      sessionUniverseRegistryPending,
-    })
-  ), [
-    allSessionsMode,
-    availableSessionSlugs.length,
-    displayedFeatured.length,
-    displayedSessionUniverseSlugs,
-    emptySectionSpinnerActive,
-    expiredListWithoutFeatured.length,
-    initialLoadCompleted,
-    isSBTCacheReady,
-    loading,
-    mintingLiveListWithoutFeatured.length,
-    refreshing,
-    revisionSyncPending,
-    sectionSessionDiscoveryPending,
-    sectionSessionSearchFlag,
-    sessionUniverseRegistryPending,
-  ]);
+  } = readinessDisplayPlan;
 
   useEffect(() => {
     const researchStep = readSbtListSyncBarResearchBlockStep();
