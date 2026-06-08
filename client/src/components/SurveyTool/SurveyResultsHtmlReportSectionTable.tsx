@@ -4,17 +4,20 @@ import {
   Table,
 } from 'reactstrap';
 
-export type SurveyResultsHtmlReportSectionRow = {
-  available: boolean;
-  key: string;
-  label: string;
-  reason?: React.ReactNode;
-};
+import type {
+  SurveyResultsHtmlReportSectionKey,
+  SurveyResultsHtmlReportSectionRow,
+} from './surveyResultsExportDisplayHelpers';
+
+export type { SurveyResultsHtmlReportSectionRow };
+
+export type SurveyResultsHtmlReportSelectedSections =
+  Partial<Record<SurveyResultsHtmlReportSectionKey, unknown>>;
 
 export type SurveyResultsHtmlReportSectionTableProps = {
-  onToggleSection: (key: string) => void;
+  onToggleSection: (key: SurveyResultsHtmlReportSectionKey) => void;
   sectionRows: SurveyResultsHtmlReportSectionRow[];
-  selectedSections: Record<string, unknown>;
+  selectedSections: SurveyResultsHtmlReportSelectedSections;
   styleMap: Record<string, string>;
 };
 

@@ -64,13 +64,13 @@ const baseProps = {
     },
     {
       available: false,
-      key: 'polis',
-      label: 'Polis',
+      key: 'argumentMap',
+      label: 'Argument Map',
       reason: 'No report yet',
     },
   ],
   selectedSections: {
-    polis: false,
+    argumentMap: false,
     report: true,
   },
   snapshot: {
@@ -106,14 +106,14 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(screen.getByText('Unavailable')).toBeInTheDocument();
     expect(screen.getByText('No report yet')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText('Include Polis'));
+    fireEvent.click(screen.getByLabelText('Include Argument Map'));
     fireEvent.click(screen.getByLabelText(/PDF report/));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-demo-mode'));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-generate-analysis'));
     fireEvent.click(screen.getByTestId('ce-surveyresults-html-report-download'));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(baseProps.onToggleSection).toHaveBeenCalledWith('polis');
+    expect(baseProps.onToggleSection).toHaveBeenCalledWith('argumentMap');
     expect(baseProps.onFormatChange).toHaveBeenCalledWith(SESSION_RESULTS_EXPORT_FORMAT_PDF);
     expect(baseProps.onToggleDemoMode).toHaveBeenCalledTimes(1);
     expect(baseProps.onGenerateAnalysis).toHaveBeenCalledTimes(1);
