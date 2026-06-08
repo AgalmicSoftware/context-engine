@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v32)
+**Skill version:** 2026-06-08 (v33)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=32",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=33",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -1234,6 +1234,56 @@ Do not make CE-specific reminder promises from worker settings. Scheduling,
 retry cadence, notification quiet hours, and "ask me later" behavior belong in
 the agent scheduler until CE owns a dedicated notification service.
 
+## Digest / Hermes Cron Install
+
+Use this when the user asks to add Context Engine questions to a recurring
+digest (a Hermes daily brief, an OpenClaw scheduler, or similar). CE never
+schedules delivery itself; the host agent's cron owns timing, quiet hours, and
+frequency. Ask the user's permission before binding CE into any recurring job.
+
+Installing into a scheduler is different from interactive use, because
+background cron jobs run in an isolated environment that resolves skills only
+from the host's persistent skill configuration, not the interactive session
+registry. Before binding CE to a cron job:
+
+1. Install this skill into the cron-visible skill registry from the worker skill
+   URL, or from the public `edge-2026` branch raw `SKILL.md`.
+2. Make sure the directory holding the installed skill is registered in the
+   host's external-skills configuration so cron can resolve it. On Hermes this
+   means the skills directory (for example `/opt/data/skills`) must appear in
+   `skills.external_dirs` in the host `config.yaml`; if it is missing, the
+   digest silently skips CE and the brief shows a line like
+   `Skill(s) not found and skipped: <slug>`.
+3. Read the exact installed slug back from the host's skill list and bind cron
+   to that exact slug. Do not assume the slug. The interactive alias can differ
+   from the cron-resolvable slug (for example a local install directory named
+   `context-engine` versus this skill's frontmatter name
+   `ce-telegram-agent-handoff`).
+4. Use the host's cron CLI to add or replace the binding; do not hand-edit the
+   jobs file. If the CLI only supports add, warn the user before creating a
+   second binding rather than silently duplicating.
+
+Keep one active prepare job per digest slot. Two prepare jobs writing the same
+digest state file at the same time can race, corrupt it, and waste tokens. Pause
+a redundant duplicate first (reversible) and delete it only after one clean
+digest cycle. Bind CE into both the morning and evening jobs when the user wants
+both, and store their `digestTimeOfDay` preference.
+
+In the digest itself, rank a fetched batch locally and surface the top three
+questions using the user's consented profile, schedule, interests, and recent
+activity. Put admin-sponsored questions first when a sponsored queue is
+configured (`POST /telegram/agent/api/questions/next` with
+`criteria.sponsoredFirst: true`). Include draft answers only when the user has
+granted that permission. Keep it succinct and do not show question IDs.
+
+After binding, do a read-only verification: no active job still references a
+missing slug; the user's `ceagt_` bearer credential exists in the host's private
+store but is never printed; the digest path calls
+`GET /telegram/agent/api/questions?limit=20` (using `/questions/next` only for
+the sponsored queue); and chat-approved answers submit only with `submit: true`
+plus `humanApproved: true`. Never print the `ceagt_` token, user profile data,
+or private file contents in digest output or logs.
+
 ## Pose Questions
 
 Use tags within the current overall session to distinguish topics, events, tracks, or agent-originated themes. Do not create child sessions for this flow.
@@ -1447,6 +1497,14 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v33)
+
+- Added a Digest / Hermes Cron Install section: register the skill directory in
+  the host's external-skills config, bind cron to the exact installed slug (not
+  the interactive alias), keep one prepare job per digest slot, and surface the
+  top three locally-ranked questions with sponsored-first ordering and consented
+  draft answers.
 
 ### 2026-06-08 (v32)
 
