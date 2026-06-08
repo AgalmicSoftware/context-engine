@@ -1,4 +1,5 @@
 import {
+  resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
@@ -396,6 +397,61 @@ describe('runSessionWizardPublishMetadataUploadController', () => {
     })).rejects.toBe(error);
 
     expect(Object.keys(callbacks)).toEqual(['setPublishStep']);
+  });
+});
+
+describe('resolveSessionWizardRegisterStepRequest', () => {
+  it('describes register progress and upload overrides without owning register execution', () => {
+    const request = resolveSessionWizardRegisterStepRequest({
+      publishExecutionPlan: buildPlan({
+        stepNumbers: {
+          'register-session': 4,
+        },
+      }),
+      uploadResult: {
+        metadataUri: 'ar://uploaded-metadata',
+        onChainFields: {
+          name: 'Writers Room',
+          workerUrl: 'https://worker.example.test',
+        },
+      },
+    });
+
+    expect(request).toEqual({
+      publishStep: 4,
+      registerGroupArgs: {
+        metadataUriOverride: 'ar://uploaded-metadata',
+        sessionFieldsOverride: {
+          name: 'Writers Room',
+          workerUrl: 'https://worker.example.test',
+        },
+      },
+    });
+    expect(Object.keys(request)).toEqual([
+      'publishStep',
+      'registerGroupArgs',
+    ]);
+    expect(Object.keys(request.registerGroupArgs)).toEqual([
+      'metadataUriOverride',
+      'sessionFieldsOverride',
+    ]);
+  });
+
+  it('keeps manual metadata fallback registration args unset while preserving the progress step', () => {
+    expect(resolveSessionWizardRegisterStepRequest({
+      publishExecutionPlan: buildPlan({
+        stepNumbers: {
+          'register-session': 1,
+        },
+      }),
+      uploadResult: null,
+    })).toEqual({
+      publishStep: 1,
+      registerGroupArgs: {
+        metadataUriOverride: undefined,
+        sessionFieldsOverride: undefined,
+      },
+    });
   });
 });
 
