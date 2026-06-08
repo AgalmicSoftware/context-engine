@@ -66,6 +66,9 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
     data-testid="shell-publish"
     data-metadata-label={props.publishUiPlan?.publishMetadataDisplayState?.metadataUriLabel || ''}
     data-metadata-uri={props.publishUiPlan?.publishMetadataDisplayState?.metadataUri || ''}
+    data-publish-advanced-open={
+      String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)
+    }
     data-worker-source={props.workerUrlSource || ''}
   >
     <button type="button" onClick={props.onToggleCollapsed}>toggle publish</button>
@@ -74,7 +77,7 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
       type="button"
       data-testid="ce-wizard-publish"
       onClick={props.onPublish}
-      disabled={props.publishBusy || !props.publishUiPlan?.publishReadiness?.canPublishNow}
+      disabled={!!props.publishUiPlan?.publishActionDisplayState?.publishButtonDisabled}
     >
       publish
     </button>
@@ -190,9 +193,16 @@ const baseProps = () => ({
   persistWorkerSecrets: false,
   primaryDraftEntries: [],
   provider: null,
-  publishAdvancedOpen: false,
-  publishBusy: false,
   publishUiPlan: {
+    publishActionDisplayState: {
+      canPublishNow: true,
+      displayMode: 'advanced',
+      publishAdvancedOpen: false,
+      publishBusy: false,
+      publishButtonDisabled: false,
+      publishButtonLabel: 'Publish',
+      settingsButtonActive: false,
+    },
     publishExecutionPlan: {
       shouldAutoDeployWorker: false,
       shouldDeployPendingSbts: false,
@@ -384,6 +394,11 @@ describe('SessionWizardShell', () => {
     props.showNewSessionRequirementsBanner = false;
     props.publishUiPlan = {
       ...props.publishUiPlan,
+      publishActionDisplayState: {
+        ...props.publishUiPlan.publishActionDisplayState,
+        canPublishNow: false,
+        publishButtonDisabled: true,
+      },
       publishReadiness: {
         ...props.publishUiPlan.publishReadiness,
         canPublishNow: false,

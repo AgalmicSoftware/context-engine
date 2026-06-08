@@ -36,7 +36,6 @@ type SessionPublishSummaryProps = {
   onToggleCollapsed: () => void;
   normalModePublishSummary: PublishSummaryItem[];
   onPublish: () => void;
-  publishAdvancedOpen: boolean;
   onTogglePublishAdvanced: () => void;
   showSponsoredBundleFallbackInput: boolean;
   normalModeBundleUrlOverride: string;
@@ -80,7 +79,6 @@ const SessionPublishSummary = ({
   onToggleCollapsed,
   normalModePublishSummary,
   onPublish,
-  publishAdvancedOpen,
   onTogglePublishAdvanced,
   showSponsoredBundleFallbackInput,
   normalModeBundleUrlOverride,
@@ -122,6 +120,9 @@ const SessionPublishSummary = ({
     publishProgressDisplayState,
     publishReadiness,
   } = publishUiPlan;
+  const {
+    publishAdvancedOpen,
+  } = publishActionDisplayState;
   const {
     showUploadBlockedReason,
     uploadBlockedReason,
