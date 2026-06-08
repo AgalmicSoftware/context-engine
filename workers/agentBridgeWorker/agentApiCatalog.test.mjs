@@ -13,6 +13,7 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   const miniAppCapabilities = listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true });
   const settingsUpdate = getAgentApiCapability('agent.settings.update');
   const accountCreate = getAgentApiCapability('agent.account.create');
+  const readQuestions = getAgentApiCapability('agent.read.questions');
   const nextQuestion = getAgentApiCapability('agent.telegram.questions.next');
   const queueAdmin = getAgentApiCapability('agent.telegram.question_queue.manage');
   const adminStatus = getAgentApiCapability('agent.telegram.admin.status');
@@ -28,6 +29,7 @@ test('Telegram agent API catalog exposes canonical /api/agent capabilities by la
   assert.deepEqual(settingsUpdate.requiredFields, ['agentAccountRef', 'settingsPatchRef', 'idempotencyKey']);
   assert.equal(accountCreate.path, '/api/agent/accounts/create');
   assert.deepEqual(accountCreate.requiredFields, ['telegramPrincipalId', 'accountMode', 'idempotencyKey']);
+  assert.deepEqual(readQuestions.optionalFields, ['limit', 'count', 'topN']);
   assert.equal(nextQuestion.path, '/telegram/agent/api/questions/next');
   assert.equal(nextQuestion.safeTelegramLanes.includes(TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT), true);
   assert.equal(queueAdmin.path, '/telegram/agent/api/question-queue');

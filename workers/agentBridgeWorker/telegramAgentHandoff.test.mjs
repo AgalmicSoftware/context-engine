@@ -239,7 +239,7 @@ async function putSubmittedResult(env, {
   label = 'Agree',
   value = '',
   comments = '',
-  createdAt = '2026-05-08T12:00:00.000Z',
+  createdAt = '2026-06-01T12:00:00.000Z',
 } = {}) {
   await env.AGENT_ACTION_KV.put(key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`, JSON.stringify({
     status: 'direct_submitted',
@@ -263,7 +263,7 @@ async function managedAccountAddressForTelegramUser(env, telegramUserId = '42') 
       user: { telegramUserId, username: 'host' },
       chat: { chatId: telegramUserId, chatType: 'private', type: 'private', isPrivate: true },
     },
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   return account.accountAddress;
 }
@@ -275,7 +275,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-05-31 \(v29\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-05-31 \(v30\)/);
   assert.match(source, /direct-answer first/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /cache or install this Markdown skill locally/);
@@ -355,12 +355,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-05-31 (v29)');
+  assert.equal(body.version, '2026-05-31 (v30)');
   assert.equal(body.skill, 'ce-telegram-agent-handoff');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-05-31 (v29)');
+  assert.equal(body.latestVersion, '2026-05-31 (v30)');
   assert.equal(body.updateNote, '');
 });
 
@@ -372,8 +372,8 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/[0-9a-f]{40}\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
-  assert.match(location, /v=2026-05-31-v29-/);
+  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(location, /v=2026-05-31-v30-/);
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -389,14 +389,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-05-31 (v29)',
+    latestVersion: '2026-05-31 (v30)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-05-31 (v29)');
+  assert.equal(payload.latestVersion, '2026-05-31 (v30)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -520,6 +520,53 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   assert.equal(missingTokenBody.action, 'refresh_user_agent_token');
 });
 
+test('Telegram agent questions endpoint caps candidate batches when requested', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-12-01T12:00:00.000Z',
+  });
+  assert.equal(issued.ok, true);
+  const uncappedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const uncapped = await jsonBody(uncappedResponse);
+  const limitedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&limit=1', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const limited = await jsonBody(limitedResponse);
+  const postLimitedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        count: 1,
+      },
+    }),
+    env,
+  });
+  const postLimited = await jsonBody(postLimitedResponse);
+
+  assert.equal(uncappedResponse.status, 200);
+  assert.equal(uncapped.questions.length, 2);
+  assert.equal(limitedResponse.status, 200);
+  assert.equal(limited.questions.length, 1);
+  assert.equal(limited.questions[0].questionId, 'q-binary');
+  assert.equal(postLimitedResponse.status, 200);
+  assert.equal(postLimited.questions.length, 1);
+});
+
 test('Telegram agent token follows a follow-default private binding across default flips', async () => {
   const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
   await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
@@ -527,7 +574,7 @@ test('Telegram agent token follows a follow-default private binding across defau
     telegramUserId: '42',
     sessionSlug: 'alpha',
     followDefault: true,
-    selectedAt: '2026-05-08T12:00:00.000Z',
+    selectedAt: '2026-06-01T12:00:00.000Z',
   }));
   const issued = await createTelegramAgentDelegationToken({
     env,
@@ -535,7 +582,7 @@ test('Telegram agent token follows a follow-default private binding across defau
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const alphaResponse = await handleTelegramAgentHandoffRequest({
@@ -559,7 +606,7 @@ test('Telegram agent token preserves pinned bindings across default flips', asyn
     telegramUserId: '42',
     sessionSlug: 'gamma',
     followDefault: false,
-    selectedAt: '2026-05-08T12:00:00.000Z',
+    selectedAt: '2026-06-01T12:00:00.000Z',
   }));
   const issued = await createTelegramAgentDelegationToken({
     env,
@@ -567,7 +614,7 @@ test('Telegram agent token preserves pinned bindings across default flips', asyn
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({ defaultSessionSlug: 'beta' }).AGENT_BRIDGE_SESSION_POLICY_JSON;
@@ -586,7 +633,7 @@ test('Telegram agent request with existing sessionSlug switches and pins the use
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const switched = await handleTelegramAgentHandoffRequest({
@@ -613,7 +660,7 @@ test('Telegram agent treats legacy private bindings without followDefault as pin
     version: 1,
     telegramUserId: '42',
     sessionSlug: 'beta',
-    selectedAt: '2026-05-08T12:00:00.000Z',
+    selectedAt: '2026-06-01T12:00:00.000Z',
   }));
   const issued = await createTelegramAgentDelegationToken({
     env,
@@ -621,7 +668,7 @@ test('Telegram agent treats legacy private bindings without followDefault as pin
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -639,7 +686,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const firstResponse = await handleTelegramAgentHandoffRequest({
@@ -677,7 +724,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
       token: issued.token,
       body: {
         sessionSlug: 'alpha',
-        createdAt: '2026-05-08T12:05:00.000Z',
+        createdAt: '2026-06-01T12:05:00.000Z',
         topicPreferences: ['AI Futures', 'Governance'],
         digestTimeOfDay: 'night',
         answers: {
@@ -705,7 +752,7 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   const saved = await jsonBody(saveResponse);
   assert.equal(saveResponse.status, 200);
   assert.equal(saved.completed, true);
-  assert.equal(saved.completedAt, '2026-05-08T12:05:00.000Z');
+  assert.equal(saved.completedAt, '2026-06-01T12:05:00.000Z');
   assert.equal(saved.answers.preference_tailoring, true);
   assert.equal(saved.answers.draft_responses, true);
   assert.equal(saved.answers.demographics_research, true);
@@ -763,7 +810,7 @@ test('Telegram agent onboarding infers consented bucket groups from profile cont
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -804,7 +851,7 @@ test('Telegram agent onboarding asks bucket follow-ups when profile lacks consen
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -839,7 +886,7 @@ test('Telegram agent onboarding keeps topic and bucket data opt-in', async () =>
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -970,14 +1017,14 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
     username: 'old_user',
     sessionSlug: 'alpha',
     accountAddress: `0x${'12'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   await writeTelegramAgentDelegationTokenUserPointer({
     env,
     telegramUserId: '42',
     tokenHash: previous.tokenHash,
     issuedAt: previous.record.issuedAt,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -1110,7 +1157,7 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
     username: 'host',
     sessionSlug: 'alpha',
     accountAddress,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
@@ -1177,7 +1224,7 @@ test('Telegram client login ignores caller-supplied workerUrl', async () => {
     username: 'host',
     sessionSlug: 'alpha',
     accountAddress,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
@@ -1721,7 +1768,7 @@ test('Telegram agent can read active questions and draft preferences after group
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const questionsResponse = await handleTelegramAgentHandoffRequest({
@@ -1738,7 +1785,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-05-31 (v29)');
+  assert.equal(questions.skillVersion, '2026-05-31 (v30)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -1783,7 +1830,7 @@ test('Telegram agent can read active questions and draft preferences after group
     questionId: 'q-binary',
     answerLabel: 'Other user draft',
     answerValue: 'Other user draft',
-    selectedAt: '2026-05-08T12:01:00.000Z',
+    selectedAt: '2026-06-01T12:01:00.000Z',
   }));
 
   const actionsResponse = await handleTelegramAgentHandoffRequest({
@@ -1807,7 +1854,7 @@ test('Telegram agent can read active questions and draft preferences after group
     sessionSlug: 'alpha',
     telegramUserId: '42',
     patch: { draftDivergenceOptIn: true },
-    createdAt: '2026-05-08T12:02:00.000Z',
+    createdAt: '2026-06-01T12:02:00.000Z',
   });
 
   const submitResponse = await handleTelegramAgentHandoffRequest({
@@ -1921,7 +1968,7 @@ test('Telegram agent can read and render topic-map results without raw response 
       telegramUserId,
       questionId,
       answer: { label, value: String(label).toLowerCase() },
-      createdAt: `2026-05-08T12:02:0${counter}.000Z`,
+      createdAt: `2026-06-01T12:02:0${counter}.000Z`,
     }));
   }
 
@@ -2025,10 +2072,10 @@ test('Telegram agent groups suppress live groups below minGroupSize', async () =
       { questionId: 'q-two', questionType: 'binary', prompt: 'Should Alpha ask more questions?', tags: ['results'] },
     ]),
   });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:1', telegramUserId: '42', questionId: 'q-one', label: 'Agree', comments: 'raw private answer one', createdAt: '2026-05-08T12:00:01.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:2', telegramUserId: '43', questionId: 'q-one', label: 'Agree', comments: 'raw private answer two', createdAt: '2026-05-08T12:00:02.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:3', telegramUserId: '42', questionId: 'q-two', label: 'Disagree', createdAt: '2026-05-08T12:00:03.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:4', telegramUserId: '43', questionId: 'q-two', label: 'Disagree', createdAt: '2026-05-08T12:00:04.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:1', telegramUserId: '42', questionId: 'q-one', label: 'Agree', comments: 'raw private answer one', createdAt: '2026-06-01T12:00:01.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:2', telegramUserId: '43', questionId: 'q-one', label: 'Agree', comments: 'raw private answer two', createdAt: '2026-06-01T12:00:02.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:3', telegramUserId: '42', questionId: 'q-two', label: 'Disagree', createdAt: '2026-06-01T12:00:03.000Z' });
+  await putSubmittedResult(env, { key: 'telegram:submit-request:4', telegramUserId: '43', questionId: 'q-two', label: 'Disagree', createdAt: '2026-06-01T12:00:04.000Z' });
 
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=groups'),
@@ -2120,7 +2167,7 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const rankedResponse = await handleTelegramAgentHandoffRequest({
@@ -2195,7 +2242,7 @@ test('Telegram agent tags endpoint returns active tag counts and rejects explici
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -2284,14 +2331,14 @@ test('Telegram agent handoff accepts dynamically approved Telegram groups', asyn
     type: 'telegram_group_approval',
     sessionSlug: 'alpha',
     chatId: '-100123',
-    approvedAt: '2026-05-08T12:00:00.000Z',
+    approvedAt: '2026-06-01T12:00:00.000Z',
   }));
   await env.AGENT_ACTION_KV.put('telegram:group-session:-100123', JSON.stringify({
     version: 1,
     chatId: '-100123',
     sessionSlug: 'alpha',
     sessionName: 'Alpha Session',
-    linkedAt: '2026-05-08T12:00:00.000Z',
+    linkedAt: '2026-06-01T12:00:00.000Z',
   }));
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions', {
@@ -2318,7 +2365,7 @@ test('Telegram agent next-question queue serves sponsored questions first and ad
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const firstResponse = await handleTelegramAgentHandoffRequest({
@@ -2381,7 +2428,7 @@ test('Telegram agent service token can manage sponsored question queue as sessio
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const setResponse = await handleTelegramAgentHandoffRequest({
@@ -2652,7 +2699,7 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
     username: 'alpha_admin',
     sessionSlug: 'alpha',
     accountAddress: rootAdminAddress,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   await createTelegramAgentDelegationToken({
     env,
@@ -2660,7 +2707,7 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
     username: 'beta_user',
     sessionSlug: 'beta',
     accountAddress: `0x${'34'.repeat(20)}`,
-    createdAt: '2026-05-08T12:00:00.000Z',
+    createdAt: '2026-06-01T12:00:00.000Z',
   });
   await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q1', JSON.stringify({
     sessionSlug: 'alpha',
@@ -3209,7 +3256,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-05-31 (v29)',
+        latestVersion: '2026-05-31 (v30)',
         note: 'Refresh before answering.',
       },
     }),
@@ -3241,13 +3288,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-05-31 (v29)');
+  assert.equal(initialStatus.version, '2026-05-31 (v30)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-05-31 (v29)');
+  assert.equal(set.latestVersion, '2026-05-31 (v30)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');
@@ -3264,14 +3311,14 @@ test('Telegram agent can recommend and auto-apply question importance votes with
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
   await saveTelegramAgentSettingsPatch({
     env,
     telegramUserId: '42',
     sessionSlug: 'alpha',
     patch: { agentAutoApplyQuestionVotes: true },
-    createdAt: '2026-05-08T12:00:01.000Z',
+    createdAt: '2026-06-01T12:00:01.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -3335,7 +3382,7 @@ test('Telegram agent question auto-votes are opt-in by default', async () => {
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/question-votes/recommend', {
@@ -3367,7 +3414,7 @@ test('Telegram agent question vote apply records human overrides and respects au
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const applyResponse = await handleTelegramAgentHandoffRequest({
@@ -3414,7 +3461,7 @@ test('Telegram agent question vote apply records human overrides and respects au
     telegramUserId: '42',
     sessionSlug: 'alpha',
     patch: { agentAutoApplyQuestionVotes: false },
-    createdAt: '2026-05-08T12:05:00.000Z',
+    createdAt: '2026-06-01T12:05:00.000Z',
   });
   assert.equal(saved.ok, true);
 
@@ -3444,7 +3491,7 @@ test('Telegram agent can create and dry-run pose a new group question', async ()
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -3484,7 +3531,7 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
   const sourceUrl = 'https://example.com/agent-village/report?view=public';
 
@@ -3618,7 +3665,7 @@ test('Telegram agent preserves explicit question tags without session tag infere
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -3665,7 +3712,7 @@ test('Telegram agent geo backlinks handle bytes32 question ids without secret fa
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -3686,7 +3733,7 @@ test('Telegram agent can propose Cloudflare-only groups for user approval', asyn
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const proposeResponse = await handleTelegramAgentHandoffRequest({
@@ -3738,7 +3785,7 @@ test('Telegram agent can create a worker-local child session record', async () =
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -3777,7 +3824,7 @@ test('Telegram agent group and child-session routes require telegram-only sessio
   await buildTelegramCommandResponse({
     update: groupMessage('/join alpha'),
     env,
-    now: '2026-05-08T12:00:00.000Z',
+    now: '2026-06-01T12:00:00.000Z',
   });
 
   const groupsResponse = await handleTelegramAgentHandoffRequest({

@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-31 (v29)
+**Skill version:** 2026-05-31 (v30)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=29",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=30",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -1033,36 +1033,50 @@ short freeform answer. After the user replies, call
 `humanApproved: true` only when the reply clearly authorizes submission.
 Generate a Mini App link only when the user asks to review or edit in Telegram.
 
-When the user has elected to see one question every so often, prefer the
-next-question queue endpoint:
+When the user has elected to see questions in a digest or recurring brief,
+fetch a candidate batch and rank it inside the host agent using the user's
+consented profile, schedule, interests, and recent activity. Do not let CE pick
+the "most relevant" ordinary question for the user. CE may still choose the next
+admin-sponsored question when a sponsored queue is configured.
+
+```http
+GET /telegram/agent/api/questions?limit=20
+```
+
+or:
+
+```json
+{
+  "sessionSlug": "ee-26-organizers",
+  "limit": 20,
+  "preferences": {
+    "interests": ["agent-village", "programmable-cryptography"]
+  }
+}
+```
+
+Use `limit: 20` as the normal digest candidate set. If the host agent has enough
+latency budget, it may request more candidates; the worker caps explicit
+question-list limits at 200. The agent should then select the most relevant
+question or the top `questionsPerBatch` questions itself. Prefer questions the
+user has not answered, that match consented profile/activity context, and that
+would be useful or interesting to answer now.
+
+Use the next-question queue endpoint only when you need the admin-sponsored
+queue or a persistent per-user cursor:
 
 ```http
 POST /telegram/agent/api/questions/next
 ```
 
-Example request:
-
-```json
-{
-  "sessionSlug": "ee-26-organizers",
-  "queueKey": "daily-ai-governance",
-  "criteria": {
-    "tags": ["ai-governance"],
-    "questionTypes": ["binary"],
-    "sponsoredFirst": true
-  },
-  "preferences": {
-    "interests": ["organizer-feedback", "agent-village"]
-  }
-}
-```
-
-The worker returns one `question`, advances a per-user queue cursor by default,
-and marks `sponsored: true` when the selected question came from the
-admin-configured sponsored queue. Send `advance: false` for preview-only calls,
-or `resetQueue: true` when the user asks to restart a cadence. Session admins
-can set the sponsored queue from the bot Admin Actions screen or with
-`/question_queue 1 3 4`.
+For sponsored queues, send `criteria.sponsoredFirst: true`. The worker returns
+one `question`, advances a per-user queue cursor by default, and marks
+`sponsored: true` when the selected question came from the admin-configured
+sponsored queue. Send `advance: false` for preview-only calls, or
+`resetQueue: true` when the user asks to restart a cadence. If the returned
+question is not sponsored, the host agent may ignore it and rank the broader
+`/questions` batch instead. Session admins can set the sponsored queue from the
+bot Admin Actions screen or with `/question_queue 1 3 4`.
 
 Operator agents can also manage that same sponsored queue through the worker:
 
@@ -1184,16 +1198,22 @@ call `apply` from its own inference alone.
 
 Recommended loop for scheduled prompts:
 
-1. At the user's chosen cadence, call `POST /telegram/agent/api/questions/next`
-   with the user's selected criteria.
-2. Confirm the returned question is `answerable`; if no question is returned,
-   ask whether to broaden criteria or reset the queue.
-3. Ask one or a small batch in the OpenClaw conversation, or call
+1. At the user's chosen cadence, call `GET /telegram/agent/api/questions?limit=20`
+   or `POST /telegram/agent/api/questions` with `limit: 20`, plus any consented
+   interest/session hints.
+2. Rank the returned answerable questions inside the host agent. If the admin
+   sponsored queue should preempt ordinary relevance, call
+   `/telegram/agent/api/questions/next` with `criteria.sponsoredFirst: true`
+   first and include the sponsored result when present.
+3. Ask one or a small batch directly in the OpenClaw conversation, or call
    `POST /telegram/agent/api/questions/pose` when the question should appear in
    the CE-bound Telegram group.
-4. Save the user's natural-language answers as drafts with
-   `POST /telegram/agent/api/preferences`.
-5. Send the user to the CE Mini App for review and final submission.
+4. When the user clearly approves an answer in chat, submit it directly with
+   `POST /telegram/agent/api/preferences` and root-level `submit: true` plus
+   `humanApproved: true`.
+5. Save a draft or send a Mini App link only when the user asks to review/edit,
+   when the answer is ambiguous, or when the agent is not authorized to submit
+   directly.
 
 Do not make CE-specific reminder promises from worker settings. Scheduling,
 retry cadence, notification quiet hours, and "ask me later" behavior belong in
@@ -1412,6 +1432,15 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-05-31 (v30)
+
+- Scheduled digests now instruct agents to fetch a question batch and rank it
+  locally, using `/questions/next` only for sponsored queues or cursors.
+- The scheduled prompt loop now direct-submits explicit chat answers instead of
+  defaulting to Mini App draft review.
+- The worker skill endpoint now redirects to the public `edge-2026` skill file
+  instead of a stale pinned commit URL.
 
 ### 2026-05-31 (v29)
 

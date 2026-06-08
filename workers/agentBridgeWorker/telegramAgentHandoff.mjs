@@ -100,9 +100,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=29';
-const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/8eb9ef69ed9dd3e33113c642f65735ae42a635e1/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v29)';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=30';
+const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v30)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -571,6 +571,9 @@ function inputFromRequest(request, body = {}) {
     sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
     relevanceMode: safeString(body.relevanceMode || url.searchParams.get('relevanceMode')),
     questionTypes: body.questionTypes || body.questionType || url.searchParams.get('questionTypes') || url.searchParams.get('questionType'),
+    limit: Object.hasOwn(body, 'limit') ? body.limit : url.searchParams.get('limit'),
+    count: Object.hasOwn(body, 'count') ? body.count : url.searchParams.get('count'),
+    topN: Object.hasOwn(body, 'topN') ? body.topN : url.searchParams.get('topN'),
     queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
     advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
     resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
@@ -1547,6 +1550,12 @@ function rankQuestionsByPreferences(questions = [], input = {}, context = {}) {
   };
 }
 
+function questionsResponseLimit(input = {}) {
+  const value = Number(input.limit || input.count || input.topN || 0);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.max(1, Math.min(200, Math.floor(value)));
+}
+
 async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil = null } = {}) {
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug, { waitUntil });
   const questions = [];
@@ -1566,6 +1575,8 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
   const responseQuestions = requestedQuestionId
     ? ranked.questions.filter((question) => safeString(question.questionId) === requestedQuestionId)
     : ranked.questions;
+  const limit = questionsResponseLimit(input);
+  const listedQuestions = limit > 0 ? responseQuestions.slice(0, limit) : responseQuestions;
   const flag = await readAgentSkillUpdateFlag(env);
   const body = {
     ok: true,
@@ -1577,7 +1588,7 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     relevance: ranked.relevance,
     skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
     skillUpdateAvailable: flag.updateAvailable === true,
-    questions: responseQuestions,
+    questions: listedQuestions,
   };
   assertNoSecretShape(body, 'Telegram questions response must not serialize secrets.');
   return json(body);

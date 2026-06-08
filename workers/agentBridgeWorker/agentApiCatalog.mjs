@@ -141,6 +141,7 @@ const CAPABILITIES = Object.freeze([
     groupSafe: true,
     botCommands: ['/questions'],
     miniAppRoutes: ['questions'],
+    optionalFields: ['limit', 'count', 'topN'],
   }),
   freezeEntry({
     id: 'agent.telegram.questions.next',
