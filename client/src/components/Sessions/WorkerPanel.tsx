@@ -91,7 +91,6 @@ export type WorkerPanelProps = {
   resolvedActiveSessionSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
-  deployInFlight: boolean;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
@@ -153,7 +152,6 @@ const WorkerPanel = ({
   resolvedActiveSessionSlug,
   setDeployForm,
   handleDeployWorker,
-  deployInFlight,
   deployStatusDisplayState,
   showWorkerUrlField,
   displayedWorkerUrl,
@@ -299,7 +297,6 @@ const WorkerPanel = ({
             cloudflareTokenSlug={toStr(draft.slug || resolvedActiveSessionSlug).trim()}
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
-            deployInFlight={deployInFlight}
             deployStatusDisplayState={deployStatusDisplayState}
           />
 

@@ -55,7 +55,11 @@ jest.mock('./WorkerPanel', () => (props: any) => (
   <section data-testid="shell-worker" data-worker-url={props.displayedWorkerUrl || ''}>
     {props.deployHelperToggle}
     <button type="button" onClick={props.onToggleCollapsed}>toggle worker</button>
-    <button type="button" onClick={props.handleDeployWorker} disabled={props.deployInFlight}>
+    <button
+      type="button"
+      onClick={props.handleDeployWorker}
+      disabled={!!props.deployStatusDisplayState?.deployButtonDisabled}
+    >
       deploy worker
     </button>
   </section>
@@ -125,8 +129,8 @@ const baseProps = () => ({
   deployComplete: false,
   deployForm: {},
   deployHelperUrl: 'https://deploy.example.test',
-  deployInFlight: false,
   deployStatusDisplayState: {
+    deployButtonDisabled: false,
     deployStatusText: '',
     isError: false,
   },

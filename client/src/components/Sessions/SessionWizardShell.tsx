@@ -42,7 +42,6 @@ const SessionWizardShell = ({
   deployComplete,
   deployForm,
   deployHelperUrl,
-  deployInFlight,
   deployStatusDisplayState,
   deployWorkerUrl,
   devPersistWorkerSecrets,
@@ -317,7 +316,6 @@ const SessionWizardShell = ({
         resolvedActiveSessionSlug={resolvedActiveSessionSlug}
         setDeployForm={setDeployForm}
         handleDeployWorker={handleDeployWorker}
-        deployInFlight={deployInFlight}
         deployStatusDisplayState={deployStatusDisplayState}
         showWorkerUrlField={showWorkerUrlField}
         displayedWorkerUrl={displayedWorkerUrl}

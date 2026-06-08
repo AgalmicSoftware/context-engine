@@ -52,7 +52,6 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
-  deployInFlight: boolean;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
 };
 
@@ -87,16 +86,17 @@ const WorkerDeploySection = ({
   cloudflareTokenSlug = '',
   setDeployForm,
   handleDeployWorker,
-  deployInFlight,
   deployStatusDisplayState,
 }: WorkerDeploySectionProps) => {
   const renderTooltip = typeof renderInfoTooltip === 'function'
     ? renderInfoTooltip
     : () => null;
   const {
+    deployButtonDisabled,
     deployStatusText,
     isError: deployStatusIsError,
   } = deployStatusDisplayState || {
+    deployButtonDisabled: false,
     deployStatusText: '',
     isError: false,
   };
@@ -315,7 +315,7 @@ const WorkerDeploySection = ({
               className={styles.actionButton}
               data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
               onClick={handleDeployWorker}
-              disabled={deployInFlight}
+              disabled={deployButtonDisabled}
             >
               Deploy worker
             </Button>
