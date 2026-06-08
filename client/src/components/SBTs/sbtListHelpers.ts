@@ -31,6 +31,8 @@ export {
   readSbtListCacheMetaSnapshot,
 } from './sbtListItemNormalizationHelpers';
 export type { SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
+export { buildSbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
+export type { SbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
 export {
   collectSbtDocumentUrls,
   collectSbtTagValues,

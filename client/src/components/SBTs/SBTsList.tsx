@@ -71,6 +71,7 @@ import {
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
+  buildSbtListCacheReadPlan,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRenderItemKey,
@@ -91,7 +92,6 @@ import {
   isModifiedSbtListPointerNavigation,
   isSbtListManagedDgCacheName,
   normalizeSbtListAddressLower,
-  normalizeSbtListItems,
   pickNormalizedSbtListSessionSlug,
   readSbtListShowDemoSessions,
   readSbtListUniverseCollapsedState,
@@ -1824,15 +1824,15 @@ const SBTsList = ({
       }
       if (!isRecord(cache)) return;
 
-      const netCache = isRecord(cache[netKey]) ? cache[netKey] : {};
-
-      const hydrated = normalizeSbtListItems(Object.values(isRecord(netCache.sbtList) ? netCache.sbtList : {}));
+      const cacheReadPlan = buildSbtListCacheReadPlan({
+        netKey,
+        rawCache: cache,
+        targetSlug: slug,
+      });
+      const hydrated = cacheReadPlan.hydrated;
       if (!hydrated.length) return;
 
-      updateSessionCacheMeta(slug, {
-        lastBlock: Number(netCache?.lastBlock || 0),
-        sbtCount: hydrated.length,
-      });
+      updateSessionCacheMeta(slug, cacheReadPlan.meta);
 
       primed = true;
       setSbtListBySlug((prev) => {
@@ -2085,37 +2085,27 @@ const SBTsList = ({
         return;
       }
 
-      const currentGlobalCacheRaw = await readCache('sbtCache', targetSlug);
-      const currentGlobalCache =
-        (currentGlobalCacheRaw && typeof currentGlobalCacheRaw === 'object')
-          ? currentGlobalCacheRaw
-          : {};
-      const hasNetworkCacheEntry = currentGlobalCache[netKey] != null;
-      const cachedNetworkData = hasNetworkCacheEntry
-        ? currentGlobalCache[netKey]
-        : { sbtList: {}, lastBlock: 0 };
-      const sbtMapFromCache = { ...(cachedNetworkData.sbtList || {}) };
-      const hydrated = normalizeSbtListItems(Object.values(sbtMapFromCache));
-      updateSessionCacheMeta(targetSlug, {
-        lastBlock: Number(cachedNetworkData?.lastBlock || 0),
-        sbtCount: hydrated.length,
-      });
       const hasLoadedBefore = !!sessionHasLoadedOnceRef.current[targetSlug];
       const currentForSlug = Array.isArray(sbtListBySlugRef.current[targetSlug])
         ? sbtListBySlugRef.current[targetSlug]
         : [];
-      const shouldKeepExistingCards = (
-        hydrated.length === 0 &&
-        !forceRefresh &&
-        hasLoadedBefore &&
-        currentForSlug.length > 0
-      );
+      const currentGlobalCacheRaw = await readCache('sbtCache', targetSlug);
+      const cacheReadPlan = buildSbtListCacheReadPlan({
+        currentItems: currentForSlug,
+        forceRefresh,
+        hasLoadedBefore,
+        netKey,
+        rawCache: currentGlobalCacheRaw,
+        targetSlug,
+      });
+      const hydrated = cacheReadPlan.hydrated;
+      updateSessionCacheMeta(targetSlug, cacheReadPlan.meta);
 
       if (sessionFetchRunBySlugRef.current[targetSlug] !== runId || !isMounted.current) {
         return;
       }
 
-      if (!shouldKeepExistingCards) {
+      if (cacheReadPlan.shouldApplyCards) {
         setSbtListBySlug((prev) => {
           const existing = Array.isArray(prev[targetSlug]) ? prev[targetSlug] : [];
           if (areSbtListArraysEqual(existing, hydrated)) return prev;
@@ -2123,11 +2113,9 @@ const SBTsList = ({
         });
       }
 
-      if (hydrated.length > 0) {
+      if (cacheReadPlan.shouldEnsurePasswordFlags) {
         // PASSWORD-LOCK FLAGS WITH CORRECT SLUG CONTEXT
-        await ensureGroupPasswordFlags(
-          hydrated.map((x) => (x && x.slug == null ? { ...x, slug: targetSlug } : x))
-        );
+        await ensureGroupPasswordFlags(cacheReadPlan.passwordFlagItems);
       }
       setSessionLoadStateBySlug((prev) => ({ ...prev, [targetSlug]: 'loaded' }));
       setSessionHasLoadedOnceBySlug((prev) => (
