@@ -100,9 +100,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=30';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=31';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-05-31 (v30)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v31)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -4121,6 +4121,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   const submitted = [];
   const skipped = [];
   const draftEditMetrics = [];
+  let submitRequestedCount = 0;
   const settings = await loadTelegramAgentSettings({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -4130,6 +4131,8 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   let reviewRequired = false;
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
+    const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);
+    if (shouldSubmit) submitRequestedCount += 1;
     const question = byId.get(questionId);
     if (!question) {
       skipped.push({ questionId, reason: 'question_not_active_or_answerable' });
@@ -4140,7 +4143,6 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       skipped.push({ questionId, reason: 'answer_not_understood' });
       continue;
     }
-    const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);
     if (!shouldSubmit) reviewRequired = true;
     const previousDraft = draftEditOptIn
       ? await readAnswerDraft({
@@ -4228,10 +4230,13 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     }
   }
   const finalReviewRequired = drafts.length > 0 ? reviewRequired : true;
+  const directSubmitIncomplete = submitRequestedCount > 0 && submitted.length < submitRequestedCount;
   const payload = {
-    ok: true,
+    ok: !directSubmitIncomplete,
+    ...(directSubmitIncomplete ? { reason: 'direct_submit_incomplete' } : {}),
     sessionSlug: context.session.sessionSlug,
     draftCount: drafts.length,
+    submitRequestedCount,
     submittedCount: submitted.length,
     skipped,
     drafts,
@@ -4250,7 +4255,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     },
   };
   assertNoSecretShape(payload, 'Telegram agent preference response must not serialize secrets.');
-  return json(payload);
+  return json(payload, { status: directSubmitIncomplete ? 422 : 200 });
 }
 
 function normalizeCreateQuestionBatch(input = {}) {

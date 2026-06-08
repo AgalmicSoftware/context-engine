@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-05-31 (v30)
+**Skill version:** 2026-06-08 (v31)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=30",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=31",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -721,6 +721,15 @@ Use direct submit for commands like "choose unsure", "answer agree", or "submit
 that" when the user has clearly authorized the action. Use drafts when the user
 asks for suggestions, wants to review language, or has not clearly approved
 submission.
+
+For direct submit, do not treat the answer as recorded unless the HTTP status is
+2xx, `ok` is true, and `submittedCount === submitRequestedCount` for the answers
+you intended to submit. If the worker returns `422` with
+`reason: "direct_submit_incomplete"`, at least one requested answer was skipped
+or not recorded. Do not tell the user the answer was submitted; re-fetch active
+questions, repair the question reference or answer shape, and retry. Keep the
+user-facing summary brief and do not show question IDs unless the user asks for
+debug details.
 
 If the user enabled draft-edit research and you adjust an answer in chat, send
 the initial suggestion alongside the final answer so CE can calculate
@@ -1432,6 +1441,17 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v31)
+
+- Direct-submit preference calls now fail closed with
+  `direct_submit_incomplete` when a requested answer is skipped instead of
+  returning a draft-only success that an agent could misreport as submitted.
+- Agents now verify `submittedCount === submitRequestedCount` before telling a
+  user that chat-submitted answers were recorded, and keep question IDs out of
+  normal user-facing summaries.
+- Submit records receive server timestamps when callers omit `createdAt`, so
+  admin metrics can count recent real responses reliably.
 
 ### 2026-05-31 (v30)
 
