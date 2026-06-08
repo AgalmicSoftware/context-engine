@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
   buildSurveyResultsHtmlReportDownloadLabel,
+  buildSurveyResultsHtmlReportExportModalDisplayPlan,
   renderSurveyResultsHtmlReportExportModal,
 } from './SurveyResultsHtmlReportExportModal';
 import {
@@ -174,5 +175,45 @@ describe('SurveyResultsHtmlReportExportModal', () => {
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_VIEWER)).toBe('Download HTML Viewer');
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML)).toBe('Download Single HTML');
     expect(buildSurveyResultsHtmlReportDownloadLabel(SESSION_RESULTS_EXPORT_FORMAT_PDF)).toBe('Download PDF');
+  });
+
+  it('builds action labels and inert display decisions without invoking handlers', () => {
+    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan(baseProps)).toEqual(expect.objectContaining({
+      canGenerateAnalysis: true,
+      downloadBlockedMessage: 'Select only available sections, or generate selected analysis views before download.',
+      downloadLabel: 'Download HTML Viewer',
+      exporterLabel: '0xabc...def',
+      generateAnalysisLabel: 'Generate Analysis Views',
+      sessionLabel: 'Demo Session',
+      sessionSlugLabel: ' (demo)',
+    }));
+
+    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
+      ...baseProps,
+      analysisGenerating: true,
+      analysisProgress: '',
+      exportFormat: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
+      isAuthorized: false,
+      snapshot: {
+        exportedAt: '2026-05-25T18:30:00.000Z',
+        session: {},
+      },
+    })).toEqual(expect.objectContaining({
+      canGenerateAnalysis: false,
+      downloadBlockedMessage: 'Connect a wallet to enable download.',
+      downloadLabel: 'Download Single HTML',
+      exporterLabel: 'Not connected',
+      generateAnalysisLabel: 'Generating Analysis Views...',
+      sessionLabel: 'Session',
+      sessionSlugLabel: '',
+    }));
+
+    expect(buildSurveyResultsHtmlReportExportModalDisplayPlan({
+      ...baseProps,
+      isDemoMode: true,
+    })).toEqual(expect.objectContaining({
+      canGenerateAnalysis: true,
+      generateAnalysisLabel: 'Refresh Demo Analysis',
+    }));
   });
 });

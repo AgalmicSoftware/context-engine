@@ -89,6 +89,58 @@ export const buildSurveyResultsHtmlReportDownloadLabel = (
   return 'Download HTML Viewer';
 };
 
+export type SurveyResultsHtmlReportExportModalDisplayPlanInput = {
+  analysisGenerating?: boolean;
+  analysisPayload?: SurveyResultsRecord;
+  analysisProgress?: string;
+  exportFormat?: SessionResultsExportFormat;
+  isAuthorized?: boolean;
+  isDemoMode?: boolean;
+  snapshot?: SurveyResultsRecord;
+};
+
+export type SurveyResultsHtmlReportExportModalDisplayPlan = {
+  canGenerateAnalysis: boolean;
+  downloadBlockedMessage: string;
+  downloadLabel: string;
+  exporterLabel: string;
+  generateAnalysisLabel: string;
+  sessionLabel: string;
+  sessionSlugLabel: string;
+};
+
+export const buildSurveyResultsHtmlReportExportModalDisplayPlan = ({
+  analysisGenerating = false,
+  analysisPayload = {},
+  analysisProgress = '',
+  exportFormat = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
+  isAuthorized = false,
+  isDemoMode = false,
+  snapshot = {},
+}: SurveyResultsHtmlReportExportModalDisplayPlanInput = {}): SurveyResultsHtmlReportExportModalDisplayPlan => {
+  const sessionSlug = snapshot?.session?.slug;
+
+  return {
+    canGenerateAnalysis: (
+      (isAuthorized || isDemoMode) &&
+      !!analysisPayload?.eligibility?.eligible &&
+      !analysisGenerating
+    ),
+    downloadBlockedMessage: isAuthorized
+      ? 'Select only available sections, or generate selected analysis views before download.'
+      : 'Connect a wallet to enable download.',
+    downloadLabel: buildSurveyResultsHtmlReportDownloadLabel(exportFormat),
+    exporterLabel: snapshot?.exportedBy?.displayAddress || 'Not connected',
+    generateAnalysisLabel: analysisGenerating
+      ? analysisProgress || 'Generating Analysis Views...'
+      : isDemoMode
+        ? 'Refresh Demo Analysis'
+        : 'Generate Analysis Views',
+    sessionLabel: snapshot?.session?.name || snapshot?.session?.slug || 'Session',
+    sessionSlugLabel: sessionSlug ? ` (${sessionSlug})` : '',
+  };
+};
+
 export const renderSurveyResultsHtmlReportExportModal = ({
   analysisGenerating = false,
   analysisPayload,
@@ -112,13 +164,23 @@ export const renderSurveyResultsHtmlReportExportModal = ({
   snapshot,
   styleMap,
 }: SurveyResultsHtmlReportExportModalProps): React.ReactNode => {
-  const canGenerateAnalysis =
-    (isAuthorized || isDemoMode) &&
-    !!analysisPayload?.eligibility?.eligible &&
-    !analysisGenerating;
-  const sessionLabel = snapshot?.session?.name || snapshot?.session?.slug || 'Session';
-  const exporterLabel = snapshot?.exportedBy?.displayAddress || 'Not connected';
-  const downloadLabel = buildSurveyResultsHtmlReportDownloadLabel(exportFormat);
+  const {
+    canGenerateAnalysis,
+    downloadBlockedMessage,
+    downloadLabel,
+    exporterLabel,
+    generateAnalysisLabel,
+    sessionLabel,
+    sessionSlugLabel,
+  } = buildSurveyResultsHtmlReportExportModalDisplayPlan({
+    analysisGenerating,
+    analysisPayload,
+    analysisProgress,
+    exportFormat,
+    isAuthorized,
+    isDemoMode,
+    snapshot,
+  });
 
   return (
     <Modal
@@ -133,7 +195,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
       <ModalBody className={styleMap.htmlReportModalBody}>
         <p>
           <strong>{sessionLabel}</strong>
-          {snapshot?.session?.slug ? ` (${snapshot.session.slug})` : ''}
+          {sessionSlugLabel}
         </p>
         <p>
           Export timestamp: <strong>{snapshot?.exportedAt}</strong>
@@ -236,11 +298,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
             className={styleMap.htmlReportGenerateButton}
             data-testid="ce-surveyresults-html-report-generate-analysis"
           >
-            {analysisGenerating
-              ? analysisProgress || 'Generating Analysis Views...'
-              : isDemoMode
-                ? 'Refresh Demo Analysis'
-                : 'Generate Analysis Views'}
+            {generateAnalysisLabel}
           </Button>
         </div>
         {needsAnalysisGeneration && (
@@ -253,9 +311,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
         </Alert>
         {!canDownload && (
           <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
-            {isAuthorized
-              ? 'Select only available sections, or generate selected analysis views before download.'
-              : 'Connect a wallet to enable download.'}
+            {downloadBlockedMessage}
           </Alert>
         )}
       </ModalBody>
