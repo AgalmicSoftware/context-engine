@@ -3,7 +3,7 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **4,690 lines**
+- Current length: **4,689 lines**
 - Shell file: `client/src/components/Sessions/SessionWizardShell.tsx` (**408 lines**)
 - Intro/status rail file: `client/src/components/Sessions/SessionWizardIntroStatusRail.tsx` (**63 lines**)
 - Publish summary file: `client/src/components/Sessions/SessionPublishSummary.tsx` (**233 lines**)
@@ -114,7 +114,7 @@ SessionWizard.tsx
 | Publish prep: metadata, SBT drafts, registry writes | 3154-3602 | Builds metadata payloads, uploads Arweave metadata, finalizes deferred SBT uploads, and prepares on-chain registration | `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts` |
 | Publish orchestration and deploy helpers | 3603-4140 | Coordinates publish flow, delegates worker auto-deploy, pending-SBT step sequencing, metadata-upload dispatch, register-step tx/status callbacks, and successful completion callbacks to `sessionWizardPublishController.ts`, handles copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `runSessionWizardPublishController`, `runSessionWizardPublishMetadataUploadController`, `runSessionWizardRegisterStepController`, `runSessionWizardPublishCompletionController`, `handleCopyAdminUrl`, `handleDeployWorker` |
 | Worker/resource cards and derived publish UI | 4141-4523 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, contract modal selection, pure requirements display planning, pure sponsored auto-deploy publish-surface planning, and pure publish readiness/progress/metadata-display plan handoff | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, `resolveSessionWizardNewSessionRequirementsDisplayState`, `resolveSessionWizardSponsoredPublishSurfaceState`, `resolveSessionWizardPublishUiPlan`, selected contract memoization |
-| Final shell handoff | 4524-4690 | Derives and forwards the full `/new` surface state/handlers into the passive shell while retaining parent-owned side effects | `SessionWizardShell`, `export default SessionWizard` |
+| Final shell handoff | 4524-4689 | Derives and forwards the full `/new` surface state/handlers into the passive shell while retaining parent-owned side effects | `SessionWizardShell`, `export default SessionWizard` |
 | Passive render composition (`SessionWizardShell.tsx`) | 1-408 | Renders header, intro/status rail, encryption, metadata, worker, publish, and modal modules without owning publish/worker/storage/SBT/wallet side effects | `SessionWizardHeader`, `SessionWizardIntroStatusRail`, `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals` |
 | Passive intro/status rail (`SessionWizardIntroStatusRail.tsx`) | 1-63 | Places requirements banner, sponsored status, and normal-mode rail from explicit props while parent owns dismissal/retry/focus state and sponsored/publish/worker side effects | `SessionWizardRequirementsBanner`, `SessionWizardSponsoredStatus`, `SessionWizardNormalModeRail` |
 | Passive publish summary (`SessionPublishSummary.tsx`) | 1-233 | Places passive publish action/bundle-fallback/advanced-settings/progress/result panels while parent owns publish/deploy/upload/register/storage/wallet side effects | `SessionPublishActionControls`, `SessionPublishBundleFallbackPanel`, `SessionPublishAdvancedSettingsPanel`, `SessionPublishProgressPanel`, `SessionPublishResultLinks` |
