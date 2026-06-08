@@ -136,6 +136,7 @@ import {
   buildSurveyResultsHtmlReportDownloadAttemptPlan,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
+  buildSurveyResultsHtmlReportExportModalDescriptor,
   buildSurveyResultsHtmlReportReadinessPlan,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
@@ -4788,37 +4789,29 @@ const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
 const isAuthorized = this.isHtmlReportExportAuthorized();
-const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
-  analysisGenerating: this.state.htmlReportAnalysisGenerating,
-  isAuthorized,
-  selectedSections,
-  snapshot,
-});
-const isDemoSession = this.isHtmlReportDemoSession();
-const isDemoMode = this.isHtmlReportDemoModeActive();
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
-
-return {
+const modalDisplayDescriptor = buildSurveyResultsHtmlReportExportModalDescriptor({
   analysisGenerating: this.state.htmlReportAnalysisGenerating,
   analysisPayload,
   analysisProgress: this.state.htmlReportAnalysisProgress,
-  canDownload: readinessPlan.canDownload,
   exportFormat: this.state.htmlReportExportFormat,
   htmlReportAnalysisError: this.state.htmlReportAnalysisError,
   isAuthorized,
-  isDemoMode,
-  isDemoSession,
+  isDemoMode: this.isHtmlReportDemoModeActive(),
+  isDemoSession: this.isHtmlReportDemoSession(),
   isOpen: this.state.htmlReportModalOpen,
-  needsAnalysisGeneration: readinessPlan.needsAnalysisGeneration,
+  selectedSections,
+  snapshot,
+});
+
+return {
+  ...modalDisplayDescriptor,
   onClose: this.closeHtmlReportExportModal,
   onDownload: this.downloadHtmlReport,
   onFormatChange: this.handleHtmlReportFormatChange,
   onGenerateAnalysis: this.generateHtmlReportAnalysisViews,
   onToggleDemoMode: this.toggleHtmlReportDemoMode,
   onToggleSection: this.toggleHtmlReportSection,
-  sectionRows: readinessPlan.sectionRows,
-  selectedSections: readinessPlan.selectedSections,
-  snapshot,
   styleMap: styles,
 };
 }
