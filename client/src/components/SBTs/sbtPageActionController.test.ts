@@ -1,4 +1,5 @@
 import {
+  buildSbtPageMiniCardActionHandlers,
   runSbtPageBurnActionController,
   runSbtPageMiniBurnActionController,
   runSbtPageMiniMintActionController,
@@ -369,5 +370,100 @@ describe('sbtPageActionController', () => {
       plan: { blockedReason: 'none', shouldRenderMiniBurnButton: true },
       ports: { dispatchMiniBurn: () => { throw error; } },
     })).toThrow(error);
+  });
+
+  it('builds mini-card action handlers with the same parent dispatch shapes', () => {
+    const dispatchInviteCodeMint = jest.fn();
+    const dispatchGroupPasswordMint = jest.fn();
+    const dispatchMiniMint = jest.fn();
+    const dispatchMiniBurn = jest.fn();
+    const dispatchShowPasswordInput = jest.fn();
+
+    const handlers = buildSbtPageMiniCardActionHandlers({
+      groupPasswordInput: 'join-code',
+      miniBurnActionPlan: {
+        blockedReason: 'none',
+        shouldRenderMiniBurnButton: true,
+      },
+      miniMintActionPlan: {
+        blockedReason: 'none',
+        handlerKind: 'claim-with-invite-code',
+        shouldRenderMintArea: true,
+      },
+      ports: {
+        dispatchGroupPasswordMint,
+        dispatchInviteCodeMint,
+        dispatchMiniBurn,
+        dispatchMiniMint,
+        dispatchShowPasswordInput,
+      },
+    });
+    const event = { preventDefault: jest.fn() };
+
+    expect(handlers.onClaimWithInviteCode(event)).toMatchObject({ status: 'dispatched' });
+    expect(dispatchInviteCodeMint).toHaveBeenCalledWith('join-code');
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+
+    const groupHandlers = buildSbtPageMiniCardActionHandlers({
+      miniMintActionPlan: {
+        blockedReason: 'none',
+        handlerKind: 'mint-unlimited-with-group-password',
+        shouldRenderMintArea: true,
+      },
+      ports: {
+        dispatchGroupPasswordMint,
+      },
+    });
+    expect(groupHandlers.onMintUnlimitedWithGroupPassword()).toMatchObject({ status: 'dispatched' });
+    expect(dispatchGroupPasswordMint).toHaveBeenCalledWith();
+
+    const openHandlers = buildSbtPageMiniCardActionHandlers({
+      miniMintActionPlan: {
+        blockedReason: 'none',
+        handlerKind: 'mini-mint',
+        shouldRenderMintArea: true,
+      },
+      ports: {
+        dispatchMiniMint,
+      },
+    });
+    expect(openHandlers.onMiniMint()).toMatchObject({ status: 'dispatched' });
+    expect(dispatchMiniMint).toHaveBeenCalledWith();
+
+    const disclosureHandlers = buildSbtPageMiniCardActionHandlers({
+      miniMintActionPlan: {
+        blockedReason: 'none',
+        handlerKind: 'show-password-input',
+        shouldRenderMintArea: true,
+      },
+      ports: {
+        dispatchShowPasswordInput,
+      },
+    });
+    expect(disclosureHandlers.onShowMiniPasswordInput()).toMatchObject({ status: 'dispatched' });
+    expect(dispatchShowPasswordInput).toHaveBeenCalledWith();
+
+    expect(handlers.onMiniBurn()).toMatchObject({ status: 'dispatched' });
+    expect(dispatchMiniBurn).toHaveBeenCalledWith();
+  });
+
+  it('keeps disabled mini-card burn handlers inert', () => {
+    const dispatchMiniBurn = jest.fn();
+    const handlers = buildSbtPageMiniCardActionHandlers({
+      miniBurnActionPlan: {
+        blockedReason: 'none',
+        shouldRenderMiniBurnButton: true,
+      },
+      miniBurnDisabled: true,
+      ports: {
+        dispatchMiniBurn,
+      },
+    });
+
+    expect(handlers.onMiniBurn()).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(dispatchMiniBurn).not.toHaveBeenCalled();
   });
 });
