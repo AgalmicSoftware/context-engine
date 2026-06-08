@@ -55,9 +55,9 @@
   - `SurveyResultsHtmlReportActionControls.tsx`: **50 lines**
   - `SurveyResultsHtmlReportAnalysisControls.tsx`: **57 lines**
   - `SurveyResultsHtmlReportSectionTable.tsx`: **56 lines**
-  - `surveyResultsHtmlReportDownloadRequest.ts`: **130 lines**
+  - `surveyResultsHtmlReportDownloadRequest.ts`: **131 lines**
   - `surveyResultsExportController.ts`: **125 lines**
-  - `surveyResultsExportDisplayHelpers.ts`: **651 lines**
+  - `surveyResultsExportDisplayHelpers.ts`: **661 lines**
   - `SurveyResultsQuestionSummaryCard.tsx`: **115 lines**
   - `SurveyResultsAggregatorSummaries.tsx`: **97 lines**
   - `SurveyResultsAggregatorSummaryDisplay.tsx`: **106 lines**
