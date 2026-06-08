@@ -605,14 +605,16 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(displayState).toEqual(expect.objectContaining({
       activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressAriaValueText: `${Math.round(displayState.publishProgressPercent)}% Register On-chain`,
+      publishProgressEyebrow: 'Publishing Session',
       publishStep: 4,
       publishProgressPercentRounded: Math.round(displayState.publishProgressPercent),
       publishProgressSteps: [
-        { key: 'deploy-worker', label: 'Deploy Worker' },
-        { key: 'deploy-sbts', label: 'Deploy Groups' },
-        { key: 'upload-metadata', label: 'Upload Arweave' },
-        { key: 'register-session', label: 'Register On-chain' },
-        { key: 'done', label: 'Done' },
+        { key: 'deploy-worker', label: 'Deploy Worker', state: 'complete' },
+        { key: 'deploy-sbts', label: 'Deploy Groups', state: 'complete' },
+        { key: 'upload-metadata', label: 'Upload Arweave', state: 'complete' },
+        { key: 'register-session', label: 'Register On-chain', state: 'active' },
+        { key: 'done', label: 'Done', state: 'pending' },
       ],
       showPublishProgress: true,
     }));
@@ -626,12 +628,14 @@ describe('sessionWizardPublishFlow', () => {
       publishSteps: ['register-session', 'done'],
     })).toEqual({
       activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressAriaValueText: '0% Register On-chain',
+      publishProgressEyebrow: 'Publish Complete',
       publishStep: 0,
       publishProgressPercent: 0,
       publishProgressPercentRounded: 0,
       publishProgressSteps: [
-        { key: 'register-session', label: 'Register On-chain' },
-        { key: 'done', label: 'Done' },
+        { key: 'register-session', label: 'Register On-chain', state: 'pending' },
+        { key: 'done', label: 'Done', state: 'pending' },
       ],
       showPublishProgress: false,
     });

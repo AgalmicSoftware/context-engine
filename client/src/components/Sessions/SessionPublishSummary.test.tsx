@@ -53,6 +53,8 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => {
     },
     publishProgressDisplayState: {
       activePublishProgressStepLabel: '',
+      publishProgressAriaValueText: '0% Preparing',
+      publishProgressEyebrow: 'Publish Complete',
       publishStep: 0,
       publishProgressPercent: 0,
       publishProgressPercentRounded: 0,
@@ -73,7 +75,6 @@ const buildProps = (
   onToggleCollapsed: jest.fn(),
   normalModePublishSummary: [],
   onPublish: jest.fn(),
-  publishBusy: false,
   publishAdvancedOpen: false,
   onTogglePublishAdvanced: jest.fn(),
   showSponsoredBundleFallbackInput: false,
@@ -142,7 +143,6 @@ describe('SessionPublishSummary', () => {
           wizardMode: 'normal',
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
-          publishBusy: true,
           publishUiPlan: buildPublishUiPlan({
             publishActionDisplayState: {
               displayMode: 'normal',
@@ -199,17 +199,18 @@ describe('SessionPublishSummary', () => {
     render(
       <SessionPublishSummary
         {...buildProps({
-          publishBusy: true,
           publishUiPlan: buildPublishUiPlan({
             publishProgressDisplayState: {
               activePublishProgressStepLabel: 'Upload Arweave',
+              publishProgressAriaValueText: '42% Upload Arweave',
+              publishProgressEyebrow: 'Publishing Session',
               publishStep: 2,
               publishProgressPercent: 42.4,
               publishProgressPercentRounded: 42,
               publishProgressSteps: [
-                { key: 'deploy-worker', label: 'Deploy Worker' },
-                { key: 'upload-metadata', label: 'Upload Arweave' },
-                { key: 'register-session', label: 'Register On-chain' },
+                { key: 'deploy-worker', label: 'Deploy Worker', state: 'complete' },
+                { key: 'upload-metadata', label: 'Upload Arweave', state: 'active' },
+                { key: 'register-session', label: 'Register On-chain', state: 'pending' },
               ],
               showPublishProgress: true,
             },
@@ -239,7 +240,6 @@ describe('SessionPublishSummary', () => {
           adminUrlStatus: 'Admin URL copied.',
           onCopyAdminUrl,
           onPublish,
-          publishBusy: false,
           publishUiPlan: buildPublishUiPlan({
             publishMetadataDisplayState: {
               effectiveMetadataGatewayUrl: 'https://arweave.example.test/metadata-tx',
@@ -253,13 +253,15 @@ describe('SessionPublishSummary', () => {
             },
             publishProgressDisplayState: {
               activePublishProgressStepLabel: 'Done',
+              publishProgressAriaValueText: '100% Done',
+              publishProgressEyebrow: 'Publish Complete',
               publishStep: 3,
               publishProgressPercent: 100,
               publishProgressPercentRounded: 100,
               publishProgressSteps: [
-                { key: 'upload-metadata', label: 'Upload Arweave' },
-                { key: 'register-session', label: 'Register On-chain' },
-                { key: 'done', label: 'Done' },
+                { key: 'upload-metadata', label: 'Upload Arweave', state: 'complete' },
+                { key: 'register-session', label: 'Register On-chain', state: 'complete' },
+                { key: 'done', label: 'Done', state: 'complete' },
               ],
               showPublishProgress: true,
             },

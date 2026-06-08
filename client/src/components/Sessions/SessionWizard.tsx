@@ -4588,7 +4588,6 @@ const SessionWizard = ({
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishAdvancedOpen={publishAdvancedOpen}
-      publishBusy={publishBusy}
       publishUiPlan={publishUiPlan}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}
