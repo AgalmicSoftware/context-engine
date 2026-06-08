@@ -539,6 +539,21 @@ type BuildSbtPageLoadInfoStartLogContextArgs = {
   preferCountsOnly?: unknown;
   sbtAddressOriginalCase?: unknown;
 };
+type ResolveSbtPageLoadInfoPendingQueuePlanArgs = {
+  forceEventFetch?: unknown;
+  pendingForce?: unknown;
+  pendingOptions?: unknown;
+  preferCountsOnly?: unknown;
+};
+type SbtPageLoadInfoPendingOptions = {
+  forceEventFetch: boolean;
+  preferCountsOnly: boolean;
+};
+export type SbtPageLoadInfoPendingQueuePlan = {
+  pendingForce: boolean;
+  pendingOptions: SbtPageLoadInfoPendingOptions;
+  shouldQueueLoad: true;
+};
 type BuildSbtPageOpenMintAutoJoinUrlArgs = {
   addressOverride?: unknown;
   basePath?: unknown;
@@ -841,6 +856,23 @@ export const buildSbtPageLoadInfoStartLogContext = ({
   account: account ? String(account).toLowerCase() : null,
   networkId: network?.id ?? null,
 });
+
+export const resolveSbtPageLoadInfoPendingQueuePlan = ({
+  forceEventFetch = false,
+  pendingForce = false,
+  pendingOptions = null,
+  preferCountsOnly = false,
+}: ResolveSbtPageLoadInfoPendingQueuePlanArgs = {}): SbtPageLoadInfoPendingQueuePlan => {
+  const existingOptions = isRecord(pendingOptions) ? pendingOptions : {};
+  return {
+    pendingForce: pendingForce === true || forceEventFetch === true,
+    pendingOptions: {
+      forceEventFetch: existingOptions.forceEventFetch === true || forceEventFetch === true,
+      preferCountsOnly: existingOptions.preferCountsOnly === true || preferCountsOnly === true,
+    },
+    shouldQueueLoad: true,
+  };
+};
 
 const buildSbtPageAddressListSignature = (input: unknown): string => {
   if (!Array.isArray(input)) return '';
