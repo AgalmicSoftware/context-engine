@@ -2145,6 +2145,58 @@ test('Mini App state exposes submitted rating answers for hydration', async () =
   assert.deepEqual(state.draftAnswersByQuestionKey, {});
 });
 
+test('Mini App state hydrates submitted rating answers from serialized values', async () => {
+  const kv = new MemoryKv();
+  const questionId = 'q-rating-serialized-history';
+  await kv.put(`${SUBMIT_REQUEST_KV_PREFIX}rating-serialized-history`, JSON.stringify({
+    version: 1,
+    requestId: 'rating-serialized-history',
+    status: 'direct_submitted',
+    lane: 'telegram_agent',
+    telegramUserId: 'preview-user',
+    sessionSlug: 'alpha',
+    questionId,
+    answer: {
+      value: JSON.stringify({
+        questionType: 'rating',
+        value: 7,
+        comments: 'Agent-submitted rating rationale.',
+      }),
+      controlType: 'rating_button',
+    },
+    createdAt: '2026-05-08T12:00:02.000Z',
+  }));
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env: {
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'alpha',
+        sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true }],
+      }),
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+        sessionSlug: 'alpha',
+        questionId,
+        questionType: 'rating',
+        prompt: 'Rate serialized agent answers.',
+      }]),
+    },
+    createdAt: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(state.ok, true);
+  const questionKey = state.questions[0].questionKey;
+  assert.deepEqual(state.submittedAnswerKeys, [questionKey]);
+  assert.equal(state.submittedAnswers[0].answerLabel, '7');
+  assert.deepEqual(state.submittedAnswers[0].answer, {
+    value: 7,
+    comments: 'Agent-submitted rating rationale.',
+  });
+  assert.equal(JSON.stringify(state.submittedAnswers).includes('questionType'), false);
+});
+
 test('Mini App state hydrates submitted multichoice answers from serialized values', async () => {
   const kv = new MemoryKv();
   const questionId = 'q-multichoice-history';

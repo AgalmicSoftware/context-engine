@@ -1382,19 +1382,14 @@ async function loadSubmittedMiniAppAnswers({
     if (!question) return;
     const existing = byQuestionKey.get(question.questionKey);
     if (existing && safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) >= 0) return;
+    const answer = miniAnswerFromSubmittedRecord(record, question);
     byQuestionKey.set(question.questionKey, {
       questionKey: question.questionKey,
       displayIndex: question.displayIndex,
       sessionSlug: question.sessionSlug,
       prompt: question.prompt || question.title || '',
-      answerLabel: safeAnswerString(firstAnswerValue(
-        record.answer?.label,
-        record.answer?.value,
-        record.answer?.text,
-        record.answerLabel,
-        record.answerValue,
-      )),
-      answer: miniAnswerFromSubmittedRecord(record, question),
+      answerLabel: miniSubmittedAnswerLabel(question, answer, record),
+      answer,
       status: safeString(record.status),
       submittedAt: safeString(record.createdAt),
       requestId: safeString(record.requestId),
@@ -1405,6 +1400,27 @@ async function loadSubmittedMiniAppAnswers({
     submittedAnswerKeys: submittedAnswers.map((entry) => entry.questionKey),
     submittedAnswers,
   };
+}
+
+function miniSubmittedAnswerLabel(question = {}, answer = {}, record = {}) {
+  const type = safeString(question.questionType || record.answer?.questionType || record.controlType);
+  if (type === 'rating' && answer.value !== undefined && answer.value !== null && safeAnswerString(answer.value) !== '') {
+    return safeAnswerString(answer.value);
+  }
+  if (type === 'multichoice' && Array.isArray(answer.values) && answer.values.length) {
+    return answer.values.map(safeAnswerString).filter(Boolean).join(', ');
+  }
+  if (type === 'freeform' && safeAnswerString(answer.text)) {
+    return safeAnswerString(answer.text);
+  }
+  const binaryValue = lower(answer.value);
+  if (binaryValue && AGREE_UNSURE_DISAGREE_LABELS[binaryValue]) {
+    return AGREE_UNSURE_DISAGREE_LABELS[binaryValue];
+  }
+  if (safeAnswerString(answer.value) && !safeAnswerString(answer.value).startsWith('{')) {
+    return safeAnswerString(answer.value);
+  }
+  return safeAnswerString(firstAnswerValue(record.answer?.label, record.answerLabel, record.answer?.text, record.answerValue));
 }
 
 function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
@@ -1436,7 +1452,7 @@ function miniAnswerFromSubmittedRecord(record = {}, question = {}) {
     return { text: safeAnswerString(firstAnswerValue(source.text, parsedSource.text, source.value, parsedSource.value, source.answer, record.answerValue, record.answerLabel)), comments };
   }
   if (type === 'rating') {
-    const value = Number(firstAnswerValue(source.value, source.rating, parsedSource.value, parsedSource.rating, source.answer, record.answerValue, record.answerLabel));
+    const value = Number(firstAnswerValue(parsedSource.value, parsedSource.rating, source.rating, source.answer, source.value, record.answerValue, record.answerLabel));
     return { value: Number.isFinite(value) ? value : safeAnswerString(rawValue), comments };
   }
   return { value: lower(firstAnswerValue(parsedSource.value, rawValue)), comments };
