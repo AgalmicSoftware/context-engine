@@ -115,6 +115,7 @@ import {
   resolveSbtListSessionUniverseSnapshotUpdate,
   resolveSbtListCreateGroupInitialVisibility,
   resolveSbtListRelativeImageStyle,
+  resolveSbtListRegistryRetryPlan,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
   isSbtListSyntheticNoSessionSlug,
@@ -716,15 +717,15 @@ const SBTsList = ({
     const runRetry = () => {
       if (cancelled || !isMounted.current) return;
       const next = syncSessionUniverseFromCache();
-      const nextPending =
-        shouldExpectRegistryUniverse &&
-        Number(next?.registryEntryCount || 0) <= 0 &&
-        !next?.registryHydrated;
-      if (!nextPending) return;
-      if (attempt >= maxAttempts) return;
-      attempt += 1;
-      const delayMs = Math.min(8000, attempt * 1500);
-      retryTimerId = setTimeout(runRetry, delayMs);
+      const retryPlan = resolveSbtListRegistryRetryPlan({
+        attempt,
+        maxAttempts,
+        shouldExpectRegistryUniverse,
+        snapshot: next,
+      });
+      if (!retryPlan.shouldSchedule || retryPlan.delayMs == null) return;
+      attempt = retryPlan.nextAttempt;
+      retryTimerId = setTimeout(runRetry, retryPlan.delayMs);
     };
     runRetry();
     return () => {
