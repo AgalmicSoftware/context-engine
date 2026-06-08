@@ -30,8 +30,6 @@ type PublishedPendingSbtLink = {
 };
 
 type SessionPublishSummaryProps = {
-  isNormalMode: boolean;
-  wizardMode: string;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   normalModePublishSummary: PublishSummaryItem[];
@@ -73,8 +71,6 @@ type SessionPublishSummaryProps = {
 };
 
 const SessionPublishSummary = ({
-  isNormalMode,
-  wizardMode,
   isCollapsed,
   onToggleCollapsed,
   normalModePublishSummary,
@@ -121,8 +117,10 @@ const SessionPublishSummary = ({
     publishReadiness,
   } = publishUiPlan;
   const {
+    displayMode,
     publishAdvancedOpen,
   } = publishActionDisplayState;
+  const isNormalDisplayMode = displayMode === 'normal';
   const {
     showUploadBlockedReason,
     uploadBlockedReason,
@@ -130,15 +128,15 @@ const SessionPublishSummary = ({
 
   return (
   <section id="session-wizard-section-publish" className={styles.panel}>
-    {wizardMode === 'advanced' ? (
+    {displayMode === 'advanced' ? (
       <button type="button" className={styles.panelHeader} onClick={onToggleCollapsed}>
         <span className={styles.panelTitle}>Publish</span>
         <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
       </button>
     ) : null}
-    {(isNormalMode || !isCollapsed) ? (
+    {(isNormalDisplayMode || !isCollapsed) ? (
       <div className={styles.panelBody}>
-        {isNormalMode ? (
+        {isNormalDisplayMode ? (
           <div className={styles.publishHero}>
             <div className={styles.publishSummaryGrid}>
               {normalModePublishSummary.map((item) => (
