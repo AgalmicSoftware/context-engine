@@ -21,6 +21,10 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
 function lower(value) {
   return safeString(value).toLowerCase();
 }
@@ -120,6 +124,14 @@ export function safeSessionSnapshotForSubmitQueue(session = {}) {
 
 function objectOrNull(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+}
+
+function normalizeSubmitRecordTimestamps(record = {}) {
+  const createdAt = safeString(record.createdAt || record.processedAt || record.updatedAt) || nowIso();
+  return {
+    ...record,
+    createdAt,
+  };
 }
 
 export function buildCanonicalAnswerRecord(record = {}, {
@@ -229,24 +241,25 @@ export async function persistTelegramSubmitRecord({
   const requestId = safeString(record.requestId);
   const canonicalKey = kvKey || submitRequestKvKey(requestId);
   if (!canonicalKey) return { ok: false, reason: 'submit_request_key_missing' };
-  assertNoSecretShape(record, 'Telegram submit records must not serialize secrets.');
-  const serialized = JSON.stringify(record);
-  const canonical = await persistCanonicalAnswerRecord({ kv, record, sourceKey: canonicalKey });
+  const storedRecord = normalizeSubmitRecordTimestamps(record);
+  assertNoSecretShape(storedRecord, 'Telegram submit records must not serialize secrets.');
+  const serialized = JSON.stringify(storedRecord);
+  const canonical = await persistCanonicalAnswerRecord({ kv, record: storedRecord, sourceKey: canonicalKey });
   if (!canonical.ok) return canonical;
   const submitMetadata = {
     v: 1,
     t: 'submit_request',
-    st: safeString(record.status).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 64),
-    sg: sanitizeSessionSlug(record.sessionSlug),
-    u: safeString(record.telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128),
-    c: safeString(record.createdAt).slice(0, 32),
+    st: safeString(storedRecord.status).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 64),
+    sg: sanitizeSessionSlug(storedRecord.sessionSlug),
+    u: safeString(storedRecord.telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128),
+    c: safeString(storedRecord.createdAt).slice(0, 32),
   };
   assertNoSecretShape(submitMetadata, 'Telegram submit record metadata must not serialize secrets.');
   const putOptions = { expirationTtl: SUBMIT_REQUEST_TTL_SECONDS, metadata: submitMetadata };
   await kv.put(canonicalKey, serialized, putOptions);
   const indexKeys = [
-    submitRequestSessionKvKey(record),
-    submitRequestUserKvKey(record),
+    submitRequestSessionKvKey(storedRecord),
+    submitRequestUserKvKey(storedRecord),
   ].filter((key) => key && key !== canonicalKey);
   await Promise.all(indexKeys.map((key) => kv.put(key, serialized, putOptions)));
   return { ok: true, key: canonicalKey, indexKeys };

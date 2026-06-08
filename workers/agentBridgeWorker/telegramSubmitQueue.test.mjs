@@ -188,6 +188,48 @@ test('Telegram canonical answer records are durable and last-write-wins', async 
   assert.equal(canonicalCalls.every((entry) => entry.options.expirationTtl === undefined), true);
 });
 
+test('Telegram submit records get server timestamps when omitted', async () => {
+  const kv = new MemoryKv();
+  const record = {
+    version: 1,
+    requestId: 'submit-missing-created-at',
+    idempotencyKey: 'idem-missing-created-at',
+    answerFingerprint: 'fp-missing-created-at',
+    action: 'submit_response',
+    status: 'submit_request_created',
+    lane: 'telegram_mini_app',
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+    questionId: 'q-one',
+    questionIdShort: 'q-one',
+    answer: { label: 'Agree', value: 'agree', controlType: 'agree_unsure_disagree' },
+  };
+
+  const before = Date.now();
+  const persisted = await persistTelegramSubmitRecord({
+    env: { AGENT_ACTION_KV: kv },
+    kvKey: 'telegram:submit-request:submit-missing-created-at',
+    record,
+  });
+  const after = Date.now();
+
+  assert.equal(persisted.ok, true);
+  const stored = JSON.parse(await kv.get('telegram:submit-request:submit-missing-created-at'));
+  const indexed = JSON.parse(await kv.get(submitRequestSessionKvKey(stored)));
+  const canonical = JSON.parse(await kv.get(canonicalAnswerSessionKvKey(stored)));
+  const storedMs = Date.parse(stored.createdAt);
+
+  assert.equal(Number.isFinite(storedMs), true);
+  assert.ok(storedMs >= before && storedMs <= after);
+  assert.equal(indexed.createdAt, stored.createdAt);
+  assert.equal(canonical.createdAt, stored.createdAt);
+  assert.equal(
+    kv.putCalls.find((entry) => entry.key === 'telegram:submit-request:submit-missing-created-at')
+      ?.options.metadata.c,
+    stored.createdAt.slice(0, 32),
+  );
+});
+
 test('Telegram submit queue caps metadata fields within KV metadata limits', async () => {
   const kv = new MemoryKv();
   const queue = new MemoryQueue();
