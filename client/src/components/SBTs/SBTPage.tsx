@@ -99,7 +99,6 @@ import {
   buildSbtPageParentSessionScanProgress,
   buildSbtPagePasswordExportFile,
   buildSbtPagePasswordExportRows,
-  buildSbtPagePasswordInviteLink,
   buildSbtPagePasswordInputValuePatch,
   buildSbtPageMintPasswordClearPatch,
   buildSbtPageMintPasswordPrefillPatch,
@@ -3823,17 +3822,14 @@ class SBTPage extends Component<any, any> {
 
     const baseUrl = window.location.origin;
     const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
-    const buildInviteLink = (code: string): string => (
-      buildSbtPagePasswordInviteLink({
-        baseUrl,
-        code,
-        demoPath,
-        encodeGroupPassword: encodeSbtPageGroupPassword,
-        isInvite,
-        sbtAddr,
-        sbtBasePathValue: sbtBasePath(),
-      })
-    );
+    const passwordInviteLinkContext = {
+      baseUrl,
+      demoPath,
+      encodeGroupPassword: encodeSbtPageGroupPassword,
+      isInvite,
+      sbtAddr,
+      sbtBasePathValue: sbtBasePath(),
+    };
     const openMintAutoJoinUrl = this.getOpenMintAutoJoinUrl(sbtAddr);
     const openMintUrlCopyIconState = resolveSbtPageCopyIconState({
       copiedAddress: this.state.copiedAddress,
@@ -3841,7 +3837,6 @@ class SBTPage extends Component<any, any> {
     });
 
     return SbtPageAdminActions({
-      buildInviteLink,
       burnLabel: t('burn'),
       burnSearchInput,
       burnSearchResultRecord,
@@ -3857,6 +3852,7 @@ class SBTPage extends Component<any, any> {
       onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
       openMintAutoJoinUrl,
       openMintUrlCopyIconState,
+      passwordInviteLinkContext,
       passwordGenerationCount,
       sbtLabel: t('sbt'),
     });

@@ -53,7 +53,6 @@ const createDisplayPlan = (
 const createProps = (
   overrides: Partial<React.ComponentProps<typeof SbtPageAdminActions>> = {}
 ) => ({
-  buildInviteLink: (code: string) => `https://session.example.test/join?code=${encodeURIComponent(code)}`,
   burnLabel: 'Burn',
   burnSearchInput: '0xabc',
   burnSearchResultRecord: {
@@ -74,6 +73,14 @@ const createProps = (
   openMintUrlCopyIconState: {
     shouldRenderCopiedIcon: false,
     shouldRenderDefaultIcon: true,
+  },
+  passwordInviteLinkContext: {
+    baseUrl: 'https://session.example.test',
+    demoPath: '',
+    encodeGroupPassword: null,
+    isInvite: false,
+    sbtAddr: '0xsbt',
+    sbtBasePathValue: '/join',
   },
   passwordGenerationCount: '3',
   sbtLabel: 'SBT',
@@ -133,7 +140,7 @@ describe('SbtPageAdminActions', () => {
     expect(screen.getByText('Generate Additional Password Invites')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join?code=claim-one'
+      'https://session.example.test/join/0xsbt/claim-one'
     );
 
     fireEvent.change(screen.getByPlaceholderText('Number of additional passwords'), {
@@ -281,7 +288,7 @@ describe('SbtPageAdminActions', () => {
     expect(screen.getByText('Previously Generated Password Invites')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join?code=claim-one'
+      'https://session.example.test/join/0xsbt/claim-one'
     );
 
     rerender(
