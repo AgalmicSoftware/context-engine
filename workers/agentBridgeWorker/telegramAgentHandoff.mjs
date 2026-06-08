@@ -4129,6 +4129,10 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   });
   const draftEditOptIn = settings.draftDivergenceOptIn === true;
   let reviewRequired = false;
+  if (rootSubmitRequested && entries.length === 0) {
+    submitRequestedCount = 1;
+    skipped.push({ questionId: '', reason: 'preference_entries_missing' });
+  }
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
     const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);

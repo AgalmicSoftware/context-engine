@@ -1979,6 +1979,30 @@ test('Telegram agent can read active questions and draft preferences after group
   const submitRecordsAfterBadReference = Array.from(env.AGENT_ACTION_KV.store.entries())
     .filter(([key]) => String(key).startsWith('telegram:submit-request:'));
   assert.equal(submitRecordsAfterBadReference.length, 2);
+
+  const emptySubmitResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/preferences', {
+      method: 'POST',
+      body: {
+        telegramUserId: '42',
+        groupChatId: '-100123',
+        sessionSlug: 'alpha',
+        submit: true,
+        humanApproved: true,
+        preferences: {
+          answersByQuestionId: {},
+        },
+      },
+    }),
+    env,
+  });
+  const emptySubmit = await jsonBody(emptySubmitResponse);
+  assert.equal(emptySubmitResponse.status, 422);
+  assert.equal(emptySubmit.ok, false);
+  assert.equal(emptySubmit.reason, 'direct_submit_incomplete');
+  assert.equal(emptySubmit.submitRequestedCount, 1);
+  assert.equal(emptySubmit.submittedCount, 0);
+  assert.deepEqual(emptySubmit.skipped, [{ questionId: '', reason: 'preference_entries_missing' }]);
 });
 
 test('Telegram agent can read and render topic-map results without raw response records', async () => {
