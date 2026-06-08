@@ -6322,7 +6322,15 @@ function telegramMiniAppHtml() {
     }
     .sessionOption input { width: 18px; height: 18px; accent-color: var(--accent); }
     .sessionActions { display: flex; justify-content: flex-end; }
-    .questionStack { display: grid; gap: 18px; min-height: 0; padding: 2px 0 8px; }
+    .questionStack {
+      display: grid;
+      gap: 18px;
+      min-height: 0;
+      min-width: 0;
+      max-width: 100%;
+      overflow-x: hidden;
+      padding: 2px 0 8px;
+    }
     .loadMoreQuestions { justify-self: center; min-width: min(100%, 280px); }
     .questionVotes {
       display: grid;
@@ -6399,6 +6407,9 @@ function telegramMiniAppHtml() {
       background: var(--surface);
       display: grid;
       grid-template-rows: auto auto;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
       box-shadow: var(--question-card-shadow);
     }
     .card[data-active="true"] {
@@ -6417,7 +6428,7 @@ function telegramMiniAppHtml() {
       gap: 10px;
       align-items: start;
     }
-    .cardHeadText { min-width: 0; }
+    .cardHeadText { min-width: 0; max-width: 100%; }
     .cardToggle {
       min-width: 36px;
       min-height: 36px;
@@ -6438,12 +6449,19 @@ function telegramMiniAppHtml() {
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-    .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
-    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; }
+    .prompt {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.28;
+      letter-spacing: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; min-width: 0; max-width: 100%; }
     .card.collapsed .expandedOnly { display: none; }
     .cardActions { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .cardActions[hidden] { display: none; }
-    .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
+    .segmented, .choices, .ratingTicks { display: grid; gap: 8px; min-width: 0; max-width: 100%; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .choices { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
     .choice, .segment {
@@ -6454,6 +6472,9 @@ function telegramMiniAppHtml() {
       background: rgba(255, 255, 255, 0.06);
       color: var(--text);
       text-align: center;
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
     .choice.selected {
       background: var(--accent);
@@ -6495,8 +6516,8 @@ function telegramMiniAppHtml() {
       border-color: #f44336;
       color: #ffffff;
     }
-    .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); overflow-wrap: anywhere; }
+    input[type="range"] { width: 100%; min-width: 0; max-width: 100%; accent-color: var(--accent); }
     textarea {
       width: 100%;
       min-height: 104px;
@@ -6512,6 +6533,8 @@ function telegramMiniAppHtml() {
       grid-template-columns: minmax(0, 3fr) minmax(56px, 1fr);
       gap: 8px;
       align-items: stretch;
+      min-width: 0;
+      max-width: 100%;
     }
     .freeformAnswerBox textarea,
     .freeformAnswerBox .micButton {

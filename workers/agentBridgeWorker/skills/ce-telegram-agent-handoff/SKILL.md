@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v31)
+**Skill version:** 2026-06-08 (v32)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -183,7 +183,7 @@ reads as the same stale-skill signal.
 - Use either a worker service token, a trusted Geo/Hermes invite onboarding token, or a user-scoped agent token.
 - For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
 - For a trusted Geo/Hermes invite, the agent receives an invite token from the Geo node/link and a verified Telegram user id from its own Telegram context, then calls `POST /telegram/agent/api/invite/onboard` to mint a user-scoped `ceagt_...` token. After that, use the returned `ceagt_...` token exactly like copied bot install info.
-- For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
+- For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. If CE already says onboarding is complete, the same screen offers `Copy New Agent Info`; use it to mint a fresh token for another agent surface. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
 - Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`; never ask the user for a Telegram handle/id just to use a `ceagt_...` token. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
 - Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal copied-token external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=31",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=32",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -309,9 +309,11 @@ POST /telegram/agent/api/miniapp/onboard
 
 The worker validates the Telegram initData server-side and returns that user's
 own `ceagt_...` token, worker URL, session slug, expiry, and skill name. The
-token is never written into the shared group message. The DM deep-link
-`Onboard Agent` path remains available as the fallback when the Direct Link Mini
-App short name is not configured.
+endpoint may be called again for the same Telegram user to mint a fresh token
+and revoke the prior user pointer, so it is suitable when an already-onboarded
+user needs a new agent credential. The token is never written into the shared
+group message. The DM deep-link `Onboard Agent` path remains available as the
+fallback when the Direct Link Mini App short name is not configured.
 
 ### Sensemaking Trial Deep Link
 
@@ -431,9 +433,13 @@ token was obtained. If this is a trusted Geo/Hermes invite flow and Hermes
 still has the invite token plus the observed Telegram `from.id`, call
 `POST /telegram/agent/api/invite/onboard` once more, replace the stored
 `ceagt_...` token with the newly returned token, and retry the CE request with
-that exact bearer token. If there is no trusted invite context, ask the user to
-refresh through the Context Engine Telegram bot's `Onboard Agent` flow. Do not
-keep retrying a missing, expired, or inactive token.
+that exact bearer token. This is an idempotent refresh path for already
+onboarded users; do not ask them to redo preference onboarding unless the
+returned onboarding state says preferences are incomplete. If there is no
+trusted invite context, ask the user to refresh through the Context Engine
+Telegram bot's `Onboard Agent` flow and tap `Copy New Agent Info` if the bot
+reports that Context Engine is already enabled. Do not keep retrying a missing,
+expired, or inactive token.
 
 Before using personal data, ask the user what may be used in this CE flow. The
 worker exposes a first-run onboarding endpoint for this:
@@ -1441,6 +1447,16 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v32)
+
+- Already-onboarded Telegram users can mint fresh copied agent install info
+  from the bot instead of getting stuck at a Mini App-only screen.
+- Clarified the trusted invite refresh loop: on `agent_token_*` 401s, re-run
+  invite onboarding with the observed Telegram id, replace the stored token,
+  and retry once without making the user redo completed preferences.
+- Mini App question cards now constrain long prompts, rating sliders, and
+  answer controls to the Telegram viewport.
 
 ### 2026-06-08 (v31)
 

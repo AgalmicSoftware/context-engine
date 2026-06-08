@@ -4854,7 +4854,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=19/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=32/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);
@@ -5080,6 +5080,7 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
   assert.match(linkedAgain.response.text, /Context Engine is already enabled/);
   assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
   assert.equal(JSON.stringify(linkedAgain).includes('ceagt_'), false);
   assert.equal(secondPointer.tokenHash, firstPointer.tokenHash);
@@ -5125,8 +5126,67 @@ test('private Onboard Agent callback opens Mini App when already onboarded', asy
   assert.equal(result.response.method, 'editMessageText');
   assert.equal(result.callbackQueryId, 'onboard-existing-tap');
   assert.equal(buttons.some((button) => button.text === 'Copy Agent Info'), false);
+  assert.equal(buttons.some((button) => button.text === 'Copy New Agent Info'), true);
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
   assert.equal(JSON.stringify(result).includes('ceagt_'), false);
+});
+
+test('already-onboarded agent screen can mint a fresh copy token on demand', async () => {
+  const now = '2026-05-08T12:00:00.000Z';
+  const env = agentTokenEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const first = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const firstCopy = flattenButtons(first.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  assert.equal(firstLoaded.ok, true);
+
+  const linkedAgain = await buildTelegramCommandResponse({
+    update: privateMessage('/start agent_onboarding__alpha'),
+    env,
+    now,
+  });
+  const refreshButton = flattenButtons(linkedAgain.response.replyMarkup)
+    .find((button) => button.text === 'Copy New Agent Info');
+  assert.ok(refreshButton?.callback_data);
+
+  const refreshed = await buildTelegramCommandResponse({
+    update: {
+      update_id: 9206,
+      callback_query: {
+        id: 'onboard-refresh-token',
+        data: refreshButton.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 80,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now,
+  });
+  const refreshedCopy = flattenButtons(refreshed.response.replyMarkup)
+    .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
+  const refreshedToken = refreshedCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
+  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
+  const refreshedLoaded = await loadTelegramAgentDelegationToken({ env, token: refreshedToken, now });
+  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+
+  assert.equal(refreshed.screen, 'agent_token');
+  assert.equal(refreshed.response.method, 'editMessageText');
+  assert.equal(refreshed.callbackQueryId, 'onboard-refresh-token');
+  assert.match(refreshedToken, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.notEqual(refreshedToken, firstToken);
+  assert.equal(oldLoaded.ok, false);
+  assert.equal(refreshedLoaded.ok, true);
+  assert.equal(pointer.tokenHash, refreshedLoaded.tokenHash);
+  assert.match(refreshedCopy, /\ntoken=ceagt_/);
+  assert.equal(refreshed.response.text.includes(refreshedToken), false);
 });
 
 test('/start agent_onboarding non-default slug pins the session', async () => {

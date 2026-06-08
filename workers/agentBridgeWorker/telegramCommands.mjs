@@ -145,7 +145,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=19';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=32';
 const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/edge-2026';
 const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
@@ -3181,11 +3181,12 @@ async function buildAgentOnboardingStartResponse({
   messageId = '',
 } = {}) {
   if (normalized.chat?.isPrivate) {
+    const forceToken = normalized.forceAgentToken === true;
     const pointer = await readTelegramAgentDelegationTokenUserPointer({
       env,
       telegramUserId: normalized.user.telegramUserId,
     });
-    if (pointer.tokenHash) {
+    if (pointer.tokenHash && !forceToken) {
       return buildAgentAlreadyOnboardedResponse({
         normalized,
         command,
@@ -3259,6 +3260,16 @@ async function buildAgentAlreadyOnboardedResponse({
   });
   const rows = [];
   if (miniAppButton) rows.push([miniAppButton]);
+  const refreshTokenButton = await makeCallbackButton({
+    env,
+    label: 'Copy New Agent Info',
+    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug, forceToken: true },
+    seed: `agent_onboarded|refresh_token|${sessionSlug || 'default'}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  if (refreshTokenButton) rows.push([refreshTokenButton]);
   await appendBackToStartRow(rows, {
     env,
     normalized,
@@ -10011,7 +10022,10 @@ async function buildStartPayloadResponse({
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
     return buildAgentOnboardingStartResponse({
-      normalized,
+      normalized: {
+        ...normalized,
+        forceAgentToken: record.serverContextRef?.forceToken === true,
+      },
       command,
       env,
       sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
@@ -10363,7 +10377,10 @@ async function buildCallbackResponse({
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_TOKEN) {
     return attachCallbackQueryId(await buildAgentOnboardingStartResponse({
-      normalized,
+      normalized: {
+        ...normalized,
+        forceAgentToken: record.serverContextRef?.forceToken === true,
+      },
       command: 'callback:create_agent_token',
       env,
       sessionSlugOverride: sessionSlug,

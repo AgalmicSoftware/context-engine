@@ -269,7 +269,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes('--pile-shadow-light'), false);
   assert.equal(html.includes('-7px -7px 14px'), false);
   assert.match(html, /--question-card-shadow: 7px 7px 14px var\(--pile-shadow-dark\);/);
-  assert.match(html, /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*padding: 2px 0 8px;/);
+  assert.match(html, /\.questionStack \{[\s\S]*gap: 18px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow-x: hidden;[\s\S]*padding: 2px 0 8px;/);
   assert.match(html, /\.loadMoreQuestions/);
   assert.match(html, /function loadMoreQuestions\(\)/);
   assert.match(html, /stateUrl\.searchParams\.set\('questionLimit', String\(state\.questionLimit\)\);/);
@@ -278,7 +278,12 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /function shouldAutoExpandQuestions\(data\)/);
   assert.match(html, /setTimeout\(\(\) => load\(\), 0\);/);
   assert.match(html, /state\.questionLimit = FAST_INITIAL_QUESTION_LIMIT;/);
-  assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
+  assert.match(html, /\.card \{[\s\S]*border-radius: 20px;[\s\S]*min-width: 0;[\s\S]*max-width: 100%;[\s\S]*overflow: hidden;[\s\S]*box-shadow: var\(--question-card-shadow\);/);
+  assert.match(html, /\.prompt \{[\s\S]*overflow-wrap: anywhere;[\s\S]*word-break: break-word;/);
+  assert.match(html, /\.cardBody \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
+  assert.match(html, /\.segmented, \.choices, \.ratingTicks \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
+  assert.match(html, /\.choice, \.segment \{[\s\S]*min-width: 0;[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(html, /input\[type="range"\] \{[\s\S]*min-width: 0;[\s\S]*max-width: 100%;/);
   assert.match(html, /\.card\[data-active="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\), var\(--question-card-shadow\);/);
   assert.match(html, /\.card\[data-highlight="true"\] \{[\s\S]*box-shadow: inset 4px 0 0 var\(--settings-accent\), var\(--question-card-shadow\);/);
   assert.match(html, /\.filterButton\.active \{[\s\S]*background: var\(--filter-accent\);/);
