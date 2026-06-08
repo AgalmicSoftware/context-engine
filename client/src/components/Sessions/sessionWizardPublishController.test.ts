@@ -3,6 +3,7 @@ import {
   resolveSessionWizardPublishCompletionRequest,
   resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
+  resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
@@ -562,6 +563,74 @@ describe('resolveSessionWizardRegisterStepRequest', () => {
         metadataUriOverride: undefined,
         sessionFieldsOverride: undefined,
       },
+    });
+  });
+});
+
+describe('resolveSessionWizardRegisterIdentityDescriptor', () => {
+  it('normalizes register identity values without owning duplicate registry reads', () => {
+    expect(resolveSessionWizardRegisterIdentityDescriptor({
+      draftSlug: ' writers-room ',
+      sessionId: '00000000-0000-0000-0000-000000000001',
+      registryChainId: '84532',
+      sessionNetworkChainId: '11155420',
+      registryAddress: '0x0000000000000000000000000000000000000abc',
+    })).toEqual({
+      status: 'ready',
+      blockedReason: '',
+      registrySlug: 'writers-room',
+      sessionIdHexValue: '0x00000000000000000000000000000001',
+      registryChainIdValue: 84532,
+      statusMessage: '',
+    });
+  });
+
+  it('keeps the on-chain general slug mapping and falls back to the session chain id', () => {
+    expect(resolveSessionWizardRegisterIdentityDescriptor({
+      draftSlug: '',
+      sessionId: '0x00000000000000000000000000000002',
+      registryChainId: '',
+      sessionNetworkChainId: 11155420,
+      registryAddress: '0x0000000000000000000000000000000000000abc',
+    })).toEqual({
+      status: 'ready',
+      blockedReason: '',
+      registrySlug: 'general',
+      sessionIdHexValue: '0x00000000000000000000000000000002',
+      registryChainIdValue: 11155420,
+      statusMessage: '',
+    });
+  });
+
+  it('describes missing session id and registry address using the existing messages', () => {
+    expect(resolveSessionWizardRegisterIdentityDescriptor({
+      draftSlug: 'writers-room',
+      sessionId: '',
+      registryChainId: 84532,
+      sessionNetworkChainId: 11155420,
+      registryAddress: '0x0000000000000000000000000000000000000abc',
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'session-id-required',
+      registrySlug: 'writers-room',
+      sessionIdHexValue: '',
+      registryChainIdValue: 84532,
+      statusMessage: 'Session ID (UUID) is required.',
+    });
+
+    expect(resolveSessionWizardRegisterIdentityDescriptor({
+      draftSlug: 'writers-room',
+      sessionId: '0x00000000000000000000000000000003',
+      registryChainId: 84532,
+      sessionNetworkChainId: 11155420,
+      registryAddress: '',
+    })).toEqual({
+      status: 'blocked',
+      blockedReason: 'registry-address-required',
+      registrySlug: 'writers-room',
+      sessionIdHexValue: '0x00000000000000000000000000000003',
+      registryChainIdValue: 84532,
+      statusMessage: 'Registry address is not configured for this chain.',
     });
   });
 });
