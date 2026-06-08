@@ -29,6 +29,7 @@ import {
 } from './SbtListDisplayCards';
 import {
   SbtListInitialLoader,
+  SbtListSectionBody,
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
@@ -2696,14 +2697,15 @@ const SBTsList = ({
   };
 
   const renderFeaturedSection = () => {
-    if (displayedFeatured.length === 0) {
-      if (showFeaturedSectionLoadingHint) return renderSectionLoadingHint();
-      return <div className={styles.sectionEmptyHint}>{`No featured ${t('sbtsLower')}.`}</div>;
-    }
     return (
-      <div className={styles.featuredSBTsContainer}>
+      <SbtListSectionBody
+        emptyLabel={`No featured ${t('sbtsLower')}.`}
+        hasItems={displayedFeatured.length > 0}
+        loadingHint={showFeaturedSectionLoadingHint ? renderSectionLoadingHint() : null}
+        wrapClassName={styles.featuredSBTsContainer}
+      >
         {displayedFeatured.map(renderFeaturedSBTCard)}
-      </div>
+      </SbtListSectionBody>
     );
   };
 
@@ -3074,33 +3076,34 @@ const SBTsList = ({
         {allSessionsMode && showCommunityTabCompactSettings && !showAdminButtons && renderSessionUniverseSelector()}
 
         {renderSectionTitle(`Featured ${t('sbts')}`, 'section-spinner-featured')}
-        {miniFeatured.length > 0 ? (
-          <div className={styles.sbtGrid}>
-            {miniFeatured.map(renderFeaturedSBTCard)}
-          </div>
-        ) : showFeaturedSectionLoadingHint ? (
-          renderSectionLoadingHint()
-        ) : (
-          <div className={styles.sectionEmptyHint}>{`No featured ${t('sbtsLower')}.`}</div>
-        )}
+        <SbtListSectionBody
+          emptyLabel={`No featured ${t('sbtsLower')}.`}
+          hasItems={miniFeatured.length > 0}
+          loadingHint={showFeaturedSectionLoadingHint ? renderSectionLoadingHint() : null}
+          wrapClassName={styles.sbtGrid}
+        >
+          {miniFeatured.map(renderFeaturedSBTCard)}
+        </SbtListSectionBody>
 
         {renderSectionTitle(`${t('minting')} Live`, 'section-spinner-live')}
-        {miniMintingLive.length > 0 ? (
-          <div className={styles.sbtGrid}>{miniMintingLive.map(renderSBTButton)}</div>
-        ) : showLiveSectionLoadingHint ? (
-          renderSectionLoadingHint()
-        ) : (
-          <div className={styles.sectionEmptyHint}>{`No live ${t('sbtsLower')}.`}</div>
-        )}
+        <SbtListSectionBody
+          emptyLabel={`No live ${t('sbtsLower')}.`}
+          hasItems={miniMintingLive.length > 0}
+          loadingHint={showLiveSectionLoadingHint ? renderSectionLoadingHint() : null}
+          wrapClassName={styles.sbtGrid}
+        >
+          {miniMintingLive.map(renderSBTButton)}
+        </SbtListSectionBody>
 
         {renderSectionTitle(`${t('minting')} Expired`, 'section-spinner-expired')}
-        {miniExpired.length > 0 ? (
-          <div className={styles.sbtGrid}>{miniExpired.map(renderSBTButton)}</div>
-        ) : showExpiredSectionLoadingHint ? (
-          renderSectionLoadingHint()
-        ) : (
-          <div className={styles.sectionEmptyHint}>{`No expired ${t('sbtsLower')}.`}</div>
-        )}
+        <SbtListSectionBody
+          emptyLabel={`No expired ${t('sbtsLower')}.`}
+          hasItems={miniExpired.length > 0}
+          loadingHint={showExpiredSectionLoadingHint ? renderSectionLoadingHint() : null}
+          wrapClassName={styles.sbtGrid}
+        >
+          {miniExpired.map(renderSBTButton)}
+        </SbtListSectionBody>
       </div>
     );
   }
@@ -3223,22 +3226,22 @@ const SBTsList = ({
       )}
 
       {renderSectionTitle(`${t('minting')} Live`, 'section-spinner-live')}
-      {mintingLiveListWithoutFeatured.length > 0 ? (
-        mintingLiveListWithoutFeatured.map(renderSBTButton)
-      ) : showLiveSectionLoadingHint ? (
-        renderSectionLoadingHint()
-      ) : (
-        <div className={styles.sectionEmptyHint}>{`No live ${t('sbtsLower')}.`}</div>
-      )}
+      <SbtListSectionBody
+        emptyLabel={`No live ${t('sbtsLower')}.`}
+        hasItems={mintingLiveListWithoutFeatured.length > 0}
+        loadingHint={showLiveSectionLoadingHint ? renderSectionLoadingHint() : null}
+      >
+        {mintingLiveListWithoutFeatured.map(renderSBTButton)}
+      </SbtListSectionBody>
 
       {renderSectionTitle(`${t('minting')} Expired`, 'section-spinner-expired')}
-      {expiredListWithoutFeatured.length > 0 ? (
-        expiredListWithoutFeatured.map(renderSBTButton)
-      ) : showExpiredSectionLoadingHint ? (
-        renderSectionLoadingHint()
-      ) : (
-        <div className={styles.sectionEmptyHint}>{`No expired ${t('sbtsLower')}.`}</div>
-      )}
+      <SbtListSectionBody
+        emptyLabel={`No expired ${t('sbtsLower')}.`}
+        hasItems={expiredListWithoutFeatured.length > 0}
+        loadingHint={showExpiredSectionLoadingHint ? renderSectionLoadingHint() : null}
+      >
+        {expiredListWithoutFeatured.map(renderSBTButton)}
+      </SbtListSectionBody>
       <TagModal
         isOpen={!!activeTag}
         toggle={() => setActiveTag('')}
