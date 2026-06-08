@@ -80,9 +80,11 @@ export {
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
+  resolveSbtListSectionLoadingState,
 } from './sbtListSessionLoadingHelpers';
 export type {
   SbtListLiveProgressSnapshot,
+  SbtListSectionLoadingState,
   SbtListSessionChipState,
   SbtListSessionChipStateBySlug,
   SbtListSessionLoadingStatus,
