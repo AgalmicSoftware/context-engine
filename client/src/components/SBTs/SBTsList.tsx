@@ -83,6 +83,7 @@ import {
   buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
+  collectSbtListLinkedScopedEntries,
   dedupeNormalizedSbtListSlugs,
   getSbtCardDetails,
   getVisibleSbtListSessionSlugsFromEntries,
@@ -92,7 +93,6 @@ import {
   isModifiedSbtListPointerNavigation,
   isSbtListManagedDgCacheName,
   normalizeSbtListAddressLower,
-  pickNormalizedSbtListSessionSlug,
   readSbtListShowDemoSessions,
   readSbtListUniverseCollapsedState,
   readSbtListSyncBarResearchBlockStep,
@@ -125,6 +125,7 @@ import type {
   SbtCardDetails,
   SbtPassiveLatestLookupInFlightBySlug,
   SbtPassiveLatestLookupStateBySlug,
+  SbtListScopedEntryOptions,
 } from './sbtListHelpers';
 
 const sbtLog = createLogger('sbt');
@@ -163,13 +164,6 @@ type SbtListItem = UnknownRecord & {
   sessionSlugExplicit?: unknown;
   slug?: unknown;
   __sourceSessionSlug?: unknown;
-};
-type SbtListScopedCacheEntry = UnknownRecord & {
-  slug?: unknown;
-  value?: unknown;
-};
-type SbtListScopedEntryOptions = {
-  requireConcreteBinding?: boolean;
 };
 type SbtListPointerEventLike = {
   altKey?: boolean;
@@ -1235,65 +1229,21 @@ const SBTsList = ({
     targetSlugs: unknown = [],
     options: SbtListScopedEntryOptions = {}
   ): SbtListItem[] => {
-    const targetSlugSet = new Set<string>(dedupeNormalizedSbtListSlugs(targetSlugs));
-    if (targetSlugSet.size === 0) return [];
-
-    let knownEntries: SbtListScopedCacheEntry[] = [];
+    let knownEntries: unknown[] = [];
     try {
       const entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
-      knownEntries = Array.isArray(entries) ? entries as SbtListScopedCacheEntry[] : [];
+      knownEntries = Array.isArray(entries) ? entries : [];
     } catch (_) {
       return [];
     }
 
-    const requireConcreteBinding = options?.requireConcreteBinding === true;
-    const out: SbtListItem[] = [];
-    const seen = new Set<string>();
-
-    knownEntries.forEach(({ slug: cacheSlug, value }) => {
-      const sourceSlug = normalizeSessionSlug(cacheSlug || '');
-      const cacheValue = isRecord(value) ? value : null;
-      if (!cacheValue) return;
-
-      Object.values(cacheValue).forEach((netNode) => {
-        const scopedList = isRecord(netNode) && isRecord(netNode.sbtList) ? netNode.sbtList : null;
-        if (!scopedList) return;
-
-        Object.entries(scopedList).forEach(([cacheAddress, entry]) => {
-          const rawEntry = isRecord(entry) ? entry as SbtListItem : {};
-          const entryWithSource: SbtListItem = {
-            ...rawEntry,
-            sbtAddress: rawEntry?.sbtAddress || cacheAddress,
-            __sourceSessionSlug: pickNormalizedSbtListSessionSlug(rawEntry?.__sourceSessionSlug, sourceSlug),
-            slug: pickNormalizedSbtListSessionSlug(rawEntry?.slug, sourceSlug),
-          };
-          const addrLower = String(entryWithSource?.sbtAddress || '').trim().toLowerCase();
-          if (!addrLower || seen.has(addrLower)) return;
-
-          const concreteBindingSlug = resolveConcreteSessionBindingSlug(entryWithSource);
-          const bindingInScope = (
-            concreteBindingSlug != null &&
-            targetSlugSet.has(normalizeSessionSlug(concreteBindingSlug))
-          );
-          if (requireConcreteBinding && !bindingInScope) return;
-
-          const resolvedSlug = normalizeSessionSlug(
-            resolveSbtSessionSlug(entryWithSource) || entryWithSource?.slug || sourceSlug
-          );
-          const resolvedInScope = targetSlugSet.has(resolvedSlug);
-          if (!requireConcreteBinding && !bindingInScope && !resolvedInScope) return;
-
-          seen.add(addrLower);
-          out.push(
-            bindingInScope
-              ? { ...entryWithSource, slug: normalizeSessionSlug(concreteBindingSlug || '') }
-              : { ...entryWithSource, slug: resolvedSlug }
-          );
-        });
-      });
-    });
-
-    return out;
+    return collectSbtListLinkedScopedEntries({
+      entries: knownEntries,
+      options,
+      resolveConcreteSessionBindingSlug,
+      resolveSbtSessionSlug,
+      targetSlugs,
+    }) as SbtListItem[];
   }, [resolveConcreteSessionBindingSlug, resolveSbtSessionSlug]);
 
   const sbtList = useMemo(() => {
