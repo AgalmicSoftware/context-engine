@@ -84,6 +84,13 @@ export type SbtListSessionChipState = {
 
 export type SbtListSessionChipStateBySlug = Record<string, SbtListSessionChipState | undefined>;
 
+export type SbtListSectionLoadingState = {
+  refreshButtonBusy: boolean;
+  sectionSessionDiscoveryPending: boolean;
+  sectionSessionSearchFlag: boolean;
+  shouldKeepSectionSpinnersOn: boolean;
+};
+
 type BuildSbtListSessionLoadingStatusArgs = {
   allSessionsMode?: boolean;
   alwaysShow?: boolean;
@@ -121,6 +128,25 @@ type BuildSbtListSessionChipStateBySlugArgs = {
   sbtListBySlug?: Record<string, unknown>;
   sessionHasLoadedOnceBySlug?: Record<string, unknown>;
   sessionLoadStateBySlug?: Record<string, unknown>;
+};
+
+type ResolveSbtListSectionLoadingStateArgs = {
+  getSessionProgressSnapshot?: (slug: string) => {
+    deferred?: unknown;
+    hasLatest?: unknown;
+    remainingBlocks?: unknown;
+    scanInProgress?: unknown;
+  } | null;
+  hasNoSessionCards?: unknown;
+  isSBTCacheReady?: unknown;
+  loading?: unknown;
+  refreshing?: unknown;
+  revisionSyncPending?: unknown;
+  sbtListBySlug?: Record<string, unknown>;
+  sectionSessionSlugs?: unknown;
+  sessionHasLoadedOnceBySlug?: Record<string, unknown>;
+  sessionLoadStateBySlug?: Record<string, unknown>;
+  sessionUniverseRegistryPending?: unknown;
 };
 
 type BuildSbtListSessionProgressSnapshotArgs = {
@@ -277,6 +303,74 @@ export const buildSbtListChipLoadingStatusBySlug = ({
   });
 
   return out;
+};
+
+export const resolveSbtListSectionLoadingState = ({
+  getSessionProgressSnapshot = () => null,
+  hasNoSessionCards = false,
+  isSBTCacheReady = false,
+  loading = false,
+  refreshing = false,
+  revisionSyncPending = false,
+  sbtListBySlug = {},
+  sectionSessionSlugs = [],
+  sessionHasLoadedOnceBySlug = {},
+  sessionLoadStateBySlug = {},
+  sessionUniverseRegistryPending = false,
+}: ResolveSbtListSectionLoadingStateArgs = {}): SbtListSectionLoadingState => {
+  const slugs = Array.isArray(sectionSessionSlugs) ? sectionSessionSlugs : [];
+  const sectionSessionDiscoveryPending = slugs.length > 0 && slugs.some((slugRaw) => {
+    const slug = normalizeSbtListStatusSlug(slugRaw);
+    if (isSbtListSyntheticNoSessionSlug(slug)) {
+      const anySessionLoaded = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
+      if (refreshing) return true;
+      if (hasNoSessionCards) return false;
+      if (!isSBTCacheReady) return true;
+      if (sessionUniverseRegistryPending) return true;
+      return !anySessionLoaded;
+    }
+
+    const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
+    const listForSlug = sbtListBySlug[slug];
+    const hasCards = Array.isArray(listForSlug) && listForSlug.length > 0;
+    const loadState = sessionLoadStateBySlug[slug] || 'idle';
+    const snapshot = getSessionProgressSnapshot(slug);
+    const scanInProgress = !!snapshot?.scanInProgress;
+    const deferred = !!snapshot?.deferred;
+    const hasKnownLatest = !!snapshot?.hasLatest;
+    const blocksRemaining = Number(snapshot?.remainingBlocks || 0);
+
+    if (loadState === 'loading') return true;
+    if (refreshing) return true;
+    if (!hasCards && !isSBTCacheReady) return true;
+    if (!hasCards && hasKnownLatest && blocksRemaining > 0 && (
+      !isSBTCacheReady || scanInProgress || deferred || revisionSyncPending
+    )) return true;
+    if (!hasCards && sessionUniverseRegistryPending) return true;
+    return !hasLoadedOnce && !hasCards;
+  });
+  const sectionSessionSearchFlag = slugs.some((slugRaw) => {
+    const slug = normalizeSbtListStatusSlug(slugRaw);
+    const snapshot = getSessionProgressSnapshot(slug);
+    return !!(snapshot?.scanInProgress || snapshot?.deferred);
+  });
+
+  return {
+    sectionSessionDiscoveryPending,
+    sectionSessionSearchFlag,
+    shouldKeepSectionSpinnersOn: !!(
+      loading ||
+      refreshing ||
+      revisionSyncPending ||
+      sectionSessionDiscoveryPending ||
+      sectionSessionSearchFlag
+    ),
+    refreshButtonBusy: !!(
+      refreshing ||
+      sectionSessionDiscoveryPending ||
+      sectionSessionSearchFlag
+    ),
+  };
 };
 
 export const buildSbtListSessionChipStateBySlug = ({

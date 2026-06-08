@@ -118,6 +118,7 @@ import {
   resolveSbtListRealtimeProgressRetentionPlan,
   resolveSbtListSelectedSessionUniverseSlugs,
   resolveSbtListSelectedHiddenRegistrySessionSlugs,
+  resolveSbtListSectionLoadingState,
   resolveSbtListSectionSessionSlugs,
   resolveSbtListSessionUniverseSnapshotUpdate,
   resolveSbtListCreateGroupInitialVisibility,
@@ -1632,68 +1633,38 @@ const SBTsList = ({
     commitChipProgressVisibility,
   ]);
 
-  const sectionSessionDiscoveryPending = useMemo(() => {
-    if (!sectionSessionSlugs.length) return false;
-    return sectionSessionSlugs.some((slugRaw: unknown) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug)) {
-        const anySessionLoaded = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
-        if (refreshing) return true;
-        if (hasNoSessionCards) return false;
-        if (!isSBTCacheReady) return true;
-        if (sessionUniverseRegistryPending) return true;
-        return !anySessionLoaded;
-      }
-      const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
-      const hasCards = Array.isArray(sbtListBySlug[slug]) && sbtListBySlug[slug].length > 0;
-      const loadState = sessionLoadStateBySlug[slug] || 'idle';
-      const snapshot = getSessionProgressSnapshot(slug);
-      const scanInProgress = !!snapshot?.scanInProgress;
-      const deferred = !!snapshot?.deferred;
-      const hasKnownLatest = !!snapshot?.hasLatest;
-      const blocksRemaining = Number(snapshot?.remainingBlocks || 0);
-      if (loadState === 'loading') return true;
-      if (refreshing) return true;
-      if (!hasCards && !isSBTCacheReady) return true;
-      if (!hasCards && hasKnownLatest && blocksRemaining > 0 && (
-        !isSBTCacheReady || scanInProgress || deferred || revisionSyncPending
-      )) return true;
-      if (!hasCards && sessionUniverseRegistryPending) return true;
-      return !hasLoadedOnce && !hasCards;
+  const {
+    sectionSessionDiscoveryPending,
+    sectionSessionSearchFlag,
+    shouldKeepSectionSpinnersOn,
+    refreshButtonBusy,
+  } = useMemo(() => {
+    return resolveSbtListSectionLoadingState({
+      getSessionProgressSnapshot,
+      hasNoSessionCards,
+      isSBTCacheReady,
+      loading,
+      refreshing,
+      revisionSyncPending,
+      sbtListBySlug,
+      sectionSessionSlugs,
+      sessionHasLoadedOnceBySlug,
+      sessionLoadStateBySlug,
+      sessionUniverseRegistryPending,
     });
   }, [
-    isSBTCacheReady,
     getSessionProgressSnapshot,
-    revisionSyncPending,
-    refreshing,
     hasNoSessionCards,
-    sectionSessionSlugs,
+    isSBTCacheReady,
+    loading,
+    refreshing,
+    revisionSyncPending,
     sbtListBySlug,
+    sectionSessionSlugs,
     sessionHasLoadedOnceBySlug,
     sessionLoadStateBySlug,
     sessionUniverseRegistryPending,
   ]);
-
-  const sectionSessionSearchFlag = useMemo(() => (
-    sectionSessionSlugs.some((slugRaw: unknown) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      const snapshot = getSessionProgressSnapshot(slug);
-      return !!(snapshot?.scanInProgress || snapshot?.deferred);
-    })
-  ), [sectionSessionSlugs, getSessionProgressSnapshot]);
-
-  const shouldKeepSectionSpinnersOn = (
-    loading ||
-    refreshing ||
-    revisionSyncPending ||
-    sectionSessionDiscoveryPending ||
-    sectionSessionSearchFlag
-  );
-  const refreshButtonBusy = (
-    refreshing ||
-    sectionSessionDiscoveryPending ||
-    sectionSessionSearchFlag
-  );
   const SECTION_SPINNER_HIDE_DELAY_MS = 1200;
 
   useEffect(() => {
