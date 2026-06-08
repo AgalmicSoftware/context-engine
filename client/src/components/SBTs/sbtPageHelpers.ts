@@ -316,6 +316,17 @@ type ResolveSbtPageShouldRefreshCountsArgs = {
   mintedAddresses?: unknown;
   mintedTokensOverride?: unknown;
 };
+type ResolveSbtPageRefreshLifecyclePlanArgs = {
+  eventScanTried?: unknown;
+  parentOwnsInitialRefresh?: unknown;
+  refreshOptions?: unknown;
+  shouldRefreshCounts?: unknown;
+  usingCentralHydration?: unknown;
+};
+export type SbtPageRefreshLifecyclePlan = {
+  shouldPromoteToForcedCountsRefresh: boolean;
+  shouldRunEventScanRefresh: boolean;
+};
 type ResolveSbtPageOwnerLookupFallbackDecisionArgs = {
   burnedAddresses?: unknown;
   countsLoaded?: unknown;
@@ -1076,6 +1087,28 @@ export const resolveSbtPageShouldRefreshCounts = ({
     mintedTokensOverride == null
   )
 );
+
+export const resolveSbtPageRefreshLifecyclePlan = ({
+  eventScanTried = false,
+  parentOwnsInitialRefresh = false,
+  refreshOptions = null,
+  shouldRefreshCounts = false,
+  usingCentralHydration = false,
+}: ResolveSbtPageRefreshLifecyclePlanArgs = {}): SbtPageRefreshLifecyclePlan => {
+  const shouldUseCentralRefresh = (
+    !!shouldRefreshCounts &&
+    !!usingCentralHydration &&
+    !parentOwnsInitialRefresh
+  );
+  const hasForcedCountsOptions = (
+    isRecord(refreshOptions) &&
+    !!refreshOptions.forceCounts
+  );
+  return {
+    shouldPromoteToForcedCountsRefresh: shouldUseCentralRefresh && !hasForcedCountsOptions,
+    shouldRunEventScanRefresh: shouldUseCentralRefresh && !eventScanTried,
+  };
+};
 
 export const resolveSbtPageOwnerLookupFallbackDecision = ({
   burnedAddresses = [],

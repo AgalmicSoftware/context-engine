@@ -2,6 +2,7 @@ import {
   buildSbtPageRefreshOptions,
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
+  resolveSbtPageRefreshLifecyclePlan,
   resolveSbtPageShouldRefreshCounts,
 } from './sbtPageHelpers';
 
@@ -100,5 +101,58 @@ describe('sbtPageHelpers refresh helpers', () => {
       mintedTokensOverride: null,
       ownerLookupUpperBound: null,
     })).toBeNaN();
+  });
+
+  it('plans centralized refresh lifecycle work without owning refresh execution', () => {
+    expect(resolveSbtPageRefreshLifecyclePlan({
+      eventScanTried: false,
+      parentOwnsInitialRefresh: false,
+      refreshOptions: undefined,
+      shouldRefreshCounts: true,
+      usingCentralHydration: true,
+    })).toEqual({
+      shouldPromoteToForcedCountsRefresh: true,
+      shouldRunEventScanRefresh: true,
+    });
+    expect(resolveSbtPageRefreshLifecyclePlan({
+      eventScanTried: true,
+      parentOwnsInitialRefresh: false,
+      refreshOptions: { forceCounts: true },
+      shouldRefreshCounts: true,
+      usingCentralHydration: true,
+    })).toEqual({
+      shouldPromoteToForcedCountsRefresh: false,
+      shouldRunEventScanRefresh: false,
+    });
+    expect(resolveSbtPageRefreshLifecyclePlan({
+      eventScanTried: 'already-scanned',
+      parentOwnsInitialRefresh: false,
+      refreshOptions: { forceCounts: 1 },
+      shouldRefreshCounts: true,
+      usingCentralHydration: true,
+    })).toEqual({
+      shouldPromoteToForcedCountsRefresh: false,
+      shouldRunEventScanRefresh: false,
+    });
+    expect(resolveSbtPageRefreshLifecyclePlan({
+      eventScanTried: false,
+      parentOwnsInitialRefresh: true,
+      refreshOptions: null,
+      shouldRefreshCounts: true,
+      usingCentralHydration: true,
+    })).toEqual({
+      shouldPromoteToForcedCountsRefresh: false,
+      shouldRunEventScanRefresh: false,
+    });
+    expect(resolveSbtPageRefreshLifecyclePlan({
+      eventScanTried: false,
+      parentOwnsInitialRefresh: false,
+      refreshOptions: null,
+      shouldRefreshCounts: true,
+      usingCentralHydration: false,
+    })).toEqual({
+      shouldPromoteToForcedCountsRefresh: false,
+      shouldRunEventScanRefresh: false,
+    });
   });
 });
