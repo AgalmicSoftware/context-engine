@@ -32,6 +32,8 @@ import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysis
 import { buildSurveyResultsHtmlReportReadinessPlan } from './surveyResultsExportDisplayHelpers';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
+import SurveyResultsHtmlReportAnalysisControls from './SurveyResultsHtmlReportAnalysisControls';
+import SurveyResultsHtmlReportSectionTable from './SurveyResultsHtmlReportSectionTable';
 import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 import { callAI } from '../../utilities/ai/aiScripts.js';
@@ -162,6 +164,8 @@ const createAnalysisArtifact = (inputSignature = 'input-sig') => ({
 });
 
 const RESOLVABLE_COMPONENTS = new Set([
+  SurveyResultsHtmlReportAnalysisControls,
+  SurveyResultsHtmlReportSectionTable,
   SurveyResultsReportSurface,
 ]);
 const resolvedComponentCache = new WeakMap();
@@ -246,6 +250,12 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_COMPONENTS.has(node.type)) {
+    if (!resolvedComponentCache.has(node)) {
+      resolvedComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
 };
 
