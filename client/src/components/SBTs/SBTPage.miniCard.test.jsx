@@ -1,4 +1,5 @@
 import SBTPage from './SBTPage';
+import SbtPageMiniActionArea from './SbtPageMiniActionArea';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageMiniCardDisplay from './SbtPageMiniCardDisplay';
 import styles from './SBTPage.module.scss';
@@ -42,6 +43,7 @@ const createSubject = (props = {}) => {
 };
 
 const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SbtPageMiniActionArea,
   SbtPageMiniCardDisplay,
 ]);
 const resolvedTreeComponentCache = new WeakMap();
@@ -71,7 +73,15 @@ const flattenText = (node) => {
   if (node == null) return '';
   if (typeof node === 'string' || typeof node === 'number') return String(node);
   if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
-  if (typeof node === 'object') return flattenText(node?.props?.children);
+  if (typeof node === 'object') {
+    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+      if (!resolvedTreeComponentCache.has(node)) {
+        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+      }
+      return flattenText(resolvedTreeComponentCache.get(node));
+    }
+    return flattenText(node?.props?.children);
+  }
   return '';
 };
 
