@@ -125,7 +125,9 @@ import {
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
 import {
+  appendSessionWizardRegisterTxEntry,
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterStepRequest,
@@ -3593,16 +3595,15 @@ const SessionWizard = ({
         }
       } catch (e) { log.warn('SessionWizard: fallback', e); }
     } catch (err) {
-      const txHash = err?.transactionHash || err?.transaction?.hash || '';
-      if (txHash) {
-        setRegisterTxs((prev) => {
-          if (prev.some((entry) => entry.hash === txHash)) return prev;
-          return [...prev, { action: 'createSession', hash: txHash }];
-        });
+      const registerFailureSettlement = resolveSessionWizardRegisterFailureSettlementDescriptor({ error: err });
+      if (registerFailureSettlement.txEntry) {
+        setRegisterTxs((prev) => appendSessionWizardRegisterTxEntry(
+          prev,
+          registerFailureSettlement.txEntry
+        ));
       }
-      const errorMessage = err?.message || 'Failed to register session.';
-      setStatus(errorMessage);
-      throw err instanceof Error ? err : new Error(errorMessage);
+      setStatus(registerFailureSettlement.errorMessage);
+      throw err instanceof Error ? err : new Error(registerFailureSettlement.errorMessage);
     }
   };
 
