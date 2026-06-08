@@ -72,6 +72,7 @@ import {
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
+  buildSbtListChipProgressDesiredVisibilityBySlug,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRealtimeProgressInputPlan,
@@ -102,6 +103,7 @@ import {
   resolveSbtListConcreteSessionBindingSlug,
   resolveSbtListActionableSessionSlugs,
   resolveSbtListChipSelectedSessionSlugs,
+  resolveSbtListChipProgressVisibilityPlan,
   resolveSbtListClampedSelectedSessionSlugs,
   resolveSbtListDefaultSelectedSessionSlugs,
   resolveSbtListDisplayedSessionUniverseSlugs,
@@ -1526,15 +1528,11 @@ const SBTsList = ({
   ]);
 
   const chipProgressDesiredVisibilityBySlug = useMemo(() => {
-    if (!allSessionsMode) return {};
-    const out: SbtListBooleanBySlug = {};
-    Object.entries(chipLoadingStatusBySlug).forEach(([slugRaw, status]) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug) || !status) return;
-      const chipState = sessionChipStateBySlug[slug];
-      out[slug] = !!chipState?.isLoading;
-    });
-    return out;
+    return buildSbtListChipProgressDesiredVisibilityBySlug({
+      allSessionsMode,
+      chipLoadingStatusBySlug,
+      sessionChipStateBySlug,
+    }) as SbtListBooleanBySlug;
   }, [allSessionsMode, chipLoadingStatusBySlug, sessionChipStateBySlug]);
 
   const commitChipProgressVisibility = useCallback((
@@ -1571,74 +1569,72 @@ const SBTsList = ({
 
   useEffect(() => {
     chipProgressDesiredBySlugRef.current = chipProgressDesiredVisibilityBySlug;
-    const desiredSlugs = new Set(Object.keys(chipProgressDesiredVisibilityBySlug || {}));
-    const knownSlugs = new Set([
-      ...Object.keys(chipProgressVisibilityMetaRef.current || {}),
-      ...desiredSlugs,
-    ]);
     const nowMs = Date.now();
+    const visibilityPlan = resolveSbtListChipProgressVisibilityPlan({
+      desiredVisibilityBySlug: chipProgressDesiredVisibilityBySlug,
+      metaBySlug: chipProgressVisibilityMetaRef.current,
+      minVisibleMs: SBT_CHIP_PROGRESS_VISIBILITY_MIN_INTERVAL_MS,
+      nowMs,
+    });
 
-    knownSlugs.forEach((slug) => {
-      const normalizedSlug = normalizeSessionSlug(slug || '');
-      if (!desiredSlugs.has(normalizedSlug)) {
-        clearChipProgressVisibilityTimeout(normalizedSlug);
-        delete chipProgressVisibilityMetaRef.current[normalizedSlug];
+    visibilityPlan.actions.forEach((action) => {
+      if (action.type === 'remove') {
+        clearChipProgressVisibilityTimeout(action.slug);
+        delete chipProgressVisibilityMetaRef.current[action.slug];
         setChipProgressVisibilityBySlug((prev) => {
-          if (!Object.prototype.hasOwnProperty.call(prev || {}, normalizedSlug)) return prev;
+          if (!Object.prototype.hasOwnProperty.call(prev || {}, action.slug)) return prev;
           const next = { ...(prev || {}) };
-          delete next[normalizedSlug];
+          delete next[action.slug];
           return next;
         });
         return;
       }
 
-      const desiredVisible = !!chipProgressDesiredVisibilityBySlug[normalizedSlug];
-      const existingMeta = chipProgressVisibilityMetaRef.current[normalizedSlug];
-      if (!existingMeta) {
-        chipProgressVisibilityMetaRef.current[normalizedSlug] = {
-          visible: desiredVisible,
-          pendingVisible: desiredVisible,
+      if (action.type === 'initialize') {
+        chipProgressVisibilityMetaRef.current[action.slug] = {
+          visible: action.visible,
+          pendingVisible: action.visible,
           lastModeChangeAtMs: nowMs,
           timerId: null,
         };
-        if (desiredVisible) {
+        if (action.visible) {
           setChipProgressVisibilityBySlug((prev) => {
-            if (prev?.[normalizedSlug]) return prev;
-            return { ...(prev || {}), [normalizedSlug]: true };
+            if (prev?.[action.slug]) return prev;
+            return { ...(prev || {}), [action.slug]: true };
           });
         }
         return;
       }
 
-      if (!!existingMeta.visible === desiredVisible) {
-        clearChipProgressVisibilityTimeout(normalizedSlug);
-        chipProgressVisibilityMetaRef.current[normalizedSlug] = {
+      if (action.type === 'sync-pending') {
+        const existingMeta = chipProgressVisibilityMetaRef.current[action.slug] || {};
+        clearChipProgressVisibilityTimeout(action.slug);
+        chipProgressVisibilityMetaRef.current[action.slug] = {
           ...existingMeta,
-          pendingVisible: desiredVisible,
+          pendingVisible: action.visible,
           timerId: null,
         };
         return;
       }
 
-      const elapsedMs = nowMs - Number(existingMeta.lastModeChangeAtMs || 0);
-      if (elapsedMs >= SBT_CHIP_PROGRESS_VISIBILITY_MIN_INTERVAL_MS) {
-        commitChipProgressVisibility(normalizedSlug, desiredVisible, nowMs);
+      if (action.type === 'commit') {
+        commitChipProgressVisibility(action.slug, action.visible, nowMs);
         return;
       }
 
-      if (existingMeta.timerId && existingMeta.pendingVisible === desiredVisible) {
+      if (action.type === 'keep-timer') {
         return;
       }
 
-      clearChipProgressVisibilityTimeout(normalizedSlug);
-      const delayMs = Math.max(0, SBT_CHIP_PROGRESS_VISIBILITY_MIN_INTERVAL_MS - elapsedMs);
+      const existingMeta = chipProgressVisibilityMetaRef.current[action.slug] || {};
+      clearChipProgressVisibilityTimeout(action.slug);
       const timerId = setTimeout(() => {
-        const nextDesiredVisible = !!chipProgressDesiredBySlugRef.current?.[normalizedSlug];
-        commitChipProgressVisibility(normalizedSlug, nextDesiredVisible, Date.now());
-      }, delayMs);
-      chipProgressVisibilityMetaRef.current[normalizedSlug] = {
+        const nextDesiredVisible = !!chipProgressDesiredBySlugRef.current?.[action.slug];
+        commitChipProgressVisibility(action.slug, nextDesiredVisible, Date.now());
+      }, action.delayMs);
+      chipProgressVisibilityMetaRef.current[action.slug] = {
         ...existingMeta,
-        pendingVisible: desiredVisible,
+        pendingVisible: action.visible,
         timerId,
       };
     });
