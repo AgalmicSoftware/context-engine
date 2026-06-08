@@ -191,6 +191,22 @@ export type SessionWizardRegisterIdentityDescriptor = {
   statusMessage: string;
 };
 
+export type SessionWizardRegisterDuplicateCheckDescriptorInput = {
+  registryChainId?: unknown;
+  registrySlug?: unknown;
+  sessionIdHexValue?: unknown;
+};
+
+export type SessionWizardRegisterDuplicateCheckDescriptor = {
+  chainId: number;
+  registrySlug: string;
+  sessionIdHexValue: string;
+  shouldCheckSlug: boolean;
+  shouldCheckSessionId: boolean;
+  slugDuplicateMessage: string;
+  sessionIdDuplicateMessage: string;
+};
+
 export type SessionWizardRegisterArgsDescriptor = {
   metadataUriMissing: boolean;
   registerArgs: AnyRecord;
@@ -508,6 +524,25 @@ export const resolveSessionWizardRegisterIdentityDescriptor = ({
     sessionIdHexValue,
     registryChainIdValue,
     statusMessage: '',
+  };
+};
+
+export const resolveSessionWizardRegisterDuplicateCheckDescriptor = ({
+  registryChainId,
+  registrySlug,
+  sessionIdHexValue,
+}: SessionWizardRegisterDuplicateCheckDescriptorInput): SessionWizardRegisterDuplicateCheckDescriptor => {
+  const normalizedRegistrySlug = toStr(registrySlug).trim();
+  const normalizedSessionIdHexValue = toStr(sessionIdHexValue).trim();
+
+  return {
+    chainId: Number(registryChainId || 0),
+    registrySlug: normalizedRegistrySlug,
+    sessionIdHexValue: normalizedSessionIdHexValue,
+    shouldCheckSlug: !!normalizedRegistrySlug,
+    shouldCheckSessionId: !!normalizedSessionIdHexValue,
+    slugDuplicateMessage: `Session slug already exists on-chain: ${normalizedRegistrySlug}`,
+    sessionIdDuplicateMessage: 'Session ID already exists on-chain. Generate a new session ID.',
   };
 };
 
