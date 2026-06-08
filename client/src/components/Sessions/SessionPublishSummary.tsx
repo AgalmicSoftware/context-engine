@@ -119,12 +119,12 @@ const SessionPublishSummary = ({
   status,
 }: SessionPublishSummaryProps) => {
   const {
+    publishActionDisplayState,
     publishMetadataDisplayState,
     publishProgressDisplayState,
     publishReadiness,
   } = publishUiPlan;
   const {
-    canPublishNow,
     showUploadBlockedReason,
     uploadBlockedReason,
   } = publishReadiness;
@@ -150,22 +150,16 @@ const SessionPublishSummary = ({
               ))}
             </div>
             <SessionPublishActionControls
-              canPublishNow={canPublishNow}
-              isNormalMode
+              displayState={publishActionDisplayState}
               onPublish={onPublish}
               onTogglePublishAdvanced={onTogglePublishAdvanced}
-              publishAdvancedOpen={publishAdvancedOpen}
-              publishBusy={publishBusy}
             />
           </div>
         ) : (
           <SessionPublishActionControls
-            canPublishNow={canPublishNow}
-            isNormalMode={false}
+            displayState={publishActionDisplayState}
             onPublish={onPublish}
             onTogglePublishAdvanced={onTogglePublishAdvanced}
-            publishAdvancedOpen={publishAdvancedOpen}
-            publishBusy={publishBusy}
           />
         )}
 
