@@ -69,8 +69,6 @@ const buildPublishUiPlan = (overrides: Record<string, any> = {}) => {
 const buildProps = (
   overrides: Partial<React.ComponentProps<typeof SessionPublishSummary>> = {}
 ): React.ComponentProps<typeof SessionPublishSummary> => ({
-  isNormalMode: false,
-  wizardMode: 'advanced',
   isCollapsed: false,
   onToggleCollapsed: jest.fn(),
   normalModePublishSummary: [],
@@ -118,8 +116,6 @@ describe('SessionPublishSummary', () => {
     const { rerender } = render(
       <SessionPublishSummary
         {...buildProps({
-          isNormalMode: true,
-          wizardMode: 'normal',
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
           publishUiPlan: buildPublishUiPlan({
@@ -138,8 +134,6 @@ describe('SessionPublishSummary', () => {
     rerender(
       <SessionPublishSummary
         {...buildProps({
-          isNormalMode: true,
-          wizardMode: 'normal',
           normalModePublishSummary: [{ label: 'Session', value: 'Ready' }],
           onPublish,
           publishUiPlan: buildPublishUiPlan({

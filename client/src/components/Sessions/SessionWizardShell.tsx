@@ -330,8 +330,6 @@ const SessionWizardShell = ({
 
     {(!isNormalMode || !collapsedSections.publish) && (
       <SessionPublishSummary
-        isNormalMode={isNormalMode}
-        wizardMode={wizardMode}
         isCollapsed={collapsedSections.publish}
         onToggleCollapsed={() => toggleSection('publish')}
         normalModePublishSummary={normalModePublishSummary}
