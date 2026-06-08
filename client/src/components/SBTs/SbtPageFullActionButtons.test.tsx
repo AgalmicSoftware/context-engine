@@ -4,10 +4,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import {
   SbtPageBurnActionSurface,
   SbtPageMintActionSurface,
+  renderSbtPageFullActionSurfaces,
 } from './SbtPageFullActionButtons';
 import {
   resolveSbtPageBurnActionPlan,
   resolveSbtPageBurnStatusButtonState,
+  resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageMintButtonDisplayState,
   resolveSbtPageStatusButtonContentState,
   type SbtPageBurnActionPlan,
@@ -196,5 +198,77 @@ describe('SbtPageBurnActionSurface', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('renderSbtPageFullActionSurfaces', () => {
+  it('builds the full mint surface from named execution props', () => {
+    const onMint = jest.fn();
+    const surfaces = renderSbtPageFullActionSurfaces({
+      actionDisplayPlan: resolveSbtPageFullActionDisplayPlan({
+        account: '0xholder',
+        actionClassName: 'action-button',
+        burningStatus: 'idle',
+        mintButtonClassName: 'mint-button',
+        mintingStatus: 'idle',
+        nowSeconds: 100,
+        sbtInfo: activeSbtInfo,
+        userHasSBT: false,
+      }),
+      burnExecution: {
+        onBurn: jest.fn(),
+      },
+      groupPasswordInput: 'join-code',
+      mintExecution: {
+        onClaimWithInviteCode: jest.fn(),
+        onGroupPasswordInputChange: jest.fn(),
+        onManualPasswordInputChange: jest.fn(),
+        onMint,
+        onMintUnlimitedWithGroupPassword: jest.fn(),
+        onOpenMintTransaction: jest.fn(),
+      },
+    });
+
+    render(<>{surfaces.mintButton}{surfaces.burnButton}</>);
+    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+
+    expect(onMint).toHaveBeenCalledTimes(1);
+    expect(onMint).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('button', { name: 'Burn' })).toBeNull();
+  });
+
+  it('builds the full burn surface from named execution props', () => {
+    const onBurn = jest.fn();
+    const surfaces = renderSbtPageFullActionSurfaces({
+      actionDisplayPlan: resolveSbtPageFullActionDisplayPlan({
+        account: '0xholder',
+        actionClassName: 'action-button',
+        burnedLabel: 'Burned',
+        burningStatus: 'idle',
+        burnButtonClassName: 'burn-button',
+        burnLabel: 'Burn',
+        mintingStatus: 'idle',
+        nowSeconds: 100,
+        sbtInfo: activeSbtInfo,
+        userHasSBT: true,
+      }),
+      burnExecution: {
+        onBurn,
+      },
+      mintExecution: {
+        onClaimWithInviteCode: jest.fn(),
+        onGroupPasswordInputChange: jest.fn(),
+        onManualPasswordInputChange: jest.fn(),
+        onMint: jest.fn(),
+        onMintUnlimitedWithGroupPassword: jest.fn(),
+        onOpenMintTransaction: jest.fn(),
+      },
+    });
+
+    render(<>{surfaces.mintButton}{surfaces.burnButton}</>);
+    fireEvent.click(screen.getByRole('button', { name: 'Burn' }));
+
+    expect(onBurn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
   });
 });

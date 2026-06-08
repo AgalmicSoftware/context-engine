@@ -22,6 +22,7 @@ import SbtPageAdminSection from './SbtPageAdminSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
 import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageStatsSection from './SbtPageStatsSection';
+import type { SbtPageFullActionSurfaces } from './SbtPageFullActionButtons';
 import type {
   SbtPageHolderCountStatus,
   SbtPageHolderScanProgressDisplay,
@@ -111,6 +112,7 @@ type SbtPageFullViewCallbacks = {
 
 type RenderSbtPageFullViewArgs = {
   adminActions: React.ReactNode;
+  actionSurfaces: SbtPageFullActionSurfaces;
   actionLabels: {
     burn: string;
     burnedLower: string;
@@ -144,8 +146,6 @@ type RenderSbtPageFullViewArgs = {
   state: SbtPageFullViewState;
   workerScanInProgress?: unknown;
   workerScanPending?: unknown;
-  burnButton: React.ReactNode;
-  mintButton: React.ReactNode;
 };
 
 export const renderSbtPageFullViewLoading = ({
@@ -226,6 +226,7 @@ const renderSbtPageMintEndDisplay = ({
 export const renderSbtPageFullView = ({
   adminActions,
   actionLabels,
+  actionSurfaces,
   callbacks,
   defaultFeaturedSBTs,
   filterNetwork,
@@ -250,8 +251,6 @@ export const renderSbtPageFullView = ({
   state,
   workerScanInProgress,
   workerScanPending,
-  burnButton,
-  mintButton,
 }: RenderSbtPageFullViewArgs): React.ReactElement => {
   const {
     bookmarked,
@@ -457,14 +456,14 @@ export const renderSbtPageFullView = ({
             />
             <SbtPageActionsSection
               actionFeedbackState={actionFeedbackState}
-              burnButton={burnButton}
+              burnButton={actionSurfaces.burnButton}
               burnLabel={actionLabels.burn}
               burnedLowerLabel={actionLabels.burnedLower}
               copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
               errorCopyIconState={errorCopyIconState}
               errorMessage={error as React.ReactNode}
               getExplorerLink={getExplorerLink}
-              mintButton={mintButton}
+              mintButton={actionSurfaces.mintButton}
               mintLabel={actionLabels.mint}
               mintedLowerLabel={actionLabels.mintedLower}
               onCopyError={copyErrorToClipboard}

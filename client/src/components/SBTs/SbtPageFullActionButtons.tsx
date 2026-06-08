@@ -10,9 +10,35 @@ import {
 import type {
   SbtPageBurnActionPlan,
   SbtPageBurnStatusButtonState,
+  SbtPageFullActionDisplayPlan,
   SbtPageMintButtonDisplayState,
   SbtPageStatusButtonContentState,
 } from './sbtPageActionDisplayHelpers';
+
+export type SbtPageFullMintActionExecutionProps = {
+  onClaimWithInviteCode: (inviteCode?: unknown) => unknown;
+  onGroupPasswordInputChange: React.ChangeEventHandler<HTMLInputElement>;
+  onManualPasswordInputChange: React.ChangeEventHandler<HTMLInputElement>;
+  onMint: (forceEventRefreshOnSuccess?: boolean) => unknown;
+  onMintUnlimitedWithGroupPassword: () => unknown;
+  onOpenMintTransaction: () => unknown;
+};
+
+export type SbtPageFullBurnActionExecutionProps = {
+  onBurn: () => unknown;
+};
+
+export type SbtPageFullActionSurfaces = {
+  burnButton: React.ReactNode;
+  mintButton: React.ReactNode;
+};
+
+type RenderSbtPageFullActionSurfacesArgs = {
+  actionDisplayPlan: SbtPageFullActionDisplayPlan;
+  burnExecution: SbtPageFullBurnActionExecutionProps;
+  groupPasswordInput?: string;
+  mintExecution: SbtPageFullMintActionExecutionProps;
+};
 
 type SbtPageMintActionSurfaceProps = {
   buttonClassName: string;
@@ -197,3 +223,33 @@ export const SbtPageBurnActionSurface = ({
     />
   );
 };
+
+export const renderSbtPageFullActionSurfaces = ({
+  actionDisplayPlan,
+  burnExecution,
+  groupPasswordInput = '',
+  mintExecution,
+}: RenderSbtPageFullActionSurfacesArgs): SbtPageFullActionSurfaces => ({
+  burnButton: actionDisplayPlan.shouldRenderBurnSurface ? (
+    <SbtPageBurnActionSurface
+      buttonClassName={actionDisplayPlan.burnActionButtonClassName}
+      contentState={actionDisplayPlan.burnButtonContentState}
+      displayState={actionDisplayPlan.burnStatusButtonState}
+      onBurn={burnExecution.onBurn}
+      plan={actionDisplayPlan.burnActionPlan}
+    />
+  ) : null,
+  mintButton: actionDisplayPlan.shouldRenderMintSurface ? (
+    <SbtPageMintActionSurface
+      buttonClassName={actionDisplayPlan.mintActionButtonClassName}
+      displayState={actionDisplayPlan.mintButtonDisplayState}
+      groupPasswordInput={groupPasswordInput || ''}
+      onClaimWithInviteCode={mintExecution.onClaimWithInviteCode}
+      onGroupPasswordInputChange={mintExecution.onGroupPasswordInputChange}
+      onManualPasswordInputChange={mintExecution.onManualPasswordInputChange}
+      onMint={mintExecution.onMint}
+      onMintUnlimitedWithGroupPassword={mintExecution.onMintUnlimitedWithGroupPassword}
+      onOpenMintTransaction={mintExecution.onOpenMintTransaction}
+    />
+  ) : null,
+});
