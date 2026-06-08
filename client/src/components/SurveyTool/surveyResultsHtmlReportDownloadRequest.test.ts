@@ -149,6 +149,23 @@ describe('buildSurveyResultsHtmlReportDownloadExecutionPlan', () => {
     expect(plan.readinessPlan.needsAnalysisGeneration).toBe(true);
   });
 
+  it('blocks pending analysis generation before describing render/download execution', () => {
+    const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
+      analysisGenerating: true,
+      isAuthorized: true,
+      selectedSections,
+      snapshot: buildSnapshot(),
+    });
+
+    expect(plan.status).toBe('blocked');
+    expect(plan.blockedReason).toBe('analysis-generating');
+    expect(plan.downloadRequest).toBeNull();
+    expect(plan.statePatch).toEqual({
+      alertMessage: 'Wait for analysis generation to finish before downloading the report.',
+    });
+    expect(plan.readinessPlan.canDownload).toBe(false);
+  });
+
   it('describes ready PDF render/download identity without executing report work', () => {
     const plan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
       format: SESSION_RESULTS_EXPORT_FORMAT_PDF,

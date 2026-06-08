@@ -352,6 +352,21 @@ describe('surveyResultsExportDisplayHelpers', () => {
     });
 
     expect(buildSurveyResultsHtmlReportDownloadAttemptPlan({
+      analysisGenerating: true,
+      isAuthorized: true,
+      readinessPlan: {
+        hasExportableSections: true,
+        hasUnavailableSelectedSections: false,
+      },
+    })).toEqual({
+      blockedReason: 'analysis-generating',
+      statePatch: {
+        alertMessage: 'Wait for analysis generation to finish before downloading the report.',
+      },
+      status: 'blocked',
+    });
+
+    expect(buildSurveyResultsHtmlReportDownloadAttemptPlan({
       isAuthorized: true,
       readinessPlan: {
         hasExportableSections: true,
