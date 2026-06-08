@@ -1,11 +1,14 @@
 import {
   SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND,
   SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
+  SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsAnalysisPayloadBuildResult,
+  type SessionResultsExportFormat,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
+import type { ReactNode } from 'react';
 import {
   buildSurveyResultsAlertMessagePatch,
 } from './surveyResultsHelpers';
@@ -300,6 +303,37 @@ export type SurveyResultsHtmlReportReadinessPlanInput = {
   snapshot: SessionResultsHtmlSnapshot;
 };
 
+export type SurveyResultsHtmlReportExportModalDescriptorInput = {
+  analysisGenerating?: unknown;
+  analysisPayload?: SessionResultsAnalysisPayloadBuildResult | Record<string, unknown>;
+  analysisProgress?: unknown;
+  exportFormat?: SessionResultsExportFormat | null;
+  htmlReportAnalysisError?: ReactNode;
+  isAuthorized?: unknown;
+  isDemoMode?: unknown;
+  isDemoSession?: unknown;
+  isOpen?: unknown;
+  selectedSections?: SessionResultsSectionSelection | null;
+  snapshot: SessionResultsHtmlSnapshot;
+};
+
+export type SurveyResultsHtmlReportExportModalDescriptor = {
+  analysisGenerating: boolean;
+  analysisPayload: SessionResultsAnalysisPayloadBuildResult | Record<string, unknown>;
+  analysisProgress: string;
+  canDownload: boolean;
+  exportFormat: SessionResultsExportFormat;
+  htmlReportAnalysisError: ReactNode;
+  isAuthorized: boolean;
+  isDemoMode: boolean;
+  isDemoSession: boolean;
+  isOpen: boolean;
+  needsAnalysisGeneration: boolean;
+  sectionRows: SurveyResultsHtmlReportSectionRow[];
+  selectedSections: Required<SessionResultsSectionSelection>;
+  snapshot: SessionResultsHtmlSnapshot;
+};
+
 export const SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS: Required<SessionResultsSectionSelection> = Object.freeze({
   argumentMap: false,
   atlas: false,
@@ -399,6 +433,46 @@ export const buildSurveyResultsHtmlReportReadinessPlan = ({
     needsAnalysisGeneration,
     sectionRows,
     selectedSections: normalizedSelectedSections,
+  };
+};
+
+export const buildSurveyResultsHtmlReportExportModalDescriptor = ({
+  analysisGenerating = false,
+  analysisPayload = {},
+  analysisProgress = '',
+  exportFormat = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
+  htmlReportAnalysisError = '',
+  isAuthorized = false,
+  isDemoMode = false,
+  isDemoSession = false,
+  isOpen = false,
+  selectedSections,
+  snapshot,
+}: SurveyResultsHtmlReportExportModalDescriptorInput): SurveyResultsHtmlReportExportModalDescriptor => {
+  const generating = !!analysisGenerating;
+  const authorized = !!isAuthorized;
+  const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+    analysisGenerating: generating,
+    isAuthorized: authorized,
+    selectedSections,
+    snapshot,
+  });
+
+  return {
+    analysisGenerating: generating,
+    analysisPayload,
+    analysisProgress: String(analysisProgress || ''),
+    canDownload: readinessPlan.canDownload,
+    exportFormat: exportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
+    htmlReportAnalysisError,
+    isAuthorized: authorized,
+    isDemoMode: !!isDemoMode,
+    isDemoSession: !!isDemoSession,
+    isOpen: !!isOpen,
+    needsAnalysisGeneration: readinessPlan.needsAnalysisGeneration,
+    sectionRows: readinessPlan.sectionRows,
+    selectedSections: readinessPlan.selectedSections,
+    snapshot,
   };
 };
 
