@@ -1,4 +1,6 @@
 import {
+  buildSbtListChipLoadingStatusBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
@@ -6,6 +8,108 @@ import {
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 describe('sbtListSessionLoadingHelpers', () => {
+  const makeStatus = (slug: string, statusLabel = 'Loading') => ({
+    chipBlockProgressText: `Current ${slug || 'general'}`,
+    chipRemainingText: 'Syncing',
+    deferred: false,
+    displayCurrentBlock: 0,
+    displayName: slug || 'General',
+    hasLatest: false,
+    lastBlock: 0,
+    latestForGroup: null,
+    progressPct: 0,
+    progressText: `Loading ${slug || 'general'}`,
+    remainingBlocks: null,
+    scanInProgress: false,
+    slug,
+    slugLabel: slug || 'general',
+    statusLabel,
+  });
+
+  it('plans initial loader status rows with fallback resolution', () => {
+    const calls: unknown[] = [];
+    const resolveStatus = (slug: unknown, options?: unknown) => {
+      calls.push([slug, options]);
+      return String(slug || '') === 'beta' ? null : makeStatus(String(slug || ''));
+    };
+
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['alpha', 'beta'],
+      resolveStatus,
+    })).toEqual([
+      expect.objectContaining({
+        displayName: 'alpha',
+        slug: 'alpha',
+        slugLabel: 'alpha',
+      }),
+    ]);
+    expect(calls).toEqual([
+      ['alpha', undefined],
+      ['beta', undefined],
+    ]);
+
+    calls.length = 0;
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['beta'],
+      resolveStatus,
+    })).toEqual([
+      expect.objectContaining({
+        displayName: 'fallback',
+        slug: 'fallback',
+        slugLabel: 'fallback',
+      }),
+    ]);
+    expect(calls).toEqual([
+      ['beta', undefined],
+      ['fallback', { forceShow: true }],
+    ]);
+
+    calls.length = 0;
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['alpha'],
+      resolveStatus,
+      windowAvailable: false,
+    })).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('plans chip loading status maps with selected-scope filtering', () => {
+    const calls: unknown[] = [];
+    const resolveStatus = (slug: unknown, options?: unknown) => {
+      calls.push([slug, options]);
+      return makeStatus(String(slug || ''));
+    };
+
+    expect(buildSbtListChipLoadingStatusBySlug({
+      allSessionsMode: false,
+      displayedSessionUniverseSlugs: ['alpha'],
+      resolveStatus,
+    })).toEqual({});
+    expect(calls).toEqual([]);
+
+    const result = buildSbtListChipLoadingStatusBySlug({
+      allSessionsMode: true,
+      displayedSessionUniverseSlugs: ['alpha', 'beta', 'alpha'],
+      isListModeScopeEnabled: true,
+      resolveStatus,
+      selectedSessionUniverseSlugs: new Set(['beta']),
+    });
+
+    expect(result).toEqual({
+      beta: expect.objectContaining({
+        displayName: 'beta',
+        slug: 'beta',
+        slugLabel: 'beta',
+      }),
+    });
+    expect(calls).toEqual([
+      ['beta', { alwaysShow: true }],
+    ]);
+  });
+
   it('builds session loading status, chip state, and progress snapshots', () => {
     expect(buildSbtListSessionLoadingStatus({
       allSessionsMode: true,
