@@ -1229,6 +1229,9 @@ const SBTsList = ({
     targetSlugs: unknown = [],
     options: SbtListScopedEntryOptions = {}
   ): SbtListItem[] => {
+    const normalizedTargetSlugs = dedupeNormalizedSbtListSlugs(targetSlugs);
+    if (!normalizedTargetSlugs.length) return [];
+
     let knownEntries: unknown[] = [];
     try {
       const entries = listNamespaceEntriesSync('sbtCache', { cloneValues: false });
@@ -1242,7 +1245,7 @@ const SBTsList = ({
       options,
       resolveConcreteSessionBindingSlug,
       resolveSbtSessionSlug,
-      targetSlugs,
+      targetSlugs: normalizedTargetSlugs,
     }) as SbtListItem[];
   }, [resolveConcreteSessionBindingSlug, resolveSbtSessionSlug]);
 
