@@ -7,16 +7,17 @@ describe('SessionPublishProgressPanel', () => {
   it('renders active publish progress from the display descriptor', () => {
     render(
       <SessionPublishProgressPanel
-        publishBusy={true}
         progressDisplayState={{
           activePublishProgressStepLabel: 'Upload Arweave',
+          publishProgressAriaValueText: '42% Upload Arweave',
+          publishProgressEyebrow: 'Publishing Session',
           publishStep: 2,
           publishProgressPercent: 42.4,
           publishProgressPercentRounded: 42,
           publishProgressSteps: [
-            { key: 'deploy-worker', label: 'Deploy Worker' },
-            { key: 'upload-metadata', label: 'Upload Arweave' },
-            { key: 'register-session', label: 'Register On-chain' },
+            { key: 'deploy-worker', label: 'Deploy Worker', state: 'complete' },
+            { key: 'upload-metadata', label: 'Upload Arweave', state: 'active' },
+            { key: 'register-session', label: 'Register On-chain', state: 'pending' },
           ],
           showPublishProgress: true,
         }}
@@ -34,16 +35,17 @@ describe('SessionPublishProgressPanel', () => {
   it('renders completed publish progress and hides when descriptor says hidden', () => {
     const { rerender } = render(
       <SessionPublishProgressPanel
-        publishBusy={false}
         progressDisplayState={{
           activePublishProgressStepLabel: 'Done',
+          publishProgressAriaValueText: '100% Done',
+          publishProgressEyebrow: 'Publish Complete',
           publishStep: 3,
           publishProgressPercent: 100,
           publishProgressPercentRounded: 100,
           publishProgressSteps: [
-            { key: 'upload-metadata', label: 'Upload Arweave' },
-            { key: 'register-session', label: 'Register On-chain' },
-            { key: 'done', label: 'Done' },
+            { key: 'upload-metadata', label: 'Upload Arweave', state: 'complete' },
+            { key: 'register-session', label: 'Register On-chain', state: 'complete' },
+            { key: 'done', label: 'Done', state: 'complete' },
           ],
           showPublishProgress: true,
         }}
@@ -55,9 +57,10 @@ describe('SessionPublishProgressPanel', () => {
 
     rerender(
       <SessionPublishProgressPanel
-        publishBusy={false}
         progressDisplayState={{
           activePublishProgressStepLabel: '',
+          publishProgressAriaValueText: '0% Preparing',
+          publishProgressEyebrow: 'Publish Complete',
           publishStep: 0,
           publishProgressPercent: 0,
           publishProgressPercentRounded: 0,

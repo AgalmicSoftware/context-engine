@@ -574,10 +574,13 @@ export const getSessionWizardPublishProgressPercent = ({
 export type SessionWizardPublishProgressStep = {
   key: string;
   label: string;
+  state: 'active' | 'complete' | 'pending';
 };
 
 export type SessionWizardPublishProgressDisplayState = {
   activePublishProgressStepLabel: string;
+  publishProgressAriaValueText: string;
+  publishProgressEyebrow: 'Publish Complete' | 'Publishing Session';
   publishStep: number;
   publishProgressPercent: number;
   publishProgressPercentRounded: number;
@@ -586,15 +589,23 @@ export type SessionWizardPublishProgressDisplayState = {
 };
 
 export const buildSessionWizardPublishProgressSteps = ({
+  publishBusy = false,
+  publishStep = 0,
   publishSteps = [],
   sbtsLabel = 'SBTs',
 }: {
+  publishBusy?: boolean;
+  publishStep?: number;
   publishSteps?: unknown[];
   sbtsLabel?: unknown;
 } = {}): SessionWizardPublishProgressStep[] => {
   const normalizedSbtLabel = toStr(sbtsLabel).trim() || 'SBTs';
-  return (Array.isArray(publishSteps) ? publishSteps : []).map((keyRaw) => {
+  const currentPublishStep = Math.max(0, Number(publishStep || 0));
+  return (Array.isArray(publishSteps) ? publishSteps : []).map((keyRaw, index) => {
     const key = toStr(keyRaw).trim();
+    const stepNumber = index + 1;
+    const isActive = currentPublishStep === stepNumber && (publishBusy || key !== 'done');
+    const isComplete = currentPublishStep > stepNumber || (key === 'done' && currentPublishStep >= stepNumber);
     return {
       key,
       label: key === 'deploy-worker'
@@ -606,6 +617,7 @@ export const buildSessionWizardPublishProgressSteps = ({
             : key === 'register-session'
               ? 'Register On-chain'
               : 'Done',
+      state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });
 };
@@ -623,11 +635,13 @@ export const resolveSessionWizardPublishProgressDisplayState = ({
   publishSteps?: unknown[];
   sbtsLabel?: unknown;
 } = {}): SessionWizardPublishProgressDisplayState => {
+  const currentPublishStep = Math.max(0, Number(publishStep || 0));
   const publishProgressSteps = buildSessionWizardPublishProgressSteps({
+    publishBusy,
+    publishStep: currentPublishStep,
     publishSteps,
     sbtsLabel,
   });
-  const currentPublishStep = Math.max(0, Number(publishStep || 0));
   const activePublishProgressStep = publishProgressSteps[
     Math.max(0, Math.min((currentPublishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
   ] || publishProgressSteps[0] || null;
@@ -637,12 +651,16 @@ export const resolveSessionWizardPublishProgressDisplayState = ({
     totalSteps: publishProgressSteps.length,
     elapsedMs,
   });
+  const publishProgressPercentRounded = Math.round(publishProgressPercent);
+  const activePublishProgressStepLabel = activePublishProgressStep?.label || 'Preparing';
 
   return {
-    activePublishProgressStepLabel: activePublishProgressStep?.label || 'Preparing',
+    activePublishProgressStepLabel,
+    publishProgressAriaValueText: `${publishProgressPercentRounded}% ${activePublishProgressStepLabel}`,
+    publishProgressEyebrow: publishBusy ? 'Publishing Session' : 'Publish Complete',
     publishStep: currentPublishStep,
     publishProgressPercent,
-    publishProgressPercentRounded: Math.round(publishProgressPercent),
+    publishProgressPercentRounded,
     publishProgressSteps,
     showPublishProgress: !!publishBusy || currentPublishStep > 0,
   };

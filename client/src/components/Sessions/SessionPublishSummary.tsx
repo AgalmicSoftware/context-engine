@@ -36,7 +36,6 @@ type SessionPublishSummaryProps = {
   onToggleCollapsed: () => void;
   normalModePublishSummary: PublishSummaryItem[];
   onPublish: () => void;
-  publishBusy: boolean;
   publishAdvancedOpen: boolean;
   onTogglePublishAdvanced: () => void;
   showSponsoredBundleFallbackInput: boolean;
@@ -81,7 +80,6 @@ const SessionPublishSummary = ({
   onToggleCollapsed,
   normalModePublishSummary,
   onPublish,
-  publishBusy,
   publishAdvancedOpen,
   onTogglePublishAdvanced,
   showSponsoredBundleFallbackInput,
@@ -180,7 +178,6 @@ const SessionPublishSummary = ({
 
         <SessionPublishProgressPanel
           progressDisplayState={publishProgressDisplayState}
-          publishBusy={publishBusy}
         />
 
         {showUploadBlockedReason ? (
