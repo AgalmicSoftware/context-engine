@@ -2,6 +2,7 @@ import {
   buildSbtPageRefreshOptions,
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
+  resolveSbtPageCacheRevisionReloadPlan,
   resolveSbtPageRefreshLifecyclePlan,
   resolveSbtPageShouldRefreshCounts,
 } from './sbtPageHelpers';
@@ -153,6 +154,53 @@ describe('sbtPageHelpers refresh helpers', () => {
     })).toEqual({
       shouldPromoteToForcedCountsRefresh: false,
       shouldRunEventScanRefresh: false,
+    });
+  });
+
+  it('plans cache revision reloads without owning component lifecycle execution', () => {
+    expect(resolveSbtPageCacheRevisionReloadPlan({
+      isMounted: true,
+      nextSbtAddress: '0x00000000000000000000000000000000000000a1',
+      nextSbtCacheRevision: 2,
+      prevSbtCacheRevision: 1,
+    })).toEqual({
+      cacheRevisionChanged: true,
+      shouldReloadSbtInfo: true,
+      shouldResetMetaHydrationTried: true,
+      loadOptions: false,
+    });
+    expect(resolveSbtPageCacheRevisionReloadPlan({
+      isMounted: true,
+      nextSbtAddress: '0x00000000000000000000000000000000000000a1',
+      nextSbtCacheRevision: 1,
+      prevSbtCacheRevision: 1,
+    })).toEqual({
+      cacheRevisionChanged: false,
+      shouldReloadSbtInfo: false,
+      shouldResetMetaHydrationTried: false,
+      loadOptions: null,
+    });
+    expect(resolveSbtPageCacheRevisionReloadPlan({
+      isMounted: false,
+      nextSbtAddress: '0x00000000000000000000000000000000000000a1',
+      nextSbtCacheRevision: 2,
+      prevSbtCacheRevision: 1,
+    })).toEqual({
+      cacheRevisionChanged: true,
+      shouldReloadSbtInfo: false,
+      shouldResetMetaHydrationTried: false,
+      loadOptions: null,
+    });
+    expect(resolveSbtPageCacheRevisionReloadPlan({
+      isMounted: true,
+      nextSbtAddress: '',
+      nextSbtCacheRevision: 2,
+      prevSbtCacheRevision: 1,
+    })).toEqual({
+      cacheRevisionChanged: true,
+      shouldReloadSbtInfo: false,
+      shouldResetMetaHydrationTried: false,
+      loadOptions: null,
     });
   });
 });

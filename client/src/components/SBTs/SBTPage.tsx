@@ -163,6 +163,7 @@ import {
   resolveSbtPageRelevantInfoLists,
   resolveSbtPageRefreshLifecyclePlan,
   reconcileSbtPageHolderRefreshState,
+  resolveSbtPageCacheRevisionReloadPlan,
   resolveSbtPageCachedGroupPasswordHash,
   resolveSbtPageChainMetadataReadNeeds,
   resolveSbtPageGroupPasswordMintState,
@@ -662,11 +663,19 @@ class SBTPage extends Component<any, any> {
       return;
     }
 
-    if (sbtCacheRevision !== prevProps.sbtCacheRevision) {
-      if (this._isMounted && SBTAddress) {
-        // Re-attempt centralized meta hydration on a new cache revision; no event scan here.
+    const cacheRevisionReloadPlan = resolveSbtPageCacheRevisionReloadPlan({
+      isMounted: this._isMounted,
+      nextSbtAddress: SBTAddress,
+      nextSbtCacheRevision: sbtCacheRevision,
+      prevSbtCacheRevision: prevProps.sbtCacheRevision,
+    });
+    if (cacheRevisionReloadPlan.cacheRevisionChanged) {
+      if (cacheRevisionReloadPlan.shouldResetMetaHydrationTried) {
         this._metaHydrationTried = {};
-        this.loadSBTInfo(false);
+      }
+      if (cacheRevisionReloadPlan.shouldReloadSbtInfo) {
+        // Re-attempt centralized meta hydration on a new cache revision; no event scan here.
+        this.loadSBTInfo(cacheRevisionReloadPlan.loadOptions);
       }
       return;
     }
