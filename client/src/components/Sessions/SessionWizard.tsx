@@ -127,6 +127,7 @@ import {
 import {
   appendSessionWizardRegisterTxEntry,
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
@@ -3749,8 +3750,9 @@ const SessionWizard = ({
         },
       });
     } catch (err) {
-      setStatus(err?.message || 'Publish failed.');
-      setPublishStep(0);
+      const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+      setStatus(publishFailureSettlement.errorMessage);
+      setPublishStep(publishFailureSettlement.publishStep);
     } finally {
       setPublishBusy(false);
     }

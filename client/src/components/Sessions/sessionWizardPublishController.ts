@@ -122,6 +122,15 @@ export type SessionWizardPublishCompletionControllerResult = {
   publishedPendingSbtLinks: unknown[];
 };
 
+export type SessionWizardPublishFailureSettlementInput = {
+  error?: unknown;
+};
+
+export type SessionWizardPublishFailureSettlementDescriptor = {
+  errorMessage: string;
+  publishStep: number;
+};
+
 export type SessionWizardRegisterTxEntry = AnyRecord;
 
 export type SessionWizardRegisterTxsUpdater =
@@ -673,6 +682,17 @@ export const resolveSessionWizardPublishCompletionRequest = ({
   pendingDraftSnapshot: Array.isArray(pendingDraftSnapshot) ? pendingDraftSnapshot : [],
   sessionSlug: toStr(sessionSlug).trim(),
 });
+
+export const resolveSessionWizardPublishFailureSettlementDescriptor = ({
+  error,
+}: SessionWizardPublishFailureSettlementInput): SessionWizardPublishFailureSettlementDescriptor => {
+  const err = (error && typeof error === 'object') ? error as AnyRecord : {};
+  const errorMessage = err.message ? toStr(err.message) : '';
+  return {
+    errorMessage: errorMessage || 'Publish failed.',
+    publishStep: 0,
+  };
+};
 
 export const runSessionWizardPublishCompletionController = ({
   input,

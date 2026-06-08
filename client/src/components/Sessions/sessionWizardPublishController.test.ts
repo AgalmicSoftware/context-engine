@@ -1,6 +1,7 @@
 import {
   appendSessionWizardRegisterTxEntry,
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterArgsDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterIdentityDescriptor,
@@ -1026,6 +1027,38 @@ describe('resolveSessionWizardPublishCompletionRequest', () => {
       deployedPendingDrafts: [],
       pendingDraftSnapshot: [],
       sessionSlug: '',
+    });
+  });
+});
+
+describe('resolveSessionWizardPublishFailureSettlementDescriptor', () => {
+  it('describes publish failure status and progress reset without owning state effects', () => {
+    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
+      error: new Error('worker deploy rejected'),
+    })).toEqual({
+      errorMessage: 'worker deploy rejected',
+      publishStep: 0,
+    });
+  });
+
+  it('falls back to the existing publish failure copy for malformed errors', () => {
+    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
+      error: 'failed',
+    })).toEqual({
+      errorMessage: 'Publish failed.',
+      publishStep: 0,
+    });
+
+    expect(resolveSessionWizardPublishFailureSettlementDescriptor({})).toEqual({
+      errorMessage: 'Publish failed.',
+      publishStep: 0,
+    });
+
+    expect(resolveSessionWizardPublishFailureSettlementDescriptor({
+      error: { message: '' },
+    })).toEqual({
+      errorMessage: 'Publish failed.',
+      publishStep: 0,
     });
   });
 });
