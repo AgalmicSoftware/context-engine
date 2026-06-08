@@ -213,6 +213,7 @@ export {
   resolveSbtPageMintActionPlan,
   resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
+  resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,
   resolveSbtPagePasswordAlertState,
   resolveSbtPagePasswordGenerationButtonState,
@@ -224,6 +225,7 @@ export {
 export type {
   SbtPageManualClaimActionRequest,
   SbtPageManualClaimActionRequestViewKind,
+  SbtPageFullActionDisplayPlan,
   SbtPageMiniManualClaimActionRequest,
   SbtPageMiniManualClaimActionRequestViewKind,
   SbtPageMiniMintActionPlan,
