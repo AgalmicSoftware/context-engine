@@ -39,8 +39,7 @@ import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFu
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import {
-  runSbtPageMiniBurnActionController,
-  runSbtPageMiniMintActionController,
+  buildSbtPageMiniCardActionHandlers,
 } from './sbtPageActionController';
 import {
   appendSbtPageBookmark,
@@ -3998,6 +3997,19 @@ class SBTPage extends Component<any, any> {
         userHasSBT,
         userIsSbtAdmin,
       });
+      const miniCardActionHandlers = buildSbtPageMiniCardActionHandlers({
+        groupPasswordInput: this.state.groupPasswordInput,
+        miniBurnActionPlan,
+        miniBurnDisabled: !!miniBurnButtonState?.disabled,
+        miniMintActionPlan,
+        ports: {
+          dispatchGroupPasswordMint: this.mintUnlimitedWithGroupPassword,
+          dispatchInviteCodeMint: this.claimWithInviteCode,
+          dispatchMiniBurn: this.miniBurnHandler,
+          dispatchMiniMint: this.miniMintHandler,
+          dispatchShowPasswordInput: () => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true })),
+        },
+      });
 
       return (
         <SbtPageMiniCard
@@ -4042,46 +4054,14 @@ class SBTPage extends Component<any, any> {
             event.preventDefault();
             window.open(`${window.location.origin}${sbtDetailPath}`, '_blank', 'noopener,noreferrer');
           }}
-          onClaimWithInviteCode={(event) => runSbtPageMiniMintActionController({
-            event,
-            inviteCodeMintArgs: [this.state.groupPasswordInput],
-            plan: miniMintActionPlan,
-            ports: {
-              dispatchInviteCodeMint: this.claimWithInviteCode,
-            },
-          })}
+          onClaimWithInviteCode={miniCardActionHandlers.onClaimWithInviteCode}
           onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
           onImageError={imageErrorHandler}
           onManualPasswordInputChange={this.handleManualPasswordInputChange}
-          onMiniBurn={(event) => runSbtPageMiniBurnActionController({
-            disabled: !!miniBurnButtonState?.disabled,
-            event,
-            plan: miniBurnActionPlan,
-            ports: {
-              dispatchMiniBurn: this.miniBurnHandler,
-            },
-          })}
-          onMiniMint={(event) => runSbtPageMiniMintActionController({
-            event,
-            plan: miniMintActionPlan,
-            ports: {
-              dispatchMiniMint: this.miniMintHandler,
-            },
-          })}
-          onMintUnlimitedWithGroupPassword={(event) => runSbtPageMiniMintActionController({
-            event,
-            plan: miniMintActionPlan,
-            ports: {
-              dispatchGroupPasswordMint: this.mintUnlimitedWithGroupPassword,
-            },
-          })}
-          onShowMiniPasswordInput={(event) => runSbtPageMiniMintActionController({
-            event,
-            plan: miniMintActionPlan,
-            ports: {
-              dispatchShowPasswordInput: () => this.setState(buildSbtPageMiniPasswordInputPatch({ visible: true })),
-            },
-          })}
+          onMiniBurn={miniCardActionHandlers.onMiniBurn}
+          onMiniMint={miniCardActionHandlers.onMiniMint}
+          onMintUnlimitedWithGroupPassword={miniCardActionHandlers.onMintUnlimitedWithGroupPassword}
+          onShowMiniPasswordInput={miniCardActionHandlers.onShowMiniPasswordInput}
           sbtAddress={sbtAddressForDisplay}
           sbtName={sbtNameText}
           shouldRenderEndedIndicator={shouldRenderEndedIndicator}

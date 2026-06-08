@@ -57,6 +57,14 @@ export type SbtPageMiniMintActionControllerPorts<
   dispatchShowPasswordInput?: SbtPageActionDispatch<ShowPasswordInputArgs>;
 };
 
+export type SbtPageMiniCardActionControllerPorts = SbtPageMiniBurnActionControllerPorts &
+  SbtPageMiniMintActionControllerPorts<
+    [],
+    [],
+    [unknown],
+    []
+  >;
+
 export type RunSbtPageMintActionControllerArgs<
   MintArgs extends readonly unknown[] = readonly unknown[]
 > = {
@@ -104,9 +112,25 @@ export type RunSbtPageMiniMintActionControllerArgs<
   showPasswordInputArgs?: ShowPasswordInputArgs;
 };
 
+export type BuildSbtPageMiniCardActionHandlersArgs = {
+  groupPasswordInput?: unknown;
+  miniBurnActionPlan?: SbtPageMiniBurnActionPlanLike | null;
+  miniBurnDisabled?: boolean;
+  miniMintActionPlan?: SbtPageMiniMintActionPlanLike | null;
+  ports?: SbtPageMiniCardActionControllerPorts;
+};
+
 export type SbtPageActionControllerResult = {
   blockedReason: unknown;
   status: 'blocked' | 'disabled' | 'dispatched' | 'hidden' | 'opened-transaction' | 'unhandled';
+};
+
+export type SbtPageMiniCardActionHandlers = {
+  onClaimWithInviteCode: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
+  onMiniBurn: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
+  onMiniMint: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
+  onMintUnlimitedWithGroupPassword: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
+  onShowMiniPasswordInput: (event?: SbtPageActionEventLike | null) => SbtPageActionControllerResult;
 };
 
 const isBlocked = (blockedReason: unknown): boolean => (
@@ -371,3 +395,39 @@ export const runSbtPageMiniBurnActionController = ({
     status: 'dispatched',
   };
 };
+
+export const buildSbtPageMiniCardActionHandlers = ({
+  groupPasswordInput = '',
+  miniBurnActionPlan = null,
+  miniBurnDisabled = false,
+  miniMintActionPlan = null,
+  ports = {},
+}: BuildSbtPageMiniCardActionHandlersArgs = {}): SbtPageMiniCardActionHandlers => ({
+  onClaimWithInviteCode: (event = null) => runSbtPageMiniMintActionController({
+    event,
+    inviteCodeMintArgs: [groupPasswordInput],
+    plan: miniMintActionPlan,
+    ports,
+  }),
+  onMiniBurn: (event = null) => runSbtPageMiniBurnActionController({
+    disabled: miniBurnDisabled,
+    event,
+    plan: miniBurnActionPlan,
+    ports,
+  }),
+  onMiniMint: (event = null) => runSbtPageMiniMintActionController({
+    event,
+    plan: miniMintActionPlan,
+    ports,
+  }),
+  onMintUnlimitedWithGroupPassword: (event = null) => runSbtPageMiniMintActionController({
+    event,
+    plan: miniMintActionPlan,
+    ports,
+  }),
+  onShowMiniPasswordInput: (event = null) => runSbtPageMiniMintActionController({
+    event,
+    plan: miniMintActionPlan,
+    ports,
+  }),
+});
