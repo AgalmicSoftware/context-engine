@@ -143,8 +143,7 @@ import {
   resolveSbtPageSessionSlugFromInfo,
   resolveSbtPageActiveBlockTimeMs,
   resolveSbtPageActiveChainId,
-  resolveSbtPageAdminActionState,
-  resolveSbtPageAdminBurnButtonState,
+  resolveSbtPageAdminActionDisplayPlan,
   resolveSbtPageAddressLinkState,
   resolveSbtPageCopyableErrorText,
   resolveSbtPageCopyIconState,
@@ -158,10 +157,7 @@ import {
   resolveSbtPageMiniCardDisplayState,
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
-  resolveSbtPagePasswordExportControlsState,
   resolveSbtPagePasswordExportSelection,
-  resolveSbtPagePasswordGenerationButtonState,
-  resolveSbtPagePasswordInventoryDisplayState,
   resolveSbtPageRecoveryCacheChainId,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
@@ -173,7 +169,6 @@ import {
   resolveSbtPageSessionDisplayConfig,
   resolveSbtPageSessionDisplayLabel,
   resolveSbtPageShouldRefreshCounts,
-  resolveSbtPageStatusButtonContentState,
   resolveSbtPageUrlAutoMintIntent,
   resolveSbtPageUserAdminStatus,
   resolveSbtAddress,
@@ -3818,28 +3813,21 @@ class SBTPage extends Component<any, any> {
     const burnSearchResultRecord = isRecord(burnSearchResult)
       ? burnSearchResult as SbtPageBurnSearchResult
       : null;
-    const {
-      canAdminBurn,
-      isInvite,
-      showNoMoreInvites,
-      showPasswordGen,
-    } = resolveSbtPageAdminActionState({
+    const adminActionDisplayPlan = resolveSbtPageAdminActionDisplayPlan({
       account: this.props.account,
-      hasInviteMint: this.state.hasInviteMint,
-      sbtInfo,
-    });
-
-    const {
-      adminGeneratedPasswordList,
-      cachedPasswordList,
-      combinedPasswords,
-      effectiveIncludePreviousPasswords,
-      onlyCachedPasswords,
-    } = resolveSbtPagePasswordExportSelection({
       adminGeneratedPasswords,
+      burnedLabel: t('burned'),
+      burningStatus,
+      burnLabel: t('burn'),
+      burnSearchResult,
       cachedPasswords,
+      hasInviteMint: this.state.hasInviteMint,
       includePreviousPasswords,
+      passwordGenerationCount,
+      sbtInfo,
+      sbtLabel: t('sbt'),
     });
+    const { combinedPasswords, isInvite } = adminActionDisplayPlan;
 
     const resolvedSbtAddress = resolveSbtAddress(this.props.SBTAddress);
     const sbtAddr = typeof resolvedSbtAddress === 'string'
@@ -3860,44 +3848,19 @@ class SBTPage extends Component<any, any> {
       })
     );
     const openMintAutoJoinUrl = this.getOpenMintAutoJoinUrl(sbtAddr);
-    const passwordExportControlsState = resolveSbtPagePasswordExportControlsState({
-      adminGeneratedPasswordList,
-      effectiveIncludePreviousPasswords,
-      onlyCachedPasswords,
-    });
-    const adminBurnStatusButtonState = resolveSbtPageAdminBurnButtonState({
-      burnSearchResult,
-      burningStatus,
-    });
-    const adminBurnButtonContentState = resolveSbtPageStatusButtonContentState({
-      idleLabel: `${t('burn')} ${t('sbt')}`,
-      isFailure: adminBurnStatusButtonState.isFailure,
-      isIdle: adminBurnStatusButtonState.isIdle,
-      isPending: adminBurnStatusButtonState.isPending,
-      isSuccess: adminBurnStatusButtonState.isSuccess,
-      successLabel: t('burned'),
-    });
-    const passwordGenerationButtonState = resolveSbtPagePasswordGenerationButtonState({
-      passwordGenerationCount,
-    });
-    const passwordInventoryDisplayState = resolveSbtPagePasswordInventoryDisplayState({
-      combinedPasswords,
-      showNoMoreInvites,
-      showPasswordGen,
-    });
     const openMintUrlCopyIconState = resolveSbtPageCopyIconState({
       copiedAddress: this.state.copiedAddress,
       targetKey: 'open-mint-url',
     });
 
     return SbtPageAdminActions({
-      adminBurnButtonContentState,
-      adminBurnStatusButtonState,
+      adminBurnButtonContentState: adminActionDisplayPlan.adminBurnButtonContentState,
+      adminBurnStatusButtonState: adminActionDisplayPlan.adminBurnStatusButtonState,
       buildInviteLink,
       burnLabel: t('burn'),
       burnSearchInput,
       burnSearchResultRecord,
-      canAdminBurn,
+      canAdminBurn: adminActionDisplayPlan.canAdminBurn,
       combinedPasswords,
       exportFormat,
       onAdminBurn: this.handleAdminBurn,
@@ -3910,10 +3873,10 @@ class SBTPage extends Component<any, any> {
       onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
       openMintAutoJoinUrl,
       openMintUrlCopyIconState,
-      passwordExportControlsState,
-      passwordGenerationButtonState,
+      passwordExportControlsState: adminActionDisplayPlan.passwordExportControlsState,
+      passwordGenerationButtonState: adminActionDisplayPlan.passwordGenerationButtonState,
       passwordGenerationCount,
-      passwordInventoryDisplayState,
+      passwordInventoryDisplayState: adminActionDisplayPlan.passwordInventoryDisplayState,
       sbtLabel: t('sbt'),
     });
   };

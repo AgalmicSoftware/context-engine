@@ -1,3 +1,9 @@
+import {
+  resolveSbtPagePasswordExportControlsState,
+  resolveSbtPagePasswordExportSelection,
+  resolveSbtPagePasswordInventoryDisplayState,
+} from './sbtPagePasswordExportHelpers';
+
 type ResolveSbtPageMintEndDisplayStateArgs = {
   nowMs?: unknown;
   sbtInfo?: unknown;
@@ -388,6 +394,17 @@ type ResolveSbtPageAdminActionStateArgs = {
   hasInviteMint?: unknown;
   sbtInfo?: unknown;
 };
+type ResolveSbtPageAdminActionDisplayPlanArgs = ResolveSbtPageAdminActionStateArgs & {
+  adminGeneratedPasswords?: unknown;
+  burnedLabel?: unknown;
+  burningStatus?: unknown;
+  burnLabel?: unknown;
+  burnSearchResult?: unknown;
+  cachedPasswords?: unknown;
+  includePreviousPasswords?: unknown;
+  passwordGenerationCount?: unknown;
+  sbtLabel?: unknown;
+};
 type ResolveSbtPageMintFlowDisplayStateArgs = {
   hasGroupPasswordMint?: unknown;
   hasInviteMint?: unknown;
@@ -401,6 +418,19 @@ type SbtPageAdminActionState = {
   isInvite: boolean;
   showNoMoreInvites: boolean;
   showPasswordGen: boolean;
+};
+export type SbtPageAdminActionDisplayPlan = SbtPageAdminActionState & {
+  adminBurnButtonContentState: SbtPageStatusButtonContentState;
+  adminBurnStatusButtonState: SbtPageBurnStatusButtonState;
+  adminGeneratedPasswordList: string[];
+  cachedPasswordList: string[];
+  combinedPasswords: string[];
+  effectiveIncludePreviousPasswords: unknown;
+  onlyCachedPasswords: boolean;
+  passwordExportControlsState: ReturnType<typeof resolveSbtPagePasswordExportControlsState>;
+  passwordGenerationButtonState: SbtPagePasswordGenerationButtonState;
+  passwordInventoryDisplayState: ReturnType<typeof resolveSbtPagePasswordInventoryDisplayState>;
+  passwordsToExport: string[];
 };
 type SbtPageMintFlowDisplayState = {
   shouldRenderClaimCountdown: boolean;
@@ -1493,6 +1523,67 @@ export const resolveSbtPageAdminActionState = ({
     isInvite: !!hasInviteMint,
     showNoMoreInvites,
     showPasswordGen,
+  };
+};
+
+export const resolveSbtPageAdminActionDisplayPlan = ({
+  account = '',
+  adminGeneratedPasswords = [],
+  burnedLabel = 'Burned',
+  burningStatus = '',
+  burnLabel = 'Burn',
+  burnSearchResult = null,
+  cachedPasswords = [],
+  hasInviteMint = false,
+  includePreviousPasswords = false,
+  passwordGenerationCount = null,
+  sbtInfo = null,
+  sbtLabel = 'SBT',
+}: ResolveSbtPageAdminActionDisplayPlanArgs = {}): SbtPageAdminActionDisplayPlan => {
+  const adminActionState = resolveSbtPageAdminActionState({
+    account,
+    hasInviteMint,
+    sbtInfo,
+  });
+  const passwordExportSelection = resolveSbtPagePasswordExportSelection({
+    adminGeneratedPasswords,
+    cachedPasswords,
+    includePreviousPasswords,
+  });
+  const passwordExportControlsState = resolveSbtPagePasswordExportControlsState({
+    adminGeneratedPasswordList: passwordExportSelection.adminGeneratedPasswordList,
+    effectiveIncludePreviousPasswords: passwordExportSelection.effectiveIncludePreviousPasswords,
+    onlyCachedPasswords: passwordExportSelection.onlyCachedPasswords,
+  });
+  const adminBurnStatusButtonState = resolveSbtPageAdminBurnButtonState({
+    burnSearchResult,
+    burningStatus,
+  });
+  const adminBurnButtonContentState = resolveSbtPageStatusButtonContentState({
+    idleLabel: `${String(burnLabel || 'Burn')} ${String(sbtLabel || 'SBT')}`,
+    isFailure: adminBurnStatusButtonState.isFailure,
+    isIdle: adminBurnStatusButtonState.isIdle,
+    isPending: adminBurnStatusButtonState.isPending,
+    isSuccess: adminBurnStatusButtonState.isSuccess,
+    successLabel: burnedLabel,
+  });
+  const passwordGenerationButtonState = resolveSbtPagePasswordGenerationButtonState({
+    passwordGenerationCount,
+  });
+  const passwordInventoryDisplayState = resolveSbtPagePasswordInventoryDisplayState({
+    combinedPasswords: passwordExportSelection.combinedPasswords,
+    showNoMoreInvites: adminActionState.showNoMoreInvites,
+    showPasswordGen: adminActionState.showPasswordGen,
+  });
+
+  return {
+    ...adminActionState,
+    ...passwordExportSelection,
+    adminBurnButtonContentState,
+    adminBurnStatusButtonState,
+    passwordExportControlsState,
+    passwordGenerationButtonState,
+    passwordInventoryDisplayState,
   };
 };
 

@@ -1,6 +1,7 @@
 import {
   buildSbtPageActionButtonClassName,
   resolveSbtPageActionFeedbackState,
+  resolveSbtPageAdminActionDisplayPlan,
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageBurnActionPlan,
@@ -795,6 +796,80 @@ describe('sbtPageActionDisplayHelpers', () => {
     })).toMatchObject({
       showErrorTransactionHash: true,
       showTransactionError: true,
+    });
+  });
+
+  it('builds the admin action display plan without admin execution callbacks', () => {
+    const plan = resolveSbtPageAdminActionDisplayPlan({
+      account: '0xAdmin',
+      adminGeneratedPasswords: ['new-code'],
+      burnedLabel: 'Removed',
+      burningStatus: 'pending',
+      burnLabel: 'Remove',
+      burnSearchResult: { tokenId: '7' },
+      cachedPasswords: ['old-code'],
+      hasInviteMint: true,
+      includePreviousPasswords: true,
+      passwordGenerationCount: 0,
+      sbtInfo: {
+        admin: '0xadmin',
+        burnAuth: 2,
+        hasPasswordMint: true,
+        maxTokens: '0',
+      },
+      sbtLabel: 'Badge',
+    });
+
+    expect(plan).toMatchObject({
+      adminBurnButtonContentState: {
+        idleLabel: 'Remove Badge',
+        shouldRenderPendingIcon: true,
+        successLabel: 'Removed',
+      },
+      adminBurnStatusButtonState: {
+        disabled: true,
+        isPending: true,
+      },
+      canAdminBurn: true,
+      combinedPasswords: ['old-code', 'new-code'],
+      effectiveIncludePreviousPasswords: true,
+      hasPasswordMint: true,
+      isInvite: true,
+      passwordExportControlsState: {
+        effectiveIncludePreviousPasswordsChecked: true,
+        renderIncludePreviousCheckbox: true,
+        showCachedPasswordsIncludedNote: false,
+      },
+      passwordGenerationButtonState: {
+        disabled: true,
+      },
+      passwordInventoryDisplayState: {
+        shouldRenderGeneratedPasswordList: true,
+        shouldRenderPasswordGenerationSection: true,
+      },
+      passwordsToExport: ['old-code', 'new-code'],
+      showPasswordGen: true,
+    });
+
+    expect(resolveSbtPageAdminActionDisplayPlan({
+      cachedPasswords: ['cached-code'],
+      includePreviousPasswords: false,
+      sbtInfo: {
+        hasPasswordMint: true,
+        maxTokens: '2',
+      },
+    })).toMatchObject({
+      canAdminBurn: false,
+      combinedPasswords: ['cached-code'],
+      passwordExportControlsState: {
+        effectiveIncludePreviousPasswordsChecked: true,
+        renderIncludePreviousCheckbox: false,
+        showCachedPasswordsIncludedNote: true,
+      },
+      passwordInventoryDisplayState: {
+        shouldRenderPreviousPasswordsSection: true,
+      },
+      showNoMoreInvites: true,
     });
   });
 
