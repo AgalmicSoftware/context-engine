@@ -35,6 +35,7 @@ describe('sessionWizardDeployErrors', () => {
 
   it('classifies deploy status display errors without owning deploy execution', () => {
     expect(resolveSessionWizardDeployStatusDisplayState()).toEqual({
+      deployButtonDisabled: false,
       deployStatusText: '',
       isError: false,
     });
@@ -42,18 +43,21 @@ describe('sessionWizardDeployErrors', () => {
       deployInFlight: true,
       deployStatus: 'Uploading worker...',
     })).toEqual({
+      deployButtonDisabled: true,
       deployStatusText: 'Uploading worker...',
       isError: false,
     });
     expect(resolveSessionWizardDeployStatusDisplayState({
       deployStatus: 'Worker deployed.',
     })).toEqual({
+      deployButtonDisabled: false,
       deployStatusText: 'Worker deployed.',
       isError: false,
     });
     expect(resolveSessionWizardDeployStatusDisplayState({
       deployStatus: 'Missing API token.',
     })).toEqual({
+      deployButtonDisabled: false,
       deployStatusText: 'Missing API token.',
       isError: true,
     });
@@ -61,6 +65,7 @@ describe('sessionWizardDeployErrors', () => {
       deployStatus: 'Custom URL changed after deploy.',
       deployVerifiedInUi: true,
     })).toEqual({
+      deployButtonDisabled: false,
       deployStatusText: 'Custom URL changed after deploy.',
       isError: false,
     });

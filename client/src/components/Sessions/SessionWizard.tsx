@@ -4518,7 +4518,6 @@ const SessionWizard = ({
       deployComplete={deployComplete}
       deployForm={deployForm}
       deployHelperUrl={deployHelperUrl}
-      deployInFlight={deployInFlight}
       deployStatusDisplayState={deployStatusDisplayState}
       deployWorkerUrl={deployWorkerUrl}
       devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}

@@ -11,6 +11,7 @@ type ResolveSessionWizardDeployStatusDisplayStateArgs = {
   deployVerifiedInUi?: unknown;
 };
 export type SessionWizardDeployStatusDisplayState = {
+  deployButtonDisabled: boolean;
   deployStatusText: string;
   isError: boolean;
 };
@@ -111,6 +112,7 @@ export const resolveSessionWizardDeployStatusDisplayState = ({
   const deployStatusText = toStr(deployStatus);
   const deployStatusLower = deployStatusText.toLowerCase();
   return {
+    deployButtonDisabled: !!deployInFlight,
     deployStatusText,
     isError: !!deployStatusText &&
       !deployInFlight &&
