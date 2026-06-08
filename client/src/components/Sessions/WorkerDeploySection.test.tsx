@@ -38,8 +38,8 @@ const buildWorkerDeploySectionProps = (
   cloudflareTokenSlug: 'demo-worker',
   setDeployForm: () => {},
   handleDeployWorker: () => {},
-  deployInFlight: false,
   deployStatusDisplayState: {
+    deployButtonDisabled: false,
     deployStatusText: '',
     isError: false,
   },
@@ -114,6 +114,7 @@ describe('WorkerDeploySection', () => {
   it('renders deploy status from the display descriptor', () => {
     renderWorkerDeploySection({
       deployStatusDisplayState: {
+        deployButtonDisabled: false,
         deployStatusText: 'Missing API token.',
         isError: true,
       },
@@ -122,6 +123,18 @@ describe('WorkerDeploySection', () => {
     const status = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS);
     expect(status).toHaveTextContent('Missing API token.');
     expect(status.className).toContain('copyStatusError');
+  });
+
+  it('disables deploy from the display descriptor', () => {
+    renderWorkerDeploySection({
+      deployStatusDisplayState: {
+        deployButtonDisabled: true,
+        deployStatusText: 'Deploying worker...',
+        isError: false,
+      },
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).toBeDisabled();
   });
 
   it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
