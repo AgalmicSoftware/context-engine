@@ -72,6 +72,7 @@ import {
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
+  buildSbtListChipProgressDisplayPlan,
   buildSbtListChipProgressDesiredVisibilityBySlug,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
@@ -2961,18 +2962,10 @@ const SBTsList = ({
                 const isLoaded = !!chipState?.isLoaded;
                 const isLoading = !!chipProgressVisibilityBySlug[normalized];
                 const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
-                const showChipProgress = chipLoadingStatus != null && isLoading;
-                const progressWidth = showChipProgress
-                  ? (chipLoadingStatus.hasLatest
-                    ? `${Math.max(6, chipLoadingStatus.progressPct)}%`
-                    : '35%')
-                  : '0%';
-                const chipProgressStyle = showChipProgress
-                  ? {
-                    '--ce-chip-progress-width': progressWidth,
-                    background: `linear-gradient(90deg, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.62) ${progressWidth}, rgba(0,0,0,0.22) ${progressWidth}, rgba(0,0,0,0.22) 100%)`,
-                  }
-                  : undefined;
+                const chipProgressPlan = buildSbtListChipProgressDisplayPlan({
+                  isLoading,
+                  status: chipLoadingStatus,
+                });
                 const sessionRouteHref = buildSessionRouteHref(normalized);
                 return {
                   key: s || 'general',
@@ -2985,10 +2978,10 @@ const SBTsList = ({
                   href: sessionRouteHref,
                   showOpen: !!sessionRouteHref,
                   openTitle: `Open session ${labelForSessionSlug(s)} in new tab`,
-                  showProgress: showChipProgress,
-                  progressText: chipLoadingStatus?.chipRemainingText || '',
-                  indeterminate: !(chipLoadingStatus?.hasLatest),
-                  style: chipProgressStyle,
+                  showProgress: chipProgressPlan.showProgress,
+                  progressText: chipProgressPlan.progressText,
+                  indeterminate: chipProgressPlan.indeterminate,
+                  style: chipProgressPlan.style,
                   rowTestId: `session-chip-row-${normalized || 'general'}`,
                   chipTestId: `session-chip-${normalized || 'general'}`,
                   checkTestId: `session-chip-check-${normalized || 'general'}`,
