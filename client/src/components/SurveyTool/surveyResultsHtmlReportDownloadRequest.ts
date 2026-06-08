@@ -7,6 +7,12 @@ import {
   type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
+import {
+  buildSurveyResultsHtmlReportDownloadAttemptPlan,
+  buildSurveyResultsHtmlReportReadinessPlan,
+  type SurveyResultsHtmlReportDownloadAttemptPlan,
+  type SurveyResultsHtmlReportReadinessPlan,
+} from './surveyResultsExportDisplayHelpers.js';
 
 export type SurveyResultsHtmlReportDownloadKind = 'html' | 'pdf';
 
@@ -25,6 +31,27 @@ export type SurveyResultsHtmlReportDownloadRequest = {
     sections: Required<SessionResultsSectionSelection>;
   };
 };
+
+type SurveyResultsHtmlReportBlockedDownloadAttemptPlan = Extract<
+  SurveyResultsHtmlReportDownloadAttemptPlan,
+  { status: 'blocked' }
+>;
+
+export type SurveyResultsHtmlReportDownloadExecutionPlan =
+  | {
+    blockedReason: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['blockedReason'];
+    downloadRequest: null;
+    readinessPlan: SurveyResultsHtmlReportReadinessPlan;
+    statePatch: SurveyResultsHtmlReportBlockedDownloadAttemptPlan['statePatch'];
+    status: 'blocked';
+  }
+  | {
+    blockedReason: '';
+    downloadRequest: SurveyResultsHtmlReportDownloadRequest;
+    readinessPlan: SurveyResultsHtmlReportReadinessPlan;
+    statePatch: null;
+    status: 'ready';
+  };
 
 export const buildSurveyResultsHtmlReportDownloadRequest = ({
   format = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
@@ -52,5 +79,52 @@ export const buildSurveyResultsHtmlReportDownloadRequest = ({
       format,
       sections: selectedSections,
     },
+  };
+};
+
+export const buildSurveyResultsHtmlReportDownloadExecutionPlan = ({
+  analysisGenerating = false,
+  format = SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
+  isAuthorized = false,
+  selectedSections,
+  snapshot,
+}: {
+  analysisGenerating?: unknown;
+  format?: SessionResultsExportFormat;
+  isAuthorized?: boolean;
+  selectedSections: Required<SessionResultsSectionSelection>;
+  snapshot: SessionResultsHtmlSnapshot;
+}): SurveyResultsHtmlReportDownloadExecutionPlan => {
+  const readinessPlan = buildSurveyResultsHtmlReportReadinessPlan({
+    analysisGenerating,
+    isAuthorized,
+    selectedSections,
+    snapshot,
+  });
+  const downloadAttemptPlan = buildSurveyResultsHtmlReportDownloadAttemptPlan({
+    isAuthorized,
+    readinessPlan,
+  });
+
+  if (downloadAttemptPlan.status === 'blocked') {
+    return {
+      blockedReason: downloadAttemptPlan.blockedReason,
+      downloadRequest: null,
+      readinessPlan,
+      statePatch: downloadAttemptPlan.statePatch,
+      status: 'blocked',
+    };
+  }
+
+  return {
+    blockedReason: '',
+    downloadRequest: buildSurveyResultsHtmlReportDownloadRequest({
+      format,
+      selectedSections,
+      snapshot,
+    }),
+    readinessPlan,
+    statePatch: null,
+    status: 'ready',
   };
 };
