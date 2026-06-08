@@ -67,6 +67,18 @@ export type SessionWizardPublishStartPreflightDescriptor = {
   statusMessage: string;
 };
 
+export type SessionWizardPublishAdminPreflightInput = {
+  resolvedPublisher?: string | null;
+};
+
+export type SessionWizardPublishAdminPreflightDescriptor = {
+  status: 'blocked' | 'ready';
+  blockedReason: 'publisher-required' | '';
+  signerAccountOverride: string;
+  shouldOpenLoginModal: boolean;
+  statusMessage: string;
+};
+
 export type SessionWizardPublishCompletionLinksInput = {
   deployedDrafts: SessionWizardPendingDraftLike[];
   pendingDraftSnapshot: SessionWizardPendingDraftLike[];
@@ -355,6 +367,28 @@ export const resolveSessionWizardPublishStartPreflightDescriptor = ({
     status: 'ready',
     blockedReason: '',
     shouldResetPublishState: true,
+    shouldOpenLoginModal: false,
+    statusMessage: '',
+  };
+};
+
+export const resolveSessionWizardPublishAdminPreflightDescriptor = ({
+  resolvedPublisher = '',
+}: SessionWizardPublishAdminPreflightInput): SessionWizardPublishAdminPreflightDescriptor => {
+  if (!resolvedPublisher) {
+    return {
+      status: 'blocked',
+      blockedReason: 'publisher-required',
+      signerAccountOverride: '',
+      shouldOpenLoginModal: true,
+      statusMessage: 'Connect your wallet to publish this session.',
+    };
+  }
+
+  return {
+    status: 'ready',
+    blockedReason: '',
+    signerAccountOverride: resolvedPublisher,
     shouldOpenLoginModal: false,
     statusMessage: '',
   };
