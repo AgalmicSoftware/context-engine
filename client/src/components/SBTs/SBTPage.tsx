@@ -32,8 +32,8 @@ import {
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import SbtPageAdminActions from './SbtPageAdminActions';
 import {
-  SbtPageBurnActionSurface,
-  SbtPageMintActionSurface,
+  renderSbtPageFullActionSurfaces,
+  type SbtPageFullActionSurfaces,
 } from './SbtPageFullActionButtons';
 import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
 import SbtPageMiniCard from './SbtPageMiniCard';
@@ -3680,51 +3680,30 @@ class SBTPage extends Component<any, any> {
     });
   };
 
-  renderMintButton = (
+  renderFullActionSurfaces = (
     actionDisplayPlan: SbtPageFullActionDisplayPlan = this.resolveFullActionDisplayPlan()
-  ): React.ReactNode => {
+  ): SbtPageFullActionSurfaces => {
     const { groupPasswordInput, lastMintTxHash } = this.state;
 
-    if (!actionDisplayPlan.shouldRenderMintSurface) {
-      return null;
-    }
-
-    return (
-      <SbtPageMintActionSurface
-        buttonClassName={actionDisplayPlan.mintActionButtonClassName}
-        displayState={actionDisplayPlan.mintButtonDisplayState}
-        groupPasswordInput={groupPasswordInput || ''}
-        onClaimWithInviteCode={this.claimWithInviteCode}
-        onGroupPasswordInputChange={this.handleGroupPasswordInputChange}
-        onManualPasswordInputChange={this.handleManualPasswordInputChange}
-        onMint={this.handleMint}
-        onMintUnlimitedWithGroupPassword={this.mintUnlimitedWithGroupPassword}
-        onOpenMintTransaction={() => window.open(
+    return renderSbtPageFullActionSurfaces({
+      actionDisplayPlan,
+      burnExecution: {
+        onBurn: this.handleBurn,
+      },
+      groupPasswordInput: groupPasswordInput || '',
+      mintExecution: {
+        onClaimWithInviteCode: this.claimWithInviteCode,
+        onGroupPasswordInputChange: this.handleGroupPasswordInputChange,
+        onManualPasswordInputChange: this.handleManualPasswordInputChange,
+        onMint: this.handleMint,
+        onMintUnlimitedWithGroupPassword: this.mintUnlimitedWithGroupPassword,
+        onOpenMintTransaction: () => window.open(
           this.getExplorerLink(lastMintTxHash),
           '_blank',
           'noopener,noreferrer'
-        )}
-      />
-    );
-  };
-
-  renderBurnButton = (
-    actionDisplayPlan: SbtPageFullActionDisplayPlan = this.resolveFullActionDisplayPlan()
-  ): React.ReactNode => {
-    if (!actionDisplayPlan.shouldRenderBurnSurface) {
-      return null;
-    }
-
-
-    return (
-      <SbtPageBurnActionSurface
-        buttonClassName={actionDisplayPlan.burnActionButtonClassName}
-        contentState={actionDisplayPlan.burnButtonContentState}
-        displayState={actionDisplayPlan.burnStatusButtonState}
-        onBurn={this.handleBurn}
-        plan={actionDisplayPlan.burnActionPlan}
-      />
-    );
+        ),
+      },
+    });
   };
 
   renderRelevantInfo = (): React.ReactNode => {
@@ -4132,6 +4111,7 @@ class SBTPage extends Component<any, any> {
     const scanProgress = this.getEffectiveHolderScanProgress();
     const filterNetwork = this.state.network || this.props.network || null;
     const fullActionDisplayPlan = this.resolveFullActionDisplayPlan();
+    const actionSurfaces = this.renderFullActionSurfaces(fullActionDisplayPlan);
     return renderSbtPageFullView({
       actionLabels: {
         burn: t('burn'),
@@ -4140,6 +4120,7 @@ class SBTPage extends Component<any, any> {
         mintedLower: t('mintedLower'),
         minting: t('minting'),
       },
+      actionSurfaces,
       adminActions: this.renderAdminActions(),
       callbacks: {
         bookmarkSBT: this.bookmarkSBT,
@@ -4219,8 +4200,6 @@ class SBTPage extends Component<any, any> {
       },
       workerScanInProgress: this.props.sbtScanInProgress,
       workerScanPending: this.props.sbtScanPending,
-      burnButton: this.renderBurnButton(fullActionDisplayPlan),
-      mintButton: this.renderMintButton(fullActionDisplayPlan),
     });
   }
 }
