@@ -331,6 +331,18 @@ export type SbtPageRefreshLifecyclePlan = {
   shouldPromoteToForcedCountsRefresh: boolean;
   shouldRunEventScanRefresh: boolean;
 };
+type ResolveSbtPageCacheRevisionReloadPlanArgs = {
+  isMounted?: unknown;
+  nextSbtAddress?: unknown;
+  nextSbtCacheRevision?: unknown;
+  prevSbtCacheRevision?: unknown;
+};
+export type SbtPageCacheRevisionReloadPlan = {
+  cacheRevisionChanged: boolean;
+  shouldReloadSbtInfo: boolean;
+  shouldResetMetaHydrationTried: boolean;
+  loadOptions: false | null;
+};
 type ResolveSbtPageOwnerLookupFallbackDecisionArgs = {
   burnedAddresses?: unknown;
   countsLoaded?: unknown;
@@ -792,6 +804,22 @@ export const buildSbtPageLoadInfoRequestKey = ({
     String(account || '').trim().toLowerCase(),
     String(Number(sbtCacheRevision || 0) || 0),
   ].join('|');
+};
+
+export const resolveSbtPageCacheRevisionReloadPlan = ({
+  isMounted = false,
+  nextSbtAddress = null,
+  nextSbtCacheRevision = undefined,
+  prevSbtCacheRevision = undefined,
+}: ResolveSbtPageCacheRevisionReloadPlanArgs = {}): SbtPageCacheRevisionReloadPlan => {
+  const cacheRevisionChanged = nextSbtCacheRevision !== prevSbtCacheRevision;
+  const shouldReloadSbtInfo = cacheRevisionChanged && !!isMounted && !!nextSbtAddress;
+  return {
+    cacheRevisionChanged,
+    shouldReloadSbtInfo,
+    shouldResetMetaHydrationTried: shouldReloadSbtInfo,
+    loadOptions: shouldReloadSbtInfo ? false : null,
+  };
 };
 
 export const buildSbtPageLoadInfoStartLogContext = ({
