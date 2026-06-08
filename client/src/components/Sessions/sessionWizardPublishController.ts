@@ -440,7 +440,7 @@ export const resolveSessionWizardRegisterFailureSettlementDescriptor = ({
 
   return {
     txEntry: txHash ? { action: 'createSession', hash: txHash } : null,
-    errorMessage: toStr(err.message).trim() || 'Failed to register session.',
+    errorMessage: toStr(err.message) || 'Failed to register session.',
   };
 };
 
