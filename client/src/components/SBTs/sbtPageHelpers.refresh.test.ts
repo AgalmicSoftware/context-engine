@@ -3,6 +3,7 @@ import {
   resolveSbtPageOwnerLookupFallbackDecision,
   resolveSbtPageOwnerLookupTokenCount,
   resolveSbtPageCacheRevisionReloadPlan,
+  resolveSbtPageLoadInfoPendingQueuePlan,
   resolveSbtPageRefreshLifecyclePlan,
   resolveSbtPageShouldRefreshCounts,
 } from './sbtPageHelpers';
@@ -201,6 +202,52 @@ describe('sbtPageHelpers refresh helpers', () => {
       shouldReloadSbtInfo: false,
       shouldResetMetaHydrationTried: false,
       loadOptions: null,
+    });
+  });
+
+  it('plans pending load queue merges without scheduling the rerun', () => {
+    expect(resolveSbtPageLoadInfoPendingQueuePlan({
+      forceEventFetch: false,
+      preferCountsOnly: true,
+    })).toEqual({
+      pendingForce: false,
+      pendingOptions: {
+        forceEventFetch: false,
+        preferCountsOnly: true,
+      },
+      shouldQueueLoad: true,
+    });
+    expect(resolveSbtPageLoadInfoPendingQueuePlan({
+      forceEventFetch: true,
+      pendingForce: false,
+      pendingOptions: {
+        forceEventFetch: false,
+        preferCountsOnly: true,
+      },
+      preferCountsOnly: false,
+    })).toEqual({
+      pendingForce: true,
+      pendingOptions: {
+        forceEventFetch: true,
+        preferCountsOnly: true,
+      },
+      shouldQueueLoad: true,
+    });
+    expect(resolveSbtPageLoadInfoPendingQueuePlan({
+      forceEventFetch: false,
+      pendingForce: true,
+      pendingOptions: {
+        forceEventFetch: true,
+        preferCountsOnly: false,
+      },
+      preferCountsOnly: false,
+    })).toEqual({
+      pendingForce: true,
+      pendingOptions: {
+        forceEventFetch: true,
+        preferCountsOnly: false,
+      },
+      shouldQueueLoad: true,
     });
   });
 });

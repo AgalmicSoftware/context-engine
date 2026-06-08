@@ -153,6 +153,7 @@ import {
   resolveSbtPageHolderScanActive,
   resolveSbtPageIdentityPanelDisplayState,
   resolveSbtPageInteractiveCursorStyle,
+  resolveSbtPageLoadInfoPendingQueuePlan,
   resolveSbtPageMetadataHydrationMode,
   resolveSbtPageMiniCardDisplayState,
   resolveSbtPageOwnerLookupFallbackDecision,
@@ -2050,16 +2051,15 @@ class SBTPage extends Component<any, any> {
     const isCurrentLoad = () => this.isCurrentLoadSbtInfoRequest(requestKey);
 
     if (this._loadSbtInfoInFlight) {
-      this._loadSbtInfoPending = true;
-      const pendingOptions = this._loadSbtInfoPendingOptions || {
-        forceEventFetch: false,
-        preferCountsOnly: false,
-      };
-      this._loadSbtInfoPendingOptions = {
-        forceEventFetch: pendingOptions.forceEventFetch || forceEventFetch,
-        preferCountsOnly: pendingOptions.preferCountsOnly || preferCountsOnly,
-      };
-      if (forceEventFetch) this._loadSbtInfoPendingForce = true;
+      const pendingQueuePlan = resolveSbtPageLoadInfoPendingQueuePlan({
+        forceEventFetch,
+        pendingForce: this._loadSbtInfoPendingForce,
+        pendingOptions: this._loadSbtInfoPendingOptions,
+        preferCountsOnly,
+      });
+      this._loadSbtInfoPending = pendingQueuePlan.shouldQueueLoad;
+      this._loadSbtInfoPendingOptions = pendingQueuePlan.pendingOptions;
+      this._loadSbtInfoPendingForce = pendingQueuePlan.pendingForce;
       return;
     }
 
