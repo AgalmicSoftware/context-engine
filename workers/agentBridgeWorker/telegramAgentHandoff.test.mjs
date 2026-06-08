@@ -275,7 +275,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   );
 
   assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-06-08 \(v33\)/);
+  assert.match(source, /\*\*Skill version:\*\* 2026-06-08 \(v34\)/);
   assert.match(source, /direct-answer first/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /cache or install this Markdown skill locally/);
@@ -355,12 +355,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-08 (v33)');
+  assert.equal(body.version, '2026-06-08 (v34)');
   assert.equal(body.skill, 'ce-telegram-agent-handoff');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-06-08 (v33)');
+  assert.equal(body.latestVersion, '2026-06-08 (v34)');
   assert.equal(body.updateNote, '');
 });
 
@@ -373,7 +373,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
-  assert.match(location, /v=2026-06-08-v33-/);
+  assert.match(location, /v=2026-06-08-v34-/);
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -389,14 +389,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-06-08 (v33)',
+    latestVersion: '2026-06-08 (v34)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-06-08 (v33)');
+  assert.equal(payload.latestVersion, '2026-06-08 (v34)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -545,6 +545,9 @@ test('Telegram agent questions endpoint caps candidate batches when requested', 
     env,
   });
   const limited = await jsonBody(limitedResponse);
+  assert.equal(limited.answerState.answeredCount, 0);
+  assert.equal(limited.answerState.unansweredCount, 2);
+  assert.equal(limited.answerState.sort, 'unanswered_first');
   const postLimitedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions', {
       method: 'POST',
@@ -563,8 +566,59 @@ test('Telegram agent questions endpoint caps candidate batches when requested', 
   assert.equal(limitedResponse.status, 200);
   assert.equal(limited.questions.length, 1);
   assert.equal(limited.questions[0].questionId, 'q-binary');
+  assert.equal(limited.questions[0].answeredByUser, false);
   assert.equal(postLimitedResponse.status, 200);
   assert.equal(postLimited.questions.length, 1);
+
+  const submitResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/preferences', {
+      method: 'POST',
+      token: issued.token,
+      body: {
+        sessionSlug: 'alpha',
+        submit: true,
+        humanApproved: true,
+        preferences: {
+          answersByQuestionId: {
+            'q-binary': { value: 'unsure' },
+          },
+        },
+      },
+    }),
+    env,
+  });
+  const submitted = await jsonBody(submitResponse);
+  assert.equal(submitResponse.status, 200);
+  assert.equal(submitted.ok, true);
+  assert.equal(submitted.submittedCount, 1);
+
+  const unansweredFirstResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&limit=1', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const unansweredFirst = await jsonBody(unansweredFirstResponse);
+  assert.equal(unansweredFirstResponse.status, 200);
+  assert.equal(unansweredFirst.answerState.answeredCount, 1);
+  assert.equal(unansweredFirst.answerState.unansweredCount, 1);
+  assert.equal(unansweredFirst.questions.length, 1);
+  assert.equal(unansweredFirst.questions[0].questionId, 'q-freeform');
+  assert.equal(unansweredFirst.questions[0].answeredByUser, false);
+
+  const answeredLookupResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&questionId=q-binary', {
+      token: issued.token,
+    }),
+    env,
+  });
+  const answeredLookup = await jsonBody(answeredLookupResponse);
+  assert.equal(answeredLookupResponse.status, 200);
+  assert.equal(answeredLookup.answerState.sort, 'requested_question');
+  assert.equal(answeredLookup.questions.length, 1);
+  assert.equal(answeredLookup.questions[0].questionId, 'q-binary');
+  assert.equal(answeredLookup.questions[0].answeredByUser, true);
+  assert.match(answeredLookup.questions[0].answerStatus, /submit|direct/);
 });
 
 test('Telegram agent token follows a follow-default private binding across default flips', async () => {
@@ -701,11 +755,11 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(first.questions.length, 6);
   assert.equal(
     first.questions.find((question) => question.id === 'preference_tailoring')?.prompt,
-    'Can I pass preferences and calendar info to CE to surface relevant questions?'
+    'Can I use your Edge profile, interests, and calendar info to surface relevant CE questions?'
   );
   assert.equal(
     first.questions.find((question) => question.id === 'demographic_link_opt_in')?.prompt,
-    'Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?'
+    'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?'
   );
   assert.equal(first.answers.preference_tailoring, false);
   assert.equal(first.answers.demographic_link_opt_in, false);
@@ -1810,7 +1864,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-06-08 (v33)');
+  assert.equal(questions.skillVersion, '2026-06-08 (v34)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -3339,7 +3393,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-06-08 (v33)',
+        latestVersion: '2026-06-08 (v34)',
         note: 'Refresh before answering.',
       },
     }),
@@ -3371,13 +3425,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-06-08 (v33)');
+  assert.equal(initialStatus.version, '2026-06-08 (v34)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-06-08 (v33)');
+  assert.equal(set.latestVersion, '2026-06-08 (v34)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');

@@ -96,13 +96,14 @@ import {
   SUBMIT_REQUEST_TTL_SECONDS,
   SUBMITTED_RESULT_STATUSES,
   submitRequestSessionKvPrefix,
+  submitRequestUserKvPrefix,
 } from './telegramSubmitQueue.mjs';
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=33';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=34';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v33)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v34)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -122,11 +123,11 @@ const textEncoder = new TextEncoder();
 const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   {
     id: 'preference_tailoring',
-    prompt: 'Can I pass preferences and calendar info to CE to surface relevant questions?',
+    prompt: 'Can I use your Edge profile, interests, and calendar info to surface relevant CE questions?',
   },
   {
     id: 'demographic_link_opt_in',
-    prompt: 'Can I link non-identifying information (demographics, attendance week) to your responses for research purposes?',
+    prompt: 'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?',
   },
   {
     id: 'draft_responses',
@@ -1122,6 +1123,31 @@ async function readMetricRecord(env = {}, key = '') {
   return record && typeof record === 'object' && !Array.isArray(record) ? record : null;
 }
 
+async function listHandoffKvRecordsByPrefix(env = {}, prefix = '', {
+  limit = 10000,
+} = {}) {
+  const entries = await listMetricKvEntriesByPrefix(env, prefix, { limit });
+  const records = [];
+  for (const entry of entries) {
+    const record = await readMetricRecord(env, entry.key);
+    if (record) records.push({ ...record, key: entry.key });
+  }
+  return records;
+}
+
+function dedupeSubmitRecordsByRequestId(records = []) {
+  const byId = new Map();
+  (Array.isArray(records) ? records : []).forEach((record) => {
+    const requestId = safeString(record?.requestId || record?.idempotencyKey || record?.key);
+    if (!requestId) return;
+    const existing = byId.get(requestId);
+    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
+      byId.set(requestId, record);
+    }
+  });
+  return Array.from(byId.values());
+}
+
 function sessionFromSessionFirstKey(key = '', prefix = '') {
   const rest = safeString(key).startsWith(prefix) ? safeString(key).slice(prefix.length) : '';
   return sanitizeSessionSlug(rest.split(':')[0]);
@@ -1416,6 +1442,87 @@ function safePublicAgentQuestion(question = {}, options = {}) {
   }
 }
 
+function agentQuestionAnswerRef(sessionSlug = '', questionId = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const qid = safeString(questionId);
+  return slug && qid ? `${slug}:${qid}` : '';
+}
+
+async function loadAgentQuestionAnswerState({
+  env = {},
+  context = {},
+  questions = [],
+} = {}) {
+  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const questionByRef = new Map();
+  const sessionSlugs = new Set();
+  (Array.isArray(questions) ? questions : []).forEach((question) => {
+    const ref = agentQuestionAnswerRef(question.sessionSlug || context.session?.sessionSlug, question.questionId);
+    if (!ref) return;
+    questionByRef.set(ref, question);
+    sessionSlugs.add(ref.split(':')[0]);
+  });
+  if (!telegramUserId || !questionByRef.size || !sessionSlugs.size) {
+    return {
+      source: telegramUserId ? 'submit_records' : 'unavailable',
+      answeredByRef: new Map(),
+      answeredCount: 0,
+      unansweredCount: questionByRef.size,
+    };
+  }
+  const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
+  const indexedRecordGroups = await Promise.all([...sessionSlugs].map((sessionSlug) => {
+    const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+    return prefix ? listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
+  }));
+  const records = dedupeSubmitRecordsByRequestId(indexedRecordGroups.flat());
+  const answeredByRef = new Map();
+  records.forEach((record) => {
+    if (safeString(record.telegramUserId) !== telegramUserId) return;
+    if (!submittedStatuses.has(safeString(record.status))) return;
+    const ref = agentQuestionAnswerRef(record.sessionSlug, record.questionId);
+    if (!questionByRef.has(ref)) return;
+    const existing = answeredByRef.get(ref);
+    if (existing && safeString(existing.answeredAt).localeCompare(safeString(record.createdAt)) >= 0) return;
+    answeredByRef.set(ref, {
+      answeredByUser: true,
+      answeredAt: safeString(record.createdAt),
+      answerStatus: safeString(record.status),
+    });
+  });
+  return {
+    source: 'submit_records',
+    answeredByRef,
+    answeredCount: answeredByRef.size,
+    unansweredCount: Math.max(0, questionByRef.size - answeredByRef.size),
+  };
+}
+
+function applyAgentQuestionAnswerState(questions = [], answerState = {}, context = {}) {
+  const answeredByRef = answerState.answeredByRef instanceof Map ? answerState.answeredByRef : new Map();
+  return (Array.isArray(questions) ? questions : []).map((question) => {
+    const ref = agentQuestionAnswerRef(question.sessionSlug || context.session?.sessionSlug, question.questionId);
+    const answered = ref ? answeredByRef.get(ref) : null;
+    return {
+      ...question,
+      answeredByUser: answered?.answeredByUser === true,
+      ...(answered?.answeredAt ? { answeredAt: answered.answeredAt } : {}),
+      ...(answered?.answerStatus ? { answerStatus: answered.answerStatus } : {}),
+    };
+  });
+}
+
+function sortAgentQuestionsByAnswerState(questions = []) {
+  return (Array.isArray(questions) ? questions : [])
+    .map((question, index) => ({ question, index }))
+    .sort((left, right) => {
+      const leftAnswered = left.question?.answeredByUser === true ? 1 : 0;
+      const rightAnswered = right.question?.answeredByUser === true ? 1 : 0;
+      return leftAnswered - rightAnswered || left.index - right.index;
+    })
+    .map((entry) => entry.question);
+}
+
 function normalizePreferenceTagHints(input = {}) {
   const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
     ? input.preferences
@@ -1571,10 +1678,12 @@ async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil
 async function handleQuestionsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
   const ranked = rankQuestionsByPreferences(questions, input, context);
+  const answerState = await loadAgentQuestionAnswerState({ env, context, questions: ranked.questions });
+  const rankedWithAnswerState = applyAgentQuestionAnswerState(ranked.questions, answerState, context);
   const requestedQuestionId = safeString(input.questionId);
   const responseQuestions = requestedQuestionId
-    ? ranked.questions.filter((question) => safeString(question.questionId) === requestedQuestionId)
-    : ranked.questions;
+    ? rankedWithAnswerState.filter((question) => safeString(question.questionId) === requestedQuestionId)
+    : sortAgentQuestionsByAnswerState(rankedWithAnswerState);
   const limit = questionsResponseLimit(input);
   const listedQuestions = limit > 0 ? responseQuestions.slice(0, limit) : responseQuestions;
   const flag = await readAgentSkillUpdateFlag(env);
@@ -1586,6 +1695,12 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
     questionSourceReason: loaded.reason || '',
     ...(Number(loaded.skippedMalformed || 0) > 0 ? { skippedMalformed: Number(loaded.skippedMalformed || 0) } : {}),
     relevance: ranked.relevance,
+    answerState: {
+      source: answerState.source,
+      answeredCount: answerState.answeredCount,
+      unansweredCount: answerState.unansweredCount,
+      sort: requestedQuestionId ? 'requested_question' : 'unanswered_first',
+    },
     skillVersion: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
     skillUpdateAvailable: flag.updateAvailable === true,
     questions: listedQuestions,

@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v33)
+**Skill version:** 2026-06-08 (v34)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -202,9 +202,9 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 
 1. If you are a Telegram-native Hermes agent and the user clicked a Geo/CE invite link, use the Trusted Geo / Hermes Invite Onboarding flow below to mint a `ceagt_...` token from the invite token plus the Telegram `from.id` you observed. Otherwise, ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
 2. Obtain the user-scoped `ceagt_...` token either from the invite-onboarding response or from copied bot install info. For copied install info, extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
-3. Choose the first action by agent context. In Claude Code or another low-context copied-token invocation, skip onboarding by default: do not ask for profile, calendar, demographic, attendance, Telegram id, or group chat fields; go straight to questions. In Hermes, OpenClaw, or another Edge-native agent that already has authorized profile/calendar/Telegram context, call `GET <Worker>/telegram/agent/api/onboarding` first when preferences, consent, attendance, digest timing, or group buckets are relevant. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If relevant consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
-4. Call `GET <Worker>/telegram/agent/api/questions` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session.
-5. Pick up to 10 answerable questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
+3. Choose the first action by agent context. In Claude Code or another low-context copied-token invocation, skip onboarding by default: do not ask for profile, calendar, demographic, attendance, Telegram id, or group chat fields; go straight to questions. In Hermes, OpenClaw, or another Edge-native agent that already has authorized Edge profile/calendar/Telegram context, ask one concise setup question before onboarding: "Can I use your Edge profile, interests, calendar, and non-identifying fields like bio keywords, age bucket, country/region, role, and attendance week to pick relevant CE questions and support research buckets?" If the user says "yes", "accept all", or otherwise approves the recommended setup, translate that into explicit onboarding answers and profile-derived buckets; do not ask the user to manually fill buckets that can be inferred from authorized Edge context. If they decline or narrow consent, persist only the explicit allowed fields. Call `GET <Worker>/telegram/agent/api/onboarding` first when preferences, consent, attendance, digest timing, or group buckets are relevant. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If relevant consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/telegram/agent/api/onboarding`.
+4. Call `GET <Worker>/telegram/agent/api/questions?limit=20` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session. The response marks submitted questions with `answeredByUser` and sorts ordinary listings unanswered-first; keep that ordering unless a sponsored question or strong local relevance signal should override it.
+5. Pick up to 10 answerable, unanswered questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Immediately show the first or most relevant answerable question and ask how the user wants to answer. Do not ask whether to surface it; surfacing it is the default action after a successful question read.
 7. Draft responses, show the proposed answers, and ask for confirmation.
 8. Save drafts with `POST <Worker>/telegram/agent/api/preferences`. If the user explicitly says to answer or choose an option on their behalf, include `submit: true` and `humanApproved: true`; this submits without requiring the Mini App.
@@ -236,7 +236,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=33",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=34",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -283,11 +283,17 @@ local auth context, never repeat it back to the user, and send the exact token
 string as `Authorization: Bearer <token>` on later CE calls to the same
 `contextEngine.worker`. Do not include quotes, angle brackets, Markdown, or
 the whole JSON response in the bearer header. For Hermes or another
-Edge-native agent with authorized profile/calendar/Telegram context, first
+Edge-native agent with authorized profile/calendar/Telegram context, first ask
+whether CE may use the user's Edge profile, interests, calendar, and
+non-identifying fields (bio keywords, age bucket, country/region, role, and
+attendance week). A plain "yes" or "accept all" can approve the recommended CE
+setup; translate it into explicit onboarding answers and profile-derived
+buckets rather than asking the user to re-enter data Hermes can infer. If the
+user declines or narrows consent, persist only the approved subset. Then
 complete any relevant onboarding preferences or consent questions from the
-returned onboarding state or `GET /telegram/agent/api/onboarding`. Then call
-`GET <Worker>/telegram/agent/api/questions` with the returned token and surface
-the first relevant question directly in chat. For Claude Code or another
+returned onboarding state or `GET /telegram/agent/api/onboarding`. Next call
+`GET <Worker>/telegram/agent/api/questions?limit=20` with the returned token and
+surface the first relevant unanswered question directly in chat. For Claude Code or another
 low-context copied-token agent, skip onboarding by default and fetch questions
 first.
 
@@ -452,13 +458,17 @@ POST /telegram/agent/api/onboarding
 `GET` returns the fixed first-run consent questions and any saved answers. `POST`
 persists the answers for the token's Telegram user and current session. Defaults
 are privacy-preserving: all consent is off until the user explicitly answers.
-Ask the user what topics they want CE to prioritize, such as AI futures, Edge
-City, governance, infra, social, art, or sessions they attended. Treat this as
-opt-in: if the user says yes to preference tailoring, the agent may read the
-authorized parts of the user's Edge profile and activity to choose questions.
-If they do not opt in, use only the current conversation and public session
-context. Persist approved topics as `topicPreferences` in the onboarding POST
-body. The current questions map to these settings:
+For Edge-native Hermes/OpenClaw, lead with a single concise permission question:
+"Can I use your Edge profile, interests, and calendar info to surface relevant
+CE questions? Can I also use non-identifying Edge profile fields for research
+buckets: bio keywords, age bucket, country/region, role, and attendance week?"
+If the user says "yes", "accept all", or gives equivalent approval, treat that
+as consent for the recommended onboarding settings returned by the endpoint and
+auto-fill topic preferences plus attendance/role buckets from authorized Edge
+profile/activity. Ask manual follow-ups only for fields that are missing or
+uncertain. If they do not opt in, use only the current conversation and public
+session context. Persist approved topics as `topicPreferences` in the onboarding
+POST body. The current questions map to these settings:
 
 ```json
 {
@@ -490,13 +500,14 @@ body. The current questions map to these settings:
 The onboarding endpoint also persists `dailyDigestOptIn` for future Edge daily
 digest integrations. It also stores `topicPreferences`,
 `demographicLinkOptIn`, `attendanceLinkOptIn`, and `draftDivergenceOptIn`.
-Demographic and attendance linking are default-off. Ask the user: "Can I link
-non-identifying information (demographics, attendance week) to your responses
-for research purposes?" Only when the user opts in may the agent link otherwise
-anonymous responses to approved buckets such as Edge Bio keywords, age bucket,
-country, region, Week 1, Week 2, Week 3, Week 4, Entire Month, or Attended
-Previous Edge Events. These buckets are associated with the user's answers for
-research and filtering, not published as the user's identity.
+Demographic and attendance linking are default-off. Ask in Edge-profile terms:
+"Can I use non-identifying Edge profile fields for research buckets: bio
+keywords, age bucket, country/region, role, and attendance week?" Only when the
+user opts in may the agent link otherwise anonymous responses to approved
+buckets such as Edge Bio keywords, age bucket, country, region, Week 1, Week 2,
+Week 3, Week 4, Entire Month, or Attended Previous Edge Events. These buckets
+are associated with the user's answers for research and filtering, not
+published as the user's identity.
 Draft-edit research is also default-off. Unless the user opts in, do not ask CE
 to record draft/edit research metrics. When opted in, CE stores
 privacy-preserving metrics comparing the initial draft to the saved or
@@ -504,11 +515,13 @@ submitted answer: binary transitions, rating direction/delta, multichoice
 added/removed counts, and text/comment length buckets. CE does not store raw
 freeform text or raw comments in these research records.
 
-For a low-friction Hermes UX, the agent may offer a natural-language "accept
-all recommended onboarding permissions" option. That is not a separate API
-flag. If the user accepts, translate it into explicit onboarding answers and
+For a low-friction Hermes UX, the agent should offer a natural-language
+"accept all recommended onboarding permissions" option. That is not a separate
+API flag. If the user accepts, translate it into explicit onboarding answers and
 persist those normal fields; if the user declines or narrows consent, persist
-only the explicit allowed fields.
+only the explicit allowed fields. After saving onboarding, immediately fetch
+`GET /telegram/agent/api/questions?limit=20` and surface the first relevant
+unanswered question rather than stopping at a settings summary.
 
 When the user answers yes to demographic or attendance linking, auto-fill
 aggregate buckets from any profile fields the user authorized. For attendance,
@@ -1072,7 +1085,9 @@ or:
 
 Use `limit: 20` as the normal digest candidate set. If the host agent has enough
 latency budget, it may request more candidates; the worker caps explicit
-question-list limits at 200. The agent should then select the most relevant
+question-list limits at 200. The worker annotates each question with
+`answeredByUser` when it has a submitted answer from the current user and sorts
+ordinary question listings unanswered-first. The agent should then select the most relevant
 question or the top `questionsPerBatch` questions itself. Prefer questions the
 user has not answered, that match consented profile/activity context, and that
 would be useful or interesting to answer now.
@@ -1497,6 +1512,16 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v34)
+
+- Agent question listings now annotate the current user's submitted questions
+  and sort ordinary batches unanswered-first, so host agents can fetch
+  `limit=20` and avoid repeating answered questions.
+- Clarified Edge-native onboarding: ask permission to use Edge profile,
+  interests, calendar, and non-identifying research buckets first; a plain
+  "yes" can accept the recommended setup, and agents should infer buckets from
+  authorized Edge context before asking manual follow-ups.
 
 ### 2026-06-08 (v33)
 
