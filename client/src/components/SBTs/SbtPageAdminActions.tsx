@@ -9,24 +9,11 @@ import {
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
+import type { SbtPageAdminActionDisplayPlan } from './sbtPageHelpers';
 
 type SbtPageCopyIconState = {
   shouldRenderCopiedIcon?: boolean;
   shouldRenderDefaultIcon?: boolean;
-};
-
-type SbtPageStatusButtonContentState = {
-  failureLabel?: React.ReactNode;
-  idleLabel?: React.ReactNode;
-  shouldRenderFailure?: boolean;
-  shouldRenderIdleLabel?: boolean;
-  shouldRenderPendingIcon?: boolean;
-  shouldRenderSuccess?: boolean;
-  successLabel?: React.ReactNode;
-};
-
-type SbtPageButtonState = {
-  disabled?: boolean;
 };
 
 type SbtPageBurnSearchResultRecord = {
@@ -34,28 +21,12 @@ type SbtPageBurnSearchResultRecord = {
   tokenId?: unknown;
 };
 
-type SbtPagePasswordExportControlsState = {
-  effectiveIncludePreviousPasswordsChecked?: boolean;
-  renderIncludePreviousCheckbox?: boolean;
-  showCachedPasswordsIncludedNote?: boolean;
-};
-
-type SbtPagePasswordInventoryDisplayState = {
-  shouldRenderGeneratedPasswordList?: boolean;
-  shouldRenderNoMoreInvitesEmptyState?: boolean;
-  shouldRenderPasswordGenerationSection?: boolean;
-  shouldRenderPreviousPasswordsSection?: boolean;
-};
-
 export type SbtPageAdminActionsProps = {
-  adminBurnButtonContentState: SbtPageStatusButtonContentState;
-  adminBurnStatusButtonState: SbtPageButtonState;
   buildInviteLink: (code: string) => string;
   burnLabel: string;
   burnSearchInput: unknown;
   burnSearchResultRecord: SbtPageBurnSearchResultRecord | null;
-  canAdminBurn: boolean;
-  combinedPasswords: unknown[];
+  displayPlan: SbtPageAdminActionDisplayPlan;
   exportFormat: unknown;
   onAdminBurn: React.MouseEventHandler<HTMLButtonElement>;
   onBurnSearchChange: React.ChangeEventHandler<HTMLInputElement>;
@@ -67,17 +38,19 @@ export type SbtPageAdminActionsProps = {
   onPasswordGenerationCountChange: React.ChangeEventHandler<HTMLInputElement>;
   openMintAutoJoinUrl: string;
   openMintUrlCopyIconState: SbtPageCopyIconState;
-  passwordExportControlsState: SbtPagePasswordExportControlsState;
-  passwordGenerationButtonState: SbtPageButtonState;
   passwordGenerationCount: unknown;
-  passwordInventoryDisplayState: SbtPagePasswordInventoryDisplayState;
   sbtLabel: string;
+};
+
+type SbtPagePasswordInviteRowsProps = {
+  buildInviteLink: (code: string) => string;
+  combinedPasswords: string[];
 };
 
 const SbtPagePasswordInviteRows = ({
   buildInviteLink,
   combinedPasswords,
-}: Pick<SbtPageAdminActionsProps, 'buildInviteLink' | 'combinedPasswords'>): React.ReactElement => (
+}: SbtPagePasswordInviteRowsProps): React.ReactElement => (
   <ul>
     {combinedPasswords.map((password, index) => {
       const passwordText = String(password);
@@ -91,20 +64,21 @@ const SbtPagePasswordInviteRows = ({
   </ul>
 );
 
+type SbtPagePasswordExportControlsProps = {
+  exportFormat: unknown;
+  onExportFormatChange: React.ChangeEventHandler<HTMLSelectElement>;
+  onExportPasswords: React.MouseEventHandler<HTMLButtonElement>;
+  onIncludePreviousPasswordsChange: React.ChangeEventHandler<HTMLInputElement>;
+  passwordExportControlsState: SbtPageAdminActionDisplayPlan['passwordExportControlsState'];
+};
+
 const SbtPagePasswordExportControls = ({
   exportFormat,
   onExportFormatChange,
   onExportPasswords,
   onIncludePreviousPasswordsChange,
   passwordExportControlsState,
-}: Pick<
-  SbtPageAdminActionsProps,
-  | 'exportFormat'
-  | 'onExportFormatChange'
-  | 'onExportPasswords'
-  | 'onIncludePreviousPasswordsChange'
-  | 'passwordExportControlsState'
->): React.ReactElement => (
+}: SbtPagePasswordExportControlsProps): React.ReactElement => (
   <div className={styles.exportOptions}>
     {passwordExportControlsState.renderIncludePreviousCheckbox && (
       <label>
@@ -134,14 +108,19 @@ const SbtPagePasswordExportControls = ({
 );
 
 const SbtPageAdminActions = ({
-  adminBurnButtonContentState,
-  adminBurnStatusButtonState,
   buildInviteLink,
   burnLabel,
   burnSearchInput,
   burnSearchResultRecord,
-  canAdminBurn,
-  combinedPasswords,
+  displayPlan: {
+    adminBurnButtonContentState,
+    adminBurnStatusButtonState,
+    canAdminBurn,
+    combinedPasswords,
+    passwordExportControlsState,
+    passwordGenerationButtonState,
+    passwordInventoryDisplayState,
+  },
   exportFormat,
   onAdminBurn,
   onBurnSearchChange,
@@ -153,10 +132,7 @@ const SbtPageAdminActions = ({
   onPasswordGenerationCountChange,
   openMintAutoJoinUrl,
   openMintUrlCopyIconState,
-  passwordExportControlsState,
-  passwordGenerationButtonState,
   passwordGenerationCount,
-  passwordInventoryDisplayState,
   sbtLabel,
 }: SbtPageAdminActionsProps): React.ReactElement => (
   <div className={styles.adminActions}>
