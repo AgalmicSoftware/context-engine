@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ethers } from 'ethers';
 
 import {
@@ -19,15 +22,23 @@ import {
   buildLitChipotleWrappedPlaintext,
   fingerprintLitChipotlePolicy,
 } from '../../client/src/utilities/crypto/litChipotlePolicy.js';
-import {
-  DEFAULT_CHIPOTLE_ACTION_CODE,
-} from '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const ethersUtils = ethers?.utils || ethers;
 const TEST_ACTION_CID = 'QmAction123';
 const TEST_PKP_ID = '0xpkp123';
 const TEST_GATE_ADDRESS = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
 const TEST_REQUESTER = '0x00000000000000000000000000000000000000aa';
+
+const readDefaultChipotleActionCode = () => {
+  const catalogPath = resolve(__dirname, '../../client/src/utilities/crypto/litChipotleCatalog.ts');
+  const catalogSource = readFileSync(catalogPath, 'utf8');
+  const match = catalogSource.match(/export const DEFAULT_CHIPOTLE_ACTION_CODE = `([\s\S]*?)`;/);
+  assert.ok(match, 'client Lit Chipotle catalog must export DEFAULT_CHIPOTLE_ACTION_CODE');
+  return match[1];
+};
+
+const DEFAULT_CHIPOTLE_ACTION_CODE = readDefaultChipotleActionCode();
 
 const makePolicy = (overrides = {}) => buildLitChipotlePolicy({
   chainId: 11155420,

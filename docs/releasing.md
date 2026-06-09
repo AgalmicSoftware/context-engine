@@ -39,7 +39,8 @@ Important behavior:
 - The first sync run installs a repo-local `pre-push` hook that blocks `dev -> origin`
 - Commits that only touch stripped paths are skipped automatically
 - `--dry-run` lists which commits would replay vs skip without creating the replay branch
-- `--push` pushes the resulting branch to `origin` and safely refreshes an existing remote target branch with `--force-with-lease` when needed
+- Before the replayed branch is imported or pushed, `scripts/verify-public-release-surface.js` scans public JavaScript/TypeScript imports, exports, dynamic imports, and `require(...)` calls and fails if any public file resolves into a stripped path such as `contextEngine-cc/`
+- `--push` pushes the resulting branch to `origin` only after the strip, planning-path, identity, public-surface import, and public `npm run test:node` audits pass, and safely refreshes an existing remote target branch with `--force-with-lease` when needed
 - `--source-branch <name>` lets you replay from a temporary rebased branch instead of your primary `dev`
 - Existing local target branches still require `--force-with-lease` before the script rewrites them
 - `--force-with-lease` remains accepted explicitly, and is required whenever the local target branch already exists
@@ -52,6 +53,8 @@ Push safety:
 - The replay branch is rebuilt from `origin/main`, not from `dev`
 - Only the replayed public-safe commits become reachable from the branch you push
 - The same strip patterns as `prepare-public-release.sh` are applied before every replayed commit is created
+- The public-surface import verifier uses the same strip-pattern helper, so newly stripped paths automatically become invalid import targets from public files
+- The replayed public tree runs `npm run test:node` before push with the source checkout's `node_modules` linked into the temporary public checkout when available, so public-copy inventory and stripped-path assumptions fail locally before PR CI
 
 If `origin/<branch>` already exists, the script refreshes that PR branch automatically with `--force-with-lease`. If the remote branch was deleted but a stale local branch still exists, rerun with `--force-with-lease` so the script can safely rewrite the local branch before recreating the remote one.
 
@@ -80,7 +83,7 @@ Both workflows remove these paths from the public result:
 | `.DS_Store`, `docs/codebase-*.md`, `docs/assets/codebase-*`, `docs/*PRD*.md`, `docs/*prd*.md` | Local macOS metadata, ignored codebase audit exports, and private planning docs |
 | `private-pack.manifest.json` (tracked repo copy) | Generated strip inventory should not ship from the dev tree |
 | `Demo Integration Package/` | Raw source data |
-| `scripts/test-*.js`, `scripts/lib/e2e/`, `scripts/run-agent-bridge-worker-tests.js`, `scripts/vendor-cecc-ethers-bundle.js` | E2E/private helper scripts |
+| `scripts/test-*.js`, `scripts/seed-*.js`, `scripts/start-playwright-server.js`, `scripts/lib/e2e/`, `scripts/run-agent-bridge-worker-tests.js`, `scripts/vendor-cecc-ethers-bundle.js` | E2E/private helper scripts |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
 
 For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing stripped files with SHA-256 checksums, so the strip can be verified or reversed. Private planning paths are deliberately omitted from that public manifest so roadmap filenames and planning IDs are not exposed. Any tracked repo-root copy is stripped before publish. Root npm script entries that point at stripped private test runners are also removed so public package scripts do not advertise missing private files.
@@ -117,6 +120,7 @@ Review each match. Published contract addresses, `localhost`, and `example.com` 
    - Any `make sync-public` / `make sync-public-push` run also installs it automatically
 3. Run `make sync-public` or `bash scripts/sync-public-history.sh --push release-staging` to build or refresh the replayed public branch
    - If `release-staging` already exists locally, add `--force-with-lease`
+   - The command fails before push if any public source file still imports a stripped private path or if public Node tests fail
 4. Open or update the PR from `release-staging` into `main`
 5. Choose the merge method intentionally: `Merge pull request` preserves the replayed `release-staging` commit SHAs on `main`, while `Rebase and merge` keeps `main` linear but assigns new SHAs
 6. For the artifact workflow, run `make release` and then run the PII scan against the stripped output before publishing it

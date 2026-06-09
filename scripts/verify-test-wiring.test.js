@@ -58,8 +58,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'worker:bundle': 'node scripts/worker-bundle.mjs',
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
+          'verify:public-release-surface': 'node scripts/verify-public-release-surface.js',
           'verify:release':
-            'npm run lint && npm run typecheck:client && npm run test:release:client && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );
@@ -102,6 +103,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/vite-navigation-smoke.test.js',
       'scripts/verify-worker-bundle-sync.mjs',
       'scripts/verify-worker-bundle-sync.test.js',
+      'scripts/verify-public-release-surface.js',
+      'scripts/verify-public-release-surface.test.js',
       'workers/sessionCorsWorker/package.json',
       'workers/deploy-helper/wrangler.example.toml',
       'workers/deploy-helper/.dev.vars.example',
