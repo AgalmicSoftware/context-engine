@@ -250,6 +250,7 @@ import {
 } from '../../utilities/sessionResultsExport';
 import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
 import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
+import type { QuestionFilterHandle } from './QuestionFilter';
 import {
   renderSurveyResultsHtmlReportExportModal,
   type SurveyResultsHtmlReportExportModalProps,
@@ -359,10 +360,6 @@ type SurveyResultsEffectiveSlugScanMemo = {
   surveyId: string;
   nonceKey: string;
   slug: string;
-};
-type SurveyResultsQuestionFilterHandle = {
-  handleApplyFilters: (usePendingState?: unknown) => void;
-  handleClearFilters: () => void;
 };
 type SurveyResultsAggregatorEntry = [string, unknown];
 type SurveyResultsResponseCardClassNames = {
@@ -1005,7 +1002,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   _scrollMutationObserver: MutationObserver | null;
   _scrollToQuestionRetryTimer: ReturnType<typeof setTimeout> | null;
   questionIdTableRef: React.RefObject<HTMLDivElement>;
-  questionFilterRef: React.RefObject<SurveyResultsQuestionFilterHandle>;
+  questionFilterRef: React.RefObject<QuestionFilterHandle>;
   _isMounted: boolean;
   _questionFilterQuestionsMemo: SurveyResultsQuestionFilterQuestionsMemo;
   _questionTableEntriesMemo: SurveyResultsQuestionTableEntriesMemo;
