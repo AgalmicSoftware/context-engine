@@ -460,6 +460,9 @@ import {
   shouldUseSubmittedResponseJson,
 } from './surveyQuestionsJsonDerivation.js';
 import {
+  buildSurveyQuestionsRouteJsonControlsProps,
+} from './surveyQuestionsRouteJsonControlsProps.js';
+import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
   buildTransientSubmitFeedbackState,
@@ -8344,16 +8347,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           submitButtonText,
           submissionError: this.state.submissionError,
         }}
-        jsonControlsProps={{
+        jsonControlsProps={buildSurveyQuestionsRouteJsonControlsProps({
           bottomRef: this.bottomRef,
           copiedQuestionsJson: this.state.copiedQuestionsJson,
           copiedResponseJson: this.state.copiedResponseJson,
           copiedSurveyJson: this.state.copiedSurveyJson,
+          copyJsonToClipboard: this.copyJsonToClipboard,
           hidden: hideEmbeddedDebugUi,
           jsonPanelDisplayState,
-          onCopyQuestionsJson: () => this.copyJsonToClipboard(questionsJson, 'questions'),
-          onCopyResponseJson: () => this.copyJsonToClipboard(responseJson, 'response'),
-          onCopySurveyJson: () => this.copyJsonToClipboard(surveyJson, 'survey'),
           onToggleQuestionsJson: this.toggleShowQuestionsJson,
           onToggleResponseJson: this.toggleShowResponseJson,
           onToggleSurveyJson: this.toggleShowSurveyJson,
@@ -8361,7 +8362,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           renderJsonTree: this.jsonTreeDisplay,
           responseJson,
           surveyJson,
-        }}
+        })}
         tagModalProps={{
           onClose: this.closeQuestionTagModal,
         }}
