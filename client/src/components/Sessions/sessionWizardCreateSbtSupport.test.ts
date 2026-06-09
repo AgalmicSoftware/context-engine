@@ -2,6 +2,7 @@ import {
   buildSessionWizardCreateSbtModalLaunchState,
   buildSessionWizardDeferredCreateSbtComponentProps,
   getSessionWizardGateById,
+  resolveSessionWizardCreateSbtModalPlan,
   resolveSessionWizardCreateSbtTargetGateId,
 } from './sessionWizardCreateSbtSupport';
 
@@ -62,6 +63,65 @@ describe('sessionWizardCreateSbtSupport', () => {
       sessionSlug: 'custom-slug',
       arweaveJwkOverride: 'manual-jwk',
     });
+  });
+
+  it('resolves create-sbt modal chain, session slug, and JWK display values', () => {
+    const getEnabledWorkerArweaveJwk = jest.fn(() => 'worker-jwk');
+
+    expect(resolveSessionWizardCreateSbtModalPlan({
+      createSbtModalState: {
+        sessionSlug: 'modal-session',
+        arweaveJwkOverride: 'modal-jwk',
+      },
+      draft: {
+        slug: 'draft-session',
+        networkChainId: 84532,
+      },
+      getChainById: (chainId) => ({ id: chainId, name: `Known ${chainId}` }),
+      getChainName: (chainId) => `Chain ${chainId}`,
+      getEnabledWorkerArweaveJwk,
+      network: { id: 11155420, name: 'OP Sepolia' },
+      registryChainId: 11155420,
+      resolvedActiveSessionSlug: 'active-session',
+      workerSecretsEnabled: true,
+    })).toEqual({
+      arweaveJwkOverride: 'modal-jwk',
+      chainId: 84532,
+      network: { id: 84532, name: 'Known 84532' },
+      sessionSlug: 'modal-session',
+    });
+    expect(getEnabledWorkerArweaveJwk).not.toHaveBeenCalled();
+  });
+
+  it('falls back create-sbt modal values and suppresses worker JWKs when disabled', () => {
+    const getEnabledWorkerArweaveJwk = jest.fn(() => 'worker-jwk');
+
+    expect(resolveSessionWizardCreateSbtModalPlan({
+      createSbtModalState: {},
+      draft: {},
+      getChainById: () => null,
+      getChainName: (chainId) => `Chain ${chainId}`,
+      getEnabledWorkerArweaveJwk,
+      network: { chainId: 84532, name: 'Base Sepolia' },
+      registryChainId: '',
+      resolvedActiveSessionSlug: 'active-session',
+      workerSecretsEnabled: false,
+    })).toEqual({
+      arweaveJwkOverride: '',
+      chainId: 84532,
+      network: { id: 84532, name: 'Chain 84532' },
+      sessionSlug: 'active-session',
+    });
+    expect(getEnabledWorkerArweaveJwk).not.toHaveBeenCalled();
+  });
+
+  it('uses the enabled worker JWK fallback when the modal has no override', () => {
+    expect(resolveSessionWizardCreateSbtModalPlan({
+      createSbtModalState: {},
+      draft: { slug: 'draft-session' },
+      getEnabledWorkerArweaveJwk: () => 'worker-jwk',
+      workerSecretsEnabled: true,
+    }).arweaveJwkOverride).toBe('worker-jwk');
   });
 
   it('builds deferred CreateSBT props from draft session context', () => {
