@@ -679,7 +679,7 @@ const SessionWizard = ({
       null
     ) as SessionRegistryReadContract | null;
     if (!registryRead || typeof registryRead.sessionExists !== 'function') {
-      return false;
+      throw new Error('Session registry read contract not available.');
     }
     return !!(await registryRead.sessionExists(sessionRegistryUtils.toRegistrySlug(slug)));
   }, []);
