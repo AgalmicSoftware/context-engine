@@ -231,12 +231,15 @@ type SbtSelectorCustomSbtSelection = {
   sessionName: unknown;
   sessionSlug: string;
 };
-type BuildSbtSelectorSelectedDisplayEntriesArgs = {
+type BuildSbtSelectorSelectedDisplayEntriesArgs<
+  TSelected extends Record<string, unknown> = Record<string, unknown>,
+  TOption extends Record<string, unknown> = Record<string, unknown>,
+> = {
   currentSessionSlug?: unknown;
   resolveSbtLabel?: (sbtInfo: unknown, address: string, sessionSlug: string) => unknown;
-  sbtOptionsByAddress?: Map<string, Record<string, unknown>>;
-  sbtOptionsBySelectionKey?: Map<string, Record<string, unknown>>;
-  selectedSbts?: unknown;
+  sbtOptionsByAddress?: Map<string, TOption>;
+  sbtOptionsBySelectionKey?: Map<string, TOption>;
+  selectedSbts?: TSelected[] | unknown;
 };
 type SbtSelectorHiddenTitleInfo = Record<string, unknown> & {
   name?: unknown;
@@ -701,17 +704,20 @@ export const buildScopeFeaturedSbtSelectorEntries = ({
   return out;
 };
 
-export const buildSbtSelectorSelectedDisplayEntries = ({
+export const buildSbtSelectorSelectedDisplayEntries = <
+  TSelected extends Record<string, unknown> = Record<string, unknown>,
+  TOption extends Record<string, unknown> = Record<string, unknown>,
+>({
   currentSessionSlug = '',
   resolveSbtLabel = () => '',
   sbtOptionsByAddress = new Map(),
   sbtOptionsBySelectionKey = new Map(),
   selectedSbts = [],
-}: BuildSbtSelectorSelectedDisplayEntriesArgs = {}): unknown[] => (
-  (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown) => {
-    const record = isRecord(sbt) ? sbt : {};
+}: BuildSbtSelectorSelectedDisplayEntriesArgs<TSelected, TOption> = {}): TSelected[] => (
+  (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown): TSelected => {
+    const record = isRecord(sbt) ? sbt as TSelected : {} as TSelected;
     const address = String(record.address || '').toLowerCase();
-    if (!address) return sbt;
+    if (!address) return sbt as TSelected;
     const fromOptions = (
       sbtOptionsBySelectionKey.get(getSelectableSbtKey(record)) ||
       sbtOptionsByAddress.get(address)
@@ -735,7 +741,7 @@ export const buildSbtSelectorSelectedDisplayEntries = ({
       sessionName: fromOptions?.sessionName || record.sessionName || null,
       sessionSlug: pickNormalizedSessionSlug(fromOptions?.sessionSlug, record.sessionSlug, currentSessionSlug),
       ...(sessionBindingSlug != null ? { sessionBindingSlug } : {}),
-    };
+    } as unknown as TSelected;
   })
 );
 
