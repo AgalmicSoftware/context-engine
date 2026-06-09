@@ -422,6 +422,18 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   bundleUrl?: string;
 };
 
+type ResourceGateSelectionState = string | string[];
+type ResourceGateMapState = Record<string, ResourceGateSelectionState>;
+
+type GateSelectionState = UnknownRecord & {
+  sbts?: unknown[];
+  mode?: string;
+  chainId?: ChainIdLike | null;
+  perMemberLimit?: unknown;
+};
+
+type GateSelectionsState = Record<string, GateSelectionState>;
+
 type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   sessionName?: string;
   sessionInfo?: string;
@@ -657,7 +669,7 @@ const SessionWizard = ({
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
   const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
-  const [registryChainId, setRegistryChainId] = useState(() => {
+  const [registryChainId, setRegistryChainId] = useState<number>(() => {
     const fromDraft = Number(draft.networkChainId || 0);
     if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
     const fromNetwork = Number(network?.id || 0);
@@ -667,8 +679,8 @@ const SessionWizard = ({
       return defaultRegistryChainId;
     }
     const available = getSessionRegistryChains();
-    if (available.length) return available[0].id;
-    return DEFAULT_CHAIN_ID;
+    if (available.length) return Number(available[0].id || 0) || 0;
+    return Number(DEFAULT_CHAIN_ID || 0) || 0;
   });
   const checkSessionSlugExists = useCallback(async ({
     registryChainId: chainId,
@@ -721,17 +733,17 @@ const SessionWizard = ({
     )));
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
-  const [gateSelections, setGateSelections] = useState<UnknownRecord>(() => initialGateSelections);
+  const [gateSelections, setGateSelections] = useState<GateSelectionsState>(() => initialGateSelections as GateSelectionsState);
   const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
   const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
     () => initialDefaultGateId || initialGateRef.current?.id || ''
   );
   const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(() => initialFeaturedDraftGateAutoLink);
   // Gate selection is always per-resource when multiple gates exist (no toggle needed).
-  const [resourceGateMap, setResourceGateMap] = useState<Record<string, string>>(() => {
+  const [resourceGateMap, setResourceGateMap] = useState<ResourceGateMapState>(() => {
     const cachedMap = cachedWizard?.resourceGateMap;
-    if (cachedMap && typeof cachedMap === 'object') return cachedMap;
-    return buildResourceGateMap(initialGates, initialDefaultGateId || initialGateRef.current.id);
+    if (cachedMap && typeof cachedMap === 'object') return cachedMap as ResourceGateMapState;
+    return buildResourceGateMap(initialGates, initialDefaultGateId || initialGateRef.current.id) as ResourceGateMapState;
   });
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false);
   const [showJsonPreview, setShowJsonPreview] = useState(false);
@@ -839,7 +851,7 @@ const SessionWizard = ({
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     apiToken: toStr(cachedDeployForm.apiToken || '').trim(),
     workerName: toStr(cachedDeployForm.workerName || '').trim(),
-    adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || null,
+    adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
     accountId: toStr(cachedDeployForm.accountId || '').trim(),
     bundleUrl: toStr(cachedDeployForm.bundleUrl || CLOUDFLARE_WORKER_BUNDLE_URL),
   });
@@ -1146,7 +1158,7 @@ const SessionWizard = ({
     ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet
     : '';
 
-  const buildWorkerName = (rawName) => {
+  const buildWorkerName = (rawName: unknown): string => {
     const base = toStr(rawName)
       .trim()
       .toLowerCase()
@@ -1173,6 +1185,10 @@ const SessionWizard = ({
     // For now we assume session chain === registry chain; if this diverges, split these values.
     setRegistryChainId((prev) => (Number(prev || 0) === desiredChain ? prev : desiredChain));
   }, [initialRegistryChainId]);
+
+  const handleRegistryChainIdChange = useCallback((value: string | number) => {
+    setRegistryChainId(Number(value || 0) || 0);
+  }, []);
 
   useEffect(() => {
     const raw = toStr(initialSessionId).trim();
@@ -1425,12 +1441,14 @@ const SessionWizard = ({
     const resolvedDefaultGateId = defaultGateId || encryptionGates[0]?.id || '';
     setDraft((prev) => {
       const next = deepClone(prev);
-      const gates = {};
+      const gates: UnknownRecord = {};
       encryptionGates.forEach((gate) => {
+        const gateId = toStr(gate?.id).trim();
+        if (!gateId) return;
         const sbtAddresses = normalizeSbtSelection(gate.sbts || [])
           .map((sbt) => sbt.address)
           .filter(Boolean);
-        gates[gate.id] = {
+        gates[gateId] = {
           type: 'sbt',
           label: gate.label,
           sbtAddresses,
@@ -1440,7 +1458,7 @@ const SessionWizard = ({
           mode: gate.mode,
         };
       });
-      const resources = {};
+      const resources: UnknownRecord = {};
       workerResourceKeys.forEach((key) => {
         const resourceGate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId, encryptionGates);
         if (!resourceGate) return;
@@ -3788,11 +3806,11 @@ const SessionWizard = ({
 
   const parseAllowOriginsInput = () => parseSessionWizardAllowOriginsInput(workerAllowOrigins);
 
-  const getResourceSecretFields = (resourceKey) => {
+  const getResourceSecretFields = (resourceKey: string) => {
     return resolveSessionWizardResourceSecretFields(resourceKey, draft?.ai);
   };
 
-  const buildSponsoredFlagFields = (secretsSnapshot = getCurrentWorkerSecrets()) => {
+  const buildSponsoredFlagFields = (secretsSnapshot: WorkerSecretsLike = getCurrentWorkerSecrets()) => {
     const currentSlug = normalizeSlug(draft?.slug || '');
     const currentWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerBaseUrlForDelegation);
     const fallbackFields = (
@@ -3819,7 +3837,7 @@ const SessionWizard = ({
   const buildGateSelectionsSnapshot = () => {
     const chainId = Number(registryChainId || draft.networkChainId || 0) || null;
     const resolvedDefaultGateId = defaultGateId || encryptionGates[0]?.id || '';
-    const snapshot = {};
+    const snapshot: GateSelectionsState = {};
     workerResourceKeys.forEach((key) => {
       const gate = resolveResourceGate(resourceGateMap[key], resolvedDefaultGateId, encryptionGates);
       if (!gate) return;
@@ -4078,7 +4096,7 @@ const SessionWizard = ({
     [encryptionGates]
   );
 
-  const updateResourceGate = (resourceKey: string, gateId: string) => {
+  const updateResourceGate = (resourceKey: string, gateId: ResourceGateSelectionState) => {
     setResourceGateMap((prev) => ({
       ...prev,
       [resourceKey]: gateId,
@@ -4534,7 +4552,7 @@ const SessionWizard = ({
       onManualMetadataUrlChange={setManualMetadataUrl}
       onNormalModeBundleUrlOverrideChange={setNormalModeBundleUrlOverride}
       onPublish={handlePublish}
-      onRegistryChainIdChange={setRegistryChainId}
+      onRegistryChainIdChange={handleRegistryChainIdChange}
       onRetrySponsoredBundle={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
       onToggleDisplaySettings={() => setWizardDisplaySettingsOpen((prev) => !prev)}
       onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}

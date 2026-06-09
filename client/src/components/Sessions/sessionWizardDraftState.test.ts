@@ -200,6 +200,19 @@ describe('sessionWizardDraftState', () => {
     }));
   });
 
+  it('keeps multi-gate resource selections in the cache write payload', () => {
+    const resourceGateMap = {
+      ai: ['gate-1', 'gate-2'],
+      rpc: 'gate-2',
+    };
+
+    const payload = buildSessionWizardCacheWritePayload({
+      resourceGateMap,
+    });
+
+    expect(payload.resourceGateMap).toBe(resourceGateMap);
+  });
+
   it('keeps worker secrets only when local secret persistence is explicitly enabled', () => {
     const workerSecrets = {
       apiToken: 'secret',

@@ -14,6 +14,7 @@ import {
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
 const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
@@ -37,7 +38,7 @@ export type WorkerPanelProps = {
   renderSessionWizardInfoTooltip?: (props: {
     id?: string;
     content?: React.ReactNode;
-    placement?: string;
+    placement?: SessionWizardTooltipRenderOptions['placement'];
     testId?: string;
     ariaLabel?: string;
   }) => React.ReactNode;
