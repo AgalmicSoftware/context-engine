@@ -317,7 +317,7 @@ type SbtSelectorNameHydrationEntry = {
   address: string;
   slug: string;
 };
-type SbtSelectorBuiltOption = Record<string, unknown> & {
+export type SbtSelectorBuiltOption = Record<string, unknown> & {
   address: string;
   chainId: number | null;
   image: unknown;
