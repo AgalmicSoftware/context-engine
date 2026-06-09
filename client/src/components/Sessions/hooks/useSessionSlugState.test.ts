@@ -64,4 +64,45 @@ describe('useSessionSlugState', () => {
 
     expect(result.current.slugAvailability).toEqual({ status: 'idle' });
   });
+
+  it('reflects injected registry check results for public slugs', async () => {
+    jest.useFakeTimers();
+    const sessionExists = jest.fn()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const { result, rerender } = renderHook(
+      ({ slug }) => useSessionSlugState({
+        slug,
+        privateSlugMode: false,
+        registryChainId: 11155420,
+        sessionExists,
+      }),
+      { initialProps: { slug: 'taken-session' } }
+    );
+
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sessionExists).toHaveBeenNthCalledWith(1, {
+      registryChainId: 11155420,
+      slug: 'taken-session',
+    });
+    expect(result.current.slugAvailability).toEqual({ status: 'taken' });
+
+    rerender({ slug: 'open-session' });
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(sessionExists).toHaveBeenNthCalledWith(2, {
+      registryChainId: 11155420,
+      slug: 'open-session',
+    });
+    expect(result.current.slugAvailability).toEqual({ status: 'available' });
+  });
 });

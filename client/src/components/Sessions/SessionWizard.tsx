@@ -427,7 +427,7 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   sessionHeader?: string;
   sessionHeaderImg?: string;
   slug?: string;
-  networkChainId?: ChainIdLike;
+  networkChainId?: string | number;
   blockLimits?: UnknownRecord;
   contracts?: SessionContractsLike;
   featuredSBTs?: UnknownRecord[];
@@ -464,6 +464,15 @@ type CreateSbtModalState = {
 type ContractViewerModalState = {
   open: boolean;
   contractKey: string;
+};
+
+type SessionSlugExistsArgs = {
+  registryChainId?: ChainIdLike;
+  slug: string;
+};
+
+type SessionRegistryReadContract = {
+  sessionExists?: (slug: string) => Promise<boolean> | boolean;
 };
 
 type CollapsedSectionsState = Record<string, boolean> & {
@@ -591,7 +600,7 @@ const SessionWizard = ({
     return buildDefaultGateState(initialDraft.networkChainId || network?.id);
   }, [cachedWizard, initialDraft.networkChainId, network?.id]);
   const initialFeaturedDraftGateAutoLink = useMemo(
-    () => normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink),
+    () => normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink as UnknownRecord | null | undefined),
     [cachedWizard]
   );
   const initialSessionIdValue = useMemo(() => {
@@ -660,11 +669,19 @@ const SessionWizard = ({
     if (available.length) return available[0].id;
     return DEFAULT_CHAIN_ID;
   });
-  const checkSessionSlugExists = useCallback(({ registryChainId: chainId, slug }) => (
-    sessionRegistryUtils
-      .getRegistryContract(chainId)
-      .sessionExists(sessionRegistryUtils.toRegistrySlug(slug))
-  ), []);
+  const checkSessionSlugExists = useCallback(async ({
+    registryChainId: chainId,
+    slug,
+  }: SessionSlugExistsArgs): Promise<boolean> => {
+    const registryRead = sessionRegistryUtils.getRegistryContract(
+      chainId,
+      null
+    ) as SessionRegistryReadContract | null;
+    if (!registryRead || typeof registryRead.sessionExists !== 'function') {
+      return false;
+    }
+    return !!(await registryRead.sessionExists(sessionRegistryUtils.toRegistrySlug(slug)));
+  }, []);
   const { slugAvailability } = useSessionSlugState({
     slug: draft?.slug,
     privateSlugMode,
