@@ -1,3 +1,5 @@
+import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
+
 export type SurveyResultsSyncStatusTrackPlan = {
   color: 'info' | 'success';
   label: string;
@@ -30,11 +32,6 @@ export type SurveyResultsSyncStatusDisplayPlan = {
   viewMode: string;
 };
 
-const toBlockNumber = (value: unknown): number => {
-  const numeric = Number(value || 0);
-  return Number.isFinite(numeric) ? numeric : 0;
-};
-
 const buildLoadingTrack = (): SurveyResultsSyncStatusTrackPlan => ({
   color: 'info',
   label: '',
@@ -62,11 +59,13 @@ const buildSyncStatusTrackPlan = ({
   networkLatestBlock: unknown;
   refreshTargetBlock: unknown;
 }): SurveyResultsSyncStatusTrackPlan => {
-  const latestBlock = toBlockNumber(networkLatestBlock);
-  const clampedLocalBlock = Math.min(toBlockNumber(localBlock), latestBlock);
+  const latestBlock = normalizeSurveyResultsBlockNumber(networkLatestBlock);
+  const localBlockNumber = normalizeSurveyResultsBlockNumber(localBlock);
+  const refreshTargetBlockNumber = normalizeSurveyResultsBlockNumber(refreshTargetBlock);
+  const clampedLocalBlock = Math.min(localBlockNumber, latestBlock);
   const clampedRefreshTargetBlock =
-    toBlockNumber(refreshTargetBlock) > 0
-      ? Math.min(toBlockNumber(refreshTargetBlock), latestBlock)
+    refreshTargetBlockNumber > 0
+      ? Math.min(refreshTargetBlockNumber, latestBlock)
       : 0;
 
   if (clampedLocalBlock === 0 || latestBlock === 0) {

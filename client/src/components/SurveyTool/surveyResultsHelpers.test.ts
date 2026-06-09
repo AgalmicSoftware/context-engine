@@ -99,6 +99,9 @@ describe('surveyResultsHelpers state patches', () => {
     expect(buildSurveyResultsNetworkLatestBlockPatch('123')).toEqual({
       networkLatestBlock: 123,
     });
+    expect(buildSurveyResultsNetworkLatestBlockPatch(Number.POSITIVE_INFINITY)).toEqual({
+      networkLatestBlock: 0,
+    });
     expect(buildSurveyResultsRefreshTargetBlocksPatch(456)).toEqual({
       refreshTargetQuestionBlock: 456,
       refreshTargetResponseBlock: 456,

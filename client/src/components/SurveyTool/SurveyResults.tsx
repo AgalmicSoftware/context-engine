@@ -62,6 +62,11 @@ import {
   scanSurveyResultsSessionSlugFromCache,
 } from './surveyResultsSessionResolution.js';
 import {
+  normalizeSurveyResultsBlockNumber,
+  readSurveyResultsLatestBlock,
+  type SurveyResultsLatestBlockMap,
+} from './surveyResultsBlockNumbers.js';
+import {
   buildSurveyResultsAlertMessagePatch,
   buildSurveyResultsBookmarkFeedbackPatch,
   buildSurveyResultsBookmarkedQuestionIdsPatch,
@@ -380,7 +385,6 @@ type SurveyResultsQuestionEncryptionRecord = SurveyResultsRecord & {
 type SurveyResultsQuestionWithEncryption = SurveyResultsRecord & {
   encryption?: SurveyResultsQuestionEncryptionRecord | unknown;
 };
-type SurveyResultsLatestBlockMap = Record<string, unknown>;
 type SurveyResultsSessionConfigRecord = SurveyResultsRecord & {
   __registry?: SurveyResultsRecord & { chainId?: unknown };
   networkChainId?: number | string | null;
@@ -644,22 +648,6 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
-const toSurveyResultsLatestBlockMap = (value: unknown): SurveyResultsLatestBlockMap => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as SurveyResultsLatestBlockMap
-    : {}
-);
-const normalizeSurveyResultsBlockNumber = (value: unknown): number => {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-const readSurveyResultsLatestBlock = (latestBlockMap: unknown, key: unknown): number => {
-  const normalizedKey = String(key || '').toLowerCase();
-  if (!normalizedKey) return 0;
-  return normalizeSurveyResultsBlockNumber(
-    toSurveyResultsLatestBlockMap(latestBlockMap)[normalizedKey]
-  );
-};
 const preserveSurveyResultsFilterStateValue = (
   value: unknown
 ): SurveyResultsFilterState => (
