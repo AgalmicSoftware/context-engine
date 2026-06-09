@@ -101,9 +101,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=35';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=36';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v35)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v36)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -149,6 +149,11 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function safeAnswerString(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
 }
 
 function lower(value) {
@@ -1448,6 +1453,55 @@ function agentQuestionAnswerRef(sessionSlug = '', questionId = '') {
   return slug && qid ? `${slug}:${qid}` : '';
 }
 
+function firstAnswerValue(...values) {
+  return values.find((value) => safeAnswerString(value) !== '');
+}
+
+function submitRecordAnswerForAgent(record = {}) {
+  const answer = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
+    ? record.answer
+    : {};
+  const parsed = safeJsonParse(answer.value || record.answerValue, null);
+  const structured = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  const questionType = safeString(firstAnswerValue(
+    structured.questionType,
+    record.questionType,
+    answer.questionType,
+    record.controlType,
+  ));
+  const label = safeAnswerString(firstAnswerValue(answer.label, structured.label, record.answerLabel));
+  const base = {
+    requestId: safeString(record.requestId),
+    answeredAt: safeString(record.createdAt),
+    status: safeString(record.status),
+    questionType,
+    ...(label ? { label } : {}),
+  };
+  if (questionType === 'multichoice') {
+    const values = Array.isArray(structured.values)
+      ? structured.values.map(safeAnswerString).filter(Boolean)
+      : [firstAnswerValue(structured.value, answer.value, record.answerValue)].map(safeAnswerString).filter(Boolean);
+    return {
+      ...base,
+      values,
+      ...(safeAnswerString(structured.comments) ? { comments: safeAnswerString(structured.comments) } : {}),
+    };
+  }
+  if (questionType === 'freeform') {
+    return {
+      ...base,
+      text: safeAnswerString(firstAnswerValue(structured.text, structured.value, answer.text, answer.value, record.answerText)),
+      ...(safeAnswerString(structured.comments) ? { comments: safeAnswerString(structured.comments) } : {}),
+    };
+  }
+  const value = Object.hasOwn(structured, 'value') ? structured.value : firstAnswerValue(answer.value, record.answerValue);
+  return {
+    ...base,
+    value,
+    ...(safeAnswerString(structured.comments) ? { comments: safeAnswerString(structured.comments) } : {}),
+  };
+}
+
 async function loadAgentQuestionAnswerState({
   env = {},
   context = {},
@@ -1488,6 +1542,7 @@ async function loadAgentQuestionAnswerState({
       answeredByUser: true,
       answeredAt: safeString(record.createdAt),
       answerStatus: safeString(record.status),
+      myAnswer: submitRecordAnswerForAgent(record),
     });
   });
   return {
@@ -1508,6 +1563,7 @@ function applyAgentQuestionAnswerState(questions = [], answerState = {}, context
       answeredByUser: answered?.answeredByUser === true,
       ...(answered?.answeredAt ? { answeredAt: answered.answeredAt } : {}),
       ...(answered?.answerStatus ? { answerStatus: answered.answerStatus } : {}),
+      ...(answered?.myAnswer ? { myAnswer: answered.myAnswer } : {}),
     };
   });
 }

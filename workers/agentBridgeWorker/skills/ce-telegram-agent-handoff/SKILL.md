@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v35)
+**Skill version:** 2026-06-08 (v36)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -239,7 +239,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=35",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=36",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -745,11 +745,20 @@ asks for suggestions, wants to review language, or has not clearly approved
 submission.
 
 For direct submit, do not treat the answer as recorded unless the HTTP status is
-2xx, `ok` is true, and `submittedCount === submitRequestedCount` for the answers
-you intended to submit. If the worker returns `422` with
-`reason: "direct_submit_incomplete"`, at least one requested answer was skipped
-or not recorded. Do not tell the user the answer was submitted; re-fetch active
-questions, repair the question reference or answer shape, and retry. Keep the
+2xx, `ok` is true, `submittedCount === submitRequestedCount` for the answers you
+intended to submit, every intended answer has a returned `requestId`, and no
+target question appears in `skipped`. If `replayed: true` appears on a submitted
+item, say the answer was already recorded rather than implying a new write. If
+the worker returns `422` with `reason: "direct_submit_incomplete"`, at least one
+requested answer was skipped or not recorded. Do not tell the user the answer
+was submitted; re-fetch active questions, repair the question reference or
+answer shape, and retry.
+
+After a direct submit, verify with `GET /telegram/agent/api/questions?limit=20`
+or `GET /telegram/agent/api/questions?questionId=<id>`. For authenticated
+user-scoped requests, answered questions include `answeredByUser`, `answeredAt`,
+`answerStatus`, and `myAnswer`. Use `myAnswer` to confirm the value you just
+sent (for example rating `5`) before telling the user it was recorded. Keep the
 user-facing summary brief and do not show question IDs unless the user asks for
 debug details.
 
@@ -1515,6 +1524,15 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v36)
+
+- Added a stricter direct-submit success contract: agents must require returned
+  request ids, no skipped target questions, and follow-up authenticated question
+  verification before telling users an answer was recorded.
+- Documented the authenticated `myAnswer` echo on question reads so agents can
+  verify the submitted value without relying on local state or stale Geo-node
+  instructions.
 
 ### 2026-06-08 (v35)
 
