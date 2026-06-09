@@ -3,38 +3,111 @@ import React from 'react';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { getSurveyResponseQuestionId } from './surveyResultsHelpers.js';
 
-type SurveyResultsRecord = Record<string, any>;
+export type SurveyResultsIndividualResponseRecord = Record<string, unknown>;
 
-export type SurveyResultsIndividualResponseListEntry = SurveyResultsRecord & {
+export type SurveyResultsIndividualQuestionRecord = SurveyResultsIndividualResponseRecord & {
+  id?: unknown;
+  prompt?: React.ReactNode;
+  sessionSlug?: unknown;
+  type?: unknown;
+};
+
+export type SurveyResultsIndividualEncryptedFieldRecord = SurveyResultsIndividualResponseRecord & {
+  encrypted?: unknown;
+  encryptedPortion?: unknown;
+  value?: unknown;
+};
+
+export type SurveyResultsIndividualAnswerRecord = SurveyResultsIndividualResponseRecord & {
+  additional?: SurveyResultsIndividualEncryptedFieldRecord | null;
+  answer?: SurveyResultsIndividualEncryptedFieldRecord | null;
+  conviction?: unknown;
+  convictionEncrypted?: unknown;
+  importance?: unknown;
+  importanceEncrypted?: unknown;
+  prompt?: unknown;
+  questionID?: unknown;
+  questionId?: unknown;
+  timeStamp?: unknown;
+  timestamp?: unknown;
+  type?: unknown;
+};
+
+export type SurveyResultsIndividualResponsePayload = SurveyResultsIndividualResponseRecord & {
+  responses?: SurveyResultsIndividualAnswerRecord[];
+};
+
+export type SurveyResultsIndividualResponseListEntry = SurveyResultsIndividualResponseRecord & {
+  response?: SurveyResultsIndividualResponsePayload | null;
   responder: string;
   surveyId?: unknown;
 };
 
+export type SurveyResultsIndividualResponseCardDisplayProps = Partial<Record<
+  | 'aggregatorContainerClassName'
+  | 'aggregatorFreeformAnswerClassName'
+  | 'aggregatorParagraphClassName'
+  | 'aggregatorTextClassName'
+  | 'bodyClassName'
+  | 'containerClassName'
+  | 'iconButtonClassName'
+  | 'linksContainerClassName',
+  string
+>>;
+
+export type SurveyResultsIndividualLockedResponseKeyArgs = {
+  questionId?: unknown;
+  responder?: unknown;
+  response?: SurveyResultsIndividualAnswerRecord | null;
+  surveyId?: unknown;
+};
+
+export type SurveyResultsIndividualDecryptedOverrideArgs = {
+  key: string;
+  response: SurveyResultsIndividualAnswerRecord;
+};
+
 export type SurveyResultsIndividualResponseDisplayRow = {
   activeSessionSlug: string;
-  displayResponse: SurveyResultsRecord | null;
+  displayResponse: SurveyResultsIndividualAnswerRecord | null;
   isOwnResponse: boolean;
-  question: SurveyResultsRecord;
+  question: SurveyResultsIndividualQuestionRecord;
   questionId: string;
   rowKey: number;
 };
 
 export type SurveyResultsIndividualResponseBodyProps = {
   account?: string;
-  applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
+  applyDecryptedOverrideToResponse: (
+    args: SurveyResultsIndividualDecryptedOverrideArgs
+  ) => SurveyResultsIndividualAnswerRecord | null;
   currentSurveyId?: string;
   effectiveSlug?: string;
-  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
-  getLockedResponseKey: (args: SurveyResultsRecord) => string;
-  getResponseCardProps: () => SurveyResultsRecord;
-  network?: SurveyResultsRecord | null;
-  preNetworkQuestions?: Record<string, SurveyResultsRecord>;
+  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsIndividualQuestionRecord;
+  getLockedResponseKey: (args: SurveyResultsIndividualLockedResponseKeyArgs) => string;
+  getResponseCardProps: () => SurveyResultsIndividualResponseCardDisplayProps;
+  network?: SurveyResultsIndividualResponseRecord | null;
+  preNetworkQuestions?: Record<string, SurveyResultsIndividualQuestionRecord>;
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
   response?: SurveyResultsIndividualResponseListEntry;
   sbtCacheRevision?: unknown;
   styleMap: Record<string, string>;
 };
+
+const toIndividualAnswerRecord = (value: unknown): SurveyResultsIndividualAnswerRecord | null => (
+  value && typeof value === 'object' ? value as SurveyResultsIndividualAnswerRecord : null
+);
+
+const toIndividualAnswerRows = (value: unknown): SurveyResultsIndividualAnswerRecord[] => (
+  Array.isArray(value)
+    ? value.map(toIndividualAnswerRecord).filter((row): row is SurveyResultsIndividualAnswerRecord => !!row)
+    : []
+);
+
+const toDisplayString = (value: unknown): string => (
+  value === null || value === undefined ? '' : String(value)
+);
 
 export const buildSurveyResultsIndividualResponseDisplayRows = ({
   account = '',
@@ -56,12 +129,9 @@ export const buildSurveyResultsIndividualResponseDisplayRows = ({
   | 'preNetworkQuestions'
   | 'response'
 >): SurveyResultsIndividualResponseDisplayRow[] => {
-  const parsedResponse = response.response as SurveyResultsRecord | undefined;
-  const responseRows = Array.isArray(parsedResponse?.responses)
-    ? parsedResponse?.responses as SurveyResultsRecord[]
-    : [];
+  const responseRows = toIndividualAnswerRows(response.response?.responses);
 
-  return responseRows.map((answerItem: SurveyResultsRecord, aIndex: number) => {
+  return responseRows.map((answerItem, aIndex) => {
     const questionId = getSurveyResponseQuestionId(answerItem);
     const question = preNetworkQuestions[questionId] || getFallbackQuestion(questionId, 'individual');
     const responseKey = getLockedResponseKey({
@@ -76,9 +146,9 @@ export const buildSurveyResultsIndividualResponseDisplayRows = ({
     });
 
     return {
-      activeSessionSlug: question?.sessionSlug || effectiveSlug,
+      activeSessionSlug: toDisplayString(question?.sessionSlug) || effectiveSlug,
       displayResponse,
-      isOwnResponse: account?.toLowerCase() === response.responder?.toLowerCase(),
+      isOwnResponse: account.toLowerCase() === response.responder.toLowerCase(),
       question,
       questionId,
       rowKey: aIndex,

@@ -1,7 +1,15 @@
 import React from 'react';
 
 import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
-import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
+import SurveyResultsIndividualResponseBody, {
+  type SurveyResultsIndividualDecryptedOverrideArgs,
+  type SurveyResultsIndividualLockedResponseKeyArgs,
+  type SurveyResultsIndividualQuestionRecord,
+  type SurveyResultsIndividualResponseCardDisplayProps,
+  type SurveyResultsIndividualResponseListEntry,
+  type SurveyResultsIndividualResponseRecord,
+  type SurveyResultsIndividualAnswerRecord,
+} from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
 import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
@@ -11,40 +19,37 @@ import type {
   SurveyResultsCacheReadinessDisplayPlan,
 } from './surveyResultsCacheReadinessDisplayPlan';
 
-type SurveyResultsRecord = Record<string, any>;
 type SurveyResultsEntry = [string, unknown];
-type SurveyResultsResponseListEntry = SurveyResultsRecord & {
-  responder: string;
-  surveyId?: unknown;
-};
 
 export type SurveyResultsDisplayPanelsArgs = {
   account?: string;
-  activeQuestionToggles?: SurveyResultsRecord;
-  activeToggles?: SurveyResultsRecord;
+  activeQuestionToggles?: Record<string, unknown>;
+  activeToggles?: Record<string, unknown>;
   alertMessage?: React.ReactNode;
-  applyDecryptedOverrideToResponse: (args: SurveyResultsRecord) => SurveyResultsRecord | null;
+  applyDecryptedOverrideToResponse: (
+    args: SurveyResultsIndividualDecryptedOverrideArgs
+  ) => SurveyResultsIndividualAnswerRecord | null;
   cacheReadinessDisplay: SurveyResultsCacheReadinessDisplayPlan;
   currentSurveyId?: string;
   effectiveSlug?: string;
   filterControlsNode?: React.ReactNode;
   filterLoading?: boolean;
-  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsRecord;
-  getLockedResponseKey: (args: SurveyResultsRecord) => string;
-  getResponseCardProps: () => SurveyResultsRecord;
+  getFallbackQuestion: (questionId: unknown, mode?: unknown) => SurveyResultsIndividualQuestionRecord;
+  getLockedResponseKey: (args: SurveyResultsIndividualLockedResponseKeyArgs) => string;
+  getResponseCardProps: () => SurveyResultsIndividualResponseCardDisplayProps;
   lockedResponsesBannerNode?: React.ReactNode;
-  network?: SurveyResultsRecord | null;
+  network?: SurveyResultsIndividualResponseRecord | null;
   onSurveyViewModeKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
   onSurveyViewModeToggle: () => void;
   onToggleQuestionList: () => void;
   onToggleResponse: (index: number) => void;
-  preNetworkQuestions?: Record<string, SurveyResultsRecord>;
+  preNetworkQuestions?: Record<string, SurveyResultsIndividualQuestionRecord>;
   questionModeEntries?: SurveyResultsEntry[];
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
   renderQuestionSummary: (questionId: string, responses: unknown) => React.ReactNode;
   renderQuestionTable: () => React.ReactNode;
-  responses?: SurveyResultsResponseListEntry[];
+  responses?: SurveyResultsIndividualResponseListEntry[];
   sbtCacheRevision?: unknown;
   styleMap: Record<string, string>;
   surveyAggregateEntries?: SurveyResultsEntry[];
@@ -146,7 +151,7 @@ export const renderSurveyResultsDisplayPanels = ({
         effectiveSlug={effectiveSlug}
         filterLoading={filterLoading}
         onToggleResponse={onToggleResponse}
-        renderResponseBody={(response: SurveyResultsResponseListEntry) => (
+        renderResponseBody={(response: SurveyResultsIndividualResponseListEntry) => (
           <SurveyResultsIndividualResponseBody
             account={account}
             applyDecryptedOverrideToResponse={applyDecryptedOverrideToResponse}
