@@ -53,6 +53,25 @@ type BuildSessionWizardDeferredCreateSbtComponentPropsArgs = {
   workerUrlOverride?: unknown;
 };
 
+type ResolveSessionWizardCreateSbtModalPlanArgs = {
+  createSbtModalState?: Record<string, unknown> | null;
+  draft?: Record<string, unknown> | null;
+  getChainById?: (chainId: number | null) => SessionWizardNetworkLike | null | undefined;
+  getChainName?: (chainId: number | null) => string;
+  getEnabledWorkerArweaveJwk?: () => unknown;
+  network?: SessionWizardNetworkLike | null;
+  registryChainId?: unknown;
+  resolvedActiveSessionSlug?: unknown;
+  workerSecretsEnabled?: boolean;
+};
+
+type SessionWizardCreateSbtModalPlan = {
+  arweaveJwkOverride: string;
+  chainId: number | null;
+  network: SessionWizardNetworkLike;
+  sessionSlug: string;
+};
+
 export const getSessionWizardGateById = (
   gates: SessionWizardCreateSbtGate[] = [],
   gateId: unknown,
@@ -109,6 +128,54 @@ export const buildSessionWizardCreateSbtModalLaunchState = ({
       : currentArweaveJwk
   ).trim(),
 });
+
+export const resolveSessionWizardCreateSbtModalPlan = ({
+  createSbtModalState = null,
+  draft = {},
+  getChainById = () => null,
+  getChainName = () => '',
+  getEnabledWorkerArweaveJwk = () => '',
+  network = null,
+  registryChainId = null,
+  resolvedActiveSessionSlug = '',
+  workerSecretsEnabled = false,
+}: ResolveSessionWizardCreateSbtModalPlanArgs = {}): SessionWizardCreateSbtModalPlan => {
+  const draftRecord = draft && typeof draft === 'object' ? draft : {};
+  const modalState = createSbtModalState && typeof createSbtModalState === 'object'
+    ? createSbtModalState
+    : {};
+  const chainId = Number(
+    draftRecord.networkChainId ||
+    registryChainId ||
+    network?.id ||
+    network?.chainId ||
+    0
+  ) || null;
+  const resolvedNetwork = getChainById(chainId) || (
+    chainId
+      ? { id: chainId, name: getChainName(chainId) || `Chain ${chainId}` }
+      : (network || { id: null, name: '' })
+  );
+  const sessionSlug = toStr(
+    modalState.sessionSlug ||
+    draftRecord.slug ||
+    resolvedActiveSessionSlug ||
+    ''
+  ).trim();
+  const arweaveJwkOverride = workerSecretsEnabled
+    ? toStr(
+        modalState.arweaveJwkOverride ||
+        getEnabledWorkerArweaveJwk()
+      ).trim()
+    : '';
+
+  return {
+    arweaveJwkOverride,
+    chainId,
+    network: resolvedNetwork,
+    sessionSlug,
+  };
+};
 
 export const buildSessionWizardDeferredCreateSbtComponentProps = ({
   account = '',
