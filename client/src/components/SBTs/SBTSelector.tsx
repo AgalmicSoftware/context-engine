@@ -359,12 +359,12 @@ const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object'
 );
 const sbtSelectorRuntimePorts = bindSbtSelectorRuntimePorts({
-  contractScripts,
-  hydrateSbtDisplayNameTargeted,
-  logger: sbtLog,
-  resolveSbtDisplayLabel,
-  warmSbtDisplayNamesTargeted,
-  writeCache,
+  contractScripts: () => contractScripts,
+  hydrateSbtDisplayNameTargeted: () => hydrateSbtDisplayNameTargeted,
+  logger: () => sbtLog,
+  resolveSbtDisplayLabel: () => resolveSbtDisplayLabel,
+  warmSbtDisplayNamesTargeted: () => warmSbtDisplayNamesTargeted,
+  writeCache: () => writeCache,
 });
 const sbtLogUntyped = sbtSelectorRuntimePorts.logger;
 const hydrateSbtDisplayNameTargetedTyped = sbtSelectorRuntimePorts.hydrateSbtDisplayNameTargeted;

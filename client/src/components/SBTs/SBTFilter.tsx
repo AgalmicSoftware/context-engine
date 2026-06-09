@@ -108,8 +108,8 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 const sbtLog = createLogger('sbt');
 const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
 const sbtFilterRuntimePorts = bindSbtFilterRuntimePorts({
-  contractScripts,
-  writeCache,
+  contractScripts: () => contractScripts,
+  writeCache: () => writeCache,
 });
 const writeCacheValue = sbtFilterRuntimePorts.writeCache;
 
