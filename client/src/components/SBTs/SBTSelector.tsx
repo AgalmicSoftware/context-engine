@@ -41,6 +41,14 @@ import {
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeaturedSBTs.js';
+import {
+  bindSbtSelectorRuntimePorts,
+  isEnsureLightSbtUniverse,
+} from './sbtSelectorRuntimePorts';
+import type {
+  SbtSelectorLogMethod,
+  UnknownRecord,
+} from './sbtSelectorRuntimePorts';
 import { resolveSbtSelectorSelectedSessionContext } from './sbtSelectorSessionResolution.js';
 import {
   buildSbtOptionsRequestSignature,
@@ -153,11 +161,6 @@ import type {
 } from './sbtSelectorHelpers';
 
 const sbtLog = createLogger('sbt');
-type UnknownRecord = Record<string, unknown>;
-type SbtSelectorLogMethod = (...args: unknown[]) => void;
-type SbtSelectorLogger = UnknownRecord & {
-  log: SbtSelectorLogMethod;
-};
 type SbtSelectorScopedEntryMap = Record<string, SbtSelectorScopedEntry | null | undefined>;
 type SbtSelectorSlugOverrideArgs = {
   slugOverride?: unknown;
@@ -235,10 +238,6 @@ type SbtSelectorUniverseInflight = Record<string, Promise<unknown> | undefined>;
 type SbtSelectorRefreshScopedUniverseArgs = {
   forceDiscover?: unknown;
 };
-type EnsureLightSbtUniverse = (
-  slugs: string[],
-  options?: { forceExactSlugs?: boolean }
-) => unknown;
 type SbtSelectorOption = SbtSelectorBuiltOption;
 type SbtSelectorSessionConfigSigLike = UnknownRecord & {
   __registry?: UnknownRecord & {
@@ -356,66 +355,23 @@ type SbtSelectorAddressHydrationResult = {
   address: string;
   sbtInfo: UnknownRecord | null;
 };
-type SbtDisplayNameTargetedArgs = {
-  address?: unknown;
-  addresses?: unknown;
-  chainId?: unknown;
-  metadataLookupConfig?: unknown;
-  preferredSlug?: unknown;
-  writeBack?: boolean;
-};
-type SbtDisplayNameTargetedResult = UnknownRecord & {
-  address?: unknown;
-  image?: unknown;
-  info?: UnknownRecord | null;
-  name?: unknown;
-};
-type ResolveSbtDisplayLabelArgs = {
-  address?: unknown;
-  fallback?: string;
-  preferredSlug?: unknown;
-  sbtInfo?: unknown;
-};
-type ResolveSbtDisplayLabelTyped = (
-  args: ResolveSbtDisplayLabelArgs
-) => unknown;
-type HydrateSbtDisplayNameTargeted = (
-  args?: SbtDisplayNameTargetedArgs
-) => Promise<SbtDisplayNameTargetedResult | null>;
-type WarmSbtDisplayNamesTargeted = (
-  args?: SbtDisplayNameTargetedArgs
-) => Promise<SbtDisplayNameTargetedResult[] | null | undefined>;
-type WriteCacheTyped = (
-  namespace: string,
-  slug?: string,
-  value?: unknown
-) => Promise<unknown>;
-type ContractScriptsSbtAddressLoader = UnknownRecord & {
-  getAllSbtAddressesCached: (
-    mode: unknown,
-    discoveryRef: unknown,
-    options?: {
-      onDiscoveredAddresses?: (payload?: SbtSelectorDiscoveredAddressesPayload) => void;
-    }
-  ) => Promise<unknown>;
-};
 const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object'
 );
-const sbtLogUntyped = sbtLog as unknown as SbtSelectorLogger;
-const hydrateSbtDisplayNameTargetedTyped: HydrateSbtDisplayNameTargeted = (args) => (
-  (hydrateSbtDisplayNameTargeted as unknown as HydrateSbtDisplayNameTargeted)(args)
-);
-const warmSbtDisplayNamesTargetedTyped: WarmSbtDisplayNamesTargeted = (args) => (
-  (warmSbtDisplayNamesTargeted as unknown as WarmSbtDisplayNamesTargeted)(args)
-);
-const resolveSbtDisplayLabelTyped: ResolveSbtDisplayLabelTyped = (args) => (
-  (resolveSbtDisplayLabel as unknown as ResolveSbtDisplayLabelTyped)(args)
-);
-const writeCacheTyped: WriteCacheTyped = (namespace, slug, value) => (
-  (writeCache as unknown as WriteCacheTyped)(namespace, slug, value)
-);
-const contractScriptsUntyped = contractScripts as unknown as ContractScriptsSbtAddressLoader;
+const sbtSelectorRuntimePorts = bindSbtSelectorRuntimePorts({
+  contractScripts,
+  hydrateSbtDisplayNameTargeted,
+  logger: sbtLog,
+  resolveSbtDisplayLabel,
+  warmSbtDisplayNamesTargeted,
+  writeCache,
+});
+const sbtLogUntyped = sbtSelectorRuntimePorts.logger;
+const hydrateSbtDisplayNameTargetedTyped = sbtSelectorRuntimePorts.hydrateSbtDisplayNameTargeted;
+const warmSbtDisplayNamesTargetedTyped = sbtSelectorRuntimePorts.warmSbtDisplayNamesTargeted;
+const resolveSbtDisplayLabelTyped = sbtSelectorRuntimePorts.resolveSbtDisplayLabel;
+const writeCacheTyped = sbtSelectorRuntimePorts.writeCache;
+const contractScriptsUntyped = sbtSelectorRuntimePorts.contractScripts;
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
 const SELECTED_SBT_HYDRATION_RETRY_MS = 45 * 1000;
@@ -1114,8 +1070,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       return null;
     }
     if (typeof window === 'undefined') return null;
-    const ensureLightSbtUniverse = this.props.ensureLightSbtUniverse as unknown;
-    if (typeof ensureLightSbtUniverse !== 'function') {
+    const ensureLightSbtUniverse = this.props.ensureLightSbtUniverse;
+    if (!isEnsureLightSbtUniverse(ensureLightSbtUniverse)) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
         emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff unavailable', this.getSelectorLogContext());
       }
@@ -1153,8 +1109,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
 
     try {
-      const runEnsureLightSbtUniverse = ensureLightSbtUniverse as EnsureLightSbtUniverse;
-      const result = runEnsureLightSbtUniverse(kickoffSlugs, { forceExactSlugs: true });
+      const result = ensureLightSbtUniverse(kickoffSlugs, { forceExactSlugs: true });
       this.beginDiscovering();
       Promise.resolve(result).then(() => {
         if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
