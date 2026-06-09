@@ -1,6 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 
-type SessionWizardCreateSbtGate = Record<string, unknown> & {
+export type SessionWizardCreateSbtGate = Record<string, unknown> & {
   id?: unknown;
   gateId?: unknown;
   label?: unknown;
@@ -9,15 +9,15 @@ type SessionWizardCreateSbtGate = Record<string, unknown> & {
   sbts?: unknown;
 };
 
-type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
+export type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
   targetType?: unknown;
   gateId?: unknown;
   sessionSlug?: unknown;
   arweaveJwkOverride?: unknown;
 };
 
-type SessionWizardCreateSbtLaunchState = {
-  targetType: unknown;
+export type SessionWizardCreateSbtLaunchState = {
+  targetType: string;
   gateId: string;
   sessionSlug: string;
   arweaveJwkOverride: string;
@@ -92,7 +92,7 @@ export const buildSessionWizardCreateSbtModalLaunchState = ({
   currentDraftSlug?: unknown;
   currentArweaveJwk?: unknown;
 } = {}): SessionWizardCreateSbtLaunchState => ({
-  targetType: options?.targetType || 'gate',
+  targetType: toStr(options?.targetType || 'gate').trim() || 'gate',
   gateId: resolveSessionWizardCreateSbtTargetGateId({
     allEncryptionGates,
     defaultGateId,
