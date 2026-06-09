@@ -217,6 +217,73 @@ export const buildSessionWizardInitialDraftFromCache = ({
   return normalized;
 };
 
+export const applySessionWizardRegistryChainDraftDefaults = ({
+  draft = {},
+  chainId = 0,
+  contractDefaults = {},
+  pathRpc = '',
+}: {
+  draft?: AnyRecord | null;
+  chainId?: unknown;
+  contractDefaults?: AnyRecord | null;
+  pathRpc?: unknown;
+} = {}): AnyRecord => {
+  const resolvedChainId = Number(chainId || 0) || 0;
+  const next = deepClone((draft && typeof draft === 'object') ? draft : {}) as AnyRecord;
+  if (!resolvedChainId) return next;
+
+  if (Number(next.networkChainId || 0) !== resolvedChainId) {
+    next.networkChainId = resolvedChainId;
+  }
+
+  const defaults = (contractDefaults && typeof contractDefaults === 'object') ? contractDefaults : {};
+  const contracts = (next.contracts && typeof next.contracts === 'object') ? next.contracts as AnyRecord : {};
+  next.contracts = contracts;
+  const keys = new Set([
+    ...Object.keys(contracts || {}),
+    ...Object.keys(defaults || {}),
+  ]);
+  keys.forEach((key) => {
+    const entry = (
+      contracts[key] &&
+      typeof contracts[key] === 'object'
+    ) ? contracts[key] as AnyRecord : {};
+    const fallback = toStr(defaults[key] || '').trim();
+    if (fallback) {
+      entry.address = fallback;
+    }
+    entry.chainId = resolvedChainId;
+    contracts[key] = entry;
+  });
+
+  const resolvedPathRpc = toStr(pathRpc).trim();
+  if (resolvedPathRpc) {
+    const rpc = (next.rpc && typeof next.rpc === 'object') ? next.rpc as AnyRecord : {};
+    next.rpc = rpc;
+    if (!toStr(rpc.provider).trim()) {
+      rpc.provider = 'path';
+    }
+    const rpcProviders = (rpc.providers && typeof rpc.providers === 'object') ? rpc.providers as AnyRecord : {};
+    rpc.providers = rpcProviders;
+    const pathProvider = (
+      rpcProviders.path &&
+      typeof rpcProviders.path === 'object'
+    ) ? rpcProviders.path as AnyRecord : {};
+    rpcProviders.path = pathProvider;
+    if (!toStr(pathProvider.rpcUrl).trim()) {
+      pathProvider.rpcUrl = resolvedPathRpc;
+    }
+
+    const faucet = (next.faucet && typeof next.faucet === 'object') ? next.faucet as AnyRecord : {};
+    next.faucet = faucet;
+    if (!toStr(faucet.rpcUrl).trim()) {
+      faucet.rpcUrl = resolvedPathRpc;
+    }
+  }
+
+  return next;
+};
+
 export const buildSessionWizardCacheWritePayload = ({
   sessionId = '',
   draft = {},
