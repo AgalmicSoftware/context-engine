@@ -23,7 +23,7 @@ import { createLogger } from '../logging.js';
 type LooseObject = { [key: string]: unknown };
 type RpcParams = unknown[];
 type RpcCacheMethod = 'eth_call' | 'eth_getLogs' | 'eth_blockNumber' | 'eth_chainId';
-type ProviderSend = (methodIn: unknown, paramsIn: unknown) => Promise<any>;
+type ProviderSend = (methodIn: string, paramsIn: unknown[]) => Promise<any>;
 
 interface RpcCacheEntry {
   expiresAt: number;
@@ -77,7 +77,7 @@ interface WrappedProviderMeta extends LooseObject {
   url?: unknown;
 }
 
-interface WrappedProvider extends LooseObject {
+interface WrappedProvider {
   send: ProviderSend;
   __CE_RPC_DEBUG_CONTEXT__?: ProviderDebugContext | null;
   __CE_RPC_SEND_META?: ProviderSendMeta;
@@ -706,7 +706,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
       if (backoffError) throw backoffError;
       try {
-        const result = await originalSend(methodIn, paramsIn);
+        const result = await originalSend(method, params);
         recordRpcRateLimitSuccess(rateLimitKey);
         return result;
       } catch (err) {
@@ -803,7 +803,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     }
 
     const run: Promise<any> = (async (): Promise<any> => {
-      return await originalSend(methodIn, paramsIn);
+      return await originalSend(method, params);
     })();
 
     if (shouldDedupe) globalCache.inflight.set(keyHash, run);
