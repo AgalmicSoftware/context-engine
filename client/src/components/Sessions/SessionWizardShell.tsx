@@ -4,7 +4,7 @@ import React from 'react';
 import styles from './SessionWizard.module.scss';
 import EncryptionPanel from './EncryptionPanel';
 import SessionMetadataEditor from './SessionMetadataEditor';
-import SessionPublishSummary from './SessionPublishSummary';
+import SessionWizardPublishSection from './SessionWizardPublishSection';
 import SessionWizardHeader from './SessionWizardHeader';
 import SessionWizardIntroStatusRail from './SessionWizardIntroStatusRail';
 import SessionWizardModals from './SessionWizardModals';
@@ -324,48 +324,47 @@ const SessionWizardShell = ({
       />
     )}
 
-    {(!isNormalMode || !collapsedSections.publish) && (
-      <SessionPublishSummary
-        isCollapsed={collapsedSections.publish}
-        onToggleCollapsed={() => toggleSection('publish')}
-        normalModePublishSummary={normalModePublishSummary}
-        onPublish={onPublish}
-        onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
-        showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
-        normalModeBundleUrlOverride={normalModeBundleUrlOverride}
-        onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
-        normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
-        manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
-        bundleFileInputRef={sponsoredPublishBundleFileInputRef}
-        onBundleFileChange={setBundleFile}
-        onClearBundleFile={clearSelectedBundleFile}
-        bundleFile={bundleFile}
-        localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-        sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
-        publishUiPlan={publishUiPlan}
-        renderInfoTooltip={renderSessionWizardInfoTooltip}
-        resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
-        workerUrlSource={workerUrlSource}
-        manualMetadataUrl={manualMetadataUrl}
-        onManualMetadataUrlChange={onManualMetadataUrlChange}
-        manualGasLimit={manualGasLimit}
-        onManualGasLimitChange={onManualGasLimitChange}
-        manualGasPriceGwei={manualGasPriceGwei}
-        onManualGasPriceGweiChange={onManualGasPriceGweiChange}
-        manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
-        onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
-        manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
-        onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
-        registerTxs={registerTxs}
-        registerExplorerBaseUrl={registerExplorerBaseUrl}
-        sessionUrl={sessionUrl}
-        adminUrl={adminUrl}
-        publishedPendingSbtLinks={publishedPendingSbtLinks}
-        onCopyAdminUrl={handleCopyAdminUrl}
-        adminUrlStatus={adminUrlStatus}
-        status={status}
-      />
-    )}
+    <SessionWizardPublishSection
+      isCollapsed={collapsedSections.publish}
+      isNormalMode={isNormalMode}
+      onToggleCollapsed={() => toggleSection('publish')}
+      normalModePublishSummary={normalModePublishSummary}
+      onPublish={onPublish}
+      onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
+      showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
+      normalModeBundleUrlOverride={normalModeBundleUrlOverride}
+      onNormalModeBundleUrlOverrideChange={onNormalModeBundleUrlOverrideChange}
+      normalModeBundleUrlOverrideValidationError={normalModeBundleUrlOverrideValidationError}
+      manualBundleUrlOverrideHelp={manualBundleUrlOverrideHelp}
+      bundleFileInputRef={sponsoredPublishBundleFileInputRef}
+      onBundleFileChange={setBundleFile}
+      onClearBundleFile={clearSelectedBundleFile}
+      bundleFile={bundleFile}
+      localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
+      sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
+      publishUiPlan={publishUiPlan}
+      renderInfoTooltip={renderSessionWizardInfoTooltip}
+      resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
+      workerUrlSource={workerUrlSource}
+      manualMetadataUrl={manualMetadataUrl}
+      onManualMetadataUrlChange={onManualMetadataUrlChange}
+      manualGasLimit={manualGasLimit}
+      onManualGasLimitChange={onManualGasLimitChange}
+      manualGasPriceGwei={manualGasPriceGwei}
+      onManualGasPriceGweiChange={onManualGasPriceGweiChange}
+      manualMaxFeePerGasGwei={manualMaxFeePerGasGwei}
+      onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
+      manualMaxPriorityFeePerGasGwei={manualMaxPriorityFeePerGasGwei}
+      onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
+      registerTxs={registerTxs}
+      registerExplorerBaseUrl={registerExplorerBaseUrl}
+      sessionUrl={sessionUrl}
+      adminUrl={adminUrl}
+      publishedPendingSbtLinks={publishedPendingSbtLinks}
+      onCopyAdminUrl={handleCopyAdminUrl}
+      adminUrlStatus={adminUrlStatus}
+      status={status}
+    />
 
     <SessionWizardModals
       account={account}
