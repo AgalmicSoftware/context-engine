@@ -329,11 +329,12 @@ type SbtSelectorLoadOptionsArgs = {
 type SbtSelectorCallback<TValue> = {
   bivarianceHack(value: TValue): void;
 }['bivarianceHack'];
-type SbtSelectorProps = UnknownRecord & {
+type SbtSelectorProps = {
   additionalSBTOptions?: unknown;
   autoDiscover?: boolean;
   chainId?: unknown;
   defaultFeaturedSBTs?: unknown;
+  discoverySessionSlugs?: unknown;
   enableGroupSelect?: unknown;
   ensureLightSbtUniverse?: unknown;
   id?: string | number;
@@ -342,10 +343,12 @@ type SbtSelectorProps = UnknownRecord & {
   network?: unknown;
   onAddSBT: SbtSelectorCallback<SbtSelectorSelectableOption>;
   onRemoveSBT?: SbtSelectorCallback<string>;
+  provider?: unknown;
   sbtCacheRevision?: unknown;
   selectedSBTs?: unknown;
   sessionConfig?: unknown;
   sessionSlug?: unknown;
+  showAllSBTs?: unknown;
   slug?: unknown;
   variant?: string;
 };
