@@ -34,6 +34,7 @@ import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, 
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import QuestionFilter from './QuestionFilter';
+import type { QuestionFilterHandle } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
@@ -454,10 +455,6 @@ type QuestionsDashboardProgress = SurveySelectorRecord & {
   phase?: unknown;
   slug?: unknown;
 };
-type SurveySelectorQuestionFilterHandle = {
-  handleApplyFilters: (usePendingState?: unknown) => void;
-  handleClearFilters: () => void;
-};
 type SurveySelectorQuestionCountSnapshot = {
   hasValue: boolean;
   contextKey: string;
@@ -478,7 +475,7 @@ const getStaticSurveyQuestionsComponent = (
 );
 
 export class SurveySelector extends Component<any, any> {
-  questionFilterRef: React.RefObject<SurveySelectorQuestionFilterHandle>;
+  questionFilterRef: React.RefObject<QuestionFilterHandle>;
   surveyQuestionsRef: React.RefObject<unknown>;
   loadingTimeout: ReturnType<typeof setTimeout> | null;
   _copySurveyIdTimer: ReturnType<typeof setTimeout> | null;
