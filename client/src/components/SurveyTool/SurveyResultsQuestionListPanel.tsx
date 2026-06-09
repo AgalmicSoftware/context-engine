@@ -3,10 +3,8 @@ import React from 'react';
 import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
 import type { SurveyResultsQuestionListDisplayPlan } from './surveyResultsQuestionSummaryStatusController';
 
-type SurveyResultsRecord = Record<string, any>;
-
 type SurveyResultsQuestionListPanelProps = {
-  activeQuestionToggles?: SurveyResultsRecord;
+  activeQuestionToggles?: Record<string, unknown>;
   onToggleQuestionList: () => void;
   questionListDisplay: SurveyResultsQuestionListDisplayPlan;
   renderQuestionTable: () => React.ReactNode;
