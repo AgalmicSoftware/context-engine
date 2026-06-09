@@ -5,6 +5,7 @@ import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
+import type { QuestionFilterHandle } from './QuestionFilter';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 import type {
   SurveyResultsCacheFilterInput,
@@ -58,7 +59,7 @@ type SurveyResultsFilterExportControlsProps = SurveyResultsFilterExportControlsC
   onToggleQuestionFilter: () => void;
   provider?: unknown;
   questionFilterQuestions: unknown;
-  questionFilterRef: React.Ref<unknown>;
+  questionFilterRef: React.Ref<QuestionFilterHandle>;
   questionResponses: unknown;
   responses: unknown;
   styleMap: Record<string, string>;
@@ -169,7 +170,7 @@ export const renderSurveyResultsFilterExportControls = ({
             </Button>
 
             <QuestionFilter
-              ref={questionFilterRef as never}
+              ref={questionFilterRef}
               onFilterActivityChange={onFilterActivityChange}
               resultsMode={true}
               filterModalOpen={showQuestionFilter}
