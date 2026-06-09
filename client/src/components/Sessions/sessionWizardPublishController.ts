@@ -7,6 +7,7 @@ import {
   normalizeSessionWizardArweaveUri,
 } from './sessionWizardUrlSupport';
 import { getSessionSlugValidationError } from './sessionWizardSlugValidation';
+import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
@@ -105,21 +106,21 @@ export type SessionWizardPublishCompletionControllerPorts = {
   ) => SessionWizardPendingDraftLike[];
   buildPublishedPendingSbtLinks: (
     args: SessionWizardPublishCompletionLinksInput
-  ) => unknown[];
+  ) => PublishedPendingSbtLink[];
 };
 
 export type SessionWizardPublishCompletionControllerCallbacks = {
   promoteDeployedPendingSbtSelections: (
     deployedDrafts: SessionWizardPendingDraftLike[]
   ) => void;
-  setPublishedPendingSbtLinks: (links: unknown[]) => void;
+  setPublishedPendingSbtLinks: (links: PublishedPendingSbtLink[]) => void;
   clearPendingSbtDrafts: () => void;
   setPublishStep: (step: number) => void;
 };
 
 export type SessionWizardPublishCompletionControllerResult = {
   normalizedDeployedPendingDrafts: SessionWizardPendingDraftLike[];
-  publishedPendingSbtLinks: unknown[];
+  publishedPendingSbtLinks: PublishedPendingSbtLink[];
 };
 
 export type SessionWizardPublishFailureSettlementInput = {
