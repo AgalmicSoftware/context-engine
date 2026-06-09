@@ -87,14 +87,18 @@ import {
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
+  buildSurveyResultsLocalStoragePollPatch,
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsRefreshStatusSequencePlan,
+  buildSurveyResultsSurveyIdPropChangePatch,
+  buildSurveyResultsSurveyIdStateChangePatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
+  buildSurveyResultsViewModeResetPatch,
   buildSurveyResultsViewStatePatch,
   buildSurveyRespondersPayloadRefSignature,
   buildSurveyRespondersSignature,
@@ -1881,22 +1885,12 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
       this._surveyModeSourceSignature = '';
       clearResponseParseMemo();
       this.setState(
-        {
-          questionLocalBlock: 0,
-          responseLocalBlock: 0,
-          surveyLocalBlock: 0,
-          refreshTargetQuestionBlock: 0,
-          refreshTargetResponseBlock: 0,
-          refreshTargetSurveyBlock: 0,
-          questionResultsHydrated:
-            this.state.viewMode === 'questions' ? false : this.state.questionResultsHydrated,
-          surveyResultsHydrated:
-            this.state.viewMode === 'survey' ? false : this.state.surveyResultsHydrated,
-          demoResultsViewMode: 'raw',
-          demoResultsAtlasNodeId: null,
-          // If switching to questions, clear surveyId
-          surveyId: this.state.viewMode === 'questions' ? '' : this.state.surveyId,
-        },
+        asSurveyResultsStatePatch(buildSurveyResultsViewModeResetPatch({
+          questionResultsHydrated: this.state.questionResultsHydrated,
+          surveyId: this.state.surveyId,
+          surveyResultsHydrated: this.state.surveyResultsHydrated,
+          viewMode: this.state.viewMode,
+        })),
         () => {
           this.resetLocalStoragePollingBackoff('view-mode-change');
           this.queueResultsRefresh('view-mode-change');
@@ -1909,15 +1903,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
       clearResponseParseMemo();
       if (this.props.surveyId && this.props.surveyId !== this.state.surveyId) {
         this.setState(
-          {
-            surveyId: this.props.surveyId,
-            viewMode: 'survey',
-            surveyLocalBlock: 0,
-            refreshTargetSurveyBlock: 0,
-            surveyResultsHydrated: false,
-            demoResultsViewMode: 'raw',
-            demoResultsAtlasNodeId: null,
-          },
+          asSurveyResultsStatePatch(buildSurveyResultsSurveyIdPropChangePatch(this.props.surveyId)),
           () => {
             this.resetLocalStoragePollingBackoff('survey-id-prop-change');
             this.queueResultsRefresh('survey-id-prop-change');
@@ -1925,13 +1911,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
         );
       } else if (prevState.surveyId !== this.state.surveyId && this.state.viewMode === 'survey') {
         this.setState(
-          {
-            surveyLocalBlock: 0,
-            refreshTargetSurveyBlock: 0,
-            surveyResultsHydrated: false,
-            demoResultsViewMode: 'raw',
-            demoResultsAtlasNodeId: null,
-          },
+          asSurveyResultsStatePatch(buildSurveyResultsSurveyIdStateChangePatch()),
           () => {
             this.resetLocalStoragePollingBackoff('survey-id-state-change');
             this.queueResultsRefresh('survey-id-state-change');
@@ -2417,14 +2397,14 @@ pollLocalStorageForUpdates(): boolean {
 
     if (blockOrRespChanged || questionCountChanged || surveyResponseCountChanged) {
       this.setState(
-        {
+        asSurveyResultsStatePatch(buildSurveyResultsLocalStoragePollPatch({
           questionLocalBlock: localQBlock,
           responseLocalBlock: localRespBlock,
           surveyLocalBlock: localSBlock,
           cachedQuestionsCount: newQuestionsCount,
           cachedSurveyResponsesCount: localSurveyResponsesCount,
           networkLatestBlock: netLatest
-        },
+        })),
         () => {
           this.queueResultsRefresh('poll-local-storage-change');
         }
