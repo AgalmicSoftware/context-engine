@@ -1,6 +1,18 @@
+import type { ReactNode } from 'react';
 import { t } from '../../utilities/ui/terminology.js';
 
 type DraftLike = Record<string, unknown>;
+
+export type SessionWizardRenderFieldOptions = {
+  forceShow?: boolean;
+};
+
+export type SessionWizardRenderField = (
+  key: string,
+  value: unknown,
+  path: string[],
+  opts?: SessionWizardRenderFieldOptions
+) => ReactNode;
 
 type SessionWizardFieldVisibilityOptions = {
   forceShow?: boolean;

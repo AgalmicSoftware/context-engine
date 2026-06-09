@@ -15,6 +15,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
+import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
 const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
 const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
@@ -95,7 +96,7 @@ export type WorkerPanelProps = {
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
-  renderField: (key: unknown, value: unknown, path: unknown, opts?: Record<string, unknown>) => React.ReactNode;
+  renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
 };
 
