@@ -352,7 +352,7 @@ type SbtSelectorProps = {
   slug?: unknown;
   variant?: string;
 };
-type SbtSelectorState = UnknownRecord & SbtSelectorToggleState & {
+type SbtSelectorState = SbtSelectorToggleState & {
   customSBTAddress: string;
   discovering: boolean;
   groupOptions: SbtSelectorGroupOption[];
