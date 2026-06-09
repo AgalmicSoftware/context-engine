@@ -5165,16 +5165,16 @@ const demoSurfaceProps = isDemoAlternateResultsView
       networkChainId: this.props.networkChainId,
       onAtlasModalClose: this.handleDemoAtlasModalClose,
       onAtlasNodeOpen: this.handleDemoAtlasOpen,
-	      questionResponses: this.getMemoizedPolisQuestionResponses(
-	        true,
-	        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
-	          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
-	          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
-	      ),
-	      questionResponsesNonce: this.props.questionResponsesNonce as number | undefined,
-	      questionScanProgress: this.props.questionScanProgress as SurveyResultsRecord | null | undefined,
-	      viewKey: demoResultsViewMode,
-	    }
+      questionResponses: this.getMemoizedPolisQuestionResponses(
+        true,
+        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+      ),
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      questionScanProgress: this.props.questionScanProgress,
+      viewKey: demoResultsViewMode,
+    }
   : null;
 
 return (
