@@ -2019,10 +2019,10 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       : [];
     const selectedAddressesState = resolveSbtSelectorSelectedAddressesState({ selectedSbts });
     const additionalOptions = this.normalizeAdditionalSBTOptions();
-    const mergedSbtOptions = buildSbtSelectorMergedSelectableOptions({
+    const mergedSbtOptions = buildSbtSelectorMergedSelectableOptions<SbtSelectorSelectableOption>({
       additionalOptions,
       sbtOptions: sbtOptionsList,
-    }) as SbtSelectorSelectableOption[];
+    });
     const sbtOptionsBySelectionKey = this.getSbtOptionsBySelectionKey(mergedSbtOptions);
     const sbtOptionsByAddress = this.getSbtOptionsByAddress(mergedSbtOptions);
     const autoSearchSessionOptions = this.getAutoSearchSessionOptions();
@@ -2045,16 +2045,19 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       manualInputWarning,
       showManualInput,
     });
-    const { displayOptions } = resolveSbtSelectorDisplayOptions({
+    const { displayOptions } = resolveSbtSelectorDisplayOptions<SbtSelectorSelectableOption>({
       defaultFeaturedSBTs,
       limitToFeatured,
       mergedSbtOptions,
       scopeFeaturedAddresses,
-    }) as { displayOptions: SbtSelectorSelectableOption[] };
+    });
 
     const selectOptions = buildSbtSelectorSelectOptions(displayOptions);
 
-    const selectedDisplay = buildSbtSelectorSelectedDisplayEntries({
+    const selectedDisplay = buildSbtSelectorSelectedDisplayEntries<
+      SbtSelectorSelectableOption,
+      SbtSelectorSelectableOption
+    >({
       currentSessionSlug,
       resolveSbtLabel: (sbtInfo: unknown, address: string, sessionSlug: string) => (
         this.resolveSbtLabel(sbtInfo, address, sessionSlug)
@@ -2062,7 +2065,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       sbtOptionsByAddress,
       sbtOptionsBySelectionKey,
       selectedSbts,
-    }) as SbtSelectorSelectableOption[];
+    });
 
     // We expect `selectedSBTs` and `onRemoveSBT` to be passed in from the parent if we want to display existing selections.
 
