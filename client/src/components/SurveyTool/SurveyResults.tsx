@@ -35,7 +35,7 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import { serializeFilterState, type SurveyFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   parseQuestionSessionIdFromSearch,
@@ -311,7 +311,7 @@ type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
 type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
 };
-type SurveyResultsFilterState = Partial<SurveyFilterState> & SurveyResultsRecord;
+type SurveyResultsFilterState = SurveyResultsRecord;
 type SurveyResultsQuestionExportRecord = {
   id: unknown;
   options: unknown[];
@@ -536,7 +536,7 @@ type SurveyResultsProps = SurveyResultsRecord & {
   account?: string;
   activeSessionSlug?: string;
   defaultTags?: unknown[];
-  filterState?: SurveyResultsRecord | null;
+  filterState?: SurveyResultsFilterState | null;
   filteredQuestionsCount?: number | null;
   isOpen?: boolean;
   isQuestionCacheReady?: boolean;
@@ -5027,7 +5027,7 @@ const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
   filteredQuestionsCount,
   filteredResponsesCount,
   filterLoading,
-  filterState: this.state.filterState as SurveyResultsRecord,
+  filterState: this.state.filterState,
   hasRefreshQuestionMetadata: typeof this.props.refreshQuestionMetadata === 'function',
   hasRefreshQuestionResponses: typeof this.props.refreshQuestionResponses === 'function',
   hasRefreshSurveyResponsesByID: typeof this.props.refreshSurveyResponsesByID === 'function',
