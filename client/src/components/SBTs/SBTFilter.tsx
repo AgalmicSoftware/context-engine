@@ -117,10 +117,26 @@ type SbtFilterQuickSbtOption = {
   address: string;
 };
 type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState) => unknown;
-type SbtFilterProps = UnknownRecord & {
+type SbtFilterProps = {
+  autoExpand?: unknown;
+  buttonSurface?: unknown;
+  defaultFeaturedSBTs?: unknown;
+  externalSBTFilterState?: unknown;
+  expandToSbtHolders?: boolean;
+  hideLoadingOverlay?: unknown;
+  hideUI?: unknown;
+  isQuestionCacheReady?: unknown;
+  isSBTCacheReady?: unknown;
+  isSurveyCacheReady?: unknown;
+  items?: unknown;
+  mode?: unknown;
+  network?: unknown;
   onFilter?: SbtFilterCallback;
   onFilterCreators?: SbtFilterCallback;
   onFilterResponders?: SbtFilterCallback;
+  provider?: unknown;
+  sbtCacheRevision?: unknown;
+  sessionSlug?: unknown;
   setFilterLoading?: (loading: boolean) => unknown;
 };
 type SbtFilterState = Omit<SbtFilterInitialState, 'lastAppliedFilterSnapshot'> & {
@@ -177,7 +193,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   }
 
 
-  componentDidUpdate(prevProps: UnknownRecord, prevState: UnknownRecord): void {
+  componentDidUpdate(prevProps: Readonly<SbtFilterProps>, prevState: Readonly<SbtFilterState>): void {
     // Determine readiness based on mode.
     const wasDataReady = isSbtFilterDataReady({
       mode: prevProps.mode,
@@ -1029,7 +1045,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   addSbtSelection = (stateKey: string, sbtObject: SbtFilterSbtOption): void => {
     const address = readSbtOptionAddress(sbtObject);
     if (shouldAppendSbtFilterSelection({ address, state: this.state, stateKey })) {
-      this.setState((prev: UnknownRecord) => buildSbtFilterSelectionAddPatch({
+      this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionAddPatch({
         sbtObject,
         state: prev,
         stateKey,
@@ -1038,7 +1054,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   removeSbtSelection = (stateKey: string, address: unknown): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterSelectionRemovePatch({
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionRemovePatch({
       address,
       state: prev,
       stateKey,
@@ -1088,21 +1104,21 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   toggleVerifiedHumans = (): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prev,
       stateKey: 'onlyVerifiedHumans',
     }));
   };
 
   toggleFilterOptions = (): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prev,
       stateKey: 'showFilterOptions',
     }));
   };
 
   toggleShowAllSBTs = (): void => {
-    this.setState((prevState: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prevState: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prevState,
       stateKey: 'showAllSBTs',
     }));
