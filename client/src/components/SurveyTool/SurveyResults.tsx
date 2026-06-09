@@ -35,7 +35,7 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
+import { serializeFilterState, type SurveyFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   parseQuestionSessionIdFromSearch,
@@ -311,6 +311,7 @@ type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
 type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
 };
+type SurveyResultsFilterState = Partial<SurveyFilterState> & SurveyResultsRecord;
 type SurveyResultsQuestionExportRecord = {
   id: unknown;
   options: unknown[];
@@ -549,8 +550,8 @@ type SurveyResultsProps = SurveyResultsRecord & {
   networkChainId?: number | string | null;
   onClose?: () => void;
   onCountUpdate?: (count: unknown) => void;
-  onFilterChange?: (filterState: unknown) => void;
-  onFilterStateChangeForUrlUpdate?: (filterState: unknown) => void;
+  onFilterChange?: (filterState: SurveyResultsFilterState) => void;
+  onFilterStateChangeForUrlUpdate?: (filterState: SurveyResultsFilterState) => void;
   preventUrlChange?: boolean;
   profile?: unknown;
   provider?: unknown;
@@ -589,7 +590,7 @@ type SurveyResultsState = SurveyResultsRecord & {
   filteredQuestionsCount: number | null;
   filteredResponsesCount: number;
   filterLoading: boolean;
-  filterState: SurveyResultsRecord;
+  filterState: SurveyResultsFilterState;
   htmlReportAnalysisArtifact: SessionResultsGeneratedAnalysisArtifact | null;
   htmlReportAnalysisError: string;
   htmlReportAnalysisGenerating: boolean;
@@ -645,6 +646,29 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
+const preserveSurveyResultsFilterStateValue = (
+  value: unknown
+): SurveyResultsFilterState => (
+  (value || {}) as SurveyResultsFilterState
+);
+const normalizeNextSurveyResultsFilterState = (
+  nextFilterState: unknown,
+  fallbackFilterState: unknown = {}
+): SurveyResultsFilterState => (
+  nextFilterState && typeof nextFilterState === 'object'
+    ? nextFilterState as SurveyResultsFilterState
+    : preserveSurveyResultsFilterStateValue(fallbackFilterState)
+);
+const buildSurveyResultsSbtFilterState = ({
+  filterState,
+  sbtFilter,
+}: {
+  filterState: unknown;
+  sbtFilter: unknown;
+}): SurveyResultsFilterState => ({
+  ...toSurveyResultsRecord(filterState),
+  sbtFilter,
+});
 const asSurveyResultsStatePatch = (patch: unknown): SurveyResultsState => (
   patch as SurveyResultsState
 );
@@ -940,7 +964,7 @@ const buildLockedResponseSignature = (response: SurveyResultsResponseRecord = {}
 
 const getFilterStateSignature = (
   filterState: unknown
-): string => serializeFilterState(filterState as SurveyResultsRecord | null | undefined) || '';
+): string => serializeFilterState(filterState as SurveyResultsFilterState | null | undefined) || '';
 const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknown): boolean => {
   if (currentValue === nextValue) return true;
   if (currentValue == null || nextValue == null) return currentValue === nextValue;
@@ -1069,7 +1093,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
       viewMode: this.props.viewMode as SurveyResultsState['viewMode'], // 'survey' or 'questions'
       filterLoading: false,
       showQuestionFilter: false,
-      filterState: (this.props.filterState || {}) as SurveyResultsRecord,
+      filterState: preserveSurveyResultsFilterStateValue(this.props.filterState),
       syncDetailsOpen: false,
       bookmarkedQuestionIDs: bootstrapQuestionIds,
       bookmarkedSurveyIDs: bootstrapSurveyIds,
@@ -1482,7 +1506,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     return next;
   }
 
-  notifyFilterStateCommitted(nextFilterState: unknown): void {
+  notifyFilterStateCommitted(nextFilterState: SurveyResultsFilterState): void {
     const nextSignature = getFilterStateSignature(nextFilterState);
     if (this._lastNotifiedFilterStateSignature === nextSignature) return;
     this._lastNotifiedFilterStateSignature = nextSignature;
@@ -1496,10 +1520,10 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
 
   commitResultsFilterState(statePatch: SurveyResultsRecord | null | undefined, nextFilterState: unknown): void {
     const patch: SurveyResultsRecord = (statePatch && typeof statePatch === 'object') ? statePatch : {};
-    const normalizedFilterState =
-      nextFilterState && typeof nextFilterState === 'object'
-        ? nextFilterState
-        : (this.state.filterState || {});
+    const normalizedFilterState = normalizeNextSurveyResultsFilterState(
+      nextFilterState,
+      this.state.filterState
+    );
     const filterStateChanged = !areValuesEquivalentBySignature(
       this.state.filterState,
       normalizedFilterState
@@ -3902,8 +3926,11 @@ handleFilteredResponses = (
   if (!this.props.isQuestionCacheReady) return;
   const nextFilterState =
     typeof newSbtFilterLocalState !== 'undefined'
-      ? { ...toSurveyResultsRecord(this.state.filterState), sbtFilter: newSbtFilterLocalState }
-      : (this.state.filterState || {});
+      ? buildSurveyResultsSbtFilterState({
+        filterState: this.state.filterState,
+        sbtFilter: newSbtFilterLocalState,
+      })
+      : preserveSurveyResultsFilterStateValue(this.state.filterState);
 
   if (this.state.viewMode === 'survey') {
     if (this.state.surveyViewMode === 'individuals') {
