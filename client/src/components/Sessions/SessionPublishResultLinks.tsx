@@ -5,17 +5,12 @@ import { faCopy } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import type { SessionWizardPublishMetadataDisplayState } from './sessionWizardPublishReadiness';
+import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type RegisterTxEntry = {
   hash: string;
   action: string;
-};
-
-type PublishedPendingSbtLink = {
-  address: string;
-  label: string;
-  href: string;
 };
 
 type SessionPublishResultLinksProps = {
