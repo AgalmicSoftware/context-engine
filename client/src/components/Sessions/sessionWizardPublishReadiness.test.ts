@@ -1,6 +1,7 @@
 import {
   resolveSessionWizardPublishActionDisplayState,
   resolveSessionWizardPublishRequestDescriptor,
+  resolveSessionWizardPublishMetadataIdentityState,
   resolveSessionWizardPublishMetadataDisplayState,
   resolveSessionWizardPublishReadiness,
   resolveSessionWizardPublishUiPlan,
@@ -343,6 +344,39 @@ describe('resolveSessionWizardPublishReadiness', () => {
   });
 
   it('describes uploaded and manual metadata fallback display without upload execution ports', () => {
+    const buildGatewayUrl = jest.fn((metadataTxId: string) => `https://gateway.example/${metadataTxId}`);
+
+    expect(resolveSessionWizardPublishMetadataIdentityState({
+      buildGatewayUrl,
+      manualMetadataUrl: `https://arweave.net/${txId}`,
+      metadataUrl: 'https://example.test/ignored-uploaded-metadata.json',
+    })).toEqual({
+      effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
+      effectiveMetadataTxId: txId,
+      effectiveMetadataUri: `ar://${txId}`,
+    });
+    expect(buildGatewayUrl).toHaveBeenCalledWith(txId);
+
+    expect(resolveSessionWizardPublishMetadataIdentityState({
+      buildGatewayUrl,
+      manualMetadataUrl: '',
+      metadataUrl: txId,
+    })).toEqual({
+      effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
+      effectiveMetadataTxId: txId,
+      effectiveMetadataUri: txId,
+    });
+
+    expect(resolveSessionWizardPublishMetadataIdentityState({
+      buildGatewayUrl,
+      manualMetadataUrl: 'https://example.test/custom-metadata.json',
+      metadataUrl: txId,
+    })).toEqual({
+      effectiveMetadataGatewayUrl: '',
+      effectiveMetadataTxId: '',
+      effectiveMetadataUri: 'https://example.test/custom-metadata.json',
+    });
+
     expect(resolveSessionWizardPublishMetadataDisplayState({
       effectiveMetadataGatewayUrl: `https://arweave.net/${txId}`,
       effectiveMetadataTxId: txId,
@@ -389,6 +423,23 @@ describe('resolveSessionWizardPublishReadiness', () => {
       showManualMetadataUri: false,
       showMetadataUri: false,
     });
+  });
+
+  it('lets the publish UI plan derive metadata tx links without parent Arweave branching', () => {
+    const plan = resolveSessionWizardPublishUiPlan({
+      ...baseInput,
+      buildMetadataGatewayUrl: (metadataTxId: string) => `https://gateway.example/${metadataTxId}`,
+      manualMetadataUrl: '',
+      metadataUrl: txId,
+    });
+
+    expect(plan.publishMetadataDisplayState).toEqual(expect.objectContaining({
+      effectiveMetadataGatewayUrl: `https://gateway.example/${txId}`,
+      effectiveMetadataTxId: txId,
+      metadataUri: `ar://${txId}`,
+      showArweaveTx: true,
+      showMetadataUri: true,
+    }));
   });
 
   it('describes publish action controls without execution callbacks', () => {

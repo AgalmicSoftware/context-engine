@@ -268,10 +268,8 @@ import {
 } from './sessionWizardUiSupport';
 import {
   getSessionWizardExplorerBaseUrl as getExplorerBaseUrl,
-  normalizeSessionWizardArweaveUri as normalizeArweaveUri,
   normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
-  parseSessionWizardArweaveTxId as parseArweaveTxId,
 } from './sessionWizardUrlSupport';
 import {
   parseSessionWizardAllowOriginsInput,
@@ -4194,11 +4192,6 @@ const SessionWizard = ({
     [draft]
   );
 
-  const effectiveMetadataUrl = normalizeArweaveUri(manualMetadataUrl) || metadataUrl;
-  const effectiveMetadataTxId = parseArweaveTxId(effectiveMetadataUrl);
-  const effectiveMetadataGatewayUrl = effectiveMetadataTxId
-    ? arweaveScripts.buildArweaveGatewayUrl(effectiveMetadataTxId)
-    : '';
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
@@ -4331,8 +4324,7 @@ const SessionWizard = ({
     canUseSponsoredAutoDeployNow,
     manualMetadataUrl,
     metadataUrl,
-    effectiveMetadataGatewayUrl,
-    effectiveMetadataTxId,
+    buildMetadataGatewayUrl: arweaveScripts.buildArweaveGatewayUrl,
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
