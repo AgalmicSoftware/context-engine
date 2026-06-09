@@ -135,6 +135,7 @@ import type {
   SbtListChipProgressVisibilityMeta,
   SbtCacheMetaSnapshot,
   SbtCardDetails,
+  SbtListHelperItem,
   SbtPassiveLatestLookupInFlightBySlug,
   SbtPassiveLatestLookupStateBySlug,
   SbtListRealtimeProgressBySlug,
@@ -163,7 +164,7 @@ type SbtListMetadata = UnknownRecord & {
   tokenURI?: unknown;
   tokenUri?: unknown;
 };
-type SbtListItem = UnknownRecord & {
+type SbtListItem = SbtListHelperItem & {
   blockNumber?: unknown;
   burnedAddresses?: unknown;
   defaultSbtTags?: unknown;
@@ -1176,7 +1177,7 @@ const SBTsList = ({
       resolveConcreteSessionBindingSlug,
       resolveSbtSessionSlug,
       targetSlugs: normalizedTargetSlugs,
-    }) as SbtListItem[];
+    });
   }, [resolveConcreteSessionBindingSlug, resolveSbtSessionSlug]);
 
   const sbtList = useMemo(() => {
@@ -2685,14 +2686,14 @@ const SBTsList = ({
       sbt,
       unnamedLabel: t('sbt'),
     });
-    if (!model) return null;
+    if (!model || !sbt) return null;
     const {
       name,
       sbtAddress,
       sbtAddressLower,
       sessionSlug,
     } = model;
-    const resolvedSbt = sbt as SbtListItem;
+    const resolvedSbt = sbt;
     const details = getSbtCardDetails(sbt);
     const detailsId = `sbt-details-${sbtAddressLower}`;
     const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
