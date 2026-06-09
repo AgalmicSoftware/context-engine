@@ -2,7 +2,7 @@
 /** @file SessionWizard.tsx */
 // Temporary: this file is mid-migration from JSX to TSX. Keep the runtime
 // unblocked while we restore strict typing in smaller, reviewable slices.
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
 import { ReactReduxContext } from 'react-redux';
@@ -10,7 +10,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faImage, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
-import LockableFieldFrame from './LockableFieldFrame';
+import LockableFieldFrame, { type LockableFieldFrameProps } from './LockableFieldFrame';
 import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
@@ -523,7 +523,12 @@ type SponsoredBundleWorkerSecretStatePatch = {
   persistWorkerSecrets?: boolean;
 };
 
-type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
+type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
+type SessionHeaderFileState = File | Blob;
+type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement'];
+type SessionWizardRenderFieldOptions = {
+  forceShow?: boolean;
+};
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
@@ -1070,7 +1075,7 @@ const SessionWizard = ({
   const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
   const [sessionHeaderMode, setSessionHeaderMode] = useState('url');
   const [compactSessionHeaderMode, setCompactSessionHeaderMode] = useState('idle');
-  const [sessionHeaderFile, setSessionHeaderFile] = useState<File | null>(null);
+  const [sessionHeaderFile, setSessionHeaderFile] = useState<SessionHeaderFileState | null>(null);
   const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
   const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
   sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
@@ -1104,7 +1109,7 @@ const SessionWizard = ({
     () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
     [cloudflareWorkerSbtGateMode, workerResourceKeys]
   );
-  const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
+  const setSessionHeaderStatus = useCallback((text = '', tone: SessionHeaderUploadStatusTone = 'default') => {
     setSessionHeaderUploadStatus(text);
     setSessionHeaderUploadStatusTone(text ? tone : 'default');
   }, []);
@@ -2378,7 +2383,12 @@ const SessionWizard = ({
     }));
   }, [featuredDraftGateAutoLink, encryptionGates, pendingSbtDrafts]);
 
-  const renderField = (key, value, path, opts = {}) => {
+  const renderField = (
+    key: string,
+    value: unknown,
+    path: string[],
+    opts: SessionWizardRenderFieldOptions = {}
+  ) => {
     const forceShow = !!opts.forceShow;
     const currentPath = [...path, key];
     if (shouldHideSessionWizardField({
@@ -2415,19 +2425,21 @@ const SessionWizard = ({
       ? normalizeGateIds(encryptedFieldGates[keyString]).filter((id) => gateIds.includes(id))
       : [];
     const primaryGate = selectedGateIds.length === 1 ? getGateById(selectedGateIds[0]) : null;
+    const primaryGateLabel = toStr(primaryGate?.label).trim();
+    const primaryGateColor = toStr(primaryGate?.color).trim();
     const locked = selectedGateIds.length > 0;
     const lockActive = isSlugField ? privateSlugMode : locked;
     const defaultLockLabel = isNormalMode ? '' : t('sbt');
-    const lockBadgeLabel = isSlugField
+    const lockBadgeLabel: ReactNode = isSlugField
       ? 'ID'
       : (selectedGateIds.length === 0
         ? defaultLockLabel
         : (selectedGateIds.length === 1
-          ? (primaryGate?.label || selectedGateIds[0] || defaultLockLabel)
+          ? (primaryGateLabel || selectedGateIds[0] || defaultLockLabel)
           : `${selectedGateIds.length} ${t('gatesLower')}`));
     const showLockBadge = !!lockBadgeLabel;
-    const lockBadgeStyle = (!isSlugField && selectedGateIds.length === 1 && primaryGate)
-      ? { borderColor: primaryGate.color, color: primaryGate.color }
+    const lockBadgeStyle = (!isSlugField && selectedGateIds.length === 1 && primaryGateColor)
+      ? { borderColor: primaryGateColor, color: primaryGateColor }
       : undefined;
     const lockTitle = isSlugField
       ? (slugPinnedByPendingSbtDrafts
@@ -2437,11 +2449,11 @@ const SessionWizard = ({
           : 'Use session ID as the URL (private mode). This does not encrypt the URL.'))
       : locked
         ? (selectedGateIds.length === 1
-          ? `Locked with ${primaryGate?.label || selectedGateIds[0]}. Click to edit or unlock.`
+          ? `Locked with ${primaryGateLabel || selectedGateIds[0]}. Click to edit or unlock.`
           : `Locked with ${selectedGateIds.length} ${t('gatesLower')}. Click to edit or unlock.`)
         : `Click to lock with a ${t('gateLower')}.`;
-    const lockIconStyle = (!isSlugField && selectedGateIds.length === 1 && primaryGate)
-      ? { color: primaryGate.color }
+    const lockIconStyle = (!isSlugField && selectedGateIds.length === 1 && primaryGateColor)
+      ? { color: primaryGateColor }
       : undefined;
     const handleLockClick = () => {
       if (isSlugField) {
@@ -2453,17 +2465,18 @@ const SessionWizard = ({
     const tooltipText = getSessionWizardFieldTooltip(currentPath, value);
     const chainName = /chainid$/i.test(keyString) ? getChainName(value) : '';
     const displayLabelText = chainName ? `${displayLabel} (${chainName})` : displayLabel;
+    const fieldTooltipPlacement: SessionWizardTooltipPlacement = 'right';
     const fieldTooltipControl = renderSessionWizardInfoTooltip({
       id: tooltipId,
       content: tooltipText,
-      placement: 'right',
+      placement: fieldTooltipPlacement,
       ariaLabel: `${displayLabelText} info`,
     });
     const slugValidationError = isSlugField ? getSessionSlugValidationError(value) : '';
     const fieldGateLockProps = !isSlugField ? {
       gateOptions,
       selectedGateIds,
-      onChangeSelectedGateIds: (nextIds) => {
+      onChangeSelectedGateIds: (nextIds: unknown) => {
         const filtered = normalizeGateIds(nextIds).filter((id) => gateIds.includes(id));
         setEncryptedFieldGates((prev) => {
           const next = { ...(prev || {}) };
@@ -2477,15 +2490,15 @@ const SessionWizard = ({
         if (!filtered.length) setOpenLockKey('');
       },
       open: openLockKey === keyString,
-      onToggleOpen: (nextOpen) => setOpenLockKey(nextOpen ? keyString : ''),
+      onToggleOpen: (nextOpen: boolean) => setOpenLockKey(nextOpen ? keyString : ''),
       disabled: !gateIds.length,
       showDots: true,
     } : null;
-    const fieldFrameProps = {
+    const fieldFrameProps: LockableFieldFrameProps = {
       label: displayLabelText,
       tooltipText,
       tooltipId,
-      tooltipPlacement: 'right',
+      tooltipPlacement: fieldTooltipPlacement,
       tooltipAriaLabel: `${displayLabelText} info`,
       tooltipsEnabled: sessionWizardTooltipsEnabled,
       canLock,
