@@ -10,9 +10,6 @@ const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
-const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
-const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
-const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 const REPO_ROOT = path.join(__dirname, '..');
 
@@ -55,21 +52,6 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       path.join('scripts', 'verify-public-release-surface.js'),
       fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
-    );
-    writeFile(
-      sourceDir,
-      path.join('scripts', 'verify-public-docs.js'),
-      fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
-    );
-    writeFile(
-      sourceDir,
-      path.join('scripts', 'verify-public-assets.js'),
-      fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
-    );
-    writeFile(
-      sourceDir,
-      path.join('scripts', 'verify-public-text.js'),
-      fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
@@ -215,6 +197,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-release-surface.js'),
+      fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 

@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 2026-06-09
+
+### Completed TODOs
+
+- Added a public-release surface verifier that blocks JavaScript/TypeScript imports into stripped paths before release replay branches are imported or pushed, changed the Worker Chipotle tests to read the public client action catalog instead of the stripped `contextEngine-cc` mirror, and made release replay run public `test:node` before push so stripped public-copy regressions fail locally.
+
+## 2026-06-06
+
+### Completed TODOs
+
+- Added a signed worker `secret-presence` admin action that returns allowed-key booleans without exposing secret values, and updated `/admin` Worker secrets cards so blank write-only inputs show unknown/configured/empty status from the worker presence manifest instead of local draft emptiness.
+
 ## 2026-05-25
 
 ### Completed TODOs

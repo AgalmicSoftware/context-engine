@@ -332,6 +332,13 @@ scrub_public_package_json
 
 verify_private_planning_paths_absent
 
+if [ ! -f "$STAGING_ROOT/scripts/verify-public-release-surface.js" ]; then
+  printf 'Public release surface verifier is missing from release copy: scripts/verify-public-release-surface.js\n' >&2
+  exit 1
+fi
+
+node "$STAGING_ROOT/scripts/verify-public-release-surface.js" "$STAGING_ROOT" >&2
+
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 
 printf '%s files stripped, output at %s\n' "$stripped_count" "$OUTPUT_ABS"
