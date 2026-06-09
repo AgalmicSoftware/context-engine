@@ -14,6 +14,7 @@ import {
   SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   type SessionResultsExportFormat,
+  type SessionResultsHtmlSnapshot,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
 import { renderSurveyResultsHtmlReportActionControls } from './SurveyResultsHtmlReportActionControls';
@@ -22,14 +23,13 @@ import SurveyResultsHtmlReportSectionTable, {
   type SurveyResultsHtmlReportSectionRow,
 } from './SurveyResultsHtmlReportSectionTable';
 import type {
+  SurveyResultsHtmlReportAnalysisPayload,
   SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers';
 
-type SurveyResultsRecord = Record<string, any>;
-
 export type SurveyResultsHtmlReportExportModalDisplayProps = {
   analysisGenerating?: boolean;
-  analysisPayload: SurveyResultsRecord;
+  analysisPayload: SurveyResultsHtmlReportAnalysisPayload;
   analysisProgress?: string;
   canDownload?: boolean;
   exportFormat?: SessionResultsExportFormat;
@@ -41,7 +41,7 @@ export type SurveyResultsHtmlReportExportModalDisplayProps = {
   needsAnalysisGeneration?: boolean;
   sectionRows: SurveyResultsHtmlReportSectionRow[];
   selectedSections: SessionResultsSectionSelection;
-  snapshot: SurveyResultsRecord;
+  snapshot: SessionResultsHtmlSnapshot;
   styleMap: Record<string, string>;
 };
 
@@ -90,12 +90,12 @@ export const buildSurveyResultsHtmlReportDownloadLabel = (
 
 export type SurveyResultsHtmlReportExportModalDisplayPlanInput = {
   analysisGenerating?: boolean;
-  analysisPayload?: SurveyResultsRecord;
+  analysisPayload?: SurveyResultsHtmlReportAnalysisPayload;
   analysisProgress?: string;
   exportFormat?: SessionResultsExportFormat;
   isAuthorized?: boolean;
   isDemoMode?: boolean;
-  snapshot?: SurveyResultsRecord;
+  snapshot?: Partial<SessionResultsHtmlSnapshot>;
 };
 
 export type SurveyResultsHtmlReportExportModalDisplayPlan = {

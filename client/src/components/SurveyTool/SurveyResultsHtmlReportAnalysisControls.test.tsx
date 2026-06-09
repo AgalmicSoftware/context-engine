@@ -66,4 +66,18 @@ describe('SurveyResultsHtmlReportAnalysisControls', () => {
 
     expect(onGenerateAnalysis).not.toHaveBeenCalled();
   });
+
+  it('renders partial analysis payloads with zeroed counts and no reasons alert', () => {
+    render(
+      <SurveyResultsHtmlReportAnalysisControls
+        analysisPayload={{}}
+        generateAnalysisLabel="Generate Analysis Views"
+        onGenerateAnalysis={jest.fn()}
+        styleMap={styleMap}
+      />
+    );
+
+    expect(screen.getByText(/0\s+responses,\s+0\s+participants,\s+0\s+questions\./)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });
