@@ -1055,6 +1055,64 @@ describe('SurveyResults question-mode polling and filter state', () => {
     peekSpy.mockRestore();
   });
 
+  it('falls back to zero for malformed survey latest-block cache entries while polling counts', () => {
+    const surveyId = 'survey-malformed-block';
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+      surveyId,
+      viewMode: 'survey',
+    }));
+
+    const questionBucket = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: {},
+      questionResponses: {},
+    };
+    const surveyBucket = {
+      surveyResponses: {
+        [surveyId]: {
+          '0x1111111111111111111111111111111111111111': { response: true },
+          '0x2222222222222222222222222222222222222222': { response: true },
+        },
+      },
+      surveyResponsesLatestBlock: {
+        [surveyId]: 'not-a-block',
+      },
+      surveysLatestBlock: 'also-not-a-block',
+    };
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      if (namespace === 'surveysCache') return { '84532': surveyBucket };
+      return {};
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 99,
+      cachedQuestionsCount: 0,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(true);
+    expect(subject.state.surveyLocalBlock).toBe(0);
+    expect(subject.state.cachedSurveyResponsesCount).toBe(2);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+    peekSpy.mockRestore();
+  });
+
   it('fetches and renders question results using networkChainId without wallet network', async () => {
     const subject = createSubject({
       network: null,
