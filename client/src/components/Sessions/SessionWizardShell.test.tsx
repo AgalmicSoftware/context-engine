@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import SessionWizardShell from './SessionWizardShell';
+import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
   <div data-testid="shell-header" data-mode={props.wizardMode}>
@@ -97,7 +97,7 @@ jest.mock('./SessionWizardModals', () => (props: any) => (
   </div>
 ));
 
-const baseProps = () => ({
+const baseProps = (): SessionWizardShellProps => ({
   account: '0x00000000000000000000000000000000000000aa',
   activeCreateSbtTargetGate: null,
   activeCreateSbtTargetGateId: '',
@@ -244,7 +244,6 @@ const baseProps = () => ({
       uploadBlockedReason: '',
     },
   },
-  publishStep: 0,
   publishedPendingSbtLinks: [],
   registerExplorerBaseUrl: '',
   registerTxs: [],
@@ -309,7 +308,7 @@ const baseProps = () => ({
   workerUrlSource: 'custom worker URL',
   wizardDisplaySettingsOpen: false,
   wizardMode: 'normal',
-  normalizeSbtSelection: jest.fn((value) => value),
+  normalizeSbtSelection: jest.fn(() => []),
 });
 
 describe('SessionWizardShell', () => {
