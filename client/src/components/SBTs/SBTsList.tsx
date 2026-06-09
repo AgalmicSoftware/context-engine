@@ -55,6 +55,10 @@ import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.j
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import {
+  bindSbtListRuntimePorts,
+  type SbtListBlockWindow,
+} from './sbtListRuntimePorts';
+import {
   filterSessionUniverseEntriesByDemoVisibility,
   getCustomDemoSessionEntries,
   mergeSessionUniverseEntriesBySlug,
@@ -232,23 +236,8 @@ type SbtListFetchSBTs = (
 ) => Promise<void>;
 type SbtListChipProgressMeta = SbtListChipProgressVisibilityMeta;
 type SbtListChipProgressMetaBySlug = Record<string, SbtListChipProgressMeta | undefined>;
-type SbtListBlockWindow = UnknownRecord & {
-  toBlock?: unknown;
-};
 type SbtListGroupPasswordMap = Record<string, boolean | undefined>;
 type SbtListPasswordFlagResult = [string, boolean];
-type SbtGroupPasswordHashReader = {
-  getGroupPasswordHash: (
-    providerName: string,
-    sbtAddress: string,
-    groupKeyOrCfg?: unknown,
-    options?: unknown
-  ) => Promise<unknown>;
-};
-type SbtRelevantBlockWindowReader = {
-  getRelevantBlockWindowForFilter: (scopeRef: unknown) => Promise<SbtListBlockWindow | unknown>;
-};
-type HasCachedCreateSbtFormReader = (options?: UnknownRecord) => boolean;
 type SbtListNetwork = UnknownRecord & {
   id?: unknown;
 };
@@ -291,9 +280,10 @@ const isRecord = (value: unknown): value is UnknownRecord => (
 const isSbtListPointerEventLike = (value: unknown): value is SbtListPointerEventLike => (
   !!value && typeof value === 'object'
 );
-const sbtGroupPasswordHashReader = contractScripts as unknown as SbtGroupPasswordHashReader;
-const sbtRelevantBlockWindowReader = contractScripts as unknown as SbtRelevantBlockWindowReader;
-const hasCachedCreateSbtFormReader = hasCachedCreateSbtForm as unknown as HasCachedCreateSbtFormReader;
+const sbtListRuntimePorts = bindSbtListRuntimePorts({
+  contractScripts: () => contractScripts,
+  hasCachedCreateSbtForm: () => hasCachedCreateSbtForm,
+});
 const DEMO_SESSION_MAP = getDemoSessionMap();
 
 const SBT_LIVE_PROGRESS_BRIDGE_MS = 2500;
@@ -786,7 +776,7 @@ const SBTsList = ({
   const [excludePasswordLocked, setExcludePasswordLocked] = useState<boolean>(false);
   const [showCreateGroup, setShowCreateGroup] = useState<boolean>(() => (
     resolveSbtListCreateGroupInitialVisibility({
-      hasCachedCreateSbtForm: hasCachedCreateSbtFormReader,
+      hasCachedCreateSbtForm: sbtListRuntimePorts.hasCachedCreateSbtForm,
       listSlug,
     })
   ));
@@ -1325,7 +1315,7 @@ const SBTsList = ({
               : { slug, __forceLatestBlock: true }
           )
           : scopeRef;
-        const { toBlock } = await sbtRelevantBlockWindowReader.getRelevantBlockWindowForFilter(
+        const { toBlock } = await sbtListRuntimePorts.contractScripts.getRelevantBlockWindowForFilter(
           blockWindowRef
         ) as SbtListBlockWindow;
         const latest = Number(toBlock || 0);
@@ -1863,7 +1853,7 @@ const SBTsList = ({
           try {
             // Per-item slug awareness
             const sSlug = (s && s.slug != null) ? s.slug : listSlug;
-            const gph = await sbtGroupPasswordHashReader.getGroupPasswordHash('none', sbtAddress, sSlug);
+            const gph = await sbtListRuntimePorts.contractScripts.getGroupPasswordHash('none', sbtAddress, sSlug);
             const isLocked = !!gph && gph !== ethers.constants.HashZero;
             return [sbtAddressLower, isLocked];
           } catch {
