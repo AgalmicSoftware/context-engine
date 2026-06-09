@@ -16,19 +16,12 @@ export type SbtGroupPasswordHashReader = {
 export type SbtRelevantBlockWindowReader = {
   getRelevantBlockWindowForFilter: (
     scopeRef: unknown
-  ) => Promise<SbtListBlockWindow>;
+  ) => Promise<SbtListBlockWindow | unknown>;
 };
 
 export type SbtListContractScriptsBoundary =
   SbtGroupPasswordHashReader &
   SbtRelevantBlockWindowReader;
-
-type SbtListContractScriptsRawBoundary =
-  SbtGroupPasswordHashReader & {
-    getRelevantBlockWindowForFilter: (
-      scopeRef: unknown
-    ) => Promise<unknown>;
-  };
 
 export type HasCachedCreateSbtFormReader = (
   options?: SbtListRuntimeRecord
@@ -50,8 +43,8 @@ export const bindSbtListRuntimePorts = ({
   contractScripts,
   hasCachedCreateSbtForm,
 }: BindSbtListRuntimePortsArgs): SbtListRuntimePorts => {
-  const readContractScripts = (): SbtListContractScriptsRawBoundary => (
-    contractScripts() as unknown as SbtListContractScriptsRawBoundary
+  const readContractScripts = (): SbtListContractScriptsBoundary => (
+    contractScripts() as unknown as SbtListContractScriptsBoundary
   );
   const readHasCachedCreateSbtForm = (): HasCachedCreateSbtFormReader => (
     hasCachedCreateSbtForm() as unknown as HasCachedCreateSbtFormReader
@@ -68,7 +61,7 @@ export const bindSbtListRuntimePorts = ({
         )
       ),
       getRelevantBlockWindowForFilter: (scopeRef) => (
-        readContractScripts().getRelevantBlockWindowForFilter(scopeRef) as Promise<SbtListBlockWindow>
+        readContractScripts().getRelevantBlockWindowForFilter(scopeRef)
       ),
     },
     hasCachedCreateSbtForm: (options) => readHasCachedCreateSbtForm()(options),
