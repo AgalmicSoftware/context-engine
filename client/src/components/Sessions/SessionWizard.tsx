@@ -481,6 +481,26 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
   storageProfile: boolean;
 };
 
+type WorkerSecretsUpdateFn = (current: WorkerSecretsLike) => WorkerSecretsLike | UnknownRecord | null | undefined;
+
+type SponsoredBundleDeploymentStatePatch = {
+  deployForm?: DeployFormState;
+  deployStatus?: string;
+  deployInFlight?: boolean;
+  deployComplete?: boolean;
+  workerMode?: string;
+  deployWorkerUrl?: string;
+  provisionedSponsoredContext?: UnknownRecord;
+  forceManualBundleFile?: boolean;
+  normalModeBundleUrlOverride?: string;
+  workerUrlAutoFilled?: boolean;
+};
+
+type SponsoredBundleWorkerSecretStatePatch = {
+  workerSecretsEnabled?: boolean;
+  persistWorkerSecrets?: boolean;
+};
+
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
 const log = createLogger('general');
@@ -897,13 +917,13 @@ const SessionWizard = ({
     workerSecrets: getCurrentWorkerSecrets(),
     workerSecretsEnabled,
   }), [getCurrentWorkerSecrets, workerSecretsEnabled]);
-  const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater) => {
+  const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater: unknown) => {
     const current = resolveWorkerSecretsSnapshot({
       workerSecretsRef,
       defaults: DEFAULT_WORKER_SECRETS,
     });
     const nextValue = typeof nextValueOrUpdater === 'function'
-      ? nextValueOrUpdater(current)
+      ? (nextValueOrUpdater as WorkerSecretsUpdateFn)(current)
       : nextValueOrUpdater;
     const next = sanitizeSessionWizardWorkerSecretsForLitMode(
       {
@@ -935,7 +955,7 @@ const SessionWizard = ({
     forceManualBundleFile: nextForceManualBundleFile,
     normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
     workerUrlAutoFilled: nextWorkerUrlAutoFilled,
-  } = {}) => {
+  }: SponsoredBundleDeploymentStatePatch = {}) => {
     if (nextDeployForm !== undefined) {
       setDeployForm(nextDeployForm);
     }
@@ -970,7 +990,7 @@ const SessionWizard = ({
   const updateSponsoredBundleWorkerSecretState = useCallback(({
     workerSecretsEnabled: nextWorkerSecretsEnabled,
     persistWorkerSecrets: nextPersistWorkerSecrets,
-  } = {}) => {
+  }: SponsoredBundleWorkerSecretStatePatch = {}) => {
     if (typeof nextWorkerSecretsEnabled === 'boolean') {
       setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
     }
