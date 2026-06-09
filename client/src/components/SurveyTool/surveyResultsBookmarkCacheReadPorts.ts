@@ -21,6 +21,11 @@ export type SurveyResultsBookmarkLists = {
   questions: string[];
 };
 
+type SurveyResultsBookmarksCacheValue = {
+  surveys?: unknown;
+  questions?: unknown;
+};
+
 export function buildSurveyResultsBookmarksCacheReadRequest(
   { slug = '' }: { slug?: unknown } = {}
 ): SurveyResultsBookmarksCacheReadRequest {
@@ -28,10 +33,12 @@ export function buildSurveyResultsBookmarksCacheReadRequest(
 }
 
 export function selectSurveyResultsBookmarkLists(cacheValue: unknown): SurveyResultsBookmarkLists {
-  const ok = !!cacheValue && typeof cacheValue === 'object'
-    && Array.isArray((cacheValue as any).surveys)
-    && Array.isArray((cacheValue as any).questions);
-  if (!ok) return { surveys: [], questions: [] };
-  const v = cacheValue as { surveys: unknown[]; questions: unknown[] };
+  if (!cacheValue || typeof cacheValue !== 'object') {
+    return { surveys: [], questions: [] };
+  }
+  const v = cacheValue as SurveyResultsBookmarksCacheValue;
+  if (!Array.isArray(v.surveys) || !Array.isArray(v.questions)) {
+    return { surveys: [], questions: [] };
+  }
   return { surveys: [...(v.surveys as string[])], questions: [...(v.questions as string[])] };
 }
