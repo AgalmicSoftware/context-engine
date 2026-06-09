@@ -631,6 +631,68 @@ describe('SurveyResults cache/readiness shell wiring', () => {
     expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the current filter state when a commit receives a non-object filter payload', () => {
+    const onFilterChange = jest.fn();
+    const onFilterStateChangeForUrlUpdate = jest.fn();
+    const currentFilterState = {
+      questionTypes: ['rating'],
+      sbtFilter: { selectedSBTGroups: ['group-a'] },
+    };
+    const subject = attachStateHarness(createSubject({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate,
+    }));
+    subject.state = {
+      ...subject.state,
+      filteredQuestionsCount: 0,
+      filterState: currentFilterState,
+    };
+
+    subject.commitResultsFilterState({ filteredQuestionsCount: 2 }, 'stale-filter-payload');
+
+    expect(subject.state.filterState).toBe(currentFilterState);
+    expect(subject.state.filteredQuestionsCount).toBe(2);
+    expect(onFilterStateChangeForUrlUpdate).toHaveBeenCalledWith(currentFilterState);
+    expect(onFilterChange).toHaveBeenCalledWith(currentFilterState);
+  });
+
+  it('merges SBT filter state into the current filter state for filtered response updates', () => {
+    const onFilterChange = jest.fn();
+    const sbtFilterState = { selectedSBTGroups: ['group-b'] };
+    const rows = [
+      {
+        responder: '0x1111111111111111111111111111111111111111',
+        response: { responses: [] },
+      },
+    ];
+    const subject = attachStateHarness(createSubject({
+      isQuestionCacheReady: true,
+      onFilterChange,
+      viewMode: 'survey',
+    }));
+    subject.state = {
+      ...subject.state,
+      filterState: {
+        questionTypes: ['rating'],
+        selectedTags: ['alpha'],
+      },
+      surveyViewMode: 'individuals',
+      totalResponsesCount: 5,
+      viewMode: 'survey',
+    };
+
+    subject.handleFilteredResponses(rows, sbtFilterState);
+
+    expect(subject.state.sbtFilteredResponses).toBe(rows);
+    expect(subject.state.filteredResponsesCount).toBe(1);
+    expect(subject.state.filterState).toEqual({
+      questionTypes: ['rating'],
+      selectedTags: ['alpha'],
+      sbtFilter: sbtFilterState,
+    });
+    expect(onFilterChange).toHaveBeenCalledWith(subject.state.filterState);
+  });
+
   it('hides quick refresh when results are in sync while keeping the detailed refresh action parent-owned', () => {
     const subject = createSubject({
       isOpen: true,
