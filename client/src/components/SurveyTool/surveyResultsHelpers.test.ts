@@ -19,6 +19,7 @@ import {
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
+  buildSurveyResultsLocalStoragePollPatch,
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
@@ -26,9 +27,12 @@ import {
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
+  buildSurveyResultsSurveyIdPropChangePatch,
+  buildSurveyResultsSurveyIdStateChangePatch,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
+  buildSurveyResultsViewModeResetPatch,
   buildSurveyResultsViewStatePatch,
   buildSurveyRespondersSignature,
   countQuestionModeResponses,
@@ -101,6 +105,73 @@ describe('surveyResultsHelpers state patches', () => {
     });
     expect(buildSurveyResultsNetworkLatestBlockPatch(Number.POSITIVE_INFINITY)).toEqual({
       networkLatestBlock: 0,
+    });
+    expect(buildSurveyResultsViewModeResetPatch({
+      questionResultsHydrated: true,
+      surveyId: '0xsurvey',
+      surveyResultsHydrated: true,
+      viewMode: 'questions',
+    })).toEqual({
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      questionResultsHydrated: false,
+      surveyResultsHydrated: true,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+      surveyId: '',
+    });
+    expect(buildSurveyResultsViewModeResetPatch({
+      questionResultsHydrated: true,
+      surveyId: '0xsurvey',
+      surveyResultsHydrated: true,
+      viewMode: 'survey',
+    })).toEqual({
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      questionResultsHydrated: true,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+      surveyId: '0xsurvey',
+    });
+    expect(buildSurveyResultsSurveyIdPropChangePatch('0xnext')).toEqual({
+      surveyId: '0xnext',
+      viewMode: 'survey',
+      surveyLocalBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+    });
+    expect(buildSurveyResultsSurveyIdStateChangePatch()).toEqual({
+      surveyLocalBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      surveyResultsHydrated: false,
+      demoResultsViewMode: 'raw',
+      demoResultsAtlasNodeId: null,
+    });
+    expect(buildSurveyResultsLocalStoragePollPatch({
+      cachedQuestionsCount: 3,
+      cachedSurveyResponsesCount: 4,
+      networkLatestBlock: 99,
+      questionLocalBlock: 10,
+      responseLocalBlock: 11,
+      surveyLocalBlock: 12,
+    })).toEqual({
+      questionLocalBlock: 10,
+      responseLocalBlock: 11,
+      surveyLocalBlock: 12,
+      cachedQuestionsCount: 3,
+      cachedSurveyResponsesCount: 4,
+      networkLatestBlock: 99,
     });
     expect(buildSurveyResultsRefreshTargetBlocksPatch(456)).toEqual({
       refreshTargetQuestionBlock: 456,
