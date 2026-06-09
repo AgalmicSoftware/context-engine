@@ -116,6 +116,8 @@ type SbtMintBurnCountsResult = UnknownRecord & {
 type SbtFilterQuickSbtOption = {
   address: string;
 };
+type SbtFilterSelectionListKey = Exclude<keyof SbtFilterSelectionState, 'onlyVerifiedHumans'>;
+type SbtFilterQuickChipKey = 'ir' | 'er' | 'ia' | 'ea' | 'ic' | 'ec' | 'ir2' | 'er2';
 type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState) => unknown;
 type SbtFilterProps = {
   autoExpand?: unknown;
@@ -282,7 +284,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     });
   };
 
-  setFilterLoading = (loading: unknown): void => {
+  setFilterLoading = (loading: boolean): void => {
     const loadingUpdate = resolveSbtFilterLoadingUpdate({
       currentLoading: this.state.loading,
       isMounted: this._isMounted,
@@ -1042,7 +1044,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   // Handlers for adding/removing SBT “include” or “exclude”
-  addSbtSelection = (stateKey: string, sbtObject: SbtFilterSbtOption): void => {
+  addSbtSelection = (stateKey: SbtFilterSelectionListKey, sbtObject: SbtFilterSbtOption): void => {
     const address = readSbtOptionAddress(sbtObject);
     if (shouldAppendSbtFilterSelection({ address, state: this.state, stateKey })) {
       this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionAddPatch({
@@ -1053,7 +1055,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     }
   };
 
-  removeSbtSelection = (stateKey: string, address: unknown): void => {
+  removeSbtSelection = (stateKey: SbtFilterSelectionListKey, address: unknown): void => {
     this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionRemovePatch({
       address,
       state: prev,
@@ -1128,7 +1130,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   renderQuickSelectChips = (
     selectedSBTs: unknown,
     onAddHandler: (sbtObject: SbtFilterQuickSbtOption) => void,
-    filterKey: unknown
+    filterKey: SbtFilterQuickChipKey
   ): React.ReactNode => {
     const { defaultFeaturedSBTs, sessionSlug } = this.props;
     if (!hasSbtFilterFeaturedOptions(defaultFeaturedSBTs)) {
