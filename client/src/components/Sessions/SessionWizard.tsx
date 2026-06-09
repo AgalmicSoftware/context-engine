@@ -297,6 +297,8 @@ import {
   buildSessionWizardDeferredCreateSbtComponentProps,
   getSessionWizardGateById,
   resolveSessionWizardCreateSbtTargetGateId,
+  type SessionWizardCreateSbtLaunchOptions,
+  type SessionWizardCreateSbtLaunchState,
 } from './sessionWizardCreateSbtSupport';
 import {
   getSessionWizardWorkerDeployValidationError,
@@ -463,7 +465,7 @@ type SessionWizardProps = {
   activeSessionSlug?: string;
   ensureLightSbtUniverse?: (() => unknown) | null;
   sbtCacheRevision?: unknown;
-  toggleLoginModal?: (() => void) | null;
+  toggleLoginModal?: ((open?: boolean) => void) | null;
   loginComplete?: boolean;
   loginInProgress?: boolean;
   initialSessionId?: string | number | null;
@@ -734,7 +736,7 @@ const SessionWizard = ({
     open: false,
     contractKey: '',
   }));
-  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<UnknownRecord | null>(null);
+  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<SessionWizardCreateSbtLaunchState | null>(null);
   const hasPrivateSbtName = useMemo(() => {
     const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
     return gates.some((gate) => normalizeSbtSelection(gate?.sbts || []).some((sbt) => (
@@ -910,7 +912,9 @@ const SessionWizard = ({
   const togglePrivateSlugModeRef = useRef<null | (() => void)>(null);
   const updateDraftValueRef = useRef<null | ((path: unknown[], value: unknown) => void)>(null);
   const resolveCreateSbtTargetGateIdRef = useRef<null | ((requestedGateId?: unknown) => string)>(null);
-  const openCreateSbtModalRef = useRef<null | ((options?: UnknownRecord) => void)>(null);
+  const openCreateSbtModalRef = useRef<null | ((
+    options?: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState
+  ) => void)>(null);
   const clearPendingSbtDraftsRef = useRef<null | ((draftsToClear?: unknown[], statusMessage?: string) => void)>(null);
   const pruneAllPendingSbtSelectionsRef = useRef<null | (() => void)>(null);
   const prunePendingSbtSelectionsRef = useRef<null | ((addressLowerSet: Set<string>) => void)>(null);
@@ -1823,8 +1827,8 @@ const SessionWizard = ({
     }))
   ), [pendingSbtDrafts]);
 
-  const getGateById = (gateId) => getSessionWizardGateById(allEncryptionGates, gateId);
-  const resolveCreateSbtTargetGateId = (requestedGateId = '') => resolveSessionWizardCreateSbtTargetGateId({
+  const getGateById = (gateId: unknown) => getSessionWizardGateById(allEncryptionGates, gateId);
+  const resolveCreateSbtTargetGateId = (requestedGateId: unknown = '') => resolveSessionWizardCreateSbtTargetGateId({
     allEncryptionGates,
     defaultGateId,
     requestedGateId,
@@ -1832,13 +1836,15 @@ const SessionWizard = ({
   resolveCreateSbtTargetGateIdRef.current = resolveCreateSbtTargetGateId;
   const activeCreateSbtTargetGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
   const activeCreateSbtTargetGate = getSessionWizardGateById(allEncryptionGates, activeCreateSbtTargetGateId);
-  const focusCreateSbtTargetGate = (gateId = '') => {
+  const focusCreateSbtTargetGate = (gateId: unknown = '') => {
     const resolvedGateId = resolveCreateSbtTargetGateId(gateId);
     if (!resolvedGateId) return;
     setCreateSbtTargetGateId((prev) => (prev === resolvedGateId ? prev : resolvedGateId));
   };
 
-  const buildCreateSbtModalLaunchState = (options = {}) => buildSessionWizardCreateSbtModalLaunchState({
+  const buildCreateSbtModalLaunchState = (
+    options: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState = {}
+  ) => buildSessionWizardCreateSbtModalLaunchState({
     options,
     allEncryptionGates,
     defaultGateId,
@@ -1846,7 +1852,9 @@ const SessionWizard = ({
     currentArweaveJwk: getEnabledWorkerArweaveJwk(workerSecretsRef.current),
   });
 
-  const openCreateSbtModal = (options = {}) => {
+  const openCreateSbtModal = (
+    options: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState = {}
+  ) => {
     const nextModalState = buildCreateSbtModalLaunchState(options);
     setCreateSbtModalState({
       open: true,
@@ -1855,7 +1863,9 @@ const SessionWizard = ({
   };
   openCreateSbtModalRef.current = openCreateSbtModal;
 
-  const launchCreateSbtModal = (options = {}) => {
+  const launchCreateSbtModal = (
+    options: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState = {}
+  ) => {
     const nextModalState = buildCreateSbtModalLaunchState(options);
     if (loginComplete !== true) {
       setPendingCreateSbtLaunch(nextModalState);
