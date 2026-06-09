@@ -16,8 +16,8 @@ export const buildPublishedPendingSbtLinks = ({
   pendingDraftSnapshot = [],
   sessionSlug = '',
 }: {
-  deployedDrafts?: unknown[];
-  pendingDraftSnapshot?: unknown[];
+  deployedDrafts?: readonly unknown[];
+  pendingDraftSnapshot?: readonly unknown[];
   sessionSlug?: string;
 } = {}): PublishedPendingSbtLink[] => {
   const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);

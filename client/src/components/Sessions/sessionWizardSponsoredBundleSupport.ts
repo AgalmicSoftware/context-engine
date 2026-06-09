@@ -15,14 +15,15 @@ import type {
 type SponsoredBundleLike = AnyRecord & {
   meta?: AnyRecord;
 };
+type SponsoredBundleInput = SponsoredBundleLike | null | undefined;
 
-export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleLike = {}): string => normalizeWorkerAuthUrl(toStr(
+export const resolveSponsoredBundleBootstrapWorkerUrl = (bundle: SponsoredBundleInput = {}): string => normalizeWorkerAuthUrl(toStr(
   bundle?.bootstrapWorkerUrl ||
   bundle?.meta?.sourceWorkerUrl ||
   ''
 ).trim());
 
-export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleLike = {}): string => {
+export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: SponsoredBundleInput = {}): string => {
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
   const appliedLabels = [];
   if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
@@ -55,7 +56,7 @@ export const resolveSponsoredBundleAdvancedFieldNotices = ({
   workerSecrets = {},
   deployForm = {},
 }: {
-  sponsoredBundle?: SponsoredBundleLike;
+  sponsoredBundle?: SponsoredBundleInput;
   workerSecrets?: WorkerSecretsLike | AnyRecord;
   deployForm?: AnyRecord;
 } = {}) => {

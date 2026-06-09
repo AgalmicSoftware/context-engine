@@ -81,28 +81,28 @@ export type SessionWizardPublishAdminPreflightDescriptor = {
 };
 
 export type SessionWizardPublishCompletionLinksInput = {
-  deployedDrafts: SessionWizardPendingDraftLike[];
-  pendingDraftSnapshot: SessionWizardPendingDraftLike[];
+  deployedDrafts: readonly SessionWizardPendingDraftLike[];
+  pendingDraftSnapshot: readonly SessionWizardPendingDraftLike[];
   sessionSlug: string;
 };
 
 export type SessionWizardPublishCompletionControllerInput = {
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
-  deployedPendingDrafts?: SessionWizardPendingDraftLike[];
-  pendingDraftSnapshot?: SessionWizardPendingDraftLike[];
+  deployedPendingDrafts?: readonly SessionWizardPendingDraftLike[];
+  pendingDraftSnapshot?: readonly SessionWizardPendingDraftLike[];
   sessionSlug?: unknown;
 };
 
 export type SessionWizardPublishCompletionRequestInput = {
   publishExecutionPlan: SessionWizardPublishExecutionPlanLike;
-  deployedPendingDrafts?: SessionWizardPendingDraftLike[] | null;
-  pendingDraftSnapshot?: SessionWizardPendingDraftLike[] | null;
+  deployedPendingDrafts?: readonly SessionWizardPendingDraftLike[] | null;
+  pendingDraftSnapshot?: readonly SessionWizardPendingDraftLike[] | null;
   sessionSlug?: unknown;
 };
 
 export type SessionWizardPublishCompletionControllerPorts = {
   normalizePendingDrafts: (
-    drafts: SessionWizardPendingDraftLike[]
+    drafts: readonly SessionWizardPendingDraftLike[]
   ) => SessionWizardPendingDraftLike[];
   buildPublishedPendingSbtLinks: (
     args: SessionWizardPublishCompletionLinksInput
