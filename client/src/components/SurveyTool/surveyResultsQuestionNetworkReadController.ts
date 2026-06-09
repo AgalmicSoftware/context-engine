@@ -116,6 +116,11 @@ const toSlugList = (value: unknown[] | null | undefined): string[] => (
     : []
 );
 
+const normalizeQuestionNetworkBlockNumber = (value: unknown): number => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const toQuestionBucket = (value: unknown): SurveyResultsQuestionBucketRecord => (
   value && typeof value === 'object'
     ? value as SurveyResultsQuestionBucketRecord
@@ -247,10 +252,13 @@ export function mergeScopedQuestionNetworkData(
       questionBucket.questionResponses || {},
       { allowedQuestionIds }
     );
-    questionsLatestBlock = Math.max(questionsLatestBlock, Number(questionBucket.questionsLatestBlock || 0));
+    questionsLatestBlock = Math.max(
+      questionsLatestBlock,
+      normalizeQuestionNetworkBlockNumber(questionBucket.questionsLatestBlock)
+    );
     questionResponsesLatestBlock = Math.max(
       questionResponsesLatestBlock,
-      Number(questionBucket.questionResponsesLatestBlock || 0)
+      normalizeQuestionNetworkBlockNumber(questionBucket.questionResponsesLatestBlock)
     );
   });
 
