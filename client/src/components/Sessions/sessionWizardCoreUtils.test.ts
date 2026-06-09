@@ -4,6 +4,7 @@ import {
   formatContractLabel,
   generateSessionId,
   getChainName,
+  getSessionWizardErrorMessage,
   mergeDeep,
 } from './sessionWizardCoreUtils';
 
@@ -17,6 +18,15 @@ describe('sessionWizardCoreUtils', () => {
     expect(getChainName(0)).toBe('');
     expect(formatContractLabel('sessionRegistry')).toBe('Session Registry');
     expect(formatContractLabel('custom_contractKey')).toBe('Custom Contract Key');
+  });
+
+  it('normalizes error messages while preserving fallback text for opaque objects', () => {
+    expect(getSessionWizardErrorMessage(new Error('upload failed'), 'fallback')).toBe('upload failed');
+    expect(getSessionWizardErrorMessage({ message: 'registry failed' }, 'fallback')).toBe('registry failed');
+    expect(getSessionWizardErrorMessage({ code: 500 }, 'Failed to upload metadata.')).toBe(
+      'Failed to upload metadata.'
+    );
+    expect(getSessionWizardErrorMessage('plain failure', 'fallback')).toBe('plain failure');
   });
 
   it('builds stable sponsored sbt lookup keys', () => {
