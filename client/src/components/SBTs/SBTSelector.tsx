@@ -575,7 +575,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     this._sbtOptionsByAddressMemo = { source: null, value: new Map() };
   }
 
-  componentDidUpdate(prevProps: UnknownRecord, prevState: UnknownRecord) {
+  componentDidUpdate(prevProps: Readonly<SbtSelectorProps>, prevState: Readonly<SbtSelectorState>) {
     const prevPropSessionSlug = this.getPropSessionSlug(prevProps);
     const nextPropSessionSlug = this.getPropSessionSlug(this.props);
     const updateSignals = resolveSbtSelectorUpdateSignals({
@@ -663,13 +663,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
   };
 
-  getPropSessionSlug = (props: unknown = this.props): string => resolvePropSessionSlug(props);
+  getPropSessionSlug = (props: Readonly<SbtSelectorProps> = this.props): string => resolvePropSessionSlug(props);
 
   buildSlugListSignature = (slugs: unknown): string => buildSessionSlugSignature(
     normalizeDiscoverySlugs(slugs, { allowEmpty: true })
   );
 
-  getDiscoveryOverrideSignature = (props: unknown = this.props): string => (
+  getDiscoveryOverrideSignature = (props: Readonly<SbtSelectorProps> = this.props): string => (
     this.buildSlugListSignature(getNormalizedDiscoveryOverride(props))
   );
 
