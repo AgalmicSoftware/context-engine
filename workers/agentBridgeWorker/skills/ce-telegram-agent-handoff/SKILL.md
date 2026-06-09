@@ -5,11 +5,11 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v34)
+**Skill version:** 2026-06-08 (v35)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
-**Token handling:** a pasted `ceagt_...` value is a private bearer credential. Extract it, store it only in the agent's local secret/auth context, and never repeat, summarize, echo, log, or include it in messages back to the user.
+**Token handling:** a pasted `ceagt_...` value is a private bearer credential. Extract it, store it only in the agent's local secret/auth context, and never repeat, summarize, echo, log, or include it in messages back to the user. Never display the token, even partially masked, in normal chat, summaries, tool-call explanations, receipts, debug output, Markdown code blocks, or "here is what I did" status messages. If a token is ever exposed in chat or logs, treat it as rotated-needed: ask the user to mint fresh CE agent info, or rerun the trusted invite onboarding path once and replace the stored token.
 
 ## Copied Agent Info Rule
 
@@ -22,6 +22,9 @@ The copied `ceagt_...` token is not optional context. Send it on every CE
 request as `Authorization: Bearer <token>`. Never make an unauthenticated
 question, draft, answer, vote, or results request when copied install info
 included a token. The worker uses that bearer token to infer the user identity.
+When acknowledging setup, say only "Context Engine is connected" or "I stored
+the CE credential privately." Do not quote the token, do not show a shortened
+prefix/suffix, and do not include it in a recap of copied install info.
 
 For Claude Code or any other low-context copied-user-token flow, including
 OpenClaw/Hermes when they only have pasted credentials and no authorized Edge
@@ -236,7 +239,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=34",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=35",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -1512,6 +1515,12 @@ flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
 ## Changelog
+
+### 2026-06-08 (v35)
+
+- Strengthened copied-token handling instructions: agents must never display,
+  mask, summarize, or recap `ceagt_...` credentials, and should rotate/re-onboard
+  if a token is exposed in chat or logs.
 
 ### 2026-06-08 (v34)
 
