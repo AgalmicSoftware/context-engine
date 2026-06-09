@@ -169,6 +169,43 @@ describe('surveyResultsQuestionNetworkReadController', () => {
     expect(result.result.questionResponsesLatestBlock).toBe(13);
   });
 
+  it('falls back to zero for malformed scoped latest-block metadata', () => {
+    const readQuestionBucket = jest.fn(() => ({
+      questionsLatestBlock: 'not-a-block',
+      questionResponsesLatestBlock: 'also-not-a-block',
+      questions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Malformed metadata question',
+          sessionSlug: 'edge',
+        },
+      },
+      questionResponses: {
+        q1: {
+          '0xABC': { answer: { value: 'Cached response' } },
+        },
+      },
+    }));
+
+    const result = runSurveyResultsQuestionNetworkReadController({
+      netIdStr: 84532,
+      questionReadSlugs: ['edge'],
+      ports: {
+        readQuestionBucket,
+      },
+      viewMode: 'questions',
+    });
+
+    expect(result.result.questionsLatestBlock).toBe(0);
+    expect(result.result.questionResponsesLatestBlock).toBe(0);
+    expect(result.result.questions.q1).toEqual(expect.objectContaining({
+      prompt: 'Malformed metadata question',
+    }));
+    expect(result.result.questionResponses.q1).toEqual({
+      '0xABC': { answer: { value: 'Cached response' } },
+    });
+  });
+
   it('keeps empty and missing cached response buckets empty without inventing fallback responses', () => {
     const readQuestionBucket = jest.fn((slug) => (
       slug === 'edge'
