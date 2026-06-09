@@ -1,10 +1,12 @@
 import { t } from '../../utilities/ui/terminology.js';
 import { normalizeAiProvider } from './sessionWizardAiConfig';
 
+type SessionWizardSecretFieldType = 'password' | 'text' | 'textarea';
+
 type SessionWizardSecretField = {
   key: string;
   label: string;
-  type: string;
+  type: SessionWizardSecretFieldType;
   placeholder?: string;
   required?: boolean;
   rows?: number;
@@ -23,7 +25,7 @@ const readAiModelProvider = (ai: unknown, modelKey: string): string => {
   return normalizeAiProvider(model.provider || 'openai');
 };
 
-export const RESOURCE_LABELS = {
+export const RESOURCE_LABELS: Record<string, string> = {
   default: 'DEFAULT',
   questionResponses: 'QUESTION RESPONSES',
   surveyResponses: 'SURVEY RESPONSES',
@@ -36,7 +38,7 @@ export const RESOURCE_LABELS = {
   lit: 'LIT',
 };
 
-export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
+export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Object.freeze({
   ai: 'Session-funded OpenAI key used for text generation and transcription.',
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,

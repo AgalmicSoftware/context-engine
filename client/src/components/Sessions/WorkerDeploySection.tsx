@@ -5,11 +5,12 @@ import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: string;
+  placement?: SessionWizardTooltipRenderOptions['placement'];
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;
