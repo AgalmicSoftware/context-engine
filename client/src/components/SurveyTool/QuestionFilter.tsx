@@ -3654,5 +3654,6 @@ const mapStateToProps = (state: UnknownRecord = {}) => {
   };
 };
 
+export type QuestionFilterHandle = Pick<QuestionFilter, 'handleApplyFilters' | 'handleClearFilters'>;
 export { QuestionFilter };
 export default connect(mapStateToProps, null, null, { forwardRef: true })(QuestionFilter);
