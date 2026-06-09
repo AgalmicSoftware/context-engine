@@ -74,7 +74,6 @@ import {
   buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
   buildSbtListChipLoadingStatusBySlug,
-  buildSbtListChipProgressDisplayPlan,
   buildSbtListChipProgressDesiredVisibilityBySlug,
   buildSbtListInitialLoaderStatuses,
   buildSbtListMetaRowModel,
@@ -84,6 +83,8 @@ import {
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
   buildSbtListPassiveLatestLookupPlan,
+  buildSbtListSessionRouteHref,
+  buildSbtListSessionSelectorOptions,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
@@ -129,6 +130,7 @@ import {
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
   isSbtListSyntheticNoSessionSlug,
+  resolveSbtListSessionSelectorSummarySlugs,
 } from './sbtListHelpers';
 import type {
   SbtCacheMetaSnapshot,
@@ -2776,26 +2778,13 @@ const SBTsList = ({
   const renderSessionUniverseSelector = () => {
     if (!allSessionsMode) return null;
     const publicBasePath = readPublicUrlBasePath();
-    const withPublicBasePath = (pathIn: unknown): string => {
-      const normalizedPath = String(pathIn || '').trim();
-      if (!normalizedPath) return publicBasePath || '/';
-      return `${publicBasePath}${normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`}` || normalizedPath;
-    };
-    const buildSessionRouteHref = (slugRaw: unknown): string => {
-      const normalized = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(normalized)) return '';
-      const cfg = getDisplaySessionConfig(normalized);
-      const routeToken = String(
-        cfg?.__registry?.sessionId ||
-        cfg?.__registry?.sessionIdHex ||
-        cfg?.sessionId ||
-        cfg?.sessionIdHex ||
-        ''
-      ).trim();
-      if (routeToken) return withPublicBasePath(`/session/${encodeURIComponent(routeToken)}`);
-      if (!normalized) return withPublicBasePath('/session');
-      return withPublicBasePath(`/session/${encodeURIComponent(normalized)}`);
-    };
+    const buildSessionRouteHref = (slugRaw: unknown): string => (
+      buildSbtListSessionRouteHref({
+        getSessionConfig: getDisplaySessionConfig,
+        publicBasePath,
+        slug: slugRaw,
+      })
+    );
 
     const handleOpenSessionChip = (
       slugRaw: unknown,
@@ -2820,9 +2809,22 @@ const SBTsList = ({
       isListModeScopeEnabled &&
       !showMoreSessions &&
       remainingHiddenRegistrySessionSlugs.length > 0;
-    const collapsedSummarySlugs = isListModeScopeEnabled
-      ? selectedSessionUniverseSlugs
-      : [normalizeSessionSlug(listSlug || '')];
+    const collapsedSummarySlugs = resolveSbtListSessionSelectorSummarySlugs({
+      isListModeScopeEnabled,
+      listSlug,
+      selectedSessionUniverseSlugs,
+    });
+    const sessionSelectorOptions = buildSbtListSessionSelectorOptions({
+      activeSessionSlug,
+      buildSessionRouteHref,
+      chipLoadingStatusBySlug,
+      chipProgressVisibilityBySlug,
+      displayedSessionUniverseSlugs,
+      isListModeScopeEnabled,
+      labelForSessionSlug,
+      selectedSessionUniverseSlugs: selectedSessionUniverseSlugSet,
+      sessionChipStateBySlug,
+    });
     const renderCollapsedSummary = (testId: string): React.ReactNode => (
       <SbtListSessionUniverseSummary
         testId={testId}
@@ -2905,45 +2907,7 @@ const SBTsList = ({
         {!isUniverseCollapsed && (
           <div className={styles.sessionUniverseChips}>
             <SessionChipSelector
-              options={displayedSessionUniverseSlugs.map((s) => {
-                const normalized = normalizeSessionSlug(s);
-                const isSelected = isListModeScopeEnabled
-                  ? selectedSessionUniverseSlugSet.has(normalized)
-                  : (normalized === normalizeSessionSlug(activeSessionSlug));
-                const chipState = sessionChipStateBySlug[normalized];
-                const isLoaded = !!chipState?.isLoaded;
-                const isLoading = !!chipProgressVisibilityBySlug[normalized];
-                const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
-                const chipProgressPlan = buildSbtListChipProgressDisplayPlan({
-                  isLoading,
-                  status: chipLoadingStatus,
-                });
-                const sessionRouteHref = buildSessionRouteHref(normalized);
-                return {
-                  key: s || 'general',
-                  slug: normalized,
-                  label: labelForSessionSlug(s),
-                  selected: isSelected,
-                  active: !isListModeScopeEnabled && isSelected,
-                  loaded: isLoaded,
-                  general: normalized === '',
-                  href: sessionRouteHref,
-                  showOpen: !!sessionRouteHref,
-                  openTitle: `Open session ${labelForSessionSlug(s)} in new tab`,
-                  showProgress: chipProgressPlan.showProgress,
-                  progressText: chipProgressPlan.progressText,
-                  indeterminate: chipProgressPlan.indeterminate,
-                  style: chipProgressPlan.style,
-                  rowTestId: `session-chip-row-${normalized || 'general'}`,
-                  chipTestId: `session-chip-${normalized || 'general'}`,
-                  checkTestId: `session-chip-check-${normalized || 'general'}`,
-                  openTestId: `session-chip-open-${normalized || 'general'}`,
-                  progressWrapTestId: `session-chip-progress-wrap-${normalized || 'general'}`,
-                  progressTrackTestId: `session-chip-progress-track-${normalized || 'general'}`,
-                  progressFillTestId: `session-chip-progress-fill-${normalized || 'general'}`,
-                  progressTextTestId: `session-chip-progress-text-${normalized || 'general'}`,
-                };
-              })}
+              options={sessionSelectorOptions}
               onToggle={handleSessionChipClick}
               onOpen={handleOpenSessionChip}
             />

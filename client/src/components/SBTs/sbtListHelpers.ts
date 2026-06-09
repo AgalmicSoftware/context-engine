@@ -135,6 +135,16 @@ export type {
   SbtListChipProgressVisibilityPlan,
 } from './sbtListChipProgressVisibilityHelpers';
 export {
+  buildSbtListSessionRouteHref,
+  buildSbtListSessionSelectorOptions,
+  resolveSbtListSessionSelectorSummarySlugs,
+} from './sbtListSessionSelectorDisplayHelpers';
+export type {
+  SbtListSessionSelectorChipState,
+  SbtListSessionSelectorOption,
+  SbtListSessionSelectorRouteConfig,
+} from './sbtListSessionSelectorDisplayHelpers';
+export {
   resolveSbtListRegistryRetryPlan,
 } from './sbtListRegistryLifecycleHelpers';
 export type {
