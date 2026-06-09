@@ -7,6 +7,18 @@ import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
 
+type SurveyResultsFilterState = Record<string, unknown> & {
+  sbtFilter?: unknown;
+};
+type SurveyResultsQuestionFilterCallback = (
+  filteredQuestionsOrCombined: unknown,
+  filterState: SurveyResultsFilterState
+) => void;
+type SurveyResultsSbtFilterCallback = (
+  filteredResponses: unknown,
+  sbtFilterState?: unknown
+) => void;
+
 type SurveyResultsFilterExportControlsProps = {
   activeSessionSlug: string;
   aggregateQuestionResponses: unknown;
@@ -18,7 +30,7 @@ type SurveyResultsFilterExportControlsProps = {
     exportOptions: readonly { label: string; value: string }[];
     exportTypeLabel?: string;
   };
-  filterState: Record<string, unknown>;
+  filterState: SurveyResultsFilterState;
   isFilterActive: boolean;
   isQuestionCacheReady?: unknown;
   isSBTCacheReady?: unknown;
@@ -28,9 +40,9 @@ type SurveyResultsFilterExportControlsProps = {
   onExportHtmlReport: () => void;
   onExportTypeChange: (value: string) => void;
   onFilterActivityChange: (active: unknown) => void;
-  onQuestionFilter: (...args: unknown[]) => void;
+  onQuestionFilter: SurveyResultsQuestionFilterCallback;
   onQuestionFilterCountUpdate: (count: unknown) => void;
-  onSbtFilter: (...args: unknown[]) => void;
+  onSbtFilter: SurveyResultsSbtFilterCallback;
   onSetFilterLoading: (loading: unknown) => void;
   onToggleExportArea: () => void;
   onToggleQuestionFilter: () => void;
