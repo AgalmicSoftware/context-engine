@@ -246,6 +246,7 @@ import {
   deepClone,
   generateSessionId,
   getChainName,
+  getSessionWizardErrorMessage,
 } from './sessionWizardCoreUtils';
 import {
   clearSessionWizardCache,
@@ -614,14 +615,6 @@ const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftSta
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS as Readonly<Record<string, string[]>>;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS));
-
-const getSessionWizardErrorMessage = (error: unknown, fallback = ''): string => {
-  if (error instanceof Error) return error.message || fallback;
-  if (error && typeof error === 'object' && 'message' in error) {
-    return toStr((error as { message?: unknown }).message) || fallback;
-  }
-  return toStr(error) || fallback;
-};
 
 const buildProvisionedSponsoredContextState = (
   value: unknown
