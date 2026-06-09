@@ -301,6 +301,7 @@ import {
   buildSessionWizardCreateSbtModalLaunchState,
   buildSessionWizardDeferredCreateSbtComponentProps,
   getSessionWizardGateById,
+  resolveSessionWizardCreateSbtModalPlan,
   resolveSessionWizardCreateSbtTargetGateId,
   type SessionWizardCreateSbtLaunchOptions,
   type SessionWizardCreateSbtLaunchState,
@@ -4585,24 +4586,25 @@ const SessionWizard = ({
       };
     });
   }, [isNormalMode, showNormalModeWorkerStep]);
-  const createSbtModalChainId = Number(draft.networkChainId || registryChainId || network?.id || network?.chainId || 0) || null;
-  const createSbtModalNetwork = getChainById(createSbtModalChainId) || (
-    createSbtModalChainId
-      ? { id: createSbtModalChainId, name: getChainName(createSbtModalChainId) || `Chain ${createSbtModalChainId}` }
-      : (network || { id: null, name: '' })
-  );
-  const createSbtModalSessionSlug = toStr(
-    createSbtModalState.sessionSlug ||
-    draft.slug ||
-    resolvedActiveSessionSlug ||
-    ''
-  ).trim();
-  const createSbtModalArweaveJwkOverride = workerSecretsEnabled
-    ? toStr(
-        createSbtModalState.arweaveJwkOverride ||
-        getEnabledWorkerArweaveJwk()
-      ).trim()
-    : '';
+  const createSbtModalPlan = resolveSessionWizardCreateSbtModalPlan({
+    createSbtModalState,
+    draft,
+    getChainById,
+    getChainName,
+    getEnabledWorkerArweaveJwk,
+    network: network ? {
+      chainId: network?.chainId,
+      id: network?.id,
+      name: network?.name,
+    } : null,
+    registryChainId,
+    resolvedActiveSessionSlug,
+    workerSecretsEnabled,
+  });
+  const createSbtModalChainId = createSbtModalPlan.chainId;
+  const createSbtModalNetwork = createSbtModalPlan.network;
+  const createSbtModalSessionSlug = createSbtModalPlan.sessionSlug;
+  const createSbtModalArweaveJwkOverride = createSbtModalPlan.arweaveJwkOverride;
   const wizardContractViewerPlan = useMemo(() => resolveSessionWizardContractViewerPlan({
     activeSessionSlug,
     draftContracts: draft?.contracts,
