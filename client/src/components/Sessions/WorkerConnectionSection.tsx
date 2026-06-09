@@ -3,6 +3,7 @@ import React from 'react';
 import { Button } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
+import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
 type RenderInfoTooltip = (props: {
   id?: string;
@@ -15,7 +16,7 @@ type RenderInfoTooltip = (props: {
 export type WorkerConnectionSectionProps = {
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
-  renderField: (key: unknown, value: unknown, path: unknown, opts?: Record<string, unknown>) => React.ReactNode;
+  renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
   showSharedWorkerChoice: boolean;
