@@ -115,17 +115,35 @@ type BuildSbtSelectorRootClassNameArgs = {
 type BuildSbtSelectorSourceSessionSlugPatchArgs = {
   slug?: unknown;
 };
+type SbtSelectorSourceSessionSlugPatch = {
+  sourceSessionSlug: string;
+};
 type BuildSbtSelectorDiscoveringPatchArgs = {
   discovering?: unknown;
+};
+type SbtSelectorDiscoveringPatch = {
+  discovering: boolean;
 };
 type BuildSbtSelectorLoadingOptionsPatchArgs = {
   loadingOptions?: unknown;
 };
-type BuildSbtSelectorGroupOptionsPatchArgs = {
-  groupOptions?: unknown;
+type SbtSelectorLoadingOptionsPatch = {
+  loadingOptions: boolean;
+};
+type BuildSbtSelectorGroupOptionsPatchArgs<TGroupOption = unknown> = {
+  groupOptions?: TGroupOption[] | unknown;
+};
+type SbtSelectorGroupOptionsPatch<TGroupOption = unknown> = {
+  groupOptions: TGroupOption[];
+};
+type SbtSelectorSelectedOptionResetPatch = {
+  selectedOption: null;
 };
 type BuildSbtSelectorManualInputWarningPatchArgs = {
   warning?: unknown;
+};
+type SbtSelectorManualInputWarningPatch = {
+  manualInputWarning: string;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -329,34 +347,42 @@ export const buildSbtSelectorRootClassName = ({
 
 export const buildSbtSelectorSourceSessionSlugPatch = ({
   slug = '',
-}: BuildSbtSelectorSourceSessionSlugPatchArgs = {}): Record<string, string> => ({
+}: BuildSbtSelectorSourceSessionSlugPatchArgs = {}): SbtSelectorSourceSessionSlugPatch => ({
   sourceSessionSlug: String(slug ?? ''),
 });
 
 export const buildSbtSelectorDiscoveringPatch = ({
   discovering = false,
-}: BuildSbtSelectorDiscoveringPatchArgs = {}): Record<string, boolean> => ({
+}: BuildSbtSelectorDiscoveringPatchArgs = {}): SbtSelectorDiscoveringPatch => ({
   discovering: discovering === true,
 });
 
 export const buildSbtSelectorLoadingOptionsPatch = ({
   loadingOptions = false,
-}: BuildSbtSelectorLoadingOptionsPatchArgs = {}): Record<string, boolean> => ({
+}: BuildSbtSelectorLoadingOptionsPatchArgs = {}): SbtSelectorLoadingOptionsPatch => ({
   loadingOptions: loadingOptions === true,
 });
 
-export const buildSbtSelectorGroupOptionsPatch = ({
+export function buildSbtSelectorGroupOptionsPatch<TGroupOption>(
+  args: { groupOptions: TGroupOption[] }
+): SbtSelectorGroupOptionsPatch<TGroupOption>;
+export function buildSbtSelectorGroupOptionsPatch(
+  args?: BuildSbtSelectorGroupOptionsPatchArgs
+): SbtSelectorGroupOptionsPatch;
+export function buildSbtSelectorGroupOptionsPatch({
   groupOptions = [],
-}: BuildSbtSelectorGroupOptionsPatchArgs = {}): Record<string, unknown[]> => ({
+}: BuildSbtSelectorGroupOptionsPatchArgs = {}): SbtSelectorGroupOptionsPatch {
+  return {
   groupOptions: Array.isArray(groupOptions) ? groupOptions : [],
-});
+  };
+}
 
-export const buildSbtSelectorSelectedOptionResetPatch = (): Record<string, null> => ({
+export const buildSbtSelectorSelectedOptionResetPatch = (): SbtSelectorSelectedOptionResetPatch => ({
   selectedOption: null,
 });
 
 export const buildSbtSelectorManualInputWarningPatch = ({
   warning = '',
-}: BuildSbtSelectorManualInputWarningPatchArgs = {}): Record<string, string> => ({
+}: BuildSbtSelectorManualInputWarningPatchArgs = {}): SbtSelectorManualInputWarningPatch => ({
   manualInputWarning: String(warning ?? ''),
 });
