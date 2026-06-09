@@ -374,7 +374,7 @@ type SurveyResultsQuestionWithEncryption = SurveyResultsRecord & {
 };
 type SurveyResultsSessionConfigRecord = SurveyResultsRecord & {
   __registry?: SurveyResultsRecord & { chainId?: unknown };
-  networkChainId?: unknown;
+  networkChainId?: number | string | null;
   sponsored?: SurveyResultsRecord & { gates?: unknown };
 };
 type SurveyResultsLockedResponseKeyArgs = {
@@ -521,6 +521,111 @@ type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
+type SurveyResultsProps = SurveyResultsRecord & {
+  account?: string;
+  activeSessionSlug?: string;
+  defaultTags?: unknown[];
+  filterState?: SurveyResultsRecord | null;
+  filteredQuestionsCount?: number | null;
+  isOpen?: boolean;
+  isQuestionCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
+  isSBTCacheReady?: boolean;
+  isSurveyCacheReady?: boolean;
+  lit?: SurveyResultsLitHooks | null;
+  litHooks?: SurveyResultsLitHooks | null;
+  loginComplete?: boolean;
+  network?: (SurveyResultsRecord & { id?: unknown }) | null;
+  networkChainId?: number | string | null;
+  onClose?: () => void;
+  onCountUpdate?: (count: unknown) => void;
+  onFilterChange?: (filterState: unknown) => void;
+  onFilterStateChangeForUrlUpdate?: (filterState: unknown) => void;
+  preventUrlChange?: boolean;
+  profile?: unknown;
+  provider?: unknown;
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
+  questionsCacheNonce?: unknown;
+  refreshQuestionMetadata?: () => unknown;
+  refreshQuestionResponses?: () => unknown;
+  refreshSurveyResponsesByID?: (surveyId: string) => unknown;
+  sbtCacheRevision?: unknown;
+  sessionName?: string;
+  sessionSlug?: string;
+  sessionSlugPinned?: boolean;
+  sessionState?: unknown;
+  setFilterLoading?: (loading: unknown) => void;
+  surveyId?: string;
+  viewMode?: string;
+};
+type SurveyResultsState = SurveyResultsRecord & {
+  activeQuestionToggles: Record<string, boolean>;
+  activeToggles: Record<string, boolean>;
+  aggregateQuestionResponses: Record<string, unknown[]>;
+  aggregatorQuestionResponses: Record<string, unknown[]>;
+  alertMessage: string;
+  bookmarkedQuestionIDs: string[];
+  bookmarkedSurveyIDs: string[];
+  cachedQuestionsCount: number;
+  cachedSurveyResponsesCount: number;
+  csvData: string;
+  decryptedResponseOverrides: Record<string, SurveyResultsDecryptedResponseOverride>;
+  demoResultsAtlasNodeId: string | null;
+  demoResultsViewMode: string;
+  exportAreaOpen: boolean;
+  exportType: string;
+  filterBookmarkedFeedback: boolean;
+  filteredQuestionsCount: number | null;
+  filteredResponsesCount: number;
+  filterLoading: boolean;
+  filterState: SurveyResultsRecord;
+  htmlReportAnalysisArtifact: SessionResultsGeneratedAnalysisArtifact | null;
+  htmlReportAnalysisError: string;
+  htmlReportAnalysisGenerating: boolean;
+  htmlReportAnalysisInputSignature: string;
+  htmlReportAnalysisProgress: string;
+  htmlReportDemoMode: boolean;
+  htmlReportExportedAt: string;
+  htmlReportExportFormat: SessionResultsExportFormat;
+  htmlReportModalOpen: boolean;
+  htmlReportSelectedSections: Required<SessionResultsSectionSelection>;
+  isFilterActive: boolean;
+  loading: boolean;
+  lockedResponseDetailsOpen: boolean;
+  lockedResponsesDecrypting: boolean;
+  networkLatestBlock: number;
+  questionIdSortAsc: boolean;
+  questionIdSortBy: string;
+  questionLocalBlock: number;
+  questionPartialLoading: boolean;
+  questionPartialProgress: number;
+  questionPartialTotal: number;
+  questionResponses: SurveyResultsQuestionResponsesByQuestion | SurveyResultsRecord;
+  questionResultsHydrated: boolean;
+  refreshTargetQuestionBlock: number;
+  refreshTargetResponseBlock: number;
+  refreshTargetSurveyBlock: number;
+  responseLocalBlock: number;
+  responsePartialLoading: boolean;
+  responsePartialProgress: number;
+  responsePartialTotal: number;
+  responses: SurveyResultsResponseListEntry[];
+  sbtFilteredAggregatorQuestionResponses: Record<string, unknown>;
+  sbtFilteredQuestionResponses: SurveyResultsRecord;
+  sbtFilteredResponses: SurveyResultsResponseListEntry[];
+  showQuestionFilter: boolean;
+  surveyDocumentURLs: string[];
+  surveyId: string;
+  surveyLocalBlock: number;
+  surveyResultsHydrated: boolean;
+  surveyTitle: string;
+  surveyViewMode: string;
+  syncDetailsOpen: boolean;
+  totalQuestionsCount: number;
+  totalResponsesCount: number;
+  viewMode: string;
+};
 type SurveyResultsSbtDisplayLabelResolver = (args: {
   address: string;
   chainId?: unknown;
@@ -529,6 +634,20 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 }) => string;
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
+);
+const asSurveyResultsStatePatch = (patch: unknown): SurveyResultsState => (
+  patch as SurveyResultsState
+);
+const asSurveyResultsStateUpdater = (
+  updater: (prevState: SurveyResultsRecord) => unknown
+): ((
+  prevState: Readonly<SurveyResultsState>,
+  props: Readonly<SurveyResultsProps>
+) => SurveyResultsState) => (
+  updater as (
+    prevState: Readonly<SurveyResultsState>,
+    props: Readonly<SurveyResultsProps>
+  ) => SurveyResultsState
 );
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
@@ -847,7 +966,7 @@ const getResponseQuestionType = (
 );
 
 
-class SurveyResults extends Component<any, any> {
+class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   _syncLoadingStartedAt: number | null;
   _scrollMutationObserver: MutationObserver | null;
   _scrollToQuestionRetryTimer: ReturnType<typeof setTimeout> | null;
@@ -896,7 +1015,7 @@ class SurveyResults extends Component<any, any> {
   _stableFallbackQuestions: SurveyResultsFallbackQuestionBuckets | null = null;
   csvFileName: string = '';
 
-  constructor(props: SurveyResultsRecord) {
+  constructor(props: SurveyResultsProps) {
     super(props);
 
     const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
@@ -937,10 +1056,10 @@ class SurveyResults extends Component<any, any> {
       sbtFilteredQuestionResponses: {},
       aggregatorQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
-      viewMode: this.props.viewMode, // 'survey' or 'questions'
+      viewMode: this.props.viewMode || 'questions', // 'survey' or 'questions'
       filterLoading: false,
       showQuestionFilter: false,
-      filterState: this.props.filterState || {},
+      filterState: toSurveyResultsRecord(this.props.filterState),
       syncDetailsOpen: false,
       bookmarkedQuestionIDs: bootstrapQuestionIds,
       bookmarkedSurveyIDs: bootstrapSurveyIds,
@@ -1106,7 +1225,7 @@ class SurveyResults extends Component<any, any> {
    * Resolve the effective session slug for cache + RPC calls.
    * Priority: explicit sessionSlug → Redux active slug → cache scan → general ('').
    */
-  getEffectiveSlug() {
+  getEffectiveSlug(): string {
     const explicitSlug = resolveSurveyResultsExplicitSessionSlug({
       ...this.props,
       search: (typeof window !== 'undefined' && window.location?.search) || '',
@@ -1380,10 +1499,10 @@ class SurveyResults extends Component<any, any> {
     ));
     if (!filterStateChanged && !patchChanged) return;
     this.setState(
-      {
+      asSurveyResultsStatePatch({
         ...patch,
         filterState: normalizedFilterState,
-      },
+      }),
       () => this.notifyFilterStateCommitted(this.state.filterState)
     );
   }
@@ -1486,7 +1605,7 @@ class SurveyResults extends Component<any, any> {
       initialViewMode = 'survey';
     }
 
-    this.setState(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId), () => {
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId)), () => {
       this.handleUrlBasedView();
 
       if (this.props.isOpen) {
@@ -1592,7 +1711,7 @@ class SurveyResults extends Component<any, any> {
   }
 
 
-  componentDidUpdate(prevProps: SurveyResultsRecord, prevState: SurveyResultsRecord): void {
+  componentDidUpdate(prevProps: SurveyResultsProps, prevState: SurveyResultsState): void {
     const refreshReasons: Set<string> = new Set();
     const pendingStatePatch: SurveyResultsRecord = {};
     let hasPendingStatePatch = false;
@@ -1832,7 +1951,7 @@ class SurveyResults extends Component<any, any> {
   runNonceTickRefresh = async (): Promise<void> => {
     try {
       const slug = this.getEffectiveSlug();
-      const latest = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
+      const latest = await contractScripts.getLatestBlockNumber(this.props.provider as string | undefined, slug);
       const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
         isMounted: this._isMounted,
         latestBlock: latest,
@@ -1845,7 +1964,7 @@ class SurveyResults extends Component<any, any> {
       });
       if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
       this.setState(
-        refreshStatusSequencePlan.statePatch,
+        asSurveyResultsStatePatch(refreshStatusSequencePlan.statePatch),
         () => {
           // Re-read localStorage derived counters and repaint from cache immediately
           this.pollLocalStorageForUpdates();
@@ -1882,7 +2001,7 @@ class SurveyResults extends Component<any, any> {
 
   handleFilterActivityChange = (isActive: unknown): void => {
     if (this.state.isFilterActive === isActive) return;
-    this.setState(buildSurveyResultsFilterActivePatch(isActive));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsFilterActivePatch(isActive)));
   };
 
   getIsDemoQuestionResultsContext = (): boolean => (
@@ -1891,19 +2010,19 @@ class SurveyResults extends Component<any, any> {
   );
 
   handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
-    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsDemoViewSelectPatch({
+    this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsDemoViewSelectPatch({
       nextView,
       prevState,
-    }));
+    })));
   };
 
   handleDemoAtlasOpen = (nodeId: unknown = ''): void => {
-    this.setState(buildSurveyResultsDemoAtlasOpenPatch(nodeId));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsDemoAtlasOpenPatch(nodeId)));
   };
 
   handleDemoAtlasModalClose = (): void => {
     if (!this.state.demoResultsAtlasNodeId) return;
-    this.setState(buildSurveyResultsDemoAtlasNodePatch());
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsDemoAtlasNodePatch()));
   };
 
   handleClearFiltersFromParent = (e: React.SyntheticEvent): void => {
@@ -1964,7 +2083,7 @@ class SurveyResults extends Component<any, any> {
     // In that case, we don't necessarily change the mode here, as componentDidMount/Update handles props.
 
     if (this.state.viewMode !== newViewMode || this.state.surveyId !== newSurveyId) {
-      this.setState(buildSurveyResultsViewStatePatch(newViewMode, newSurveyId), () => {
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsViewStatePatch(newViewMode, newSurveyId)), () => {
         this.queueResultsRefresh('url-view-change');
       });
     }
@@ -2056,12 +2175,12 @@ class SurveyResults extends Component<any, any> {
     this._pollLatestBlockFetchInFlight = true;
     const slug = this.getEffectiveSlug();
     contractScripts
-      .getLatestBlockNumber(this.props.provider, slug)
+      .getLatestBlockNumber(this.props.provider as string | undefined, slug)
       .then((blk: unknown) => {
         if (!this._isMounted) return;
         const parsed = Number(blk || 0);
         if (parsed > 0 && parsed !== Number(this.state.networkLatestBlock || 0)) {
-          this.setState(buildSurveyResultsNetworkLatestBlockPatch(parsed));
+          this.setState(asSurveyResultsStatePatch(buildSurveyResultsNetworkLatestBlockPatch(parsed)));
         }
       })
       .catch((e: unknown) => { surveyLog.warn('SurveyResults: fallback', e); })
@@ -2376,7 +2495,7 @@ if (this.state.viewMode === 'survey') {
       this._surveyModeSourceCoarseSignature = emptySignature;
       this._surveyModeSourcePayloadRefSignature = '';
       this._surveyModeSourceCacheNonce = Number(this._surveysCacheChangeNonce || 0);
-      this.setState(buildSurveyResultsEmptySurveyModePatch());
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsEmptySurveyModePatch()));
       return;
     }
 
@@ -2424,7 +2543,7 @@ if (this.state.viewMode === 'survey') {
     this._surveyModeSourceSignature = sourceSignature;
 
     const aggregatorMap: Record<string, SurveyResultsAggregateRow[]> = {};
-    const rawResponses: SurveyResultsAggregateRow[] = [];
+    const rawResponses: SurveyResultsResponseListEntry[] = [];
     allResponders.forEach((responder) => {
       const responderLower = String(responder || '').toLowerCase();
       const rawResp = normalizeSurveyResponsePayloadByQuestionId(
@@ -2434,7 +2553,7 @@ if (this.state.viewMode === 'survey') {
       rawResponses.push({
         responder: responderLower,
         surveyId: currentSurveyID,
-        response: rawResp,
+        response: rawResp as SurveyResultsResponseListEntry['response'],
       });
       if (!rawResp || !Array.isArray(rawResp.responses)) return;
       rawResp.responses.forEach((ans: SurveyResultsResponseRecord) => {
@@ -2460,16 +2579,16 @@ if (this.state.viewMode === 'survey') {
 
     // Retrieve title from the correct group cache
     let foundTitle = '';
-    let foundDocURLs: unknown[] = [];
+    let foundDocURLs: string[] = [];
     if (surveyNetCache?.surveys?.[currentSurveyID]) {
       foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
       foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
-        ? surveyNetCache.surveys[currentSurveyID].documentURLs
+        ? surveyNetCache.surveys[currentSurveyID].documentURLs as string[]
         : [];
     }
 
     // Initialize master and filtered views so UI renders immediately
-    this.setState(buildSurveyResultsSurveyModeHydratedPatch({
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsSurveyModeHydratedPatch({
       aggregateQuestionResponses: finalAggregator,
       filteredResponsesCount: rawResponses.length,
       responses: rawResponses,
@@ -2479,7 +2598,7 @@ if (this.state.viewMode === 'survey') {
       surveyTitle: foundTitle,
       totalQuestionsCount: totalQCount,
       totalResponsesCount: totalRespondersCount,
-    }));
+    })));
   }
 
 
@@ -2530,7 +2649,7 @@ const initialFilteredCount = totalResponseCount;
 // 🛡️ Preserve currently-applied filters across refresh if a filter is active
 if (this.state.isFilterActive) {
   this.setState(
-    buildSurveyResultsFilteredQuestionModeHydratedPatch({
+    asSurveyResultsStatePatch(buildSurveyResultsFilteredQuestionModeHydratedPatch({
       aggregatorQuestionResponses: finalAggregator,
       currentFilteredQuestionsCount: this.state.filteredQuestionsCount,
       currentFilteredResponsesCount: this.state.filteredResponsesCount,
@@ -2539,7 +2658,7 @@ if (this.state.isFilterActive) {
       sbtFilteredAggregatorQuestionResponses: this.state.sbtFilteredAggregatorQuestionResponses,
       totalQuestionsCount: totalQ,
       totalResponsesCount: totalResponseCount,
-    }),
+    })),
     () => {
       // ask the QuestionFilter to re-apply its pipeline on the fresh data
       if (this.questionFilterRef && this.questionFilterRef.current) {
@@ -2551,13 +2670,13 @@ if (this.state.isFilterActive) {
   );
 } else {
   // no active filters – reset filtered view to the full aggregator
-  this.setState(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
     aggregatorQuestionResponses: finalAggregator,
     filteredResponsesCount: initialFilteredCount,
     questionResponses: partialQR,
     totalQuestionsCount: totalQ,
     totalResponsesCount: totalResponseCount,
-  }));
+  })));
 }
 }
 
@@ -2569,7 +2688,7 @@ let header = '';
 const csvRows: string[] = [];
 
 if (!this.hasEffectiveNetworkId()) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
   return '';
 }
 const networkQuestions = this.getNetworkQuestionsForCurrentContext();
@@ -2601,7 +2720,7 @@ try {
   const suggested = `${prefix}_${tsName}${cleanSession ? '_' + cleanSession : ''}.csv`;
   this.csvFileName = suggested;
   if (typeof this.setState === 'function') {
-    this.setState(buildSurveyResultsCsvFileNamePatch(suggested));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(suggested)));
   }
 } catch (err) {
   surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set CSV filename:', err);
@@ -2609,7 +2728,7 @@ try {
   this.csvFileName = fallback;
   try {
     if (typeof this.setState === 'function') {
-      this.setState(buildSurveyResultsCsvFileNamePatch(fallback));
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(fallback)));
     }
   } catch (innerErr) {
     surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set fallback CSV filename:', innerErr);
@@ -2857,13 +2976,13 @@ return JSON.stringify(
 
 generateQuestionsCSV = (): string => {
 if (!this.hasEffectiveNetworkId()) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
   return '';
 }
 
 const filteredQuestions = this.getFilteredQuestionsForExport();
 if (!filteredQuestions.length) {
-  this.setState(buildSurveyResultsAlertMessagePatch('No filtered questions to export.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('No filtered questions to export.')));
   return '';
 }
 
@@ -3018,7 +3137,7 @@ return artifact && artifact.kind ? artifact : null;
 }
 
 applyHtmlReportAnalysisLifecycleStatePatch: SurveyResultsAnalysisLifecycleStatePatchPort = (patch) => {
-this.setState(patch);
+this.setState(asSurveyResultsStatePatch(patch));
 }
 
 buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
@@ -3555,7 +3674,7 @@ try {
   if (!completionPlan?.lifecyclePatchDescriptor) {
     throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
   }
-  this.setState(completionPlan.lifecyclePatchDescriptor);
+  this.setState(asSurveyResultsStatePatch(completionPlan.lifecyclePatchDescriptor));
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
   runSurveyResultsAnalysisLifecycleController({
@@ -3581,7 +3700,7 @@ const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
   snapshot,
 });
 if (downloadPlan.status === 'blocked') {
-  this.setState(downloadPlan.statePatch);
+  this.setState(asSurveyResultsStatePatch(downloadPlan.statePatch));
   return;
 }
 
@@ -3596,10 +3715,10 @@ try {
   } else {
     downloadSessionResultsHtmlReport(html, downloadRequest.filename);
   }
-  this.setState(buildSurveyResultsHtmlReportDownloadSuccessPatch());
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadSuccessPatch()));
 } catch (error) {
   surveyLog.error('[SurveyResults.downloadHtmlReport] Failed to export HTML report:', error);
-  this.setState(buildSurveyResultsHtmlReportDownloadFailurePatch());
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadFailurePatch()));
 }
 }
 
@@ -3631,14 +3750,14 @@ runSurveyResultsExportController({
   },
   getCurrentAlertMessage: () => this.state.alertMessage,
   onAlertMessage: (message) => {
-    this.setState(buildSurveyResultsAlertMessagePatch(message));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch(message)));
   },
   timestamp,
 });
 };
 
 handleExportTypeChange = (type: unknown): void => {
-this.setState(buildSurveyResultsExportTypePatch(type));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsExportTypePatch(type)));
 };
 
 handleQuestionFilter = (
@@ -3736,12 +3855,12 @@ handleQuestionFilter = (
 
     if (loadingUpdate.shouldQueueState) {
       this._pendingFilterLoadingValue = loadingUpdate.nextPendingValue;
-      this.setState((prev: SurveyResultsRecord) => (
+      this.setState(asSurveyResultsStateUpdater((prev: SurveyResultsRecord) => (
         buildSurveyResultsFilterLoadingStatePatch({
           nextLoading: loadingUpdate.nextLoading,
           prevState: prev,
         })
-      ), () => {
+      )), () => {
         if (this.state.filterLoading === this._pendingFilterLoadingValue) {
           this._pendingFilterLoadingValue = null;
         }
@@ -3760,7 +3879,7 @@ handleQuestionFilterCountUpdate = (count: unknown): void => {
     state: this.state,
   });
   if (!countPatch) return;
-  this.setState(countPatch);
+  this.setState(asSurveyResultsStatePatch(countPatch));
   if (this.props.onCountUpdate) this.props.onCountUpdate(count);
 };
 
@@ -3854,19 +3973,19 @@ handleFilteredResponses = (
 
 
 toggleQuestionSummary = (questionId: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
   itemKey: questionId,
   mapKey: 'activeQuestionToggles',
   prevState,
-}));
+})));
 };
 
 toggleResponse = (index: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
   itemKey: index,
   mapKey: 'activeToggles',
   prevState,
-}));
+})));
 };
 
 toggleSurveyBookmark = (surveyId: unknown): void => {
@@ -3904,7 +4023,7 @@ void runSurveyResultsSurveyQuestionBookmarkWriteController({
     surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
   }
 });
-this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value)));
 };
 
 toggleQuestionBookmark = (questionId: unknown): void => {
@@ -3942,7 +4061,7 @@ void runSurveyResultsSurveyQuestionBookmarkWriteController({
     surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
   }
 });
-this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value)));
 };
 
 getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {
@@ -4368,7 +4487,7 @@ decryptFieldValue = async (
 handleDecryptLockedResponses = async (): Promise<void> => {
   if (this.state.lockedResponsesDecrypting) return;
   if (!this.props.loginComplete || !this.props.account) {
-    this.setState(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.'));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.')));
     return;
   }
 
@@ -4377,7 +4496,7 @@ handleDecryptLockedResponses = async (): Promise<void> => {
   const lockedRows = Array.isArray(model?.lockedRows) ? model.lockedRows : [];
   if (lockedRows.length === 0) return;
 
-  this.setState(buildSurveyResultsLockedResponsesDecryptingPatch(true));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true)));
 
   let anyDecrypted = false;
   const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
@@ -4445,15 +4564,15 @@ handleDecryptLockedResponses = async (): Promise<void> => {
     }
   }
 
-  this.setState(buildSurveyResultsLockedResponsesDecryptCompletePatch({
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptCompletePatch({
     anyDecrypted,
     decryptedResponseOverrides: nextOverrides,
     walletLowerLabel: t('walletLower'),
-  }));
+  })));
 };
 
 toggleLockedResponseDetails = (): void => {
-  this.setState(toggleSurveyResultsLockedResponseDetailsPatch);
+  this.setState(asSurveyResultsStateUpdater(toggleSurveyResultsLockedResponseDetailsPatch));
 };
 
 renderQuestionSummary = (
@@ -4492,7 +4611,7 @@ renderQuestionSummary = (
     onToggleBookmark: this.toggleQuestionBookmark,
     onToggleSummary: this.toggleQuestionSummary,
     questionId,
-    questionResponsesNonce: this.props.questionResponsesNonce,
+	      questionResponsesNonce: this.props.questionResponsesNonce as number | undefined,
     questionsCacheNonce: this.props.questionsCacheNonce,
     responses,
     sbtCacheRevision: this.props.sbtCacheRevision,
@@ -4624,21 +4743,21 @@ this._scrollToQuestionRetryTimer = setTimeout(() => {
 };
 
 changeQuestionIdSort = (column: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsQuestionIdSortPatch({
+this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsQuestionIdSortPatch({
   column,
   prevState,
-}));
+})));
 };
 
   toggleQuestionFilter = (): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'showQuestionFilter',
-}));
+})));
 };
 
 toggleSurveyViewMode = (mode: unknown): void => {
-this.setState(buildSurveyResultsSurveyViewModePatch(mode));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsSurveyViewModePatch(mode)));
 };
 
 handleSurveyViewModeToggle = (): void => {
@@ -4653,16 +4772,16 @@ if (event.key === 'Enter' || event.key === ' ') {
 };
 
 toggleExportArea = (): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'exportAreaOpen',
-}));
+})));
 };
 
 handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = this.getEffectiveSlug();
-  const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
+	  const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider as string | undefined, slug);
   const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
     latestBlock: latestOnChain,
     followUpEffects: [
@@ -4675,7 +4794,7 @@ try {
   if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
 
   this.setState(
-    refreshStatusSequencePlan.statePatch,
+    asSurveyResultsStatePatch(refreshStatusSequencePlan.statePatch),
     async () => {
       await runSurveyResultsManualRefreshDispatchController({
         ports: {
@@ -4753,7 +4872,7 @@ if (!writeResult.ok) {
 
 try {
   if (writeResult.shouldApplySuccessFeedback) {
-    this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(true)));
   }
 
   if (this._bookmarkFeedbackTimer) {
@@ -4763,7 +4882,7 @@ try {
   this._bookmarkFeedbackTimer = setTimeout(() => {
     this._bookmarkFeedbackTimer = null;
     if (this._isMounted) {
-      this.setState(buildSurveyResultsBookmarkFeedbackPatch(false));
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(false)));
     }
   }, 2000);
 } catch (e) {
@@ -4880,7 +4999,7 @@ const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
   networkLatestBlock: this.state.networkLatestBlock,
   nowMs: Date.now(),
   questionLocalBlock: this.state.questionLocalBlock,
-  questionResponsesNonce: this.props.questionResponsesNonce,
+	      questionResponsesNonce: this.props.questionResponsesNonce as number | undefined,
   questionsCacheNonce: this.props.questionsCacheNonce,
   questionResultsHydrated: this.state.questionResultsHydrated,
   refreshTargetQuestionBlock: this.state.refreshTargetQuestionBlock,
@@ -4907,10 +5026,10 @@ const syncStatusNode = renderSurveyResultsSyncStatusPanel({
   syncDetailsOpen: !!this.state.syncDetailsOpen,
   syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
   onToggleSyncDetails: () =>
-    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+    this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
       prevState,
       stateKey: 'syncDetailsOpen',
-    })),
+    }))),
   onManualRefresh: () => this.handleManualRefresh(),
   miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
   miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
@@ -5009,16 +5128,16 @@ const demoSurfaceProps = isDemoAlternateResultsView
       networkChainId: this.props.networkChainId,
       onAtlasModalClose: this.handleDemoAtlasModalClose,
       onAtlasNodeOpen: this.handleDemoAtlasOpen,
-      questionResponses: this.getMemoizedPolisQuestionResponses(
-        true,
-        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
-          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
-          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
-      ),
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      questionScanProgress: this.props.questionScanProgress,
-      viewKey: demoResultsViewMode,
-    }
+	      questionResponses: this.getMemoizedPolisQuestionResponses(
+	        true,
+	        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+	          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+	          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+	      ),
+	      questionResponsesNonce: this.props.questionResponsesNonce as number | undefined,
+	      questionScanProgress: this.props.questionScanProgress as SurveyResultsRecord | null | undefined,
+	      viewKey: demoResultsViewMode,
+	    }
   : null;
 
 return (
@@ -5061,14 +5180,14 @@ return (
 }
 }
 
- const mapStateToProps = (state: SurveyResultsRecord = {}) => {
-   const sessionState = toSurveyResultsRecord(state.sessionState);
-   const profile = toSurveyResultsRecord(state.profile);
-   const activeSessionSlug = sessionState.activeSessionSlug || '';
-   return {
-     activeSessionSlug,
-     account: profile.account || '',
-     loginComplete: !!sessionState.loginComplete,
-   };
- };
+	 const mapStateToProps = (state: SurveyResultsRecord = {}) => {
+	   const sessionState = toSurveyResultsRecord(state.sessionState);
+	   const profile = toSurveyResultsRecord(state.profile);
+	   const activeSessionSlug = String(sessionState.activeSessionSlug || '');
+	   return {
+	     activeSessionSlug,
+	     account: String(profile.account || ''),
+	     loginComplete: !!sessionState.loginComplete,
+	   };
+	 };
  export default connect(mapStateToProps)(SurveyResults);
