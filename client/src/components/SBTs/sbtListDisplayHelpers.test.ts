@@ -7,6 +7,7 @@ import {
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRootClassName,
   buildSbtListSessionUniversePanelClassName,
+  findSbtListInteractiveAncestor,
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListLoadingProgressFillStyle,
@@ -87,5 +88,18 @@ describe('sbtListDisplayHelpers', () => {
       isActive: true,
       toggleClassName: 'filter-toggle',
     })).toBe('filter filter-toggle filter-active');
+  });
+
+  it('finds interactive ancestors only for targets with closest support', () => {
+    const card = document.createElement('article');
+    const button = document.createElement('button');
+    const icon = document.createElement('span');
+    button.appendChild(icon);
+    card.appendChild(button);
+
+    expect(findSbtListInteractiveAncestor(icon, 'button')).toBe(button);
+    expect(findSbtListInteractiveAncestor(card, 'button')).toBe(null);
+    expect(findSbtListInteractiveAncestor({} as EventTarget, 'button')).toBe(null);
+    expect(findSbtListInteractiveAncestor(null, 'button')).toBe(null);
   });
 });
