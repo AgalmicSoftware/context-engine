@@ -172,7 +172,7 @@ describe('surveyResultsQuestionNetworkReadController', () => {
   it('falls back to zero for malformed scoped latest-block metadata', () => {
     const readQuestionBucket = jest.fn(() => ({
       questionsLatestBlock: 'not-a-block',
-      questionResponsesLatestBlock: 'also-not-a-block',
+      questionResponsesLatestBlock: Number.POSITIVE_INFINITY,
       questions: {
         q1: {
           id: 'q1',

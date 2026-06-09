@@ -1,4 +1,5 @@
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -115,11 +116,6 @@ const toSlugList = (value: unknown[] | null | undefined): string[] => (
     ? value.map((slug) => String(slug || ''))
     : []
 );
-
-const normalizeQuestionNetworkBlockNumber = (value: unknown): number => {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
 
 const toQuestionBucket = (value: unknown): SurveyResultsQuestionBucketRecord => (
   value && typeof value === 'object'
@@ -254,11 +250,11 @@ export function mergeScopedQuestionNetworkData(
     );
     questionsLatestBlock = Math.max(
       questionsLatestBlock,
-      normalizeQuestionNetworkBlockNumber(questionBucket.questionsLatestBlock)
+      normalizeSurveyResultsBlockNumber(questionBucket.questionsLatestBlock)
     );
     questionResponsesLatestBlock = Math.max(
       questionResponsesLatestBlock,
-      normalizeQuestionNetworkBlockNumber(questionBucket.questionResponsesLatestBlock)
+      normalizeSurveyResultsBlockNumber(questionBucket.questionResponsesLatestBlock)
     );
   });
 

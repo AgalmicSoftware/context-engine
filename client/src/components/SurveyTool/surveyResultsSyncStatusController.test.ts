@@ -232,4 +232,32 @@ describe('surveyResultsSyncStatusController', () => {
       viewMode: 'unknown',
     });
   });
+
+  it('normalizes malformed block values before building progress text', () => {
+    expect(buildSurveyResultsSyncStatusDisplayPlan({
+      viewMode: 'questions',
+      networkLatestBlock: 100,
+      questionLocalBlock: Number.POSITIVE_INFINITY,
+      responseLocalBlock: 'not-a-block',
+      refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
+      refreshTargetResponseBlock: 80,
+    })).toMatchObject({
+      isSynced: false,
+      question: {
+        color: 'info',
+        label: '',
+        progress: 0,
+        remainingBlocks: 0,
+        showSpinner: true,
+      },
+      response: {
+        color: 'info',
+        label: '',
+        progress: 0,
+        remainingBlocks: 0,
+        showSpinner: true,
+      },
+      syncStatusText: 'Loading...',
+    });
+  });
 });
