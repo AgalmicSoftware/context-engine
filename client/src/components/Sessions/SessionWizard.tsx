@@ -451,11 +451,16 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
   lit?: UnknownRecord;
+  sponsored?: DraftSponsoredState;
 };
 
 type DraftAiModelsState = Record<string, UnknownRecord>;
 type DraftAiState = UnknownRecord & {
   models?: DraftAiModelsState;
+};
+type DraftSponsoredState = UnknownRecord & {
+  defaultGateId?: unknown;
+  gates?: Record<string, UnknownRecord>;
 };
 
 type SessionWizardProps = {
@@ -1454,7 +1459,7 @@ const SessionWizard = ({
     const resolvedDefaultGateId = defaultGateId || encryptionGates[0]?.id || '';
     setDraft((prev) => {
       const next = deepClone(prev);
-      const gates: UnknownRecord = {};
+      const gates: Record<string, UnknownRecord> = {};
       encryptionGates.forEach((gate) => {
         const gateId = toStr(gate?.id).trim();
         if (!gateId) return;
@@ -1678,7 +1683,7 @@ const SessionWizard = ({
     setSessionHeaderStatus('');
   };
 
-  const defaultSponsoredGateId = draft?.sponsored?.defaultGateId;
+  const defaultSponsoredGateId = toStr(draft?.sponsored?.defaultGateId).trim();
   const defaultSponsoredGate = defaultSponsoredGateId ? draft?.sponsored?.gates?.[defaultSponsoredGateId] : null;
   const defaultSponsoredSbtAddress = toStr(defaultSponsoredGate?.sbtAddress || '').trim();
   const defaultSponsoredLookupSlug = resolvedActiveSessionSlug || draft?.slug || '';
