@@ -2,6 +2,7 @@ import {
   SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND,
   SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
+  type SessionResultsAnalysisEligibility,
   type SessionResultsAnalysisPayloadBuildResult,
   type SessionResultsExportFormat,
   type SessionResultsGeneratedAnalysisArtifact,
@@ -319,6 +320,13 @@ export type SurveyResultsHtmlReportDownloadAttemptPlan =
     status: 'blocked';
   };
 
+export type SurveyResultsHtmlReportAnalysisPayload =
+  Partial<SessionResultsAnalysisPayloadBuildResult> &
+  Record<string, unknown> & {
+    eligibility?: Partial<SessionResultsAnalysisEligibility>;
+    inputSignature?: unknown;
+  };
+
 export type SurveyResultsHtmlReportReadinessPlanInput = {
   analysisGenerating?: unknown;
   isAuthorized?: unknown;
@@ -328,7 +336,7 @@ export type SurveyResultsHtmlReportReadinessPlanInput = {
 
 export type SurveyResultsHtmlReportExportModalDescriptorInput = {
   analysisGenerating?: unknown;
-  analysisPayload?: SessionResultsAnalysisPayloadBuildResult | Record<string, unknown>;
+  analysisPayload?: SurveyResultsHtmlReportAnalysisPayload;
   analysisProgress?: unknown;
   exportFormat?: SessionResultsExportFormat | null;
   htmlReportAnalysisError?: ReactNode;
@@ -342,7 +350,7 @@ export type SurveyResultsHtmlReportExportModalDescriptorInput = {
 
 export type SurveyResultsHtmlReportExportModalDescriptor = {
   analysisGenerating: boolean;
-  analysisPayload: SessionResultsAnalysisPayloadBuildResult | Record<string, unknown>;
+  analysisPayload: SurveyResultsHtmlReportAnalysisPayload;
   analysisProgress: string;
   canDownload: boolean;
   exportFormat: SessionResultsExportFormat;
