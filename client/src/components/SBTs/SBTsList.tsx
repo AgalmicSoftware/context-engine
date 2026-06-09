@@ -56,7 +56,6 @@ import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sb
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import {
   bindSbtListRuntimePorts,
-  type SbtListBlockWindow,
 } from './sbtListRuntimePorts';
 import {
   filterSessionUniverseEntriesByDemoVisibility,
@@ -74,6 +73,7 @@ import {
   buildSbtListFeaturedCardModel,
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
+  findSbtListInteractiveAncestor,
   buildSbtListInteractiveMiniCardModel,
   buildSbtListCacheReadPlan,
   buildSbtListChipLoadingStatusBySlug,
@@ -1317,7 +1317,7 @@ const SBTsList = ({
           : scopeRef;
         const { toBlock } = await sbtListRuntimePorts.contractScripts.getRelevantBlockWindowForFilter(
           blockWindowRef
-        ) as SbtListBlockWindow;
+        );
         const latest = Number(toBlock || 0);
         if (Number.isFinite(latest) && latest > 0) {
           updates[slug] = latest;
@@ -2431,11 +2431,10 @@ const SBTsList = ({
   ): void => {
     if (!sbtAddress) return;
     if (event?.defaultPrevented) return;
-    const target = event?.target;
-    const targetWithClosest = target as { closest?: (selector: string) => Element | null } | null | undefined;
-    const interactiveAncestor = typeof targetWithClosest?.closest === 'function'
-      ? targetWithClosest.closest(FEATURED_CARD_INTERACTIVE_SELECTOR)
-      : null;
+    const interactiveAncestor = findSbtListInteractiveAncestor(
+      event?.target,
+      FEATURED_CARD_INTERACTIVE_SELECTOR
+    );
     if (
       interactiveAncestor &&
       interactiveAncestor !== event?.currentTarget

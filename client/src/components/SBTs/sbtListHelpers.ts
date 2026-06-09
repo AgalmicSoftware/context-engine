@@ -162,6 +162,7 @@ export {
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRootClassName,
   buildSbtListSessionUniversePanelClassName,
+  findSbtListInteractiveAncestor,
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListLoadingProgressFillStyle,
