@@ -1138,7 +1138,11 @@ describe('runSessionWizardPublishCompletionController', () => {
         deployed: false,
       },
     ];
-    const publishedLinks = [{ href: '/sbt/0xaa', label: 'Newly Deployed Group' }];
+    const publishedLinks = [{
+      address: '0x00000000000000000000000000000000000000aa',
+      href: '/sbt/0xaa',
+      label: 'Newly Deployed Group',
+    }];
     const normalizePendingDrafts = jest.fn((drafts) => {
       events.push('normalizePendingDrafts');
       expect(drafts).toEqual([{ id: 'raw-deployed-draft' }]);
