@@ -20,9 +20,11 @@ export type SbtFilterContractScriptsBoundary = {
   getSbtMintBurnCountsByAddress: (...args: unknown[]) => Promise<SbtMintBurnCountsResult>;
 };
 
+type SbtFilterRuntimePortGetter = () => unknown;
+
 type BindSbtFilterRuntimePortsArgs = {
-  contractScripts: unknown;
-  writeCache: unknown;
+  contractScripts: SbtFilterRuntimePortGetter;
+  writeCache: SbtFilterRuntimePortGetter;
 };
 
 export type SbtFilterRuntimePorts = {
@@ -33,7 +35,20 @@ export type SbtFilterRuntimePorts = {
 export const bindSbtFilterRuntimePorts = ({
   contractScripts,
   writeCache,
-}: BindSbtFilterRuntimePortsArgs): SbtFilterRuntimePorts => ({
-  contractScripts: contractScripts as unknown as SbtFilterContractScriptsBoundary,
-  writeCache: writeCache as unknown as SbtFilterCacheWriter,
-});
+}: BindSbtFilterRuntimePortsArgs): SbtFilterRuntimePorts => {
+  const readContractScripts = (): SbtFilterContractScriptsBoundary => (
+    contractScripts() as unknown as SbtFilterContractScriptsBoundary
+  );
+  const readWriteCache = (): SbtFilterCacheWriter => (
+    writeCache() as unknown as SbtFilterCacheWriter
+  );
+
+  return {
+    contractScripts: {
+      getSbtMintBurnCountsByAddress: (...args) => (
+        readContractScripts().getSbtMintBurnCountsByAddress(...args)
+      ),
+    },
+    writeCache: (namespace, slug, value) => readWriteCache()(namespace, slug, value),
+  };
+};
