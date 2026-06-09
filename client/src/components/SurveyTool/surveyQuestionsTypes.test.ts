@@ -32,11 +32,13 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
   buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
+  buildSurveyQuestionsJsonPreviewDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsMaskedQuestionVisibility,
@@ -186,6 +188,44 @@ describe('surveyQuestionsTypes', () => {
     });
   });
 
+  it('builds SurveyQuestions authoring route readiness without owning rendering', () => {
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: [{ id: 'q1' }],
+    })).toEqual({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      hasVisibleQuestions: true,
+      questionPoolReady: true,
+      shouldRenderEditableQuestions: true,
+      visibleQuestionCount: 1,
+    });
+
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: true,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: [{ id: 'q1' }],
+    }).shouldRenderEditableQuestions).toBe(false);
+
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: null,
+    })).toMatchObject({
+      hasVisibleQuestions: false,
+      shouldRenderEditableQuestions: false,
+      visibleQuestionCount: 0,
+    });
+  });
+
   it('builds SurveyQuestions full loading progress state for scan progress', () => {
     const progressState = buildSurveyQuestionsFullLoadingProgressState({
       progressSlug: 'session-a',
@@ -332,6 +372,46 @@ describe('surveyQuestionsTypes', () => {
       parsedViewAddressAnswers,
       viewingAnswers: true,
     }).jsonForDisplay).toBe(parsedViewAddressAnswers);
+  });
+
+  it('builds SurveyQuestions route JSON preview availability from route mode', () => {
+    const jsonPreview = { preview: true };
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: null,
+      viewingAnswers: false,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: [{ id: 'q1' }],
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: null,
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: false,
+      jsonPreview: null,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview: '',
+      questionPool: [],
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview: {},
+    });
   });
 
   it('builds SurveyQuestions JSON display fallbacks for missing responses', () => {
