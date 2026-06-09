@@ -74,6 +74,50 @@ describe('SurveyTool single-question response bootstrap', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
+
+  it('stops single-question bootstrap before cache or network work when the route question id is missing', async () => {
+    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(null);
+    const getResponseSpy = jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: '',
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: {},
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      sessionSlugPinned: true,
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      isLoadingResponse: true,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.updateSingleQuestionDebug = jest.fn();
+
+    await subject.fetchSingleQuestionData();
+
+    expect(subject.updateSingleQuestionDebug).toHaveBeenCalledWith(expect.objectContaining({
+      phase: 'missing-question-id',
+    }));
+    expect(subject.state.isLoadingResponse).toBe(false);
+    expect(readCacheSpy).not.toHaveBeenCalled();
+    expect(getResponseSpy).not.toHaveBeenCalled();
+  });
+
   it('hydrates a viewed response from a fresh persistent cache reread before falling back to hash-only retries', async () => {
     const responderAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const staleCache = {

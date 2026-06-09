@@ -1,11 +1,273 @@
 import {
+  buildSbtListChipLoadingStatusBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
+  resolveSbtListReadinessDisplayPlan,
+  resolveSbtListSectionLoadingState,
 } from './sbtListSessionLoadingHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 describe('sbtListSessionLoadingHelpers', () => {
+  const makeStatus = (slug: string, statusLabel = 'Loading') => ({
+    chipBlockProgressText: `Current ${slug || 'general'}`,
+    chipRemainingText: 'Syncing',
+    deferred: false,
+    displayCurrentBlock: 0,
+    displayName: slug || 'General',
+    hasLatest: false,
+    lastBlock: 0,
+    latestForGroup: null,
+    progressPct: 0,
+    progressText: `Loading ${slug || 'general'}`,
+    remainingBlocks: null,
+    scanInProgress: false,
+    slug,
+    slugLabel: slug || 'general',
+    statusLabel,
+  });
+
+  it('plans initial loader status rows with fallback resolution', () => {
+    const calls: unknown[] = [];
+    const resolveStatus = (slug: unknown, options?: unknown) => {
+      calls.push([slug, options]);
+      return String(slug || '') === 'beta' ? null : makeStatus(String(slug || ''));
+    };
+
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['alpha', 'beta'],
+      resolveStatus,
+    })).toEqual([
+      expect.objectContaining({
+        displayName: 'alpha',
+        slug: 'alpha',
+        slugLabel: 'alpha',
+      }),
+    ]);
+    expect(calls).toEqual([
+      ['alpha', undefined],
+      ['beta', undefined],
+    ]);
+
+    calls.length = 0;
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['beta'],
+      resolveStatus,
+    })).toEqual([
+      expect.objectContaining({
+        displayName: 'fallback',
+        slug: 'fallback',
+        slugLabel: 'fallback',
+      }),
+    ]);
+    expect(calls).toEqual([
+      ['beta', undefined],
+      ['fallback', { forceShow: true }],
+    ]);
+
+    calls.length = 0;
+    expect(buildSbtListInitialLoaderStatuses({
+      fallbackSlug: 'fallback',
+      loaderSessionSlugs: ['alpha'],
+      resolveStatus,
+      windowAvailable: false,
+    })).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('plans chip loading status maps with selected-scope filtering', () => {
+    const calls: unknown[] = [];
+    const resolveStatus = (slug: unknown, options?: unknown) => {
+      calls.push([slug, options]);
+      return makeStatus(String(slug || ''));
+    };
+
+    expect(buildSbtListChipLoadingStatusBySlug({
+      allSessionsMode: false,
+      displayedSessionUniverseSlugs: ['alpha'],
+      resolveStatus,
+    })).toEqual({});
+    expect(calls).toEqual([]);
+
+    const result = buildSbtListChipLoadingStatusBySlug({
+      allSessionsMode: true,
+      displayedSessionUniverseSlugs: ['alpha', 'beta', 'alpha'],
+      isListModeScopeEnabled: true,
+      resolveStatus,
+      selectedSessionUniverseSlugs: new Set(['beta']),
+    });
+
+    expect(result).toEqual({
+      beta: expect.objectContaining({
+        displayName: 'beta',
+        slug: 'beta',
+        slugLabel: 'beta',
+      }),
+    });
+    expect(calls).toEqual([
+      ['beta', { alwaysShow: true }],
+    ]);
+  });
+
+  it('plans section loading readiness and search flags', () => {
+    expect(resolveSbtListSectionLoadingState()).toEqual({
+      refreshButtonBusy: false,
+      sectionSessionDiscoveryPending: false,
+      sectionSessionSearchFlag: false,
+      shouldKeepSectionSpinnersOn: false,
+    });
+
+    expect(resolveSbtListSectionLoadingState({
+      isSBTCacheReady: true,
+      sectionSessionSlugs: ['alpha'],
+      sessionLoadStateBySlug: { alpha: 'loading' },
+    })).toEqual({
+      refreshButtonBusy: true,
+      sectionSessionDiscoveryPending: true,
+      sectionSessionSearchFlag: false,
+      shouldKeepSectionSpinnersOn: true,
+    });
+
+    expect(resolveSbtListSectionLoadingState({
+      getSessionProgressSnapshot: () => ({
+        hasLatest: true,
+        remainingBlocks: 0,
+      }),
+      isSBTCacheReady: true,
+      sbtListBySlug: {
+        alpha: [{ sbtAddress: '0x1111111111111111111111111111111111111111' }],
+      },
+      sectionSessionSlugs: ['alpha'],
+      sessionHasLoadedOnceBySlug: { alpha: true },
+      sessionLoadStateBySlug: { alpha: 'loaded' },
+    })).toEqual({
+      refreshButtonBusy: false,
+      sectionSessionDiscoveryPending: false,
+      sectionSessionSearchFlag: false,
+      shouldKeepSectionSpinnersOn: false,
+    });
+
+    expect(resolveSbtListSectionLoadingState({
+      getSessionProgressSnapshot: () => ({
+        hasLatest: true,
+        remainingBlocks: 10,
+        scanInProgress: true,
+      }),
+      isSBTCacheReady: true,
+      revisionSyncPending: true,
+      sectionSessionSlugs: ['alpha'],
+      sessionHasLoadedOnceBySlug: { alpha: true },
+    })).toEqual({
+      refreshButtonBusy: true,
+      sectionSessionDiscoveryPending: true,
+      sectionSessionSearchFlag: true,
+      shouldKeepSectionSpinnersOn: true,
+    });
+
+    expect(resolveSbtListSectionLoadingState({
+      hasNoSessionCards: true,
+      isSBTCacheReady: true,
+      refreshing: false,
+      sectionSessionSlugs: [SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+      sessionHasLoadedOnceBySlug: { alpha: true },
+    })).toEqual({
+      refreshButtonBusy: false,
+      sectionSessionDiscoveryPending: false,
+      sectionSessionSearchFlag: false,
+      shouldKeepSectionSpinnersOn: false,
+    });
+
+    expect(resolveSbtListSectionLoadingState({
+      hasNoSessionCards: true,
+      isSBTCacheReady: true,
+      refreshing: true,
+      sectionSessionSlugs: [SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+      sessionHasLoadedOnceBySlug: { alpha: true },
+    })).toEqual({
+      refreshButtonBusy: true,
+      sectionSessionDiscoveryPending: true,
+      sectionSessionSearchFlag: false,
+      shouldKeepSectionSpinnersOn: true,
+    });
+  });
+
+  it('plans section readiness display without owning loading execution', () => {
+    expect(resolveSbtListReadinessDisplayPlan({
+      allSessionsMode: false,
+      availableSessionSlugCount: 1,
+      initialLoadCompleted: false,
+      isSBTCacheReady: false,
+      loading: true,
+    })).toEqual(expect.objectContaining({
+      canShowSectionEmptyState: false,
+      initialLoadingActive: true,
+      sectionHeaderSpinnerVisible: false,
+      sectionReadinessPending: true,
+      shouldDeferInitialLoaderForUniverse: false,
+      showInitialLoader: true,
+      showFeaturedSectionLoadingHint: true,
+      showLiveSectionLoadingHint: true,
+      showExpiredSectionLoadingHint: true,
+      showSectionBodyLoadingHint: true,
+      showUniverseSpinner: true,
+    }));
+
+    expect(resolveSbtListReadinessDisplayPlan({
+      allSessionsMode: true,
+      availableSessionSlugCount: 2,
+      displayedSessionUniverseSlugs: ['alpha', 'beta'],
+      initialLoadCompleted: false,
+      isSBTCacheReady: false,
+      sectionSessionDiscoveryPending: true,
+    })).toEqual(expect.objectContaining({
+      initialLoadingActive: true,
+      shouldDeferInitialLoaderForUniverse: true,
+      showInitialLoader: false,
+      showSectionBodyLoadingHint: true,
+      showUniverseSpinner: true,
+    }));
+
+    expect(resolveSbtListReadinessDisplayPlan({
+      allSessionsMode: true,
+      availableSessionSlugCount: 2,
+      displayedFeaturedCount: 0,
+      expiredCount: 0,
+      initialLoadCompleted: true,
+      isSBTCacheReady: true,
+      mintingLiveCount: 0,
+    })).toEqual(expect.objectContaining({
+      canShowSectionEmptyState: true,
+      initialLoadingActive: false,
+      sectionReadinessPending: false,
+      showExpiredSectionLoadingHint: false,
+      showFeaturedSectionLoadingHint: false,
+      showInitialLoader: false,
+      showLiveSectionLoadingHint: false,
+      showSectionBodyLoadingHint: false,
+      showUniverseSpinner: false,
+    }));
+
+    expect(resolveSbtListReadinessDisplayPlan({
+      availableSessionSlugCount: 0,
+      displayedFeaturedCount: 1,
+      expiredCount: 1,
+      initialLoadCompleted: true,
+      isSBTCacheReady: true,
+      mintingLiveCount: 1,
+      revisionSyncPending: true,
+    })).toEqual(expect.objectContaining({
+      canShowSectionEmptyState: false,
+      showExpiredSectionLoadingHint: false,
+      showFeaturedSectionLoadingHint: false,
+      showLiveSectionLoadingHint: false,
+      showSectionBodyLoadingHint: true,
+      showUniverseSpinner: true,
+    }));
+  });
+
   it('builds session loading status, chip state, and progress snapshots', () => {
     expect(buildSbtListSessionLoadingStatus({
       allSessionsMode: true,

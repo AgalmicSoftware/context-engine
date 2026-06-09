@@ -9,6 +9,8 @@ import {
   resolveSessionWizardBundleUrlForMode,
   resolveSessionWizardDeployBundleMode,
   resolveSessionWizardDeployBundlePayload,
+  resolveSessionWizardPublishProgressDisplayState,
+  resolveSessionWizardSponsoredPublishSurfaceState,
   resolveSessionWizardSponsoredAutoDeployReadiness,
   resolveSponsoredBundleDeployReadiness,
   resolveSessionWizardShouldAutoDeployWorker,
@@ -319,6 +321,82 @@ describe('sessionWizardPublishFlow', () => {
     })).toBe('url');
   });
 
+  it('plans sponsored auto-deploy publish surface without deploy or upload ports', () => {
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: true,
+      wizardMode: 'normal',
+      workerMode: 'custom',
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: true,
+        missing: [],
+      },
+      forceManualBundleFile: false,
+      hasBundleFile: false,
+      normalModeDefaultBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+      manualBundleRetryMessage: 'Retry with a local bundle.',
+      missingHostedBundleMessage: 'Bundle URL missing.',
+    })).toEqual({
+      canUseSponsoredAutoDeployNow: true,
+      hasNormalModeBundleUrlOverride: false,
+      normalModeBundleHelpText: expect.stringContaining('GitHub-hosted worker bundle'),
+      normalModeHostedBundleConfigured: true,
+      normalModeManualBundleHelpText: 'Retry with a local bundle.',
+      shouldUseSponsoredAutoDeployFlow: true,
+      showNormalModeManualBundleControls: false,
+      showNormalModeWorkerStep: false,
+      showSponsoredBundleFallbackInput: false,
+      sponsoredAutoDeployBundleMode: 'url',
+      sponsoredAutoDeployMissingBundleUrl: false,
+      sponsoredLocalBundledAssetAvailable: true,
+    });
+  });
+
+  it('plans hosted-bundle fallback visibility for sponsored normal-mode deploys', () => {
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: true,
+      wizardMode: 'normal',
+      workerMode: 'custom',
+      deployForm: { bundleUrl: 'https://stale-advanced.example.test/sessionCorsWorker.bundle.js' },
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: false,
+        missing: ['Worker bundle URL'],
+      },
+      forceManualBundleFile: false,
+      hasBundleFile: false,
+      normalModeDefaultBundleUrl: '',
+      manualBundleRetryMessage: 'Retry with a local bundle.',
+      missingHostedBundleMessage: 'Bundle URL missing.',
+    })).toEqual(expect.objectContaining({
+      canUseSponsoredAutoDeployNow: false,
+      normalModeBundleHelpText: 'Bundle URL missing.',
+      normalModeHostedBundleConfigured: false,
+      normalModeManualBundleHelpText: 'Bundle URL missing.',
+      shouldUseSponsoredAutoDeployFlow: false,
+      showNormalModeManualBundleControls: true,
+      showNormalModeWorkerStep: false,
+      showSponsoredBundleFallbackInput: true,
+      sponsoredAutoDeployBundleMode: 'upload',
+      sponsoredAutoDeployMissingBundleUrl: true,
+      sponsoredLocalBundledAssetAvailable: false,
+    }));
+
+    expect(resolveSessionWizardSponsoredPublishSurfaceState({
+      isNormalMode: false,
+      workerMode: 'custom',
+      sponsoredAutoDeployState: {
+        active: true,
+        ready: false,
+        missing: ['Worker bundle URL'],
+      },
+      normalModeDefaultBundleUrl: '',
+    })).toEqual(expect.objectContaining({
+      showNormalModeManualBundleControls: false,
+      showSponsoredBundleFallbackInput: false,
+    }));
+  });
+
   it('resolves deploy bundle payloads for URL and validated upload modes', async () => {
     await expect(resolveSessionWizardDeployBundlePayload({
       effectiveBundleMode: 'url',
@@ -513,5 +591,53 @@ describe('sessionWizardPublishFlow', () => {
       totalSteps: 5,
       elapsedMs: 0,
     })).toBe(100);
+  });
+
+  it('describes publish progress display state without mutating plan steps', () => {
+    const publishSteps = ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'];
+    const displayState = resolveSessionWizardPublishProgressDisplayState({
+      elapsedMs: 1300,
+      publishBusy: true,
+      publishStep: 4,
+      publishSteps,
+      sbtsLabel: 'Groups',
+    });
+
+    expect(displayState).toEqual(expect.objectContaining({
+      activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressAriaValueText: `${Math.round(displayState.publishProgressPercent)}% Register On-chain`,
+      publishProgressEyebrow: 'Publishing Session',
+      publishStep: 4,
+      publishProgressPercentRounded: Math.round(displayState.publishProgressPercent),
+      publishProgressSteps: [
+        { key: 'deploy-worker', label: 'Deploy Worker', state: 'complete' },
+        { key: 'deploy-sbts', label: 'Deploy Groups', state: 'complete' },
+        { key: 'upload-metadata', label: 'Upload Arweave', state: 'complete' },
+        { key: 'register-session', label: 'Register On-chain', state: 'active' },
+        { key: 'done', label: 'Done', state: 'pending' },
+      ],
+      showPublishProgress: true,
+    }));
+    expect(displayState.publishProgressPercent).toBeGreaterThan(60);
+    expect(displayState.publishProgressPercent).toBeLessThan(80);
+    expect(publishSteps).toEqual(['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done']);
+
+    expect(resolveSessionWizardPublishProgressDisplayState({
+      publishBusy: false,
+      publishStep: 0,
+      publishSteps: ['register-session', 'done'],
+    })).toEqual({
+      activePublishProgressStepLabel: 'Register On-chain',
+      publishProgressAriaValueText: '0% Register On-chain',
+      publishProgressEyebrow: 'Publish Complete',
+      publishStep: 0,
+      publishProgressPercent: 0,
+      publishProgressPercentRounded: 0,
+      publishProgressSteps: [
+        { key: 'register-session', label: 'Register On-chain', state: 'pending' },
+        { key: 'done', label: 'Done', state: 'pending' },
+      ],
+      showPublishProgress: false,
+    });
   });
 });

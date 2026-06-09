@@ -16,8 +16,6 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
@@ -335,18 +333,22 @@ describe('SurveyResults filter state synchronization', () => {
 
     expect(subject.queueResultsRefresh).toHaveBeenCalledTimes(1);
     const reason = subject.queueResultsRefresh.mock.calls[0][0];
-    expect(reason).toContain('modal-open');
-    expect(reason).toContain('cache-ready');
-    expect(reason).toContain('responses-cache-ready');
+    expect(reason).toBe('modal-open|cache-ready|responses-cache-ready');
   });
 });
 
 describe('SurveyResults bookmark cache writes', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
   it('uses clone:false reads when mutating survey/question bookmarks in results view', async () => {
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      surveys: [],
-      questions: [],
-    });
+    const liveBookmarksCache = {
+      surveys: ['existing-survey'],
+      questions: ['existing-question'],
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveBookmarksCache);
     const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
 
     const subject = attachStateHarness(createSubject({
@@ -356,10 +358,434 @@ describe('SurveyResults bookmark cache writes', () => {
 
     subject.toggleSurveyBookmark('s1');
     subject.toggleQuestionBookmark('q1');
-    await Promise.resolve();
+    await flushMicrotasks();
 
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
     expect(writeSpy).toHaveBeenCalledTimes(2);
+    expect(writeSpy).toHaveBeenNthCalledWith(1, 'bookmarksCache', 'edge', {
+      surveys: ['existing-survey', 's1'],
+      questions: ['existing-question'],
+    });
+    expect(writeSpy).toHaveBeenNthCalledWith(2, 'bookmarksCache', 'edge', {
+      surveys: ['existing-survey'],
+      questions: ['existing-question', 'q1'],
+    });
+    expect(liveBookmarksCache).toEqual({
+      surveys: ['existing-survey'],
+      questions: ['existing-question'],
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['existing-survey', 's1']);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['existing-question', 'q1']);
+  });
+
+  it('normalizes malformed survey bookmark lists before writing to the active slug', async () => {
+    const malformedCache = {
+      surveys: 'bad-surveys',
+      questions: ['existing-question'],
+      otherField: 'discarded',
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(malformedCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleSurveyBookmark('s1');
+    await flushMicrotasks();
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      otherField: 'discarded',
+      surveys: ['s1'],
+      questions: ['existing-question'],
+    });
+    expect(malformedCache).toEqual({
+      surveys: 'bad-surveys',
+      questions: ['existing-question'],
+      otherField: 'discarded',
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1']);
+  });
+
+  it('applies question bookmark removal state even when the async cache write fails', async () => {
+    const writeError = new Error('bookmark write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: ['s1'],
+      questions: ['q1'],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(writeError);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    try {
+      subject.toggleQuestionBookmark('q1');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+        surveys: ['s1'],
+        questions: [],
+      });
+      expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        '[SurveyResults] Error saving bookmarksCache:',
+        writeError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('orders survey bookmark identity, cache read, write dispatch, and parent state application', async () => {
+    const events: string[] = [];
+    const liveBookmarksCache = {
+      surveys: [],
+      questions: ['existing-question'],
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      events.push('peek');
+      return liveBookmarksCache;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(async () => {
+      events.push('write');
+      return true;
+    });
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    const originalSetState = subject.setState;
+    subject.setState = jest.fn((updater, cb) => {
+      events.push('setState');
+      return originalSetState(updater, cb);
+    });
+    subject.getEffectiveSlug = jest.fn(() => {
+      events.push('slug');
+      return 'edge';
+    });
+    events.length = 0;
+
+    subject.toggleSurveyBookmark('s-ordered');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['s-ordered'],
+      questions: ['existing-question'],
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-ordered']);
+    expect(events.slice(0, 4)).toEqual(['slug', 'peek', 'write', 'setState']);
+  });
+
+  it('normalizes malformed question bookmark lists before writing to the active slug', async () => {
+    const malformedCache = {
+      surveys: ['existing-survey'],
+      questions: 'bad-questions',
+      otherField: 'kept',
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(malformedCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleQuestionBookmark('q2');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['existing-survey'],
+      questions: ['q2'],
+      otherField: 'kept',
+    });
+    expect(malformedCache).toEqual({
+      surveys: ['existing-survey'],
+      questions: 'bad-questions',
+      otherField: 'kept',
+    });
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q2']);
+  });
+
+  it('applies plan-derived survey bookmark removals through the parent write path', async () => {
+    const liveBookmarksCache = {
+      surveys: ['s-remove', 's-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    };
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveBookmarksCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    subject.toggleSurveyBookmark('s-remove');
+    await flushMicrotasks();
+
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+      surveys: ['s-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    });
+    expect(liveBookmarksCache).toEqual({
+      surveys: ['s-remove', 's-keep'],
+      questions: ['existing-question'],
+      otherField: 'kept',
+    });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-keep']);
+  });
+
+  it('falls back to default bookmark cache when the sync cache read throws', async () => {
+    const readError = new Error('bookmark read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      throw readError;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    try {
+      subject.toggleSurveyBookmark('s-read-fallback');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', {
+        surveys: ['s-read-fallback'],
+        questions: [],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['s-read-fallback']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        '[SurveyResults] Error reading bookmarksCache:',
+        readError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('preserves current empty-slug bookmark write identity when no effective slug is available', async () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: [],
+      questions: [],
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: '',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => '');
+
+    subject.toggleQuestionBookmark('q-empty-slug');
+    await flushMicrotasks();
+
+    expect(cacheScripts.peekCacheSync).toHaveBeenCalledWith('bookmarksCache', '', { clone: false });
+    expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', '', {
+      surveys: [],
+      questions: ['q-empty-slug'],
+    });
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q-empty-slug']);
+  });
+
+  it('keeps survey bookmark write failures state-applied and allows a later successful retry', async () => {
+    const liveBookmarksCache = {
+      surveys: ['existing-survey'],
+      questions: ['existing-question'],
+    };
+    const writeError = new Error('survey bookmark write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveBookmarksCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache')
+      .mockRejectedValueOnce(writeError)
+      .mockResolvedValueOnce(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+
+    try {
+      subject.toggleSurveyBookmark('s-fail');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
+        surveys: ['existing-survey', 's-fail'],
+        questions: ['existing-question'],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['existing-survey', 's-fail']);
+      expect(liveBookmarksCache).toEqual({
+        surveys: ['existing-survey'],
+        questions: ['existing-question'],
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        '[SurveyResults] Error saving bookmarksCache:',
+        writeError
+      );
+
+      subject.toggleSurveyBookmark('s-retry');
+      await flushMicrotasks();
+
+      expect(writeSpy).toHaveBeenCalledTimes(2);
+      expect(writeSpy).toHaveBeenLastCalledWith('bookmarksCache', 'edge', {
+        surveys: ['existing-survey', 's-retry'],
+        questions: ['existing-question'],
+      });
+      expect(subject.state.bookmarkedSurveyIDs).toEqual(['existing-survey', 's-retry']);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('blocks filter bookmark writes when the results view is unmounted', async () => {
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = false;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterState: { types: ['radio'] },
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync');
+    const readSpy = jest.spyOn(cacheScripts, 'readCache');
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+
+    await subject.handleBookmarkFilter();
+
+    expect(peekSpy).not.toHaveBeenCalled();
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(subject.getEffectiveSlug).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+  });
+
+  it('writes eligible filter bookmarks to the active slug and toggles success feedback', async () => {
+    jest.useFakeTimers();
+    const filterState = { types: ['radio'], tags: ['alpha'] };
+    const existingFiltersCache = { bookmarkedFilters: ['existing-filter'], otherField: 'kept' };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(existingFiltersCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterBookmarkedFeedback: false,
+      filterState,
+    };
+
+    try {
+      await subject.handleBookmarkFilter();
+
+      expect(peekSpy).toHaveBeenCalledWith('filters', 'edge', { clone: false });
+      expect(writeSpy).toHaveBeenCalledWith('filters', 'edge', {
+        otherField: 'kept',
+        bookmarkedFilters: ['existing-filter', filterState],
+      });
+      expect(existingFiltersCache).toEqual({
+        bookmarkedFilters: ['existing-filter'],
+        otherField: 'kept',
+      });
+      expect(subject.state.filterBookmarkedFeedback).toBe(true);
+
+      jest.runOnlyPendingTimers();
+
+      expect(subject.state.filterBookmarkedFeedback).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('falls back to async filter cache reads before writing bookmark payloads', async () => {
+    const filterState = { types: ['multichoice'], tags: ['fallback'] };
+    const readFiltersCache = { bookmarkedFilters: ['from-read'], persisted: true };
+    const events: string[] = [];
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      events.push('peek');
+      return null;
+    });
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async () => {
+      events.push('read');
+      return readFiltersCache;
+    });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockImplementation(async () => {
+      events.push('write');
+      return true;
+    });
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    const originalSetState = subject.setState;
+    subject.setState = jest.fn((updater, cb) => {
+      events.push('setState');
+      return originalSetState(updater, cb);
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => {
+      events.push('slug');
+      return 'edge';
+    });
+    subject.state = {
+      ...subject.state,
+      filterBookmarkedFeedback: false,
+      filterState,
+    };
+    events.length = 0;
+
+    await subject.handleBookmarkFilter();
+
+    expect(peekSpy).toHaveBeenCalledWith('filters', 'edge', { clone: false });
+    expect(readSpy).toHaveBeenCalledWith('filters', 'edge');
+    expect(writeSpy).toHaveBeenCalledWith('filters', 'edge', {
+      bookmarkedFilters: ['from-read', filterState],
+      persisted: true,
+    });
+    expect(readFiltersCache).toEqual({
+      bookmarkedFilters: ['from-read'],
+      persisted: true,
+    });
+    expect(subject.state.filterBookmarkedFeedback).toBe(true);
+    expect(events.slice(0, 4)).toEqual(['slug', 'peek', 'read', 'write']);
+    expect(events).toContain('setState');
+  });
+
+  it('initializes invalid bookmarked filter cache shape without changing the target identity', async () => {
+    const filterState = { types: ['slider'], range: [1, 5] };
+    const invalidCache = {
+      bookmarkedFilters: 'not-an-array',
+      otherField: 'kept',
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(invalidCache);
+    const readSpy = jest.spyOn(cacheScripts, 'readCache');
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterState,
+    };
+
+    await subject.handleBookmarkFilter();
+
+    expect(peekSpy).toHaveBeenCalledWith('filters', 'edge', { clone: false });
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(writeSpy).toHaveBeenCalledWith('filters', 'edge', {
+      bookmarkedFilters: [filterState],
+      otherField: 'kept',
+    });
+    expect(invalidCache).toEqual({
+      bookmarkedFilters: 'not-an-array',
+      otherField: 'kept',
+    });
   });
 
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
@@ -390,6 +816,64 @@ describe('SurveyResults bookmark cache writes', () => {
       );
     } finally {
       consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('keeps failed filter bookmark writes inert and allows a later successful retry', async () => {
+    jest.useFakeTimers();
+    const liveCache = { bookmarkedFilters: ['existing-filter'] };
+    const writeError = new Error('write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache')
+      .mockRejectedValueOnce(writeError)
+      .mockResolvedValueOnce(true);
+
+    const subject = attachStateHarness(createSubject({
+      activeSessionSlug: 'edge',
+    }));
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      filterBookmarkedFeedback: false,
+      filterState: { types: ['radio'] },
+    };
+
+    try {
+      await subject.handleBookmarkFilter();
+
+      expect(writeSpy).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', {
+        bookmarkedFilters: ['existing-filter', { types: ['radio'] }],
+      });
+      expect(subject.state.filterBookmarkedFeedback).toBe(false);
+      expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        'Error saving bookmarked filters cache:',
+        writeError
+      );
+
+      subject.state = {
+        ...subject.state,
+        filterState: { types: ['slider'] },
+      };
+
+      await subject.handleBookmarkFilter();
+
+      expect(writeSpy).toHaveBeenCalledTimes(2);
+      expect(writeSpy).toHaveBeenLastCalledWith('filters', 'edge', {
+        bookmarkedFilters: ['existing-filter', { types: ['slider'] }],
+      });
+      expect(subject.state.filterBookmarkedFeedback).toBe(true);
+
+      jest.runOnlyPendingTimers();
+
+      expect(subject.state.filterBookmarkedFeedback).toBe(false);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      jest.useRealTimers();
     }
   });
 });
@@ -567,6 +1051,64 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
     expect(changed).toBe(true);
     expect(subject.state.cachedQuestionsCount).toBe(2);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
+    peekSpy.mockRestore();
+  });
+
+  it('falls back to zero for malformed survey latest-block cache entries while polling counts', () => {
+    const surveyId = 'survey-malformed-block';
+    const subject = attachStateHarness(createSubject({
+      isOpen: true,
+      network: { id: 84532 },
+      surveyId,
+      viewMode: 'survey',
+    }));
+
+    const questionBucket = {
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 7,
+      questions: {},
+      questionResponses: {},
+    };
+    const surveyBucket = {
+      surveyResponses: {
+        [surveyId]: {
+          '0x1111111111111111111111111111111111111111': { response: true },
+          '0x2222222222222222222222222222222222222222': { response: true },
+        },
+      },
+      surveyResponsesLatestBlock: {
+        [surveyId]: 'not-a-block',
+      },
+      surveysLatestBlock: 'also-not-a-block',
+    };
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace: any) => {
+      if (namespace === 'questionsCache') return { '84532': questionBucket };
+      if (namespace === 'surveysCache') return { '84532': surveyBucket };
+      return {};
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId,
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      surveyLocalBlock: 99,
+      cachedQuestionsCount: 0,
+      cachedSurveyResponsesCount: 0,
+    };
+    subject.maybeRefreshNetworkLatestBlockFromPolling = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+
+    const changed = subject.pollLocalStorageForUpdates();
+
+    expect(changed).toBe(true);
+    expect(subject.state.surveyLocalBlock).toBe(0);
+    expect(subject.state.cachedSurveyResponsesCount).toBe(2);
     expect(subject.queueResultsRefresh).toHaveBeenCalledWith('poll-local-storage-change');
     peekSpy.mockRestore();
   });
@@ -776,6 +1318,425 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(maxInFlight).toBe(1);
     expect(subject.pollLocalStorageForUpdates).toHaveBeenCalledTimes(2);
     expect(subject.requestFetchResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('nonce tick writes refresh status targets before parent polling follow-up', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: { id: 'provider' },
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn(() => calls.push('reset'));
+    subject.queueResultsRefresh = jest.fn(() => calls.push('queue'));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(234);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.state.networkLatestBlock).toBe(234);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(234);
+    expect(subject.state.refreshTargetResponseBlock).toBe(234);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(234);
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        networkLatestBlock: 234,
+        refreshTargetQuestionBlock: 234,
+        refreshTargetResponseBlock: 234,
+        refreshTargetSurveyBlock: 234,
+      },
+      expect.any(Function)
+    );
+    expect(calls).toEqual(['poll', 'reset', 'queue']);
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('nonce-tick');
+  });
+
+  it('skips refresh status writes and polling follow-up when nonce refresh unmounts before write', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = false;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.setState = jest.fn();
+    subject.pollLocalStorageForUpdates = jest.fn();
+    subject.resetLocalStoragePollingBackoff = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(345);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.pollLocalStorageForUpdates).not.toHaveBeenCalled();
+    expect(subject.resetLocalStoragePollingBackoff).not.toHaveBeenCalled();
+    expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+    expect(subject.state.refreshTargetQuestionBlock).toBe(0);
+    expect(subject.state.refreshTargetResponseBlock).toBe(0);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(0);
+  });
+
+  it('ignores malformed background latest-block polling values', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(Number.POSITIVE_INFINITY);
+
+    subject.maybeRefreshNetworkLatestBlockFromPolling();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state.networkLatestBlock).toBe(0);
+    expect(subject._pollLatestBlockFetchInFlight).toBe(false);
+  });
+
+  it('recovers refresh status writes after a nonce latest-block failure', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockRejectedValueOnce(new Error('latest block failed'))
+      .mockResolvedValueOnce(456);
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.pollLocalStorageForUpdates).not.toHaveBeenCalled();
+    expect(calls).toEqual(['reset:nonce-tick-fallback', 'queue:nonce-tick-fallback']);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(0);
+    expect(subject.state.refreshTargetResponseBlock).toBe(0);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(0);
+
+    calls.length = 0;
+    jest.clearAllMocks();
+    subject._isMounted = true;
+
+    await subject.runNonceTickRefresh();
+    await flushMicrotasks();
+
+    expect(subject.state.networkLatestBlock).toBe(456);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(456);
+    expect(subject.state.refreshTargetResponseBlock).toBe(456);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(456);
+    expect(subject.pollLocalStorageForUpdates).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual(['poll', 'reset:nonce-tick', 'queue:nonce-tick']);
+  });
+
+  it('preserves a queued nonce retry after latest-block failure and recovers status writes', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      questionResponsesNonce: 1,
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+
+    const first = createDeferred<number>();
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockImplementationOnce(() => first.promise)
+      .mockResolvedValueOnce(654);
+
+    const firstRunPromise = subject.handleNonceTick();
+    subject.handleNonceTick();
+    expect(subject._nonceTickInFlight).toBe(true);
+    expect(subject._nonceTickQueued).toBe(true);
+
+    first.reject(new Error('latest block failed'));
+    await firstRunPromise;
+    await flushMicrotasks();
+
+    expect(subject._nonceTickInFlight).toBe(false);
+    expect(subject._nonceTickQueued).toBe(false);
+    expect(subject.state.networkLatestBlock).toBe(654);
+    expect(subject.state.refreshTargetQuestionBlock).toBe(654);
+    expect(subject.state.refreshTargetResponseBlock).toBe(654);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(654);
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual([
+      'reset:nonce-tick-fallback',
+      'queue:nonce-tick-fallback',
+      'poll',
+      'reset:nonce-tick',
+      'queue:nonce-tick',
+    ]);
+  });
+
+  it('manual refresh dispatches question refresh ports before shell polling follow-up', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshQuestionMetadata: jest.fn(async () => calls.push('metadata')),
+      refreshQuestionResponses: jest.fn(async () => calls.push('responses')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn(() => calls.push('reset'));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn(() => calls.push('queue'));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(123);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.state.refreshTargetQuestionBlock).toBe(123);
+    expect(subject.state.refreshTargetResponseBlock).toBe(123);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(123);
+    expect(subject.props.refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(subject.resetLocalStoragePollingBackoff).toHaveBeenCalledWith('manual-refresh');
+    expect(subject.queueResultsRefresh).toHaveBeenCalledWith('manual-refresh');
+    expect(calls).toEqual(['metadata', 'responses', 'reset', 'poll', 'queue']);
+  });
+
+  it('manual survey refresh writes target status before survey dispatch and polling follow-up', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: { id: 'provider' },
+      refreshSurveyResponsesByID: jest.fn(async (surveyId: string) => {
+        calls.push(`survey:${surveyId}`);
+      }),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '0xABC',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    subject.setState = jest.fn((patch, cb) => {
+      calls.push(`setState:${Object.keys(patch || {}).join(',')}`);
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(321);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: 321,
+        refreshTargetResponseBlock: 321,
+        refreshTargetSurveyBlock: 321,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshSurveyResponsesByID).toHaveBeenCalledWith('0xabc');
+    expect(subject.state.refreshTargetQuestionBlock).toBe(321);
+    expect(subject.state.refreshTargetResponseBlock).toBe(321);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(321);
+    expect(calls).toEqual([
+      'setState:refreshTargetQuestionBlock,refreshTargetResponseBlock,refreshTargetSurveyBlock',
+      'survey:0xabc',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
+
+  it('manual refresh keeps missing latest block as a parent-owned status write', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshQuestionMetadata: jest.fn(async () => calls.push('metadata')),
+      refreshQuestionResponses: jest.fn(async () => calls.push('responses')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(undefined);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: undefined,
+        refreshTargetResponseBlock: undefined,
+        refreshTargetSurveyBlock: undefined,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'metadata',
+      'responses',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
+
+  it('manual survey refresh keeps dispatch inert when the survey target is missing', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshSurveyResponsesByID: jest.fn(async () => calls.push('survey')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '',
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(222);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.state.refreshTargetQuestionBlock).toBe(222);
+    expect(subject.state.refreshTargetResponseBlock).toBe(222);
+    expect(subject.state.refreshTargetSurveyBlock).toBe(222);
+    expect(subject.props.refreshSurveyResponsesByID).not.toHaveBeenCalled();
+    expect(calls).toEqual([
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
+  });
+
+  it('manual refresh does not short-circuit already current refresh target blocks', async () => {
+    const calls: string[] = [];
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+      refreshQuestionMetadata: jest.fn(async () => calls.push('metadata')),
+      refreshQuestionResponses: jest.fn(async () => calls.push('responses')),
+    });
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      refreshTargetQuestionBlock: 777,
+      refreshTargetResponseBlock: 777,
+      refreshTargetSurveyBlock: 777,
+    };
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    subject.resetLocalStoragePollingBackoff = jest.fn((reason) => calls.push(`reset:${reason}`));
+    subject.pollLocalStorageForUpdates = jest.fn(() => {
+      calls.push('poll');
+      return false;
+    });
+    subject.queueResultsRefresh = jest.fn((reason) => calls.push(`queue:${reason}`));
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(777);
+
+    await subject.handleManualRefresh();
+    await flushMicrotasks();
+
+    expect(subject.setState).toHaveBeenCalledWith(
+      {
+        refreshTargetQuestionBlock: 777,
+        refreshTargetResponseBlock: 777,
+        refreshTargetSurveyBlock: 777,
+      },
+      expect.any(Function)
+    );
+    expect(subject.props.refreshQuestionMetadata).toHaveBeenCalledTimes(1);
+    expect(subject.props.refreshQuestionResponses).toHaveBeenCalledTimes(1);
+    expect(calls).toEqual([
+      'metadata',
+      'responses',
+      'reset:manual-refresh',
+      'poll',
+      'queue:manual-refresh',
+    ]);
   });
 });
 

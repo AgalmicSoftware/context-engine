@@ -242,6 +242,42 @@ describe('UserPage analysis cache and routing', () => {
     }
   });
 
+  it('keeps fresh analysis visible when the analysisCache write port throws', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { instance, slug } = makeAnalysisCacheInstance();
+    const writeSpy = jest
+      .spyOn(instance, '_writeAnalysisCacheEntry')
+      .mockRejectedValue(new Error('analysis write failed'));
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'fresh summary despite write failure',
+      details: 'fresh details despite write failure',
+      name: 'Fresh Despite Write Failure',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(writeSpy).toHaveBeenCalledWith(expect.objectContaining({
+        sessionSlug: slug,
+        result: expect.objectContaining({
+          summary: 'fresh summary despite write failure',
+        }),
+      }));
+      expect(instance.state.analysisName).toBe('Fresh Despite Write Failure');
+      expect(instance.state.aiAnalysis).toBe('fresh summary despite write failure');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+      expect(instance.state.analysisError).toBe('');
+    } finally {
+      nowSpy.mockRestore();
+      warnSpy.mockRestore();
+    }
+  });
+
   it('hydrates unchanged analysis input from analysisCache without calling AI', async () => {
     const cachedAt = 1710000000000;
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(cachedAt);
@@ -326,17 +362,61 @@ describe('UserPage analysis cache and routing', () => {
         name: 'Fresh After Expiry',
         historicalAlignment: {},
       });
+      instance.state = {
+        ...instance.state,
+        aiAnalysis: 'stale cached summary',
+        analysisCachedAt: cachedAt - 1000,
+        analysisServedFromCache: true,
+      };
 
       await instance.analyzeUser();
 
       expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.aiAnalysis).toBe('new summary after expiry');
       expect(instance.state.analysisName).toBe('Fresh After Expiry');
       expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
       const refreshed = getSingleAnalysisCacheEntry({ slug, networkID, addressLower });
       expect(refreshed.entry.cachedAt).toBe(cachedAt);
       expect(refreshed.entry.result.summary).toBe('new summary after expiry');
     } finally {
       nowSpy.mockRestore();
+    }
+  });
+
+  it('falls back to AI when the analysisCache read port throws', async () => {
+    const now = 1710000000000;
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(now);
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const realPeekCache = cacheScripts.peekCacheSync;
+    let analysisReadAttempts = 0;
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug, options) => {
+      if (namespace === 'analysisCache' && analysisReadAttempts === 0) {
+        analysisReadAttempts += 1;
+        throw new Error('analysis read failed');
+      }
+      return realPeekCache(namespace, slug, options);
+    });
+    const { instance } = makeAnalysisCacheInstance();
+    analyzeUserOpinions.mockResolvedValueOnce({
+      summary: 'fallback summary after cache read error',
+      details: 'fallback details',
+      name: 'Fallback Analysis',
+      historicalAlignment: {},
+    });
+
+    try {
+      await instance.analyzeUser();
+
+      expect(analyzeUserOpinions).toHaveBeenCalledTimes(1);
+      expect(instance.state.analysisName).toBe('Fallback Analysis');
+      expect(instance.state.aiAnalysis).toBe('fallback summary after cache read error');
+      expect(instance.state.analysisServedFromCache).toBe(false);
+      expect(instance.state.analysisCachedAt).toBeNull();
+      expect(analysisReadAttempts).toBe(1);
+    } finally {
+      nowSpy.mockRestore();
+      warnSpy.mockRestore();
     }
   });
 
@@ -455,7 +535,7 @@ describe('UserPage analysis cache and routing', () => {
       activeSessionSlug: 'primary-session',
     });
 
-    expect(instance.getBookmarksSlug()).toBe('primary-session');
+    expect(instance.getActiveSessionSlug()).toBe('primary-session');
     expect(instance._getDeepScanPrioritySlugs()).toEqual(['primary-session', '', 'edge']);
   });
 

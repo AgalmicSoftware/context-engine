@@ -17,14 +17,19 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
-import styles from './SurveyResults.module.scss';
+import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
+import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
+import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
+import SurveyResultsSyncDetailsDisplay, {
+  SurveyResultsSyncTrackRow,
+} from './SurveyResultsSyncDetailsDisplay';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -38,6 +43,13 @@ type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
+  SurveyResultsQuestionListPanel,
+  SurveyResultsSyncDetailsDisplay,
+  SurveyResultsSyncTrackRow,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -134,6 +146,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
+      if (!resolvedTreeComponentCache.has(current)) {
+        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedTreeComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -152,6 +171,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
@@ -185,7 +210,22 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedTreeComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
+};
+
+const getSyncStatusNodeFromSubject = (subject: any): TreeNode => {
+  const tree = subject.render();
+  const headerNode = findElement(
+    tree,
+    (element) => element?.props?.syncStatusNode
+  );
+  return headerNode?.props?.syncStatusNode;
 };
 
 describe('countQuestionModeResponses', () => {
@@ -256,6 +296,66 @@ describe('hasAnyCountableSurveyAnswer', () => {
   });
 });
 
+describe('SurveyResults constructor bookmark bootstrap', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('hydrates bookmarked survey and question IDs from a valid cache copy', () => {
+    const cachedSurveys = ['s1', 's2'];
+    const cachedQuestions = ['q1'];
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      surveys: cachedSurveys,
+      questions: cachedQuestions,
+    });
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+    expect(subject.state.bookmarkedSurveyIDs).not.toBe(cachedSurveys);
+    expect(subject.state.bookmarkedQuestionIDs).not.toBe(cachedQuestions);
+
+    cachedSurveys.push('s3');
+    cachedQuestions.push('q2');
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+  });
+
+  it.each([
+    ['null cache', null],
+    ['missing arrays', {}],
+    ['wrong bookmark list types', { surveys: 'x', questions: 5 }],
+  ])('defaults bookmarked IDs for malformed cache: %s', (_label, cachedValue) => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(cachedValue);
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+  });
+
+  it('defaults bookmarked IDs when the cache read throws', () => {
+    const readError = new Error('bookmark constructor read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
+      throw readError;
+    });
+
+    const subject = createSubject({ activeSessionSlug: 'edge' });
+
+    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
+    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[SurveyResults] Error reading bookmarksCache:',
+      readError
+    );
+  });
+});
+
 describe('SurveyResults display helpers', () => {
   it('builds aggregator classes and table icon styles', () => {
     expect(SURVEY_RESULTS_CLICKABLE_ICON_STYLE).toEqual({ cursor: 'pointer' });
@@ -282,12 +382,6 @@ describe('SurveyResults display helpers', () => {
     expect(SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE).toEqual({ marginRight: '6px' });
     expect(SURVEY_RESULTS_MINI_PROGRESS_STYLE).toEqual({ minWidth: '100px' });
     expect(SURVEY_RESULTS_TRAILING_LABEL_STYLE).toEqual({ marginLeft: '10px' });
-    expect(buildSurveyResultsAggregatorPanelClassName(styles)).toBe(
-      `${styles.surveyResultsAggregatorPanel} ${styles.surveyResultsAggregatorText}`
-    );
-    expect(buildSurveyResultsMultichoiceOptionClassName(styles)).toBe(
-      `${styles.surveyResultsFreeformAnswer} ${styles.surveyResultsMultichoiceOption}`
-    );
     expect(resolveSurveyResultsSyncDetailsStyle(true)).toEqual({ display: 'block' });
     expect(resolveSurveyResultsSyncDetailsStyle(false)).toEqual({ display: undefined });
     expect(resolveSurveyResultsToggleKnobStyle(true)).toEqual({
@@ -298,5 +392,879 @@ describe('SurveyResults display helpers', () => {
       left: '1px',
       backgroundColor: '#fff',
     });
+  });
+});
+
+describe('SurveyResults question-list display wiring', () => {
+  it('passes empty question-list display state without rendering the question table', () => {
+    const subject = createSubject({ isOpen: true });
+    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable');
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        __questionList__: true,
+      },
+      aggregatorQuestionResponses: {},
+      filterLoading: false,
+      sbtFilteredAggregatorQuestionResponses: {},
+      surveyViewMode: 'aggregate',
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      viewMode: 'questions',
+    };
+
+    const questionListCard = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionListCard
+    );
+
+    expect(questionListCard?.props?.showEmptyState).toBe(true);
+    expect(questionListCard?.props?.questionTableNode).toBeNull();
+    expect(renderQuestionIDsTableSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps loading question-list display active without showing the empty state', () => {
+    const subject = createSubject({ isOpen: true });
+    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable').mockReturnValue(<table><tbody /></table>);
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        __questionList__: true,
+      },
+      filterLoading: true,
+      sbtFilteredAggregatorQuestionResponses: {},
+      viewMode: 'questions',
+    };
+
+    const questionListCard = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionListCard
+    );
+
+    expect(questionListCard?.props?.showEmptyState).toBe(false);
+    expect(questionListCard?.props?.questionTableNode?.type).toBe('table');
+    expect(renderQuestionIDsTableSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SurveyResults cache/readiness shell wiring', () => {
+  it('preserves selected survey identity outputs for the header and individual response list', () => {
+    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      isResponsesCacheReady: true,
+      isSurveyCacheReady: true,
+      sessionSlug: 'controller-session',
+      surveyId,
+      viewMode: 'survey',
+    });
+    subject.state = {
+      ...subject.state,
+      networkLatestBlock: 90,
+      surveyId,
+      surveyLocalBlock: 90,
+      surveyResultsHydrated: true,
+      surveyTitle: 'Controller Input Survey',
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+      responses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+      sbtFilteredResponses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+    };
+
+    const tree = subject.render();
+    const header = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsModalHeader
+    );
+    const individualList = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+
+    expect(header?.props).toEqual(expect.objectContaining({
+      currentSurveyId: surveyId,
+      effectiveSlug: 'controller-session',
+      surveyTitle: 'Controller Input Survey',
+      viewMode: 'survey',
+    }));
+    expect(individualList?.props).toEqual(expect.objectContaining({
+      currentSurveyId: surveyId,
+      effectiveSlug: 'controller-session',
+      filterLoading: false,
+      responses: [
+        {
+          responder: '0x1111111111111111111111111111111111111111',
+          response: { responses: [] },
+          surveyId,
+        },
+      ],
+    }));
+  });
+
+  it('preserves question filter, cache readiness, filter loading, and polling inputs for controller extraction', () => {
+    const filterState = { text: 'controller input', sbtFilter: { selectedSBTGroups: ['group-a'] } };
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      defaultTags: ['alpha', 'beta'],
+      isOpen: true,
+      isQuestionCacheReady: false,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+      questionResponsesNonce: 'responses-nonce-1',
+      questionsCacheNonce: 'questions-nonce-2',
+      sbtCacheRevision: 'sbt-revision-3',
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      filterLoading: true,
+      filterState,
+      networkLatestBlock: 100,
+      questionLocalBlock: 40,
+      questionResponses: {
+        q1: {
+          '0xaaa': { answer: { value: 'Visible answer' } },
+        },
+      },
+      refreshTargetQuestionBlock: 80,
+      refreshTargetResponseBlock: 70,
+      responseLocalBlock: 20,
+      showQuestionFilter: true,
+      viewMode: 'questions',
+    };
+
+    const tree = subject.render();
+    const questionFilter = findElement(
+      tree,
+      (element) => element?.props?.resultsMode === true && element?.props?.creatorAndResponderMode === true
+    );
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+
+    const questionFilterProps = questionFilter?.props || {};
+    expect({
+      activeSessionSlug: questionFilterProps.activeSessionSlug,
+      currentSurveyIdForUrl: questionFilterProps.currentSurveyIdForUrl,
+      currentViewModeForUrl: questionFilterProps.currentViewModeForUrl,
+      defaultTags: questionFilterProps.defaultTags,
+      filterState: questionFilterProps.filterState,
+      isQuestionCacheReady: questionFilterProps.isQuestionCacheReady,
+      isSBTCacheReady: questionFilterProps.isSBTCacheReady,
+      questionResponsesNonce: questionFilterProps.questionResponsesNonce,
+      questionsCacheNonce: questionFilterProps.questionsCacheNonce,
+      sbtCacheRevision: questionFilterProps.sbtCacheRevision,
+      storageKeyPrefix: questionFilterProps.storageKeyPrefix,
+    }).toEqual({
+      activeSessionSlug: 'edge',
+      currentSurveyIdForUrl: null,
+      currentViewModeForUrl: 'questions',
+      defaultTags: ['alpha', 'beta'],
+      filterState,
+      isQuestionCacheReady: false,
+      isSBTCacheReady: true,
+      questionResponsesNonce: 'responses-nonce-1',
+      questionsCacheNonce: 'questions-nonce-2',
+      sbtCacheRevision: 'sbt-revision-3',
+      storageKeyPrefix: 'dg:filters:__scope__:demo|edge',
+    });
+    expect(questionFilter?.props?.setFilterLoading).toBe(subject.setFilterLoading);
+    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 40');
+    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 50');
+
+    quickRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the quick refresh action during missing-cache loading and dispatches the parent refresh handler', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: false,
+    };
+
+    const tree = subject.render();
+    const headerNode = findElement(
+      tree,
+      (element) => element?.props?.syncStatusNode
+    );
+    const syncStatusNode = headerNode?.props?.syncStatusNode;
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+
+    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
+    expect(quickRefresh).toBeTruthy();
+
+    quickRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the current filter state when a commit receives a non-object filter payload', () => {
+    const onFilterChange = jest.fn();
+    const onFilterStateChangeForUrlUpdate = jest.fn();
+    const currentFilterState = {
+      questionTypes: ['rating'],
+      sbtFilter: { selectedSBTGroups: ['group-a'] },
+    };
+    const subject = attachStateHarness(createSubject({
+      onFilterChange,
+      onFilterStateChangeForUrlUpdate,
+    }));
+    subject.state = {
+      ...subject.state,
+      filteredQuestionsCount: 0,
+      filterState: currentFilterState,
+    };
+
+    subject.commitResultsFilterState({ filteredQuestionsCount: 2 }, 'stale-filter-payload');
+
+    expect(subject.state.filterState).toBe(currentFilterState);
+    expect(subject.state.filteredQuestionsCount).toBe(2);
+    expect(onFilterStateChangeForUrlUpdate).toHaveBeenCalledWith(currentFilterState);
+    expect(onFilterChange).toHaveBeenCalledWith(currentFilterState);
+  });
+
+  it('merges SBT filter state into the current filter state for filtered response updates', () => {
+    const onFilterChange = jest.fn();
+    const sbtFilterState = { selectedSBTGroups: ['group-b'] };
+    const rows = [
+      {
+        responder: '0x1111111111111111111111111111111111111111',
+        response: { responses: [] },
+      },
+    ];
+    const subject = attachStateHarness(createSubject({
+      isQuestionCacheReady: true,
+      onFilterChange,
+      viewMode: 'survey',
+    }));
+    subject.state = {
+      ...subject.state,
+      filterState: {
+        questionTypes: ['rating'],
+        selectedTags: ['alpha'],
+      },
+      surveyViewMode: 'individuals',
+      totalResponsesCount: 5,
+      viewMode: 'survey',
+    };
+
+    subject.handleFilteredResponses(rows, sbtFilterState);
+
+    expect(subject.state.sbtFilteredResponses).toBe(rows);
+    expect(subject.state.filteredResponsesCount).toBe(1);
+    expect(subject.state.filterState).toEqual({
+      questionTypes: ['rating'],
+      selectedTags: ['alpha'],
+      sbtFilter: sbtFilterState,
+    });
+    expect(onFilterChange).toHaveBeenCalledWith(subject.state.filterState);
+  });
+
+  it('hides quick refresh when results are in sync while keeping the detailed refresh action parent-owned', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 25,
+      questionLocalBlock: 25,
+      responseLocalBlock: 25,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const tree = subject.render();
+    const headerNode = findElement(
+      tree,
+      (element) => element?.props?.syncStatusNode
+    );
+    const syncStatusNode = headerNode?.props?.syncStatusNode;
+    const quickRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    );
+    const detailedRefresh = findElement(
+      syncStatusNode,
+      (element) => element?.props?.title === 'Refresh Data from Cache/Chain'
+    );
+
+    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(true);
+    expect(quickRefresh).toBeNull();
+    expect(detailedRefresh).toBeTruthy();
+
+    detailedRefresh?.props?.onClick();
+
+    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders question-mode loading tracks from missing polling blocks', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 0,
+      questionLocalBlock: 0,
+      responseLocalBlock: 0,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'Questions:')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'Responses:')).toBe(true);
+    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(false);
+    expect(findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    )).toBeTruthy();
+  });
+
+  it('renders question and response tracks while question-mode polling is stale', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      networkLatestBlock: 100,
+      questionLocalBlock: 80,
+      responseLocalBlock: 70,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      syncDetailsOpen: true,
+    };
+    subject._syncLoadingStartedAt = Date.now() - 15000;
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const markup = renderToStaticMarkup(syncStatusNode);
+
+    expect(markup).toContain('Syncing...');
+    expect(markup).toContain('Questions:');
+    expect(markup).toContain('Remaining Blocks: 20 (Current: 80 / Latest: 100)');
+    expect(markup).toContain('Responses:');
+    expect(markup).toContain('Remaining Blocks: 30 (Current: 70 / Latest: 100)');
+    expect(markup).toContain('Refresh Now');
+    expect(findElement(
+      syncStatusNode,
+      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+    )).toBeTruthy();
+  });
+
+  it('renders survey-mode readiness from the survey response track only', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'survey',
+      surveyId: '0xabc',
+    });
+    subject.handleManualRefresh = jest.fn();
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: '0xabc',
+      networkLatestBlock: 100,
+      questionLocalBlock: 100,
+      responseLocalBlock: 100,
+      surveyLocalBlock: 40,
+      refreshTargetQuestionBlock: 0,
+      refreshTargetResponseBlock: 0,
+      refreshTargetSurveyBlock: 0,
+      syncDetailsOpen: true,
+    };
+
+    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
+    const markup = renderToStaticMarkup(syncStatusNode);
+
+    expect(markup).toContain('Syncing...');
+    expect(markup).not.toContain('Questions:');
+    expect(markup).toContain('Responses:');
+    expect(markup).toContain('Remaining Blocks: 60 (Current: 40 / Latest: 100)');
+    expect(markup).toContain('Refresh Now');
+  });
+
+  it('keeps long-sync gating from changing status copy or refresh availability', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(20000);
+    try {
+      const subject = createSubject({
+        isOpen: true,
+        viewMode: 'questions',
+      });
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+        networkLatestBlock: 100,
+        questionLocalBlock: 90,
+        responseLocalBlock: 100,
+        syncDetailsOpen: true,
+      };
+      subject._syncLoadingStartedAt = 4000;
+
+      let syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+      expect(renderToStaticMarkup(syncStatusNode)).toContain('Syncing...');
+      expect(findElement(
+        syncStatusNode,
+        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+      )).toBeTruthy();
+
+      subject.state = {
+        ...subject.state,
+        questionLocalBlock: 100,
+      };
+      syncStatusNode = getSyncStatusNodeFromSubject(subject);
+
+      expect(renderToStaticMarkup(syncStatusNode)).toContain('In Sync');
+      expect(findElement(
+        syncStatusNode,
+        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
+      )).toBeNull();
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it('routes async scoped question cache reads through peek before read fallback without side effects', async () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const peekBucket = {
+      questionsLatestBlock: 40,
+      questionResponsesLatestBlock: 41,
+      questions: {
+        qpeek: {
+          id: 'qpeek',
+          prompt: 'Peek prompt',
+          sessionSlug: 'edge',
+        },
+      },
+      questionResponses: {
+        qpeek: {
+          '0xaaa': { answer: { value: 'Peek answer' } },
+        },
+      },
+    };
+    const readBucket = {
+      questionsLatestBlock: 50,
+      questionResponsesLatestBlock: 51,
+      questions: {
+        qread: {
+          id: 'qread',
+          prompt: 'Read prompt',
+          sessionSlug: 'fallback',
+        },
+      },
+      questionResponses: {
+        qread: {
+          '0xbbb': { answer: { value: 'Read answer' } },
+        },
+      },
+    };
+    subject.getQuestionReadSlugs = jest.fn(() => ['edge', 'fallback']);
+    subject.shouldRequireAuthoritativeQuestionScope = jest.fn(() => false);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((_namespace: string, slug: string) => (
+      slug === 'edge' ? { 84532: peekBucket } : {}
+    ));
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (_namespace: string, slug: string) => (
+      slug === 'fallback' ? { 84532: readBucket } : {}
+    ));
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const result = await subject.getScopedQuestionNetworkData('questions');
+
+      expect(subject.getQuestionReadSlugs).toHaveBeenCalledWith('questions');
+      expect(subject.shouldRequireAuthoritativeQuestionScope).toHaveBeenCalledWith('questions');
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'fallback', { clone: false });
+      expect(readSpy).toHaveBeenCalledTimes(1);
+      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'fallback');
+      expect(result).toMatchObject({
+        questionsLatestBlock: 50,
+        questionResponsesLatestBlock: 51,
+        questions: {
+          qpeek: expect.objectContaining({ prompt: 'Peek prompt', sessionSlug: 'edge' }),
+          qread: expect.objectContaining({ prompt: 'Read prompt', sessionSlug: 'fallback' }),
+        },
+        questionResponses: {
+          qpeek: {
+            '0xaaa': { answer: { value: 'Peek answer' } },
+          },
+          qread: {
+            '0xbbb': { answer: { value: 'Read answer' } },
+          },
+        },
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      peekSpy.mockRestore();
+      readSpy.mockRestore();
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q1: { id: 'q1', prompt: 'Cached question' },
+    }));
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {
+        ...subject.state.activeQuestionToggles,
+        'Q-missing': true,
+      },
+    };
+
+    const summary = subject.renderQuestionSummary(
+      'Q-missing',
+      [{ responder: '0xabc', response: { answer: { value: 'Fallback answer' } } }],
+      {}
+    ) as React.ReactElement;
+    const defaultSummary = summary.props.renderDefaultSummary();
+
+    expect(summary.props.metadataMissing).toBe(true);
+    expect(summary.props.questionPrompt).toBe('Unknown question: Q-missing');
+    expect(defaultSummary.props.question).toEqual({
+      id: 'Q-missing',
+      prompt: 'Unknown question',
+    });
+    expect(subject.getNetworkQuestionsForCurrentContext).not.toHaveBeenCalled();
+  });
+
+  it('reads cached question metadata for selected summaries when no render cache is preloaded', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const cachedQuestion = {
+      id: 'q-ready',
+      prompt: 'Ready cached prompt',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-ready': cachedQuestion,
+      'q-other': {
+        id: 'q-other',
+        prompt: 'Other cached prompt',
+        sessionSlug: 'edge',
+      },
+    }));
+    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Ready',
+        [],
+        null
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Ready',
+        viewMode: 'questions',
+      });
+      expect(summary.props.metadataMissing).toBe(false);
+      expect(summary.props.questionPrompt).toBe('Ready cached prompt');
+      expect(defaultSummary.props.question).toBe(cachedQuestion);
+      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('passes selected survey and question identity to selected summary metadata reads', () => {
+    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId,
+      viewMode: 'survey',
+    });
+    const cachedQuestion = {
+      id: 'q-survey',
+      prompt: 'Survey selected prompt',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.state = {
+      ...subject.state,
+      surveyId,
+      viewMode: 'survey',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-survey': cachedQuestion,
+    }));
+
+    const summary = subject.renderQuestionSummary(
+      'Q-Survey',
+      [],
+      null
+    ) as React.ReactElement;
+
+    expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+      activeSessionSlug: 'edge',
+      currentSurveyId: surveyId,
+      questionId: 'Q-Survey',
+      viewMode: 'survey',
+    });
+    expect(summary.props.metadataMissing).toBe(false);
+    expect(summary.props.questionPrompt).toBe('Survey selected prompt');
+  });
+
+  it('keeps loading selected metadata placeholders as cached results without side effects', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    const pendingQuestion = {
+      __ceQuestionMetadataPending: true,
+      id: 'q-loading',
+      prompt: 'Loading cached question metadata...',
+      sessionSlug: 'edge',
+      type: 'freeform',
+    };
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      'q-loading': pendingQuestion,
+    }));
+    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Loading',
+        [{ responder: '0xabc', response: { answer: { value: 'Cached answer' } } }],
+        null
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Loading',
+        viewMode: 'questions',
+      });
+      expect(summary.props.metadataMissing).toBe(false);
+      expect(summary.props.questionPrompt).toBe('Loading cached question metadata...');
+      expect(defaultSummary.props.question).toBe(pendingQuestion);
+      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('falls back for selected summaries when the cached metadata read is empty without side effects', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const summary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const defaultSummary = summary.props.renderDefaultSummary();
+
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
+      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
+        activeSessionSlug: 'edge',
+        currentSurveyId: '',
+        questionId: 'Q-Empty',
+        viewMode: 'questions',
+      });
+      expect(summary.props.metadataMissing).toBe(true);
+      expect(summary.props.questionPrompt).toBe('Unknown question: Q-Empty');
+      expect(defaultSummary.props.question).toEqual({
+        id: 'Q-Empty',
+        prompt: 'Unknown question',
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('reuses selected-summary fallback status objects without cache persistence or state writes', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
+    subject.setState = jest.fn();
+    subject.queueResultsRefresh = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+    subject.generateResponsesCSV = jest.fn();
+    subject.generateResultsJSON = jest.fn();
+
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    try {
+      const firstSummary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const firstDefaultSummary = firstSummary.props.renderDefaultSummary();
+      const secondSummary = subject.renderQuestionSummary(
+        'Q-Empty',
+        [],
+        undefined
+      ) as React.ReactElement;
+      const secondDefaultSummary = secondSummary.props.renderDefaultSummary();
+
+      expect(firstSummary.props.metadataMissing).toBe(true);
+      expect(secondSummary.props.metadataMissing).toBe(true);
+      expect(firstDefaultSummary.props.question).toBe(secondDefaultSummary.props.question);
+      expect(firstDefaultSummary.props.question).toEqual({
+        id: 'Q-Empty',
+        prompt: 'Unknown question',
+      });
+      expect(subject.setState).not.toHaveBeenCalled();
+      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
+      expect(subject.fetchResponses).not.toHaveBeenCalled();
+      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
+      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
+      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
+      expect(writeSpy).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it('wires selected fallback status plans through parent summary and individual modes', () => {
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+
+    const summary = subject.getStableFallbackQuestion('Q-Plan', 'summary');
+    const individual = subject.getStableFallbackQuestion('Q-Plan', 'individual');
+
+    expect(subject.getStableFallbackQuestion('Q-Plan', 'summary')).toBe(summary);
+    expect(subject.getStableFallbackQuestion('Q-Plan', 'individual')).toBe(individual);
+    expect(summary).toEqual({
+      id: 'Q-Plan',
+      prompt: 'Unknown question',
+    });
+    expect(individual).toEqual({
+      id: 'Q-Plan',
+      creator: '',
+      type: '',
+      prompt: '',
+    });
+    expect(individual).not.toBe(summary);
   });
 });

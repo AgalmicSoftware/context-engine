@@ -42,6 +42,15 @@ type BuildSbtListFilterLabelClassNameArgs = {
   isActive?: unknown;
   toggleClassName?: unknown;
 };
+type SbtListClosestTarget = EventTarget & {
+  closest: (selector: string) => Element | null;
+};
+
+const hasSbtListClosestTarget = (value: unknown): value is SbtListClosestTarget => (
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as { closest?: unknown }).closest === 'function'
+);
 
 export const buildSbtListLoadingGroupStatusClassName = ({
   activeClassName = '',
@@ -137,3 +146,12 @@ export const buildSbtListFilterLabelClassName = ({
   String(toggleClassName || ''),
   isActive ? String(activeClassName || '') : '',
 ].filter(Boolean).join(' '));
+
+export const findSbtListInteractiveAncestor = (
+  target: EventTarget | null | undefined,
+  selector: string
+): Element | null => (
+  hasSbtListClosestTarget(target)
+    ? target.closest(selector)
+    : null
+);

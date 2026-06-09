@@ -231,12 +231,15 @@ type SbtSelectorCustomSbtSelection = {
   sessionName: unknown;
   sessionSlug: string;
 };
-type BuildSbtSelectorSelectedDisplayEntriesArgs = {
+type BuildSbtSelectorSelectedDisplayEntriesArgs<
+  TSelected extends Record<string, unknown> = Record<string, unknown>,
+  TOption extends Record<string, unknown> = Record<string, unknown>,
+> = {
   currentSessionSlug?: unknown;
   resolveSbtLabel?: (sbtInfo: unknown, address: string, sessionSlug: string) => unknown;
-  sbtOptionsByAddress?: Map<string, Record<string, unknown>>;
-  sbtOptionsBySelectionKey?: Map<string, Record<string, unknown>>;
-  selectedSbts?: unknown;
+  sbtOptionsByAddress?: Map<string, TOption>;
+  sbtOptionsBySelectionKey?: Map<string, TOption>;
+  selectedSbts?: TSelected[] | unknown;
 };
 type SbtSelectorHiddenTitleInfo = Record<string, unknown> & {
   name?: unknown;
@@ -275,7 +278,7 @@ type ApplySbtSelectorHydrationResultsArgs = {
   resolvedAggregatedSbtList?: unknown;
   results?: unknown;
 };
-type SbtSelectorComparableOption = Record<string, unknown> & {
+type SbtSelectorComparableOption = {
   address?: unknown;
   chainId?: unknown;
   image?: unknown;
@@ -314,7 +317,7 @@ type SbtSelectorNameHydrationEntry = {
   address: string;
   slug: string;
 };
-type SbtSelectorBuiltOption = Record<string, unknown> & {
+export type SbtSelectorBuiltOption = Record<string, unknown> & {
   address: string;
   chainId: number | null;
   image: unknown;
@@ -435,13 +438,18 @@ type ResolveLinkedSbtSelectorScopeEntryArgs = {
   sourceSlug?: unknown;
   targetSlugSet?: ReadonlySet<string> | null;
 };
-type BuildSbtSelectorOptionsStatePatchArgs = {
+type BuildSbtSelectorOptionsStatePatchArgs<TSbtOption = unknown> = {
   currentLoadingOptions?: unknown;
   currentSbtOptions?: unknown;
   currentScopeFeaturedAddresses?: unknown;
   featuredEntries?: unknown;
   loadingOptions?: unknown;
-  sbtOptions?: unknown;
+  sbtOptions?: TSbtOption[] | unknown;
+};
+export type SbtSelectorOptionsStatePatch<TSbtOption = unknown> = {
+  loadingOptions?: boolean;
+  sbtOptions?: TSbtOption[];
+  scopeFeaturedAddresses?: string[];
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -449,11 +457,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 );
 const MASKED_SBT_LABEL = String(getSbtMaskedFieldValue() || '').trim().toLowerCase();
 
-const asComparableSbtOption = (value: unknown): SbtSelectorComparableOption => (
-  value != null && (typeof value === 'object' || typeof value === 'function')
-    ? value as unknown as SbtSelectorComparableOption
-    : {}
-);
+const asComparableSbtOption = (value: unknown): SbtSelectorComparableOption => {
+  const record = isRecord(value) ? value : {};
+  return {
+    address: record.address,
+    chainId: record.chainId,
+    image: record.image,
+    maskedTitleHidden: record.maskedTitleHidden,
+    name: record.name,
+    selectionKey: record.selectionKey,
+    sessionName: record.sessionName,
+    sessionSlug: record.sessionSlug,
+  };
+};
 
 export const normalizeAdditionalSbtOptions = (optionsInput: unknown): NormalizedAdditionalSbtOption[] => (
   Array.isArray(optionsInput)
@@ -696,14 +712,23 @@ export const buildScopeFeaturedSbtSelectorEntries = ({
   return out;
 };
 
-export const buildSbtSelectorSelectedDisplayEntries = ({
+export function buildSbtSelectorSelectedDisplayEntries<
+  TSelected extends Record<string, unknown> = Record<string, unknown>,
+  TOption extends Record<string, unknown> = Record<string, unknown>,
+>(args: BuildSbtSelectorSelectedDisplayEntriesArgs<TSelected, TOption> & {
+  selectedSbts?: TSelected[];
+}): TSelected[];
+export function buildSbtSelectorSelectedDisplayEntries(
+  args?: BuildSbtSelectorSelectedDisplayEntriesArgs
+): unknown[];
+export function buildSbtSelectorSelectedDisplayEntries({
   currentSessionSlug = '',
   resolveSbtLabel = () => '',
   sbtOptionsByAddress = new Map(),
   sbtOptionsBySelectionKey = new Map(),
   selectedSbts = [],
-}: BuildSbtSelectorSelectedDisplayEntriesArgs = {}): unknown[] => (
-  (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown) => {
+}: BuildSbtSelectorSelectedDisplayEntriesArgs = {}): unknown[] {
+  return (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown): unknown => {
     const record = isRecord(sbt) ? sbt : {};
     const address = String(record.address || '').toLowerCase();
     if (!address) return sbt;
@@ -731,8 +756,8 @@ export const buildSbtSelectorSelectedDisplayEntries = ({
       sessionSlug: pickNormalizedSessionSlug(fromOptions?.sessionSlug, record.sessionSlug, currentSessionSlug),
       ...(sessionBindingSlug != null ? { sessionBindingSlug } : {}),
     };
-  })
-);
+  });
+}
 
 export const shouldIncludeSbtSelectorEntryForListScope = ({
   declaredSessionSlug = null,
@@ -1168,16 +1193,18 @@ export const areSbtSelectorAddressListsEqual = (left: unknown, right: unknown): 
   );
 };
 
-export const buildSbtSelectorOptionsStatePatch = ({
+export const buildSbtSelectorOptionsStatePatch = <TSbtOption = unknown>({
   currentLoadingOptions = undefined,
   currentSbtOptions = [],
   currentScopeFeaturedAddresses = [],
   featuredEntries = [],
   loadingOptions = undefined,
   sbtOptions = [],
-}: BuildSbtSelectorOptionsStatePatchArgs = {}): Record<string, unknown> => {
-  const nextPatch: Record<string, unknown> = {};
-  if (!areSbtOptionsEqual(currentSbtOptions, sbtOptions)) nextPatch.sbtOptions = sbtOptions;
+}: BuildSbtSelectorOptionsStatePatchArgs<TSbtOption> = {}): SbtSelectorOptionsStatePatch<TSbtOption> => {
+  const nextPatch: SbtSelectorOptionsStatePatch<TSbtOption> = {};
+  if (!areSbtOptionsEqual(currentSbtOptions, sbtOptions)) {
+    nextPatch.sbtOptions = Array.isArray(sbtOptions) ? sbtOptions : [];
+  }
   const scopeFeaturedAddresses = buildSbtSelectorScopeFeaturedAddresses(featuredEntries);
   const prevFeatured = Array.isArray(currentScopeFeaturedAddresses)
     ? currentScopeFeaturedAddresses

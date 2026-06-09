@@ -140,6 +140,7 @@ broadcast/
 /TODO/
 /contextEngine-cc/TODO/
 /docs/internal-prds/
+/docs/potential-tools/
 /local-private-version/
 CLAUDE.md
 
@@ -204,3 +205,7 @@ __pycache__/
 
 # Demo Integration Package (raw source data, not shipped in bundle)
 Demo Integration Package/
+
+# AI discourse corpus — local untracked working files
+ai-discourse-corpus/bookmark-ingestion-procedure.md
+ai-discourse-corpus/corpuses/known-tweet-urls.txt

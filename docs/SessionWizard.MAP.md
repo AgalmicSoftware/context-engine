@@ -3,34 +3,65 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **~4,993 lines**
+- Current length: **4,815 lines**
+- Shell file: `client/src/components/Sessions/SessionWizardShell.tsx` (**583 lines**)
+- Intro/status rail file: `client/src/components/Sessions/SessionWizardIntroStatusRail.tsx` (**63 lines**)
+- Publish summary file: `client/src/components/Sessions/SessionPublishSummary.tsx` (**218 lines**)
+- Publish bundle fallback file: `client/src/components/Sessions/SessionPublishBundleFallbackPanel.tsx` (**85 lines**)
+- Publish advanced settings file: `client/src/components/Sessions/SessionPublishAdvancedSettingsPanel.tsx` (**128 lines**)
+- Publish action controls file: `client/src/components/Sessions/SessionPublishActionControls.tsx` (**77 lines**)
+- Publish progress panel file: `client/src/components/Sessions/SessionPublishProgressPanel.tsx` (**79 lines**)
+- Publish result links file: `client/src/components/Sessions/SessionPublishResultLinks.tsx` (**120 lines**)
+- Publish links helper: `client/src/components/Sessions/sessionWizardPublishLinks.ts` (**50 lines**)
+- Contracts field file: `client/src/components/Sessions/SessionWizardContractsField.tsx` (**108 lines**)
+- Storage profile field file: `client/src/components/Sessions/SessionWizardStorageProfileField.tsx` (**121 lines**)
+- Requirements display helper: `client/src/components/Sessions/sessionWizardRequirementsDisplay.ts` (**95 lines**)
+- Publish readiness helper: `client/src/components/Sessions/sessionWizardPublishReadiness.ts` (**326 lines**)
+- Metadata payload helper: `client/src/components/Sessions/sessionWizardMetadataPayload.ts` (**146 lines**)
+- Draft state helper: `client/src/components/Sessions/sessionWizardDraftState.ts` (**344 lines**)
+- AI config helper: `client/src/components/Sessions/sessionWizardAiConfig.ts` (**150 lines**)
+- Create-SBT support helper: `client/src/components/Sessions/sessionWizardCreateSbtSupport.ts` (**261 lines**)
+- Contract helper: `client/src/components/Sessions/sessionWizardContracts.ts` (**149 lines**)
+- Resource-gate support helper: `client/src/components/Sessions/sessionWizardResourceGateSupport.ts` (**186 lines**)
 - Component type: **React function component**
-- Hook inventory: **45 `useEffect` calls**, **32 `useMemo` calls**, **13 `useCallback` calls**
+- Hook inventory: **45 `useEffect` calls**, **33 `useMemo` calls**, **14 `useCallback` calls**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
 - Status note: the section ranges below are approximate current anchors; use the live file for exact line references.
-- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, narrow modal shells, passive wizard chrome/status pieces, and the first publish controller slices. `SessionWizard` still owns the public surface and low-level publish side effects; `sessionWizardPublishController.ts` owns the publish worker auto-deploy, pending-SBT step sequencing, register-step tx/status boundary, and successful completion callbacks.
+- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, narrow modal shells, passive wizard chrome/status pieces, the final passive render shell with an explicit typed prop contract, the intro/status rail, publish action controls, publish bundle fallback controls, publish advanced settings, publish progress/result display panels, the advanced contracts field, the storage profile field, pure `/new` requirements display planning, pure publish readiness/request/action/progress/metadata identity/display planning, pure published pending-SBT link display-model planning, pure sponsored auto-deploy publish-surface planning, narrow publish controller slices, pure metadata payload/upload guard descriptors, pure registry-chain draft defaults for contracts/RPC/faucet, pure AI model-provider patch planning, typed create-SBT modal launch descriptors, typed pending SBT/gate runtime boundaries, typed worker signing/runtime handoffs, direct `SessionWizard.tsx` TypeScript coverage after removing the file-level suppression, pure worker resource-gate selection planning, pure contract-viewer modal planning, and pure create-SBT modal value planning. `SessionWizard` still owns state derivation and low-level publish side effects; `SessionWizardShell.tsx` owns passive final layout/wiring and the typed parent-to-panel prop boundary, `SessionWizardIntroStatusRail.tsx` owns passive requirements/status/normal-mode rail placement, `SessionPublishActionControls.tsx` owns publish button/settings affordance rendering from a named action display state and named publish/settings execution callback props while routing publish/settings callbacks back to the parent, `SessionPublishBundleFallbackPanel.tsx` owns passive sponsored/manual bundle fallback rendering while routing named bundle URL/file callbacks back to the parent, `SessionPublishAdvancedSettingsPanel.tsx` owns passive manual metadata/gas override rendering while routing named manual override callbacks back to the parent, `SessionPublishSummary.tsx` now renders normal/advanced mode and advanced-settings visibility from `SessionWizardPublishActionDisplayState` instead of duplicate shell props, `SessionPublishProgressPanel.tsx` owns passive publish-progress rendering from descriptor-owned eyebrow, ARIA text, percent, and step state, `SessionPublishResultLinks.tsx` owns passive metadata/register/session/admin/result-link rendering while routing the admin-copy callback back to the parent, `WorkerDeploySection.tsx` now consumes a named deploy-status/action display state instead of raw status/error/in-flight shell props while still routing deploy execution to the parent, `SessionWizardContractsField.tsx` owns passive contract-row rendering while routing draft updates/modal opens back to the parent, `SessionWizardStorageProfileField.tsx` owns passive storage-profile controls while routing normalized draft patches back to the parent, `sessionWizardRequirementsDisplay.ts` owns pure `/new` requirements banner visibility/status planning, `sessionWizardPublishReadiness.ts` owns pure publish readiness/request/action/execution/progress/metadata identity/display planning, `sessionWizardPublishLinks.ts` owns pure published pending-SBT link display-model planning without owning SBT deployment/finalization, route, or state effects, `sessionWizardPublishFlow.ts` owns pure sponsored auto-deploy publish-surface planning and progress display state, `sessionWizardPublishController.ts` owns worker auto-deploy dispatch, pending-SBT step sequencing, typed register tx entry shape, metadata-upload dispatch around an injected parent upload port, pure publish start/admin preflight and register-step request/identity/duplicate-check/preflight/register-args descriptor planning, register-step tx/status boundary, pure register success/failure settlement planning, completion request planning, pure publish failure settlement planning, and successful completion callbacks, `sessionWizardDraftState.ts` owns initial draft/cache shape plus pure registry-chain contract/RPC/faucet draft defaults, `sessionWizardAiConfig.ts` owns pure AI model/provider correction patch planning, `sessionWizardCreateSbtSupport.ts` owns typed create-SBT launch descriptors plus modal chain/network/session/JWK display planning, `sessionWizardContracts.ts` owns pure contract defaults, visible-key, registry-address, and contract-viewer modal planning, `sessionWizardResourceGateSupport.ts` owns pure worker resource-card selection fallback/update planning, and `sessionWizardMetadataPayload.ts` owns pure base metadata identity/default-featured normalization plus upload-time secret/gate budget guard planning without owning header upload, encryption, Arweave upload, wallet, worker auth, registry, route, or state effects.
+
+- Typed-readiness note: `SessionWizard` now typechecks directly without `@ts-nocheck`. It keeps deploy form, registry-chain, gate-selection, resource-gate map, session-header upload, field renderer, metadata encryption/upload, register/publish handoff, sponsored-bundle refs, render-field handoff, AI model patch, create-SBT launch, sponsored draft-gate reads, pending SBT draft/gate callbacks, provisioned sponsored context state, worker deploy runtime refs, register tx entries, and worker signing handoffs under local typed boundaries; `resourceGateMap` explicitly permits both single gate ids and multi-gate id arrays while publish/deploy/upload/worker/storage/wallet/route effects remain parent-owned. Passive tooltip render props share `SessionWizardTooltipRenderOptions['placement']`, metadata/worker shell surfaces share the `SessionWizardRenderField` callback shape, publish completion accepts readonly pending-draft snapshots, nullable sponsored-bundle refs are normalized by helper boundaries, and `rpcReadCache.ts` accepts normal ethers `send(string, params[])` providers without requiring call-site casts. Remaining readiness work should focus on reducing structural shell size and state density rather than restoring suppression.
 
 ## Navigation Rules
 
-- Start in `SessionWizard.tsx` only if you need the top-level UI flow, publish guards, metadata upload, registry writes, or low-level side-effect implementations.
+- Start in `SessionWizard.tsx` if you need top-level state, publish guards, metadata upload execution, registry writes, low-level side-effect implementations, or derived props passed into the final shell.
+- Start in `SessionWizardShell.tsx` for final passive render composition, section ordering, the typed shell prop contract, and parent-to-panel prop wiring.
+- Start in `SessionWizardIntroStatusRail.tsx` for requirements banner, sponsored-bundle status, and normal-mode rail placement inside the shell.
 - Start in `CollapsibleFieldGroup.tsx` for collapsible advanced-section chrome.
 - Start in `AiFieldSelect.tsx` for AI/gate select field rendering and its option/placeholder behavior.
 - Start in `sessionWizardFieldDescriptors.ts` for ordered draft field descriptors, labels, tooltip text, and normal/advanced field visibility.
 - Start in `SessionWizardHeader.tsx` for the title, mode toggle, sponsored display settings, and advanced registry-chain selector.
 - Start in `SessionWizardRequirementsBanner.tsx` for `/new` setup prerequisite copy and dismissal display.
+- Start in `sessionWizardRequirementsDisplay.ts` for pure `/new` setup prerequisite visibility and connected/sponsored status planning.
 - Start in `SessionWizardNormalModeRail.tsx` for the normal-mode step cards/progress rail.
 - Start in `SessionWizardSponsoredStatus.tsx` for sponsored-bundle preload/import status display.
 - Start in `SessionWizardSessionIdBadge.tsx` for the advanced metadata-panel session ID badge, copy button, and regenerate button.
 - Start in `SessionWizardInfoTooltip.tsx` for shared SessionWizard tooltip trigger markup.
 - Start in `SessionMetadataEditor.tsx` for the metadata panel composition, JSON preview controls, and More Options surface.
-- Start in `SessionPublishSummary.tsx` for publish controls, publish progress, generated URLs, manual metadata/gas overrides, and published pending-SBT links.
-- Start in `sessionWizardPublishController.ts` for publish step, register-step tx/status, and completion sequencing that calls injected side-effect ports/callbacks.
-- Start in `SessionWizardModals.tsx` for top-level `/new` modal ownership; it delegates to `SessionWizardCreateSbtModal.tsx`, `SessionWizardContractViewerModal.tsx`, and `SessionHeaderPreviewModal.tsx`.
+- Start in `SessionWizardContractsField.tsx` for advanced contract row rendering, contract tooltips, modal-trigger buttons, and address input wiring.
+- Start in `SessionWizardStorageProfileField.tsx` for advanced storage backend and Cloudflare payload-access controls.
+- Start in `SessionPublishSummary.tsx` for publish panel composition. Use `SessionPublishActionControls.tsx` for publish button/settings affordance display, `SessionPublishBundleFallbackPanel.tsx` for sponsored/manual bundle fallback display, `SessionPublishAdvancedSettingsPanel.tsx` for manual metadata/gas override display, `SessionPublishProgressPanel.tsx` for publish-progress display, and `SessionPublishResultLinks.tsx` for generated metadata/register/session/admin/SBT links.
+- Start in `sessionWizardPublishReadiness.ts` for pure publish readiness, request identity, action display, metadata fallback identity/display, UI execution-step, and progress-display plans.
+- Start in `sessionWizardPublishLinks.ts` for published pending-SBT link display models after publish completion; `SessionWizard.tsx` and `sessionWizardPublishController.ts` still own completion state/callback execution.
+- Start in `sessionWizardPublishFlow.ts` for pure sponsored auto-deploy bundle mode, hosted-bundle fallback visibility, and normal-mode publish-surface display planning.
+- Start in `sessionWizardPublishController.ts` for publish step dispatch, publish start/admin preflight, metadata-upload dispatch, register-step request/identity/duplicate-check/preflight/register-args descriptor planning, register-step tx/status, register success/failure settlement planning, completion request planning, publish failure settlement planning, and completion sequencing that calls injected side-effect ports/callbacks.
+- Start in `sessionWizardMetadataPayload.ts` for pure metadata payload identity/default-featured normalization or upload-time secret/gate budget guard planning; `SessionWizard.tsx` still owns header upload, encryption, Arweave upload, worker auth, wallet, registry, route, and state effects.
+- Start in `sessionWizardDraftState.ts` for default/cached draft normalization, cache write payloads, and pure registry-chain contract/RPC/faucet draft defaults; `SessionWizard.tsx` still owns when those defaults are applied.
+- Start in `SessionWizardModals.tsx` for top-level `/new` modal ownership; it delegates to `SessionWizardCreateSbtModal.tsx`, `SessionWizardContractViewerModal.tsx`, and `SessionHeaderPreviewModal.tsx`. Use `sessionWizardCreateSbtSupport.ts` for pure create-SBT launch/deferred-props/modal value planning.
 - Start in `WorkerPanel.tsx` for worker setup composition; its subsections live in `WorkerSecretsSection.tsx`, `WorkerDeploySection.tsx`, and `WorkerConnectionSection.tsx`.
 - Start in `hooks/useSponsoredBundleLifecycle.ts` for sponsored-bundle loading, apply/restore, and baseline override behavior.
 - Start in `hooks/useSessionWizardWorkerDeploy.ts` for deploy-button orchestration, worker verification, and deploy helper lifecycle.
 - Start in `sessionWizardNormalModeCards.ts` for normal-mode card and publish-summary view-model builders.
-- Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
+- Start in `sessionWizardContracts.ts` for contract defaults, visible contract keys, registry-address resolution, or contract-viewer modal planning.
 - Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
 - Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
 - Start in `sessionWizardStorageProfile.ts` for `/new` Advanced session storage profile defaults and Cloudflare primitive metadata.
@@ -40,26 +71,42 @@
 
 ```text
 SessionWizard.tsx
-  -> SessionWizardHeader.tsx
-  -> SessionWizardRequirementsBanner.tsx
-  -> SessionWizardSponsoredStatus.tsx
-  -> SessionWizardNormalModeRail.tsx
+  -> SessionWizardShell.tsx
+       -> SessionWizardHeader.tsx
+       -> SessionWizardIntroStatusRail.tsx
+            -> SessionWizardRequirementsBanner.tsx
+            -> SessionWizardSponsoredStatus.tsx
+            -> SessionWizardNormalModeRail.tsx
+       -> EncryptionPanel.tsx
+       -> SessionMetadataEditor.tsx
+            -> SessionWizardSessionIdBadge.tsx
+       -> WorkerPanel.tsx
+            -> WorkerSecretsSection.tsx
+            -> WorkerDeploySection.tsx
+            -> WorkerConnectionSection.tsx
+       -> SessionPublishSummary.tsx
+            -> SessionPublishActionControls.tsx
+            -> SessionPublishBundleFallbackPanel.tsx
+            -> SessionPublishAdvancedSettingsPanel.tsx
+            -> SessionPublishProgressPanel.tsx
+            -> SessionPublishResultLinks.tsx
+       -> SessionWizardModals.tsx
+            -> SessionWizardCreateSbtModal.tsx
+            -> SessionWizardContractViewerModal.tsx
+            -> SessionHeaderPreviewModal.tsx
   -> CollapsibleFieldGroup.tsx
   -> AiFieldSelect.tsx
   -> sessionWizardFieldDescriptors.ts
-  -> SessionMetadataEditor.tsx
-       -> SessionWizardSessionIdBadge.tsx
-  -> SessionPublishSummary.tsx
+  -> sessionWizardRequirementsDisplay.ts
+  -> sessionWizardPublishReadiness.ts
+  -> sessionWizardPublishLinks.ts
+  -> sessionWizardPublishFlow.ts
   -> sessionWizardPublishController.ts
+  -> sessionWizardMetadataPayload.ts
+  -> sessionWizardDraftState.ts
   -> SessionWizardInfoTooltip.tsx
-  -> SessionWizardModals.tsx
-       -> SessionWizardCreateSbtModal.tsx
-       -> SessionWizardContractViewerModal.tsx
-       -> SessionHeaderPreviewModal.tsx
-  -> WorkerPanel.tsx
-       -> WorkerSecretsSection.tsx
-       -> WorkerDeploySection.tsx
-       -> WorkerConnectionSection.tsx
+  -> SessionWizardContractsField.tsx
+  -> SessionWizardStorageProfileField.tsx
   -> sessionWizardNormalModeCards.ts
   -> hooks/useSponsoredBundleLifecycle.ts
   -> hooks/useSessionWizardWorkerDeploy.ts
@@ -75,15 +122,32 @@ SessionWizard.tsx
 
 | Section | Lines | Purpose | Key Exports / Helpers |
 |---|---:|---|---|
-| Imports, re-exports, constants, pure helpers | 1-539 | File-level helper exports, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `buildSessionWizardPublishPlan`, `resolveSessionWizardChipotleHookConfig` |
-| Component bootstrap and cached draft hydration | 540-1249 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, sponsored-bundle lifecycle wiring |
-| Derived config and synchronization effects | 1250-2237 | Keeps chain defaults, gate/resource snapshots, header preview state, and source-session inheritance aligned with the active draft | registry-chain effects, gate sync effects, session-header preview effects |
-| Draft mutation and modal orchestration | 2238-2405 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
-| Field renderer and advanced metadata fields | 2406-3329 | Recursive field rendering, lock/gate UI, compact header image controls, normal-vs-advanced metadata fields | `renderCompactSessionHeaderField`, `renderSessionHeaderPreviewSurface`, `renderField` |
-| Publish prep: metadata, SBT drafts, registry writes | 3330-3776 | Builds metadata payloads, uploads Arweave metadata, finalizes deferred SBT uploads, and prepares on-chain registration | `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts` |
-| Publish orchestration and deploy helpers | 3777-4342 | Coordinates publish flow, delegates worker auto-deploy, pending-SBT step sequencing, register-step tx/status callbacks, and successful completion callbacks to `sessionWizardPublishController.ts`, handles copy helpers, session/admin URL generation, worker deploy inputs, and connected-admin resolution | `handlePublish`, `runSessionWizardPublishController`, `runSessionWizardRegisterStepController`, `runSessionWizardPublishCompletionController`, `handleCopyAdminUrl`, `handleDeployWorker` |
-| Worker/resource cards and derived publish UI | 4340-4770 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, contract modal selection, and publish progress state | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, selected contract memoization |
-| Main render tree and composed panels | 4771-4993 | Renders the full `/new` surface by composing header, requirements, sponsored status, normal rail, encryption, metadata, worker, publish, and modal modules | `SessionWizardHeader`, `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals`, `export default SessionWizard` |
+| Imports, re-exports, constants, pure helpers | 1-666 | File-level helper exports, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers, local typed state aliases, typed metadata/encryption boundaries, and typed wrapper boundaries for contract metadata/worker auth helpers | `getSessionSlugValidationError`, `buildSessionWizardPublishPlan`, `buildPublishedPendingSbtLinks`, `resolveSessionWizardChipotleHookConfig` |
+| Component bootstrap and cached draft hydration | 667-1341 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, sponsored-bundle lifecycle wiring |
+| Derived config and synchronization effects | 1342-2115 | Keeps chain defaults, gate/resource snapshots, header preview state, AI model-provider patches, sponsored default SBT lookup state, and source-session inheritance aligned with the active draft while delegating pure registry-chain contract/RPC/faucet draft default patching to `sessionWizardDraftState.ts` | registry-chain effects, gate sync effects, session-header preview effects, AI model patch effect |
+| Draft mutation and modal orchestration | 2116-2533 | Core draft updates, gate editing, pending SBT draft/selection reconciliation, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
+| Field renderer and advanced metadata fields | 2534-3042 | Recursive field rendering, lock/gate UI, compact header image controls, contracts/storage field handoffs, normal-vs-advanced metadata fields | `renderCompactSessionHeaderField`, `renderSessionHeaderPreviewSurface`, `renderField`, `SessionWizardContractsField`, `SessionWizardStorageProfileField` |
+| Publish prep: metadata, SBT drafts, registry writes | 3043-3721 | Builds metadata payloads using pure payload helpers, applies parent-owned encryption, uploads Arweave metadata, finalizes deferred SBT uploads, and prepares on-chain registration | `applyEncryption`, `buildMetadataPayload`, `handleUploadMetadata`, `deployPendingSbtDrafts`, `handleRegisterGroup`, `resolveSessionWizardMetadataPayloadBase`, `applySessionWizardMetadataUploadGuards` |
+| Publish orchestration and deploy helpers | 3722-4304 | Coordinates publish flow, delegates worker auto-deploy, pending-SBT step sequencing, publish start/admin preflight, metadata-upload dispatch, register-step request/identity/duplicate-check/preflight/register-args descriptor planning, register-step tx/status callbacks, register success/failure settlement planning, completion request planning, publish failure settlement planning, and successful completion callbacks to `sessionWizardPublishController.ts`, handles copy helpers, session/admin URL application, worker deploy inputs, worker auth signing handoffs, and connected-admin resolution | `handlePublish`, `resolveSessionWizardPublishStartPreflightDescriptor`, `resolveSessionWizardPublishAdminPreflightDescriptor`, `runSessionWizardPublishController`, `runSessionWizardPublishMetadataUploadController`, `resolveSessionWizardRegisterStepRequest`, `resolveSessionWizardRegisterIdentityDescriptor`, `resolveSessionWizardRegisterDuplicateCheckDescriptor`, `resolveSessionWizardRegisterPreflightDescriptor`, `resolveSessionWizardRegisterArgsDescriptor`, `runSessionWizardRegisterStepController`, `resolveSessionWizardRegisterSuccessSettlementDescriptor`, `resolveSessionWizardRegisterFailureSettlementDescriptor`, `appendSessionWizardRegisterTxEntry`, `resolveSessionWizardPublishCompletionRequest`, `resolveSessionWizardPublishFailureSettlementDescriptor`, `runSessionWizardPublishCompletionController`, `handleCopyAdminUrl`, `handleDeployWorker` |
+| Worker/resource cards and derived publish UI | 4305-4653 | Worker deploy result handling, config/secrets sync UI, resource secret inputs, resource-card selection plans, contract modal selection, create-SBT modal value planning, pure requirements display planning, pure sponsored auto-deploy publish-surface planning, pure publish readiness/action/progress/metadata identity/display plan handoff, and deploy-status/action display-state handoff | `updateResourceGate`, `renderResourceInputs`, `renderResourceCard`, `resolveSessionWizardResourceGateSelectionState`, `resolveSessionWizardResourceGateSelectionUpdate`, `resolveSessionWizardCreateSbtModalPlan`, `resolveSessionWizardContractViewerPlan`, `resolveSessionWizardNewSessionRequirementsDisplayState`, `resolveSessionWizardSponsoredPublishSurfaceState`, `resolveSessionWizardPublishUiPlan`, `resolveSessionWizardDeployStatusDisplayState` |
+| Final shell handoff | 4654-4815 | Derives and forwards the full `/new` surface state/handlers into the passive shell while retaining parent-owned side effects | `SessionWizardShell`, `export default SessionWizard` |
+| Draft state planning (`sessionWizardDraftState.ts`) | 1-344 | Normalizes default/cached draft shape, builds cache write payloads, and plans pure registry-chain contract/RPC/faucet draft defaults without owning state application | `buildSessionWizardDefaultTemplate`, `buildSessionWizardInitialDraftFromCache`, `applySessionWizardRegistryChainDraftDefaults`, `buildSessionWizardCacheWritePayload` |
+| Contract planning (`sessionWizardContracts.ts`) | 1-149 | Resolves contract defaults, visible keys, registry address, sanitized visible contracts, and contract-viewer modal contracts/selection/hrefs without owning draft mutation or modal state | `getSessionWizardContractDefaults`, `resolveSessionWizardRegistryAddress`, `resolveSessionWizardContractViewerPlan` |
+| Create-SBT modal planning (`sessionWizardCreateSbtSupport.ts`) | 1-261 | Resolves create-SBT target gates, launch state, deferred component props, and modal chain/network/session/JWK display values while parent keeps modal state and save callbacks | `resolveSessionWizardCreateSbtTargetGateId`, `buildSessionWizardCreateSbtModalLaunchState`, `resolveSessionWizardCreateSbtModalPlan`, `buildSessionWizardDeferredCreateSbtComponentProps` |
+| Passive render composition (`SessionWizardShell.tsx`) | 1-583 | Renders header, intro/status rail, encryption, metadata, worker, publish, and modal modules through an explicit typed prop contract without owning publish/worker/storage/SBT/wallet side effects | `SessionWizardHeader`, `SessionWizardIntroStatusRail`, `SessionMetadataEditor`, `WorkerPanel`, `SessionPublishSummary`, `SessionWizardModals` |
+| Passive intro/status rail (`SessionWizardIntroStatusRail.tsx`) | 1-63 | Places requirements banner, sponsored status, and normal-mode rail from explicit props while parent owns dismissal/retry/focus state and sponsored/publish/worker side effects | `SessionWizardRequirementsBanner`, `SessionWizardSponsoredStatus`, `SessionWizardNormalModeRail` |
+| Passive publish summary (`SessionPublishSummary.tsx`) | 1-218 | Places passive publish action/bundle-fallback/advanced-settings/progress/result panels from the publish UI plan while parent owns publish/deploy/upload/register/storage/wallet side effects | `SessionPublishActionControls`, `SessionPublishBundleFallbackPanel`, `SessionPublishAdvancedSettingsPanel`, `SessionPublishProgressPanel`, `SessionPublishResultLinks` |
+| Passive publish action controls (`SessionPublishActionControls.tsx`) | 1-77 | Renders normal/advanced publish buttons, loading/disabled states, and advanced-settings affordance from `SessionWizardPublishActionDisplayState` plus named execution callback props while routing publish/settings callbacks back to the parent without owning publish, upload, deploy, route, or state mutation side effects | `SessionPublishActionControls` |
+| Passive publish bundle fallback (`SessionPublishBundleFallbackPanel.tsx`) | 1-85 | Renders manual bundle URL override and one-shot bundle-file retry controls while routing named bundle URL/file callbacks back to the parent without owning worker deploy, bundle fetch, publish, route, or state mutation side effects | `SessionPublishBundleFallbackPanel` |
+| Passive publish advanced settings (`SessionPublishAdvancedSettingsPanel.tsx`) | 1-128 | Renders manual metadata URI and gas override controls from explicit values while routing named manual override callbacks back to the parent without owning metadata upload, register transaction, route, or state mutation side effects | `SessionPublishAdvancedSettingsPanel` |
+| Passive publish progress (`SessionPublishProgressPanel.tsx`) | 1-79 | Renders publish step progress from `SessionWizardPublishProgressDisplayState` while parent/controller code owns publish step mutation and publish execution | `SessionPublishProgressPanel` |
+| Passive publish result links (`SessionPublishResultLinks.tsx`) | 1-120 | Renders metadata URI, Arweave tx, register txs, session/admin URLs, published pending-SBT links, and status copy from explicit descriptors while routing admin-copy back to the parent | `SessionPublishResultLinks` |
+| Published pending-SBT link planning (`sessionWizardPublishLinks.ts`) | 1-50 | Builds pure published pending-SBT link display models from newly deployed drafts plus already-finalized pending draft snapshots without owning deploy/finalization, route, or state effects | `buildPublishedPendingSbtLinks` |
+| Passive contracts field (`SessionWizardContractsField.tsx`) | 1-108 | Renders advanced contract rows, explainer tooltip triggers, modal buttons, and address inputs while parent owns draft mutation and modal selection | `SessionWizardContractsField` |
+| Passive storage profile field (`SessionWizardStorageProfileField.tsx`) | 1-121 | Renders advanced storage backend and Cloudflare payload-access controls while parent owns draft mutation and broader publish/storage side effects | `SessionWizardStorageProfileField` |
+| Requirements display planning (`sessionWizardRequirementsDisplay.ts`) | 1-95 | Derives `/new` requirements banner visibility, connected status, sponsored status, and pending requirement labels without owning wallet, sponsored bundle, publish, route, worker, storage, or state application side effects | `resolveSessionWizardNewSessionRequirementsDisplayState` |
+| Publish readiness/UI planning (`sessionWizardPublishReadiness.ts`) | 1-326 | Derives publish readiness, request identity, execution/action/progress display descriptors, and metadata identity/display state using an injected gateway URL builder without owning metadata upload, Arweave writes, worker deploy, registry, route, wallet, or state effects | `resolveSessionWizardPublishReadiness`, `resolveSessionWizardPublishRequestDescriptor`, `resolveSessionWizardPublishMetadataIdentityState`, `resolveSessionWizardPublishUiPlan` |
+| Metadata payload planning (`sessionWizardMetadataPayload.ts`) | 1-146 | Derives base metadata identity/default-featured normalization and upload-time secret/gate budget guards without owning header upload, encryption, Arweave upload, worker auth, wallet, registry, route, or state effects | `resolveSessionWizardMetadataPayloadBase`, `applySessionWizardMetadataUploadGuards`, `normalizeSessionWizardDefaultFeaturedSbtMetadata` |
 
 ## Key Workflows
 
@@ -110,12 +174,31 @@ CreateSBTGroup modal
 
 ```text
 draft + gates + worker state
+  -> sessionWizardRequirementsDisplay pure `/new` prerequisite display plan
+  -> sessionWizardPublishFlow pure sponsored auto-deploy bundle/fallback surface plan
+  -> sessionWizardPublishReadiness pure readiness/request/action/progress/metadata identity/display UI plan
+  -> sessionWizardMetadataPayload pure base metadata identity/default-featured and upload guard plans
+  -> sessionWizardPublishController pure publish start preflight descriptor plan
+  -> sessionWizardPublishController pure publish admin preflight descriptor plan
   -> sessionWizardPublishController optional worker deploy
   -> sessionWizardPublishController optional pending SBT deploy/finalize
-  -> metadata upload
+  -> sessionWizardPublishController metadata upload dispatch around SessionWizard-owned upload execution
+  -> sessionWizardPublishController pure register-step request plan
+  -> sessionWizardPublishController pure register identity readiness plan
+  -> sessionWizardPublishController pure duplicate-check request plan
+  -> SessionWizard-owned duplicate registry contract reads
+  -> sessionWizardPublishController pure register preflight descriptor plan
+  -> sessionWizardPublishController pure register-args descriptor plan
   -> sessionWizardPublishController register-step tx/status callbacks around injected session registry write
-  -> session/admin URL generation
+  -> sessionWizardPublishController pure register-success settlement plan
+  -> SessionWizard-owned session/admin URL, cache, session ID, registry-refresh state application
+  -> sessionWizardPublishController pure register-failure settlement and tx append planning
+  -> SessionWizard-owned error status, tx state application, and rethrow
+  -> sessionWizardPublishController pure completion request plan
   -> sessionWizardPublishController completion callbacks
+  -> sessionWizardPublishLinks pure published pending-SBT link display model
+  -> if any publish step throws: sessionWizardPublishController pure publish-failure settlement plan
+  -> if any publish step throws: SessionWizard-owned error status and publish-progress reset application
 ```
 
 ### Sponsored bundle flow
@@ -138,9 +221,9 @@ bundle link / imported bundle
 | `workerSecrets` / `workerSecretsEnabled` | Worker-side secrets and whether the wizard should manage them | Controls deploy validation and post-deploy secret sync |
 | `draft.storageProfile` | Advanced-mode session-owned storage profile | Defaults to Arweave; Lit-Arweave keeps encrypted Arweave docs/context available; Cloudflare mode records worker-enforced R2/D1/KV/Durable Object primitives without making `/worker-setup` own storage policy |
 | `deployForm` / `deployWorkerUrl` / `deployComplete` | Worker deploy input and result state | Drives worker verification UI and publish readiness |
-| `publishStep` / `publishBusy` | Publish progress state | Feeds progress UI and controls which step label is shown |
+| `publishStep` / `publishBusy` | Parent-owned publish progress and busy state | Feeds `sessionWizardPublishReadiness.ts` progress/action UI planning; `SessionPublishProgressPanel` and `SessionPublishActionControls` consume descriptor-owned display state through `SessionPublishSummary` instead of receiving raw busy props |
 | `slugAvailability` | Async slug-check result | Blocks invalid publish/deploy attempts early |
-| `resourceGateMap` | Resource-to-gate assignments for AI, Arweave, tx gas, etc. | Gets serialized into sponsored/worker config payloads |
+| `resourceGateMap` | Resource-to-gate assignments for AI, Arweave, tx gas, etc. | Stores single gate ids or multi-gate id arrays and gets serialized into sponsored/worker config payloads |
 
 ## Edit Heuristics
 
@@ -151,4 +234,4 @@ bundle link / imported bundle
 
 ## Residual Risk
 
-`SessionWizard.tsx` is still a large hook-driven state machine. This map helps navigation, but it does not replace the longer-term decomposition work tracked in the refactor roadmap.
+`SessionWizard.tsx` is still a large hook-driven state machine even though passive final composition now lives in `SessionWizardShell.tsx`. This map helps navigation, but it does not replace the longer-term decomposition work tracked in the refactor roadmap.

@@ -95,6 +95,9 @@ import type {
 } from './sbtFilterHelpers';
 import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  bindSbtFilterRuntimePorts,
+} from './sbtFilterRuntimePorts';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
@@ -104,32 +107,45 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 
 const sbtLog = createLogger('sbt');
 const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
-const writeCacheValue = writeCache as (namespace: string, slug: string, value: unknown) => Promise<unknown>;
+const sbtFilterRuntimePorts = bindSbtFilterRuntimePorts({
+  contractScripts: () => contractScripts,
+  writeCache: () => writeCache,
+});
+const writeCacheValue = sbtFilterRuntimePorts.writeCache;
 
-type SbtMintBurnCountsResult = UnknownRecord & {
-  burnedAddresses?: unknown;
-  burnedCountByAddress?: unknown;
-  mintedAddresses?: unknown;
-  mintedCountByAddress?: unknown;
-  ok?: unknown;
-};
 type SbtFilterQuickSbtOption = {
   address: string;
 };
+type SbtFilterSelectionListKey = Exclude<keyof SbtFilterSelectionState, 'onlyVerifiedHumans'>;
+type SbtFilterQuickChipKey = 'ir' | 'er' | 'ia' | 'ea' | 'ic' | 'ec' | 'ir2' | 'er2';
 type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState) => unknown;
-type SbtFilterProps = UnknownRecord & {
+type SbtFilterProps = {
+  autoExpand?: unknown;
+  buttonSurface?: unknown;
+  defaultFeaturedSBTs?: unknown;
+  externalSBTFilterState?: unknown;
+  expandToSbtHolders?: boolean;
+  hideLoadingOverlay?: unknown;
+  hideUI?: unknown;
+  isQuestionCacheReady?: unknown;
+  isSBTCacheReady?: unknown;
+  isSurveyCacheReady?: unknown;
+  items?: unknown;
+  mode?: unknown;
+  network?: unknown;
   onFilter?: SbtFilterCallback;
   onFilterCreators?: SbtFilterCallback;
   onFilterResponders?: SbtFilterCallback;
+  provider?: unknown;
+  sbtCacheRevision?: unknown;
+  sessionSlug?: unknown;
   setFilterLoading?: (loading: boolean) => unknown;
 };
 type SbtFilterState = Omit<SbtFilterInitialState, 'lastAppliedFilterSnapshot'> & {
   lastAppliedFilterSnapshot: unknown;
   [key: string]: unknown;
 };
-const contractScriptsBoundary = contractScripts as {
-  getSbtMintBurnCountsByAddress: (...args: unknown[]) => Promise<SbtMintBurnCountsResult>;
-};
+const contractScriptsBoundary = sbtFilterRuntimePorts.contractScripts;
 
 const HOLDER_SET_MEMO_MAX_ENTRIES = 500;
 
@@ -177,7 +193,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   }
 
 
-  componentDidUpdate(prevProps: UnknownRecord, prevState: UnknownRecord): void {
+  componentDidUpdate(prevProps: Readonly<SbtFilterProps>, prevState: Readonly<SbtFilterState>): void {
     // Determine readiness based on mode.
     const wasDataReady = isSbtFilterDataReady({
       mode: prevProps.mode,
@@ -266,7 +282,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     });
   };
 
-  setFilterLoading = (loading: unknown): void => {
+  setFilterLoading = (loading: boolean): void => {
     const loadingUpdate = resolveSbtFilterLoadingUpdate({
       currentLoading: this.state.loading,
       isMounted: this._isMounted,
@@ -1026,10 +1042,10 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   // Handlers for adding/removing SBT “include” or “exclude”
-  addSbtSelection = (stateKey: string, sbtObject: SbtFilterSbtOption): void => {
+  addSbtSelection = (stateKey: SbtFilterSelectionListKey, sbtObject: SbtFilterSbtOption): void => {
     const address = readSbtOptionAddress(sbtObject);
     if (shouldAppendSbtFilterSelection({ address, state: this.state, stateKey })) {
-      this.setState((prev: UnknownRecord) => buildSbtFilterSelectionAddPatch({
+      this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionAddPatch({
         sbtObject,
         state: prev,
         stateKey,
@@ -1037,8 +1053,8 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     }
   };
 
-  removeSbtSelection = (stateKey: string, address: unknown): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterSelectionRemovePatch({
+  removeSbtSelection = (stateKey: SbtFilterSelectionListKey, address: unknown): void => {
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterSelectionRemovePatch({
       address,
       state: prev,
       stateKey,
@@ -1088,21 +1104,21 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   };
 
   toggleVerifiedHumans = (): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prev,
       stateKey: 'onlyVerifiedHumans',
     }));
   };
 
   toggleFilterOptions = (): void => {
-    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prev: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prev,
       stateKey: 'showFilterOptions',
     }));
   };
 
   toggleShowAllSBTs = (): void => {
-    this.setState((prevState: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+    this.setState((prevState: Readonly<SbtFilterState>) => buildSbtFilterBooleanTogglePatch({
       state: prevState,
       stateKey: 'showAllSBTs',
     }));
@@ -1112,7 +1128,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
   renderQuickSelectChips = (
     selectedSBTs: unknown,
     onAddHandler: (sbtObject: SbtFilterQuickSbtOption) => void,
-    filterKey: unknown
+    filterKey: SbtFilterQuickChipKey
   ): React.ReactNode => {
     const { defaultFeaturedSBTs, sessionSlug } = this.props;
     if (!hasSbtFilterFeaturedOptions(defaultFeaturedSBTs)) {

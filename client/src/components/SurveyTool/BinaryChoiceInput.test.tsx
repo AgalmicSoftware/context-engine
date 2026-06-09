@@ -30,6 +30,22 @@ describe('BinaryChoiceInput', () => {
     expect(onChange).toHaveBeenNthCalledWith(2, 'Agree');
   });
 
+  it('does not emit option changes when disabled', () => {
+    const onChange = jest.fn();
+    render(
+      <BinaryChoiceInput
+        questionId="q1"
+        value="Agree"
+        disabled
+        onChange={onChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Unsure' }));
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('renders agree/disagree icons only when requested', () => {
     const { container, rerender } = render(
       <BinaryChoiceInput

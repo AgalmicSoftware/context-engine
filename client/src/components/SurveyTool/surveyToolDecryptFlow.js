@@ -1,3 +1,8 @@
+import {
+  buildSurveyQuestionDecryptExecutionPlan,
+  buildSurveyQuestionDecryptRequestPlan,
+} from './surveyQuestionDecryptRequestPlan';
+
 export const buildEmptyQuestionDecryptSlice = () => ({
   answers: {},
   importance: {},
@@ -81,6 +86,25 @@ export const buildQuestionRenderDisplayState = ({
   allowDecryptAdditional: !!fieldDisplayState?.additionalDecryptState?.allowDecrypt,
   isAnswerDecrypting: !!fieldDisplayState?.answerDecryptState?.busy,
   isAdditionalDecrypting: !!fieldDisplayState?.additionalDecryptState?.busy,
+});
+
+export const buildQuestionFieldDecryptControlDisplayState = ({
+  actionLabel = 'Decrypt Answer',
+  allowDecrypt = false,
+  autoDecryptEnabled = false,
+  busy = false,
+  decryptTooltip = 'Login to decrypt this encrypted field.',
+  isDecrypting = false,
+  showBusySpinnerWhenAutoDecryptEnabled = false,
+  wrapperStyle = undefined,
+} = {}) => ({
+  actionLabel,
+  autoDecryptEnabled: !!autoDecryptEnabled,
+  busy: !!busy,
+  disabled: !!isDecrypting || !allowDecrypt,
+  showBusySpinnerWhenAutoDecryptEnabled: !!showBusySpinnerWhenAutoDecryptEnabled,
+  title: !allowDecrypt ? decryptTooltip : undefined,
+  wrapperStyle,
 });
 
 export const buildAutoDecryptMaskedFieldSignature = (field = null) => {
@@ -364,6 +388,99 @@ export const clearQuestionFieldBusyMap = (
   return cleared;
 };
 
+export const hasQuestionDecryptBusy = (busyMap = {}) => (
+  Object.values(busyMap || {}).some(Boolean)
+);
+
+export const buildQuestionDecryptBusyTokenRegistration = ({
+  tokenSeq = 0,
+  busyTokens = {},
+  keysToMark = [],
+} = {}) => {
+  const token = (Number(tokenSeq) || 0) + 1;
+  const nextBusyTokens = { ...(busyTokens || {}) };
+  keysToMark.forEach((key) => {
+    if (key) nextBusyTokens[key] = token;
+  });
+  return {
+    token,
+    busyTokens: nextBusyTokens,
+  };
+};
+
+export const buildClearedQuestionDecryptBusyTokens = ({
+  busyTokens = {},
+  keysToClear = [],
+  token = null,
+} = {}) => {
+  const nextBusyTokens = { ...(busyTokens || {}) };
+  keysToClear.forEach((key) => {
+    if (!key) return;
+    if (token == null || nextBusyTokens[key] === token) {
+      delete nextBusyTokens[key];
+    }
+  });
+  return nextBusyTokens;
+};
+
+export const ownsQuestionDecryptBusyTokens = ({
+  busyTokens = {},
+  keysToCheck = [],
+  token = null,
+} = {}) => {
+  if (token == null) return true;
+  const keys = keysToCheck.filter(Boolean);
+  return keys.length > 0 && keys.every((key) => busyTokens?.[key] === token);
+};
+
+export const buildQuestionDecryptOwnedClearState = ({
+  prevState = null,
+  questionId = '',
+  fieldToDecrypt = 'both',
+  token = null,
+  busyTokens = {},
+  activeSurveyDecryptAttemptSeq = 0,
+  extraPatch = {},
+} = {}) => {
+  const keysToClear = getQuestionFieldTaskKeys(questionId, {
+    includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
+    includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
+  }).filter((key) => key && token != null && busyTokens?.[key] === token);
+
+  if (keysToClear.length === 0) {
+    return {
+      busyTokens: { ...(busyTokens || {}) },
+      statePatch: token == null
+        ? {
+            ...extraPatch,
+            isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
+              hasQuestionDecryptBusy(prevState?.decryptingByKey || {}),
+            decryptingByKey: prevState?.decryptingByKey || {},
+          }
+        : null,
+    };
+  }
+
+  const decryptingByKey = { ...(prevState?.decryptingByKey || {}) };
+  keysToClear.forEach((key) => {
+    decryptingByKey[key] = false;
+  });
+
+  return {
+    busyTokens: buildClearedQuestionDecryptBusyTokens({
+      busyTokens,
+      keysToClear,
+      token,
+    }),
+    statePatch: {
+      ...extraPatch,
+      isDecrypting: Number(activeSurveyDecryptAttemptSeq || 0) > 0 ||
+        hasQuestionDecryptBusy(decryptingByKey),
+      decryptingByKey,
+    },
+  };
+};
+
 export const getQuestionFieldDecryptSelection = (
   questionId,
   fieldToDecrypt = 'both',
@@ -419,6 +536,177 @@ export const buildQuestionDecryptFailureState = (
     fieldToDecrypt,
   ),
 });
+
+export const startQuestionDecryptAttemptStatus = ({
+  host = null,
+  questionId = '',
+  fieldToDecrypt = 'both',
+  baselineForDecrypt = null,
+  prepareQuestionDecryptAttempt = null,
+  registerQuestionDecryptBusyTokens = null,
+  setState = null,
+  buildQuestionDecryptStartState: buildStartState = null,
+} = {}) => {
+  const preparePort = prepareQuestionDecryptAttempt || ((options) => (
+    host?.prepareQuestionDecryptAttempt?.(options) || {}
+  ));
+  const registerBusyPort = registerQuestionDecryptBusyTokens || ((keys) => (
+    host?.registerQuestionDecryptBusyTokens?.(keys)
+  ));
+  const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
+  const buildStartPort = buildStartState || ((prev, keys) => (
+    host?.buildQuestionDecryptStartState?.(prev, keys) || buildQuestionDecryptStartState(prev, keys)
+  ));
+
+  const preparedAttempt = preparePort({ questionId, fieldToDecrypt, baselineForDecrypt }) || {};
+  if (!preparedAttempt.shouldDecrypt) {
+    return { shouldReturn: true, result: false, reason: 'no-masked-field' };
+  }
+
+  const decryptSelection = preparedAttempt.decryptSelection || {};
+  const keysToMark = decryptSelection.keysToMark || [];
+  const decryptAttemptToken = registerBusyPort(keysToMark);
+  setStatePort((prev) => buildStartPort(prev, keysToMark));
+
+  return {
+    shouldReturn: false,
+    result: null,
+    reason: 'started',
+    decryptAttemptToken,
+    decryptSelection,
+    keysToMark,
+    clearMode: decryptSelection.clearMode,
+    chainId: preparedAttempt.chainId,
+    lit: preparedAttempt.lit,
+    opts: preparedAttempt.opts,
+  };
+};
+
+export const applyQuestionDecryptCompletionStatus = ({
+  host = null,
+  context = null,
+  questionId = '',
+  fieldToDecrypt = 'both',
+  decryptAttemptToken = null,
+  keysToMark = [],
+  setState = null,
+  clearQuestionDecryptBusyTokens = null,
+  isDecryptContextCurrent = null,
+  canUpdateStateForAsyncSnapshot = null,
+  ownsQuestionDecryptBusyTokens = null,
+  buildQuestionDecryptStaleState = null,
+  buildSuccessState = null,
+  successStateKind = '',
+  successStateOptions = {},
+  onSuccessStateApplied,
+} = {}) => {
+  const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
+  const clearBusyPort = clearQuestionDecryptBusyTokens || ((keys, token) => (
+    host?.clearQuestionDecryptBusyTokens?.(keys, token)
+  ));
+  const isCurrentPort = isDecryptContextCurrent || ((snapshot) => (
+    host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
+  ));
+  const canUpdatePort = canUpdateStateForAsyncSnapshot || ((snapshot) => (
+    host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false
+  ));
+  const ownsBusyPort = ownsQuestionDecryptBusyTokens || ((keys, token) => (
+    host?.ownsQuestionDecryptBusyTokens ? host.ownsQuestionDecryptBusyTokens(keys, token) : true
+  ));
+  const buildStalePort = buildQuestionDecryptStaleState || ((prev, targetQid, targetField, token) => (
+    host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null
+  ));
+  const buildSuccessPort = buildSuccessState || ((prev) => {
+    if (successStateKind === 'viewed') {
+      return host?.buildViewedResponseDecryptSuccessState?.(prev, successStateOptions) || null;
+    }
+    if (successStateKind === 'self') {
+      return host?.buildSelfQuestionDecryptSuccessState?.(prev, successStateOptions) || null;
+    }
+    return null;
+  });
+
+  if (!isCurrentPort(context)) {
+    if (canUpdatePort(context)) {
+      setStatePort((prev) => buildStalePort(
+        prev,
+        questionId,
+        fieldToDecrypt,
+        decryptAttemptToken,
+      ));
+    }
+    return { shouldReturn: true, result: false, reason: 'stale-context' };
+  }
+
+  if (!ownsBusyPort(keysToMark, decryptAttemptToken)) {
+    setStatePort((prev) => buildStalePort(
+      prev,
+      questionId,
+      fieldToDecrypt,
+      decryptAttemptToken,
+    ));
+    return { shouldReturn: true, result: false, reason: 'stale-busy-token' };
+  }
+
+  clearBusyPort(keysToMark, decryptAttemptToken);
+  setStatePort((prev) => buildSuccessPort(prev), onSuccessStateApplied);
+  return { shouldReturn: false, result: null, reason: 'applied' };
+};
+
+export const applyQuestionDecryptFailureStatus = ({
+  host = null,
+  context = null,
+  questionId = '',
+  fieldToDecrypt = 'both',
+  decryptAttemptToken = null,
+  error = null,
+  setState = null,
+  isDecryptContextCurrent = null,
+  canUpdateStateForAsyncSnapshot = null,
+  buildQuestionDecryptStaleState = null,
+  buildQuestionDecryptFailureStateForAttempt = null,
+} = {}) => {
+  const setStatePort = setState || (host?.setState ? host.setState.bind(host) : () => {});
+  const isCurrentPort = isDecryptContextCurrent || ((snapshot) => (
+    host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
+  ));
+  const canUpdatePort = canUpdateStateForAsyncSnapshot || ((snapshot) => (
+    host?.canUpdateStateForAsyncSnapshot ? host.canUpdateStateForAsyncSnapshot(snapshot) : false
+  ));
+  const buildStalePort = buildQuestionDecryptStaleState || ((prev, targetQid, targetField, token) => (
+    host?.buildQuestionDecryptStaleState?.(prev, targetQid, targetField, token) || null
+  ));
+  const buildFailurePort = buildQuestionDecryptFailureStateForAttempt || ((
+    prev,
+    targetQid,
+    targetField,
+    message,
+    token,
+  ) => (
+    host?.buildQuestionDecryptFailureStateForAttempt?.(prev, targetQid, targetField, message, token) || null
+  ));
+
+  if (!isCurrentPort(context)) {
+    if (decryptAttemptToken != null && canUpdatePort(context)) {
+      setStatePort((prev) => buildStalePort(
+        prev,
+        questionId,
+        fieldToDecrypt,
+        decryptAttemptToken,
+      ));
+    }
+    return false;
+  }
+
+  setStatePort((prev) => buildFailurePort(
+    prev,
+    questionId,
+    fieldToDecrypt,
+    error?.message,
+    decryptAttemptToken,
+  ));
+  return false;
+};
 
 export const decryptQuestionRatingEnvelopes = async (
   ratingEnvelopes = null,
@@ -605,6 +893,76 @@ export const buildSurveyDecryptSourceState = (
     sourceSlice: carryForwardSurveyQuestionRatings(baseSourceSlice, previousStateSlice),
     ratingEnvelopesByQid: collectQuestionRatingEnvelopesByQid(latestResponse),
   };
+};
+
+export const buildSurveyDecryptAttemptSourceInputs = ({
+  decryptContext = null,
+  state = null,
+  getEffectiveDraftSlug = null,
+} = {}) => {
+  const surveyIndex = decryptContext?.surveyIndex || 0;
+  const fallbackSourceSlice =
+    state?.surveysResponseState?.[surveyIndex] ||
+    buildEmptyQuestionDecryptSlice();
+
+  return {
+    surveyIndex,
+    slug: decryptContext?.sessionSlug || (
+      typeof getEffectiveDraftSlug === 'function' ? getEffectiveDraftSlug() : ''
+    ),
+    fallbackUserAnswers: state?.userAnswers,
+    fallbackSourceSlice,
+    previousStateSlice: state?.surveysResponseState?.[surveyIndex] || {},
+  };
+};
+
+export const applySurveyDecryptStaleStatus = ({
+  host = null,
+  context = null,
+  attemptId = null,
+  isDecryptContextCurrent = null,
+  canUpdateSurveyDecryptAttempt = null,
+  finishSurveyDecryptAttempt = null,
+  setSurveyDecryptStaleState = null,
+  buildSurveyDecryptStaleState = null,
+} = {}) => {
+  const isCurrentPort = typeof isDecryptContextCurrent === 'function'
+    ? isDecryptContextCurrent
+    : ((snapshot) => (
+        host?.isDecryptContextCurrent ? host.isDecryptContextCurrent(snapshot) : true
+      ));
+
+  if (isCurrentPort(context)) {
+    return { shouldReturn: false, reason: 'current-context' };
+  }
+
+  const canUpdatePort = typeof canUpdateSurveyDecryptAttempt === 'function'
+    ? canUpdateSurveyDecryptAttempt
+    : ((snapshot, targetAttemptId) => (
+        host?.canUpdateSurveyDecryptAttempt
+          ? host.canUpdateSurveyDecryptAttempt(snapshot, targetAttemptId)
+          : false
+      ));
+
+  if (canUpdatePort(context, attemptId)) {
+    const finishPort = finishSurveyDecryptAttempt || host?.finishSurveyDecryptAttempt;
+    if (typeof finishPort === 'function') {
+      finishPort(attemptId);
+    }
+    const setStalePort = setSurveyDecryptStaleState || (
+      host?.setState ? host.setState.bind(host) : null
+    );
+    if (typeof setStalePort === 'function') {
+      const buildStalePort = buildSurveyDecryptStaleState || host?.buildSurveyDecryptStaleState;
+      const stalePatch = typeof buildStalePort === 'function'
+        ? buildStalePort()
+        : { isDecrypting: false };
+      setStalePort(stalePatch);
+    }
+    return { shouldReturn: true, reason: 'stale-context-applied' };
+  }
+
+  return { shouldReturn: true, reason: 'stale-context-skipped' };
 };
 
 export const hydrateLatestQuestionDecryptState = async (
@@ -955,25 +1313,20 @@ export const buildQuestionDecryptExecutionContext = ({
     (Array.isArray(questionPool) && questionPool.length > 0)
       ? questionPool
       : (Array.isArray(pileQuestions) ? pileQuestions : []);
-  const lit = litHooks && litHooks.getKey ? { getKey: litHooks.getKey } : undefined;
+  const executionPlan = buildSurveyQuestionDecryptExecutionPlan({
+    account,
+    chainId,
+    hasher,
+    litHooks,
+    provider,
+    providerKind,
+    questionId,
+    questionPool: resolvedQuestionPool,
+    surveyId,
+  });
 
   return {
-    providerKind,
-    chainId,
-    surveyId,
-    questionPool: resolvedQuestionPool,
-    lit,
-    opts: {
-      providerKind,
-      provider,
-      account,
-      chainId,
-      surveyId,
-      questionPool: resolvedQuestionPool,
-      ...(lit ? { lit } : {}),
-      hasher,
-      throwOnError: true,
-    },
+    ...executionPlan,
   };
 };
 
@@ -1037,6 +1390,7 @@ export const prepareQuestionDecryptAttempt = (
 
   if (!decryptSelection.hasMaskedField) {
     return {
+      blockedReason: 'no-masked-field',
       shouldDecrypt: false,
       decryptSelection,
     };
@@ -1046,14 +1400,35 @@ export const prepareQuestionDecryptAttempt = (
     chainId,
     lit,
     opts,
+    target,
   } = buildQuestionDecryptExecutionContext(baselineForDecrypt, questionId);
+  const requestPlan = buildSurveyQuestionDecryptRequestPlan({
+    account: opts?.account,
+    baselineForDecrypt,
+    chainId,
+    decryptSelection,
+    fieldToDecrypt,
+    hasher: opts?.hasher,
+    litHooks: lit,
+    provider: opts?.provider,
+    providerKind: opts?.providerKind,
+    questionId,
+    questionPool: opts?.questionPool,
+    surveyId: opts?.surveyId,
+  });
+  const decryptRequest = requestPlan.decryptRequest
+    ? { ...requestPlan.decryptRequest, options: opts || requestPlan.decryptRequest.options }
+    : null;
 
   return {
-    shouldDecrypt: true,
-    decryptSelection,
-    chainId,
+    blockedReason: requestPlan.blockedReason,
+    shouldDecrypt: requestPlan.shouldDecrypt,
+    decryptSelection: requestPlan.decryptSelection,
+    chainId: requestPlan.chainId,
+    decryptRequest,
     lit,
     opts,
+    target: requestPlan.target || target,
   };
 };
 

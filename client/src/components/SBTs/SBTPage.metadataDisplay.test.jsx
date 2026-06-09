@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import SBTPage from './SBTPage';
 import SbtPageActionsSection from './SbtPageActionsSection';
 import SbtPageIdentityPanel from './SbtPageIdentityPanel';
+import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
 import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
@@ -10,6 +11,10 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
 
 const mockIsCryptoMode = jest.fn(() => true);
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SbtPageMoreDetailsSection,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -43,6 +48,12 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
+  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -64,6 +75,12 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
+    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+      if (!resolvedTreeComponentCache.has(node)) {
+        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+      }
+      return treeIncludesText(resolvedTreeComponentCache.get(node), text);
+    }
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
@@ -194,9 +211,72 @@ describe('SBTPage metadata display', () => {
 
     expect(() => subject.render()).not.toThrow();
     const actionsSection = findActionsSection(subject.render());
-    expect(actionsSection?.props?.mintSuccessText).toBe('');
-    expect(actionsSection?.props?.burnSuccessText).toBe('');
-    expect(actionsSection?.props?.transactionErrorText).toBe('');
+    expect(actionsSection?.props?.actionFeedbackState).toMatchObject({
+      showBurnSuccess: false,
+      showErrorTransactionHash: false,
+      showMintSuccess: false,
+      showTransactionError: false,
+    });
+    expect(actionsSection?.props?.transactionState).toEqual({
+      lastBurnTxHash: null,
+      lastMintTxHash: null,
+      transactionHash: null,
+    });
+  });
+
+  it('wires extracted full-view handlers back to the parent shell methods', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.copyToClipboard = jest.fn();
+    subject.bookmarkSBT = jest.fn();
+    subject.toggleStats = jest.fn();
+    subject.toggleActions = jest.fn();
+    subject.openMintedModal = jest.fn();
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+      showActions: true,
+    };
+
+    const tree = subject.render();
+    const identityPanel = findElementInTree(
+      tree,
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    const statsSection = findElementInTree(
+      tree,
+      (element) => element?.type === SbtPageStatsSection
+    );
+    const actionsSection = findActionsSection(tree);
+
+    identityPanel.props.onContractCopy();
+    identityPanel.props.onBookmark();
+    statsSection.props.onToggle();
+    statsSection.props.onOpenMintedModal();
+    actionsSection.props.onToggle();
+
+    expect(subject.copyToClipboard).toHaveBeenCalledWith(
+      '0x00000000000000000000000000000000000000a1',
+      'contract'
+    );
+    expect(subject.bookmarkSBT).toHaveBeenCalledTimes(1);
+    expect(subject.toggleStats).toHaveBeenCalledTimes(1);
+    expect(subject.openMintedModal).toHaveBeenCalledTimes(1);
+    expect(subject.toggleActions).toHaveBeenCalledTimes(1);
   });
 
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
@@ -234,6 +314,48 @@ describe('SBTPage metadata display', () => {
     expect(metadataLink).toBeTruthy();
     expect(metadataLink.props.href).toContain(txId);
     expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
+  });
+
+  it('passes resolved token metadata link display state to the identity panel', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const identityPanel = findElementInTree(
+      subject.render(),
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    expect(identityPanel?.props?.tokenUriHref).toBe('https://example.example.test/metadata/sbt.json');
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        ...subject.state.sbtInfo,
+        tokenURI: 'https://cdn.example.test/preview.png',
+      },
+    };
+    const imageOnlyIdentityPanel = findElementInTree(
+      subject.render(),
+      (element) => element?.type === SbtPageIdentityPanel
+    );
+    expect(imageOnlyIdentityPanel?.props?.tokenUriHref).toBe('');
   });
 
   it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {

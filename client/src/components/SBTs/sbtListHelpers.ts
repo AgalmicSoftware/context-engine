@@ -31,6 +31,8 @@ export {
   readSbtListCacheMetaSnapshot,
 } from './sbtListItemNormalizationHelpers';
 export type { SbtCacheMetaSnapshot } from './sbtListItemNormalizationHelpers';
+export { buildSbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
+export type { SbtListCacheReadPlan } from './sbtListCacheReadPlanHelpers';
 export {
   collectSbtDocumentUrls,
   collectSbtTagValues,
@@ -70,21 +72,87 @@ export {
 } from './sbtListSessionUniverseHelpers';
 export type {
   SbtListSessionUniverseOptions,
+  SbtListSessionUniverseSnapshot,
+  SbtListSessionUniverseSnapshotLike,
   SbtSessionGroupLists,
 } from './sbtListSessionUniverseHelpers';
 export {
+  buildSbtListChipLoadingStatusBySlug,
+  buildSbtListInitialLoaderStatuses,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
+  resolveSbtListReadinessDisplayPlan,
+  resolveSbtListSectionLoadingState,
 } from './sbtListSessionLoadingHelpers';
 export type {
   SbtListLiveProgressSnapshot,
+  SbtListReadinessDisplayPlan,
+  SbtListSectionLoadingState,
   SbtListSessionChipState,
   SbtListSessionChipStateBySlug,
   SbtListSessionLoadingStatus,
+  SbtListSessionLoadingStatusBySlug,
+  SbtListSessionLoadingStatusOptions,
+  SbtListSessionLoadingStatusResolver,
   SbtListSessionLoadingStatusSnapshot,
   SbtListSessionProgressSnapshot,
 } from './sbtListSessionLoadingHelpers';
+export { collectSbtListLinkedScopedEntries } from './sbtListScopedEntryHelpers';
+export type { SbtListScopedEntryOptions } from './sbtListScopedEntryHelpers';
+export {
+  buildSbtListPassiveLatestLookupPlan,
+} from './sbtListPassiveLatestLookupHelpers';
+export type {
+  SbtPassiveLatestLookupInFlightBySlug,
+  SbtPassiveLatestLookupPlan,
+  SbtPassiveLatestLookupProgressSnapshot,
+  SbtPassiveLatestLookupRequest,
+  SbtPassiveLatestLookupState,
+  SbtPassiveLatestLookupStateBySlug,
+} from './sbtListPassiveLatestLookupHelpers';
+export {
+  buildSbtListRealtimeProgressInputPlan,
+  resolveSbtListRealtimeProgressRetentionPlan,
+} from './sbtListRealtimeProgressHelpers';
+export type {
+  SbtListRealtimeProgressBySlug,
+  SbtListRealtimeProgressInputPlan,
+  SbtListRealtimeProgressRecord,
+  SbtListRealtimeProgressRetentionPlan,
+} from './sbtListRealtimeProgressHelpers';
+export {
+  buildSbtListChipProgressDisplayPlan,
+  buildSbtListChipProgressDesiredVisibilityBySlug,
+  resolveSbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export type {
+  SbtListChipProgressBooleanBySlug,
+  SbtListChipProgressChipState,
+  SbtListChipProgressDisplayPlan,
+  SbtListChipProgressStatus,
+  SbtListChipProgressStyle,
+  SbtListChipProgressVisibilityAction,
+  SbtListChipProgressVisibilityMeta,
+  SbtListChipProgressVisibilityPlan,
+} from './sbtListChipProgressVisibilityHelpers';
+export {
+  buildSbtListSessionRouteHref,
+  buildSbtListSessionSelectorOptions,
+  resolveSbtListSessionSelectorSummarySlugs,
+} from './sbtListSessionSelectorDisplayHelpers';
+export type {
+  SbtListSessionSelectorChipState,
+  SbtListSessionSelectorOption,
+  SbtListSessionSelectorRouteConfig,
+} from './sbtListSessionSelectorDisplayHelpers';
+export {
+  resolveSbtListRegistryRetryPlan,
+} from './sbtListRegistryLifecycleHelpers';
+export type {
+  SbtListRegistryRetryPlan,
+  SbtListRegistryRetrySnapshot,
+} from './sbtListRegistryLifecycleHelpers';
 export {
   buildSbtListExpandedCardShellClassName,
   buildSbtListFilterContainerClassName,
@@ -94,6 +162,7 @@ export {
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRootClassName,
   buildSbtListSessionUniversePanelClassName,
+  findSbtListInteractiveAncestor,
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListLoadingProgressFillStyle,

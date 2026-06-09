@@ -7,6 +7,15 @@ import {
   buildSurveyDraftSemanticSignature,
 } from './surveyToolUtils.js';
 import { SurveyQuestions } from './SurveyQuestions';
+import {
+  applyDecryptedQuestionResponseValues,
+  applyDecryptedQuestionStateToSurveySlice,
+  clearQuestionFieldBusyMap,
+  ensureQuestionDecryptSliceShape,
+  getQuestionFieldTaskKeys,
+  getQuestionRatingEnvelopes,
+  markQuestionFieldBusyMap,
+} from './surveyToolDecryptFlow.js';
 import { PileViewMode } from './SurveyPileViewMode';
 import { QuestionsDashboard } from './SurveySelector';
 import DeferredRatingSlider from './DeferredRatingSlider';
@@ -264,11 +273,11 @@ describe('SurveyTool module', () => {
     expect(subject.getQuestionFieldTaskKey(' Q1 ', ' Prompt ')).toBe('q1:prompt');
     expect(subject.getQuestionFieldTaskKey('q1', 'additional')).toBe('q1:additional');
     expect(subject.getQuestionFieldTaskKey('', 'answer')).toBe('');
-    expect(subject.getQuestionFieldTaskKeys(' Q1 ', {
+    expect(getQuestionFieldTaskKeys(' Q1 ', {
       includeAnswer: true,
       includeAdditional: true,
     })).toEqual(['q1:answer', 'q1:additional']);
-    expect(subject.markQuestionFieldBusyMap({
+    expect(markQuestionFieldBusyMap({
       'q1:prompt': true,
     }, ['q1:answer', '', 'q1:additional'])).toEqual({
       'q1:prompt': true,
@@ -279,7 +288,7 @@ describe('SurveyTool module', () => {
     expect(subject.isQuestionFieldBusy('q1', 'additional')).toBe(true);
     expect(subject.isQuestionFieldBusy('q1', 'answer')).toBe(false);
     expect(subject.isQuestionFieldBusy('', 'prompt')).toBe(false);
-    expect(subject.clearQuestionFieldBusyMap({
+    expect(clearQuestionFieldBusyMap({
       'q1:answer': true,
       'q1:additional': true,
       'q1:prompt': true,
@@ -401,6 +410,13 @@ describe('SurveyTool module', () => {
       chainId: 84532,
       surveyId: 'survey-1',
       questionPool: [{ id: 'pool-q' }],
+      target: {
+        providerKind: 'browser',
+        chainId: 84532,
+        surveyId: 'survey-1',
+        questionId: 'q1',
+        fieldToDecrypt: 'both',
+      },
       lit: { getKey: litHooks.getKey },
       opts: {
         providerKind: 'browser',
@@ -419,16 +435,7 @@ describe('SurveyTool module', () => {
   });
 
   it('applies shared decrypted question response values onto viewed response records', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.applyDecryptedQuestionResponseValues(
+    expect(applyDecryptedQuestionResponseValues(
       {
         answer: { value: '*' },
         additional: { value: '*' },
@@ -453,16 +460,7 @@ describe('SurveyTool module', () => {
   });
 
   it('applies shared decrypted question state onto survey response slices', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.applyDecryptedQuestionStateToSurveySlice(
+    expect(applyDecryptedQuestionStateToSurveySlice(
       {
         answers: { q1: { value: '*', encrypted: true } },
         additionalComments: { q1: { value: '*', encrypted: true } },
@@ -632,7 +630,7 @@ describe('SurveyTool module', () => {
       network: { id: 84532 },
     });
 
-    expect(subject.getQuestionRatingEnvelopes(
+    expect(getQuestionRatingEnvelopes(
       {
         responses: [
           { questionID: 'q2', importanceEncrypted: 'skip-me' },
@@ -669,7 +667,7 @@ describe('SurveyTool module', () => {
       additionalComments: null,
     }));
 
-    expect(subject.ensureQuestionDecryptSliceShape({
+    expect(ensureQuestionDecryptSliceShape({
       answers: { q1: { value: '*' } },
       additionalComments: null,
     })).toEqual({
@@ -721,121 +719,6 @@ describe('SurveyTool module', () => {
         conviction: {},
       },
     });
-  });
-
-  it('derives shared decrypt display state for answer and additional fields', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      decryptingByKey: { 'q1:additional': true },
-    };
-
-    const stateWithoutLogin = subject.getQuestionFieldDisplayState({
-      questionId: 'q1',
-      answer: { value: '*', encrypted: true, encryptedPortion: '' },
-      additional: { value: '*', encrypted: true, encryptedPortion: '' },
-    });
-
-    expect(stateWithoutLogin.answerDecryptState.masked).toBe(true);
-    expect(stateWithoutLogin.answerDecryptState.allowDecrypt).toBe(false);
-    expect(stateWithoutLogin.additionalDecryptState.masked).toBe(true);
-    expect(stateWithoutLogin.additionalDecryptState.allowDecrypt).toBe(false);
-    expect(stateWithoutLogin.additionalDecryptState.busy).toBe(true);
-    expect(stateWithoutLogin.decryptTooltip).toBe('Login to decrypt this encrypted field.');
-
-    subject.props = {
-      ...subject.props,
-      account: '0xabc',
-      loginComplete: true,
-    };
-
-    const stateWithLogin = subject.getQuestionFieldDisplayState({
-      questionId: 'q1',
-      answer: { value: '*', encrypted: true, encryptedPortion: '' },
-      additional: { value: 'notes', encrypted: true, encryptedPortion: '' },
-    });
-
-    expect(stateWithLogin.answerDecryptState.allowDecrypt).toBe(true);
-    expect(stateWithLogin.additionalDecryptState.masked).toBe(false);
-    expect(stateWithLogin.hasAdditionalContent).toBe(true);
-    expect(stateWithLogin.glowAnswer).toBe(true);
-    expect(stateWithLogin.glowAdditional).toBe(true);
-  });
-
-  it('derives shared question response display state for full and pile render setup', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    subject.getSliderMode = jest.fn(() => 'importance');
-
-    const displayState = subject.getQuestionResponseDisplayState({
-      questionId: 'q1',
-      responseSlice: {
-        answers: { q1: { value: 'answer', encrypted: false } },
-        additionalComments: {},
-        importance: { q1: 9 },
-        conviction: { q1: 3 },
-      },
-    });
-
-    expect(displayState.answer.value).toBe('answer');
-    expect(displayState.additional.value).toBe('');
-    expect(displayState.convictionValue).toBe(3);
-    expect(displayState.importanceValue).toBe(9);
-    expect(displayState.hasConvictionImportanceValue).toBe(true);
-    expect(displayState.sliderMode).toBe('importance');
-    expect(displayState.activeSliderValue).toBe(9);
-  });
-
-  it('derives combined question render display state for shared render branches', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      decryptingByKey: { 'q1:answer': true },
-    };
-    subject.getSliderMode = jest.fn(() => 'conviction');
-
-    const displayState = subject.getQuestionRenderDisplayState({
-      questionId: 'q1',
-      responseSlice: {
-        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '' } },
-        additionalComments: { q1: { value: 'notes', encrypted: true } },
-        importance: { q1: 4 },
-        conviction: { q1: 7 },
-      },
-    });
-
-    expect(displayState.answer.value).toBe('*');
-    expect(displayState.additional.value).toBe('notes');
-    expect(displayState.maskedAnswer).toBe(true);
-    expect(displayState.maskedAdditional).toBe(false);
-    expect(displayState.allowDecryptAnswer).toBe(false);
-    expect(displayState.isAnswerDecrypting).toBe(true);
-    expect(displayState.hasAdditionalContent).toBe(true);
-    expect(displayState.glowAnswer).toBe(true);
-    expect(displayState.glowAdditional).toBe(true);
-    expect(displayState.sliderMode).toBe('conviction');
-    expect(displayState.activeSliderValue).toBe(7);
   });
 
   it('derives normalized gated prompt notice ids and copy for both single and multiple gates', () => {

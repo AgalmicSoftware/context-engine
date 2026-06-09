@@ -60,9 +60,11 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) => render(
     resolvedActiveSessionSlug="demo-session"
     setDeployForm={() => {}}
     handleDeployWorker={() => {}}
-    deployInFlight={false}
-    deployStatus=""
-    deployStatusIsError={false}
+    deployStatusDisplayState={{
+      deployButtonDisabled: false,
+      deployStatusText: '',
+      isError: false,
+    }}
     showWorkerUrlField={false}
     displayedWorkerUrl=""
     renderField={() => null}

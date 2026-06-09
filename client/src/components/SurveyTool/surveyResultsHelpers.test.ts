@@ -15,12 +15,17 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsQuestionFilterQuestions,
+  buildSurveyResultsRefreshStatusSequencePlan,
+  buildSurveyResultsRefreshTargetBlocksPatch,
+  buildSurveyResultsRefreshStatusWritePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -34,6 +39,7 @@ import {
   normalizeSurveyResponsePayloadByQuestionId,
   pickTimestampMs,
   stableSerializeSignatureValue,
+  stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
 } from './surveyResultsHelpers.js';
 
@@ -93,6 +99,167 @@ describe('surveyResultsHelpers state patches', () => {
     expect(buildSurveyResultsNetworkLatestBlockPatch('123')).toEqual({
       networkLatestBlock: 123,
     });
+    expect(buildSurveyResultsNetworkLatestBlockPatch(Number.POSITIVE_INFINITY)).toEqual({
+      networkLatestBlock: 0,
+    });
+    expect(buildSurveyResultsRefreshTargetBlocksPatch(456)).toEqual({
+      refreshTargetQuestionBlock: 456,
+      refreshTargetResponseBlock: 456,
+      refreshTargetSurveyBlock: 456,
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: 456 })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: 456,
+        refreshTargetResponseBlock: 456,
+        refreshTargetSurveyBlock: 456,
+      },
+      target: {
+        latestBlock: 456,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
+      latestBlock: 789,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        networkLatestBlock: 789,
+        refreshTargetQuestionBlock: 789,
+        refreshTargetResponseBlock: 789,
+        refreshTargetSurveyBlock: 789,
+      },
+      target: {
+        latestBlock: 789,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
+      latestBlock: Number.POSITIVE_INFINITY,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        networkLatestBlock: 0,
+        refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
+        refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
+        refreshTargetSurveyBlock: Number.POSITIVE_INFINITY,
+      },
+      target: {
+        latestBlock: Number.POSITIVE_INFINITY,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
+      isMounted: false,
+      latestBlock: 999,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: 'unmounted',
+      shouldWrite: false,
+      statePatch: null,
+      target: {
+        latestBlock: 999,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({ latestBlock: undefined })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: undefined,
+        refreshTargetResponseBlock: undefined,
+        refreshTargetSurveyBlock: undefined,
+      },
+      target: {
+        latestBlock: undefined,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: 321,
+      followUpEffects: [
+        'manualRefreshDispatch',
+        '',
+        'resetLocalStoragePollingBackoff:manual-refresh',
+        'pollLocalStorageForUpdates',
+        'queueResultsRefresh:manual-refresh',
+      ],
+    })).toEqual({
+      blockedReason: '',
+      dispatchEligibility: 'eligible',
+      orderedEffects: [
+        {
+          kind: 'state-patch',
+          keys: [
+            'refreshTargetQuestionBlock',
+            'refreshTargetResponseBlock',
+            'refreshTargetSurveyBlock',
+          ],
+          target: {
+            latestBlock: 321,
+          },
+        },
+        { kind: 'follow-up', effect: 'manualRefreshDispatch' },
+        { kind: 'follow-up', effect: 'resetLocalStoragePollingBackoff:manual-refresh' },
+        { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
+        { kind: 'follow-up', effect: 'queueResultsRefresh:manual-refresh' },
+      ],
+      shouldDispatchFollowUp: true,
+      shouldWrite: true,
+      statePatch: {
+        refreshTargetQuestionBlock: 321,
+        refreshTargetResponseBlock: 321,
+        refreshTargetSurveyBlock: 321,
+      },
+      target: {
+        latestBlock: 321,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      isMounted: false,
+      latestBlock: 654,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    })).toEqual({
+      blockedReason: 'unmounted',
+      dispatchEligibility: 'blocked',
+      orderedEffects: [],
+      shouldDispatchFollowUp: false,
+      shouldWrite: false,
+      statePatch: null,
+      target: {
+        latestBlock: 654,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: 789,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    }).orderedEffects).toEqual([
+      {
+        kind: 'state-patch',
+        keys: [
+          'networkLatestBlock',
+          'refreshTargetQuestionBlock',
+          'refreshTargetResponseBlock',
+          'refreshTargetSurveyBlock',
+        ],
+        target: {
+          latestBlock: 789,
+        },
+      },
+      { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
+    ]);
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: Number.POSITIVE_INFINITY,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    }).statePatch).toEqual({
+      networkLatestBlock: 0,
+      refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
+      refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
+      refreshTargetSurveyBlock: Number.POSITIVE_INFINITY,
+    });
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,
     });
@@ -117,6 +284,48 @@ describe('surveyResultsHelpers state patches', () => {
     })).toEqual({
       filteredQuestionsCount: 0,
     });
+    expect(buildSurveyResultsQuestionFilterQuestions({
+      questionResponses: {
+        Q1: { '0xaaa': { response: true } },
+        q2: { '0xbbb': { response: true } },
+      },
+      networkQuestionsById: {
+        q1: {
+          id: 'q1',
+          creator: '0xaaa',
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      },
+    })).toEqual([
+      {
+        id: 'q1',
+        creator: '0xaaa',
+        prompt: 'Question one',
+        type: 'freeform',
+      },
+      {
+        id: 'q2',
+        creator: '',
+        prompt: '',
+        type: '',
+      },
+    ]);
+    expect(buildSurveyResultsQuestionFilterQuestions()).toEqual([]);
+    expect(stringifySurveyResultsAggregatorResponses({
+      q1: [
+        { responder: '0x1', response: 'already text' },
+        { responder: '0x2', response: { answer: 'choice-a' } },
+      ],
+      q2: 'not-an-array',
+    })).toEqual({
+      q1: [
+        { responder: '0x1', response: 'already text' },
+        { responder: '0x2', response: '{"answer":"choice-a"}' },
+      ],
+      q2: [],
+    });
+    expect(stringifySurveyResultsAggregatorResponses(null)).toEqual({});
     expect(buildSurveyResultsQuestionFilterCountPatch({
       count: 0,
       props: { isQuestionCacheReady: true, isResponsesCacheReady: true },
@@ -350,6 +559,60 @@ describe('surveyResultsHelpers state patches', () => {
       filteredResponsesCount: 3,
       questionResultsHydrated: true,
     });
+  });
+});
+
+describe('surveyResultsHelpers individual response aggregation', () => {
+  it('aggregates individual survey responses by normalized latest question rows', () => {
+    const aggregator = buildSurveyResultsIndividualResponseAggregator([
+      {
+        responder: '0xAAA',
+        response: {
+          timestamp: '2025-01-02T00:00:00.000Z',
+          responses: [
+            {
+              questionID: 'Q1',
+              answer: { value: 'old' },
+              timestamp: '2025-01-01T00:00:00.000Z',
+            },
+            {
+              questionID: 'Q1',
+              answer: { value: 'new' },
+              timestamp: '2025-01-03T00:00:00.000Z',
+            },
+            {
+              questionId: 'Q2',
+              answer: { value: 'second' },
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(aggregator.q1).toEqual([
+      {
+        responder: '0xaaa',
+        questionId: 'q1',
+        response: {
+          questionID: 'Q1',
+          answer: { value: 'new' },
+          timestamp: '2025-01-03T00:00:00.000Z',
+        },
+        timestamp: Date.parse('2025-01-03T00:00:00.000Z'),
+      },
+    ]);
+    expect(aggregator.q2).toEqual([
+      {
+        responder: '0xaaa',
+        questionId: 'q2',
+        response: {
+          questionId: 'Q2',
+          answer: { value: 'second' },
+        },
+        timestamp: Date.parse('2025-01-02T00:00:00.000Z'),
+      },
+    ]);
+    expect(buildSurveyResultsIndividualResponseAggregator(null)).toEqual({});
   });
 });
 

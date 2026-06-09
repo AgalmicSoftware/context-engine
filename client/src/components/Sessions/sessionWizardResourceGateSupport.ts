@@ -17,6 +17,32 @@ type SessionWizardGateOption = {
   color: unknown;
 };
 
+export type SessionWizardResourceGateSelectionState = string | string[];
+
+type SessionWizardResourceGateOptionLike = Record<string, unknown> & {
+  id?: unknown;
+  value?: unknown;
+};
+
+type SessionWizardResourceGateSelectionInput = {
+  value?: unknown;
+  fallbackGateId?: unknown;
+  gateOptions?: SessionWizardResourceGateOptionLike[];
+};
+
+type SessionWizardResourceGateSelectionStatePlan = {
+  availableGateIds: string[];
+  disabled: boolean;
+  fallbackGateId: string;
+  selectedGateIds: string[];
+};
+
+type SessionWizardResourceGateSelectionUpdateInput = {
+  nextIds?: unknown;
+  availableGateIds?: string[];
+  fallbackGateId?: unknown;
+};
+
 type SessionWizardResolvedResourceGate = {
   gateId: string;
   gateIds: string[];
@@ -48,6 +74,41 @@ export const normalizeSessionWizardGateIds = (value: unknown): string[] => {
   }
   const raw = toStr(value).trim();
   return raw ? [raw] : [];
+};
+
+const getSessionWizardGateOptionValue = (
+  option: SessionWizardResourceGateOptionLike
+): string => toStr(option?.value ?? option?.id).trim();
+
+export const resolveSessionWizardResourceGateSelectionState = ({
+  value = '',
+  fallbackGateId = '',
+  gateOptions = [],
+}: SessionWizardResourceGateSelectionInput = {}): SessionWizardResourceGateSelectionStatePlan => {
+  const availableGateIds = gateOptions
+    .map((option) => getSessionWizardGateOptionValue(option))
+    .filter(Boolean);
+  const resolvedFallbackGateId = toStr(fallbackGateId).trim() || availableGateIds[0] || '';
+  const selectedGateIds = normalizeSessionWizardGateIds(value || resolvedFallbackGateId)
+    .filter((id) => availableGateIds.includes(id));
+
+  return {
+    availableGateIds,
+    disabled: availableGateIds.length <= 1,
+    fallbackGateId: resolvedFallbackGateId,
+    selectedGateIds,
+  };
+};
+
+export const resolveSessionWizardResourceGateSelectionUpdate = ({
+  nextIds = [],
+  availableGateIds = [],
+  fallbackGateId = '',
+}: SessionWizardResourceGateSelectionUpdateInput = {}): SessionWizardResourceGateSelectionState => {
+  const filteredGateIds = normalizeSessionWizardGateIds(nextIds)
+    .filter((id) => availableGateIds.includes(id));
+  if (!filteredGateIds.length) return toStr(fallbackGateId).trim() || '';
+  return filteredGateIds.length === 1 ? filteredGateIds[0] : filteredGateIds;
 };
 
 export const resolveSessionWizardResourceGateIds = (

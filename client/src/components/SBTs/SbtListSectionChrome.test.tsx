@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 
 import {
   SbtListInitialLoader,
+  SbtListSectionBody,
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
@@ -58,6 +59,48 @@ describe('SbtListSectionChrome', () => {
     rerender(<SbtListSectionTitle label="Live" showSpinner spinnerId="spinner-live" />);
 
     expect(screen.getByTestId('spinner-live')).toBeInTheDocument();
+  });
+
+  it('renders section body content, loading hints, and empty hints', () => {
+    const { rerender } = render(
+      <SbtListSectionBody
+        emptyLabel="No live groups."
+        hasItems
+        loadingHint={<span>Loading live groups</span>}
+        wrapClassName="grid"
+      >
+        <article>Live group</article>
+      </SbtListSectionBody>
+    );
+
+    expect(screen.getByText('Live group')).toBeInTheDocument();
+    expect(screen.getByText('Live group').parentElement).toHaveClass('grid');
+    expect(screen.queryByText('Loading live groups')).not.toBeInTheDocument();
+    expect(screen.queryByText('No live groups.')).not.toBeInTheDocument();
+
+    rerender(
+      <SbtListSectionBody
+        emptyLabel="No live groups."
+        hasItems={false}
+        loadingHint={<span>Loading live groups</span>}
+      >
+        <article>Live group</article>
+      </SbtListSectionBody>
+    );
+
+    expect(screen.getByText('Loading live groups')).toBeInTheDocument();
+    expect(screen.queryByText('Live group')).not.toBeInTheDocument();
+    expect(screen.queryByText('No live groups.')).not.toBeInTheDocument();
+
+    rerender(
+      <SbtListSectionBody emptyLabel="No live groups." hasItems={false}>
+        <article>Live group</article>
+      </SbtListSectionBody>
+    );
+
+    expect(screen.getByText('No live groups.')).toBeInTheDocument();
+    expect(screen.queryByText('Loading live groups')).not.toBeInTheDocument();
+    expect(screen.queryByText('Live group')).not.toBeInTheDocument();
   });
 
   it('renders block progress only outside all-sessions mode', () => {

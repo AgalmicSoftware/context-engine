@@ -16,8 +16,6 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
@@ -31,15 +29,46 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
+import {
+  SurveyResultsAggregatorEmptyState,
+  SurveyResultsFreeformSummaryDisplay,
+  SurveyResultsMultichoiceDistributionDisplay,
+} from './SurveyResultsAggregatorSummaryDisplay';
+import SurveyResultsFilterSummary from './SurveyResultsFilterSummary';
+import SurveyResultsIndividualResponseBody from './SurveyResultsIndividualResponseBody';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
+import { countSurveyResultsViewableResponses } from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
+import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import SurveyResultsQuestionSummariesPanel from './SurveyResultsQuestionSummariesPanel';
+import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+import {
+  buildSurveyResultsFreeformSummaryModel,
+  buildSurveyResultsMultichoiceSummaryModel,
+  resolveSurveyResultsSummaryQuestionType,
+} from './surveyResultsSummaryModels';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
+  SurveyResultsAggregatorEmptyState,
+  SurveyResultsFreeformSummaryDisplay,
+  SurveyResultsFilterSummary,
+  SurveyResultsIndividualResponseBody,
+  SurveyResultsMultichoiceDistributionDisplay,
+  SurveyResultsQuestionSummariesPanel,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -136,6 +165,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
+      if (!resolvedTreeComponentCache.has(current)) {
+        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedTreeComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -154,6 +190,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
@@ -181,17 +223,23 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedTreeComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
 };
 
 describe('SurveyResults multichoice aggregator summary', () => {
   it('renders the empty multichoice state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderMultichoiceAggregatorSummary([], {
-      id: 'q1',
-      type: 'multichoice',
-      options: ['Alpha', 'Beta'],
+    const tree = SurveyResultsMultichoiceAggregatorSummary({
+      summary: buildSurveyResultsMultichoiceSummaryModel([], {
+          id: 'q1',
+          type: 'multichoice',
+          options: ['Alpha', 'Beta'],
+        }),
     });
     const panel = findElement(
       tree,
@@ -312,6 +360,208 @@ describe('SurveyResults multichoice aggregator summary', () => {
     );
 
     expect(summaryCard?.props?.viewableResponsesCount).toBe(1);
+  });
+});
+
+describe('SurveyResults selected result display wiring', () => {
+  it('renders a selected question card with decrypted override data and header handlers', () => {
+    const lockedResponse = {
+      questionID: 'q1',
+      type: 'freeform',
+      answer: { encrypted: true, locked: true, value: '*' },
+      additional: { encrypted: true, locked: true, value: '*' },
+    };
+    const subject = createSubject();
+    const responseKey = subject.getLockedResponseKey({
+      responder: '0xaaa',
+      questionId: 'q1',
+      surveyId: 'survey-1',
+      response: lockedResponse,
+    });
+    subject.toggleQuestionBookmark = jest.fn();
+    subject.toggleQuestionSummary = jest.fn();
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: { q1: true },
+      bookmarkedQuestionIDs: ['q1'],
+      decryptedResponseOverrides: {
+        [responseKey]: {
+          additionalValue: 'Decrypted note',
+          answerValue: 'Decrypted answer',
+        },
+      },
+      surveyId: 'survey-1',
+    };
+
+    const tree = subject.renderQuestionSummary(
+      'q1',
+      [{ responder: '0xaaa', timestamp: 1, response: lockedResponse }],
+      {
+        q1: {
+          id: 'q1',
+          prompt: 'Explain the decision',
+          type: 'freeform',
+        },
+      }
+    );
+
+    const summaryCard = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsQuestionSummaryCard
+    );
+    expect(summaryCard?.props).toEqual(expect.objectContaining({
+      bookmarked: true,
+      isActive: true,
+      metadataMissing: false,
+      questionPrompt: 'Explain the decision',
+      resolvedQuestionType: 'freeform',
+      viewableResponsesCount: 1,
+    }));
+
+    summaryCard?.props?.onToggleBookmark();
+    summaryCard?.props?.onToggleSummary();
+    expect(subject.toggleQuestionBookmark).toHaveBeenCalledWith('q1');
+    expect(subject.toggleQuestionSummary).toHaveBeenCalledWith('q1');
+
+    const defaultSummary = summaryCard?.props?.renderDefaultSummary();
+    const singleQuestionResponse = findElement(
+      defaultSummary,
+      (element) => element?.props?.aggregatorResponseMode === true
+    );
+
+    expect(singleQuestionResponse?.props?.allResponses[0].response.answer.value).toBe('Decrypted answer');
+    expect(singleQuestionResponse?.props?.allResponses[0].response.additional.value).toBe('Decrypted note');
+  });
+
+  it('wires question-table view, sort, and bookmark controls without fetching data', () => {
+    const subject = attachStateHarness(createSubject());
+    subject.toggleQuestionBookmark = jest.fn();
+    subject.changeQuestionIdSort = jest.fn();
+    subject.scrollToQuestion = jest.fn();
+    subject.hasEffectiveNetworkId = jest.fn(() => true);
+    subject.getEffectiveSlug = jest.fn(() => 'session-one');
+    subject.state = {
+      ...subject.state,
+      activeQuestionToggles: {},
+      bookmarkedQuestionIDs: [],
+      questionIdSortAsc: true,
+      questionIdSortBy: '',
+    };
+
+    const tree = subject.renderQuestionIDsTable(
+      {
+        q1: [{ responder: '0xaaa', response: { answer: { value: 'Visible answer' } } }],
+      },
+      {
+        q1: {
+          prompt: 'Question one',
+          sessionSlug: 'session-one',
+          type: 'freeform',
+        },
+      }
+    );
+    const table = findElement(
+      tree,
+      (element) => element?.type === SurveyResultsQuestionTable
+    );
+
+    expect(table?.props?.entries).toEqual([
+      expect.objectContaining({
+        prompt: 'Question one',
+        questionId: 'q1',
+        responsesCount: 1,
+        sessionSlug: 'session-one',
+        type: 'freeform',
+      }),
+    ]);
+
+    table?.props?.onToggleQuestionBookmark('q1');
+    table?.props?.onSort('prompt');
+    table?.props?.onViewQuestion('q1');
+
+    expect(subject.toggleQuestionBookmark).toHaveBeenCalledWith('q1');
+    expect(subject.changeQuestionIdSort).toHaveBeenCalledWith('prompt');
+    expect(subject.state.activeQuestionToggles.q1).toBe(true);
+    expect(subject.scrollToQuestion).toHaveBeenCalledWith('q1');
+  });
+
+  it('routes aggregate, question, and individual modes to the correct result panels', () => {
+    const subject = createSubject({
+      isOpen: true,
+      viewMode: 'questions',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isSBTCacheReady: true,
+    });
+    subject.getScopedQuestionNetworkDataSync = jest.fn(() => ({
+      questions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Question one',
+          type: 'freeform',
+        },
+      },
+      questionResponses: {},
+      questionsLatestBlock: 1,
+      questionResponsesLatestBlock: 1,
+    }));
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      questionResultsHydrated: true,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0xaaa', response: { answer: { value: 'Question answer' } } }],
+      },
+    };
+
+    const questionList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(questionList?.props?.entries).toEqual([
+      ['q1', [{ responder: '0xaaa', response: { answer: { value: 'Question answer' } } }]],
+    ]);
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: 'survey-1',
+      surveyResultsHydrated: true,
+      surveyViewMode: 'aggregate',
+      sbtFilteredAggregatorQuestionResponses: {
+        q2: [{ responder: '0xbbb', response: { answer: { value: 'Aggregate answer' } } }],
+      },
+    };
+
+    const aggregateList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(aggregateList?.props?.entries).toEqual([
+      ['q2', [{ responder: '0xbbb', response: { answer: { value: 'Aggregate answer' } } }]],
+    ]);
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'survey',
+      surveyId: 'survey-1',
+      surveyViewMode: 'individuals',
+      responses: [{ responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } }],
+      sbtFilteredResponses: [{ responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } }],
+    };
+
+    const individualList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsIndividualResponsesList
+    );
+    const summariesList = findElement(
+      subject.render(),
+      (element) => element?.type === SurveyResultsQuestionSummariesList
+    );
+    expect(individualList?.props?.responses).toEqual([
+      { responder: '0xccc', surveyId: 'survey-1', response: { responses: [] } },
+    ]);
+    expect(summariesList).toBeNull();
   });
 });
 
@@ -703,11 +953,9 @@ describe('SurveyResults demo results views', () => {
   });
 });
 
-describe('SurveyResults.resolveSummaryQuestionType', () => {
+describe('resolveSurveyResultsSummaryQuestionType', () => {
   it('infers freeform from response.answer.type when question metadata is missing', () => {
-    const subject = createSubject();
-
-    expect(subject.resolveSummaryQuestionType(undefined, [
+    expect(resolveSurveyResultsSummaryQuestionType(undefined, [
       {
         response: { answer: { type: 'freeform', value: 'Legacy freeform answer' } },
       },
@@ -715,9 +963,7 @@ describe('SurveyResults.resolveSummaryQuestionType', () => {
   });
 
   it('normalizes legacy text response.answer.type to freeform when question metadata is null', () => {
-    const subject = createSubject();
-
-    expect(subject.resolveSummaryQuestionType(null, [
+    expect(resolveSurveyResultsSummaryQuestionType(null, [
       {
         response: { answer: { type: 'text', value: 'Legacy text answer' } },
       },
@@ -725,38 +971,35 @@ describe('SurveyResults.resolveSummaryQuestionType', () => {
   });
 });
 
-describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
+describe('countSurveyResultsViewableResponses', () => {
   it('excludes blank freeform answers and encrypted placeholders', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible freeform answer', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 
   it('does not exclude blank answers for non-freeform questions', () => {
-    const subject = createSubject();
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Agree', encrypted: false } } },
       { response: { answer: { value: '*', encrypted: true } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'binary')).toBe(2);
+    expect(countSurveyResultsViewableResponses(responses, 'binary')).toBe(2);
   });
 
-  it('uses question type in memoization for the same responses array', () => {
-    const subject = createSubject();
+  it('uses question type when counting the same responses array', () => {
     const responses = [
       { response: { answer: { value: '   ', encrypted: false } } },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    const freeformCount = subject.getMemoizedViewableResponsesCount(responses, 'freeform');
-    const binaryCount = subject.getMemoizedViewableResponsesCount(responses, 'binary');
+    const freeformCount = countSurveyResultsViewableResponses(responses, 'freeform');
+    const binaryCount = countSurveyResultsViewableResponses(responses, 'binary');
 
     expect(freeformCount).toBe(1);
     expect(binaryCount).toBe(2);
@@ -764,20 +1007,18 @@ describe('SurveyResults.getMemoizedViewableResponsesCount', () => {
   });
 
   it('does not count malformed rows that have no answer payload', () => {
-    const subject = createSubject();
     const responses = [
       { response: null },
       { response: {} },
       { response: { answer: { value: 'Visible answer', encrypted: false } } },
     ];
 
-    expect(subject.getMemoizedViewableResponsesCount(responses, 'freeform')).toBe(1);
+    expect(countSurveyResultsViewableResponses(responses, 'freeform')).toBe(1);
   });
 });
 
 describe('SurveyResults freeform summary rendering', () => {
   it('omits "0 encrypted responses not shown." when no encrypted responses exist', () => {
-    const subject = createSubject();
     const responses = [
       {
         responder: '0x1111111111111111111111111111111111111111',
@@ -791,15 +1032,19 @@ describe('SurveyResults freeform summary rendering', () => {
       },
     ];
 
-    const markup = renderToStaticMarkup(subject.renderFreeformAggregatorSummary(responses));
+    const markup = renderToStaticMarkup(
+      <SurveyResultsFreeformAggregatorSummary
+        summary={buildSurveyResultsFreeformSummaryModel(responses)}
+      />
+    );
     expect(markup).toContain('1 total responses. 1 blank not shown.');
     expect(markup).not.toContain('0 encrypted responses not shown.');
     expect(markup).toContain('Visible freeform answer');
   });
 });
 
-describe('SurveyResults Polis report props', () => {
-  it('passes scoped question scan progress through to PolisReport', () => {
+describe('SurveyResults demo surface props', () => {
+  it('passes scoped question scan progress through to the demo report surface', () => {
     const progress = {
       slug: 'edge',
       phase: 'scan',
@@ -826,18 +1071,18 @@ describe('SurveyResults Polis report props', () => {
     };
 
     const tree = subject.render();
-    const polisNode = findElement(
+    const demoSurfaceNode = findElement(
       tree,
       (candidate) => (
         candidate?.props?.questionScanProgress === progress &&
         candidate?.props?.isQuestionCacheReady === false &&
         candidate?.props?.isResponsesCacheReady === false &&
-        candidate?.props?.disclaimersActive === true
+        candidate?.props?.viewKey === 'report'
       )
     );
 
-    expect(polisNode).toBeTruthy();
-    expect(polisNode.props.questionScanProgress).toBe(progress);
+    expect(demoSurfaceNode).toBeTruthy();
+    expect(demoSurfaceNode.props.questionScanProgress).toBe(progress);
   });
 });
 

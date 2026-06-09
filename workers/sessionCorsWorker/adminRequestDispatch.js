@@ -38,6 +38,14 @@ const toTrimmedString = (value) => (
       : String(value).trim()
 );
 
+const buildSecretPresenceManifest = (secrets) => {
+  const source = secrets && typeof secrets === 'object' ? secrets : {};
+  return ALLOWED_SECRET_KEYS.reduce((acc, key) => {
+    acc[key] = !!toTrimmedString(source[key]);
+    return acc;
+  }, {});
+};
+
 const buildSetConfigIncomingConfig = ({
   existingConfig,
   body,
@@ -152,6 +160,15 @@ export const dispatchAdminRequest = async ({
     });
     await deps?.putSessionSecrets?.(env, targetSlug, nextSecrets);
     return deps?.json?.({ ok: true }, 200, headers);
+  }
+
+  if (action === 'secret-presence') {
+    const existingSecrets = (await deps?.getSessionSecrets?.(env, targetSlug)) || {};
+    return deps?.json?.({
+      ok: true,
+      sessionSlug: targetSlug,
+      secrets: buildSecretPresenceManifest(existingSecrets),
+    }, 200, headers);
   }
 
   if (action === 'lit-chipotle-status') {

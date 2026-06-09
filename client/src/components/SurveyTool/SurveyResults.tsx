@@ -1,13 +1,8 @@
 /** @file SurveyResults.tsx */
 
-import React, { Component, Suspense } from 'react';
+import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import {
-  Alert,
-  Button,
-  FormGroup,
-  Label,
-  Input,
   Form,
   Card,
   CardHeader,
@@ -15,11 +10,6 @@ import {
   FormText,
   InputGroup,
   InputGroupText,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  Table,
   Collapse
 } from 'reactstrap';
 
@@ -32,13 +22,11 @@ import {
   faCaretUp,
   faCaretDown,
   faCheck,
-  faTimes,
   faArrowLeft,
   faArrowRight,
   faQuestionCircle,
   faSearch,
   faExpand,
-  faFilter,
   faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -47,12 +35,7 @@ import contractScripts, {
   getSessionConfigBySlug,
 } from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress, getShortenedSurveyID } from 'utilities/ui/displayHelpers.js';
-import SBTFilter from '../SBTs/SBTFilter';
-import QuestionFilter from './QuestionFilter';
-import PolisReport from '../PolisReport/PolisReport';
-import SingleQuestionResponse from './SingleQuestionResponse';
 import { serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import {
   parseQuestionSessionIdFromSearch,
@@ -72,13 +55,17 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { callAI } from '../../utilities/ai/aiScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
-import LazyFallback from '../Shared/LazyFallback';
 import {
   resolveSurveyResultsExplicitSessionSlug,
   resolveSurveyResultsQuestionReadScope,
   resolveSurveyResultsSessionContext,
   scanSurveyResultsSessionSlugFromCache,
 } from './surveyResultsSessionResolution.js';
+import {
+  normalizeSurveyResultsBlockNumber,
+  readSurveyResultsLatestBlock,
+  type SurveyResultsLatestBlockMap,
+} from './surveyResultsBlockNumbers.js';
 import {
   buildSurveyResultsAlertMessagePatch,
   buildSurveyResultsBookmarkFeedbackPatch,
@@ -96,12 +83,15 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
   buildSurveyResultsLockedResponsesDecryptingPatch,
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsQuestionFilterQuestions,
+  buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyModeHydratedPatch,
   buildSurveyResultsSurveyViewModePatch,
   buildSurveyResultsUnfilteredQuestionModeHydratedPatch,
@@ -116,8 +106,12 @@ import {
   normalizeSurveyResponsePayloadByQuestionId,
   pickTimestampMs,
   stableSerializeSignatureValue,
+  stringifySurveyResultsAggregatorResponses,
   toggleSurveyResultsLockedResponseDetailsPatch,
   type SurveyResultsAggregateRow,
+  type SurveyResultsFilterQuestionRecord,
+  type SurveyResultsIndividualAggregator,
+  type SurveyResultsStringifiedAggregator,
   type SurveyResultsSurveyResponsePayload,
 } from './surveyResultsHelpers.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
@@ -130,30 +124,108 @@ import {
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
 import {
-  SurveyResultsFreeformAggregatorSummary,
-  SurveyResultsMultichoiceAggregatorSummary,
-} from './SurveyResultsAggregatorSummaries';
-import {
-  buildSurveyResultsFreeformSummaryModel,
-  buildSurveyResultsMultichoiceSummaryModel,
-  getSurveyResultsLatestResponsesByResponder,
-  resolveSurveyResultsSummaryQuestionType,
+  buildSurveyResultsQuestionTableEntries,
+  type SurveyResultsQuestionTableEntry,
 } from './surveyResultsSummaryModels';
 import {
-  renderSurveyResultsFilterSummary,
   renderSurveyResultsSyncStatusPanel,
 } from './SurveyResultsPanels';
 import {
   isSurveyResultsStateSynced,
-  type SurveyResultsSyncStateLike,
 } from './surveyResultsSyncHelpers.js';
 import {
+  SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
   SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
+  buildSurveyResultsDemoAnalysisArtifact,
+  buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsHtmlReportDownloadFailurePatch,
+  buildSurveyResultsHtmlReportDownloadSuccessPatch,
+  type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
-import { buildSurveyResultsFilterSummaryDisplayPlan } from './surveyResultsFilterStatusController';
-import { buildSurveyResultsQuestionSummaryDisplayPlan } from './surveyResultsQuestionSummaryStatusController';
-import { buildSurveyResultsSyncStatusDisplayPlan } from './surveyResultsSyncStatusController';
+import {
+  buildSurveyResultsCacheReadinessDisplayPlan,
+} from './surveyResultsCacheReadinessDisplayPlan';
+import {
+  buildSurveyResultsCacheControllerSnapshot,
+} from './surveyResultsCacheControllerSnapshot';
+import {
+  buildSurveyResultsAnalysisArtifactWritePlan,
+  buildSurveyResultsAnalysisArtifactWriteReadinessPlan,
+  buildSurveyResultsFilterBookmarkWritePlan,
+  buildSurveyResultsSurveyQuestionBookmarkWritePlan,
+  type SurveyResultsFilterBookmarkWritePlan,
+} from './surveyResultsCacheWriteEligibilityPlan';
+import {
+  buildSurveyResultsAnalysisArtifactCacheKey,
+  buildSurveyResultsAnalysisArtifactCacheReadRequestPlan,
+  type SurveyResultsAnalysisArtifactCacheReadPort,
+} from './surveyResultsAnalysisArtifactCachePorts';
+import {
+  buildSurveyResultsBookmarksCacheReadRequest,
+  selectSurveyResultsBookmarkLists,
+} from './surveyResultsBookmarkCacheReadPorts';
+import {
+  runSurveyResultsAnalysisArtifactReadController,
+} from './surveyResultsAnalysisArtifactReadController';
+import {
+  runSurveyResultsAnalysisArtifactWriteController,
+  type SurveyResultsAnalysisArtifactWritePort,
+} from './surveyResultsAnalysisArtifactWriteController';
+import {
+  buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+  type SurveyResultsAnalysisGeneratedArtifactCompletionPlan,
+} from './surveyResultsAnalysisGeneratedArtifactCompletionPlan';
+import {
+  buildSurveyResultsAnalysisLifecyclePlan,
+} from './surveyResultsAnalysisLifecyclePlan';
+import {
+  runSurveyResultsAnalysisLifecycleController,
+  type SurveyResultsAnalysisLifecycleStatePatchPort,
+} from './surveyResultsAnalysisLifecycleController';
+import {
+  runSurveyResultsFilterBookmarkWriteController,
+} from './surveyResultsFilterBookmarkWriteController';
+import {
+  runSurveyResultsSurveyQuestionBookmarkWriteController,
+  type SurveyResultsBookmarksCacheWritePort,
+} from './surveyResultsSurveyQuestionBookmarkWriteController';
+import {
+  runSurveyResultsManualRefreshDispatchController,
+} from './surveyResultsManualRefreshController';
+import {
+  runSurveyResultsQueuedRefreshController,
+} from './surveyResultsQueuedRefreshController';
+import {
+  buildSurveyResultsHtmlReportDownloadExecutionPlan,
+} from './surveyResultsHtmlReportDownloadRequest';
+import {
+  buildSurveyResultsHtmlReportModalProps,
+} from './surveyResultsHtmlReportModalProps';
+import {
+  getSurveyResultsQuestionCardDomId,
+} from './surveyResultsQuestionSummaryStatusController';
+import {
+  runSurveyResultsQuestionMetadataReadController,
+  type SurveyResultsQuestionMetadataReadIdentity,
+} from './surveyResultsQuestionMetadataReadController';
+import {
+  createSurveyResultsFallbackQuestionBuckets,
+  getSurveyResultsStableFallbackQuestion,
+  type SurveyResultsFallbackQuestion,
+  type SurveyResultsFallbackQuestionBuckets,
+} from './surveyResultsFallbackQuestionHelpers';
+import {
+  EMPTY_SCOPED_QUESTION_NETWORK_DATA,
+  runSurveyResultsQuestionNetworkAsyncReadController,
+  runSurveyResultsQuestionNetworkReadController,
+  type SurveyResultsQuestionBucketRecord,
+  type SurveyResultsQuestionRecord,
+  type SurveyResultsQuestionResponsesByQuestion,
+  type SurveyResultsQuestionResponsesByResponder,
+  type SurveyResultsScopedQuestionNetworkData,
+  type SurveyResultsScopedQuestionNetworkMemo,
+} from './surveyResultsQuestionNetworkReadController';
 import {
   runSurveyResultsBrowserDownload,
   runSurveyResultsExportController,
@@ -163,8 +235,6 @@ import {
   buildSessionResultsAnalysisInputSignature,
   buildSessionResultsAnalysisPrompt,
   buildRedactedSessionResultsSnapshot,
-  buildSessionResultsHtmlReportFilename,
-  buildSessionResultsPdfReportFilename,
   downloadSessionResultsHtmlReport,
   downloadSessionResultsPdfReport,
   evaluateSessionResultsAnalysisEligibility,
@@ -173,7 +243,6 @@ import {
   renderSessionResultsHtmlReport,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
   SESSION_RESULTS_EXPORT_FORMAT_PDF,
-  SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
   SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
   shortenSessionResultsAddress,
   type SessionResultsAnalysisResponseInput,
@@ -184,15 +253,16 @@ import {
   type SessionResultsReportQuestion,
   type SessionResultsSectionSelection,
 } from '../../utilities/sessionResultsExport';
-import SurveyResultsExportControls from './SurveyResultsExportControls';
-import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
-import SurveyResultsModalHeader from './SurveyResultsModalHeader';
-import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
-import SurveyResultsQuestionSummaryCard from './SurveyResultsQuestionSummaryCard';
-import SurveyResultsQuestionSummariesList from './SurveyResultsQuestionSummariesList';
+import type { SurveyResultsDisplayPanelsArgs } from './SurveyResultsDisplayPanels';
+import { renderSurveyResultsFilterExportControls } from './SurveyResultsFilterExportControls';
+import type { QuestionFilterHandle } from './QuestionFilter';
+import {
+  renderSurveyResultsHtmlReportExportModal,
+  type SurveyResultsHtmlReportExportModalProps,
+} from './SurveyResultsHtmlReportExportModal';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
+import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
 import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
-import SurveyResultsStatusMessages from './SurveyResultsStatusMessages';
-import SurveyResultsSurveyViewModeToggle from './SurveyResultsSurveyViewModeToggle';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -206,9 +276,6 @@ export {
 } from './surveyResultsHelpers.js';
 
 const surveyLog = createLogger('surveys');
-const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
-const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
-const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const LATEST_BLOCK_POLL_THROTTLE_MS = 8000;
 const RESPONSE_PARSE_MEMO_MAX_SIZE = 500;
 const LOCAL_STORAGE_POLL_MIN_MS = 2000;
@@ -217,21 +284,22 @@ const LOCAL_STORAGE_POLL_MAX_MS = 12000;
 const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
 type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
-const DebateMapForSurveyResults = DebateMap as React.ComponentType<SurveyResultsRecord>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
+type SurveyResultsSessionContext = ReturnType<typeof resolveSurveyResultsSessionContext>;
 type SurveyResultsScopeContextInput = {
   props?: SurveyResultsRecord;
   state?: SurveyResultsRecord;
   viewMode?: unknown;
 };
-type SurveyResultsQuestionRecord = SurveyResultsRecord & {
-  __ceQuestionMetadataPending?: unknown;
-  id?: unknown;
-  sessionSlug?: unknown;
-  sessionSlugExplicit?: unknown;
+type SurveyResultsAnalysisPayloadForAi = ReturnType<typeof buildSessionResultsAnalysisAiPayload> & {
+  eligibility: ReturnType<typeof evaluateSessionResultsAnalysisEligibility>;
+  inputSignature: string;
 };
-type SurveyResultsQuestionResponsesByResponder = Record<string, unknown>;
-type SurveyResultsQuestionResponsesByQuestion = Record<string, SurveyResultsQuestionResponsesByResponder>;
+type SurveyResultsHtmlReportExporterMetadata = {
+  address: string;
+  chainId: number | null;
+  displayAddress: string;
+};
 type SurveyResultsSummaryAnswerField = SurveyResultsRecord & {
   encrypted?: unknown;
   value?: unknown;
@@ -246,40 +314,16 @@ type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
   response?: SurveyResultsSummaryResponsePayload | null;
   responder?: unknown;
 };
-type SurveyResultsViewableResponsesCountMemoValue = {
-  count: number;
-  questionType: string;
-};
-type SurveyResultsBookmarkCache = {
-  questions: unknown[];
-  surveys: unknown[];
-};
 type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
 };
+type SurveyResultsFilterState = SurveyResultsRecord;
 type SurveyResultsQuestionExportRecord = {
   id: unknown;
   options: unknown[];
   prompt: unknown;
   tags: unknown[];
   type: unknown;
-};
-type SurveyResultsFallbackQuestion = SurveyResultsRecord & {
-  creator?: string;
-  id: unknown;
-  prompt: string;
-  type?: string;
-};
-type SurveyResultsFallbackQuestionBuckets = {
-  individual: Map<string, SurveyResultsFallbackQuestion>;
-  summary: Map<string, SurveyResultsFallbackQuestion>;
-};
-type SurveyResultsQuestionTableEntry = {
-  prompt: string;
-  questionId: string;
-  responsesCount: number;
-  sessionSlug: string;
-  type: string;
 };
 type SurveyResultsQuestionFilterQuestionsMemo = {
   questionResponsesRef: unknown;
@@ -322,33 +366,7 @@ type SurveyResultsEffectiveSlugScanMemo = {
   nonceKey: string;
   slug: string;
 };
-type SurveyResultsQuestionFilterHandle = {
-  handleApplyFilters: (usePendingState?: unknown) => void;
-  handleClearFilters: () => void;
-};
-type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 type SurveyResultsAggregatorEntry = [string, unknown];
-type SurveyResultsStringifiedAggregator = Record<string, SurveyResultsRecord[]>;
-type SurveyResultsFreeformDisplayedResponse = {
-  additional: string;
-  responder: unknown;
-  value: unknown;
-};
-type SurveyResultsFreeformSummaryModel = {
-  blankCount: number;
-  displayedResponses: SurveyResultsFreeformDisplayedResponse[];
-  encryptedCount: number;
-  totalResponses: number;
-};
-type SurveyResultsMultichoiceSummaryOption = {
-  count: number;
-  key: string;
-  label: string;
-};
-type SurveyResultsMultichoiceSummaryModel = {
-  options: SurveyResultsMultichoiceSummaryOption[];
-  totalResponders: number;
-};
 type SurveyResultsResponseCardClassNames = {
   aggregatorContainerClassName: string;
   aggregatorFreeformAnswerClassName: string;
@@ -369,7 +387,7 @@ type SurveyResultsQuestionWithEncryption = SurveyResultsRecord & {
 };
 type SurveyResultsSessionConfigRecord = SurveyResultsRecord & {
   __registry?: SurveyResultsRecord & { chainId?: unknown };
-  networkChainId?: unknown;
+  networkChainId?: number | string | null;
   sponsored?: SurveyResultsRecord & { gates?: unknown };
 };
 type SurveyResultsLockedResponseKeyArgs = {
@@ -378,57 +396,14 @@ type SurveyResultsLockedResponseKeyArgs = {
   response?: SurveyResultsResponseRecord | null;
   surveyId?: unknown;
 };
-type SurveyResultsQuestionBucketRecord = SurveyResultsRecord & {
-  questionResponses?: SurveyResultsQuestionResponsesByQuestion;
-  questionResponsesLatestBlock?: unknown;
-  questions?: Record<string, SurveyResultsQuestionRecord>;
-  questionsLatestBlock?: unknown;
-};
 type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
   surveyResponses?: Record<string, SurveyResultsRecord>;
-  surveyResponsesLatestBlock?: Record<string, unknown>;
+  surveyResponsesLatestBlock?: SurveyResultsLatestBlockMap;
   surveys?: Record<string, SurveyResultsRecord & { documentURLs?: unknown; questionIDs?: unknown; title?: string }>;
   surveysLatestBlock?: unknown;
 };
-type SurveyResultsScopedQuestionNetworkData = {
-  questionResponses: SurveyResultsQuestionResponsesByQuestion;
-  questionResponsesLatestBlock: number;
-  questions: Record<string, SurveyResultsQuestionRecord>;
-  questionsLatestBlock: number;
-};
-type SurveyResultsQuestionResponseMergeOptions = {
-  allowedQuestionIds?: Set<string> | null;
-};
-type SurveyResultsScopedQuestionOptions = {
-  allowedScopeSlugs?: Set<string> | unknown[] | null;
-  bucketSlug?: unknown;
-  question?: SurveyResultsQuestionRecord;
-  requireAuthoritativeBinding?: boolean;
-};
-type SurveyResultsScopedQuestionNetworkEntry = {
-  bucket?: SurveyResultsQuestionBucketRecord | null;
-  slug?: unknown;
-};
-type SurveyResultsScopedQuestionNetworkOptions = {
-  allowedScopeSlugs?: Set<string> | unknown[] | null;
-  requireAuthoritativeBinding?: boolean;
-};
-type SurveyResultsScopedQuestionNetworkMemo = {
-  bucketRefs?: unknown[];
-  netIdStr?: string;
-  requireAuthoritativeBinding?: boolean;
-  result?: SurveyResultsScopedQuestionNetworkData;
-  slugsKey?: string;
-  viewMode?: unknown;
-};
 type SurveyResultsManagedCacheUpdate = {
   namespace?: unknown;
-};
-type SurveyResultsFilterQuestionRecord = SurveyResultsRecord & {
-  creator?: unknown;
-  id?: unknown;
-  prompt?: unknown;
-  type?: unknown;
 };
 type SurveyResultsQuestionFilterCombinedPayload = SurveyResultsRecord & {
   filteredQuestions?: unknown;
@@ -559,19 +534,110 @@ type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
-type SurveyResultsHtmlReportSectionAvailability = {
-  argumentMap: boolean;
-  atlas: boolean;
-  report: boolean;
-  riskMatrix: boolean;
-  snapshotJson: boolean;
+type SurveyResultsProps = SurveyResultsRecord & {
+  account?: string;
+  activeSessionSlug?: string;
+  defaultTags?: unknown[];
+  filterState?: SurveyResultsFilterState | null;
+  filteredQuestionsCount?: number | null;
+  isOpen?: boolean;
+  isQuestionCacheReady?: boolean;
+  isResponsesCacheReady?: boolean;
+  isSBTCacheReady?: boolean;
+  isSurveyCacheReady?: boolean;
+  lit?: SurveyResultsLitHooks | null;
+  litHooks?: SurveyResultsLitHooks | null;
+  loginComplete?: boolean;
+  network?: (SurveyResultsRecord & { id?: unknown }) | null;
+  networkChainId?: number | string | null;
+  onClose?: () => void;
+  onCountUpdate?: (count: unknown) => void;
+  onFilterChange?: (filterState: SurveyResultsFilterState) => void;
+  onFilterStateChangeForUrlUpdate?: (filterState: SurveyResultsFilterState) => void;
+  preventUrlChange?: boolean;
+  profile?: unknown;
+  provider?: unknown;
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
+  questionsCacheNonce?: unknown;
+  refreshQuestionMetadata?: () => unknown;
+  refreshQuestionResponses?: () => unknown;
+  refreshSurveyResponsesByID?: (surveyId: string) => unknown;
+  sbtCacheRevision?: unknown;
+  sessionName?: string;
+  sessionSlug?: string;
+  sessionSlugPinned?: boolean;
+  sessionState?: unknown;
+  setFilterLoading?: (loading: unknown) => void;
+  surveyId?: string;
+  viewMode?: string;
 };
-type SurveyResultsHtmlReportSectionKey = keyof SurveyResultsHtmlReportSectionAvailability;
-type SurveyResultsHtmlReportSectionRow = {
-  available: boolean;
-  key: SurveyResultsHtmlReportSectionKey;
-  label: string;
-  reason: string;
+type SurveyResultsState = SurveyResultsRecord & {
+  activeQuestionToggles: Record<string, boolean>;
+  activeToggles: Record<string, boolean>;
+  aggregateQuestionResponses: Record<string, unknown[]>;
+  aggregatorQuestionResponses: Record<string, unknown[]>;
+  alertMessage: string;
+  bookmarkedQuestionIDs: string[];
+  bookmarkedSurveyIDs: string[];
+  cachedQuestionsCount: number;
+  cachedSurveyResponsesCount: number;
+  csvData: string;
+  decryptedResponseOverrides: Record<string, SurveyResultsDecryptedResponseOverride>;
+  demoResultsAtlasNodeId: string | null;
+  demoResultsViewMode: string;
+  exportAreaOpen: boolean;
+  exportType: string;
+  filterBookmarkedFeedback: boolean;
+  filteredQuestionsCount: number | null;
+  filteredResponsesCount: number;
+  filterLoading: boolean;
+  filterState: SurveyResultsFilterState;
+  htmlReportAnalysisArtifact: SessionResultsGeneratedAnalysisArtifact | null;
+  htmlReportAnalysisError: string;
+  htmlReportAnalysisGenerating: boolean;
+  htmlReportAnalysisInputSignature: string;
+  htmlReportAnalysisProgress: string;
+  htmlReportDemoMode: boolean;
+  htmlReportExportedAt: string;
+  htmlReportExportFormat: SessionResultsExportFormat;
+  htmlReportModalOpen: boolean;
+  htmlReportSelectedSections: Required<SessionResultsSectionSelection>;
+  isFilterActive: boolean;
+  loading: boolean;
+  lockedResponseDetailsOpen: boolean;
+  lockedResponsesDecrypting: boolean;
+  networkLatestBlock: number;
+  questionIdSortAsc: boolean;
+  questionIdSortBy: string;
+  questionLocalBlock: number;
+  questionPartialLoading: boolean;
+  questionPartialProgress: number;
+  questionPartialTotal: number;
+  questionResponses: SurveyResultsQuestionResponsesByQuestion | SurveyResultsRecord;
+  questionResultsHydrated: boolean;
+  refreshTargetQuestionBlock: number;
+  refreshTargetResponseBlock: number;
+  refreshTargetSurveyBlock: number;
+  responseLocalBlock: number;
+  responsePartialLoading: boolean;
+  responsePartialProgress: number;
+  responsePartialTotal: number;
+  responses: SurveyResultsResponseListEntry[];
+  sbtFilteredAggregatorQuestionResponses: Record<string, unknown>;
+  sbtFilteredQuestionResponses: SurveyResultsRecord;
+  sbtFilteredResponses: SurveyResultsResponseListEntry[];
+  showQuestionFilter: boolean;
+  surveyDocumentURLs: string[];
+  surveyId: string;
+  surveyLocalBlock: number;
+  surveyResultsHydrated: boolean;
+  surveyTitle: string;
+  surveyViewMode: string;
+  syncDetailsOpen: boolean;
+  totalQuestionsCount: number;
+  totalResponsesCount: number;
+  viewMode: string;
 };
 type SurveyResultsSbtDisplayLabelResolver = (args: {
   address: string;
@@ -582,41 +648,47 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
+const preserveSurveyResultsFilterStateValue = (
+  value: unknown
+): SurveyResultsFilterState => (
+  (value || {}) as SurveyResultsFilterState
+);
+const normalizeNextSurveyResultsFilterState = (
+  nextFilterState: unknown,
+  fallbackFilterState: unknown = {}
+): SurveyResultsFilterState => (
+  nextFilterState && typeof nextFilterState === 'object'
+    ? nextFilterState as SurveyResultsFilterState
+    : preserveSurveyResultsFilterStateValue(fallbackFilterState)
+);
+const buildSurveyResultsSbtFilterState = ({
+  filterState,
+  sbtFilter,
+}: {
+  filterState: unknown;
+  sbtFilter: unknown;
+}): SurveyResultsFilterState => ({
+  ...toSurveyResultsRecord(filterState),
+  sbtFilter,
+});
+const asSurveyResultsStatePatch = (patch: unknown): SurveyResultsState => (
+  patch as SurveyResultsState
+);
+const asSurveyResultsStateUpdater = (
+  updater: (prevState: SurveyResultsState) => unknown
+): ((
+  prevState: Readonly<SurveyResultsState>,
+  props: Readonly<SurveyResultsProps>
+) => SurveyResultsState) => (
+  updater as (
+    prevState: Readonly<SurveyResultsState>,
+    props: Readonly<SurveyResultsProps>
+  ) => SurveyResultsState
+);
 const resolveSbtDisplayLabelForSurveyResults: SurveyResultsSbtDisplayLabelResolver = (args) => (
   (resolveSbtDisplayLabel as unknown as SurveyResultsSbtDisplayLabelResolver)(args)
 );
 
-const HTML_REPORT_EXPORT_FORMATS: readonly { description: string; label: string; value: SessionResultsExportFormat }[] = Object.freeze([
-  {
-    description: 'Interactive local HTML',
-    label: 'Exported viewer',
-    value: SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-  },
-  {
-    description: 'Static local HTML',
-    label: 'Single HTML file',
-    value: SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML,
-  },
-  {
-    description: 'Multi-page PDF report',
-    label: 'PDF report',
-    value: SESSION_RESULTS_EXPORT_FORMAT_PDF,
-  },
-]);
-
-const DEFAULT_HTML_REPORT_SELECTED_SECTIONS: Required<SessionResultsSectionSelection> = Object.freeze({
-  argumentMap: false,
-  atlas: false,
-  report: true,
-  riskMatrix: false,
-  snapshotJson: true,
-});
-
-const HTML_REPORT_ANALYSIS_SECTION_KEYS: SurveyResultsHtmlReportSectionKey[] = [
-  'argumentMap',
-  'riskMatrix',
-  'atlas',
-];
 const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<Record<SurveyResultsHtmlReportSectionKey, SessionResultsAnalysisSectionKey>> = {
   argumentMap: 'argumentMap',
   atlas: 'atlas',
@@ -669,14 +741,6 @@ export const SURVEY_RESULTS_MINI_PROGRESS_STYLE: React.CSSProperties = {
 export const SURVEY_RESULTS_TRAILING_LABEL_STYLE: React.CSSProperties = {
   marginLeft: '10px',
 };
-
-export const buildSurveyResultsAggregatorPanelClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.surveyResultsAggregatorPanel} ${styleMap.surveyResultsAggregatorText}`;
-
-export const buildSurveyResultsMultichoiceOptionClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.surveyResultsFreeformAnswer} ${styleMap.surveyResultsMultichoiceOption}`;
 
 export const resolveSurveyResultsSyncDetailsStyle = (
   syncDetailsOpen: unknown
@@ -741,7 +805,7 @@ const hasExplicitSessionQueryPinInPath = (path: unknown = ''): boolean => {
   );
 };
 
-function applyExistingGroupPrefix(newPath: string) {
+function applyExistingGroupPrefix(newPath: string): string {
   try {
     if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
     const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
@@ -763,157 +827,6 @@ function resolveNetBucketReadOnly(cacheObj: unknown, netIdStr: unknown, fallback
   if (!cacheObj || typeof cacheObj !== 'object' || !netIdStr) return fallback;
   const bucket = (cacheObj as SurveyResultsRecord)[String(netIdStr)];
   return (bucket && typeof bucket === 'object') ? bucket : fallback;
-}
-
-const EMPTY_SCOPED_QUESTION_NETWORK_DATA = Object.freeze({
-  questions: {},
-  questionResponses: {},
-  questionsLatestBlock: 0,
-  questionResponsesLatestBlock: 0,
-}) as SurveyResultsScopedQuestionNetworkData;
-
-function mergeQuestionResponsesByQuestion(
-  accumulator: SurveyResultsQuestionResponsesByQuestion = {},
-  questionResponses: unknown = {},
-  options: SurveyResultsQuestionResponseMergeOptions = {}
-): SurveyResultsQuestionResponsesByQuestion {
-  const target = (accumulator && typeof accumulator === 'object') ? accumulator : {};
-  const source = (
-    questionResponses && typeof questionResponses === 'object'
-      ? questionResponses as SurveyResultsQuestionResponsesByQuestion
-      : {}
-  );
-  const allowedQuestionIds = options.allowedQuestionIds instanceof Set
-    ? options.allowedQuestionIds
-    : null;
-  Object.keys(source).forEach((questionId) => {
-    const lowerQuestionId = String(questionId || '').trim().toLowerCase();
-    if (!lowerQuestionId) return;
-    if (allowedQuestionIds && !allowedQuestionIds.has(lowerQuestionId)) return;
-    const responderMap = source[questionId];
-    if (!responderMap || typeof responderMap !== 'object') return;
-    if (!target[lowerQuestionId] || typeof target[lowerQuestionId] !== 'object') {
-      target[lowerQuestionId] = {};
-    }
-    const targetResponderMap = target[lowerQuestionId];
-    Object.keys(responderMap).forEach((responder) => {
-      targetResponderMap[responder] = responderMap[responder];
-    });
-  });
-  return target;
-}
-
-const hasAuthoritativeQuestionSessionSlug = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === true
-);
-
-const isPendingQuestionMetadataPlaceholder = (question: SurveyResultsQuestionRecord = {}): boolean => (
-  !!question && question.__ceQuestionMetadataPending === true
-);
-
-const resolveScopedQuestionSessionSlug = (
-  question: SurveyResultsQuestionRecord = {},
-  bucketSlug: unknown = ''
-): string => {
-  const normalizedBucketSlug = normalizeSessionSlug(bucketSlug || '');
-  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
-  if (hasAuthoritativeQuestionSessionSlug(question)) return normalizedQuestionSlug;
-  if (hasOwn(question, 'sessionSlug') && question?.sessionSlugExplicit === false) {
-    return normalizedBucketSlug;
-  }
-  return normalizedQuestionSlug || normalizedBucketSlug;
-};
-
-const shouldKeepScopedQuestion = ({
-  question = {},
-  bucketSlug = '',
-  allowedScopeSlugs = [],
-  requireAuthoritativeBinding = false,
-}: SurveyResultsScopedQuestionOptions = {}): boolean => {
-  const scopeSet = allowedScopeSlugs instanceof Set
-    ? allowedScopeSlugs
-    : new Set(
-      (Array.isArray(allowedScopeSlugs) ? allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
-  if (!scopeSet.size) return true;
-  const normalizedQuestionSlug = normalizeSessionSlug(question?.sessionSlug || '');
-  if (isPendingQuestionMetadataPlaceholder(question)) return false;
-  if (requireAuthoritativeBinding) {
-    return hasAuthoritativeQuestionSessionSlug(question) && scopeSet.has(normalizedQuestionSlug);
-  }
-  return scopeSet.has(resolveScopedQuestionSessionSlug(question, bucketSlug));
-};
-
-function mergeScopedQuestionNetworkData(
-  networkEntries: SurveyResultsScopedQuestionNetworkEntry[] = [],
-  options: SurveyResultsScopedQuestionNetworkOptions = {}
-): SurveyResultsScopedQuestionNetworkData {
-  if (!Array.isArray(networkEntries) || networkEntries.length === 0) {
-    return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
-  }
-
-  const mergedQuestions: Record<string, SurveyResultsQuestionRecord> = {};
-  const mergedQuestionResponses: SurveyResultsQuestionResponsesByQuestion = {};
-  const allowedScopeSlugs = options.allowedScopeSlugs instanceof Set
-    ? options.allowedScopeSlugs
-    : new Set(
-      (Array.isArray(options.allowedScopeSlugs) ? options.allowedScopeSlugs : [])
-        .map((slug) => normalizeSessionSlug(slug || ''))
-    );
-  const requireAuthoritativeBinding = options.requireAuthoritativeBinding === true;
-  let questionsLatestBlock = 0;
-  let questionResponsesLatestBlock = 0;
-
-  networkEntries.forEach(({ slug = '', bucket = {} }) => {
-    const questionBucket = (
-      bucket && typeof bucket === 'object'
-        ? bucket as SurveyResultsQuestionBucketRecord
-        : {}
-    );
-    const allowedQuestionIds: Set<string> = new Set();
-    const questions = (
-      questionBucket.questions && typeof questionBucket.questions === 'object'
-        ? questionBucket.questions
-        : {}
-    );
-    Object.keys(questions).forEach((questionId) => {
-      const lowerQuestionId = String(questionId || '').trim().toLowerCase();
-      if (!lowerQuestionId) return;
-      const question = questions[questionId] || {};
-      if (!shouldKeepScopedQuestion({
-        question,
-        bucketSlug: slug,
-        allowedScopeSlugs,
-        requireAuthoritativeBinding,
-      })) return;
-      allowedQuestionIds.add(lowerQuestionId);
-      if (Object.prototype.hasOwnProperty.call(mergedQuestions, lowerQuestionId)) return;
-      mergedQuestions[lowerQuestionId] = {
-        id: question?.id || questionId,
-        ...(question || {}),
-        sessionSlug: resolveScopedQuestionSessionSlug(question, slug),
-      };
-    });
-
-    mergeQuestionResponsesByQuestion(
-      mergedQuestionResponses,
-      questionBucket.questionResponses || {},
-      { allowedQuestionIds }
-    );
-    questionsLatestBlock = Math.max(questionsLatestBlock, Number(questionBucket.questionsLatestBlock || 0));
-    questionResponsesLatestBlock = Math.max(
-      questionResponsesLatestBlock,
-      Number(questionBucket.questionResponsesLatestBlock || 0)
-    );
-  });
-
-  return {
-    questions: mergedQuestions,
-    questionResponses: mergedQuestionResponses,
-    questionsLatestBlock,
-    questionResponsesLatestBlock,
-  };
 }
 
 const normalizeNonceKey = (value: unknown): number | null => {
@@ -1053,7 +966,7 @@ const buildLockedResponseSignature = (response: SurveyResultsResponseRecord = {}
 
 const getFilterStateSignature = (
   filterState: unknown
-): string => serializeFilterState(filterState as SurveyResultsRecord | null | undefined) || '';
+): string => serializeFilterState(filterState as SurveyResultsFilterState | null | undefined) || '';
 const areValuesEquivalentBySignature = (currentValue: unknown, nextValue: unknown): boolean => {
   if (currentValue === nextValue) return true;
   if (currentValue == null || nextValue == null) return currentValue === nextValue;
@@ -1089,21 +1002,12 @@ const getResponseQuestionType = (
 );
 
 
-/**
- * A single place to generate the DOM id used
- * by every question-card element.
- *  – always lower-cases the questionId
- *  – strips characters that are invalid in an HTML id
- */
-const getQuestionCardDomId = (questionId: string = ''): string =>
-  `questionCard-${questionId.toLowerCase()}`;
-
-class SurveyResults extends Component<any, any> {
+class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   _syncLoadingStartedAt: number | null;
   _scrollMutationObserver: MutationObserver | null;
   _scrollToQuestionRetryTimer: ReturnType<typeof setTimeout> | null;
   questionIdTableRef: React.RefObject<HTMLDivElement>;
-  questionFilterRef: React.RefObject<SurveyResultsQuestionFilterHandle>;
+  questionFilterRef: React.RefObject<QuestionFilterHandle>;
   _isMounted: boolean;
   _questionFilterQuestionsMemo: SurveyResultsQuestionFilterQuestionsMemo;
   _questionTableEntriesMemo: SurveyResultsQuestionTableEntriesMemo;
@@ -1133,7 +1037,6 @@ class SurveyResults extends Component<any, any> {
   _surveyModeSourcePayloadRefSignature: string;
   _surveyModeSourceCacheNonce: number;
   _individualResponsesAggregatorMemo: SurveyResultsIndividualResponsesAggregatorMemo;
-  _viewableResponsesCountMemo: WeakMap<SurveyResultsSummaryResponseRow[], SurveyResultsViewableResponsesCountMemoValue>;
   _resultsRefreshMicrotaskScheduled: boolean;
   _resultsRefreshFrameRequestId: number | null;
   _queuedResultsRefreshReasons: Set<string>;
@@ -1148,27 +1051,27 @@ class SurveyResults extends Component<any, any> {
   _stableFallbackQuestions: SurveyResultsFallbackQuestionBuckets | null = null;
   csvFileName: string = '';
 
-  constructor(props: SurveyResultsRecord) {
+  constructor(props: SurveyResultsProps) {
     super(props);
 
     const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
-    let parsedCache;
-    const defaultCache = { surveys: [], questions: [] };
+    const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug: initialSlug });
+    let bookmarksCacheValue: unknown = null;
 
     try {
-      parsedCache = peekCacheSync('bookmarksCache', initialSlug, { clone: false });
-      if (
-        !parsedCache ||
-        typeof parsedCache !== 'object' ||
-        !Array.isArray(parsedCache.surveys) ||
-        !Array.isArray(parsedCache.questions)
-      ) {
-        parsedCache = defaultCache;
-      }
+      bookmarksCacheValue = peekCacheSync(
+        bookmarksReadRequest.namespace,
+        bookmarksReadRequest.slug,
+        bookmarksReadRequest.options
+      );
     } catch (error) {
       surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-      parsedCache = defaultCache;
+      bookmarksCacheValue = null;
     }
+    const {
+      surveys: bootstrapSurveyIds,
+      questions: bootstrapQuestionIds,
+    } = selectSurveyResultsBookmarkLists(bookmarksCacheValue);
 
     this._syncLoadingStartedAt = null;
     this._scrollMutationObserver = null;
@@ -1189,13 +1092,13 @@ class SurveyResults extends Component<any, any> {
       sbtFilteredQuestionResponses: {},
       aggregatorQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
-      viewMode: this.props.viewMode, // 'survey' or 'questions'
+      viewMode: this.props.viewMode as SurveyResultsState['viewMode'], // 'survey' or 'questions'
       filterLoading: false,
       showQuestionFilter: false,
-      filterState: this.props.filterState || {},
+      filterState: preserveSurveyResultsFilterStateValue(this.props.filterState),
       syncDetailsOpen: false,
-      bookmarkedQuestionIDs: Array.isArray(parsedCache.questions) ? [...parsedCache.questions] : [],
-      bookmarkedSurveyIDs: Array.isArray(parsedCache.surveys) ? [...parsedCache.surveys] : [],
+      bookmarkedQuestionIDs: bootstrapQuestionIds,
+      bookmarkedSurveyIDs: bootstrapSurveyIds,
       questionIdSortBy: 'responses',
       questionIdSortAsc: true,
       totalQuestionsCount: 0,
@@ -1325,7 +1228,6 @@ class SurveyResults extends Component<any, any> {
       responsesRef: null,
       result: {},
     };
-    this._viewableResponsesCountMemo = new WeakMap();
     this._resultsRefreshMicrotaskScheduled = false;
     this._resultsRefreshFrameRequestId = null;
     this._queuedResultsRefreshReasons = new Set();
@@ -1355,15 +1257,11 @@ class SurveyResults extends Component<any, any> {
     this._surveysCacheChangeNonce += 1;
   };
 
-  getIsSyncedForState = (stateSnapshot: SurveyResultsSyncStateLike = this.state): boolean => (
-    isSurveyResultsStateSynced(stateSnapshot)
-  );
-
   /**
    * Resolve the effective session slug for cache + RPC calls.
    * Priority: explicit sessionSlug → Redux active slug → cache scan → general ('').
    */
-  getEffectiveSlug() {
+  getEffectiveSlug(): string {
     const explicitSlug = resolveSurveyResultsExplicitSessionSlug({
       ...this.props,
       search: (typeof window !== 'undefined' && window.location?.search) || '',
@@ -1401,7 +1299,7 @@ class SurveyResults extends Component<any, any> {
     return ''; // Default to general
   }
 
-  getEffectiveSessionContext() {
+  getEffectiveSessionContext(): SurveyResultsSessionContext {
     return resolveSurveyResultsSessionContext({
       sessionSlug: this.getEffectiveSlug(),
       resolveBySlug: getSessionConfigBySlug,
@@ -1470,7 +1368,7 @@ class SurveyResults extends Component<any, any> {
     return hasExplicitSessionQueryPinInPath(`${window.location.pathname || ''}${window.location.search || ''}`);
   }
 
-  buildQuestionResultsScopeResetPatch() {
+  buildQuestionResultsScopeResetPatch(): SurveyResultsRecord {
     return {
       questionResponses: {},
       aggregatorQuestionResponses: {},
@@ -1503,49 +1401,30 @@ class SurveyResults extends Component<any, any> {
     const netIdStr = String(this.props.network?.id ?? this.props.networkChainId ?? '');
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
-    const slugsKey = questionReadSlugs.join('|');
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries: SurveyResultsScopedQuestionNetworkEntry[] = questionReadSlugs.map((slug) => ({
-      slug,
-      bucket: resolveNetBucketReadOnly(
-        peekCacheSync('questionsCache', slug, { clone: false }) || {},
-        netIdStr,
-        {
-          questionsLatestBlock: 0,
-          questions: {},
-          questionResponses: {},
-          questionResponsesLatestBlock: 0,
-        }
-      ) as SurveyResultsQuestionBucketRecord,
-    }));
-    const memo: SurveyResultsScopedQuestionNetworkMemo = this._scopedQuestionNetworkDataSyncMemo || {};
-    const bucketRefs = entries.map((entry) => entry.bucket);
-    const memoMatches = (
-      memo.viewMode === viewMode &&
-      memo.netIdStr === netIdStr &&
-      memo.slugsKey === slugsKey &&
-      memo.requireAuthoritativeBinding === requireAuthoritativeBinding &&
-      Array.isArray(memo.bucketRefs) &&
-      memo.bucketRefs.length === bucketRefs.length &&
-      memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index])
-    );
-    if (memoMatches) return memo.result || EMPTY_SCOPED_QUESTION_NETWORK_DATA;
-
-    const result = mergeScopedQuestionNetworkData(entries, {
-      allowedScopeSlugs: questionReadSlugs,
-      // Regression guard: explicit ?session= pins must ignore legacy bucket leaks
-      // until question metadata is rehydrated with an authoritative session binding.
-      requireAuthoritativeBinding,
-    });
-    this._scopedQuestionNetworkDataSyncMemo = {
-      viewMode,
+    const controllerResult = runSurveyResultsQuestionNetworkReadController({
       netIdStr,
-      slugsKey,
+      previousMemo: this._scopedQuestionNetworkDataSyncMemo,
+      questionReadSlugs,
       requireAuthoritativeBinding,
-      bucketRefs,
-      result,
-    };
-    return result;
+      viewMode,
+      ports: {
+        readQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
+          peekCacheSync('questionsCache', slug, { clone: false }) || {},
+          networkId,
+          {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          }
+        ) as SurveyResultsQuestionBucketRecord,
+      },
+    });
+    if (!controllerResult.memoHit && controllerResult.memo) {
+      this._scopedQuestionNetworkDataSyncMemo = controllerResult.memo;
+    }
+    return controllerResult.result;
   }
 
   async getScopedQuestionNetworkData(
@@ -1555,25 +1434,29 @@ class SurveyResults extends Component<any, any> {
     if (!netIdStr) return EMPTY_SCOPED_QUESTION_NETWORK_DATA;
     const questionReadSlugs = this.getQuestionReadSlugs(viewMode);
     const requireAuthoritativeBinding = this.shouldRequireAuthoritativeQuestionScope(viewMode);
-    const entries: SurveyResultsScopedQuestionNetworkEntry[] = await Promise.all(questionReadSlugs.map(async (slug) => {
-      let questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-      if (!questionsCache || Object.keys(questionsCache).length === 0) {
-        questionsCache = (await readCache('questionsCache', slug)) || {};
-      }
-      return {
-        slug,
-        bucket: resolveNetBucketReadOnly(questionsCache, netIdStr, {
-          questionsLatestBlock: 0,
-          questions: {},
-          questionResponses: {},
-          questionResponsesLatestBlock: 0,
-        }) as SurveyResultsQuestionBucketRecord,
-      };
-    }));
-    return mergeScopedQuestionNetworkData(entries, {
-      allowedScopeSlugs: questionReadSlugs,
+    const controllerResult = await runSurveyResultsQuestionNetworkAsyncReadController({
+      netIdStr,
+      questionReadSlugs,
       requireAuthoritativeBinding,
+      ports: {
+        peekQuestionBucket: (slug, networkId) => resolveNetBucketReadOnly(
+          peekCacheSync('questionsCache', slug, { clone: false }) || {},
+          networkId,
+          {}
+        ) as SurveyResultsQuestionBucketRecord,
+        readQuestionBucket: async (slug, networkId) => resolveNetBucketReadOnly(
+          (await readCache('questionsCache', slug)) || {},
+          networkId,
+          {
+            questionsLatestBlock: 0,
+            questions: {},
+            questionResponses: {},
+            questionResponsesLatestBlock: 0,
+          }
+        ) as SurveyResultsQuestionBucketRecord,
+      },
     });
+    return controllerResult.result;
   }
 
   appendSessionHintToSurveyPath = (pathIn: unknown = ''): string => {
@@ -1610,10 +1493,9 @@ class SurveyResults extends Component<any, any> {
       return memo.result;
     }
 
-    const next = Object.keys(questionResponsesRef || {}).map((qId) => {
-      const lower = String(qId || '').toLowerCase();
-      const qData = networkQuestionsById[lower];
-      return qData || { id: lower || qId, creator: '', type: '', prompt: '' };
+    const next = buildSurveyResultsQuestionFilterQuestions({
+      networkQuestionsById,
+      questionResponses: questionResponsesRef,
     });
 
     this._questionFilterQuestionsMemo = {
@@ -1626,7 +1508,7 @@ class SurveyResults extends Component<any, any> {
     return next;
   }
 
-  notifyFilterStateCommitted(nextFilterState: unknown): void {
+  notifyFilterStateCommitted(nextFilterState: SurveyResultsFilterState): void {
     const nextSignature = getFilterStateSignature(nextFilterState);
     if (this._lastNotifiedFilterStateSignature === nextSignature) return;
     this._lastNotifiedFilterStateSignature = nextSignature;
@@ -1640,10 +1522,10 @@ class SurveyResults extends Component<any, any> {
 
   commitResultsFilterState(statePatch: SurveyResultsRecord | null | undefined, nextFilterState: unknown): void {
     const patch: SurveyResultsRecord = (statePatch && typeof statePatch === 'object') ? statePatch : {};
-    const normalizedFilterState =
-      nextFilterState && typeof nextFilterState === 'object'
-        ? nextFilterState
-        : (this.state.filterState || {});
+    const normalizedFilterState = normalizeNextSurveyResultsFilterState(
+      nextFilterState,
+      this.state.filterState
+    );
     const filterStateChanged = !areValuesEquivalentBySignature(
       this.state.filterState,
       normalizedFilterState
@@ -1653,10 +1535,10 @@ class SurveyResults extends Component<any, any> {
     ));
     if (!filterStateChanged && !patchChanged) return;
     this.setState(
-      {
+      asSurveyResultsStatePatch({
         ...patch,
         filterState: normalizedFilterState,
-      },
+      }),
       () => this.notifyFilterStateCommitted(this.state.filterState)
     );
   }
@@ -1745,7 +1627,7 @@ class SurveyResults extends Component<any, any> {
     this.notifyFilterStateCommitted(this.state.filterState);
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     this._isMounted = true;
     this._unsubscribeCacheUpdates = subscribeCacheUpdates(this.handleManagedCacheUpdate);
     window.addEventListener('popstate', this.handleUrlChange);
@@ -1759,7 +1641,7 @@ class SurveyResults extends Component<any, any> {
       initialViewMode = 'survey';
     }
 
-    this.setState(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId), () => {
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsViewStatePatch(initialViewMode, initialSurveyId)), () => {
       this.handleUrlBasedView();
 
       if (this.props.isOpen) {
@@ -1807,7 +1689,7 @@ class SurveyResults extends Component<any, any> {
   }
 
 
-  componentWillUnmount() {
+  componentWillUnmount(): void {
     this._isMounted = false;
     this._fetchResponsesQueued = false;
     this._fetchResponsesInFlight = false;
@@ -1865,7 +1747,7 @@ class SurveyResults extends Component<any, any> {
   }
 
 
-  componentDidUpdate(prevProps: SurveyResultsRecord, prevState: SurveyResultsRecord): void {
+  componentDidUpdate(prevProps: SurveyResultsProps, prevState: SurveyResultsState): void {
     const refreshReasons: Set<string> = new Set();
     const pendingStatePatch: SurveyResultsRecord = {};
     let hasPendingStatePatch = false;
@@ -1880,8 +1762,8 @@ class SurveyResults extends Component<any, any> {
       pendingStatePatch[key] = value;
       hasPendingStatePatch = true;
     };
-    const wasSynced = this.getIsSyncedForState(prevState);
-    const isSyncedNow = this.getIsSyncedForState(this.state);
+    const wasSynced = isSurveyResultsStateSynced(prevState);
+    const isSyncedNow = isSurveyResultsStateSynced(this.state);
     if (!wasSynced && isSyncedNow) {
       this._syncLoadingStartedAt = null;
     } else if (!isSyncedNow && this._syncLoadingStartedAt === null) {
@@ -1931,7 +1813,7 @@ class SurveyResults extends Component<any, any> {
       queueStatePatch('demoResultsViewMode', 'raw');
       queueStatePatch('demoResultsAtlasNodeId', null);
       // Reset then re-seed sync timer if currently loading
-      const isSyncedOnOpen = this.getIsSyncedForState(this.state);
+      const isSyncedOnOpen = isSurveyResultsStateSynced(this.state);
       this._syncLoadingStartedAt = isSyncedOnOpen ? null : Date.now();
       this.updateLocalStoragePollingState();
       // Re-open should re-emit current filter state so URL/query filter sync is restored.
@@ -2092,9 +1974,12 @@ class SurveyResults extends Component<any, any> {
       runPostPatchTasks();
     }
 
-    if (refreshReasons.size > 0) {
-      this.queueResultsRefresh(Array.from(refreshReasons).join('|'));
-    }
+    runSurveyResultsQueuedRefreshController({
+      ports: {
+        queueResultsRefresh: this.queueResultsRefresh,
+      },
+      reasons: refreshReasons,
+    });
   }
 
 
@@ -2102,15 +1987,20 @@ class SurveyResults extends Component<any, any> {
   runNonceTickRefresh = async (): Promise<void> => {
     try {
       const slug = this.getEffectiveSlug();
-      const latest = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
-      if (!this._isMounted) return;
+      const latest = await contractScripts.getLatestBlockNumber(this.props.provider as string | undefined, slug);
+      const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
+        isMounted: this._isMounted,
+        latestBlock: latest,
+        writeNetworkLatestBlock: true,
+        followUpEffects: [
+          'pollLocalStorageForUpdates',
+          'resetLocalStoragePollingBackoff:nonce-tick',
+          'queueResultsRefresh:nonce-tick',
+        ],
+      });
+      if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
       this.setState(
-        {
-          networkLatestBlock: latest,
-          refreshTargetQuestionBlock: latest,
-          refreshTargetResponseBlock: latest,
-          refreshTargetSurveyBlock: latest
-        },
+        asSurveyResultsStatePatch(refreshStatusSequencePlan.statePatch),
         () => {
           // Re-read localStorage derived counters and repaint from cache immediately
           this.pollLocalStorageForUpdates();
@@ -2147,7 +2037,7 @@ class SurveyResults extends Component<any, any> {
 
   handleFilterActivityChange = (isActive: unknown): void => {
     if (this.state.isFilterActive === isActive) return;
-    this.setState(buildSurveyResultsFilterActivePatch(isActive));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsFilterActivePatch(isActive)));
   };
 
   getIsDemoQuestionResultsContext = (): boolean => (
@@ -2156,83 +2046,19 @@ class SurveyResults extends Component<any, any> {
   );
 
   handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
-    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsDemoViewSelectPatch({
+    this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsDemoViewSelectPatch({
       nextView,
       prevState,
-    }));
+    })));
   };
 
   handleDemoAtlasOpen = (nodeId: unknown = ''): void => {
-    this.setState(buildSurveyResultsDemoAtlasOpenPatch(nodeId));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsDemoAtlasOpenPatch(nodeId)));
   };
 
   handleDemoAtlasModalClose = (): void => {
     if (!this.state.demoResultsAtlasNodeId) return;
-    this.setState(buildSurveyResultsDemoAtlasNodePatch());
-  };
-
-  renderDemoResultsSurface = (viewKey: unknown = 'report'): React.ReactNode => {
-    const activeSlug = this.getEffectiveSlug();
-    if (viewKey === 'report') {
-      return (
-        <div id="polisReportSection">
-          <PolisReport
-            questionResponses={this.getMemoizedPolisQuestionResponses(
-              true,
-              this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
-                ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
-                : (this.state.sbtFilteredAggregatorQuestionResponses || {})
-            )}
-            network={this.props.network}
-            networkChainId={this.props.networkChainId}
-            disclaimersActive={true}
-            filterState={this.props.filterState || this.state.filterState}
-            defaultTags={this.props.defaultTags}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            questionScanProgress={this.props.questionScanProgress}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            slug={activeSlug}
-          />
-        </div>
-      );
-    }
-
-    if (viewKey === 'breakdown') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Breakdown..." minHeight="30vh" />}>
-          <DemoAnalysisWorkspace sessionSlug={activeSlug} />
-        </Suspense>
-      );
-    }
-
-    if (viewKey === 'atlas') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Atlas..." minHeight="30vh" />}>
-          <div className={styles.demoResultsAtlasSurface}>
-            <DebateMapForSurveyResults
-              activeSessionSlug={activeSlug}
-              demoMode={true}
-              embedded={true}
-              requestedModalNodeId={this.state.demoResultsAtlasNodeId}
-              onModalClose={this.state.demoResultsAtlasNodeId ? this.handleDemoAtlasModalClose : null}
-            />
-          </div>
-        </Suspense>
-      );
-    }
-
-    if (viewKey === 'riskMatrix') {
-      return (
-        <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-          <div className={styles.demoResultsRiskMatrixSurface}>
-            <RiskMatrix embedded={true} onOpenAtlasNode={this.handleDemoAtlasOpen} />
-          </div>
-        </Suspense>
-      );
-    }
-
-    return null;
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsDemoAtlasNodePatch()));
   };
 
   handleClearFiltersFromParent = (e: React.SyntheticEvent): void => {
@@ -2293,7 +2119,7 @@ class SurveyResults extends Component<any, any> {
     // In that case, we don't necessarily change the mode here, as componentDidMount/Update handles props.
 
     if (this.state.viewMode !== newViewMode || this.state.surveyId !== newSurveyId) {
-      this.setState(buildSurveyResultsViewStatePatch(newViewMode, newSurveyId), () => {
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsViewStatePatch(newViewMode, newSurveyId)), () => {
         this.queueResultsRefresh('url-view-change');
       });
     }
@@ -2350,7 +2176,7 @@ class SurveyResults extends Component<any, any> {
     this._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MAX_MS;
   };
 
-  startLocalStoragePolling() {
+  startLocalStoragePolling(): void {
     if (!this.props.isOpen) return;
     if (this.isDocumentHidden()) return;
     if (this._localStoragePollingIntervalId) return;
@@ -2365,14 +2191,14 @@ class SurveyResults extends Component<any, any> {
     }, waitMs);
   }
 
-  stopLocalStoragePolling() {
+  stopLocalStoragePolling(): void {
     if (!this._localStoragePollingIntervalId) return;
     clearTimeout(this._localStoragePollingIntervalId);
     this._localStoragePollingIntervalId = null;
   }
 
   maybeRefreshNetworkLatestBlockFromPolling = (): void => {
-    if ((this.state.networkLatestBlock || 0) > 0) return;
+    if (normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock) > 0) return;
     if (this._pollLatestBlockFetchInFlight) return;
     const now = Date.now();
     if (
@@ -2385,12 +2211,13 @@ class SurveyResults extends Component<any, any> {
     this._pollLatestBlockFetchInFlight = true;
     const slug = this.getEffectiveSlug();
     contractScripts
-      .getLatestBlockNumber(this.props.provider, slug)
+      .getLatestBlockNumber(this.props.provider as string | undefined, slug)
       .then((blk: unknown) => {
         if (!this._isMounted) return;
-        const parsed = Number(blk || 0);
-        if (parsed > 0 && parsed !== Number(this.state.networkLatestBlock || 0)) {
-          this.setState(buildSurveyResultsNetworkLatestBlockPatch(parsed));
+        const parsed = normalizeSurveyResultsBlockNumber(blk);
+        const currentLatestBlock = normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock);
+        if (parsed > 0 && parsed !== currentLatestBlock) {
+          this.setState(asSurveyResultsStatePatch(buildSurveyResultsNetworkLatestBlockPatch(parsed)));
         }
       })
       .catch((e: unknown) => { surveyLog.warn('SurveyResults: fallback', e); })
@@ -2510,22 +2337,16 @@ pollLocalStorageForUpdates(): boolean {
     }
 
     // Keep retrying latest-block fetches even when local cache signatures are stable.
-    let netLatest = Number(this.state.networkLatestBlock || 0);
+    let netLatest = normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock);
     if (!netLatest) {
       this.maybeRefreshNetworkLatestBlockFromPolling();
       netLatest = 0;
     }
 
-    const localQBlock = Number(questionNetCache.questionsLatestBlock || 0);
-    const localRespBlock = Number(questionNetCache.questionResponsesLatestBlock || 0);
-    const surveyResponsesLatestBlock = (
-      surveyNetCache?.surveyResponsesLatestBlock &&
-      typeof surveyNetCache.surveyResponsesLatestBlock === 'object'
-        ? surveyNetCache.surveyResponsesLatestBlock as SurveyResultsRecord
-        : {}
-    );
+    const localQBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionsLatestBlock);
+    const localRespBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionResponsesLatestBlock);
     const localSBlock = currentSurveyId
-      ? Number(surveyResponsesLatestBlock[currentSurveyId] || 0)
+      ? readSurveyResultsLatestBlock(surveyNetCache?.surveyResponsesLatestBlock, currentSurveyId)
       : 0;
 
     const coarseSignature = [
@@ -2631,7 +2452,9 @@ try {
 }
 };
 
-getNetworkQuestionsForCurrentContext = (): Record<string, SurveyResultsQuestionRecord> => {
+getNetworkQuestionsForCurrentContext = (
+  _identity?: SurveyResultsQuestionMetadataReadIdentity
+): Record<string, SurveyResultsQuestionRecord> => {
   const networkData = this.getScopedQuestionNetworkDataSync(
     this.state.viewMode || this.props.viewMode || 'questions'
   ) as SurveyResultsScopedQuestionNetworkData;
@@ -2655,7 +2478,7 @@ if (!this.hasEffectiveNetworkId()) {
   // Cache-first results should not wait on RPC freshness. Kick the latest-block
   // lookup into the background so the modal can render cached questions/responses
   // immediately, then let the sync badge catch up when the block call resolves.
-  if (!Number(this.state.networkLatestBlock || 0)) {
+  if (!normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock)) {
     this.maybeRefreshNetworkLatestBlockFromPolling();
   }
 
@@ -2666,7 +2489,7 @@ if (this.state.viewMode === 'survey') {
 }
 };
 
-  async fetchSurveyModeResponses() {
+  async fetchSurveyModeResponses(): Promise<void> {
     const currentSurveyID = this.state.surveyId ? this.state.surveyId.toLowerCase() : null;
 
     // Use the robust slug resolver to ensure we read the correct cache
@@ -2703,7 +2526,7 @@ if (this.state.viewMode === 'survey') {
       this._surveyModeSourceCoarseSignature = emptySignature;
       this._surveyModeSourcePayloadRefSignature = '';
       this._surveyModeSourceCacheNonce = Number(this._surveysCacheChangeNonce || 0);
-      this.setState(buildSurveyResultsEmptySurveyModePatch());
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsEmptySurveyModePatch()));
       return;
     }
 
@@ -2717,10 +2540,11 @@ if (this.state.viewMode === 'survey') {
     const questionIdsSignature = questionIDsInSurvey
       .map((qid) => String(qid || '').toLowerCase())
       .join('|');
-    const surveyResponsesLatestBlock = Number(
-      surveyNetCache?.surveyResponsesLatestBlock?.[currentSurveyID] || 0
+    const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
+      surveyNetCache?.surveyResponsesLatestBlock,
+      currentSurveyID
     );
-    const surveyDefinitionLatestBlock = Number(surveyNetCache?.surveysLatestBlock || 0);
+    const surveyDefinitionLatestBlock = normalizeSurveyResultsBlockNumber(surveyNetCache?.surveysLatestBlock);
     const surveyCacheChangeNonce = Number(this._surveysCacheChangeNonce || 0);
     const questionCacheReadySignal = this.props.isQuestionCacheReady ? 1 : 0;
     const payloadRefSignature = buildSurveyRespondersPayloadRefSignature(srMap);
@@ -2751,7 +2575,7 @@ if (this.state.viewMode === 'survey') {
     this._surveyModeSourceSignature = sourceSignature;
 
     const aggregatorMap: Record<string, SurveyResultsAggregateRow[]> = {};
-    const rawResponses: SurveyResultsAggregateRow[] = [];
+    const rawResponses: SurveyResultsResponseListEntry[] = [];
     allResponders.forEach((responder) => {
       const responderLower = String(responder || '').toLowerCase();
       const rawResp = normalizeSurveyResponsePayloadByQuestionId(
@@ -2761,7 +2585,7 @@ if (this.state.viewMode === 'survey') {
       rawResponses.push({
         responder: responderLower,
         surveyId: currentSurveyID,
-        response: rawResp,
+        response: rawResp as SurveyResultsResponseListEntry['response'],
       });
       if (!rawResp || !Array.isArray(rawResp.responses)) return;
       rawResp.responses.forEach((ans: SurveyResultsResponseRecord) => {
@@ -2787,16 +2611,16 @@ if (this.state.viewMode === 'survey') {
 
     // Retrieve title from the correct group cache
     let foundTitle = '';
-    let foundDocURLs: unknown[] = [];
+    let foundDocURLs: string[] = [];
     if (surveyNetCache?.surveys?.[currentSurveyID]) {
       foundTitle = surveyNetCache.surveys[currentSurveyID].title || '';
       foundDocURLs = Array.isArray(surveyNetCache.surveys[currentSurveyID].documentURLs)
-        ? surveyNetCache.surveys[currentSurveyID].documentURLs
+        ? surveyNetCache.surveys[currentSurveyID].documentURLs as string[]
         : [];
     }
 
     // Initialize master and filtered views so UI renders immediately
-    this.setState(buildSurveyResultsSurveyModeHydratedPatch({
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsSurveyModeHydratedPatch({
       aggregateQuestionResponses: finalAggregator,
       filteredResponsesCount: rawResponses.length,
       responses: rawResponses,
@@ -2806,7 +2630,7 @@ if (this.state.viewMode === 'survey') {
       surveyTitle: foundTitle,
       totalQuestionsCount: totalQCount,
       totalResponsesCount: totalRespondersCount,
-    }));
+    })));
   }
 
 
@@ -2857,7 +2681,7 @@ const initialFilteredCount = totalResponseCount;
 // 🛡️ Preserve currently-applied filters across refresh if a filter is active
 if (this.state.isFilterActive) {
   this.setState(
-    buildSurveyResultsFilteredQuestionModeHydratedPatch({
+    asSurveyResultsStatePatch(buildSurveyResultsFilteredQuestionModeHydratedPatch({
       aggregatorQuestionResponses: finalAggregator,
       currentFilteredQuestionsCount: this.state.filteredQuestionsCount,
       currentFilteredResponsesCount: this.state.filteredResponsesCount,
@@ -2866,7 +2690,7 @@ if (this.state.isFilterActive) {
       sbtFilteredAggregatorQuestionResponses: this.state.sbtFilteredAggregatorQuestionResponses,
       totalQuestionsCount: totalQ,
       totalResponsesCount: totalResponseCount,
-    }),
+    })),
     () => {
       // ask the QuestionFilter to re-apply its pipeline on the fresh data
       if (this.questionFilterRef && this.questionFilterRef.current) {
@@ -2878,13 +2702,13 @@ if (this.state.isFilterActive) {
   );
 } else {
   // no active filters – reset filtered view to the full aggregator
-  this.setState(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsUnfilteredQuestionModeHydratedPatch({
     aggregatorQuestionResponses: finalAggregator,
     filteredResponsesCount: initialFilteredCount,
     questionResponses: partialQR,
     totalQuestionsCount: totalQ,
     totalResponsesCount: totalResponseCount,
-  }));
+  })));
 }
 }
 
@@ -2896,7 +2720,7 @@ let header = '';
 const csvRows: string[] = [];
 
 if (!this.hasEffectiveNetworkId()) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
   return '';
 }
 const networkQuestions = this.getNetworkQuestionsForCurrentContext();
@@ -2928,7 +2752,7 @@ try {
   const suggested = `${prefix}_${tsName}${cleanSession ? '_' + cleanSession : ''}.csv`;
   this.csvFileName = suggested;
   if (typeof this.setState === 'function') {
-    this.setState(buildSurveyResultsCsvFileNamePatch(suggested));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(suggested)));
   }
 } catch (err) {
   surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set CSV filename:', err);
@@ -2936,7 +2760,7 @@ try {
   this.csvFileName = fallback;
   try {
     if (typeof this.setState === 'function') {
-      this.setState(buildSurveyResultsCsvFileNamePatch(fallback));
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsCsvFileNamePatch(fallback)));
     }
   } catch (innerErr) {
     surveyLog.error('[SurveyResults.generateResponsesCSV] Failed to set fallback CSV filename:', innerErr);
@@ -3184,13 +3008,13 @@ return JSON.stringify(
 
 generateQuestionsCSV = (): string => {
 if (!this.hasEffectiveNetworkId()) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Network not available for fetching question data.')));
   return '';
 }
 
 const filteredQuestions = this.getFilteredQuestionsForExport();
 if (!filteredQuestions.length) {
-  this.setState(buildSurveyResultsAlertMessagePatch('No filtered questions to export.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('No filtered questions to export.')));
   return '';
 }
 
@@ -3315,7 +3139,7 @@ isHtmlReportDemoModeActive = (): boolean => (
   this.isHtmlReportDemoSession() && !!this.state.htmlReportDemoMode
 );
 
-getHtmlReportExporterMetadata = () => {
+getHtmlReportExporterMetadata = (): SurveyResultsHtmlReportExporterMetadata | null => {
 if (this.isHtmlReportDemoModeActive()) {
   return {
     address: 'demo-preview',
@@ -3344,138 +3168,77 @@ const artifact = this.state.htmlReportAnalysisArtifact as SessionResultsGenerate
 return artifact && artifact.kind ? artifact : null;
 }
 
+applyHtmlReportAnalysisLifecycleStatePatch: SurveyResultsAnalysisLifecycleStatePatchPort = (patch) => {
+this.setState(asSurveyResultsStatePatch(patch));
+}
+
 buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
 const built = this.buildSessionResultsAnalysisPayloadForAi();
-const questions = built.aiPayload.questions;
-const responseCounts = new Map<string, number>();
-built.aiPayload.responses.forEach((response) => {
-  const key = String(response.questionId || '').trim();
-  if (!key) return;
-  responseCounts.set(key, (responseCounts.get(key) || 0) + 1);
-});
-const questionModels = questions.length > 0
-  ? questions.slice(0, 6)
-  : [{ id: 'demo-results', prompt: 'Demo results', type: 'demo', options: [], tags: [] }];
-const groups = questionModels.slice(0, 4).map((question, index) => ({
-  id: `demo_group_${index + 1}`,
-  label: question.prompt || `Demo theme ${index + 1}`,
-  questionIds: [question.id],
-  responseCount: responseCounts.get(question.id) || 0,
-  summary: `Demo preview theme derived from ${responseCounts.get(question.id) || 0} visible response${(responseCounts.get(question.id) || 0) === 1 ? '' : 's'}.`,
-}));
-const nodes = questionModels.map((question, index) => ({
-  id: `demo_atlas_${index + 1}`,
-  label: question.prompt || `Demo node ${index + 1}`,
-  path: ['Demo Session', question.prompt || `Question ${index + 1}`],
-  questionIds: [question.id],
-  responseCount: responseCounts.get(question.id) || 0,
-  summary: 'Demo preview node generated from hydrated results.',
-}));
-const edges = nodes.slice(1).map((node, index) => ({
-  source: nodes[0]?.id || 'demo_atlas_1',
-  target: node.id,
-  label: index % 2 === 0 ? 'related theme' : 'adjacent concern',
-}));
-
-return {
+return buildSurveyResultsDemoAnalysisArtifact({
+  analysisPayload: built,
   generatedAt: new Date().toISOString(),
-  inputSignature: `demo-preview-${built.inputSignature}`,
-  kind: 'ce_session_results_analysis_artifact',
-  model: 'demo-preview',
-  participants: built.participants,
-  sections: {
-    argumentMap: {
-      available: true,
-      debates: questionModels.slice(0, 3).map((question, index) => ({
-        id: `demo_debate_${index + 1}`,
-        title: question.prompt || `Demo debate ${index + 1}`,
-        claims: [
-          {
-            id: `demo_claim_${index + 1}`,
-            label: `Participants surface tradeoffs around ${question.prompt || 'this result'}.`,
-            questionIds: [question.id],
-            responseCount: responseCounts.get(question.id) || 0,
-            stance: 'mixed',
-          },
-        ],
-      })),
-    },
-    atlas: {
-      available: true,
-      edges,
-      nodes,
-    },
-    breakdown: {
-      available: true,
-      dimensions: [],
-      groups,
-      summary: {
-        overview: 'Demo preview analysis generated locally from currently hydrated results.',
-      },
-    },
-    riskMatrix: {
-      available: true,
-      categories: questionModels.slice(0, 4).map((question, index) => ({
-        id: `demo_risk_${index + 1}`,
-        label: question.prompt || `Demo risk ${index + 1}`,
-        description: 'Demo preview category for PDF/HTML layout testing.',
-      })),
-      comments: questionModels.slice(0, 4).map((question, index) => ({
-        id: `demo_risk_comment_${index + 1}`,
-        categoryId: `demo_risk_${index + 1}`,
-        questionIds: [question.id],
-        summary: `Demo preview signal from ${responseCounts.get(question.id) || 0} visible response${(responseCounts.get(question.id) || 0) === 1 ? '' : 's'}.`,
-      })),
-      heatmap: questionModels.slice(0, 4).reduce<Record<string, unknown>>((acc, question, index) => {
-        acc[`demo_risk_${index + 1}`] = {
-          impact: index % 2 === 0 ? 'medium' : 'high',
-          likelihood: (responseCounts.get(question.id) || 0) > 1 ? 'medium' : 'low',
-        };
-        return acc;
-      }, {}),
-      scenarioLinks: [],
-    },
-  },
-  source: 'ai-generated',
-  version: 1,
-};
+  inputSignature: built.inputSignature,
+});
 }
 
 getSessionResultsAnalysisCacheSlug = (): string => this.getEffectiveSlug() || 'general';
 
 getSessionResultsAnalysisCacheKey = (inputSignature: unknown): string => (
-`sessionResultsAnalysis:v1:${this.getHtmlReportNetworkLabel() || this.getHtmlReportChainId() || 'unknown'}:${String(inputSignature || '')}`
+buildSurveyResultsAnalysisArtifactCacheKey({
+  chainId: this.getHtmlReportChainId(),
+  inputSignature,
+  networkLabel: this.getHtmlReportNetworkLabel(),
+})
 );
-
-getSessionResultsAnalysisCacheBucket = (): SurveyResultsRecord => {
-const cacheObj = peekCacheSync('analysisCache', this.getSessionResultsAnalysisCacheSlug(), { clone: false });
-return toSurveyResultsRecord(cacheObj);
-}
 
 readSessionResultsAnalysisArtifactFromCache = (
 inputSignature: unknown
 ): SessionResultsGeneratedAnalysisArtifact | null => {
-const bucket = this.getSessionResultsAnalysisCacheBucket();
-const artifacts = toSurveyResultsRecord(bucket.sessionResultsAnalysis);
-const artifact = artifacts[this.getSessionResultsAnalysisCacheKey(inputSignature)];
-return artifact && typeof artifact === 'object'
-  ? artifact as SessionResultsGeneratedAnalysisArtifact
-  : null;
+const cacheKey = this.getSessionResultsAnalysisCacheKey(inputSignature);
+const readPlan = buildSurveyResultsAnalysisArtifactCacheReadRequestPlan({
+  cacheKey,
+  inputSignature,
+  slug: this.getSessionResultsAnalysisCacheSlug(),
+});
+const readAnalysisCache = peekCacheSync as SurveyResultsAnalysisArtifactCacheReadPort;
+const readResult = runSurveyResultsAnalysisArtifactReadController({
+  ports: {
+    readAnalysisArtifactCache: readAnalysisCache,
+  },
+  readRequest: readPlan.shouldRead ? readPlan.readRequest : null,
+  target: readPlan.target,
+});
+return readResult.artifact;
 }
 
 writeSessionResultsAnalysisArtifactToCache = async (
-artifact: SessionResultsGeneratedAnalysisArtifact
+artifact: SessionResultsGeneratedAnalysisArtifact | null
 ): Promise<void> => {
 const slug = this.getSessionResultsAnalysisCacheSlug();
+const cacheKey = artifact ? this.getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '';
+const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
+  artifact,
+  cacheKey,
+  inputSignature: artifact?.inputSignature || '',
+  slug,
+});
+if (!writeReadinessPlan.shouldReadCache) return;
 const current = toSurveyResultsRecord(await readCache('analysisCache', slug));
-const artifacts = toSurveyResultsRecord(current.sessionResultsAnalysis);
-await (writeCache as SurveyResultsWriteCache)('analysisCache', slug, {
-  ...current,
-  sessionResultsAnalysis: {
-    ...artifacts,
-    [this.getSessionResultsAnalysisCacheKey(artifact.inputSignature)]: artifact,
+const writePlan = buildSurveyResultsAnalysisArtifactWritePlan({
+  artifact,
+  cacheKey,
+  currentCache: current,
+  inputSignature: artifact?.inputSignature || '',
+  slug,
+});
+if (!writePlan.shouldWrite || !writePlan.payload) return;
+const writeResult = await runSurveyResultsAnalysisArtifactWriteController({
+  plan: writePlan,
+  ports: {
+    writeAnalysisArtifact: writeCache as unknown as SurveyResultsAnalysisArtifactWritePort,
   },
 });
+if (!writeResult.ok && writeResult.error) throw writeResult.error;
 }
 
 getSessionResultsAnalysisTextField = (field: unknown): string => {
@@ -3565,7 +3328,7 @@ const resolved = resolveSbtDisplayLabelForSurveyResults({
 return this.getSessionResultsAnalysisSafeLabel(resolved);
 }
 
-getSessionResultsAnalysisSegmentDimensionsForExport = () => {
+getSessionResultsAnalysisSegmentDimensionsForExport = (): unknown[] => {
 const dimensions: unknown[] = [];
 const questions = this.getHtmlReportQuestionsForExport();
 
@@ -3671,7 +3434,7 @@ if (gateValues.length > 0) {
 return dimensions;
 }
 
-buildSessionResultsAnalysisPayloadForAi = () => {
+buildSessionResultsAnalysisPayloadForAi = (): SurveyResultsAnalysisPayloadForAi => {
 const sessionSlug = this.getEffectiveSlug() || '';
 const sessionName = String(this.props.sessionName || this.state.surveyTitle || sessionSlug || 'Session').trim();
 const built = buildSessionResultsAnalysisAiPayload({
@@ -3775,89 +3538,6 @@ return buildRedactedSessionResultsSnapshot({
 });
 }
 
-getHtmlReportSectionAvailability = (
-snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionAvailability => ({
-  report: snapshot.sections.report.available,
-  argumentMap: snapshot.sections.argumentMap.available,
-  riskMatrix: snapshot.sections.riskMatrix.available,
-  atlas: snapshot.sections.atlas.available,
-  snapshotJson: true,
-});
-
-getHtmlReportSectionRows = (
-snapshot: SessionResultsHtmlSnapshot
-): SurveyResultsHtmlReportSectionRow[] => ([
-  {
-    available: snapshot.sections.report.available,
-    key: 'report',
-    label: 'Report',
-    reason: snapshot.sections.report.available ? 'Ready' : 'No hydrated results',
-  },
-  {
-    available: snapshot.sections.argumentMap.available,
-    key: 'argumentMap',
-    label: 'Argument Map',
-    reason: snapshot.sections.argumentMap.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: snapshot.sections.riskMatrix.available,
-    key: 'riskMatrix',
-    label: 'Risk Matrix',
-    reason: snapshot.sections.riskMatrix.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: snapshot.sections.atlas.available,
-    key: 'atlas',
-    label: 'Atlas Nodes',
-    reason: snapshot.sections.atlas.available ? 'Ready' : 'Needs analysis',
-  },
-  {
-    available: true,
-    key: 'snapshotJson',
-    label: 'Embedded Snapshot JSON',
-    reason: 'Always available',
-  },
-]);
-
-hasHtmlReportExportableSections = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  (sections.report && snapshot.sections.report.available) ||
-  (sections.argumentMap && snapshot.sections.argumentMap.available) ||
-  (sections.riskMatrix && snapshot.sections.riskMatrix.available) ||
-  (sections.atlas && snapshot.sections.atlas.available) ||
-  sections.snapshotJson
-);
-
-hasHtmlReportUnavailableSelectedSections = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  (sections.report && !snapshot.sections.report.available) ||
-  (sections.argumentMap && !snapshot.sections.argumentMap.available) ||
-  (sections.riskMatrix && !snapshot.sections.riskMatrix.available) ||
-  (sections.atlas && !snapshot.sections.atlas.available)
-);
-
-needsHtmlReportAnalysisGeneration = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  HTML_REPORT_ANALYSIS_SECTION_KEYS.some((key) => sections[key] && !this.getHtmlReportSectionAvailability(snapshot)[key])
-);
-
-canDownloadHtmlReport = (
-  snapshot: SessionResultsHtmlSnapshot,
-  sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
-): boolean => (
-  this.isHtmlReportExportAuthorized() &&
-  this.hasHtmlReportExportableSections(snapshot, sections) &&
-  !this.hasHtmlReportUnavailableSelectedSections(snapshot, sections) &&
-  !this.state.htmlReportAnalysisGenerating
-);
-
 getHtmlReportAnalysisSectionsToGenerate = (
   sections: Required<SessionResultsSectionSelection> = this.getHtmlReportSelectedSections()
 ): SessionResultsAnalysisSectionKey[] => {
@@ -3869,14 +3549,6 @@ Object.entries(sections).forEach(([sectionKey, selected]) => {
 });
 return SESSION_RESULTS_ANALYSIS_SECTION_KEYS.filter((key) => keys.has(key));
 }
-
-doesHtmlReportAnalysisArtifactCoverSections = (
-  artifact: SessionResultsGeneratedAnalysisArtifact | null,
-  sections: readonly SessionResultsAnalysisSectionKey[]
-): boolean => (
-  !!artifact &&
-  sections.every((section) => !!artifact.sections?.[section]?.available)
-);
 
 openHtmlReportExportModal = (): void => {
 const snapshot = this.buildSessionResultsHtmlReportSnapshot();
@@ -3961,35 +3633,31 @@ if (!eligibility.eligible) {
 }
 
 const cached = this.readSessionResultsAnalysisArtifactFromCache(inputSignature);
-const sectionsToGenerate = this.getHtmlReportAnalysisSectionsToGenerate();
 const currentArtifact = this.getHtmlReportAnalysisArtifact();
-let artifact: SessionResultsGeneratedAnalysisArtifact | null = (
-  currentArtifact?.inputSignature === inputSignature ? currentArtifact : null
-) || cached || null;
+const analysisLifecyclePlan = buildSurveyResultsAnalysisLifecyclePlan({
+  allSections: SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
+  cachedArtifact: cached,
+  currentArtifact,
+  inputSignature,
+  requestedSections: this.getHtmlReportAnalysisSectionsToGenerate(),
+});
+let artifact: SessionResultsGeneratedAnalysisArtifact | null = analysisLifecyclePlan.artifact;
 
-if (sectionsToGenerate.length === 0) {
-  sectionsToGenerate.push(...SESSION_RESULTS_ANALYSIS_SECTION_KEYS);
-}
-
-if (this.doesHtmlReportAnalysisArtifactCoverSections(artifact, sectionsToGenerate)) {
-  this.setState({
-    htmlReportAnalysisArtifact: artifact,
-    htmlReportAnalysisError: '',
-    htmlReportAnalysisInputSignature: inputSignature,
-    htmlReportAnalysisProgress: '',
-  });
+const lifecycleResult = runSurveyResultsAnalysisLifecycleController({
+  plan: analysisLifecyclePlan,
+  ports: {
+    applyBlockedState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    applyGenerateStartState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    applyReadyState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+  },
+});
+if (!lifecycleResult.shouldGenerate) {
   return;
 }
 
-this.setState({
-  htmlReportAnalysisGenerating: true,
-  htmlReportAnalysisError: '',
-  htmlReportAnalysisInputSignature: inputSignature,
-  htmlReportAnalysisProgress: '',
-});
-
 try {
-  const missingSections = sectionsToGenerate.filter((section) => !artifact?.sections?.[section]?.available);
+  const missingSections = analysisLifecyclePlan.missingSections;
+  let completionPlan: SurveyResultsAnalysisGeneratedArtifactCompletionPlan | null = null;
   for (let index = 0; index < missingSections.length; index += 1) {
     const section = missingSections[index];
     const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
@@ -4020,22 +3688,33 @@ try {
       next: sectionArtifact,
       sections: [section],
     });
-    if (artifact) {
-      await this.writeSessionResultsAnalysisArtifactToCache(artifact);
+    completionPlan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
+      artifact,
+      cacheKey: artifact ? this.getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '',
+      failureStatePatch: analysisLifecyclePlan.failureRecovery.statePatch,
+      inputSignature,
+      requestedSections: analysisLifecyclePlan.sectionsToGenerate,
+      slug: this.getSessionResultsAnalysisCacheSlug(),
+    });
+    if (!completionPlan.usable) {
+      throw new Error(`Generated analysis artifact completion failed: ${completionPlan.blockedReason}`);
+    }
+    if (completionPlan.shouldWriteCache && completionPlan.cacheWriteDescriptor) {
+      await this.writeSessionResultsAnalysisArtifactToCache(completionPlan.cacheWriteDescriptor.payload);
     }
   }
-  this.setState({
-    htmlReportAnalysisArtifact: artifact,
-    htmlReportAnalysisGenerating: false,
-    htmlReportAnalysisError: '',
-    htmlReportAnalysisProgress: '',
-  });
+  if (!completionPlan?.lifecyclePatchDescriptor) {
+    throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
+  }
+  this.setState(asSurveyResultsStatePatch(completionPlan.lifecyclePatchDescriptor));
 } catch (error) {
   surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
-  this.setState({
-    htmlReportAnalysisGenerating: false,
-    htmlReportAnalysisError: 'Unable to generate analysis views right now. Check AI settings and try again.',
-    htmlReportAnalysisProgress: '',
+  runSurveyResultsAnalysisLifecycleController({
+    phase: 'failure-recovery',
+    plan: analysisLifecyclePlan,
+    ports: {
+      applyFailureRecoveryState: this.applyHtmlReportAnalysisLifecycleStatePatch,
+    },
   });
 }
 }
@@ -4044,64 +3723,47 @@ downloadHtmlReport = async (): Promise<void> => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
 const selectedSections = this.getHtmlReportSelectedSections();
-if (!this.isHtmlReportExportAuthorized()) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Connect a wallet with permission to view these results before export.'));
-  return;
-}
-if (!this.hasHtmlReportExportableSections(snapshot, selectedSections)) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Select at least one available report section before export.'));
-  return;
-}
-if (this.hasHtmlReportUnavailableSelectedSections(snapshot, selectedSections)) {
-  this.setState(buildSurveyResultsAlertMessagePatch('Generate selected analysis views before downloading the report.'));
+const format = this.state.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
+const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  format,
+  isAuthorized: this.isHtmlReportExportAuthorized(),
+  selectedSections,
+  snapshot,
+});
+if (downloadPlan.status === 'blocked') {
+  this.setState(asSurveyResultsStatePatch(downloadPlan.statePatch));
   return;
 }
 
 try {
-  const format = this.state.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
-  const html = renderSessionResultsHtmlReport(snapshot, {
-    format,
-    sections: selectedSections,
-  });
-  const baseFilenameArgs = {
-    exportedAt: snapshot.exportedAt,
-    name: snapshot.session.name,
-    slug: snapshot.session.slug,
-  };
-  if (format === SESSION_RESULTS_EXPORT_FORMAT_PDF) {
+  const { downloadRequest } = downloadPlan;
+  const html = renderSessionResultsHtmlReport(snapshot, downloadRequest.renderOptions);
+  if (downloadRequest.kind === 'pdf') {
     await downloadSessionResultsPdfReport({
       html,
-      filename: buildSessionResultsPdfReportFilename(baseFilenameArgs),
+      filename: downloadRequest.filename,
     });
   } else {
-    downloadSessionResultsHtmlReport(html, buildSessionResultsHtmlReportFilename(baseFilenameArgs));
+    downloadSessionResultsHtmlReport(html, downloadRequest.filename);
   }
-  this.setState({
-    htmlReportModalOpen: false,
-    alertMessage: '',
-  });
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadSuccessPatch()));
 } catch (error) {
   surveyLog.error('[SurveyResults.downloadHtmlReport] Failed to export HTML report:', error);
-  this.setState(buildSurveyResultsAlertMessagePatch('Unable to export the HTML report.'));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsHtmlReportDownloadFailurePatch()));
 }
 }
 
 getExportBaseFileName = (exportType: unknown = this.state.exportType): string => {
 const { viewMode, surveyId } = this.state;
-const questionsOnly =
-  exportType === EXPORT_TYPES.CSV_QUESTIONS ||
-  exportType === EXPORT_TYPES.JSON_QUESTIONS;
-
-if (viewMode === 'survey') {
-  const surveyIdShort = surveyId
-    ? getShortenedSurveyID(surveyId, false, null, true)
-    : 'all';
-  return questionsOnly
-    ? `contextEngine_surveyQuestions_${surveyIdShort}`
-    : `contextEngine_surveyResults_${surveyIdShort}`;
-}
-
-return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
+const surveyIdShort = surveyId
+  ? getShortenedSurveyID(surveyId, false, null, true)
+  : 'all';
+return buildSurveyResultsExportBaseFileName({
+  exportType,
+  surveyIdShort,
+  viewMode,
+});
 }
 
 downloadCSV = (): void => {
@@ -4120,14 +3782,14 @@ runSurveyResultsExportController({
   },
   getCurrentAlertMessage: () => this.state.alertMessage,
   onAlertMessage: (message) => {
-    this.setState(buildSurveyResultsAlertMessagePatch(message));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch(message)));
   },
   timestamp,
 });
 };
 
 handleExportTypeChange = (type: unknown): void => {
-this.setState(buildSurveyResultsExportTypePatch(type));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsExportTypePatch(type)));
 };
 
 handleQuestionFilter = (
@@ -4225,12 +3887,12 @@ handleQuestionFilter = (
 
     if (loadingUpdate.shouldQueueState) {
       this._pendingFilterLoadingValue = loadingUpdate.nextPendingValue;
-      this.setState((prev: SurveyResultsRecord) => (
+      this.setState(asSurveyResultsStateUpdater((prev: SurveyResultsRecord) => (
         buildSurveyResultsFilterLoadingStatePatch({
           nextLoading: loadingUpdate.nextLoading,
           prevState: prev,
         })
-      ), () => {
+      )), () => {
         if (this.state.filterLoading === this._pendingFilterLoadingValue) {
           this._pendingFilterLoadingValue = null;
         }
@@ -4249,7 +3911,7 @@ handleQuestionFilterCountUpdate = (count: unknown): void => {
     state: this.state,
   });
   if (!countPatch) return;
-  this.setState(countPatch);
+  this.setState(asSurveyResultsStatePatch(countPatch));
   if (this.props.onCountUpdate) this.props.onCountUpdate(count);
 };
 
@@ -4262,8 +3924,11 @@ handleFilteredResponses = (
   if (!this.props.isQuestionCacheReady) return;
   const nextFilterState =
     typeof newSbtFilterLocalState !== 'undefined'
-      ? { ...toSurveyResultsRecord(this.state.filterState), sbtFilter: newSbtFilterLocalState }
-      : (this.state.filterState || {});
+      ? buildSurveyResultsSbtFilterState({
+        filterState: this.state.filterState,
+        sbtFilter: newSbtFilterLocalState,
+      })
+      : preserveSurveyResultsFilterStateValue(this.state.filterState);
 
   if (this.state.viewMode === 'survey') {
     if (this.state.surveyViewMode === 'individuals') {
@@ -4343,136 +4008,96 @@ handleFilteredResponses = (
 
 
 toggleQuestionSummary = (questionId: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
   itemKey: questionId,
   mapKey: 'activeQuestionToggles',
   prevState,
-}));
+})));
 };
 
 toggleResponse = (index: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
   itemKey: index,
   mapKey: 'activeToggles',
   prevState,
-}));
+})));
 };
 
 toggleSurveyBookmark = (surveyId: unknown): void => {
 const slug = this.getEffectiveSlug();
-let bookmarksCache: SurveyResultsBookmarkCache;
-const defaultCache: SurveyResultsBookmarkCache = { surveys: [], questions: [] };
+const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug });
+let bookmarksCache: unknown = {};
 
 try {
-  const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-  const parsedRecord = parsed as SurveyResultsRecord;
-  bookmarksCache = (parsed && typeof parsed === 'object')
-    ? {
-        ...parsedRecord,
-        surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-        questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-      }
-    : defaultCache;
-  if (
-    typeof bookmarksCache !== 'object' ||
-    bookmarksCache === null ||
-    !Array.isArray(bookmarksCache.surveys) ||
-    !Array.isArray(bookmarksCache.questions)
-  ) {
-    bookmarksCache = defaultCache;
-  }
+  bookmarksCache = peekCacheSync(
+    bookmarksReadRequest.namespace,
+    bookmarksReadRequest.slug,
+    bookmarksReadRequest.options
+  );
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-  bookmarksCache = defaultCache;
+  bookmarksCache = {};
 }
 
-const surveyIndex = bookmarksCache.surveys.indexOf(surveyId);
-if (surveyIndex > -1) {
-  bookmarksCache.surveys.splice(surveyIndex, 1);
-} else {
-  bookmarksCache.surveys.push(surveyId);
-}
-
-void (writeCache as SurveyResultsWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
-  surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
+const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+  bookmarkId: surveyId,
+  bookmarkType: 'survey',
+  bookmarksCache,
+  slug,
 });
-this.setState(buildSurveyResultsBookmarkedSurveyIdsPatch(bookmarksCache.surveys));
+
+if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
+
+void runSurveyResultsSurveyQuestionBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+  },
+}).then((writeResult) => {
+  if (!writeResult.ok && writeResult.error) {
+    surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
+  }
+});
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value)));
 };
 
 toggleQuestionBookmark = (questionId: unknown): void => {
 const slug = this.getEffectiveSlug();
-let bookmarksCache: SurveyResultsBookmarkCache;
-const defaultCache: SurveyResultsBookmarkCache = { surveys: [], questions: [] };
+const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug });
+let bookmarksCache: unknown = {};
 
 try {
-  const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-  const parsedRecord = parsed as SurveyResultsRecord;
-  bookmarksCache = (parsed && typeof parsed === 'object')
-    ? {
-        ...parsedRecord,
-        surveys: Array.isArray(parsedRecord.surveys) ? [...parsedRecord.surveys] : [],
-        questions: Array.isArray(parsedRecord.questions) ? [...parsedRecord.questions] : [],
-      }
-    : defaultCache;
-  if (
-    typeof bookmarksCache !== 'object' ||
-    bookmarksCache === null ||
-    !Array.isArray(bookmarksCache.surveys) ||
-    !Array.isArray(bookmarksCache.questions)
-  ) {
-    bookmarksCache = defaultCache;
-  }
+  bookmarksCache = peekCacheSync(
+    bookmarksReadRequest.namespace,
+    bookmarksReadRequest.slug,
+    bookmarksReadRequest.options
+  );
 } catch (error) {
   surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-  bookmarksCache = defaultCache;
+  bookmarksCache = {};
 }
 
-const questionIndex = bookmarksCache.questions.indexOf(questionId);
-if (questionIndex > -1) {
-  bookmarksCache.questions.splice(questionIndex, 1);
-} else {
-  bookmarksCache.questions.push(questionId);
-}
-
-void (writeCache as SurveyResultsWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
-  surveyLog.error('[SurveyResults] Error saving bookmarksCache:', error);
+const writePlan = buildSurveyResultsSurveyQuestionBookmarkWritePlan({
+  bookmarkId: questionId,
+  bookmarkType: 'question',
+  bookmarksCache,
+  slug,
 });
-this.setState(buildSurveyResultsBookmarkedQuestionIdsPatch(bookmarksCache.questions));
-};
 
-transformIndividualResponsesToAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {
-  const responseRows = individualResponses as SurveyResultsSummaryResponseRow[];
-  if (!individualResponses || responseRows.length === 0) {
-    return {};
+if (!writePlan.shouldWrite || !writePlan.payload || !writePlan.statePatch) return;
+
+void runSurveyResultsSurveyQuestionBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeBookmarksCache: writeCache as unknown as SurveyResultsBookmarksCacheWritePort,
+  },
+}).then((writeResult) => {
+  if (!writeResult.ok && writeResult.error) {
+    surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
   }
-
-  const aggregator: SurveyResultsIndividualAggregator = {};
-
-  responseRows.forEach((response) => {
-    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
-      response.response
-    ) as SurveyResultsSurveyResponsePayload | null; // Already an object
-    if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach((answerItem) => {
-        const qIdLower = getSurveyResponseQuestionId(answerItem);
-        if (!qIdLower) return;
-
-        if (!aggregator[qIdLower]) {
-          aggregator[qIdLower] = [];
-        }
-
-        aggregator[qIdLower].push({
-          responder: String(response.responder || '').toLowerCase(), // normalize storage
-          questionId: qIdLower,
-          response: answerItem,
-          timestamp: getSurveyResponseAggregateTimestampMs(answerItem, parsedResponse),
-        });
-      });
-    }
-  });
-
-  return aggregator;
-}
+});
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkedQuestionIdsPatch(writePlan.statePatch.value)));
+};
 
 getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResultsIndividualAggregator => {
   const responsesRef = Array.isArray(individualResponses)
@@ -4482,45 +4107,12 @@ getMemoizedIndividualsAggregator = (individualResponses: unknown): SurveyResults
   if (memo.responsesRef === responsesRef) {
     return memo.result;
   }
-  const next = this.transformIndividualResponsesToAggregator(responsesRef);
+  const next = buildSurveyResultsIndividualResponseAggregator(responsesRef);
   this._individualResponsesAggregatorMemo = {
     responsesRef,
     result: next,
   };
   return next;
-};
-
-getMemoizedViewableResponsesCount = (responses: unknown, questionType: unknown = ''): number => {
-  const list = Array.isArray(responses)
-    ? responses as SurveyResultsSummaryResponseRow[]
-    : [];
-  const normalizedQuestionType = String(questionType || '').toLowerCase();
-  const memo = this._viewableResponsesCountMemo as WeakMap<
-    SurveyResultsSummaryResponseRow[],
-    SurveyResultsViewableResponsesCountMemoValue
-  >;
-  const cached = memo.get(list);
-  if (cached && cached.questionType === normalizedQuestionType) {
-    return cached.count;
-  }
-  const count = this.getLatestResponsesByResponder(list).reduce((acc: number, row) => {
-    const parsedResponse = row?.response;
-    if (!parsedResponse || !parsedResponse.answer) {
-      return acc;
-    }
-    if (isFreeformBlankAnswer(normalizedQuestionType, parsedResponse)) {
-      return acc;
-    }
-    const isEncryptedPlaceholder =
-      parsedResponse.answer.encrypted === true &&
-      parsedResponse.answer.value === '*';
-    return isEncryptedPlaceholder ? acc : (acc + 1);
-  }, 0);
-  memo.set(list, {
-    questionType: normalizedQuestionType,
-    count,
-  });
-  return count;
 };
 
 getMemoizedAggregatorEntries = (aggregator: unknown): SurveyResultsAggregatorEntry[] => {
@@ -4561,7 +4153,7 @@ getMemoizedPolisQuestionResponses = (
     return memo.result as SurveyResultsStringifiedAggregator;
   }
   const result = measureSync('ce.surveyResults.render.polisPayload', () =>
-    this.stringifyAggregatorResponses(sourceRef)
+    stringifySurveyResultsAggregatorResponses(sourceRef)
   ) as SurveyResultsStringifiedAggregator;
   this._polisQuestionResponsesMemo = {
     selected: true,
@@ -4569,34 +4161,6 @@ getMemoizedPolisQuestionResponses = (
     result,
   };
   return result;
-};
-
-resolveSummaryQuestionType = resolveSurveyResultsSummaryQuestionType;
-
-getLatestResponsesByResponder = getSurveyResultsLatestResponsesByResponder as (
-  responses?: unknown
-) => SurveyResultsSummaryResponseRow[];
-
-buildFreeformSummaryModel = buildSurveyResultsFreeformSummaryModel as (
-  responses?: unknown
-) => SurveyResultsFreeformSummaryModel;
-
-buildMultichoiceSummaryModel = buildSurveyResultsMultichoiceSummaryModel as (
-  responses?: unknown,
-  question?: SurveyResultsRecord | null
-) => SurveyResultsMultichoiceSummaryModel;
-
-renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
-  const summary = this.buildFreeformSummaryModel(responses);
-  return SurveyResultsFreeformAggregatorSummary({ summary });
-};
-
-renderMultichoiceAggregatorSummary = (
-  responses: unknown = [],
-  question: SurveyResultsRecord | null = null
-): React.ReactNode => {
-  const summary = this.buildMultichoiceSummaryModel(responses, question);
-  return SurveyResultsMultichoiceAggregatorSummary({ summary });
 };
 
 getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
@@ -4958,7 +4522,7 @@ decryptFieldValue = async (
 handleDecryptLockedResponses = async (): Promise<void> => {
   if (this.state.lockedResponsesDecrypting) return;
   if (!this.props.loginComplete || !this.props.account) {
-    this.setState(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.'));
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.')));
     return;
   }
 
@@ -4967,7 +4531,7 @@ handleDecryptLockedResponses = async (): Promise<void> => {
   const lockedRows = Array.isArray(model?.lockedRows) ? model.lockedRows : [];
   if (lockedRows.length === 0) return;
 
-  this.setState(buildSurveyResultsLockedResponsesDecryptingPatch(true));
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true)));
 
   let anyDecrypted = false;
   const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
@@ -5035,140 +4599,70 @@ handleDecryptLockedResponses = async (): Promise<void> => {
     }
   }
 
-  this.setState(buildSurveyResultsLockedResponsesDecryptCompletePatch({
+  this.setState(asSurveyResultsStatePatch(buildSurveyResultsLockedResponsesDecryptCompletePatch({
     anyDecrypted,
     decryptedResponseOverrides: nextOverrides,
     walletLowerLabel: t('walletLower'),
-  }));
+  })));
 };
 
 toggleLockedResponseDetails = (): void => {
-  this.setState(toggleSurveyResultsLockedResponseDetailsPatch);
+  this.setState(asSurveyResultsStateUpdater(toggleSurveyResultsLockedResponseDetailsPatch));
 };
-
-renderLockedResponsesToggle = (
-  lockedModel: SurveyResultsLockedResponsesModel | null = null
-): React.ReactNode => {
-  return SurveyResultsLockedResponsesToggle({
-    isOpen: !!this.state.lockedResponseDetailsOpen,
-    lockedModel,
-    onToggleDetails: this.toggleLockedResponseDetails,
-  });
-};
-
-renderLockedResponsesBanner = (
-  lockedModel: SurveyResultsLockedResponsesModel | null = null
-): React.ReactNode => {
-  return SurveyResultsLockedResponsesBanner({
-    decrypting: !!this.state.lockedResponsesDecrypting,
-    isOpen: !!this.state.lockedResponseDetailsOpen,
-    lockedModel,
-    onDecrypt: this.handleDecryptLockedResponses,
-  });
-};
-
 
 renderQuestionSummary = (
   questionId: string,
   responses: unknown,
-  preNetworkQuestions: Record<string, SurveyResultsRecord>
+  preNetworkQuestions?: Record<string, SurveyResultsRecord> | null
 ): React.ReactNode => {
-  const domId = getQuestionCardDomId(questionId);
-  const lowerQId = questionId.toLowerCase();
-
-  // Prefer preloaded per-render cache to avoid repeated localStorage hits.
-  let networkQuestions = preNetworkQuestions;
-  if (!networkQuestions) {
-    networkQuestions = this.getNetworkQuestionsForCurrentContext();
-  }
-  const question = networkQuestions[lowerQId];
-  const questionDisplay = buildSurveyResultsQuestionSummaryDisplayPlan({
-    question,
-    questionId,
-  });
-  const displayResponses = (Array.isArray(responses) ? responses : []).map((row: SurveyResultsAggregateRow) => {
-    const rowResponse = row?.response as SurveyResultsResponseRecord | null;
-    const key = this.getLockedResponseKey({
-      responder: row?.responder,
+  const activeSessionSlug = this.getEffectiveSlug();
+  const questionMetadataRead = runSurveyResultsQuestionMetadataReadController({
+    identity: {
+      activeSessionSlug,
+      currentSurveyId: String(this.state.surveyId || ''),
       questionId,
-      surveyId: this.state.surveyId,
-      response: rowResponse,
-    });
-    return {
-      ...row,
-      response: this.applyDecryptedOverrideToResponse({
-        response: rowResponse,
-        key,
-      }),
-    };
+      viewMode: String(this.state.viewMode || this.props.viewMode || 'questions'),
+    },
+    ports: {
+      readNetworkQuestions: this.getNetworkQuestionsForCurrentContext,
+    },
+    // Prefer preloaded per-render cache to avoid repeated localStorage hits.
+    preloadedNetworkQuestions: preNetworkQuestions,
   });
-  const resolvedQuestionType = this.resolveSummaryQuestionType(question, displayResponses);
-  const viewableResponsesCount = this.getMemoizedViewableResponsesCount(displayResponses, resolvedQuestionType);
+  const networkQuestions = questionMetadataRead.selectedNetworkQuestions;
 
-const isActive = this.state.activeQuestionToggles[questionId];
-return (
-  <SurveyResultsQuestionSummaryCard
-    key={questionId}
-    bookmarked={this.state.bookmarkedQuestionIDs.includes(questionId)}
-    bookmarkIconStyle={SURVEY_RESULTS_CLICKABLE_ICON_STYLE}
-    domId={domId}
-    isActive={!!isActive}
-    metadataMissing={questionDisplay.metadataMissing}
-    metadataMissingStyle={SURVEY_RESULTS_METADATA_MISSING_STYLE}
-    onToggleBookmark={() => this.toggleQuestionBookmark(questionId)}
-    onToggleSummary={() => this.toggleQuestionSummary(questionId)}
-    questionPrompt={questionDisplay.questionPrompt as React.ReactNode}
-    renderDefaultSummary={() => (
-      <SingleQuestionResponse
-        aggregatorResponseMode={true}
-        question={question || this.getStableFallbackQuestion(questionId, 'summary')}
-        allResponses={displayResponses}
-        network={this.props.network}
-        activeSessionSlug={question?.sessionSlug || this.getEffectiveSlug()}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionsCacheNonce={this.props.questionsCacheNonce}
-        sbtCacheRevision={this.props.sbtCacheRevision}
-        {...this.getSurveyResultsResponseCardProps()}
-      />
-    )}
-    renderFreeformSummary={() => this.renderFreeformAggregatorSummary(displayResponses)}
-    renderMultichoiceSummary={() => this.renderMultichoiceAggregatorSummary(displayResponses, question)}
-    resolvedQuestionType={resolvedQuestionType}
-    styleMap={styles}
-    viewableResponsesCount={viewableResponsesCount}
-  />
-);
+  return SurveyResultsQuestionSummary({
+    activeQuestionToggles: this.state.activeQuestionToggles,
+    activeSessionSlug,
+    applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+    bookmarkedQuestionIDs: this.state.bookmarkedQuestionIDs,
+    bookmarkIconStyle: SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
+    getFallbackQuestion: this.getStableFallbackQuestion,
+    getLockedResponseKey: this.getLockedResponseKey,
+    getResponseCardProps: this.getSurveyResultsResponseCardProps,
+    metadataMissingStyle: SURVEY_RESULTS_METADATA_MISSING_STYLE,
+    network: this.props.network,
+    networkQuestions,
+    onToggleBookmark: this.toggleQuestionBookmark,
+    onToggleSummary: this.toggleQuestionSummary,
+    questionId,
+    questionResponsesNonce: this.props.questionResponsesNonce,
+    questionsCacheNonce: this.props.questionsCacheNonce,
+    responses,
+    sbtCacheRevision: this.props.sbtCacheRevision,
+    styleMap: styles,
+    surveyId: this.state.surveyId,
+  });
 };
 
 getStableFallbackQuestion = (
   questionId: unknown,
   mode: unknown = 'summary'
 ): SurveyResultsFallbackQuestion => {
-const cacheKey = String(questionId || '');
 if (!this._stableFallbackQuestions || typeof this._stableFallbackQuestions !== 'object') {
-  this._stableFallbackQuestions = {
-    summary: new Map(),
-    individual: new Map(),
-  };
+  this._stableFallbackQuestions = createSurveyResultsFallbackQuestionBuckets();
 }
-const fallbackQuestions = this._stableFallbackQuestions as SurveyResultsFallbackQuestionBuckets;
-const bucket = mode === 'individual'
-  ? fallbackQuestions.individual
-  : fallbackQuestions.summary;
-if (bucket.has(cacheKey)) return bucket.get(cacheKey) as SurveyResultsFallbackQuestion;
-const fallback: SurveyResultsFallbackQuestion = mode === 'individual'
-  ? {
-    id: questionId,
-    creator: '',
-    type: '',
-    prompt: '',
-  }
-  : {
-    id: questionId,
-    prompt: 'Unknown question',
-  };
-bucket.set(cacheKey, fallback);
-return fallback;
+return getSurveyResultsStableFallbackQuestion(this._stableFallbackQuestions, questionId, mode);
 };
 
 getMemoizedQuestionTableEntries = (
@@ -5186,31 +4680,11 @@ if (
   return memo.result;
 }
 
-const questionRecord = Object(questionMap || {}) as Record<string, unknown>;
-const networkQuestionRecord = Object(networkQuestions || {}) as Record<string, SurveyResultsRecord | undefined>;
-const entries = Object.keys(questionRecord).map((qId) => {
-  const responses = questionRecord[qId] || [];
-  const lowerQ = qId.toLowerCase();
-  const qData = networkQuestionRecord[lowerQ] || {};
-  return {
-    questionId: qId,
-    responsesCount: this.getLatestResponsesByResponder(responses).length,
-    type: (qData.type || '') as string,
-    prompt: (qData.prompt || '') as string,
-    sessionSlug: (qData.sessionSlug || '') as string,
-  };
-});
-
-entries.sort((a, b) => {
-  let cmp = 0;
-  if (questionIdSortBy === 'responses') {
-    cmp = a.responsesCount - b.responsesCount;
-  } else if (questionIdSortBy === 'type') {
-    cmp = a.type.localeCompare(b.type);
-  } else if (questionIdSortBy === 'prompt') {
-    cmp = a.prompt.localeCompare(b.prompt);
-  }
-  return questionIdSortAsc ? cmp : -cmp;
+const entries = buildSurveyResultsQuestionTableEntries({
+  networkQuestions,
+  questionMap,
+  sortAsc: questionIdSortAsc,
+  sortBy: questionIdSortBy,
 });
 
 this._questionTableEntriesMemo = {
@@ -5239,12 +4713,12 @@ return (
     onViewQuestion={(questionId) => {
       // Use setState with a callback to guarantee the scroll happens after the render.
       // This ensures the card is expanded before we attempt to scroll to it.
-      this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+      this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
         forceValue: true,
         itemKey: questionId,
         mapKey: 'activeQuestionToggles',
         prevState,
-      }), () => {
+      })), () => {
         this.scrollToQuestion(questionId);
       });
     }}
@@ -5255,27 +4729,8 @@ return (
 );
 };
 
-// Add this helper inside the SurveyResults class
-stringifyAggregatorResponses = (aggregatorObj: unknown): SurveyResultsStringifiedAggregator => {
-const out: SurveyResultsStringifiedAggregator = {};
-if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
-const aggregatorRecord = aggregatorObj as Record<string, unknown>;
-Object.keys(aggregatorRecord).forEach((qId) => {
-  const arr = Array.isArray(aggregatorRecord[qId]) ? aggregatorRecord[qId] : [];
-  out[qId] = arr.map((item) => ({
-    ...(item as SurveyResultsRecord),
-    response:
-      typeof (item as SurveyResultsRecord).response === 'string'
-        ? (item as SurveyResultsRecord).response
-        : JSON.stringify((item as SurveyResultsRecord).response),
-  }));
-});
-return out;
-};
-
-
 scrollToQuestion = (questionId: unknown): void => {
-const domId = getQuestionCardDomId(questionId as string | undefined);
+const domId = getSurveyResultsQuestionCardDomId(questionId as string | undefined);
 const cleanupScrollWatcher = () => {
   if (this._scrollToQuestionRetryTimer) {
     clearTimeout(this._scrollToQuestionRetryTimer);
@@ -5323,21 +4778,21 @@ this._scrollToQuestionRetryTimer = setTimeout(() => {
 };
 
 changeQuestionIdSort = (column: unknown): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsQuestionIdSortPatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsQuestionIdSortPatch({
   column,
   prevState,
-}));
+})));
 };
 
   toggleQuestionFilter = (): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'showQuestionFilter',
-}));
+})));
 };
 
 toggleSurveyViewMode = (mode: unknown): void => {
-this.setState(buildSurveyResultsSurveyViewModePatch(mode));
+this.setState(asSurveyResultsStatePatch(buildSurveyResultsSurveyViewModePatch(mode)));
 };
 
 handleSurveyViewModeToggle = (): void => {
@@ -5352,39 +4807,40 @@ if (event.key === 'Enter' || event.key === ' ') {
 };
 
 toggleExportArea = (): void => {
-this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'exportAreaOpen',
-}));
+})));
 };
 
 handleManualRefresh = async (): Promise<void> => {
 try {
   const slug = this.getEffectiveSlug();
-  const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
+	  const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider as string | undefined, slug);
+  const refreshStatusSequencePlan = buildSurveyResultsRefreshStatusSequencePlan({
+    latestBlock: latestOnChain,
+    followUpEffects: [
+      'manualRefreshDispatch',
+      'resetLocalStoragePollingBackoff:manual-refresh',
+      'pollLocalStorageForUpdates',
+      'queueResultsRefresh:manual-refresh',
+    ],
+  });
+  if (!refreshStatusSequencePlan.shouldWrite || !refreshStatusSequencePlan.statePatch) return;
 
   this.setState(
-    {
-      refreshTargetQuestionBlock: latestOnChain,
-      refreshTargetResponseBlock: latestOnChain,
-      refreshTargetSurveyBlock: latestOnChain
-    },
+    asSurveyResultsStatePatch(refreshStatusSequencePlan.statePatch),
     async () => {
-      if (this.state.viewMode === 'questions') {
-        if (this.props.refreshQuestionMetadata) {
-          surveyLog.log("refreshQuestionMetadata present")
-          await this.props.refreshQuestionMetadata();
-        }
-        if (this.props.refreshQuestionResponses) {
-          await this.props.refreshQuestionResponses();
-        }
-      } else if (
-        this.state.viewMode === 'survey' &&
-        this.state.surveyId && // Use state.surveyId
-        this.props.refreshSurveyResponsesByID
-      ) {
-        await this.props.refreshSurveyResponsesByID(this.state.surveyId.toLowerCase());
-      }
+      await runSurveyResultsManualRefreshDispatchController({
+        ports: {
+          onQuestionMetadataRefreshAvailable: () => surveyLog.log("refreshQuestionMetadata present"),
+          refreshQuestionMetadata: this.props.refreshQuestionMetadata,
+          refreshQuestionResponses: this.props.refreshQuestionResponses,
+          refreshSurveyResponsesByID: this.props.refreshSurveyResponsesByID,
+        },
+        surveyId: this.state.surveyId,
+        viewMode: this.state.viewMode,
+      });
       this.resetLocalStoragePollingBackoff('manual-refresh');
       this.pollLocalStorageForUpdates();
       this.queueResultsRefresh('manual-refresh');
@@ -5396,9 +4852,12 @@ try {
 };
 
 handleBookmarkFilter = async (): Promise<void> => {
-if (!this._isMounted) return;
-
 const filterToBookmark = this.state.filterState;
+const mountedWritePlan = buildSurveyResultsFilterBookmarkWritePlan({
+  filterState: filterToBookmark,
+  isMounted: this._isMounted,
+});
+if (!mountedWritePlan.shouldReadCache) return;
 const slug = this.getEffectiveSlug();
 
 let filtersCache: unknown = peekCacheSync('filters', slug, { clone: false });
@@ -5408,27 +4867,48 @@ if (!filtersCache || typeof filtersCache !== 'object') {
   filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
 }
 const filtersCacheRecord = toSurveyResultsRecord(filtersCache) as SurveyResultsFiltersCache;
-let bookmarks: unknown[] = [];
+let writePlan: SurveyResultsFilterBookmarkWritePlan;
 try {
-  const parsed = filtersCacheRecord.bookmarkedFilters;
-  if (Array.isArray(parsed)) {
-    bookmarks = [...parsed];
-  } else if (parsed != null) {
+  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
+    filtersCache: filtersCacheRecord,
+    filtersCacheLoaded: true,
+    filterState: filterToBookmark,
+    isMounted: this._isMounted,
+    slug,
+  });
+  if (writePlan.bookmarkedFiltersInvalid) {
     surveyLog.warn('Bookmarked filters cache was not an array. Initializing to empty array.');
   }
 } catch (e) {
   surveyLog.error('Error parsing bookmarked filters cache:', e);
+  writePlan = buildSurveyResultsFilterBookmarkWritePlan({
+    filtersCache: {},
+    filtersCacheLoaded: true,
+    filterState: filterToBookmark,
+    isMounted: this._isMounted,
+    slug,
+  });
 }
 
-// Optional: Duplicate check (skipped for simplicity as per instructions)
-bookmarks.push(filterToBookmark);
+if (!writePlan.shouldWrite || !writePlan.payload) return;
+
+const writeResult = await runSurveyResultsFilterBookmarkWriteController({
+  plan: writePlan,
+  ports: {
+    writeFilterBookmark: writeCache as SurveyResultsWriteCache,
+  },
+});
+if (!writeResult.ok) {
+  if (writeResult.error) {
+    surveyLog.error('Error saving bookmarked filters cache:', writeResult.error);
+  }
+  return;
+}
 
 try {
-  await (writeCache as SurveyResultsWriteCache)('filters', slug, {
-    ...filtersCacheRecord,
-    bookmarkedFilters: bookmarks,
-  });
-  this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
+  if (writeResult.shouldApplySuccessFeedback) {
+    this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(true)));
+  }
 
   if (this._bookmarkFeedbackTimer) {
     clearTimeout(this._bookmarkFeedbackTimer);
@@ -5437,7 +4917,7 @@ try {
   this._bookmarkFeedbackTimer = setTimeout(() => {
     this._bookmarkFeedbackTimer = null;
     if (this._isMounted) {
-      this.setState(buildSurveyResultsBookmarkFeedbackPatch(false));
+      this.setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkFeedbackPatch(false)));
     }
   }, 2000);
 } catch (e) {
@@ -5445,188 +4925,37 @@ try {
 }
 };
 
-renderHtmlReportExportModal = (): React.ReactNode => {
+getHtmlReportModalProps = (): SurveyResultsHtmlReportExportModalProps => {
 const exportedAt = this.state.htmlReportExportedAt || new Date().toISOString();
 const snapshot = this.buildSessionResultsHtmlReportSnapshot(exportedAt);
-const sectionRows = this.getHtmlReportSectionRows(snapshot);
 const selectedSections = this.getHtmlReportSelectedSections();
-const canDownload = this.canDownloadHtmlReport(snapshot, selectedSections);
 const isAuthorized = this.isHtmlReportExportAuthorized();
-const isDemoSession = this.isHtmlReportDemoSession();
-const isDemoMode = this.isHtmlReportDemoModeActive();
-const needsAnalysisGeneration = this.needsHtmlReportAnalysisGeneration(snapshot, selectedSections);
 const analysisPayload = this.buildSessionResultsAnalysisPayloadForAi();
-const canGenerateAnalysis =
-  (isAuthorized || isDemoMode) &&
-  analysisPayload.eligibility.eligible &&
-  !this.state.htmlReportAnalysisGenerating;
-const sessionLabel = snapshot.session.name || snapshot.session.slug || 'Session';
-const exporterLabel = snapshot.exportedBy?.displayAddress || 'Not connected';
-const downloadLabel = this.state.htmlReportExportFormat === SESSION_RESULTS_EXPORT_FORMAT_PDF
-  ? 'Download PDF'
-  : this.state.htmlReportExportFormat === SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML
-    ? 'Download Single HTML'
-    : 'Download HTML Viewer';
 
-return (
-  <Modal
-    isOpen={!!this.state.htmlReportModalOpen}
-    toggle={this.closeHtmlReportExportModal}
-    className={styles.htmlReportModal}
-    data-testid="ce-surveyresults-html-report-modal"
-  >
-    <ModalHeader toggle={this.closeHtmlReportExportModal} className={styles.htmlReportModalHeader}>
-      Export HTML Report
-    </ModalHeader>
-    <ModalBody className={styles.htmlReportModalBody}>
-      <p>
-        <strong>{sessionLabel}</strong>
-        {snapshot.session.slug ? ` (${snapshot.session.slug})` : ''}
-      </p>
-      <p>
-        Export timestamp: <strong>{snapshot.exportedAt}</strong>
-      </p>
-      <p>
-        Privacy mode: <strong>Redacted</strong>
-      </p>
-      <p>
-        Downloaded by: <strong>{exporterLabel}</strong>
-      </p>
-      {!isAuthorized && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          Connect a wallet to download authenticated exports.
-        </Alert>
-      )}
-      <div className={styles.htmlReportOptionGroup}>
-        <h6>Export format</h6>
-        {HTML_REPORT_EXPORT_FORMATS.map((formatOption) => (
-          <FormGroup check key={formatOption.value} className={styles.htmlReportOptionRow}>
-            <Input
-              id={`html-report-format-${formatOption.value}`}
-              type="radio"
-              checked={this.state.htmlReportExportFormat === formatOption.value}
-              onChange={() => this.handleHtmlReportFormatChange(formatOption.value)}
-            />
-            <Label check for={`html-report-format-${formatOption.value}`}>
-              <strong>{formatOption.label}</strong>
-              <small>{formatOption.description}</small>
-            </Label>
-          </FormGroup>
-        ))}
-      </div>
-      {isDemoSession && (
-        <div className={styles.htmlReportOptionGroup}>
-          <FormGroup check className={styles.htmlReportOptionRow}>
-            <Input
-              id="html-report-demo-mode"
-              type="checkbox"
-              checked={isDemoMode}
-              onChange={this.toggleHtmlReportDemoMode}
-              data-testid="ce-surveyresults-html-report-demo-mode"
-            />
-            <Label check for="html-report-demo-mode">
-              <strong>Demo preview mode</strong>
-              <small>Use local demo analysis sections without AI or wallet auth.</small>
-            </Label>
-          </FormGroup>
-        </div>
-      )}
-      <Table size="sm" responsive className={styles.htmlReportSectionTable}>
-        <thead>
-          <tr>
-            <th scope="col">Include</th>
-            <th scope="col">Section</th>
-            <th scope="col">Availability</th>
-            <th scope="col">Why</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sectionRows.map((row) => (
-            <tr key={row.key}>
-              <td>
-                <Input
-                  aria-label={`Include ${row.label}`}
-                  checked={!!selectedSections[row.key]}
-                  type="checkbox"
-                  onChange={() => this.toggleHtmlReportSection(row.key)}
-                />
-              </td>
-              <td>{row.label}</td>
-              <td>{row.available ? 'Available' : 'Unavailable'}</td>
-              <td>{row.reason}</td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <div className={styles.htmlReportOptionGroup}>
-        <h6>Analysis views</h6>
-        <p>
-          {analysisPayload.eligibility.counts.responses} responses,
-          {' '}{analysisPayload.eligibility.counts.participants} participants,
-          {' '}{analysisPayload.eligibility.counts.questions} questions.
-          {' '}AI mode uses synthetic participant IDs.
-        </p>
-        {analysisPayload.eligibility.reasons.length > 0 && (
-          <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-            {analysisPayload.eligibility.reasons.join(' ')}
-          </Alert>
-        )}
-        {this.state.htmlReportAnalysisError && (
-          <Alert color="warning" fade={false} className={styles.htmlReportWarning}>
-            {this.state.htmlReportAnalysisError}
-          </Alert>
-        )}
-        <Button
-          type="button"
-          color="secondary"
-          onClick={this.generateHtmlReportAnalysisViews}
-          disabled={!canGenerateAnalysis}
-          className={styles.htmlReportGenerateButton}
-          data-testid="ce-surveyresults-html-report-generate-analysis"
-        >
-          {this.state.htmlReportAnalysisGenerating
-            ? this.state.htmlReportAnalysisProgress || 'Generating Analysis Views...'
-            : isDemoMode
-              ? 'Refresh Demo Analysis'
-              : 'Generate Analysis Views'}
-        </Button>
-      </div>
-      {needsAnalysisGeneration && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          Selected analysis sections need generated data before download.
-        </Alert>
-      )}
-      <Alert color="warning" fade={false} className={styles.htmlReportWarning}>
-        Redacted exports omit raw response records, wallet addresses, encrypted payloads, and gated values by default.
-      </Alert>
-      {!canDownload && (
-        <Alert color="info" fade={false} className={styles.htmlReportInfo}>
-          {isAuthorized
-            ? 'Select only available sections, or generate selected analysis views before download.'
-            : 'Connect a wallet to enable download.'}
-        </Alert>
-      )}
-    </ModalBody>
-    <ModalFooter className={styles.htmlReportModalFooter}>
-      <Button
-        color="secondary"
-        onClick={this.closeHtmlReportExportModal}
-        className={styles.htmlReportCancelButton}
-      >
-        Cancel
-      </Button>
-      <Button
-        color="primary"
-        onClick={this.downloadHtmlReport}
-        disabled={!canDownload}
-        className={styles.htmlReportDownloadButton}
-        data-testid="ce-surveyresults-html-report-download"
-      >
-        {downloadLabel}
-      </Button>
-    </ModalFooter>
-  </Modal>
-);
+return buildSurveyResultsHtmlReportModalProps({
+  analysisGenerating: this.state.htmlReportAnalysisGenerating,
+  analysisPayload,
+  analysisProgress: this.state.htmlReportAnalysisProgress,
+  exportFormat: this.state.htmlReportExportFormat,
+  htmlReportAnalysisError: this.state.htmlReportAnalysisError,
+  isAuthorized,
+  isDemoMode: this.isHtmlReportDemoModeActive(),
+  isDemoSession: this.isHtmlReportDemoSession(),
+  isOpen: this.state.htmlReportModalOpen,
+  onClose: this.closeHtmlReportExportModal,
+  onDownload: this.downloadHtmlReport,
+  onFormatChange: this.handleHtmlReportFormatChange,
+  onGenerateAnalysis: this.generateHtmlReportAnalysisViews,
+  onToggleDemoMode: this.toggleHtmlReportDemoMode,
+  onToggleSection: this.toggleHtmlReportSection,
+  selectedSections,
+  snapshot,
+  styleMap: styles,
+});
+}
+
+renderHtmlReportExportModal = (): React.ReactNode => {
+return renderSurveyResultsHtmlReportExportModal(this.getHtmlReportModalProps());
 }
 
 render() {
@@ -5671,16 +5000,9 @@ const surveyAggregateEntries =
   (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
 const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
 
-const currentViewModeForFilter = this.state.viewMode;
-const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.surveyId : null;
-
 const surveyIdAbbreviation = currentSurveyId
   ? getShortenedSurveyID(currentSurveyId, false, null, false)
   : null;
-const areSummaryCountsHydrated =
-  viewMode === 'survey'
-    ? !!this.state.surveyResultsHydrated
-    : !!this.state.questionResultsHydrated;
 const isDemoQuestionResults = this.getIsDemoQuestionResultsContext();
 const demoResultsViewMode = isDemoQuestionResults
   ? this.state.demoResultsViewMode || 'raw'
@@ -5694,378 +5016,213 @@ const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResu
       { key: 'riskMatrix', label: 'Risk Matrix' },
     ]
   : [];
-
-const filterSummaryDisplay = buildSurveyResultsFilterSummaryDisplayPlan({
+const cacheControllerSnapshot = buildSurveyResultsCacheControllerSnapshot({
+  activeSessionSlug: slug,
   aggregatorEntriesCount,
-  areSummaryCountsHydrated,
+  currentSurveyId,
+  currentSurveyIdForUrl: viewMode === 'survey' ? currentSurveyId : null,
+  currentViewModeForUrl: viewMode,
   filteredQuestionsCount,
   filteredResponsesCount,
   filterLoading,
-  surveyViewMode,
-  totalQuestionsCount,
-  totalResponsesCount,
-  viewMode,
-});
-
-const syncStatusDisplay = buildSurveyResultsSyncStatusDisplayPlan({
+  filterState: this.state.filterState,
+  hasRefreshQuestionMetadata: typeof this.props.refreshQuestionMetadata === 'function',
+  hasRefreshQuestionResponses: typeof this.props.refreshQuestionResponses === 'function',
+  hasRefreshSurveyResponsesByID: typeof this.props.refreshSurveyResponsesByID === 'function',
+  isQuestionCacheReady: this.props.isQuestionCacheReady,
+  isSBTCacheReady: this.props.isSBTCacheReady,
   networkLatestBlock: this.state.networkLatestBlock,
+  nowMs: Date.now(),
   questionLocalBlock: this.state.questionLocalBlock,
+  questionResponsesNonce: this.props.questionResponsesNonce,
+  questionsCacheNonce: this.props.questionsCacheNonce,
+  questionResultsHydrated: this.state.questionResultsHydrated,
   refreshTargetQuestionBlock: this.state.refreshTargetQuestionBlock,
   refreshTargetResponseBlock: this.state.refreshTargetResponseBlock,
   refreshTargetSurveyBlock: this.state.refreshTargetSurveyBlock,
   responseLocalBlock: this.state.responseLocalBlock,
-  showLongSyncNotice:
-    this._syncLoadingStartedAt !== null &&
-    Date.now() - this._syncLoadingStartedAt >= 15000,
+  sbtCacheRevision: this.props.sbtCacheRevision,
+  showQuestionFilter: this.state.showQuestionFilter,
+  storageKeyPrefix: this.getQuestionFilterStorageKeyPrefix(viewMode),
   surveyLocalBlock: this.state.surveyLocalBlock,
+  surveyResultsHydrated: this.state.surveyResultsHydrated,
+  surveyViewMode,
+  syncLoadingStartedAt: this._syncLoadingStartedAt,
+  totalQuestionsCount,
+  totalResponsesCount,
   viewMode,
 });
+const cacheReadinessDisplay = buildSurveyResultsCacheReadinessDisplayPlan(
+  cacheControllerSnapshot.cacheReadinessInput
+);
+const filterInput = cacheControllerSnapshot.filterInput;
+const syncStatusNode = renderSurveyResultsSyncStatusPanel({
+  syncStatusDisplay: cacheReadinessDisplay.syncStatusDisplay,
+  syncDetailsOpen: !!this.state.syncDetailsOpen,
+  syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
+  onToggleSyncDetails: () =>
+    this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
+      prevState,
+      stateKey: 'syncDetailsOpen',
+    }))),
+  onManualRefresh: () => this.handleManualRefresh(),
+  miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+  miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+  remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
+});
+const filterControlsNode = renderSurveyResultsFilterExportControls({
+  activeSessionSlug: filterInput.activeSessionSlug,
+  aggregateQuestionResponses: this.state.aggregateQuestionResponses,
+  currentSurveyIdForUrl: filterInput.currentSurveyIdForUrl,
+  currentViewModeForUrl: filterInput.currentViewModeForUrl,
+  defaultTags: this.props.defaultTags,
+  exportControlsDisplay,
+  filterState: filterInput.filterState,
+  isFilterActive,
+  isQuestionCacheReady: filterInput.isQuestionCacheReady,
+  isSBTCacheReady: filterInput.isSBTCacheReady,
+  network: this.props.network,
+  onClearFilters: this.handleClearFiltersFromParent,
+  onDownload: this.downloadCSV,
+  onExportHtmlReport: this.openHtmlReportExportModal,
+  onExportTypeChange: this.handleExportTypeChange,
+  onFilterActivityChange: this.handleFilterActivityChange,
+  onQuestionFilter: this.handleQuestionFilter,
+  onQuestionFilterCountUpdate: this.handleQuestionFilterCountUpdate,
+  onSbtFilter: this.handleFilteredResponses,
+  onSetFilterLoading: this.setFilterLoading,
+  onToggleExportArea: this.toggleExportArea,
+  onToggleQuestionFilter: this.toggleQuestionFilter,
+  provider: this.props.provider,
+  questionFilterQuestions,
+  questionFilterRef: this.questionFilterRef,
+  questionResponses: this.state.questionResponses,
+  questionResponsesNonce: filterInput.questionResponsesNonce,
+  questionsCacheNonce: filterInput.questionsCacheNonce,
+  responses: this.state.responses,
+  sbtCacheRevision: filterInput.sbtCacheRevision,
+  showQuestionFilter: filterInput.showQuestionFilter,
+  storageKeyPrefix: filterInput.storageKeyPrefix,
+  styleMap: styles,
+  surveyViewMode,
+  viewMode,
+});
+const displayPanelsProps: SurveyResultsDisplayPanelsArgs = {
+  account: this.props.account,
+  activeQuestionToggles: this.state.activeQuestionToggles,
+  activeToggles: this.state.activeToggles,
+  alertMessage,
+  applyDecryptedOverrideToResponse: this.applyDecryptedOverrideToResponse,
+  cacheReadinessDisplay,
+  currentSurveyId,
+  effectiveSlug: slug,
+  filterControlsNode,
+  filterLoading,
+  getFallbackQuestion: this.getStableFallbackQuestion,
+  getLockedResponseKey: this.getLockedResponseKey,
+  getResponseCardProps: this.getSurveyResultsResponseCardProps,
+  lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
+    decrypting: !!this.state.lockedResponsesDecrypting,
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel: lockedResponsesModel,
+    onDecrypt: this.handleDecryptLockedResponses,
+  }),
+  network: this.props.network,
+  onSurveyViewModeKeyDown: this.handleSurveyViewModeKeyDown,
+  onSurveyViewModeToggle: this.handleSurveyViewModeToggle,
+  onToggleQuestionList: () => this.toggleQuestionSummary('__questionList__'),
+  onToggleResponse: this.toggleResponse,
+  preNetworkQuestions,
+  questionModeEntries,
+  questionResponsesNonce: this.props.questionResponsesNonce,
+  questionsCacheNonce: this.props.questionsCacheNonce,
+  renderQuestionSummary: (qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions),
+  renderQuestionTable: () => this.renderQuestionIDsTable(
+    sbtFilteredAggregatorQuestionResponses,
+    preNetworkQuestions
+  ),
+  responses: sbtFilteredResponses,
+  sbtCacheRevision: this.props.sbtCacheRevision,
+  styleMap: styles,
+  surveyAggregateEntries,
+  surveyViewMode,
+  tableWrapperRef: this.questionIdTableRef,
+  toggleKnobStyle: resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate'),
+  trailingLabelStyle: SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+  viewMode,
+};
+const demoSurfaceProps = isDemoAlternateResultsView
+  ? {
+      activeSlug: slug,
+      atlasNodeId: this.state.demoResultsAtlasNodeId,
+      defaultTags: this.props.defaultTags,
+      filterState: this.props.filterState || this.state.filterState,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      network: this.props.network,
+      networkChainId: this.props.networkChainId,
+      onAtlasModalClose: this.handleDemoAtlasModalClose,
+      onAtlasNodeOpen: this.handleDemoAtlasOpen,
+      questionResponses: this.getMemoizedPolisQuestionResponses(
+        true,
+        this.state.viewMode === 'survey' && this.state.surveyViewMode === 'individuals'
+          ? this.getMemoizedIndividualsAggregator(this.state.sbtFilteredResponses)
+          : (this.state.sbtFilteredAggregatorQuestionResponses || {})
+      ),
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      questionScanProgress: this.props.questionScanProgress,
+      viewKey: demoResultsViewMode,
+    }
+  : null;
 
 return (
-  <>
-  <Modal
+  <SurveyResultsReportSurface
+    demoSurfaceProps={demoSurfaceProps}
+    displayPanelsProps={displayPanelsProps}
+    htmlReportModalProps={this.getHtmlReportModalProps()}
     isOpen={isActuallyOpen}
-    toggle={this.closeModal}
-    className={styles.resultsModal}
-  >
-    <SurveyResultsModalHeader
-      bookmarkedSurveyIDs={this.state.bookmarkedSurveyIDs}
-      currentSurveyId={currentSurveyId}
-      demoResultsViewMode={demoResultsViewMode}
-      demoResultsViewOptions={demoResultsViewOptions}
-      documentLinkIconStyle={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE}
-      effectiveSlug={this.getEffectiveSlug()}
-      isDemoQuestionResults={isDemoQuestionResults}
-      lockedResponsesToggleNode={this.renderLockedResponsesToggle(lockedResponsesModel)}
-      onClose={this.closeModal}
-      onDemoResultsViewSelect={this.handleDemoResultsViewSelect}
-      onToggleSurveyBookmark={this.toggleSurveyBookmark}
-      styleMap={styles}
-      surveyBookmarkStyle={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
-      surveyDocumentURLs={Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : []}
-      surveyIdAbbreviation={surveyIdAbbreviation}
-      surveyTitle={surveyTitle}
-      syncStatusNode={renderSurveyResultsSyncStatusPanel({
-          isSynced: syncStatusDisplay.isSynced,
-          isSyncingOrLoading: syncStatusDisplay.isSyncingOrLoading,
-          syncStatusText: syncStatusDisplay.syncStatusText,
-          showLongSyncNotice: syncStatusDisplay.showLongSyncNotice,
-          syncDetailsOpen: !!this.state.syncDetailsOpen,
-          syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
-          onToggleSyncDetails: () =>
-            this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
-              prevState,
-              stateKey: 'syncDetailsOpen',
-            })),
-          onManualRefresh: () => this.handleManualRefresh(),
-          viewMode: syncStatusDisplay.viewMode,
-          showQuickRefresh: syncStatusDisplay.showQuickRefresh,
-          showQuestionSpinner: syncStatusDisplay.question.showSpinner,
-          questionProgress: syncStatusDisplay.question.progress,
-          questionColor: syncStatusDisplay.question.color,
-          questionBarText: syncStatusDisplay.question.label,
-          showQuestionRemainingSpinner: syncStatusDisplay.question.showRemainingSpinner,
-          showResponseSpinner: syncStatusDisplay.response.showSpinner,
-          responseProgress: syncStatusDisplay.response.progress,
-          responseColor: syncStatusDisplay.response.color,
-          responseBarText: syncStatusDisplay.response.label,
-          showResponseRemainingSpinner: syncStatusDisplay.response.showRemainingSpinner,
-          miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
-          miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
-          remainingSpinnerStyle: SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
-        })}
-      viewMode={viewMode}
-    />
-
-    <ModalBody className={styles.modalBody}>
-      {isDemoAlternateResultsView ? (
-        <div
-          className={styles.demoResultsSurface}
-          data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
-        >
-          {this.renderDemoResultsSurface(demoResultsViewMode)}
-        </div>
-      ) : (
-        <>
-      <SurveyResultsStatusMessages
-        alertMessage={alertMessage}
-        filterLoading={filterLoading}
-        styleMap={styles}
-      />
-
-      {viewMode === 'survey' && (
-        <SurveyResultsSurveyViewModeToggle
-          isAggregate={surveyViewMode === 'aggregate'}
-          knobStyle={resolveSurveyResultsToggleKnobStyle(surveyViewMode === 'aggregate')}
-          onKeyDown={this.handleSurveyViewModeKeyDown}
-          onToggle={this.handleSurveyViewModeToggle}
-          styleMap={styles}
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {this.renderLockedResponsesBanner(lockedResponsesModel)}
-
-      {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <SurveyResultsQuestionListCard
-          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
-          onToggle={() => this.toggleQuestionSummary('__questionList__')}
-          questionTableNode={
-            aggregatorEntriesCount === 0 && !filterLoading
-              ? null
-              : this.renderQuestionIDsTable(
-                sbtFilteredAggregatorQuestionResponses,
-                preNetworkQuestions
-              )
-          }
-          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
-          styleMap={styles}
-          tableWrapperRef={this.questionIdTableRef}
-          title=" View & Sort Questions"
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {viewMode === 'questions' && (
-        <SurveyResultsQuestionListCard
-          isOpen={!!this.state.activeQuestionToggles['__questionList__']}
-          onToggle={() => this.toggleQuestionSummary('__questionList__')}
-          questionTableNode={
-            aggregatorEntriesCount === 0 && !filterLoading
-              ? null
-              : this.renderQuestionIDsTable(
-                sbtFilteredAggregatorQuestionResponses,
-                preNetworkQuestions
-              )
-          }
-          showEmptyState={aggregatorEntriesCount === 0 && !filterLoading}
-          styleMap={styles}
-          title="View & Sort Questions"
-          trailingLabelStyle={SURVEY_RESULTS_TRAILING_LABEL_STYLE}
-        />
-      )}
-
-      {renderSurveyResultsFilterSummary({
-        displayedTotalQuestionsCount: filterSummaryDisplay.displayedTotalQuestionsCount,
-        displayedTotalResponsesCount: filterSummaryDisplay.displayedTotalResponsesCount,
-        normalizedFilteredQuestionsCount: filterSummaryDisplay.normalizedFilteredQuestionsCount,
-        normalizedFilteredResponsesCount: filterSummaryDisplay.normalizedFilteredResponsesCount,
-        showFilteredCountSpinner: filterSummaryDisplay.showFilteredCountSpinner,
-      })}
-
-
-      {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
-      <div className={styles.exportAndFilterContainer}>
-
-        <div className={styles.filterBox}>
-          {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter (Survey Individuals): */}
-            </Label>
-          )}
-          {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter (Survey Aggregate): */}
-            </Label>
-          )}
-          {viewMode === 'questions' && (
-            <Label className={styles.filterBoxLabel}>
-              {/* Filter Questions & Responses: */}
-            </Label>
-          )}
-
-
-
-          {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-            <SBTFilter
-              items={this.state.aggregateQuestionResponses}
-              mode="responder"
-              provider={this.props.provider}
-              network={this.props.network}
-              onFilter={this.handleFilteredResponses}
-              setFilterLoading={this.setFilterLoading}
-              autoExpand={false}
-              buttonSurface="light"
-              hideLoadingOverlay={true}
-              externalSBTFilterState={this.state.filterState.sbtFilter}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-            />
-          )}
-          {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-            <SBTFilter
-              items={this.state.responses}
-              mode="responder"
-              provider={this.props.provider}
-              network={this.props.network}
-              onFilter={this.handleFilteredResponses}
-              setFilterLoading={this.setFilterLoading}
-              autoExpand={false}
-              buttonSurface="light"
-              hideLoadingOverlay={true}
-              externalSBTFilterState={this.state.filterState.sbtFilter}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-            />
-          )}
-          {viewMode === 'questions' && (
-
-            <>
-
-         {/* The "Filter" button that toggles the QuestionFilter */}
-        <Button className={styles.questionFilterButton} onClick={this.toggleQuestionFilter}>
-          Filter
-
-          <FontAwesomeIcon icon={faFilter} className={styles.questionFilterIcon} />
-
-           {isFilterActive && (
-            <span className={styles.clearFilterIcon} onClick={this.handleClearFiltersFromParent}>
-              <FontAwesomeIcon icon={faTimes} />
-            </span>
-          )}
-        </Button>
-
-<QuestionFilter
-  ref={this.questionFilterRef}
-  onFilterActivityChange={this.handleFilterActivityChange}
-  resultsMode={true}
-  filterModalOpen={this.state.showQuestionFilter}
-  toggleFilterModal={this.toggleQuestionFilter}
-  questions={questionFilterQuestions}
-  questionResponses={this.state.questionResponses}
-	provider={this.props.provider}
-	network={this.props.network}
-	onFilter={this.handleQuestionFilter}
-	onCountUpdate={this.handleQuestionFilterCountUpdate}
-	filterState={this.state.filterState}
-	setFilterLoading={this.setFilterLoading}
-  creatorAndResponderMode={true}
-  currentViewModeForUrl={currentViewModeForFilter}
-  currentSurveyIdForUrl={currentSurveyIdForFilter}
-  questionResponsesNonce={this.props.questionResponsesNonce}
-  questionsCacheNonce={this.props.questionsCacheNonce}
-  isQuestionCacheReady={this.props.isQuestionCacheReady}
-  isSBTCacheReady={this.props.isSBTCacheReady}
-  sbtCacheRevision={this.props.sbtCacheRevision}
-  defaultTags={this.props.defaultTags}
-  activeSessionSlug={this.getEffectiveSlug()}
-  storageKeyPrefix={this.getQuestionFilterStorageKeyPrefix(currentViewModeForFilter)}
-/>
-
-
-</>
-          )}
-        </div>
-
-        <SurveyResultsExportControls
-          exportAreaOpen={exportControlsDisplay.exportAreaOpen}
-          exportOptions={exportControlsDisplay.exportOptions}
-          exportTypeLabel={exportControlsDisplay.exportTypeLabel}
-          onDownload={this.downloadCSV}
-          onExportHtmlReport={this.openHtmlReportExportModal}
-          onExportTypeChange={this.handleExportTypeChange}
-          onToggleExportArea={this.toggleExportArea}
-          styleMap={styles}
-        />
-      </div>
-
-      {viewMode === 'survey' && surveyViewMode === 'individuals' && (
-        <SurveyResultsIndividualResponsesList
-          activeToggles={this.state.activeToggles}
-          currentSurveyId={currentSurveyId}
-          effectiveSlug={this.getEffectiveSlug()}
-          filterLoading={filterLoading}
-          onToggleResponse={this.toggleResponse}
-          renderResponseBody={(response: SurveyResultsResponseListEntry) => {
-            const parsedResponse = response.response; // Already an object
-            return parsedResponse &&
-              parsedResponse.responses &&
-              parsedResponse.responses.length > 0 ? (
-                parsedResponse.responses.map((answerItem: SurveyResultsRecord, aIndex: number) => {
-                  const questionId = getSurveyResponseQuestionId(answerItem);
-                  const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
-                  const responseKey = this.getLockedResponseKey({
-                    responder: response?.responder,
-                    questionId,
-                    surveyId: response?.surveyId || currentSurveyId,
-                    response: answerItem,
-                  });
-                  const displayResponse = this.applyDecryptedOverrideToResponse({
-                    response: answerItem,
-                    key: responseKey,
-                  });
-                  return (
-                    <div key={aIndex} className={styles.surveyResultsOverride}>
-                      <SingleQuestionResponse
-                        aggregatorResponseMode={false}
-                        question={questionData}
-                        response={displayResponse}
-                        mode="fullscreen"
-                        isOwnResponse={
-                          this.props.account?.toLowerCase() ===
-                          response.responder?.toLowerCase()
-                        }
-                        network={this.props.network}
-                        activeSessionSlug={questionData?.sessionSlug || this.getEffectiveSlug()}
-                        questionResponsesNonce={this.props.questionResponsesNonce}
-                        questionsCacheNonce={this.props.questionsCacheNonce}
-                        sbtCacheRevision={this.props.sbtCacheRevision}
-                        {...this.getSurveyResultsResponseCardProps()}
-                      />
-                    </div>
-                  );
-                })
-              ) : (
-                <p>No question-level responses found for this user.</p>
-              );
-          }}
-          responses={sbtFilteredResponses}
-          styleMap={styles}
-        />
-      )}
-
-      {viewMode === 'survey' && surveyViewMode === 'aggregate' && (
-        <SurveyResultsQuestionSummariesList
-          entries={surveyAggregateEntries}
-          filterLoading={filterLoading}
-          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
-          styleMap={styles}
-        />
-      )}
-
-	      {viewMode === 'questions' && (
-        <SurveyResultsQuestionSummariesList
-          entries={questionModeEntries}
-          filterLoading={filterLoading}
-          renderQuestionSummary={(qId, arr) => this.renderQuestionSummary(qId, arr, preNetworkQuestions)}
-          styleMap={styles}
-        />
-      )}
-        </>
-      )}
-
-    </ModalBody>
-
-    <ModalFooter>
-      {/* Additional footer actions if needed */}
-    </ModalFooter>
-  </Modal>
-  {this.renderHtmlReportExportModal()}
-  </>
+    modalHeaderProps={{
+      bookmarkedSurveyIDs: this.state.bookmarkedSurveyIDs,
+      currentSurveyId,
+      demoResultsViewMode,
+      demoResultsViewOptions,
+      documentLinkIconStyle: SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
+      effectiveSlug: slug,
+      isDemoQuestionResults,
+      lockedResponsesToggleNode: SurveyResultsLockedResponsesToggle({
+        isOpen: !!this.state.lockedResponseDetailsOpen,
+        lockedModel: lockedResponsesModel,
+        onToggleDetails: this.toggleLockedResponseDetails,
+      }),
+      onDemoResultsViewSelect: this.handleDemoResultsViewSelect,
+      onToggleSurveyBookmark: this.toggleSurveyBookmark,
+      styleMap: styles,
+      surveyBookmarkStyle: SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
+      surveyDocumentURLs: Array.isArray(surveyDocumentURLs) ? surveyDocumentURLs : [],
+      surveyIdAbbreviation,
+      surveyTitle,
+      syncStatusNode,
+      viewMode,
+    }}
+    onCloseResultsModal={this.closeModal}
+    reportSurfaceDisplayPlan={{
+      demoResultsViewMode,
+      isDemoAlternateResultsView,
+    }}
+    styleMap={styles}
+  />
 );
 }
 }
 
- const mapStateToProps = (state: SurveyResultsRecord = {}) => {
-   const sessionState = toSurveyResultsRecord(state.sessionState);
-   const profile = toSurveyResultsRecord(state.profile);
-   const activeSessionSlug = sessionState.activeSessionSlug || '';
-   return {
-     activeSessionSlug,
-     account: profile.account || '',
-     loginComplete: !!sessionState.loginComplete,
-   };
- };
+	 const mapStateToProps = (state: SurveyResultsRecord = {}) => {
+	   const sessionState = toSurveyResultsRecord(state.sessionState);
+	   const profile = toSurveyResultsRecord(state.profile);
+	   const activeSessionSlug = String(sessionState.activeSessionSlug || '');
+	   return {
+	     activeSessionSlug,
+	     account: String(profile.account || ''),
+	     loginComplete: !!sessionState.loginComplete,
+	   };
+	 };
  export default connect(mapStateToProps)(SurveyResults);

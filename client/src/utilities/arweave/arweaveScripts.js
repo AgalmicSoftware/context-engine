@@ -92,6 +92,7 @@ const WORKER_ENDPOINT_SUFFIXES = [
   '/admin/set-config',
   '/admin/set-secrets',
   '/admin/set-limits',
+  '/admin/secret-presence',
   '/transcribe',
   '/ai',
   '/arweave/upload',

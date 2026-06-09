@@ -799,6 +799,7 @@ Anonymous exception (AI/transcribe only):
 Admin requests require a fresh signed SIWE message (no session token):
 - `POST /admin/set-config`
 - `POST /admin/set-secrets`
+- `POST /admin/secret-presence`
 - `POST /admin/set-limits`
 - `POST /admin/lit-chipotle-status`
 
@@ -832,6 +833,12 @@ Never return secrets in responses.
   it preserves trimmed string secrets, JSON-stringified object secrets such as
   `arweaveJwk`, scalar-to-string normalization, and the existing allowed-key
   filter before `set-secrets` persists session secrets.
+- `/admin/secret-presence` uses the same signed admin authority path as
+  `/admin/set-secrets`, but returns only allowed-key booleans such as
+  `{ "openaiKey": true }`. It never returns raw values, previews, derived
+  addresses, or unrecognized secret keys. The `/admin` Worker secrets cards use
+  this manifest so blank write-only inputs are shown as unknown until verified
+  instead of being mislabeled as empty.
 - Lit sponsorship now adds:
   - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
   - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management

@@ -10,6 +10,8 @@ import type { AnyRecord } from '../shellTypes';
 export const LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH = '/dist/sessionCorsWorker.bundle.js';
 export const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
 export const DEPLOY_HELPER_BUNDLE_FETCH_ERROR = 'failed to fetch bundle';
+export const NORMAL_MODE_HOSTED_BUNDLE_HELP_MESSAGE =
+  'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.';
 
 export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value: unknown = ''): string => {
   const raw = toStr(value).trim();
@@ -100,7 +102,7 @@ export const resolveSponsoredBundleDeployReadiness = ({
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
   wizardMode?: string;
-  sponsoredBundle?: AnyRecord;
+  sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   missingWorkerSecrets?: unknown[];
@@ -198,7 +200,7 @@ export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
   wizardMode?: string;
-  sponsoredBundle?: AnyRecord;
+  sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   currentWorkerSecrets?: AnyRecord;
@@ -325,6 +327,127 @@ export const resolveSessionWizardDeployBundleMode = ({
   );
 };
 
+export type SessionWizardSponsoredAutoDeployStateLike = {
+  active?: boolean;
+  ready?: boolean;
+  missing?: unknown[];
+};
+
+export type SessionWizardSponsoredPublishSurfaceState = {
+  canUseSponsoredAutoDeployNow: boolean;
+  hasNormalModeBundleUrlOverride: boolean;
+  normalModeBundleHelpText: string;
+  normalModeHostedBundleConfigured: boolean;
+  normalModeManualBundleHelpText: string;
+  shouldUseSponsoredAutoDeployFlow: boolean;
+  showNormalModeManualBundleControls: boolean;
+  showNormalModeWorkerStep: boolean;
+  showSponsoredBundleFallbackInput: boolean;
+  sponsoredAutoDeployBundleMode: string;
+  sponsoredAutoDeployMissingBundleUrl: boolean;
+  sponsoredLocalBundledAssetAvailable: boolean;
+};
+
+export const resolveSessionWizardSponsoredPublishSurfaceState = ({
+  isNormalMode = false,
+  wizardMode = 'advanced',
+  workerMode = 'default',
+  bundleMode = 'upload',
+  deployForm = {},
+  sponsoredAutoDeployState = {},
+  forceManualBundleFile = false,
+  hasBundleFile = false,
+  normalModeBundleUrlOverride = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+  hostedBundleHelpMessage = NORMAL_MODE_HOSTED_BUNDLE_HELP_MESSAGE,
+  manualBundleRetryMessage = '',
+  missingHostedBundleMessage = '',
+}: {
+  isNormalMode?: boolean;
+  wizardMode?: string;
+  workerMode?: unknown;
+  bundleMode?: string;
+  deployForm?: AnyRecord;
+  sponsoredAutoDeployState?: SessionWizardSponsoredAutoDeployStateLike;
+  forceManualBundleFile?: boolean;
+  hasBundleFile?: boolean;
+  normalModeBundleUrlOverride?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+  hostedBundleHelpMessage?: string;
+  manualBundleRetryMessage?: string;
+  missingHostedBundleMessage?: string;
+} = {}): SessionWizardSponsoredPublishSurfaceState => {
+  const normalizedWorkerMode = toStr(workerMode).trim();
+  const shouldUseSponsoredAutoDeployFlow = (
+    normalizedWorkerMode !== 'default' &&
+    !!sponsoredAutoDeployState.ready
+  );
+  const hasManualBundleFallbackFile = !!hasBundleFile;
+  const sponsoredAutoDeployBundleMode = resolveSessionWizardDeployBundleMode({
+    wizardMode,
+    bundleMode,
+    bundleUrl: deployForm?.bundleUrl,
+    sponsoredAutoDeployReady: shouldUseSponsoredAutoDeployFlow,
+    forceManualBundleFile,
+    hasBundleFile: hasManualBundleFallbackFile,
+    normalModeBundleUrlOverride,
+    normalModeDefaultBundleUrl,
+  });
+  const showNormalModeWorkerStep = !(
+    !!sponsoredAutoDeployState.active &&
+    normalizedWorkerMode !== 'default'
+  );
+  const sponsoredLocalBundledAssetAvailable = (
+    sponsoredAutoDeployBundleMode !== 'upload' ||
+    hasManualBundleFallbackFile
+  );
+  const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow && sponsoredLocalBundledAssetAvailable;
+  const hasNormalModeBundleUrlOverride = !!toStr(normalModeBundleUrlOverride).trim();
+  const missing = Array.isArray(sponsoredAutoDeployState.missing)
+    ? sponsoredAutoDeployState.missing.map((entry) => toStr(entry).trim()).filter(Boolean)
+    : [];
+  const sponsoredAutoDeployMissingBundleUrl = (
+    !!sponsoredAutoDeployState.active &&
+    missing.includes('Worker bundle URL')
+  );
+  const showSponsoredBundleFallbackInput = (
+    !!isNormalMode &&
+    !showNormalModeWorkerStep &&
+    (
+      !!forceManualBundleFile ||
+      hasManualBundleFallbackFile ||
+      hasNormalModeBundleUrlOverride ||
+      sponsoredAutoDeployMissingBundleUrl
+    )
+  );
+  const normalModeHostedBundleConfigured = !!toStr(normalModeDefaultBundleUrl).trim();
+  const showNormalModeManualBundleControls = (
+    !!isNormalMode &&
+    (!!forceManualBundleFile || !normalModeHostedBundleConfigured)
+  );
+  const normalModeBundleHelpText = normalModeHostedBundleConfigured
+    ? hostedBundleHelpMessage
+    : missingHostedBundleMessage;
+  const normalModeManualBundleHelpText = normalModeHostedBundleConfigured
+    ? manualBundleRetryMessage
+    : missingHostedBundleMessage;
+
+  return {
+    canUseSponsoredAutoDeployNow,
+    hasNormalModeBundleUrlOverride,
+    normalModeBundleHelpText,
+    normalModeHostedBundleConfigured,
+    normalModeManualBundleHelpText,
+    shouldUseSponsoredAutoDeployFlow,
+    showNormalModeManualBundleControls,
+    showNormalModeWorkerStep,
+    showSponsoredBundleFallbackInput,
+    sponsoredAutoDeployBundleMode,
+    sponsoredAutoDeployMissingBundleUrl,
+    sponsoredLocalBundledAssetAvailable,
+  };
+};
+
 export const resolveSessionWizardDeployBundlePayload = async ({
   effectiveBundleMode = 'upload',
   bundleFile = null,
@@ -446,4 +569,99 @@ export const getSessionWizardPublishProgressPercent = ({
   const ratio = Math.max(0, Math.min(1, Number(elapsedMs || 0) / durationMs));
   const eased = 1 - Math.pow(1 - ratio, 2);
   return Math.min(99, Math.max(base + (stepSize * 0.18), base + ((cap - base) * eased)));
+};
+
+export type SessionWizardPublishProgressStep = {
+  key: string;
+  label: string;
+  state: 'active' | 'complete' | 'pending';
+};
+
+export type SessionWizardPublishProgressDisplayState = {
+  activePublishProgressStepLabel: string;
+  publishProgressAriaValueText: string;
+  publishProgressEyebrow: 'Publish Complete' | 'Publishing Session';
+  publishStep: number;
+  publishProgressPercent: number;
+  publishProgressPercentRounded: number;
+  publishProgressSteps: SessionWizardPublishProgressStep[];
+  showPublishProgress: boolean;
+};
+
+export const buildSessionWizardPublishProgressSteps = ({
+  publishBusy = false,
+  publishStep = 0,
+  publishSteps = [],
+  sbtsLabel = 'SBTs',
+}: {
+  publishBusy?: boolean;
+  publishStep?: number;
+  publishSteps?: unknown[];
+  sbtsLabel?: unknown;
+} = {}): SessionWizardPublishProgressStep[] => {
+  const normalizedSbtLabel = toStr(sbtsLabel).trim() || 'SBTs';
+  const currentPublishStep = Math.max(0, Number(publishStep || 0));
+  return (Array.isArray(publishSteps) ? publishSteps : []).map((keyRaw, index) => {
+    const key = toStr(keyRaw).trim();
+    const stepNumber = index + 1;
+    const isActive = currentPublishStep === stepNumber && (publishBusy || key !== 'done');
+    const isComplete = currentPublishStep > stepNumber || (key === 'done' && currentPublishStep >= stepNumber);
+    return {
+      key,
+      label: key === 'deploy-worker'
+        ? 'Deploy Worker'
+        : key === 'deploy-sbts'
+          ? `Deploy ${normalizedSbtLabel}`
+          : key === 'upload-metadata'
+            ? 'Upload Arweave'
+            : key === 'register-session'
+              ? 'Register On-chain'
+              : 'Done',
+      state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
+    };
+  });
+};
+
+export const resolveSessionWizardPublishProgressDisplayState = ({
+  elapsedMs = 0,
+  publishBusy = false,
+  publishStep = 0,
+  publishSteps = [],
+  sbtsLabel = 'SBTs',
+}: {
+  elapsedMs?: number;
+  publishBusy?: boolean;
+  publishStep?: number;
+  publishSteps?: unknown[];
+  sbtsLabel?: unknown;
+} = {}): SessionWizardPublishProgressDisplayState => {
+  const currentPublishStep = Math.max(0, Number(publishStep || 0));
+  const publishProgressSteps = buildSessionWizardPublishProgressSteps({
+    publishBusy,
+    publishStep: currentPublishStep,
+    publishSteps,
+    sbtsLabel,
+  });
+  const activePublishProgressStep = publishProgressSteps[
+    Math.max(0, Math.min((currentPublishStep || 1) - 1, Math.max(0, publishProgressSteps.length - 1)))
+  ] || publishProgressSteps[0] || null;
+  const publishProgressPercent = getSessionWizardPublishProgressPercent({
+    publishStep: currentPublishStep,
+    publishBusy,
+    totalSteps: publishProgressSteps.length,
+    elapsedMs,
+  });
+  const publishProgressPercentRounded = Math.round(publishProgressPercent);
+  const activePublishProgressStepLabel = activePublishProgressStep?.label || 'Preparing';
+
+  return {
+    activePublishProgressStepLabel,
+    publishProgressAriaValueText: `${publishProgressPercentRounded}% ${activePublishProgressStepLabel}`,
+    publishProgressEyebrow: publishBusy ? 'Publishing Session' : 'Publish Complete',
+    publishStep: currentPublishStep,
+    publishProgressPercent,
+    publishProgressPercentRounded,
+    publishProgressSteps,
+    showPublishProgress: !!publishBusy || currentPublishStep > 0,
+  };
 };

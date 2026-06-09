@@ -197,6 +197,174 @@ const normalizeChildrenArray = (value) => (
   Array.isArray(value) ? value : [value].filter(Boolean)
 );
 
+describe('UserPage analyze action boundary', () => {
+  it('routes header analyze clicks through the parent-owned analyze handler with preserved args', () => {
+    const instance = makeInstance();
+    instance.analyzeUser = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.analyzeButtonDisplayState.disabled).toBe(false);
+
+    const result = header.props.onAnalyzeUser(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).toHaveBeenCalledWith(event);
+  });
+
+  it('keeps disabled header analyze clicks inert before reaching analyze side effects', () => {
+    const instance = makeInstance({ isSBTCacheReady: false });
+    instance.analyzeUser = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.analyzeButtonDisplayState.disabled).toBe(true);
+
+    const result = header.props.onAnalyzeUser(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'disabled',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.analyzeUser).not.toHaveBeenCalled();
+  });
+});
+
+describe('UserPage bookmark action boundary', () => {
+  it('routes visible header bookmark clicks through the parent-owned bookmark handler', () => {
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      viewAddress: '0x00000000000000000000000000000000000000aa',
+    });
+    instance.toggleBookmark = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.headerActionVisibility.showBookmarkButton).toBe(true);
+
+    const result = header.props.onBookmark(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'dispatched',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).toHaveBeenCalledWith(event);
+  });
+
+  it('keeps hidden owner bookmark actions inert before reaching bookmark side effects', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: viewAddress,
+      viewAddress,
+    });
+    instance.toggleBookmark = jest.fn();
+    const tree = instance.render();
+    const [header] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageHeader'
+    );
+    const event = { preventDefault: jest.fn(), type: 'click' };
+
+    expect(header).toBeTruthy();
+    expect(header.props.headerActionVisibility.showBookmarkButton).toBe(false);
+
+    const result = header.props.onBookmark(event);
+
+    expect(result).toEqual({
+      blockedReason: 'none',
+      status: 'hidden',
+    });
+    expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    expect(instance.toggleBookmark).not.toHaveBeenCalled();
+  });
+});
+
+describe('UserPage decrypt action boundary', () => {
+  it('keeps rendered decrypt wiring inert without an account while preserving cached response identity', async () => {
+    const encryptedResponse = {
+      questionID: 'q1',
+      answer: {
+        value: '*',
+        encrypted: true,
+        encryptedPortion: '{"v":2}',
+        encryptionAudience: 'gate',
+      },
+    };
+    const instance = makeInstance({
+      account: '',
+      activeSessionSlug: 'edge',
+      provider: 'wagmi',
+    });
+    instance.state = {
+      ...instance.state,
+      detailedQuestionResponses: {
+        q1: encryptedResponse,
+      },
+      loadingQuestions: false,
+      loadingSBTs: false,
+      loadingSurveys: false,
+      questionCreationInfo: [],
+      questionResponseInfo: [{
+        canDecryptOtherResponses: true,
+        id: 'q1',
+        prompt: 'Cached gated response',
+        sessionSlug: 'edge',
+      }],
+      selectedTab: 'questions',
+      showSectionQuestionResponsesOpen: true,
+      showSectionQuestionsCreatedOpen: true,
+      surveyCreationInfo: [],
+      surveyResponseInfo: [],
+    };
+
+    const tree = instance.render();
+    const [questionSection] = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageQuestionSection'
+    );
+
+    expect(questionSection).toBeTruthy();
+    expect(questionSection.props.questionResponseEntries).toEqual([{
+      canDecryptOtherResponses: true,
+      id: 'q1',
+      prompt: 'Cached gated response',
+      sessionSlug: 'edge',
+    }]);
+    expect(questionSection.props.detailedQuestionResponseMap.q1).toBe(encryptedResponse);
+    expect(questionSection.props.questionResponsesNonce).toBe(0);
+    expect(questionSection.props.sbtCacheRevision).toBe(0);
+
+    const didDecrypt = await questionSection.props.onDecryptQuestion('q1', 'answer', encryptedResponse);
+
+    expect(didDecrypt).toBe(false);
+    expect(cryptoUtils.decryptSingleField).not.toHaveBeenCalled();
+    expect(instance.setState).not.toHaveBeenCalled();
+  });
+});
+
 describe('UserPage survey route boundaries', () => {
   it('keeps parent-owned survey href and open callbacks aligned with session and responder routes', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';

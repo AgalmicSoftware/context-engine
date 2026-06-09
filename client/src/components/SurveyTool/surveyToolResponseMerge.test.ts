@@ -89,6 +89,55 @@ describe('surveyToolResponseMerge', () => {
     });
   });
 
+  it('prefers refreshed plaintext over stale decrypted values even when envelopes match', () => {
+    expect(mergeDecryptedViewedResponse({
+      answer: {
+        value: 'old decrypted answer',
+        encrypted: true,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'old decrypted note',
+        encrypted: true,
+        encryptedPortion: 'add-env',
+      },
+      importance: 4,
+      importanceEncrypted: 'imp-env',
+      conviction: 2,
+      convictionEncrypted: 'conv-env',
+    }, {
+      answer: {
+        value: 'fresh plaintext answer',
+        encrypted: false,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'fresh plaintext note',
+        encrypted: false,
+        encryptedPortion: 'add-env',
+      },
+      importance: 9,
+      importanceEncrypted: 'imp-env',
+      conviction: 7,
+      convictionEncrypted: 'conv-env',
+    })).toEqual({
+      answer: {
+        value: 'fresh plaintext answer',
+        encrypted: false,
+        encryptedPortion: 'ans-env',
+      },
+      additional: {
+        value: 'fresh plaintext note',
+        encrypted: false,
+        encryptedPortion: 'add-env',
+      },
+      importance: 9,
+      importanceEncrypted: 'imp-env',
+      conviction: 7,
+      convictionEncrypted: 'conv-env',
+    });
+  });
+
   it('merges survey response arrays per question id while keeping untouched rows intact', () => {
     expect(mergeDecryptedViewedResponse({
       responses: [
@@ -144,6 +193,67 @@ describe('surveyToolResponseMerge', () => {
           },
         },
       ],
+    });
+  });
+
+  it('restores same-envelope decrypted values across cache refresh while keeping latest cache metadata', () => {
+    expect(mergeDecryptedViewedResponse({
+      responses: [{
+        questionID: 'Q1',
+        answer: {
+          value: 'clear answer',
+          encrypted: true,
+          encryptedPortion: 'ans-env',
+          source: 'previous-decrypt',
+        },
+        additional: {
+          value: 'clear note',
+          encrypted: true,
+          encryptedPortion: 'add-env',
+        },
+        importance: 8,
+        importanceEncrypted: 'importance-env',
+      }],
+    }, {
+      responses: [{
+        questionId: 'q1',
+        prompt: '[encrypted prompt from refreshed cache]',
+        cacheUpdatedAt: '2026-06-02T12:00:00.000Z',
+        answer: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'ans-env',
+          source: 'refreshed-cache',
+        },
+        additional: {
+          value: '*',
+          encrypted: true,
+          encryptedPortion: 'add-env',
+          source: 'refreshed-cache',
+        },
+        importance: '*',
+        importanceEncrypted: 'importance-env',
+      }],
+    })).toEqual({
+      responses: [{
+        questionId: 'q1',
+        prompt: '[encrypted prompt from refreshed cache]',
+        cacheUpdatedAt: '2026-06-02T12:00:00.000Z',
+        answer: {
+          value: 'clear answer',
+          encrypted: true,
+          encryptedPortion: 'ans-env',
+          source: 'refreshed-cache',
+        },
+        additional: {
+          value: 'clear note',
+          encrypted: true,
+          encryptedPortion: 'add-env',
+          source: 'refreshed-cache',
+        },
+        importance: 8,
+        importanceEncrypted: 'importance-env',
+      }],
     });
   });
 });

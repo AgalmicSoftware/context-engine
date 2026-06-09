@@ -41,6 +41,14 @@ import {
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeaturedSBTs.js';
+import {
+  bindSbtSelectorRuntimePorts,
+  isEnsureLightSbtUniverse,
+} from './sbtSelectorRuntimePorts';
+import type {
+  SbtSelectorLogMethod,
+  UnknownRecord,
+} from './sbtSelectorRuntimePorts';
 import { resolveSbtSelectorSelectedSessionContext } from './sbtSelectorSessionResolution.js';
 import {
   buildSbtOptionsRequestSignature,
@@ -145,16 +153,14 @@ import {
   shouldUsePropsSbtSelectorSessionConfigForSlug,
 } from './sbtSelectorHelpers';
 import type {
+  NormalizedAdditionalSbtOption,
   SbtNameLookupState,
+  SbtSelectorBuiltOption,
+  SbtSelectorOptionsStatePatch,
   SbtSelectorScopedEntry,
 } from './sbtSelectorHelpers';
 
 const sbtLog = createLogger('sbt');
-type UnknownRecord = Record<string, unknown>;
-type SbtSelectorLogMethod = (...args: unknown[]) => void;
-type SbtSelectorLogger = UnknownRecord & {
-  log: SbtSelectorLogMethod;
-};
 type SbtSelectorScopedEntryMap = Record<string, SbtSelectorScopedEntry | null | undefined>;
 type SbtSelectorSlugOverrideArgs = {
   slugOverride?: unknown;
@@ -199,10 +205,7 @@ type SbtSelectorLooseOption = UnknownRecord & {
   sbtAddress?: unknown;
   value?: unknown;
 };
-type SbtSelectorAdditionalOption = SbtSelectorLooseOption & {
-  address: string;
-  name: unknown;
-};
+type SbtSelectorAdditionalOption = NormalizedAdditionalSbtOption;
 type SbtSelectorAsyncOption = UnknownRecord & {
   label?: React.ReactNode;
   value?: unknown;
@@ -235,26 +238,7 @@ type SbtSelectorUniverseInflight = Record<string, Promise<unknown> | undefined>;
 type SbtSelectorRefreshScopedUniverseArgs = {
   forceDiscover?: unknown;
 };
-type EnsureLightSbtUniverse = (
-  slugs: string[],
-  options?: { forceExactSlugs?: boolean }
-) => unknown;
-type SbtSelectorOptionsStatePatch = {
-  loadingOptions?: boolean;
-  sbtOptions?: SbtSelectorOption[];
-  scopeFeaturedAddresses?: string[];
-};
-type SbtSelectorOption = UnknownRecord & {
-  address: string;
-  chainId: number | null;
-  image: unknown;
-  maskedTitleHidden: boolean;
-  name: string;
-  selectionKey: string;
-  sessionBindingSlug?: unknown;
-  sessionName: unknown;
-  sessionSlug: string;
-};
+type SbtSelectorOption = SbtSelectorBuiltOption;
 type SbtSelectorSessionConfigSigLike = UnknownRecord & {
   __registry?: UnknownRecord & {
     chainId?: unknown;
@@ -329,11 +313,12 @@ type SbtSelectorLoadOptionsArgs = {
 type SbtSelectorCallback<TValue> = {
   bivarianceHack(value: TValue): void;
 }['bivarianceHack'];
-type SbtSelectorProps = UnknownRecord & {
+type SbtSelectorProps = {
   additionalSBTOptions?: unknown;
   autoDiscover?: boolean;
   chainId?: unknown;
   defaultFeaturedSBTs?: unknown;
+  discoverySessionSlugs?: unknown;
   enableGroupSelect?: unknown;
   ensureLightSbtUniverse?: unknown;
   id?: string | number;
@@ -342,14 +327,16 @@ type SbtSelectorProps = UnknownRecord & {
   network?: unknown;
   onAddSBT: SbtSelectorCallback<SbtSelectorSelectableOption>;
   onRemoveSBT?: SbtSelectorCallback<string>;
+  provider?: unknown;
   sbtCacheRevision?: unknown;
   selectedSBTs?: unknown;
   sessionConfig?: unknown;
   sessionSlug?: unknown;
+  showAllSBTs?: unknown;
   slug?: unknown;
   variant?: string;
 };
-type SbtSelectorState = UnknownRecord & SbtSelectorToggleState & {
+type SbtSelectorState = SbtSelectorToggleState & {
   customSBTAddress: string;
   discovering: boolean;
   groupOptions: SbtSelectorGroupOption[];
@@ -368,66 +355,23 @@ type SbtSelectorAddressHydrationResult = {
   address: string;
   sbtInfo: UnknownRecord | null;
 };
-type SbtDisplayNameTargetedArgs = {
-  address?: unknown;
-  addresses?: unknown;
-  chainId?: unknown;
-  metadataLookupConfig?: unknown;
-  preferredSlug?: unknown;
-  writeBack?: boolean;
-};
-type SbtDisplayNameTargetedResult = UnknownRecord & {
-  address?: unknown;
-  image?: unknown;
-  info?: UnknownRecord | null;
-  name?: unknown;
-};
-type ResolveSbtDisplayLabelArgs = {
-  address?: unknown;
-  fallback?: string;
-  preferredSlug?: unknown;
-  sbtInfo?: unknown;
-};
-type ResolveSbtDisplayLabelTyped = (
-  args: ResolveSbtDisplayLabelArgs
-) => unknown;
-type HydrateSbtDisplayNameTargeted = (
-  args?: SbtDisplayNameTargetedArgs
-) => Promise<SbtDisplayNameTargetedResult | null>;
-type WarmSbtDisplayNamesTargeted = (
-  args?: SbtDisplayNameTargetedArgs
-) => Promise<SbtDisplayNameTargetedResult[] | null | undefined>;
-type WriteCacheTyped = (
-  namespace: string,
-  slug?: string,
-  value?: unknown
-) => Promise<unknown>;
-type ContractScriptsSbtAddressLoader = UnknownRecord & {
-  getAllSbtAddressesCached: (
-    mode: unknown,
-    discoveryRef: unknown,
-    options?: {
-      onDiscoveredAddresses?: (payload?: SbtSelectorDiscoveredAddressesPayload) => void;
-    }
-  ) => Promise<unknown>;
-};
 const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object'
 );
-const sbtLogUntyped = sbtLog as unknown as SbtSelectorLogger;
-const hydrateSbtDisplayNameTargetedTyped: HydrateSbtDisplayNameTargeted = (args) => (
-  (hydrateSbtDisplayNameTargeted as unknown as HydrateSbtDisplayNameTargeted)(args)
-);
-const warmSbtDisplayNamesTargetedTyped: WarmSbtDisplayNamesTargeted = (args) => (
-  (warmSbtDisplayNamesTargeted as unknown as WarmSbtDisplayNamesTargeted)(args)
-);
-const resolveSbtDisplayLabelTyped: ResolveSbtDisplayLabelTyped = (args) => (
-  (resolveSbtDisplayLabel as unknown as ResolveSbtDisplayLabelTyped)(args)
-);
-const writeCacheTyped: WriteCacheTyped = (namespace, slug, value) => (
-  (writeCache as unknown as WriteCacheTyped)(namespace, slug, value)
-);
-const contractScriptsUntyped = contractScripts as unknown as ContractScriptsSbtAddressLoader;
+const sbtSelectorRuntimePorts = bindSbtSelectorRuntimePorts({
+  contractScripts: () => contractScripts,
+  hydrateSbtDisplayNameTargeted: () => hydrateSbtDisplayNameTargeted,
+  logger: () => sbtLog,
+  resolveSbtDisplayLabel: () => resolveSbtDisplayLabel,
+  warmSbtDisplayNamesTargeted: () => warmSbtDisplayNamesTargeted,
+  writeCache: () => writeCache,
+});
+const sbtLogUntyped = sbtSelectorRuntimePorts.logger;
+const hydrateSbtDisplayNameTargetedTyped = sbtSelectorRuntimePorts.hydrateSbtDisplayNameTargeted;
+const warmSbtDisplayNamesTargetedTyped = sbtSelectorRuntimePorts.warmSbtDisplayNamesTargeted;
+const resolveSbtDisplayLabelTyped = sbtSelectorRuntimePorts.resolveSbtDisplayLabel;
+const writeCacheTyped = sbtSelectorRuntimePorts.writeCache;
+const contractScriptsUntyped = sbtSelectorRuntimePorts.contractScripts;
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
 
 const SELECTED_SBT_HYDRATION_RETRY_MS = 45 * 1000;
@@ -572,7 +516,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     this._sbtOptionsByAddressMemo = { source: null, value: new Map() };
   }
 
-  componentDidUpdate(prevProps: UnknownRecord, prevState: UnknownRecord) {
+  componentDidUpdate(prevProps: Readonly<SbtSelectorProps>, prevState: Readonly<SbtSelectorState>) {
     const prevPropSessionSlug = this.getPropSessionSlug(prevProps);
     const nextPropSessionSlug = this.getPropSessionSlug(this.props);
     const updateSignals = resolveSbtSelectorUpdateSignals({
@@ -660,13 +604,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
   };
 
-  getPropSessionSlug = (props: unknown = this.props): string => resolvePropSessionSlug(props);
+  getPropSessionSlug = (props: Readonly<SbtSelectorProps> = this.props): string => resolvePropSessionSlug(props);
 
   buildSlugListSignature = (slugs: unknown): string => buildSessionSlugSignature(
     normalizeDiscoverySlugs(slugs, { allowEmpty: true })
   );
 
-  getDiscoveryOverrideSignature = (props: unknown = this.props): string => (
+  getDiscoveryOverrideSignature = (props: Readonly<SbtSelectorProps> = this.props): string => (
     this.buildSlugListSignature(getNormalizedDiscoveryOverride(props))
   );
 
@@ -969,7 +913,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       resolveSbtLabel: (sbtInfo, address, sessionSlug) => (
         this.resolveSbtLabel(sbtInfo, address, sessionSlug)
       ),
-    }) as SbtSelectorOption[];
+    });
   };
 
   applySbtOptions = ({
@@ -990,16 +934,22 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       targetSlugs,
     });
     if (!this._isMounted) return sbtOptions;
-    const nextPatch = buildSbtSelectorOptionsStatePatch({
+    const nextPatch: SbtSelectorOptionsStatePatch<SbtSelectorOption> = buildSbtSelectorOptionsStatePatch({
       currentLoadingOptions: this.state.loadingOptions,
       currentSbtOptions: this.state.sbtOptions,
       currentScopeFeaturedAddresses: this.state.scopeFeaturedAddresses,
       featuredEntries,
       loadingOptions,
       sbtOptions,
-    }) as SbtSelectorOptionsStatePatch;
+    });
     if (Object.keys(nextPatch).length > 0) {
-      this.setState(nextPatch as unknown as Pick<SbtSelectorState, keyof SbtSelectorState>);
+      this.setState((prevState: Readonly<SbtSelectorState>) => ({
+        loadingOptions: typeof nextPatch.loadingOptions === 'boolean'
+          ? nextPatch.loadingOptions
+          : prevState.loadingOptions,
+        sbtOptions: nextPatch.sbtOptions || prevState.sbtOptions,
+        scopeFeaturedAddresses: nextPatch.scopeFeaturedAddresses || prevState.scopeFeaturedAddresses,
+      }));
     }
     return sbtOptions;
   };
@@ -1120,8 +1070,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       return null;
     }
     if (typeof window === 'undefined') return null;
-    const ensureLightSbtUniverse = this.props.ensureLightSbtUniverse as unknown;
-    if (typeof ensureLightSbtUniverse !== 'function') {
+    const ensureLightSbtUniverse = this.props.ensureLightSbtUniverse;
+    if (!isEnsureLightSbtUniverse(ensureLightSbtUniverse)) {
       if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
         emitSbtSelectorDebug('debug', '[SBTSelector] shared light-universe kickoff unavailable', this.getSelectorLogContext());
       }
@@ -1159,8 +1109,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     });
 
     try {
-      const runEnsureLightSbtUniverse = ensureLightSbtUniverse as EnsureLightSbtUniverse;
-      const result = runEnsureLightSbtUniverse(kickoffSlugs, { forceExactSlugs: true });
+      const result = ensureLightSbtUniverse(kickoffSlugs, { forceExactSlugs: true });
       this.beginDiscovering();
       Promise.resolve(result).then(() => {
         if (sbtLog.isEnabled('debug') || isSbtSelectorForcedDebugEnabled()) {
@@ -1890,7 +1839,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   normalizeAdditionalSBTOptions = (
     optionsInput: unknown = this.props.additionalSBTOptions
   ): SbtSelectorAdditionalOption[] => (
-    normalizeAdditionalSbtOptions(optionsInput) as SbtSelectorAdditionalOption[]
+    normalizeAdditionalSbtOptions(optionsInput)
   );
 
   formatOptionLabel = ({ label, image, value }: SbtSelectorLabelOption): React.ReactElement => {
@@ -2014,10 +1963,10 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       : [];
     const selectedAddressesState = resolveSbtSelectorSelectedAddressesState({ selectedSbts });
     const additionalOptions = this.normalizeAdditionalSBTOptions();
-    const mergedSbtOptions = buildSbtSelectorMergedSelectableOptions({
+    const mergedSbtOptions = buildSbtSelectorMergedSelectableOptions<SbtSelectorSelectableOption>({
       additionalOptions,
       sbtOptions: sbtOptionsList,
-    }) as SbtSelectorSelectableOption[];
+    });
     const sbtOptionsBySelectionKey = this.getSbtOptionsBySelectionKey(mergedSbtOptions);
     const sbtOptionsByAddress = this.getSbtOptionsByAddress(mergedSbtOptions);
     const autoSearchSessionOptions = this.getAutoSearchSessionOptions();
@@ -2040,16 +1989,19 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       manualInputWarning,
       showManualInput,
     });
-    const { displayOptions } = resolveSbtSelectorDisplayOptions({
+    const { displayOptions } = resolveSbtSelectorDisplayOptions<SbtSelectorSelectableOption>({
       defaultFeaturedSBTs,
       limitToFeatured,
       mergedSbtOptions,
       scopeFeaturedAddresses,
-    }) as { displayOptions: SbtSelectorSelectableOption[] };
+    });
 
     const selectOptions = buildSbtSelectorSelectOptions(displayOptions);
 
-    const selectedDisplay = buildSbtSelectorSelectedDisplayEntries({
+    const selectedDisplay = buildSbtSelectorSelectedDisplayEntries<
+      SbtSelectorSelectableOption,
+      SbtSelectorSelectableOption
+    >({
       currentSessionSlug,
       resolveSbtLabel: (sbtInfo: unknown, address: string, sessionSlug: string) => (
         this.resolveSbtLabel(sbtInfo, address, sessionSlug)
@@ -2057,7 +2009,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       sbtOptionsByAddress,
       sbtOptionsBySelectionKey,
       selectedSbts,
-    }) as SbtSelectorSelectableOption[];
+    });
 
     // We expect `selectedSBTs` and `onRemoveSBT` to be passed in from the parent if we want to display existing selections.
 

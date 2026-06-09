@@ -4,11 +4,13 @@ import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
+import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: string;
+  placement?: SessionWizardTooltipRenderOptions['placement'];
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;
@@ -51,9 +53,7 @@ export type WorkerDeploySectionProps = {
   cloudflareTokenSlug?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
-  deployInFlight: boolean;
-  deployStatus?: string;
-  deployStatusIsError: boolean;
+  deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
 };
 
 const WorkerDeploySection = ({
@@ -87,13 +87,20 @@ const WorkerDeploySection = ({
   cloudflareTokenSlug = '',
   setDeployForm,
   handleDeployWorker,
-  deployInFlight,
-  deployStatus,
-  deployStatusIsError,
+  deployStatusDisplayState,
 }: WorkerDeploySectionProps) => {
   const renderTooltip = typeof renderInfoTooltip === 'function'
     ? renderInfoTooltip
     : () => null;
+  const {
+    deployButtonDisabled,
+    deployStatusText,
+    isError: deployStatusIsError,
+  } = deployStatusDisplayState || {
+    deployButtonDisabled: false,
+    deployStatusText: '',
+    isError: false,
+  };
 
   if (workerMode === 'default') {
     return null;
@@ -309,14 +316,14 @@ const WorkerDeploySection = ({
               className={styles.actionButton}
               data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
               onClick={handleDeployWorker}
-              disabled={deployInFlight}
+              disabled={deployButtonDisabled}
             >
               Deploy worker
             </Button>
           </div>
-          {deployStatus && (
+          {deployStatusText && (
             <div className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`} data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}>
-              {deployStatus}
+              {deployStatusText}
             </div>
           )}
         </div>

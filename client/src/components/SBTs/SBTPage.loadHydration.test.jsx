@@ -5,6 +5,7 @@ import {
   cacheScripts,
   render,
   createSubject,
+  createReadCachePayload,
   treeIncludesText,
   flushPromises,
   createDeferred,
@@ -13,6 +14,32 @@ import {
 
 describe('SBTPage metadata load hydration', () => {
   setupSBTPageTestLifecycle();
+
+  it('keeps cache revision ticks scoped to metadata hydration without action side effects', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x00000000000000000000000000000000000000b1',
+      sbtCacheRevision: 2,
+      sessionSlug: 'edge',
+    });
+    subject._metaHydrationTried = { stale: true };
+    subject.loadSBTInfo = jest.fn();
+    subject.checkForMintPassword = jest.fn();
+    subject.handleMint = jest.fn();
+    subject.handleUrlAutoMintIntent = jest.fn();
+
+    subject.componentDidUpdate({
+      ...subject.props,
+      sbtCacheRevision: 1,
+    });
+
+    expect(subject._metaHydrationTried).toEqual({});
+    expect(subject.loadSBTInfo).toHaveBeenCalledWith(false);
+    expect(subject.checkForMintPassword).not.toHaveBeenCalled();
+    expect(subject.handleMint).not.toHaveBeenCalled();
+    expect(subject.handleUrlAutoMintIntent).not.toHaveBeenCalled();
+  });
 
   it('coalesces overlapping loadSBTInfo calls and queues a single forced rerun', async () => {
     jest.useFakeTimers();
@@ -210,6 +237,68 @@ describe('SBTPage metadata load hydration', () => {
 
     groupHashDeferred.resolve(ethers.constants.HashZero);
     await loadPromise;
+  });
+
+  it('treats complete cached metadata as ready without refresh or direct metadata fetch', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const ownerAddress = '0x00000000000000000000000000000000000000b1';
+    const refreshSpy = jest.fn().mockResolvedValue(undefined);
+    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(createReadCachePayload({
+      sbtAddress,
+      mintedAddresses: [ownerAddress],
+      burnedAddresses: [],
+      countsLoaded: true,
+      sbtInfoOverrides: {
+        name: 'Ready Cache Badge',
+        description: 'Complete cached metadata',
+        tokenURI: 'ar://ready-cache-token',
+        image: 'https://example.example.test/ready-cache.png',
+        sessionSlug: 'edge',
+        sessionSlugExplicit: true,
+      },
+    }));
+    const metadataSpy = jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue(null);
+    const historySpy = jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue(null);
+    const mintedTokensSpy = jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
+    const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(ownerAddress);
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const contractCtorSpy = jest.spyOn(ethers, 'Contract');
+
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: ownerAddress,
+      isSBTCacheReady: true,
+      refreshSbtData: refreshSpy,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      groupPasswordHash: ethers.constants.HashZero,
+      groupPasswordHashLoaded: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+    };
+    subject.fetchHolderAddressesByTokenOwnership = jest.fn();
+
+    await subject.loadSBTInfo({ preferCountsOnly: true });
+
+    expect(readSpy).toHaveBeenCalledWith('sbtCache', 'edge');
+    expect(refreshSpy).not.toHaveBeenCalled();
+    expect(metadataSpy).not.toHaveBeenCalled();
+    expect(historySpy).not.toHaveBeenCalled();
+    expect(mintedTokensSpy).not.toHaveBeenCalled();
+    expect(ownerSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(contractCtorSpy).not.toHaveBeenCalled();
+    expect(subject.fetchHolderAddressesByTokenOwnership).not.toHaveBeenCalled();
+    expect(subject.state.resolvedSessionSlug).toBe('edge');
+    expect(subject.state.sbtInfo).toEqual(expect.objectContaining({
+      name: 'Ready Cache Badge',
+      description: 'Complete cached metadata',
+      tokenURI: 'ar://ready-cache-token',
+      image: 'https://example.example.test/ready-cache.png',
+    }));
+    expect(subject.state.countsLoaded).toBe(true);
+    expect(subject.state.userHasSBT).toBe(true);
   });
 
   it('uses direct metadata reads instead of a duplicate parent-owned refresh during cold hydration', async () => {

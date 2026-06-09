@@ -7,6 +7,21 @@ import {
   REGISTRY_CACHE_KEY,
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
+import {
+  buildUserPageGateAccessCacheKey,
+  buildUserPageGatePendingKey,
+} from './userPageHelpers';
+
+const buildGateAccessCacheKey = (
+  instance,
+  { slug = '', resourceKey = '' } = {}
+) => buildUserPageGateAccessCacheKey({
+  account: instance.props.account,
+  networkID: instance.props.network?.id,
+  resourceKey,
+  sbtCacheRevision: instance.props.sbtCacheRevision,
+  slug,
+});
 
 describe('UserPage cache refresh gate access', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -15,7 +30,7 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -30,7 +45,7 @@ describe('UserPage cache refresh gate access', () => {
     });
 
     instance._queueResponseGateAccessChecks(
-      new Set([instance._buildGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -45,7 +60,7 @@ describe('UserPage cache refresh gate access', () => {
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -56,7 +71,7 @@ describe('UserPage cache refresh gate access', () => {
     });
 
     instance._queueResponseGateAccessChecks(
-      new Set([instance._buildGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
     );
     await Promise.resolve();
     await Promise.resolve();
@@ -65,6 +80,30 @@ describe('UserPage cache refresh gate access', () => {
     expect(instance._responseGateAccessStatusByKey.get(cacheKey)?.status).toBe('error');
     expect(retrySpy).toHaveBeenCalledWith(30000);
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false });
+  });
+
+  it('settles rejected gate access checks as unknown without applying state directly', async () => {
+    const account = '0x00000000000000000000000000000000000000bb';
+    const instance = makeInstance({ account });
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+    const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
+    const cacheKey = buildGateAccessCacheKey(instance, {
+      slug: 'edge',
+      resourceKey: 'questionResponses',
+    });
+    checkSponsoredAccess.mockRejectedValue(new Error('gate unavailable'));
+
+    instance._queueResponseGateAccessChecks(
+      new Set([buildUserPageGatePendingKey({ slug: 'edge', resourceKey: 'questionResponses' })])
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(checkSponsoredAccess).toHaveBeenCalledTimes(1);
+    expect(instance._responseGateAccessStatusByKey.get(cacheKey)?.status).toBe('unknown');
+    expect(retrySpy).toHaveBeenCalledWith(30000);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false });
+    expect(instance.setState).not.toHaveBeenCalled();
   });
 
   it('keeps response-gate access checks strict when only a demo-session config exists', async () => {
@@ -83,7 +122,7 @@ describe('UserPage cache refresh gate access', () => {
           questionResponses: { encrypted: true },
         },
       });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'rxc',
       resourceKey: 'questionResponses',
     });
@@ -95,7 +134,7 @@ describe('UserPage cache refresh gate access', () => {
 
     try {
       instance._queueResponseGateAccessChecks(
-        new Set([instance._buildGatePendingKey({ slug: 'rxc', resourceKey: 'questionResponses' })])
+        new Set([buildUserPageGatePendingKey({ slug: 'rxc', resourceKey: 'questionResponses' })])
       );
       await Promise.resolve();
       await Promise.resolve();
@@ -127,7 +166,7 @@ describe('UserPage cache refresh gate access', () => {
     checkSponsoredAccess.mockImplementation(() => deferred.promise);
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
     const retrySpy = jest.spyOn(instance, 'scheduleResponseGateRetry').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -152,11 +191,11 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -176,16 +215,35 @@ describe('UserPage cache refresh gate access', () => {
     expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
   });
 
+  it('keeps the nearest response-gate retry timer when later retries are requested', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
+
+    instance.scheduleResponseGateRetry(30_000);
+    instance.scheduleResponseGateRetry(60_000);
+
+    jest.advanceTimersByTime(29_999);
+    expect(queueSpy).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+    expect(queueSpy).toHaveBeenCalledWith({ markLoading: false, bypassSignature: true });
+
+    jest.advanceTimersByTime(30_000);
+    expect(queueSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('schedules a delayed refresh when error gate access is still within retry TTL', () => {
     jest.useFakeTimers();
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
@@ -210,11 +268,11 @@ describe('UserPage cache refresh gate access', () => {
     const account = '0x00000000000000000000000000000000000000bb';
     const instance = makeInstance({ account });
     const queueSpy = jest.spyOn(instance, 'queueCacheRefresh').mockImplementation(() => {});
-    const pendingKey = instance._buildGatePendingKey({
+    const pendingKey = buildUserPageGatePendingKey({
       slug: 'edge',
       resourceKey: 'questionResponses',
     });
-    const cacheKey = instance._buildGateAccessCacheKey({
+    const cacheKey = buildGateAccessCacheKey(instance, {
       slug: 'edge',
       resourceKey: 'questionResponses',
     });

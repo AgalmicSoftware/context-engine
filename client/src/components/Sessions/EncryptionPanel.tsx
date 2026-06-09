@@ -7,6 +7,7 @@ import styles from './SessionWizard.module.scss';
 import SBTSelector from '../SBTs/SBTSelector';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type EncryptionGate = {
   id: string;
@@ -34,7 +35,7 @@ export type EncryptionPanelProps = {
   renderSessionWizardInfoTooltip?: (props: {
     id?: string;
     content?: React.ReactNode;
-    placement?: string;
+    placement?: SessionWizardTooltipRenderOptions['placement'];
     testId?: string;
     ariaLabel?: string;
   }) => React.ReactNode;

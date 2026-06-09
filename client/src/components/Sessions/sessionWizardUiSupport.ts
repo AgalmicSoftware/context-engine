@@ -34,12 +34,13 @@ export const readSessionWizardTooltipsEnabled = (
 };
 
 export const resolveSessionHeaderImageFormat = (
-  fileLike: SessionWizardFileLike | File | null | undefined
+  fileLike: SessionWizardFileLike | File | Blob | null | undefined
 ): string => {
-  const fileName = toStr(fileLike?.name).trim().toLowerCase();
+  const fileRecord = isUiRecord(fileLike) ? fileLike as SessionWizardFileLike : {};
+  const fileName = toStr(fileRecord.name).trim().toLowerCase();
   const fromName = fileName.split('.').pop()?.trim() || '';
   if (['png', 'jpg', 'jpeg', 'gif'].includes(fromName)) return fromName;
-  const mime = toStr(fileLike?.type).trim().toLowerCase();
+  const mime = toStr(fileRecord.type).trim().toLowerCase();
   return (SESSION_HEADER_IMAGE_MIME_TO_EXT as Record<string, string>)[mime] || '';
 };
 

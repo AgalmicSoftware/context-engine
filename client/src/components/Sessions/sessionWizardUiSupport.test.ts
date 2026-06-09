@@ -19,6 +19,7 @@ describe('sessionWizardUiSupport', () => {
   it('resolves session header image format from name or mime type', () => {
     expect(resolveSessionHeaderImageFormat({ name: 'cover.PNG' })).toBe('png');
     expect(resolveSessionHeaderImageFormat({ type: 'image/jpeg' })).toBe('jpeg');
+    expect(resolveSessionHeaderImageFormat(new Blob(['header'], { type: 'image/gif' }))).toBe('gif');
     expect(resolveSessionHeaderImageFormat({ name: 'cover.unknown', type: 'application/json' })).toBe('');
   });
 

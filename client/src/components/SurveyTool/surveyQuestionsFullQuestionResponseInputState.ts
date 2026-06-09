@@ -27,6 +27,7 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
   }
   | {
     kind: 'rating';
+    questionId: string;
     ratingValue: number;
     disabled: boolean;
     useDeferredRating: boolean;
@@ -39,6 +40,7 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
   }
   | {
     kind: 'audio';
+    questionId: string;
     qIndex: number;
     value: string | number;
     encrypted: boolean;
@@ -49,6 +51,56 @@ export type SurveyQuestionsFullQuestionResponseInputDescriptor =
     placeholder: string;
     disableEncryption: boolean;
   };
+
+export type SurveyQuestionsFullQuestionResponseInputActionDescriptor =
+  | {
+    kind: 'answer-change';
+    questionId: string;
+    responseKey: 'answer';
+    disabled: boolean;
+    nextValue: unknown;
+    event?: unknown;
+  }
+  | {
+    kind: 'rating-change';
+    questionId: string;
+    responseKey: 'answer';
+    disabled: boolean;
+    nextValue: number;
+    event?: unknown;
+    persistStrategy: 'event-sensitive';
+  }
+  | {
+    kind: 'rating-commit';
+    questionId: string;
+    responseKey: 'answer';
+    disabled: boolean;
+    nextValue: number;
+    persistDraft: false;
+    flushAfterUpdate: true;
+  }
+  | {
+    kind: 'rating-change-complete';
+    questionId: string;
+    responseKey: 'answer';
+    disabled: boolean;
+    event?: unknown;
+  }
+  | {
+    kind: 'answer-encryption-toggle';
+    questionId: string;
+    responseKey: 'answer';
+    disabled: boolean;
+    nextEncryptedState: boolean;
+  };
+
+type BuildResponseInputActionDescriptorArgs = {
+  inputDescriptor: SurveyQuestionsFullQuestionResponseInputDescriptor;
+  kind: SurveyQuestionsFullQuestionResponseInputActionDescriptor['kind'];
+  nextValue?: unknown;
+  event?: unknown;
+  nextEncryptedState?: boolean;
+};
 
 export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
   question,
@@ -80,6 +132,7 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
     case 'rating':
       return {
         kind: 'rating',
+        questionId: question.id,
         ratingValue: getNormalizedUiRatingValue(answer.value),
         disabled,
         useDeferredRating: !!singleQuestionMode,
@@ -101,6 +154,7 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
 
       return {
         kind: 'audio',
+        questionId: question.id,
         qIndex,
         value: audioInputValue,
         encrypted: answer.encrypted || false,
@@ -114,3 +168,62 @@ export const buildSurveyQuestionsFullQuestionResponseInputDescriptor = ({
     }
   }
 };
+
+export const buildSurveyQuestionsFullQuestionResponseInputActionDescriptor = ({
+  inputDescriptor,
+  kind,
+  nextValue,
+  event,
+  nextEncryptedState = false,
+}: BuildResponseInputActionDescriptorArgs): SurveyQuestionsFullQuestionResponseInputActionDescriptor => {
+  const base = {
+    questionId: inputDescriptor.questionId,
+    responseKey: 'answer' as const,
+    disabled: inputDescriptor.disabled,
+  };
+
+  switch (kind) {
+    case 'rating-change':
+      return {
+        ...base,
+        kind,
+        nextValue: Number(nextValue),
+        event,
+        persistStrategy: 'event-sensitive',
+      };
+    case 'rating-commit':
+      return {
+        ...base,
+        kind,
+        nextValue: Number(nextValue),
+        persistDraft: false,
+        flushAfterUpdate: true,
+      };
+    case 'rating-change-complete':
+      return {
+        ...base,
+        kind,
+        event,
+      };
+    case 'answer-encryption-toggle':
+      return {
+        ...base,
+        kind,
+        nextEncryptedState: !!nextEncryptedState,
+      };
+    default:
+      return {
+        ...base,
+        kind: 'answer-change',
+        nextValue,
+        event,
+      };
+  }
+};
+
+export const shouldDispatchSurveyQuestionsFullQuestionResponseInputAction = (
+  action: SurveyQuestionsFullQuestionResponseInputActionDescriptor
+): boolean => (
+  !action.disabled &&
+  String(action.questionId || '').trim().length > 0
+);

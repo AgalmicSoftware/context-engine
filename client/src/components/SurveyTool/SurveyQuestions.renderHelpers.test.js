@@ -7,11 +7,11 @@ import GatedPromptNotice from './GatedPromptNotice';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
+import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -66,6 +66,8 @@ const findFirstNodeByType = (node, targetType) => {
   if (node?.type === targetType) return node;
   return findFirstNodeByType(node?.props?.children, targetType);
 };
+
+const findRouteSurface = (node) => findFirstNodeByType(node, SurveyQuestionsRouteSurface);
 
 const nodeHasClassName = (node, className) => {
   const value = node?.props?.className;
@@ -198,6 +200,87 @@ describe('SurveyQuestions render helpers', () => {
     expect(treeHasText(tree, '0')).toBe(true);
   });
 
+  it('wires question decrypt controls through display descriptors without moving decrypt execution', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.handleDecryptQuestionAnswer = jest.fn();
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: false,
+      isDecrypting: false,
+    };
+
+    const readyControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'answer',
+      allowDecrypt: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Answer',
+      busy: false,
+    });
+    expect(readyControl?.type).toBe(QuestionDecryptControl);
+    expect(readyControl?.props).toMatchObject({
+      actionLabel: 'Decrypt Answer',
+      autoDecryptEnabled: false,
+      busy: false,
+      disabled: false,
+      showBusySpinnerWhenAutoDecryptEnabled: false,
+      title: undefined,
+    });
+
+    readyControl.props.onClick();
+    expect(subject.handleDecryptQuestionAnswer).toHaveBeenCalledWith('Q1', 'answer');
+
+    subject.state = {
+      ...subject.state,
+      isDecrypting: true,
+    };
+    const busyControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'answer',
+      allowDecrypt: true,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Answer',
+      busy: true,
+    });
+    expect(busyControl?.props).toMatchObject({
+      busy: true,
+      disabled: true,
+      title: undefined,
+    });
+
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: true,
+      isDecrypting: false,
+    };
+    const autoDecryptControl = subject.renderQuestionFieldDecryptControl({
+      questionId: 'Q1',
+      fieldKey: 'additional',
+      allowDecrypt: false,
+      decryptTooltip: 'Connect wallet to decrypt',
+      actionLabel: 'Decrypt Comments',
+      busy: true,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      wrapperStyle: { marginTop: '4px' },
+    });
+    expect(autoDecryptControl?.props).toMatchObject({
+      actionLabel: 'Decrypt Comments',
+      autoDecryptEnabled: true,
+      busy: true,
+      disabled: true,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+      title: 'Connect wallet to decrypt',
+      wrapperStyle: { marginTop: '4px' },
+    });
+  });
+
   it('renders pile additional comments without the extra header and keeps the lock beside the field', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
@@ -324,6 +407,71 @@ describe('SurveyQuestions render helpers', () => {
     expect(dropdown.props.tags).toEqual(['governance']);
   });
 
+  it('keeps full-question response input execution handlers parent-owned with stable arguments', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 5,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const audioInputWorkerProps = { workerReady: true };
+    const sliderFlush = jest.fn();
+    subject.getAudioInputWorkerProps = jest.fn(() => audioInputWorkerProps);
+    subject.handleAnswer = jest.fn();
+    subject.flushDraftPersistAfterSliderChange = sliderFlush;
+    subject.toggleAnswerEncryption = jest.fn();
+    subject.state = {
+      ...subject.state,
+      isSubmitting: true,
+    };
+
+    const question = { id: 'q-response', type: 'rating', prompt: 'Rate this' };
+    const answer = { value: 4, encrypted: false };
+    const input = subject.renderFullQuestionResponseInput({
+      question,
+      qIndex: 2,
+      surveyIndex: 5,
+      answer,
+      glowAnswer: true,
+    });
+
+    expect(input?.type).toBe(SurveyQuestionsFullQuestionResponseInput);
+    expect(input?.props).toMatchObject({
+      question,
+      qIndex: 2,
+      answer,
+      glowAnswer: true,
+      isSubmitting: true,
+      singleQuestionMode: true,
+      audioInputWorkerProps,
+    });
+    expect(input.props.audioInputWorkerProps).toBe(audioInputWorkerProps);
+    expect(Object.keys(input.props).filter((propName) => propName.startsWith('on')).sort()).toEqual([
+      'onAnswerChange',
+      'onDeferredRatingCommit',
+      'onRatingChange',
+      'onRatingChangeComplete',
+      'onToggleAnswerEncryption',
+    ]);
+
+    input.props.onAnswerChange('next answer');
+    input.props.onRatingChange(8, { type: 'keydown' });
+    input.props.onDeferredRatingCommit(6);
+    input.props.onRatingChangeComplete();
+    input.props.onToggleAnswerEncryption(true);
+
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(1, 5, 'q-response', 'next answer');
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(2, 5, 'q-response', 8, { persistDraft: true });
+    expect(subject.handleAnswer).toHaveBeenNthCalledWith(3, 5, 'q-response', 6, {
+      persistDraft: false,
+      afterUpdate: sliderFlush,
+    });
+    expect(sliderFlush).toHaveBeenCalledTimes(1);
+    expect(subject.toggleAnswerEncryption).toHaveBeenCalledWith(5, 'q-response', true);
+  });
+
   it('renders full-question card links through the shared header helper', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
@@ -384,13 +532,97 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const controls = findFirstNodeByType(tree, SurveyQuestionsJsonControls);
+    const surface = findRouteSurface(tree);
+    const controls = surface?.props?.jsonControlsProps;
 
     expect(controls).not.toBeNull();
-    expect(controls.props.responseJson).toEqual({
+    expect(controls.responseJson).toEqual({
       message: 'No response found for survey from address: 0xdef',
     });
     expect(subject.getResponseJson).not.toHaveBeenCalled();
+  });
+
+  it('passes only expanded JSON payloads to bottom copy handlers', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    const surveyJson = { id: 'survey-1', questionIDs: ['q1'] };
+    subject.getSurveyJson = jest.fn(() => surveyJson);
+    subject.getResponseJson = jest.fn(() => ({ responses: [{ questionID: 'q1' }] }));
+    subject.copyJsonToClipboard = jest.fn();
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      displayAnswerMode: true,
+      parsedViewAddressAnswers: { responses: [] },
+      questionPool: [{ id: 'q1', type: 'freeform' }],
+      showSurveyJson: true,
+      showResponseJson: false,
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const surface = findRouteSurface(tree);
+    const controls = surface?.props?.jsonControlsProps;
+
+    expect(controls).not.toBeNull();
+    expect(controls.jsonPanelDisplayState.showSurveyJsonPanel).toBe(true);
+    expect(controls.jsonPanelDisplayState.showResponseJsonPanel).toBe(false);
+    expect(controls.surveyJson).toBe(surveyJson);
+    expect(controls.responseJson).toBeNull();
+    expect(subject.getSurveyJson).toHaveBeenCalledTimes(1);
+    expect(subject.getResponseJson).not.toHaveBeenCalled();
+
+    controls.onCopySurveyJson();
+
+    expect(subject.copyJsonToClipboard).toHaveBeenCalledWith(surveyJson, 'survey');
+  });
+
+  it('derives encrypted submit status from pending edit stats during render', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+    });
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 2, encrypted: 1 }));
+    subject.getMemoizedLockedQuestionGateDetails = jest.fn(() => []);
+    subject.renderLockedQuestionsPanel = jest.fn(() => null);
+    subject.state = {
+      ...subject.state,
+      currentStep: 1,
+      isDirty: true,
+      isSubmitting: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question' }],
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: true } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+    };
+
+    const tree = subject.render();
+    const surface = findRouteSurface(tree);
+
+    expect(surface).not.toBeNull();
+    expect(surface.props.submitFooterProps.pendingEditCount).toBe(2);
+    expect(surface.props.submitDisplayState.uploadStatusText).toBe('Encrypting...');
   });
 
   it('renders masked full-question prompts as gated prompt cards without answer editors', () => {
@@ -573,12 +805,13 @@ describe('SurveyQuestions render helpers', () => {
     };
 
     const tree = subject.render();
-    const panel = findFirstNodeByType(tree, SurveyQuestionsAuthoringPanel);
+    const surface = findRouteSurface(tree);
+    const authoringPanelProps = surface?.props?.authoringPanelProps;
 
-    expect(panel).not.toBeNull();
-    expect(panel.props.showLockedQuestionsBanner).toBe(true);
-    expect(panel.props.lockedQuestionsBanner).toBe(lockedBanner);
-    expect(panel.props.renderedEditableQuestions).toBeNull();
+    expect(surface).not.toBeNull();
+    expect(authoringPanelProps.displayState.showLockedQuestionsBanner).toBe(true);
+    expect(authoringPanelProps.lockedQuestionsBanner).toBe(lockedBanner);
+    expect(authoringPanelProps.renderedEditableQuestions).toBeNull();
     expect(subject.renderQuestion).not.toHaveBeenCalled();
     expect(subject.getMemoizedLockedQuestionGateDetails).toHaveBeenCalledWith(['q-locked']);
     expect(subject.renderLockedQuestionsPanel).toHaveBeenCalledWith({

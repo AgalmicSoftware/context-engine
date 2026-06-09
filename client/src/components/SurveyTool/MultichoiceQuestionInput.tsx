@@ -56,6 +56,7 @@ const MultichoiceQuestionInput = ({
               name={`question-${questionId}`}
               value={optionLabel}
               onChange={(event) => {
+                if (disabled) return;
                 const checked = !!event.target.checked;
                 let nextValues: unknown[] = [];
 

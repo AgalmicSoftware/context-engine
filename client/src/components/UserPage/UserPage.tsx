@@ -4,15 +4,14 @@ import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
   buildUserPageAnalysisErrorStatePatch,
+  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
   applyUserPageBookmarkNicknameSave,
-  buildUserPageAnalysisCacheEntry,
-  buildUserPageAnalysisCacheWritePayload,
   buildUserPageCacheRefreshOptions,
+  buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
   buildUserPageRefreshTelemetrySnapshot,
-  buildUserPageCacheSourcePresence,
   buildUserPageAnalysisCreatedQuestions,
   buildUserPageAnalysisCreatedSurveys,
   buildUserPageAnalysisCandidateLogRows,
@@ -31,25 +30,29 @@ import {
   buildUserPageBookmarkToggleStatePatch,
   buildUserPageAiSessionScopeContext,
   buildUserPageBooleanTogglePatch,
-  buildUserPageCacheRefreshInputSignature,
-  buildUserPageCacheLoadingHoldFlags,
-  buildUserPageCacheSourceSnapshot,
+  buildUserPageCacheRefreshStatePatch,
   buildUserPageCopiedStatePatch,
   buildUserPageDeepScanReportSignature,
   buildUserPageDeepScanReportStatus,
   buildUserPageDeepScanReportStatePatch,
   buildUserPageDeepScanReportTelemetryPayloads,
-  buildUserPageDeepScanRefreshCarryPatch,
   buildUserPageDeepScanTooltipDisplayState,
   buildUserPageDeepScanProgressStatePatch,
   buildUserPageDeepScanPrioritySlugs,
   buildUserPageDeepScanRequestStatePatch,
   buildUserPageDeepScanTooltipInputSignature,
   buildUserPageDeriveTelemetrySnapshot,
-  buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
+  buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageEncryptedVisibilityStatusRequestPlan,
+  buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
+  buildUserPageGateAccessRequestDescriptor,
+  buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
+  buildUserPageGateRetryTimerPlan,
+  buildUserPageQuestionResponseSourceDescriptor,
   buildUserPageFullProfileModalStatePatch,
   buildUserPageMissingAddressCacheStatePatch,
   buildUserPageMissingAddressCacheStateUpdate,
@@ -58,21 +61,18 @@ import {
   buildUserPageNicknameInputStatePatch,
   buildUserPageNicknameSaveStatePatch,
   buildUserPageNoSbtVisibleTelemetryState,
-  buildUserPageResponseDecryptSurveyBindings,
-  buildUserPageResponseSectionDeriveSignature,
-  buildUserPageRenderLoadingState,
+  buildUserPageResponseDecryptRequestPlan,
+  buildUserPageResponseSectionDeriveMemoPlan,
+  buildUserPageCacheRefreshDisplayState,
+  buildUserPageSurveyResponseSourceDescriptor,
   buildUserPageCreatedQuestionWrapperClassName,
   buildUserPageHeaderBookmarkClassName,
   buildUserPageSbtSection,
-  buildUserPageSbtSectionDeriveSignature,
-  buildUserPageSectionLoadingEmptyState,
+  buildUserPageSbtSectionDeriveMemoPlan,
   buildUserPageSelectedTabStatePatch,
   buildUserPageSurveyExpansionTogglePatch,
   buildUserPageTooltipTargetIds,
-  buildUserPageUnifiedCacheAggregateMemoKey,
-  buildUserPageUncertainEmptyText,
-  buildUserPageUncertaintyLoadingFlags,
-  buildUserPageUserStatsMergePatch,
+  buildUserPageUnifiedCacheAggregateMemoPlan,
   buildUserPageUsernameChangeStatePatch,
   buildUserPageUsernameEditCancelStatePatch,
   buildUserPageUsernameEditOpenStatePatch,
@@ -87,17 +87,15 @@ import {
   getActiveUserPageChainNode,
   getPrioritizedUserPageChainNodes,
   getPrioritizedUserPageNetworkCacheNodes,
-  getUserPageGateResourceKeysToCheck,
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
   hasUserPageResponseSubmissionHints,
-  inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
   isPlainAnalysisObject,
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
-  isUserPageEncryptedResponseField,
   isUserPageGateAccessContext,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSbtCacheEntryIntoAggregate,
@@ -113,18 +111,18 @@ import {
   normalizeUserPageSingleQuestionResponsePayload,
   mergeUserPageQueuedCacheRefreshFlags,
   parseUserPageCachedResponsePayload,
-  readUserPageCacheSourcePresence,
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
-  readUserPageAnalysisCacheEntry,
+  readUserPageAnalysisCreatedSurveyCachesThroughPort,
+  readUserPageAnalysisCacheThroughPort,
+  dispatchUserPageGateAccessCheckThroughPort,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
   resolveUserPageAnalysisModalDisplayState,
   resolveUserPageAnalysisSessionConfigForSlug,
   resolveUserPageAnalysisSessionFallback,
   resolveUserPageAddressDisplayState,
-  resolveUserPageAiActionPlan,
   resolveUserPageAiAvailabilityRefresh,
   resolveUserPageAvatarDisplayState,
   resolveUserPageBlockieSeed,
@@ -151,17 +149,17 @@ import {
   resolveUserPageUsernameErrorDisplayState,
   shouldApplyUserPageDeepScanResponse,
   shouldRetryUserPageQuestionData,
-  toAnalysisCacheBucket,
   toAnalysisRecord,
   upsertUserPageResponseByRecency,
+  writeUserPageAnalysisCacheThroughPort,
   writeUserPageSourceSlug,
+  type UserPageAnalysisCacheReadDescriptor,
   type UserPageAnalysisFingerprintInput,
   type UserPageAiSessionScopeContext,
   type UserPageBookmarksCache,
   type UserPageEffectiveAiConfigRequest,
   type UserPageEffectiveAiConfigResult,
   type UserPageSourceSlugMap,
-  applyUserPageDecryptedPatchToResponseField,
 } from './userPageHelpers';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import UserPageAnalysisModal from './UserPageAnalysisModal';
@@ -173,6 +171,11 @@ import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
+import {
+  runUserPageAnalyzeActionController,
+  runUserPageBookmarkActionController,
+  runUserPageCacheRefreshActionController,
+} from './userPageActionController';
 
 import { analyzeUserOpinions } from 'utilities/ai/aiScripts.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
@@ -201,7 +204,6 @@ import {
 } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { isMaskedQuestionPayload } from '../../utilities/survey/questionRouting.js';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -266,18 +268,6 @@ type CacheSourceSnapshot = CacheSourcePresence & {
 
 type UserPageTimerHandle = ReturnType<typeof setTimeout>;
 
-type UnifiedCacheAggregateMemoKeyInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  sourceMembershipSignature?: unknown;
-};
-
-type SectionDeriveSignatureInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  sourceSignature?: unknown;
-};
-
 type QueuedCacheRefreshOptions = {
   force?: unknown;
   markLoading?: unknown;
@@ -336,15 +326,6 @@ type GateAccessStatusEntry = {
   ts: number;
 };
 
-type CacheRefreshInputSignatureInput = {
-  viewAddressLower?: unknown;
-  networkID?: unknown;
-  hasSurveySources?: unknown;
-  hasQuestionSources?: unknown;
-  hasSbtSources?: unknown;
-  sourceMembershipSignature?: unknown;
-};
-
 type SponsoredAccessResult = {
   status?: unknown;
   [key: string]: unknown;
@@ -360,11 +341,6 @@ type GateAccessContext = {
 type GateAccessContextSnapshot = {
   pendingKeys: string[];
   uncertainResources: string[];
-};
-
-type GateAccessStatusByResource = {
-  resourceKey: string;
-  status: string;
 };
 
 type SourceSlugMap = UserPageSourceSlugMap;
@@ -479,23 +455,6 @@ type EncryptedVisibilityResult = {
   visible: boolean;
   canDecryptOtherResponses: boolean;
   uncertain?: boolean;
-};
-
-type DecryptableResponseField = UnknownRecord & {
-  value: unknown;
-  encrypted: boolean;
-};
-
-type DecryptedResponsePatchInput = {
-  responseObj?: unknown;
-  questionId?: unknown;
-  fieldToDecrypt?: unknown;
-  decryptedResult?: unknown;
-};
-
-type ResponseDecryptSurveyBindings = {
-  surveyId: string;
-  acceptedSurveyIds: string[];
 };
 
 type DecryptSingleFieldOptions = UnknownRecord & {
@@ -626,14 +585,11 @@ type UserAnalysisCacheEntry = UnknownRecord & {
   result?: unknown;
 };
 
-type UserAnalysisCacheReadArgs = {
+type UserAnalysisCacheWriteArgs = {
   sessionSlug: string;
   networkId: string;
   addressLower: string;
   fingerprint: string;
-};
-
-type UserAnalysisCacheWriteArgs = UserAnalysisCacheReadArgs & {
   aiContext: UserAnalysisAiContext;
   result: unknown;
 };
@@ -686,6 +642,29 @@ const writeCacheTyped = writeCache as (
 const isGateAccessContext = (value: unknown): value is GateAccessContext => (
   isUserPageGateAccessContext(value)
 );
+
+const createGateAccessContext = (): GateAccessContext => ({
+  pendingKeys: new Set(),
+  uncertainResources: new Set(),
+});
+
+const captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
+  pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
+  uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
+});
+
+const mergeGateContextSnapshot = (
+  targetContext: GateAccessContext | null,
+  snapshot: GateAccessContextSnapshot | null = null
+): void => {
+  if (!isGateAccessContext(targetContext) || !snapshot) return;
+  (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
+    targetContext.pendingKeys.add(String(item || ''));
+  });
+  (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
+    targetContext.uncertainResources.add(String(item || ''));
+  });
+};
 
 const buildUserAnalysisFingerprint = async (
   input: Omit<UserPageAnalysisFingerprintInput, 'version'>
@@ -844,11 +823,9 @@ class UserPage extends Component<any, any> {
     sessionSlug: this.props.sessionSlug,
   }) || '';
 
-  getBookmarksSlug = (): string => this.getActiveSessionSlug();
-
   getBookmarksCache = (): UserPageBookmarksCache => {
     try {
-      const slug = this.getBookmarksSlug();
+      const slug = this.getActiveSessionSlug();
       const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
       return normalizeUserPageBookmarksCache(parsed);
     } catch (_) {
@@ -857,7 +834,7 @@ class UserPage extends Component<any, any> {
   };
 
   persistBookmarksCache = (cacheObj: unknown, source: unknown = ''): void => {
-    const slug = this.getBookmarksSlug();
+    const slug = this.getActiveSessionSlug();
     void (writeCache as (
       namespace: string,
       slug?: string,
@@ -876,10 +853,22 @@ class UserPage extends Component<any, any> {
     event?.stopPropagation?.();
   };
 
+  dispatchSbtDataRefresh = (addr: unknown, slug?: unknown): void => {
+    runUserPageCacheRefreshActionController({
+      cacheRefreshArgs: [addr, slug],
+      plan: {
+        blockedReason: 'none',
+        disabled: false,
+        shouldRenderCacheRefreshAction: true,
+      },
+      ports: { dispatchCacheRefresh: this.props.refreshSbtData },
+    });
+  };
+
   handleManagedCacheUpdate = (event: ManagedCacheUpdateEvent = null): void => {
     if (!this._isMounted) return;
     const cacheUpdate = resolveUserPageManagedCacheUpdate({
-      bookmarksSlug: this.getBookmarksSlug(),
+      bookmarksSlug: this.getActiveSessionSlug(),
       namespace: event?.namespace,
       slug: event?.slug,
     });
@@ -964,11 +953,6 @@ class UserPage extends Component<any, any> {
       rows,
       lines: formatUserPageDeepScanTooltipLinesFromRows(rows, formatUserPageDeepScanBlockCount),
     };
-  };
-
-  computeDeepScanTooltipLines = (): string[] | null => {
-    const snapshot = this.computeDeepScanProgressSnapshot();
-    return snapshot?.lines || null;
   };
 
   computeDeepScanProgressRows = (): DeepScanProgressRow[] | null => {
@@ -1574,12 +1558,6 @@ class UserPage extends Component<any, any> {
 
   _dgHasAny = (name: unknown): boolean => hasNamespaceEntriesSync(String(name || ''));
 
-  _readCacheSourcePresence = (): CacheSourcePresence => {
-    return readUserPageCacheSourcePresence({
-      hasNamespaceEntries: this._dgHasAny,
-    });
-  };
-
   _readCacheSourceSnapshot = (): CacheSourceSnapshot => {
     return readUserPageCacheSourceSnapshot({
       hasNamespaceEntries: this._dgHasAny,
@@ -1600,65 +1578,6 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _buildUnifiedCacheAggregateMemoKey = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceMembershipSignature = '',
-  }: UnifiedCacheAggregateMemoKeyInput = {}): string => (
-    buildUserPageUnifiedCacheAggregateMemoKey({
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceMembershipSignature,
-      viewAddressLower,
-    })
-  );
-
-  _buildSurveyDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageResponseSectionDeriveSignature({
-      account: this.props.account,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
-  _buildQuestionDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageResponseSectionDeriveSignature({
-      account: this.props.account,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
-  _buildSbtDeriveSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    sourceSignature = '',
-  }: SectionDeriveSignatureInput = {}): string => (
-    buildUserPageSbtSectionDeriveSignature({
-      networkID,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceSignature,
-      viewAddressLower,
-    })
-  );
-
   clearQueuedCacheRefresh = (): void => {
     if (this._queuedCacheRefreshTimer) {
       clearTimeout(this._queuedCacheRefreshTimer);
@@ -1678,22 +1597,25 @@ class UserPage extends Component<any, any> {
   };
 
   scheduleResponseGateRetry = (delayMs: unknown = USERPAGE_GATE_UNKNOWN_RETRY_MS): void => {
-    if (!this._isMounted) return;
-    const safeDelay = Math.max(1000, Number(delayMs) || USERPAGE_GATE_UNKNOWN_RETRY_MS);
-    const nextDueAt = Date.now() + safeDelay;
-    if (this._responseGateRetryTimer && this._responseGateRetryDueAt > 0) {
-      if (this._responseGateRetryDueAt <= nextDueAt) {
-        return;
-      }
+    const retryTimerPlan = buildUserPageGateRetryTimerPlan({
+      currentDueAt: this._responseGateRetryDueAt,
+      delayMs,
+      fallbackDelayMs: USERPAGE_GATE_UNKNOWN_RETRY_MS,
+      hasCurrentTimer: !!this._responseGateRetryTimer,
+      isMounted: this._isMounted,
+      nowMs: Date.now(),
+    });
+    if (!retryTimerPlan.shouldScheduleTimer) return;
+    if (retryTimerPlan.shouldClearExistingTimer) {
       this.clearResponseGateRetryTimer();
     }
-    this._responseGateRetryDueAt = nextDueAt;
+    this._responseGateRetryDueAt = retryTimerPlan.nextDueAt;
     this._responseGateRetryTimer = setTimeout(() => {
       this._responseGateRetryTimer = null;
       this._responseGateRetryDueAt = 0;
       if (!this._isMounted) return;
       this.queueCacheRefresh({ markLoading: false, bypassSignature: true });
-    }, safeDelay);
+    }, retryTimerPlan.safeDelayMs);
   };
 
   queueCacheRefresh = ({
@@ -1736,26 +1658,6 @@ class UserPage extends Component<any, any> {
     this._refreshAllDataFromCache(refreshOpts);
   };
 
-  _buildGateAccessCacheKey = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => {
-    return buildUserPageGateAccessCacheKey({
-      account: this.props.account,
-      networkID: this.props.network?.id,
-      resourceKey,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      slug,
-    });
-  };
-
-  _buildGatePendingKey = ({
-    slug = '',
-    resourceKey = '',
-  }: GateAccessKeyInput = {}): string => (
-    buildUserPageGatePendingKey({ resourceKey, slug })
-  );
-
   _setResponseGateAccessStatus = (
     cacheKey: unknown,
     status: unknown,
@@ -1772,39 +1674,6 @@ class UserPage extends Component<any, any> {
     this._responseGateAccessStatusByKey.set(key, { status: nextStatus, ts: nowTs });
   };
 
-  _buildCacheRefreshInputSignature = ({
-    viewAddressLower = '',
-    networkID = '',
-    hasSurveySources = false,
-    hasQuestionSources = false,
-    hasSbtSources = false,
-    sourceMembershipSignature = '',
-  }: CacheRefreshInputSignatureInput = {}): string => {
-    const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
-      ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
-      : 0;
-    return buildUserPageCacheRefreshInputSignature({
-      account: this.props.account,
-      gateRecheckEpoch,
-      hasQuestionSources,
-      hasSbtSources,
-      hasSurveySources,
-      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
-      hasUncertainUserData: this.state.hasUncertainUserData,
-      isQuestionCacheReady: this.props.isQuestionCacheReady,
-      isResponsesCacheReady: this.props.isResponsesCacheReady,
-      isSBTCacheReady: this.props.isSBTCacheReady,
-      isSurveyCacheReady: this.props.isSurveyCacheReady,
-      networkID,
-      questionResponsesNonce: this.props.questionResponsesNonce,
-      responseGateAccessGeneration: this._responseGateAccessGeneration,
-      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
-      sbtCacheRevision: this.props.sbtCacheRevision,
-      sourceMembershipSignature,
-      viewAddressLower,
-    });
-  };
-
   _resetResponseGateAccess = (): void => {
     this._responseGateAccessGeneration += 1;
     this._responseGateAccessStatusVersion += 1;
@@ -1819,7 +1688,13 @@ class UserPage extends Component<any, any> {
   }: GateAccessKeyInput = {}): string => {
     const account = String(this.props.account || '').trim();
     if (!account) return 'needs-wallet';
-    const key = this._buildGateAccessCacheKey({ slug, resourceKey });
+    const key = buildUserPageGateAccessCacheKey({
+      account: this.props.account,
+      networkID: this.props.network?.id,
+      resourceKey,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      slug,
+    });
     const cached = this._responseGateAccessStatusByKey.get(key);
     return cached?.status || 'missing';
   };
@@ -1829,71 +1704,68 @@ class UserPage extends Component<any, any> {
     if (!account || !pendingKeys || pendingKeys.size === 0) return;
     const generation = this._responseGateAccessGeneration;
     const now = Date.now();
-    const terminalStatuses = new Set<string>(['granted', 'denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
 
     pendingKeys.forEach((pendingKey: unknown) => {
-      const [slugRaw, resourceRaw] = String(pendingKey || '').split('::');
-      const slug = normalizeUserPageGateSlug(slugRaw || '');
-      const resourceKey = String(resourceRaw || '').trim() || 'default';
-      const cacheKey = this._buildGateAccessCacheKey({ slug, resourceKey });
+      const requestDescriptor = buildUserPageGateAccessRequestDescriptor({
+        account,
+        networkID: this.props.network?.id,
+        pendingKey,
+        sbtCacheRevision: this.props.sbtCacheRevision,
+      });
+      const { cacheKey } = requestDescriptor;
       const cached = this._responseGateAccessStatusByKey.get(cacheKey);
-      const cachedTs = Number(cached?.ts || 0);
-      const cachedAgeMs = Number.isFinite(cachedTs) && cachedTs > 0
-        ? Math.max(0, now - cachedTs)
-        : Number.POSITIVE_INFINITY;
-      if (
-        cached &&
-        terminalStatuses.has(String(cached.status || '')) &&
-        cachedAgeMs < USERPAGE_GATE_TERMINAL_RECHECK_MS
-      ) {
+      const checkPlan = buildUserPageGateAccessCheckPlan({
+        cachedStatus: cached?.status,
+        cachedTs: cached?.ts,
+        hasCachedEntry: !!cached,
+        hasInFlight: this._responseGateAccessInFlightByKey.has(cacheKey),
+        nowMs: now,
+        terminalRecheckMs: USERPAGE_GATE_TERMINAL_RECHECK_MS,
+        unknownRetryMs: USERPAGE_GATE_UNKNOWN_RETRY_MS,
+      });
+      if (checkPlan.action === 'skip' || checkPlan.action === 'in-flight') {
         return;
       }
-      if (
-        cached &&
-        (cached.status === 'unknown' || cached.status === 'error' || cached.status === 'unresolved') &&
-        cachedAgeMs < USERPAGE_GATE_UNKNOWN_RETRY_MS
-      ) {
-        this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS - cachedAgeMs);
+      if (checkPlan.action === 'schedule-retry') {
+        this.scheduleResponseGateRetry(checkPlan.retryDelayMs);
         return;
       }
-      if (this._responseGateAccessInFlightByKey.has(cacheKey)) return;
 
-      const previousStatus = String(cached?.status || 'missing');
-      const shouldPreserveStatusWhileRevalidating = !!(
-        cached &&
-        terminalStatuses.has(previousStatus) &&
-        cachedAgeMs >= USERPAGE_GATE_TERMINAL_RECHECK_MS
-      );
-      if (!shouldPreserveStatusWhileRevalidating) {
+      const previousStatus = checkPlan.previousStatus;
+      const shouldPreserveStatusWhileRevalidating = checkPlan.shouldPreserveStatusWhileRevalidating;
+      if (checkPlan.shouldSetCheckingStatus) {
         this._setResponseGateAccessStatus(cacheKey, 'checking', now);
       }
-      const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+      const cfg = getSessionConfigBySlugOrDefault(requestDescriptor.sessionSlug) || {};
       let tracked: ResponseGateAccessCheckPromise | null = null;
-      tracked = (checkSponsoredAccess({
+      const settleGateAccessStatus = (resultStatus: unknown = 'unknown'): void => {
+        const settlementPlan = buildUserPageGateAccessSettlementPlan({
+          previousStatus,
+          resultStatus,
+          shouldPreserveStatusWhileRevalidating,
+        });
+        this._setResponseGateAccessStatus(cacheKey, settlementPlan.nextStatus, Date.now());
+        if (settlementPlan.shouldScheduleRetry) {
+          this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
+        }
+        if (settlementPlan.shouldQueueCacheRefresh) {
+          this.queueCacheRefresh({ markLoading: false });
+        }
+      };
+      const dispatchResult = dispatchUserPageGateAccessCheckThroughPort({
+        checkGateAccess: checkSponsoredAccess,
+        requestDescriptor,
         sessionConfig: cfg,
-        sessionSlug: slug,
-        account,
-        resourceKey,
-      }) as Promise<SponsoredAccessResult>)
+      });
+      if (dispatchResult.action !== 'dispatch') return;
+      tracked = (dispatchResult.promise as Promise<SponsoredAccessResult>)
         .then((result: SponsoredAccessResult) => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
-          const nextStatus = String(result?.status || 'unknown');
-          this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
-          if (nextStatus === 'unknown' || nextStatus === 'error' || nextStatus === 'unresolved') {
-            this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
-          }
-          if (nextStatus !== previousStatus || !shouldPreserveStatusWhileRevalidating) {
-            this.queueCacheRefresh({ markLoading: false });
-          }
+          settleGateAccessStatus(result?.status);
         })
         .catch(() => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
-          const nextStatus = 'unknown';
-          this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
-          this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
-          if (nextStatus !== previousStatus || !shouldPreserveStatusWhileRevalidating) {
-            this.queueCacheRefresh({ markLoading: false });
-          }
+          settleGateAccessStatus();
         })
         .finally(() => {
           if (this._responseGateAccessInFlightByKey.get(cacheKey) === tracked) {
@@ -1905,133 +1777,45 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _isQuestionPayloadEncrypted = (questionObj: unknown = null): boolean => {
-    const questionRecord = toAnalysisRecord(questionObj);
-    if (!Object.keys(questionRecord).length) return false;
-    if (isMaskedQuestionPayload(questionRecord)) return true;
-    return !!(
-      questionRecord.promptEncrypted ||
-      questionRecord.encryptedPrompt ||
-      questionRecord.optionsEncrypted ||
-      questionRecord.encryptedOptions ||
-      questionRecord.tagsEncrypted ||
-      questionRecord.encryptedTags
-    );
-  };
-
-  _isEncryptedResponseField = (fieldObj: unknown = null): boolean => {
-    return isUserPageEncryptedResponseField(fieldObj);
-  };
-
-  _isAnswerFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAnswerFieldEncrypted(responseObj);
-  };
-
-  _isAdditionalFieldEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageAdditionalFieldEncrypted(responseObj);
-  };
-
-  _isResponsePayloadEncrypted = (responseObj: unknown = null): boolean => {
-    return isUserPageResponsePayloadEncrypted(responseObj);
-  };
-
-  _inferResponseFieldEncryptionAudience = (
-    responseObj: unknown = null,
-    fieldKey: unknown = 'answer',
-    fallback: unknown = 'gate'
-  ): string => {
-    return inferUserPageResponseFieldEncryptionAudience(responseObj, fieldKey, fallback);
-  };
-
-  _inferResponseEncryptionAudience = (responseObj: unknown = null, fallback: unknown = 'gate'): string => {
-    return inferUserPageResponseEncryptionAudience(responseObj, fallback);
-  };
-
-  buildDecryptableResponseField = (field: unknown = null): DecryptableResponseField => {
-    return buildUserPageDecryptableResponseField(field);
-  };
-
-  applyDecryptedPatchToResponseField = (field: unknown = null, decryptedPatch: unknown = null): unknown => {
-    return applyUserPageDecryptedPatchToResponseField(field, decryptedPatch);
-  };
-
-  buildDecryptedResponsePatch = ({
-    responseObj = null,
-    questionId = '',
-    fieldToDecrypt = 'both',
-    decryptedResult = null,
-  }: DecryptedResponsePatchInput = {}): UnknownRecord | null => {
-    return buildUserPageDecryptedResponsePatch({
-      responseObj,
-      questionId,
-      fieldToDecrypt,
-      decryptedResult,
-    });
-  };
-
-  getResponseDecryptSurveyBindings = (
-    questionId: unknown,
-    responseOverride: unknown = null
-  ): ResponseDecryptSurveyBindings => {
-    return buildUserPageResponseDecryptSurveyBindings({
-      detailedSurveyResponses: this.state.detailedSurveyResponses,
-      hashZero: ethers.constants.HashZero,
-      questionId,
-      questionResponseInfo: this.state.questionResponseInfo,
-      responseOverride,
-    });
-  };
-
   handleDecryptQuestionAnswer = async (
     questionId: unknown,
     fieldToDecrypt: unknown = 'both',
     responseOverride: unknown = null
   ): Promise<boolean> => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    const account = String(this.props.account || '').trim();
-    if (!qid || !account) return false;
-    const responseRecord = toAnalysisRecord(responseOverride);
-    if (!Object.keys(responseRecord).length) return false;
-
-    const litHooks = getGlobalLitHooks();
-    const lit = litHooks && typeof litHooks.getKey === 'function'
-      ? { getKey: litHooks.getKey }
-      : null;
-    const chainId = Number(this.props.network?.id ?? this.props.networkChainId ?? 0) || 0;
-    const {
-      surveyId,
-      acceptedSurveyIds,
-    } = this.getResponseDecryptSurveyBindings(qid, responseOverride);
-
-    const responseSlice = {
-      answers: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.answer),
-      },
-      additionalComments: {
-        [qid]: this.buildDecryptableResponseField(responseRecord.additional),
-      },
-      importance: {},
-      conviction: {},
-    };
+    const decryptRequestPlan = buildUserPageResponseDecryptRequestPlan({
+      account: this.props.account,
+      detailedSurveyResponses: this.state.detailedSurveyResponses,
+      hashZero: ethers.constants.HashZero,
+      litHooks: getGlobalLitHooks(),
+      networkId: this.props.network?.id ?? this.props.networkChainId ?? 0,
+      provider: this.props.provider,
+      questionId,
+      questionResponseInfo: this.state.questionResponseInfo,
+      responseOverride,
+    });
+    if (
+      decryptRequestPlan.status !== 'ready' ||
+      !decryptRequestPlan.responseSlice ||
+      !decryptRequestPlan.cryptoOptions
+    ) {
+      return false;
+    }
+    const qid = decryptRequestPlan.questionId;
 
     let decryptedResult: unknown = null;
     try {
-      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(responseSlice, qid, fieldToDecrypt, {
-        account,
-        provider: this.props.provider,
-        providerKind: this.props.provider,
-        chainId,
-        surveyId,
-        acceptedSurveyIds,
-        lit,
-        throwOnError: true,
-      });
+      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(
+        decryptRequestPlan.responseSlice,
+        qid,
+        fieldToDecrypt,
+        decryptRequestPlan.cryptoOptions
+      );
     } catch (error) {
       accountLog.warn('[UserPage] Failed to decrypt viewed response:', error);
       return false;
     }
 
-    const patchedResponse = this.buildDecryptedResponsePatch({
+    const patchedResponse = buildUserPageDecryptedResponsePatch({
       responseObj: responseOverride,
       questionId: qid,
       fieldToDecrypt,
@@ -2041,77 +1825,17 @@ class UserPage extends Component<any, any> {
 
     let didUpdate = false;
     this.setState((prevState: UnknownRecord) => {
-      const prevDetailedQuestionResponses = toAnalysisRecord(prevState.detailedQuestionResponses);
-      const prevDetailedSurveyResponses = toAnalysisRecord(prevState.detailedSurveyResponses);
-      const nextDetailedQuestionResponses: UnknownRecord = { ...prevDetailedQuestionResponses };
-      const nextDetailedSurveyResponses: UnknownRecord = { ...prevDetailedSurveyResponses };
-
-      Object.keys(nextDetailedQuestionResponses).forEach((questionKey: string) => {
-        if (nextDetailedQuestionResponses[questionKey] === responseOverride) {
-          nextDetailedQuestionResponses[questionKey] = patchedResponse;
-          didUpdate = true;
-        }
+      const patchResult = buildUserPageDecryptedResponseStatePatch({
+        patchedResponse,
+        previousState: prevState,
+        questionId: qid,
+        responseOverride,
       });
-
-      if (
-        !didUpdate &&
-        Object.prototype.hasOwnProperty.call(nextDetailedQuestionResponses, qid)
-      ) {
-        nextDetailedQuestionResponses[qid] = patchedResponse;
-        didUpdate = true;
-      }
-
-      Object.keys(nextDetailedSurveyResponses).forEach((surveyId: string) => {
-        const surveyEntries = nextDetailedSurveyResponses[surveyId];
-        if (!Array.isArray(surveyEntries)) return;
-        let surveyEntriesChanged = false;
-        const updatedEntries = surveyEntries.map((entry: unknown) => {
-          const entryRecord = toAnalysisRecord(entry);
-          if (!Object.keys(entryRecord).length) return entry;
-          if (entryRecord.responseData !== responseOverride) return entry;
-          surveyEntriesChanged = true;
-          return {
-            ...entryRecord,
-            responseData: patchedResponse,
-          };
-        });
-        if (surveyEntriesChanged) {
-          nextDetailedSurveyResponses[surveyId] = updatedEntries;
-          didUpdate = true;
-        }
-      });
-
-      if (!didUpdate) return null;
-      return {
-        detailedQuestionResponses: nextDetailedQuestionResponses,
-        detailedSurveyResponses: nextDetailedSurveyResponses,
-      };
+      didUpdate = patchResult.didUpdate;
+      return patchResult.statePatch;
     });
 
     return didUpdate;
-  };
-
-  _createGateAccessContext = (): GateAccessContext => ({
-    pendingKeys: new Set(),
-    uncertainResources: new Set(),
-  });
-
-  _captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
-    pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
-    uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
-  });
-
-  _mergeGateContextSnapshot = (
-    targetContext: GateAccessContext | null,
-    snapshot: GateAccessContextSnapshot | null = null
-  ): void => {
-    if (!isGateAccessContext(targetContext) || !snapshot) return;
-    (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
-      targetContext.pendingKeys.add(String(item || ''));
-    });
-    (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
-      targetContext.uncertainResources.add(String(item || ''));
-    });
   };
 
   _evaluateEncryptedVisibility = ({
@@ -2121,40 +1845,37 @@ class UserPage extends Component<any, any> {
     encryptionAudience = 'gate',
     gateContext = null,
   }: EncryptedVisibilityInput = {}): EncryptedVisibilityResult => {
-    const viewerAccountLower = String(this.props.account || '').trim().toLowerCase();
-    const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
-    if (isOwnProfileViewer) {
-      return { visible: true, canDecryptOtherResponses: true };
-    }
-
-    const normalizedAudience = String(encryptionAudience || '').trim().toLowerCase();
-    if (normalizedAudience === 'self') {
-      return { visible: false, canDecryptOtherResponses: false };
-    }
-
-    const resourceKeysToCheck = getUserPageGateResourceKeysToCheck(resourceKey);
-    const statusByResource: GateAccessStatusByResource[] = resourceKeysToCheck.map((key: string) => ({
-      resourceKey: key,
-      status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
-    }));
-    if (isGateAccessContext(gateContext) && viewerAccountLower) {
-      statusByResource.forEach((entry) => {
-        gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: entry.resourceKey }));
-      });
-    }
-    if (statusByResource.some((entry) => entry.status === 'granted')) {
-      return { visible: true, canDecryptOtherResponses: true };
-    }
-    const terminalDeniedStatuses = new Set<string>(['denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
-    const hasUncertainStatus = statusByResource.some((entry) => !terminalDeniedStatuses.has(entry.status));
-    if (!hasUncertainStatus) {
-      return { visible: false, canDecryptOtherResponses: false };
-    }
-
+    const statusRequestPlan = buildUserPageEncryptedVisibilityStatusRequestPlan({
+      encryptionAudience,
+      resourceKey,
+      viewAddressLower,
+      viewerAccount: this.props.account,
+    });
+    const displayState = statusRequestPlan.action === 'terminal'
+      ? statusRequestPlan.displayState
+      : buildUserPageEncryptedVisibilityDisplayState({
+          encryptionAudience,
+          resourceKey,
+          statusByResource: statusRequestPlan.resourceKeysToCheck.map((key: string) => ({
+            resourceKey: key,
+            status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
+          })),
+          viewAddressLower,
+          viewerAccount: this.props.account,
+        });
     if (isGateAccessContext(gateContext)) {
-      gateContext.uncertainResources.add(String(resourceKey || '').trim() || 'default');
+      displayState.pendingResourceKeys.forEach((pendingResourceKey) => {
+        gateContext.pendingKeys.add(buildUserPageGatePendingKey({ slug, resourceKey: pendingResourceKey }));
+      });
+      if (displayState.uncertainResourceKey) {
+        gateContext.uncertainResources.add(displayState.uncertainResourceKey);
+      }
     }
-    return { visible: false, canDecryptOtherResponses: false, uncertain: true };
+    return {
+      visible: displayState.visible,
+      canDecryptOtherResponses: displayState.canDecryptOtherResponses,
+      ...(displayState.uncertain ? { uncertain: true } : {}),
+    };
   };
 
   _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown => measureSync('ce.userPage.aggregateCacheData', () => {
@@ -2391,13 +2112,14 @@ class UserPage extends Component<any, any> {
         : null;
       if (!surveyResponses) return;
       const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
-      const responseSourceKey = `${surveyIdLower}|${viewAddressKey}`;
-      const sourceSlug = (
-        surveyResponseSourceSlugByKey[responseSourceKey] ||
-        surveyResponseSourceSlugById[surveyIdLower] ||
-        surveySourceSlugById[surveyIdLower] ||
-        ''
-      );
+      const sourceDescriptor = buildUserPageSurveyResponseSourceDescriptor({
+        surveyId: surveyIdLower,
+        surveyResponseSourceSlugById,
+        surveyResponseSourceSlugByKey,
+        surveySourceSlugById,
+        viewAddressLower: viewAddressKey,
+      });
+      const sourceSlug = sourceDescriptor.sourceSlug;
 
       const detailedQuestionArray: SurveyQuestionResponseDetail[] = [];
       let hasNonBlank = false;
@@ -2412,10 +2134,10 @@ class UserPage extends Component<any, any> {
           type: normalizedResponse.type || 'unknown',
           prompt: normalizedResponse.prompt || 'Unknown Question',
         });
-        const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-        const answerEncrypted = this._isAnswerFieldEncrypted(normalizedResponse);
-        const additionalEncrypted = this._isAdditionalFieldEncrypted(normalizedResponse);
-        const responseEncrypted = this._isResponsePayloadEncrypted(normalizedResponse);
+        const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+        const answerEncrypted = isUserPageAnswerFieldEncrypted(normalizedResponse);
+        const additionalEncrypted = isUserPageAdditionalFieldEncrypted(normalizedResponse);
+        const responseEncrypted = isUserPageResponsePayloadEncrypted(normalizedResponse);
         let canDecryptOtherResponses = false;
 
         if (questionEncrypted || answerEncrypted) {
@@ -2424,7 +2146,7 @@ class UserPage extends Component<any, any> {
             slug: sourceSlug,
             viewAddressLower,
             encryptionAudience: answerEncrypted
-              ? this._inferResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
+              ? inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'answer', 'gate')
               : 'gate',
             gateContext,
           });
@@ -2435,7 +2157,7 @@ class UserPage extends Component<any, any> {
             resourceKey: 'surveyResponses',
             slug: sourceSlug,
             viewAddressLower,
-            encryptionAudience: this._inferResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
+            encryptionAudience: inferUserPageResponseFieldEncryptionAudience(normalizedResponse, 'additional', 'gate'),
             gateContext,
           });
           canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
@@ -2530,7 +2252,7 @@ class UserPage extends Component<any, any> {
         questionData: qData,
       });
       if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
-        if (this._isQuestionPayloadEncrypted(qData)) {
+        if (isUserPageQuestionPayloadEncrypted(qData)) {
           const visibility = this._evaluateEncryptedVisibility({
             resourceKey: 'questionResponses',
             slug: sourceSlug,
@@ -2607,20 +2329,20 @@ class UserPage extends Component<any, any> {
         prompt: userResponseObject?.prompt || 'Unknown Prompt',
       });
 
-      const responseSourceKey = `${qid}|${viewAddressKey}`;
-      const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
-        fallbackSlug:
-          questionResponseSourceSlugByKey[responseSourceKey] ||
-          questionResponseSourceSlugById[qid] ||
-          questionSourceSlugById[qid] ||
-          '',
+      const sourceDescriptor = buildUserPageQuestionResponseSourceDescriptor({
         getSessionSlugByName,
         questionData: qData,
+        questionId: qid,
+        questionResponseSourceSlugById,
+        questionResponseSourceSlugByKey,
+        questionSourceSlugById,
+        viewAddressLower: viewAddressKey,
       });
-      const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
-      const answerEncrypted = this._isAnswerFieldEncrypted(userResponseObject);
-      const additionalEncrypted = this._isAdditionalFieldEncrypted(userResponseObject);
-      const responseEncrypted = this._isResponsePayloadEncrypted(userResponseObject);
+      const sourceSlug = sourceDescriptor.sourceSlug;
+      const questionEncrypted = isUserPageQuestionPayloadEncrypted(qData);
+      const answerEncrypted = isUserPageAnswerFieldEncrypted(userResponseObject);
+      const additionalEncrypted = isUserPageAdditionalFieldEncrypted(userResponseObject);
+      const responseEncrypted = isUserPageResponsePayloadEncrypted(userResponseObject);
       let canDecryptOtherResponses = false;
       if (questionEncrypted || answerEncrypted) {
         const visibility = this._evaluateEncryptedVisibility({
@@ -2628,7 +2350,7 @@ class UserPage extends Component<any, any> {
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
           encryptionAudience: answerEncrypted
-            ? this._inferResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
+            ? inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
             : 'gate',
           gateContext,
         });
@@ -2639,7 +2361,7 @@ class UserPage extends Component<any, any> {
           resourceKey: 'questionResponses',
           slug: sourceSlug,
           viewAddressLower: viewAddressKey,
-          encryptionAudience: this._inferResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
+          encryptionAudience: inferUserPageResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
           gateContext,
         });
         canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
@@ -2721,50 +2443,51 @@ class UserPage extends Component<any, any> {
       return;
     }
 
-    const viewAddressLower = String(viewAddress || '').toLowerCase();
     const surveysReady = !!this.props.isSurveyCacheReady;
     const questionsReady = !!this.props.isQuestionCacheReady;
     const responsesReady = !!this.props.isResponsesCacheReady;
     const sbtReady = !!this.props.isSBTCacheReady;
 
     const sourceSnapshot = this._readCacheSourceSnapshot();
-    const sourcePresence = buildUserPageCacheSourcePresence(sourceSnapshot);
-    const hasSurveySources = sourceSnapshot.hasSurveySources;
-    const hasQuestionSources = sourceSnapshot.hasQuestionSources;
-    const hasSbtSources = sourceSnapshot.hasSbtSources;
-
-    const refreshInputSignature = this._buildCacheRefreshInputSignature({
-      viewAddressLower,
+    const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
+      ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
+      : 0;
+    const cacheRefreshDescriptor = buildUserPageCacheRefreshRequestDescriptor({
+      account: this.props.account,
+      bypassSignature,
+      currentInputSignature: this._lastCacheRefreshInputSignature,
+      force,
+      gateRecheckEpoch,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      isSurveyCacheReady: this.props.isSurveyCacheReady,
+      markLoading,
       networkID,
-      hasSurveySources,
-      hasQuestionSources,
-      hasSbtSources,
-      sourceMembershipSignature: sourceSnapshot.membershipSignature,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      responseGateAccessGeneration: this._responseGateAccessGeneration,
+      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sourceSnapshot,
+      viewAddress,
     });
-    if (
-      !force &&
-      !markLoading &&
-      !bypassSignature &&
-      refreshInputSignature === this._lastCacheRefreshInputSignature
-    ) {
+    if (cacheRefreshDescriptor.action === 'skip-same-signature') {
       return;
     }
-    this._lastCacheRefreshInputSignature = refreshInputSignature;
+    this._lastCacheRefreshInputSignature = cacheRefreshDescriptor.refreshInputSignature;
 
     const {
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
       holdQuestionLoading,
       holdSbtLoading,
       holdSurveyLoading,
-    } = buildUserPageCacheLoadingHoldFlags({
-      force,
-      hasQuestionSources,
-      hasSbtSources,
-      hasSurveySources,
-      questionsReady,
-      responsesReady,
-      sbtReady,
-      surveysReady,
-    });
+      sourcePresence,
+      viewAddressLower,
+    } = cacheRefreshDescriptor;
 
     this.emitProfileColdDiag('refresh', {
       viewAddress: viewAddressLower,
@@ -2794,24 +2517,24 @@ class UserPage extends Component<any, any> {
     let sbtSection: SbtSectionResult | null = null;
     let deepScanTooltipLines: string[] | null = null;
     let deepScanProgressRows: DeepScanProgressRow[] | null = null;
-    const gateContext = this._createGateAccessContext();
+    const gateContext = createGateAccessContext();
 
     try {
-      const aggregateMemoKey = this._buildUnifiedCacheAggregateMemoKey({
+      const aggregateMemoPlan = buildUserPageUnifiedCacheAggregateMemoPlan({
+        currentAggregateMemo: this._unifiedCacheAggregateMemo,
+        currentAggregateMemoKey: this._unifiedCacheAggregateMemoKey,
         viewAddressLower,
         networkID,
+        questionResponsesNonce: this.props.questionResponsesNonce,
+        sbtCacheRevision: this.props.sbtCacheRevision,
         sourceMembershipSignature: sourceSnapshot.membershipSignature,
       });
-      const canReuseAggregate = !!(
-        this._unifiedCacheAggregateMemo &&
-        this._unifiedCacheAggregateMemoKey === aggregateMemoKey
-      );
-      if (canReuseAggregate) {
-        aggregate = this._unifiedCacheAggregateMemo as UnknownRecord;
+      if (aggregateMemoPlan.canReuseAggregate) {
+        aggregate = aggregateMemoPlan.aggregate as UnknownRecord;
       } else {
         aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower }) as UnknownRecord;
         this._unifiedCacheAggregateMemo = aggregate;
-        this._unifiedCacheAggregateMemoKey = aggregateMemoKey;
+        this._unifiedCacheAggregateMemoKey = aggregateMemoPlan.aggregateMemoKey;
       }
       const latestBlockRaw = this.props.latestBlockNumber;
       const latestBlockNum = Number.isFinite(Number(latestBlockRaw)) ? Number(latestBlockRaw) : null;
@@ -2828,62 +2551,74 @@ class UserPage extends Component<any, any> {
       );
 
       if (!holdSurveyLoading) {
-        const surveySignature = this._buildSurveyDeriveSignature({
+        const surveyMemoPlan = buildUserPageResponseSectionDeriveMemoPlan({
+          account: this.props.account,
+          currentMemo: this._sectionDeriveMemo?.survey,
+          force,
           viewAddressLower,
           networkID,
+          questionResponsesNonce: this.props.questionResponsesNonce,
+          responseGateAccessGeneration: this._responseGateAccessGeneration,
+          responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
           sourceSignature: sourceSnapshot.surveySourcesSignature,
         });
-        const surveyMemo = this._sectionDeriveMemo?.survey;
-        if (!force && surveyMemo && surveyMemo.signature === surveySignature) {
-          surveySection = surveyMemo.result as SurveySectionResult;
-          this._mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
+        if (surveyMemoPlan.canReuseMemo) {
+          surveySection = surveyMemoPlan.result as SurveySectionResult;
+          mergeGateContextSnapshot(gateContext, surveyMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
-          const surveyGateContext = this._createGateAccessContext();
+          const surveyGateContext = createGateAccessContext();
           surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
-          const surveyGateSnapshot = this._captureGateContextSnapshot(surveyGateContext);
-          this._mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
+          const surveyGateSnapshot = captureGateContextSnapshot(surveyGateContext);
+          mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
-            signature: surveySignature,
+            signature: surveyMemoPlan.signature,
             result: surveySection,
             gateSnapshot: surveyGateSnapshot,
           };
         }
       }
       if (!holdQuestionLoading) {
-        const questionSignature = this._buildQuestionDeriveSignature({
+        const questionMemoPlan = buildUserPageResponseSectionDeriveMemoPlan({
+          account: this.props.account,
+          currentMemo: this._sectionDeriveMemo?.question,
+          force,
           viewAddressLower,
           networkID,
+          questionResponsesNonce: this.props.questionResponsesNonce,
+          responseGateAccessGeneration: this._responseGateAccessGeneration,
+          responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
           sourceSignature: sourceSnapshot.questionSourcesSignature,
         });
-        const questionMemo = this._sectionDeriveMemo?.question;
-        if (!force && questionMemo && questionMemo.signature === questionSignature) {
-          questionSection = questionMemo.result as QuestionSectionResult;
-          this._mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
+        if (questionMemoPlan.canReuseMemo) {
+          questionSection = questionMemoPlan.result as QuestionSectionResult;
+          mergeGateContextSnapshot(gateContext, questionMemoPlan.gateSnapshot as GateAccessContextSnapshot | null);
         } else {
-          const questionGateContext = this._createGateAccessContext();
+          const questionGateContext = createGateAccessContext();
           questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
-          const questionGateSnapshot = this._captureGateContextSnapshot(questionGateContext);
-          this._mergeGateContextSnapshot(gateContext, questionGateSnapshot);
+          const questionGateSnapshot = captureGateContextSnapshot(questionGateContext);
+          mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
-            signature: questionSignature,
+            signature: questionMemoPlan.signature,
             result: questionSection,
             gateSnapshot: questionGateSnapshot,
           };
         }
       }
       if (!holdSbtLoading) {
-        const sbtSignature = this._buildSbtDeriveSignature({
+        const sbtMemoPlan = buildUserPageSbtSectionDeriveMemoPlan({
+          currentMemo: this._sectionDeriveMemo?.sbt,
+          force,
           viewAddressLower,
           networkID,
+          sbtCacheRevision: this.props.sbtCacheRevision,
           sourceSignature: sourceSnapshot.sbtSourcesSignature,
         });
-        const sbtMemo = this._sectionDeriveMemo?.sbt;
-        if (!force && sbtMemo && sbtMemo.signature === sbtSignature) {
-          sbtSection = sbtMemo.result as SbtSectionResult;
+        if (sbtMemoPlan.canReuseMemo) {
+          sbtSection = sbtMemoPlan.result as SbtSectionResult;
         } else {
           sbtSection = this._deriveSbtSection(aggregate, viewAddressLower) as SbtSectionResult;
           this._sectionDeriveMemo.sbt = {
-            signature: sbtSignature,
+            signature: sbtMemoPlan.signature,
             result: sbtSection,
           };
         }
@@ -2936,119 +2671,30 @@ class UserPage extends Component<any, any> {
     }
 
     this.setState((prevState: UnknownRecord) => {
-      const next: UnknownRecord = {};
-      const userStatsPatch: UnknownRecord = {};
-      const keepSurveyLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('surveys');
-      const keepQuestionLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('questions');
-      const {
-        hasGateUncertainty,
-        hasQuestionGateUncertainty,
-        hasSurveyGateUncertainty,
-        keepQuestionLoadingFromUserUncertainty,
-        keepSbtLoadingFromUserUncertainty,
-        keepSurveyLoadingFromUserUncertainty,
-        preserveUserDataUncertainty,
-      } = buildUserPageUncertaintyLoadingFlags({
+      const cacheRefreshStatePatchPlan = buildUserPageCacheRefreshStatePatch({
+        aggregatePresent: !!aggregate,
+        deepScanProgressRows,
+        deepScanTooltipLines,
         hasQuestionSources,
         hasSbtSources,
         hasSurveySources,
-        keepQuestionLoadingDuringDeepScan,
-        keepSurveyLoadingDuringDeepScan,
+        holdQuestionLoading,
+        holdSbtLoading,
+        holdSurveyLoading,
+        isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
+        markLoading,
         prevState,
+        questionSection,
+        sbtSection,
+        surveySection,
         uncertainResources: gateContext.uncertainResources,
       });
-      next.hasUncertainGateAccess = hasGateUncertainty;
 
-      if (surveySection) {
-        next.surveyResponseInfo = surveySection.surveyResponseInfo;
-        next.surveyCreationInfo = surveySection.surveyCreationInfo;
-        next.detailedSurveyResponses = surveySection.detailedSurveyResponses;
-        userStatsPatch.surveysResponded = surveySection.surveysResponded;
-        userStatsPatch.surveysCreated = surveySection.surveysCreated;
-        next.loadingSurveys = (
-          keepSurveyLoadingFromUserUncertainty ||
-          hasSurveyGateUncertainty ||
-          (keepSurveyLoadingDuringDeepScan && prevState.isDeepScanning)
-        ) && surveySection.surveyResponseInfo.length === 0;
-      } else if (holdSurveyLoading || markLoading || !aggregate) {
-        next.loadingSurveys = true;
-      }
+      this.emitProfileColdDiag('loading-flags', cacheRefreshStatePatchPlan.loadingDiag);
 
-      if (questionSection) {
-        next.questionCreationInfo = questionSection.questionCreationInfo;
-        next.questionResponseInfo = questionSection.questionResponseInfo;
-        next.detailedQuestionResponses = questionSection.detailedQuestionResponses;
-        userStatsPatch.questionsCreated = questionSection.questionsCreated;
-        userStatsPatch.questionsResponded = questionSection.questionsResponded;
-        next.loadingQuestions = (
-          keepQuestionLoadingFromUserUncertainty ||
-          hasQuestionGateUncertainty ||
-          (keepQuestionLoadingDuringDeepScan && prevState.isDeepScanning)
-        ) && questionSection.questionResponseInfo.length === 0;
-      } else if (holdQuestionLoading || markLoading || !aggregate) {
-        next.loadingQuestions = true;
-      }
-
-      if (sbtSection) {
-        next.sbtList = sbtSection.sbtList;
-        userStatsPatch.badgesReceived = sbtSection.badgesReceived;
-        next.loadingSBTs = keepSbtLoadingFromUserUncertainty && sbtSection.sbtList.length === 0;
-      } else if (holdSbtLoading || markLoading || !aggregate) {
-        next.loadingSBTs = true;
-      }
-
-      Object.assign(next, buildUserPageDeepScanRefreshCarryPatch({
-        deepScanProgressRows,
-        deepScanTooltipLines,
-        prevState,
-      }));
-
-      const userStatsMergePatch = buildUserPageUserStatsMergePatch({
-        prevUserStats: prevState.userStats,
-        userStatsPatch,
-      });
-      if (userStatsMergePatch) {
-        next.userStats = userStatsMergePatch;
-      }
-
-      this.emitProfileColdDiag('loading-flags', {
-        prevIsDeepScanning: prevState.isDeepScanning,
-        prevHasUncertainUserData: prevState.hasUncertainUserData,
-        preserveUserDataUncertainty,
-        keepSurveyLoadingDuringDeepScan,
-        keepSurveyLoadingFromUserUncertainty,
-        hasSurveyGateUncertainty,
-        keepQuestionLoadingDuringDeepScan,
-        keepQuestionLoadingFromUserUncertainty,
-        hasQuestionGateUncertainty,
-        loadingSurveys: next.loadingSurveys,
-        loadingQuestions: next.loadingQuestions,
-        loadingSBTs: next.loadingSBTs,
-        surveyResponseCount: surveySection?.surveyResponseInfo?.length ?? 'N/A (held)',
-        questionResponseCount: questionSection?.questionResponseInfo?.length ?? 'N/A (held)',
-        sbtCount: sbtSection?.sbtList?.length ?? 'N/A (held)',
-      });
-
-      return Object.keys(next).length > 0 ? next : null;
+      return cacheRefreshStatePatchPlan.statePatch;
     });
   }
-
-  // -----------------------------------------------------------
-  //                    SECTION REFRESH WRAPPERS
-  // -----------------------------------------------------------
-  getSurveyDataFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  };
-
-  getQuestionDataFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  }
-
-  getSBTsFromCache = (): void => {
-    this.queueCacheRefresh({ markLoading: false });
-  }
-
-
 
   // -----------------------------------------------------------
   //        COPY / BOOKMARK / COLLAPSE / USERNAME
@@ -3351,21 +2997,17 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _readAnalysisCacheEntry = ({
-    sessionSlug,
-    networkId,
-    addressLower,
-    fingerprint,
-  }: UserAnalysisCacheReadArgs): UserAnalysisCacheEntry | null => {
-    const cacheObj = toAnalysisCacheBucket(peekCacheSync('analysisCache', sessionSlug, { clone: false }));
-    return readUserPageAnalysisCacheEntry({
-      addressLower,
-      cacheObj,
+  _readAnalysisCacheEntry = (descriptor: UserPageAnalysisCacheReadDescriptor): UserAnalysisCacheEntry | null => {
+    const cacheRead = readUserPageAnalysisCacheThroughPort({
       cacheVersion: USER_ANALYSIS_CACHE_VERSION,
-      fingerprint,
-      networkId,
       now: Date.now(),
-    }) as UserAnalysisCacheEntry | null;
+      descriptor,
+      peekCache: peekCacheSync,
+    });
+    if (cacheRead.status === 'error') {
+      accountLog.warn('[UserPage] analysis cache read failed:', cacheRead.error);
+    }
+    return cacheRead.entry as UserAnalysisCacheEntry | null;
   };
 
   _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
@@ -3388,30 +3030,23 @@ class UserPage extends Component<any, any> {
     aiContext,
     result,
   }: UserAnalysisCacheWriteArgs): Promise<UserAnalysisCacheEntry> => {
-    const cachedAt = Date.now();
-    const entry = buildUserPageAnalysisCacheEntry({
+    const cacheWrite = await writeUserPageAnalysisCacheThroughPort({
       addressLower,
       aiContext,
-      fingerprint,
       cacheVersion: USER_ANALYSIS_CACHE_VERSION,
-      cachedAt,
+      cachedAt: Date.now(),
+      fingerprint,
       networkId,
+      peekCache: peekCacheSync,
       result,
       sessionSlug,
       ttlMs: USER_ANALYSIS_TTL_MS,
-    }) as UserAnalysisCacheEntry;
-
-    const current = peekCacheSync('analysisCache', sessionSlug, { clone: false });
-    const next = buildUserPageAnalysisCacheWritePayload({
-      addressLower,
-      cachedAt,
-      currentCache: current,
-      entry,
-      fingerprint,
-      networkId,
+      writeCache: writeCacheTyped,
     });
-    await writeCacheTyped('analysisCache', sessionSlug, next);
-    return entry;
+    if (cacheWrite.status === 'error') {
+      throw cacheWrite.error;
+    }
+    return cacheWrite.entry as UserAnalysisCacheEntry;
   };
 
   analyzeUser = async (forceRefresh: unknown = false): Promise<void> => {
@@ -3443,13 +3078,19 @@ class UserPage extends Component<any, any> {
     try {
       const networkID = this.props.network?.id?.toString();
       const slug = (this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug);
-      const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
-      const questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-      surveysCreated = buildUserPageAnalysisCreatedSurveys({
+      const createdSurveyCacheRead = readUserPageAnalysisCreatedSurveyCachesThroughPort({
         networkID,
-        questionsCache,
+        peekCache: peekCacheSync,
+        sessionSlug: slug,
+      });
+      if (createdSurveyCacheRead.status === 'error') {
+        throw createdSurveyCacheRead.error;
+      }
+      surveysCreated = buildUserPageAnalysisCreatedSurveys({
+        networkID: createdSurveyCacheRead.networkID,
+        questionsCache: createdSurveyCacheRead.questionsCache,
         surveyCreationInfo: this.state.surveyCreationInfo,
-        surveysCache,
+        surveysCache: createdSurveyCacheRead.surveysCache,
       });
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
 
@@ -3475,6 +3116,21 @@ class UserPage extends Component<any, any> {
       this.props.network?.chainId ??
       ''
     );
+    const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
+      const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
+        sessionSlug: cacheContextToRead.sessionSlug,
+        networkId,
+        addressLower,
+        fingerprint: cacheContextToRead.fingerprint,
+        forceRefresh,
+      });
+      if (cacheReadDescriptor.action !== 'read') return false;
+      const cachedEntry = this._readAnalysisCacheEntry(cacheReadDescriptor);
+      if (!cachedEntry) return false;
+      if (!this._isMounted) return true;
+      this._hydrateAnalysisFromCache(cachedEntry);
+      return true;
+    };
 
     try {
       this.setState(buildUserPageAnalysisResetStatePatch());
@@ -3489,19 +3145,7 @@ class UserPage extends Component<any, any> {
         addressLower,
         networkId,
       });
-      if (!forceRefresh) {
-        const cachedEntry = this._readAnalysisCacheEntry({
-          sessionSlug: cacheContext.sessionSlug,
-          networkId,
-          addressLower,
-          fingerprint: cacheContext.fingerprint,
-        });
-        if (cachedEntry) {
-          if (!this._isMounted) return;
-          this._hydrateAnalysisFromCache(cachedEntry);
-          return;
-        }
-      }
+      if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
 
       if (!this._isMounted) return;
       this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
@@ -3526,19 +3170,7 @@ class UserPage extends Component<any, any> {
           addressLower,
           networkId,
         });
-        if (!forceRefresh) {
-          const cachedEntry = this._readAnalysisCacheEntry({
-            sessionSlug: cacheContext.sessionSlug,
-            networkId,
-            addressLower,
-            fingerprint: cacheContext.fingerprint,
-          });
-          if (cachedEntry) {
-            if (!this._isMounted) return;
-            this._hydrateAnalysisFromCache(cachedEntry);
-            return;
-          }
-        }
+        if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
         const fallbackOpts = buildUserPageAnalysisAiOptions({
           analysisSession: fallbackSession,
           defaultReason: 'fallback-gate-unavailable',
@@ -3704,7 +3336,6 @@ class UserPage extends Component<any, any> {
     const {
       addressHref,
       addressLabel,
-      nicknameToUse,
       pendingNicknameForThis: pendingForThis,
       shouldLinkAddressLabel,
     } = resolveUserPageAddressDisplayState({
@@ -3743,17 +3374,13 @@ class UserPage extends Component<any, any> {
     const blockieUrl = generateBlockieDataUrl(blockieSeed, 8, 4);
 
     // --------- NEW: Readiness & spinner glue (defensive) ----------
-    const {
-      disabledByCache,
-      isQuestionLoadingAny,
-      isQuestionReady,
-      isSBTReady,
-      isSbtLoadingAny,
-      isSurveyLoadingAny,
-      isSurveyReady,
-      questionDeepScanLoadingActive,
-      surveyDeepScanLoadingActive,
-    } = buildUserPageRenderLoadingState({
+    const cacheRefreshDisplayState = buildUserPageCacheRefreshDisplayState({
+      aiAvailable: this.state.aiAvailable,
+      analyzing,
+      collapseOpen,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainSbtData: this.state.hasUncertainSbtData,
+      hasUncertainUserData: this.state.hasUncertainUserData,
       isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
       isDeepScanning,
       isQuestionCacheReady: this.props.isQuestionCacheReady,
@@ -3763,15 +3390,27 @@ class UserPage extends Component<any, any> {
       loadingQuestions,
       loadingSBTs,
       loadingSurveys,
-    });
-    const aiActionPlan = resolveUserPageAiActionPlan({
-      aiAvailable: this.state.aiAvailable,
-      analyzing,
-      collapseOpen,
-      disabledByCache,
+      questionCreationInfo,
+      questionResponseInfo,
+      sbtLabel: t('sbt'),
+      sbtList,
+      sbtsLowerLabel: t('sbtsLower'),
+      surveyCreationInfo,
+      surveyResponseInfo,
       walletLabel: t('walletLower'),
     });
+    const {
+      isQuestionLoadingAny,
+      isSbtLoadingAny,
+      isSurveyLoadingAny,
+    } = cacheRefreshDisplayState.loadingState;
+    const aiActionPlan = cacheRefreshDisplayState.aiActionPlan;
     const { analyzeButtonDisplayState, compareButtonDisplayState } = aiActionPlan;
+    const analyzeActionPlan = {
+      blockedReason: 'none',
+      disabled: analyzeButtonDisplayState.disabled,
+      shouldRenderAnalyzeAction: !minimized,
+    };
     const analysisCacheStatusState = resolveUserPageAnalysisCacheStatusState({
       analysisCachedAt,
       analysisServedFromCache,
@@ -3793,31 +3432,11 @@ class UserPage extends Component<any, any> {
       surveysCreatedLoadingEmpty,
       questionResponsesLoadingEmpty,
       questionsCreatedLoadingEmpty,
-    } = buildUserPageSectionLoadingEmptyState({
-      isQuestionLoadingAny,
-      isQuestionReady,
-      isSbtLoadingAny,
-      isSurveyLoadingAny,
-      isSurveyReady,
-      loadingQuestions,
-      loadingSurveys,
-      questionCreationInfo,
-      questionDeepScanLoadingActive,
-      questionResponseInfo,
-      sbtList,
-      surveyCreationInfo,
-      surveyDeepScanLoadingActive,
-      surveyResponseInfo,
-    });
+    } = cacheRefreshDisplayState.sectionLoadingEmptyState;
     const {
       questionResponsesEmptyText,
       sbtEmptyText,
-    } = buildUserPageUncertainEmptyText({
-      hasUncertainSbtData: this.state.hasUncertainSbtData,
-      hasUncertainUserData: this.state.hasUncertainUserData,
-      sbtLabel: t('sbt'),
-      sbtsLowerLabel: t('sbtsLower'),
-    });
+    } = cacheRefreshDisplayState.uncertainEmptyText;
     const questionSectionDisplayState = resolveUserPageQuestionSectionDisplayState({
       questionCreationInfo,
       questionResponseInfo,
@@ -3837,9 +3456,6 @@ class UserPage extends Component<any, any> {
       sbtList,
       sbtSectionLoadingEmpty,
     });
-
-    // Old “tabs/breadcrumb” toggle is now in-section; keep reference but render nothing.
-    const surveysQuestionsToggle: React.ReactNode = null;
 
     // Unique tooltip targets (wrapping spans) for disabled buttons.
     // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
@@ -3863,6 +3479,10 @@ class UserPage extends Component<any, any> {
       deepScanTooltipLines,
       isDeepScanning,
     });
+    const renderDeepScanIndicator = (isLoading: boolean, spinnerId: string) =>
+      isLoading
+        ? this.renderDeepScanStatusIndicator(spinnerId, deepScanTooltipContent, deepScanProgressRows, deepScanTooltipTitle)
+        : null;
 
     const headerPassiveDisplayState = resolveUserPageHeaderPassiveDisplayState({
       account,
@@ -3877,13 +3497,16 @@ class UserPage extends Component<any, any> {
       viewAddress: propViewAddress,
     });
     const {
-      hasNickForThis,
       isOwner,
-      notOwnPage,
       showPen,
       showUsernamePen,
     } = headerPassiveDisplayState.profileEditVisibility;
     const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
+    const bookmarkActionPlan = {
+      blockedReason: 'none',
+      disabled: false,
+      shouldRenderBookmarkAction: headerActionVisibility.showBookmarkButton,
+    };
     const copyIconDisplayState = resolveUserPageCopyIconDisplayState({ copied });
     const bookmarkButtonDisplayState = resolveUserPageBookmarkButtonDisplayState({ bookmarked });
     const nicknameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
@@ -3955,8 +3578,18 @@ class UserPage extends Component<any, any> {
           minimized={minimized}
           nicknameEnteredIndicatorDisplayState={nicknameEnteredIndicatorDisplayState}
           nicknameInput={this.state.nicknameInput || ''}
-          onAnalyzeUser={this.analyzeUser}
-          onBookmark={this.toggleBookmark}
+          onAnalyzeUser={(event) => runUserPageAnalyzeActionController({
+            analyzeArgs: [event],
+            event,
+            plan: analyzeActionPlan,
+            ports: { dispatchAnalyze: this.analyzeUser },
+          })}
+          onBookmark={(event) => runUserPageBookmarkActionController({
+            bookmarkArgs: [event],
+            event,
+            plan: bookmarkActionPlan,
+            ports: { dispatchBookmark: this.toggleBookmark },
+          })}
           onCollapseToggle={this.toggleCollapse}
           onCopyAddress={this.copyToClipboard}
           onNicknameBlur={this.saveNickname}
@@ -4018,22 +3651,11 @@ class UserPage extends Component<any, any> {
                 sbtCacheRevision={this.props.sbtCacheRevision}
                 surveyCreationEntries={surveyCreationEntries}
                 surveyResponseEntries={surveyResponseEntries}
-                surveyResponsesLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
-                  surveySpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                surveyResponsesLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveySpinnerId)}
                 surveyResponsesSectionToggleState={surveyResponsesSectionToggleState}
                 surveySectionDisplayState={surveySectionDisplayState}
-                surveysCreatedLoadingIndicator={isSurveyLoadingAny ? this.renderDeepScanStatusIndicator(
-                  surveysCreatedSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                surveysCreatedLoadingIndicator={renderDeepScanIndicator(isSurveyLoadingAny, surveysCreatedSpinnerId)}
                 surveysCreatedSectionToggleState={surveysCreatedSectionToggleState}
-                surveysQuestionsToggle={surveysQuestionsToggle}
               />
             )}
 
@@ -4050,26 +3672,15 @@ class UserPage extends Component<any, any> {
                 onShowSurveysTab={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
                 questionCreationEntries={questionCreationEntries}
                 questionResponsesEmptyText={questionResponsesEmptyText}
-                questionResponsesLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
-                  questionSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                questionResponsesLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionSpinnerId)}
                 questionResponsesNonce={this.props.questionResponsesNonce}
                 questionResponseEntries={questionResponseEntries}
                 questionResponsesSectionToggleState={questionResponsesSectionToggleState}
                 questionSectionDisplayState={questionSectionDisplayState}
-                questionsCreatedLoadingIndicator={isQuestionLoadingAny ? this.renderDeepScanStatusIndicator(
-                  questionsCreatedSpinnerId,
-                  deepScanTooltipContent,
-                  deepScanProgressRows,
-                  deepScanTooltipTitle
-                ) : null}
+                questionsCreatedLoadingIndicator={renderDeepScanIndicator(isQuestionLoadingAny, questionsCreatedSpinnerId)}
                 questionsCreatedSectionToggleState={questionsCreatedSectionToggleState}
                 responderAddress={propViewAddress}
                 sbtCacheRevision={this.props.sbtCacheRevision}
-                surveysQuestionsToggle={surveysQuestionsToggle}
               />
             )}
 
@@ -4078,15 +3689,10 @@ class UserPage extends Component<any, any> {
               heading={`${t('minted')} ${t('sbts')}:`}
               isLoading={isSbtLoadingAny}
               isSBTCacheReady={this.props.isSBTCacheReady}
-              loadingIndicator={isSbtLoadingAny ? this.renderDeepScanStatusIndicator(
-                sbtSpinnerId,
-                deepScanTooltipContent,
-                deepScanProgressRows,
-                deepScanTooltipTitle
-              ) : null}
+              loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
               loginComplete={loginComplete}
               network={network}
-              onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+              onRefreshSbtData={this.dispatchSbtDataRefresh}
               provider={provider}
               sbtDisplayState={sbtDisplayState}
               sbtEmptyText={sbtEmptyText}
@@ -4127,7 +3733,7 @@ class UserPage extends Component<any, any> {
           loginComplete={loginComplete}
           mintedSbtsHeading={`${t('minted')} ${t('sbts')}`}
           network={network}
-          onRefreshSbtData={(addr: unknown, slug?: unknown) => this.props.refreshSbtData(addr, slug)}
+          onRefreshSbtData={this.dispatchSbtDataRefresh}
           onStatsCollapseToggle={this.toggleCollapse}
           onToggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
           provider={provider}

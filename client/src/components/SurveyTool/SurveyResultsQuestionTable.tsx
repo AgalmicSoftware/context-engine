@@ -1,18 +1,11 @@
 import React from 'react';
-import { Button, Table } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark } from '@fortawesome/free-solid-svg-icons';
+import { Table } from 'reactstrap';
 
-import { getShortenedQuestionID } from 'utilities/ui/displayHelpers.js';
-import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
-
-type SurveyResultsQuestionTableEntry = {
-  prompt?: string;
-  questionId: string;
-  responsesCount?: number;
-  sessionSlug?: string;
-  type?: string;
-};
+import type { SurveyResultsQuestionTableEntry } from './surveyResultsSummaryModels';
+import SurveyResultsQuestionTableRow, {
+  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
+  SURVEY_RESULTS_TABLE_CELL_STYLE,
+} from './SurveyResultsQuestionTableRow';
 
 type SurveyResultsQuestionTableProps = {
   bookmarkedQuestionIDs?: string[];
@@ -26,18 +19,14 @@ type SurveyResultsQuestionTableProps = {
   styleMap: Record<string, string>;
 };
 
-export const SURVEY_RESULTS_TABLE_CELL_STYLE: React.CSSProperties = {
-  textAlign: 'center',
-};
-
 export const SURVEY_RESULTS_SORTABLE_HEADER_STYLE: React.CSSProperties = {
   textAlign: 'center',
   cursor: 'pointer',
 };
 
-export const SURVEY_RESULTS_TABLE_BOOKMARK_STYLE: React.CSSProperties = {
-  marginRight: '6px',
-  cursor: 'pointer',
+export {
+  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
+  SURVEY_RESULTS_TABLE_CELL_STYLE,
 };
 
 const getSortIndicator = (column: string, sortBy = '', sortAsc = true): string => (
@@ -83,41 +72,17 @@ const SurveyResultsQuestionTable = ({
       </thead>
       <tbody>
         {entries.map((entry) => {
-          const shortened = getShortenedQuestionID(entry.questionId, false);
           const bookmarked = bookmarkedQuestionIDs.includes(entry.questionId);
           return (
-            <tr key={entry.questionId}>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <FontAwesomeIcon
-                  icon={faBookmark}
-                  style={SURVEY_RESULTS_TABLE_BOOKMARK_STYLE}
-                  color={bookmarked ? 'gold' : 'white'}
-                  onClick={() => onToggleQuestionBookmark(entry.questionId)}
-                />
-                <a
-                  href={buildQuestionRoutePath(entry.questionId, {
-                    sessionSlug: entry.sessionSlug || fallbackSessionSlug,
-                  })}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styleMap.clickableQuestionId}
-                >
-                  {shortened}
-                </a>
-              </td>
-              <td className={styleMap.promptColumn}>{entry.prompt || '(No prompt)'}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.type}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.responsesCount}</td>
-              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
-                <Button
-                  size="sm"
-                  onClick={() => onViewQuestion(entry.questionId)}
-                  className={styleMap.tableActionButton}
-                >
-                  View
-                </Button>
-              </td>
-            </tr>
+            <SurveyResultsQuestionTableRow
+              key={entry.questionId}
+              bookmarked={bookmarked}
+              entry={entry}
+              fallbackSessionSlug={fallbackSessionSlug}
+              onToggleQuestionBookmark={onToggleQuestionBookmark}
+              onViewQuestion={onViewQuestion}
+              styleMap={styleMap}
+            />
           );
         })}
       </tbody>

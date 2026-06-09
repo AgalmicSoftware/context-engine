@@ -15,6 +15,11 @@ export type SurveyResultsQuestionSummariesListDisplayPlanArgs = {
   filterLoading?: unknown;
 };
 
+export type SurveyResultsQuestionListDisplayPlanArgs = {
+  aggregatorEntriesCount?: unknown;
+  filterLoading?: unknown;
+};
+
 export type SurveyResultsAggregatorEntry = [string, unknown];
 
 export type SurveyResultsQuestionSummariesListDisplayPlan = {
@@ -25,6 +30,12 @@ export type SurveyResultsQuestionSummariesListDisplayPlan = {
   showEmptyState: boolean;
   showError: boolean;
   showSummaries: boolean;
+};
+
+export type SurveyResultsQuestionListDisplayPlan = {
+  isInert: boolean;
+  shouldRenderQuestionTable: boolean;
+  showEmptyState: boolean;
 };
 
 export const buildSurveyResultsQuestionSummaryDisplayPlan = ({
@@ -40,6 +51,10 @@ export const buildSurveyResultsQuestionSummaryDisplayPlan = ({
     questionPrompt: questionRecord?.prompt || `Unknown question: ${questionIdText}`,
   };
 };
+
+export const getSurveyResultsQuestionCardDomId = (questionId: string = ''): string => (
+  `questionCard-${questionId.toLowerCase()}`
+);
 
 export const buildSurveyResultsQuestionSummariesListDisplayPlan = ({
   emptyMessage = 'No results yet.',
@@ -64,5 +79,18 @@ export const buildSurveyResultsQuestionSummariesListDisplayPlan = ({
     showEmptyState,
     showError,
     showSummaries,
+  };
+};
+
+export const buildSurveyResultsQuestionListDisplayPlan = ({
+  aggregatorEntriesCount = 0,
+  filterLoading = false,
+}: SurveyResultsQuestionListDisplayPlanArgs = {}): SurveyResultsQuestionListDisplayPlan => {
+  const hasQuestionRows = Math.max(0, Number(aggregatorEntriesCount) || 0) > 0;
+  const loading = !!filterLoading;
+  return {
+    isInert: loading || !hasQuestionRows,
+    shouldRenderQuestionTable: hasQuestionRows || loading,
+    showEmptyState: !hasQuestionRows && !loading,
   };
 };

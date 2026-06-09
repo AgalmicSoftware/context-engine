@@ -16,8 +16,6 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
@@ -31,12 +29,23 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
 import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
+import { SurveyResultsFreeformAggregatorSummary } from './SurveyResultsAggregatorSummaries';
+import {
+  SurveyResultsAggregatorEmptyState,
+  SurveyResultsFreeformSummaryDisplay,
+} from './SurveyResultsAggregatorSummaryDisplay';
+import { buildSurveyResultsFreeformSummaryModel } from './surveyResultsSummaryModels';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsAggregatorEmptyState,
+  SurveyResultsFreeformSummaryDisplay,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -133,6 +142,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
+      if (!resolvedTreeComponentCache.has(current)) {
+        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedTreeComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -184,6 +200,12 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedTreeComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
 };
 
@@ -634,9 +656,9 @@ describe('SurveyResults survey document URLs', () => {
 
 describe('SurveyResults freeform aggregator summary', () => {
   it('renders the empty freeform state inside the SurveyResults-only aggregator panel', () => {
-    const subject = createSubject();
-
-    const tree = subject.renderFreeformAggregatorSummary([]);
+    const tree = SurveyResultsFreeformAggregatorSummary({
+      summary: buildSurveyResultsFreeformSummaryModel([]),
+    });
     const panel = findElement(
       tree,
       (element) => typeof element?.props?.className === 'string' && element.props.className.includes('surveyResultsAggregatorPanel')

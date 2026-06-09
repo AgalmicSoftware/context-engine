@@ -1,5 +1,6 @@
 import {
   buildUserPageAnalysisCacheEntry,
+  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisCacheWritePayload,
   buildUserPageAnalysisCreatedQuestions,
   buildUserPageAnalysisCreatedSurveys,
@@ -10,12 +11,15 @@ import {
   buildUserPageSbtSection,
   formatAnalysisCacheAge,
   isPlainAnalysisObject,
+  readUserPageAnalysisCacheThroughPort,
+  readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheEntry,
   readUserPageDirectNetworkCacheBucket,
   resolveUserPageAnalysisCacheStatusState,
   sortUserAnalysisKeys,
   toAnalysisCacheBucket,
   toAnalysisRecord,
+  writeUserPageAnalysisCacheThroughPort,
 } from './userPageHelpers';
 
 describe('userPageHelpers analysis cache helpers', () => {
@@ -164,6 +168,118 @@ describe('userPageHelpers analysis cache helpers', () => {
     })).toBeNull();
   });
 
+  it('describes analysis cache read identity without reading cache data', () => {
+    expect(buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: ' 0xABC ',
+      fingerprint: 'fingerprint-a',
+      networkId: 84532,
+      sessionSlug: ' Session-A ',
+    })).toEqual({
+      action: 'read',
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      sessionSlug: ' Session-A ',
+    });
+    expect(buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      forceRefresh: true,
+      networkId: 84532,
+      sessionSlug: 'session-a',
+    })).toEqual({
+      action: 'skip-force-refresh',
+      addressLower: '0xabc',
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      sessionSlug: 'session-a',
+    });
+  });
+
+  it('reads analysis cache entries through an injected port without owning state', () => {
+    const now = 1710000000000;
+    const validEntry = {
+      version: 1,
+      fingerprint: 'fingerprint-a',
+      networkId: '84532',
+      address: '0xabc',
+      expiresAt: now + 1000,
+      result: { summary: 'cached' },
+    };
+    const descriptor = buildUserPageAnalysisCacheReadDescriptor({
+      addressLower: ' 0xABC ',
+      fingerprint: 'fingerprint-a',
+      networkId: 84532,
+      sessionSlug: 'session-a',
+    });
+    const peekCache = jest.fn(() => ({
+      84532: {
+        '0xabc': {
+          'fingerprint-a': validEntry,
+        },
+      },
+    }));
+
+    expect(readUserPageAnalysisCacheThroughPort({
+      cacheVersion: 1,
+      descriptor,
+      now,
+      peekCache,
+    })).toEqual({
+      descriptor,
+      entry: validEntry,
+      status: 'hit',
+    });
+    expect(peekCache).toHaveBeenCalledWith('analysisCache', 'session-a', { clone: false });
+
+    expect(readUserPageAnalysisCacheThroughPort({
+      cacheVersion: 1,
+      descriptor: {
+        ...descriptor,
+        fingerprint: 'missing',
+      },
+      now,
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'miss',
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor: {
+        ...descriptor,
+        action: 'skip-force-refresh',
+      },
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'skipped',
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor: {
+        ...descriptor,
+        sessionSlug: '',
+      },
+      peekCache,
+    })).toMatchObject({
+      entry: null,
+      status: 'skipped',
+    });
+
+    const thrown = new Error('cache read failed');
+    const throwingPeek = jest.fn(() => {
+      throw thrown;
+    });
+    expect(readUserPageAnalysisCacheThroughPort({
+      descriptor,
+      peekCache: throwingPeek,
+    })).toEqual({
+      descriptor,
+      entry: null,
+      error: thrown,
+      status: 'error',
+    });
+  });
+
   it('builds analysis cache entries and prunes expired siblings during writes', () => {
     const cachedAt = 1710000000000;
     const entry = buildUserPageAnalysisCacheEntry({
@@ -228,6 +344,145 @@ describe('userPageHelpers analysis cache helpers', () => {
         },
       },
       other: { untouched: true },
+    });
+  });
+
+  it('writes analysis cache entries through injected ports without owning analysis state', async () => {
+    const cachedAt = 1710000000000;
+    const staleSibling = { fingerprint: 'stale', expiresAt: cachedAt - 1 };
+    const liveSibling = { fingerprint: 'live', expiresAt: cachedAt + 1 };
+    const currentCache = {
+      84532: {
+        '0xabc': {
+          stale: staleSibling,
+          live: liveSibling,
+        },
+      },
+      other: { untouched: true },
+    };
+    const peekCache = jest.fn(() => currentCache);
+    const writeCache = jest.fn(async () => true);
+
+    const result = await writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      aiContext: { provider: 'openai', model: 'gpt-5' },
+      cachedAt,
+      cacheVersion: 2,
+      fingerprint: 'fingerprint-new',
+      networkId: '84532',
+      peekCache,
+      result: { summary: 'fresh summary' },
+      sessionSlug: 'edge',
+      ttlMs: 1000,
+      writeCache,
+    });
+
+    expect(result.status).toBe('written');
+    expect(result.entry).toMatchObject({
+      version: 2,
+      fingerprint: 'fingerprint-new',
+      cachedAt,
+      expiresAt: cachedAt + 1000,
+      address: '0xabc',
+      networkId: '84532',
+      result: {
+        summary: 'fresh summary',
+      },
+    });
+    expect(result.payload).toEqual({
+      84532: {
+        '0xabc': {
+          live: liveSibling,
+          'fingerprint-new': result.entry,
+        },
+      },
+      other: { untouched: true },
+    });
+    expect(peekCache).toHaveBeenCalledWith('analysisCache', 'edge', { clone: false });
+    expect(writeCache).toHaveBeenCalledWith('analysisCache', 'edge', result.payload);
+
+    const skipped = await writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      fingerprint: '',
+      networkId: '84532',
+      peekCache,
+      sessionSlug: 'edge',
+      writeCache,
+    });
+    expect(skipped).toEqual({
+      entry: null,
+      payload: null,
+      status: 'skipped',
+    });
+
+    const thrown = new Error('write failed');
+    const throwingWrite = jest.fn(async () => {
+      throw thrown;
+    });
+    await expect(writeUserPageAnalysisCacheThroughPort({
+      addressLower: '0xabc',
+      cachedAt,
+      fingerprint: 'fingerprint-new',
+      networkId: '84532',
+      peekCache,
+      sessionSlug: 'edge',
+      writeCache: throwingWrite,
+    })).resolves.toMatchObject({
+      error: thrown,
+      status: 'error',
+    });
+  });
+
+  it('reads created-survey analysis caches through an injected port', () => {
+    const surveysCache = { 84532: { surveys: { s1: { id: 's1' } } } };
+    const questionsCache = { 84532: { questions: { q1: { id: 'q1' } } } };
+    const peekCache = jest.fn((namespace: string) => (
+      namespace === 'surveysCache' ? surveysCache : questionsCache
+    ));
+
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: 84532,
+      peekCache,
+      sessionSlug: '',
+    })).toEqual({
+      networkID: '84532',
+      questionsCache,
+      sessionSlug: '',
+      status: 'read',
+      surveysCache,
+    });
+    expect(peekCache.mock.calls).toEqual([
+      ['surveysCache', '', { clone: false }],
+      ['questionsCache', '', { clone: false }],
+    ]);
+
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: '',
+      peekCache,
+      sessionSlug: 'edge',
+    })).toEqual({
+      networkID: '',
+      questionsCache: {},
+      sessionSlug: 'edge',
+      status: 'skipped',
+      surveysCache: {},
+    });
+
+    const thrown = new Error('created survey cache read failed');
+    const throwingPeek = jest.fn(() => {
+      throw thrown;
+    });
+    expect(readUserPageAnalysisCreatedSurveyCachesThroughPort({
+      networkID: 84532,
+      peekCache: throwingPeek,
+      sessionSlug: 'edge',
+    })).toEqual({
+      error: thrown,
+      networkID: '84532',
+      questionsCache: {},
+      sessionSlug: 'edge',
+      status: 'error',
+      surveysCache: {},
     });
   });
 

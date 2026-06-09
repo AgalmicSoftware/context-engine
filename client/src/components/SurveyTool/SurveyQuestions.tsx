@@ -6,14 +6,9 @@ import {
   Dropdown,
   DropdownToggle,
   DropdownMenu,
-  DropdownItem,
   FormGroup,
   Label,
   Input,
-  Card,
-  CardBody,
-  InputGroup,
-  InputGroupText,
   ModalHeader,
   ModalBody,
   ModalFooter,
@@ -28,33 +23,23 @@ import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCheck, faSpinner, faF
 
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
-import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
-import TagModal from '../TagPage/TagModal';
-import BullhornToggleButton from './BullhornToggleButton';
-import ConvictionImportanceLabel from './ConvictionImportanceLabel';
-import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
-import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
-import FullQuestionHeader from './FullQuestionHeader';
 import GatedPromptNotice from './GatedPromptNotice';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
-import SurveyQuestionsLoadingState from './SurveyQuestionsLoadingState';
+import { renderSurveyQuestionsFullQuestionGatedPromptCard } from './SurveyQuestionsFullQuestionGatedPromptCard';
+import { renderSurveyQuestionsFullQuestionDisplay } from './SurveyQuestionsFullQuestionDisplay';
+import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
-import SurveyQuestionsAuthoringPanel from './SurveyQuestionsAuthoringPanel';
-import SurveyQuestionsJsonControls from './SurveyQuestionsJsonControls';
 import SurveyQuestionsJsonTree from './SurveyQuestionsJsonTree';
-import SurveyQuestionsResponseView from './SurveyQuestionsResponseView';
-import SurveyQuestionsSubmittedResponseView from './SurveyQuestionsSubmittedResponseView';
-import SurveyQuestionsSubmitFooter from './SurveyQuestionsSubmitFooter';
+import SurveyQuestionsRouteSurface from './SurveyQuestionsRouteSurface';
 import SurveyQuestionsSurveyAnswersView from './SurveyQuestionsSurveyAnswersView';
-import SurveyQuestionsTopStrip from './SurveyQuestionsTopStrip';
 import {
   processRatingEnvelopesForSubmit,
   type RatingEnvelopeDeps,
@@ -69,46 +54,44 @@ import {
   normalizeSubmitReceipt,
 } from './surveyToolSubmitTransactionController';
 import {
-  applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
-  applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
-  applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
+  applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
+  applyQuestionDecryptFailureStatus as applyQuestionDecryptFailureStatusHelper,
+  applySurveyDecryptStaleStatus as applySurveyDecryptStaleStatusHelper,
   buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
   buildDecryptTaskKey as buildDecryptTaskKeyHelper,
   buildFieldDecryptState as buildFieldDecryptStateHelper,
   buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
   buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
+  buildQuestionDecryptOwnedClearState as buildQuestionDecryptOwnedClearStateHelper,
   buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
+  buildQuestionFieldDecryptControlDisplayState as buildQuestionFieldDecryptControlDisplayStateHelper,
+  buildQuestionDecryptBusyTokenRegistration as buildQuestionDecryptBusyTokenRegistrationHelper,
   buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
   buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
   buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
+  buildClearedQuestionDecryptBusyTokens as buildClearedQuestionDecryptBusyTokensHelper,
+  buildSurveyDecryptAttemptSourceInputs as buildSurveyDecryptAttemptSourceInputsHelper,
   buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
   buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
   buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
-  buildEmptyQuestionDecryptSlice as buildEmptyQuestionDecryptSliceHelper,
   buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
   buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
-  clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
-  collectQuestionRatingEnvelopesByQid as collectQuestionRatingEnvelopesByQidHelper,
   buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
   buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
   decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
   decryptQuestionRatingEnvelopes as decryptQuestionRatingEnvelopesHelper,
-  ensureQuestionDecryptSliceShape as ensureQuestionDecryptSliceShapeHelper,
   finalizeSurveyDecryptAttempt as finalizeSurveyDecryptAttemptHelper,
   finalizeQuestionDecryptAttempt as finalizeQuestionDecryptAttemptHelper,
   getViewedResponseOverrideForQuestion as getViewedResponseOverrideForQuestionHelper,
   getQuestionFieldDecryptSelection as getQuestionFieldDecryptSelectionHelper,
   getQuestionFieldTaskKey as getQuestionFieldTaskKeyHelper,
-  getQuestionFieldTaskKeys as getQuestionFieldTaskKeysHelper,
-  getQuestionRatingEnvelopes as getQuestionRatingEnvelopesHelper,
   hydrateLatestQuestionDecryptState as hydrateLatestQuestionDecryptStateHelper,
-  markQuestionFieldBusyMap as markQuestionFieldBusyMapHelper,
   mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
   mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
   mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
-  carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
   normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
   normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
+  ownsQuestionDecryptBusyTokens as ownsQuestionDecryptBusyTokensHelper,
   parseEncryptedEnvelope as parseEncryptedEnvelopeHelper,
   prepareQuestionDecryptAttempt as prepareQuestionDecryptAttemptHelper,
   prepareSurveyDecryptAttempt as prepareSurveyDecryptAttemptHelper,
@@ -118,6 +101,7 @@ import {
   resolveLatestSurveyDecryptResponse as resolveLatestSurveyDecryptResponseHelper,
   resolveDecryptSurveyId as resolveDecryptSurveyIdHelper,
   runDedupedDecryptTask as runDedupedDecryptTaskHelper,
+  startQuestionDecryptAttemptStatus as startQuestionDecryptAttemptStatusHelper,
   syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
 } from './surveyToolDecryptFlow.js';
 
@@ -129,10 +113,8 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { ethers, utils } from 'ethers';
-import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { createLogger } from 'utilities/logging.js';
@@ -198,6 +180,14 @@ import {
   buildResponseGateConfigSignature,
 } from './surveyToolResponseAccess';
 import {
+  decideAutoDecryptBlocked,
+  decideAutomaticPromptDecryptByKind,
+} from './surveyQuestionsDecryptEligibility.js';
+import {
+  buildDecryptContextKeyFromContext,
+  buildResponseGatePolicyCacheKeyFromInputs,
+} from './surveyQuestionsCacheKeys.js';
+import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
@@ -217,11 +207,6 @@ import {
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
-import {
-  normalizeRatingValue,
-  RATING_MAX,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
 
 import {
   EMPTY_QUESTION_POOL,
@@ -351,7 +336,6 @@ import {
   resolveUpdateCacheContext,
   scheduleMicrotask,
   serializeSurveyToolFilterState,
-  shouldExpandSliderToggle,
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
@@ -390,7 +374,12 @@ import {
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
 import {
+  buildSingleQuestionPreservedPoolState,
+  buildSingleQuestionSourceRestoreContextPlan,
+  buildSingleQuestionSeededHydrationState,
   resolveSingleQuestionCacheBootstrap,
+  resolveSingleQuestionCacheBootstrapFlowPlan,
+  resolveSingleQuestionCacheBootstrapStopHandlingPlan,
 } from './surveyToolSingleQuestionCacheBootstrapController';
 import {
   buildSingleQuestionEncryptedMetadataPlaceholder,
@@ -471,6 +460,9 @@ import {
   shouldUseSubmittedResponseJson,
 } from './surveyQuestionsJsonDerivation.js';
 import {
+  buildSurveyQuestionsRouteJsonControlsProps,
+} from './surveyQuestionsRouteJsonControlsProps.js';
+import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
   buildTransientSubmitFeedbackState,
@@ -480,6 +472,7 @@ import {
   resolveSurveyQuestionsSubmitPendingStats,
   runSurveyQuestionsSubmitController,
   runSurveyQuestionsSubmitFailureController,
+  resolveSurveyQuestionsSubmittedResponseUrl,
   runSurveyQuestionsStaleSubmitController,
   runSurveyQuestionsSubmitStartController,
   runSurveyQuestionsSubmitSuccessController,
@@ -506,7 +499,6 @@ import {
   buildJsonPreviewState,
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
-  buildResponseEditCompleteState,
   buildResponseLoadingResetState,
   buildShowJsonState,
   buildSubmitPreparationErrorState,
@@ -515,17 +507,23 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
+  buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
+  buildSurveyQuestionsJsonPreviewDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsMaskedQuestionVisibility,
   buildSurveyQuestionsPrimarySubmitPlan,
+  buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
-  toggleShowJsonState,
+  isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -568,9 +566,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   isAutoDecryptBlocked = () => {
     try {
       const kind = cryptoUtils.getProviderKind(this.props.provider);
-      if (kind === 'wagmi') return true;
-      if (kind === 'porto') return !this.isPortoAutoSignReady();
-      return false;
+      return decideAutoDecryptBlocked(kind, () => this.isPortoAutoSignReady());
     } catch (_) {
       return false;
     }
@@ -580,9 +576,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!this.props.loginComplete || !this.props.account || !this.props.provider) return false;
     try {
       const kind = cryptoUtils.getProviderKind(this.props.provider);
-      if (kind === 'web3auth') return true;
-      if (kind === 'porto') return this.isPortoAutoSignReady();
-      return false;
+      return decideAutomaticPromptDecryptByKind(kind, () => this.isPortoAutoSignReady());
     } catch (_) {
       return false;
     }
@@ -1080,20 +1074,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     };
   };
 
-  buildDecryptContextKey = (snapshot = null) => {
-    const context = snapshot || this.buildDecryptContextSnapshot();
-    return [
-      context.account || '',
-      context.providerKind || '',
-      context.sessionSlug || '',
-      context.networkID || '',
-      context.responder || '',
-      context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
-      String(context.surveyIndex ?? '').trim(),
-      String(context.surveyId || '').trim().toLowerCase(),
-      String(context.questionID || '').trim().toLowerCase(),
-    ].join('|');
-  };
+  buildDecryptContextKey = (snapshot = null) =>
+    buildDecryptContextKeyFromContext(snapshot || this.buildDecryptContextSnapshot());
 
   isDecryptContextCurrent = (snapshot = null) => (
     !!snapshot &&
@@ -1125,46 +1107,31 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
   };
 
-  buildSurveyDecryptStaleState = () => ({
-    isDecrypting: false,
-  });
-
-  getQuestionDecryptBusyKeys = (questionId, fieldToDecrypt = 'both') => (
-    getQuestionFieldTaskKeysHelper(questionId, {
-      includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
-      includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
-    })
-  );
-
   registerQuestionDecryptBusyTokens = (keysToMark = []) => {
-    const token = (Number(this._questionDecryptBusyTokenSeq) || 0) + 1;
-    this._questionDecryptBusyTokenSeq = token;
-    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
-    keysToMark.forEach((key) => {
-      if (key) nextTokens[key] = token;
+    const result = buildQuestionDecryptBusyTokenRegistrationHelper({
+      tokenSeq: this._questionDecryptBusyTokenSeq,
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToMark,
     });
-    this._questionDecryptBusyTokens = nextTokens;
-    return token;
+    this._questionDecryptBusyTokenSeq = result.token;
+    this._questionDecryptBusyTokens = result.busyTokens;
+    return result.token;
   };
 
   clearQuestionDecryptBusyTokens = (keysToClear = [], token = null) => {
-    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
-    keysToClear.forEach((key) => {
-      if (!key) return;
-      if (token == null || nextTokens[key] === token) delete nextTokens[key];
+    this._questionDecryptBusyTokens = buildClearedQuestionDecryptBusyTokensHelper({
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToClear,
+      token,
     });
-    this._questionDecryptBusyTokens = nextTokens;
   };
 
-  ownsQuestionDecryptBusyTokens = (keysToCheck = [], token = null) => {
-    if (token == null) return true;
-    const keys = keysToCheck.filter(Boolean);
-    return keys.length > 0 && keys.every((key) => this._questionDecryptBusyTokens?.[key] === token);
-  };
-
-  hasQuestionDecryptBusy = (busyMap = {}) => (
-    Object.values(busyMap || {}).some(Boolean)
-  );
+  ownsQuestionDecryptBusyTokens = (keysToCheck = [], token = null) =>
+    ownsQuestionDecryptBusyTokensHelper({
+      busyTokens: this._questionDecryptBusyTokens,
+      keysToCheck,
+      token,
+    });
 
   buildQuestionDecryptOwnedClearState = (
     prev,
@@ -1173,28 +1140,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     token = null,
     extraPatch = {},
   ) => {
-    const keysToClear = this.getQuestionDecryptBusyKeys(questionId, fieldToDecrypt)
-      .filter((key) => key && token != null && this._questionDecryptBusyTokens?.[key] === token);
-    if (keysToClear.length === 0) {
-      return token == null
-        ? {
-            ...extraPatch,
-            isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(prev?.decryptingByKey || {}),
-            decryptingByKey: prev?.decryptingByKey || {},
-          }
-        : null;
-    }
-
-    const decryptingByKey = { ...(prev?.decryptingByKey || {}) };
-    keysToClear.forEach((key) => {
-      decryptingByKey[key] = false;
+    const result = buildQuestionDecryptOwnedClearStateHelper({
+      prevState: prev,
+      questionId,
+      fieldToDecrypt,
+      token,
+      busyTokens: this._questionDecryptBusyTokens,
+      activeSurveyDecryptAttemptSeq: this._activeSurveyDecryptAttemptSeq,
+      extraPatch,
     });
-    this.clearQuestionDecryptBusyTokens(keysToClear, token);
-    return {
-      ...extraPatch,
-      isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(decryptingByKey),
-      decryptingByKey,
-    };
+    this._questionDecryptBusyTokens = result.busyTokens;
+    return result.statePatch;
   };
 
   buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both', token = null) => {
@@ -1235,17 +1191,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!taskKey) return false;
     return !!(this.state.decryptingByKey && this.state.decryptingByKey[taskKey]);
   };
-
-  getQuestionFieldTaskKeys = (
-    questionId,
-    { includeAnswer = false, includeAdditional = false } = {},
-  ) => getQuestionFieldTaskKeysHelper(questionId, { includeAnswer, includeAdditional });
-
-  markQuestionFieldBusyMap = (busyMap, keysToMark = []) =>
-    markQuestionFieldBusyMapHelper(busyMap, keysToMark);
-
-  clearQuestionFieldBusyMap = (busyMap, questionId, fieldToDecrypt = 'both') =>
-    clearQuestionFieldBusyMapHelper(busyMap, questionId, fieldToDecrypt);
 
   getQuestionFieldDecryptSelection = (
     questionId,
@@ -1317,21 +1262,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  applyDecryptedQuestionResponseValues = (
-    responseRecord,
-    options = {},
-  ) => applyDecryptedQuestionResponseValuesHelper(responseRecord, options);
-
-  applyDecryptedQuestionResponseValuesToContainer = (
-    viewedResponseContainer,
-    options = {},
-  ) => applyDecryptedQuestionResponseValuesToContainerHelper(viewedResponseContainer, options);
-
-  applyDecryptedQuestionStateToSurveySlice = (
-    targetStateSlice,
-    options = {},
-  ) => applyDecryptedQuestionStateToSurveySliceHelper(targetStateSlice, options);
-
   buildViewedResponseDecryptSuccessState = (
     prevState,
     options = {},
@@ -1372,14 +1302,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     questionId,
     responseOverride,
   ) => mergeQuestionResponseOverrideIntoDecryptSliceHelper(responseSlice, questionId, responseOverride);
-
-  collectQuestionRatingEnvelopesByQid = (source) =>
-    collectQuestionRatingEnvelopesByQidHelper(source);
-
-  carryForwardSurveyQuestionRatings = (
-    sourceSlice,
-    previousStateSlice = null,
-  ) => carryForwardSurveyQuestionRatingsHelper(sourceSlice, previousStateSlice);
 
   buildSurveyDecryptSourceState = (
     latestResponse = null,
@@ -1495,9 +1417,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     options = {},
   ) => normalizeBulkDecryptedSliceForSurveyStateHelper(decryptedSlice, options);
 
-  getQuestionRatingEnvelopes = (source, questionId = null) =>
-    getQuestionRatingEnvelopesHelper(source, questionId);
-
   mergeQuestionRatingEnvelopeState = (previousState, nextSource, questionId = null) =>
     mergeQuestionRatingEnvelopeStateHelper(previousState, nextSource, questionId);
 
@@ -1515,11 +1434,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     fieldToDecrypt,
     errorMessage,
   );
-
-  buildEmptyQuestionDecryptSlice = () => buildEmptyQuestionDecryptSliceHelper();
-
-  ensureQuestionDecryptSliceShape = (responseSlice) =>
-    ensureQuestionDecryptSliceShapeHelper(responseSlice);
 
   buildViewedResponseDecryptBaseline = (responseOverride, questionId) =>
     buildViewedResponseDecryptBaselineHelper(
@@ -2500,7 +2414,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return isMaskedQuestionPayload(cached);
   };
 
-  isMaskedPromptText = (prompt) => String(prompt || '').trim() === '[encrypted]';
+  isMaskedPromptText = (prompt) => isSurveyQuestionsMaskedPromptText(prompt);
 
   getQuestionFetchCandidateSlugs = (questionId, preferredSlug = '', opts = {}) => {
     const sanitize = (s) => (
@@ -2512,13 +2426,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(questionId || '').trim().toLowerCase();
     const slugPinned = getSessionSlugPinnedFromProps(this.props);
     const explicitSlug = sanitize(getSessionSlugHintFromProps(this.props));
+    const currentQuestionSessionName = this.state.questionPool?.[0]?.sessionName;
     const resolvedSlug = sanitize(
       resolveSlugForIds({
-        sessionName:
-          this.props.sessionName ||
-          this.props.sessionName ||
-          (this.state.questionPool?.[0]?.sessionName) ||
-          (this.state.questionPool?.[0]?.sessionName),
+        sessionName: this.props.sessionName || currentQuestionSessionName,
         questionId: qid || this.props.questionID || null,
         surveyId: this.props.singleQuestionMode ? null : (this.props.surveyId || null),
         props: this.props,
@@ -2924,47 +2835,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return getQuestionImportanceSliderValue(slice, questionId);
   };
 
-  renderBullhornToggleButton = ({
-    onClick,
-    disabled = false,
-    title = 'Conviction / importance',
-    ariaLabel = 'Conviction / importance',
-    active = false,
-  } = {}) => (
-    <BullhornToggleButton
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      ariaLabel={ariaLabel}
-      active={active}
-    />
-  );
-
-  renderConvictionImportanceLabel = (questionId, convictionValue, importanceValue) => {
-    const mode = this.getSliderMode(questionId);
-    const isExpanded = shouldExpandSliderToggle({
-      sliderToggleExpandedByQuestion: this.state.sliderToggleExpandedByQuestion,
-      questionId,
-      sliderMode: mode,
-    });
-    return (
-      <ConvictionImportanceLabel
-        importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
-        sliderMode={mode}
-        isExpanded={isExpanded}
-        convictionValue={convictionValue}
-        importanceValue={importanceValue}
-        onSelectMode={(nextMode) => this.setSliderMode(questionId, nextMode)}
-      />
-    );
-  };
-
   flushDraftPersistAfterSliderChange = () => {
     this.persistDraftSafely && this.persistDraftSafely(0);
   };
-
-  // Keyboard changes persist during onChange so draft edits are not lost.
-  getSliderPersistOptions = (event) => buildSliderPersistOptions(event);
 
   handleConvictionImportanceChange = (surveyIndex, questionId, mode, value, options = {}) => {
     if (mode === 'importance') {
@@ -2973,40 +2846,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this.handleConviction(surveyIndex, questionId, value, options);
     }
   };
-
-  renderSingleQuestionDeferredConvictionSlider = ({
-    surveyIndex,
-    questionId,
-    sliderMode,
-    activeSliderValue,
-    convictionValue,
-    importanceValue,
-  }) => (
-    <DeferredConvictionImportanceSlider
-      value={activeSliderValue}
-      disabled={this.state.isSubmitting}
-      importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
-      sliderMode={sliderMode}
-      isExpanded={shouldExpandSliderToggle({
-        sliderToggleExpandedByQuestion: this.state.sliderToggleExpandedByQuestion,
-        questionId,
-        sliderMode,
-      })}
-      convictionValue={convictionValue}
-      importanceValue={importanceValue}
-      onSelectMode={(nextMode) => this.setSliderMode(questionId, nextMode)}
-      onCommit={(committedValue) => this.handleConvictionImportanceChange(
-        surveyIndex,
-        questionId,
-        sliderMode,
-        committedValue,
-        {
-          persistDraft: false,
-          afterUpdate: this.flushDraftPersistAfterSliderChange,
-        }
-      )}
-    />
-  );
 
   renderFullQuestionSliderSection = ({
     surveyIndex,
@@ -3018,47 +2857,39 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     hasConvictionImportanceValue,
     sliderOpen,
   }) => (
-    <div className={styles.importanceSlider}>
-      {sliderOpen ? (
-        this.props.singleQuestionMode
-          ? this.renderSingleQuestionDeferredConvictionSlider({
-              surveyIndex,
-              questionId,
-              sliderMode,
-              activeSliderValue,
-              convictionValue,
-              importanceValue,
-            })
-          : (
-            <ConvictionImportanceSliderControl
-              label={this.renderConvictionImportanceLabel(questionId, convictionValue, importanceValue)}
-              value={activeSliderValue}
-              disabled={this.state.isSubmitting}
-              onChange={(value, event) =>
-                this.handleConvictionImportanceChange(
-                  surveyIndex,
-                  questionId,
-                  sliderMode,
-                  value,
-                  this.getSliderPersistOptions(event)
-                )}
-              onChangeComplete={this.flushDraftPersistAfterSliderChange}
-            />
-          )
-      ) : ENABLE_IMPORTANCE_SLIDER_TOGGLE ? (
-        this.renderBullhornToggleButton({
-          onClick: () => this.setSliderMode(questionId, 'conviction'),
-          disabled: this.state.isSubmitting,
-          active: hasConvictionImportanceValue,
-        })
-      ) : (
-        this.renderBullhornToggleButton({
-          onClick: () => this.setSliderMode(questionId, sliderMode),
-          disabled: this.state.isSubmitting,
-          active: hasConvictionImportanceValue,
-        })
+    <SurveyQuestionsFullQuestionSliderSection
+      activeSliderValue={activeSliderValue}
+      convictionValue={convictionValue}
+      hasConvictionImportanceValue={hasConvictionImportanceValue}
+      importanceToggleEnabled={ENABLE_IMPORTANCE_SLIDER_TOGGLE}
+      importanceValue={importanceValue}
+      isSubmitting={this.state.isSubmitting}
+      onChange={(value, event) =>
+        this.handleConvictionImportanceChange(
+          surveyIndex,
+          questionId,
+          sliderMode,
+          value,
+          buildSliderPersistOptions(event)
+        )}
+      onChangeComplete={this.flushDraftPersistAfterSliderChange}
+      onCommit={(committedValue) => this.handleConvictionImportanceChange(
+        surveyIndex,
+        questionId,
+        sliderMode,
+        committedValue,
+        {
+          persistDraft: false,
+          afterUpdate: this.flushDraftPersistAfterSliderChange,
+        }
       )}
-    </div>
+      onSelectMode={(nextMode) => this.setSliderMode(questionId, nextMode)}
+      questionId={questionId}
+      singleQuestionMode={this.props.singleQuestionMode}
+      sliderMode={sliderMode}
+      sliderOpen={sliderOpen}
+      sliderToggleExpandedByQuestion={this.state.sliderToggleExpandedByQuestion}
+    />
   );
 
   renderFullQuestionResponseInput = ({
@@ -3090,7 +2921,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         surveyIndex,
         question.id,
         ratingAnswer,
-        this.getSliderPersistOptions(event)
+        buildSliderPersistOptions(event)
       )}
       onRatingChangeComplete={this.flushDraftPersistAfterSliderChange}
       onToggleAnswerEncryption={(newEncryptedState) => this.toggleAnswerEncryption(
@@ -3124,39 +2955,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
     />
   );
-
-  renderFullQuestionAdditionalEditorRow = ({
-    qIndex,
-    surveyIndex,
-    questionId,
-    additional,
-    glowAdditional,
-  }) => (
-    <AdditionalCommentsInlineRow
-      input={this.renderFullQuestionAdditionalInput({
-        qIndex,
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })}
-      lockControl={this.renderQuestionAdditionalLockControl({
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })}
-    />
-  );
-
-  renderFullQuestionCommentsSection = (content) => {
-    if (!content) return null;
-    return (
-      <div className={styles.fullQuestionComments}>
-        {content}
-      </div>
-    );
-  };
 
   parseEncryptedEnvelope = (field) => parseEncryptedEnvelopeHelper(field);
 
@@ -3319,20 +3117,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     question,
     cardIcons,
   }) => (
-    <Card key={cardKey} className={styles.fullQuestionCard}>
-      <CardBody className={`${styles.questionTitleBody} ${styles.fullQuestionBody}`}>
-        <FullQuestionHeader>
-          {this.renderPromptWithManualDecrypt(question)}
-          {cardIcons}
-        </FullQuestionHeader>
-        {this.renderGatedPromptNotice({
-          question,
-          tooltipIdSuffix: 'full',
-          fallbackId: cardKey || 'gated',
-        })}
-        {this.renderQuestionTagDropdownRow(question)}
-      </CardBody>
-    </Card>
+    renderSurveyQuestionsFullQuestionGatedPromptCard({
+      cardKey,
+      promptContent: this.renderPromptWithManualDecrypt(question),
+      cardIcons,
+      gatedPromptNotice: this.renderGatedPromptNotice({
+        question,
+        tooltipIdSuffix: 'full',
+        fallbackId: cardKey || 'gated',
+      }),
+      tagDropdownRow: this.renderQuestionTagDropdownRow(question),
+    })
   );
 
   renderQuestionMaskedPromptCard = ({
@@ -3457,104 +3252,23 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     busy,
     showBusySpinnerWhenAutoDecryptEnabled = false,
     wrapperStyle,
-  }) => (
-    <QuestionDecryptControl
-      autoDecryptEnabled={this.state.autoDecryptEnabled}
-      showBusySpinnerWhenAutoDecryptEnabled={showBusySpinnerWhenAutoDecryptEnabled}
-      onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
-      disabled={this.state.isDecrypting || !allowDecrypt}
-      title={!allowDecrypt ? decryptTooltip : undefined}
-      actionLabel={actionLabel}
-      busy={busy}
-      wrapperStyle={wrapperStyle}
-    />
-  );
-
-  renderFullQuestionMainContent = ({
-    question,
-    qIndex,
-    surveyIndex,
-    answer,
-    glowAnswer,
-    maskedAnswer,
-    allowDecryptAnswer,
-    decryptTooltip,
-    isAnswerDecrypting,
   }) => {
-    if (maskedAnswer) {
-      return this.renderQuestionFieldDecryptControl({
-        questionId: question.id,
-        fieldKey: 'answer',
-        allowDecrypt: allowDecryptAnswer,
-        decryptTooltip,
-        actionLabel: 'Decrypt Answer',
-        busy: isAnswerDecrypting,
-      });
-    }
-
-    const questionComponent = this.renderFullQuestionResponseInput({
-      question,
-      qIndex,
-      surveyIndex,
-      answer,
-      glowAnswer,
+    const displayState = buildQuestionFieldDecryptControlDisplayStateHelper({
+      actionLabel,
+      allowDecrypt,
+      autoDecryptEnabled: this.state.autoDecryptEnabled,
+      busy,
+      decryptTooltip,
+      isDecrypting: this.state.isDecrypting,
+      showBusySpinnerWhenAutoDecryptEnabled,
+      wrapperStyle,
     });
 
     return (
-      <InputGroup id={styles.responseInputSection}>
-        {questionComponent}
-      </InputGroup>
-    );
-  };
-
-  renderFullQuestionCommentsContent = ({
-    commentsOpen,
-    questionId,
-    qIndex,
-    surveyIndex,
-    additional,
-    glowAdditional,
-    maskedAnswer,
-    maskedAdditional,
-    allowDecryptAdditional,
-    decryptTooltip,
-    isAdditionalDecrypting,
-  }) => {
-    if (!commentsOpen) return null;
-
-    if (maskedAnswer && !maskedAdditional) {
-      return this.renderFullQuestionCommentsSection(
-        this.renderFullQuestionAdditionalInput({
-          qIndex,
-          surveyIndex,
-          questionId,
-          additional,
-          glowAdditional,
-        })
-      );
-    }
-
-    if (maskedAnswer || maskedAdditional) {
-      return this.renderFullQuestionCommentsSection(
-        this.renderQuestionFieldDecryptControl({
-          questionId,
-          fieldKey: 'additional',
-          allowDecrypt: allowDecryptAdditional,
-          decryptTooltip,
-          actionLabel: 'Decrypt Comments',
-          busy: isAdditionalDecrypting,
-        })
-      );
-    }
-
-    return this.renderFullQuestionCommentsSection(
-      this.renderFullQuestionAdditionalEditorRow({
-        qIndex,
-        surveyIndex,
-        questionId,
-        additional,
-        glowAdditional,
-      })
+      <QuestionDecryptControl
+        {...displayState}
+        onClick={() => this.handleDecryptQuestionAnswer(questionId, fieldKey)}
+      />
     );
   };
 
@@ -4591,19 +4305,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     },
   });
 
-  resolveUserAnswersBaselineSlice = () => {
-    const {
-      slice,
-      nextCache,
-    } = resolveSurveyUserAnswersSlice({
-      userAnswers: this.state.userAnswers,
-      userAnswersSliceCache: this._userAnswersSliceCache,
-      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-    });
-    this._userAnswersSliceCache = nextCache;
-    return slice;
-  };
-
   resolveDiffBaselineSlice = (allowLocalCache = false) => {
     const {
       baselineSlice,
@@ -4618,17 +4319,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
     this._userAnswersSliceCache = nextUserAnswersSliceCache;
     return baselineSlice;
-  };
-
-  // Check if a slice is effectively empty
-  isSliceEmpty = (slice) => {
-    if (!slice) return true;
-    const hasVal = (v) => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).length > 0);
-    if (Object.values(slice.answers || {}).some(a => hasVal(a?.value))) return false;
-    if (Object.values(slice.additionalComments || {}).some(a => hasVal(a?.value))) return false;
-    if (Object.keys(slice.importance || {}).length > 0) return false;
-    if (Object.keys(slice.conviction || {}).length > 0) return false;
-    return true;
   };
 
 
@@ -4766,29 +4456,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
     );
   };
-
-  tryAutoDecryptOnce = (questionId, field) => {
-    const key = `${questionId}:${field}`;
-
-    // simple in-memory dedupe; do not mark as "attempted" until we actually decrypt successfully
-    if (this._autoDecQueueDedup?.has(key)) return;
-    if (!this._autoDecQueueDedup) this._autoDecQueueDedup = new Set();
-    this._autoDecQueueDedup.add(key);
-
-    this.setManagedTimeout(() => {
-      (async () => {
-        try {
-          if (this.props.loginComplete && this.props.account) {
-            await this.handleDecryptQuestionAnswer(questionId, field);
-            // success will be marked by the existing success path in maybeAutoDecryptVisibleFields()
-          }
-        } finally {
-          this._autoDecQueueDedup?.delete(key);
-        }
-      })();
-    }, 0);
-  };
-
 
   getLatestQuestionResponse = async (responder, questionId, networkID, questionsCache) => {
     const slug = this._getEffectiveDraftSlug();
@@ -5359,25 +5026,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     safe({ isLoadingResponse: false });
   }
 
-  getQuestionResponse = async (responderAddress, questionId) => {
-    surveyLog.log(
-      "SurveyQuestions: getQuestionResponse() - invoked with questionId:",
-      questionId
-    );
-    // Use the same slug resolution as drafts/decrypt in single-question flows
-    const slug = this._getEffectiveDraftSlug();
-    const questionAnswer = await contractScripts.getResponse(
-      this.props.provider,
-      responderAddress,
-      questionId,
-      slug
-    );
-    surveyLog.log("SurveyQuestions: questionAnswer: ", questionAnswer);
-    return questionAnswer;
-  };
-
-
-
   // Prefill single-question draft from prior response.
   // Hydrates encrypted: true for previously encrypted fields.
   // Intelligently merges baseline and preserves un-edited responses cleanly.
@@ -5441,91 +5089,46 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       : Math.max(fetchTimeoutMs, 20000);
     const maxCandidateSlugs = Math.max(2, Number(opts?.maxCandidateSlugs || 8));
 
-    let questionId = this.props.questionID;
-    if (!questionId) {
-      this.updateSingleQuestionDebug({
-        phase: 'missing-question-id',
-        runId,
-        bootstrapRetryAttempt,
-      });
+    const sourceContextPlan = buildSingleQuestionSourceRestoreContextPlan({
+      bootstrapRetryAttempt,
+      getQuestionFetchCandidateSlugs: this.getQuestionFetchCandidateSlugs,
+      maxCandidateSlugs,
+      pendingRetrySig: this._singleQuestionBootstrapRetrySig,
+      props: this.props,
+      questionPool: this.state.questionPool,
+      runId,
+    });
+    if (sourceContextPlan.status === 'missing-question-id') {
+      this.updateSingleQuestionDebug(sourceContextPlan.debugPayload);
       surveyLog.warn('SurveyQuestions: No questionID provided in singleQuestionMode.');
-      safeSetState({ isLoadingResponse: false });
+      safeSetState(sourceContextPlan.statePatch);
       return;
     }
-    questionId = questionId.toLowerCase();
+    const questionId = sourceContextPlan.questionId;
     const preserveCurrentSingleQuestionPool = (extraState = {}) => {
-      const existingPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : [];
-      const existingCurrentQuestion = existingPool.find((item) => (
-        String(item?.id || item?.questionID || '').trim().toLowerCase() === questionId
-      ));
-      if (!existingCurrentQuestion) return false;
-      safeSetState({
-        questionPool: [{ ...existingCurrentQuestion, id: questionId }],
-        ...(extraState && typeof extraState === 'object' ? extraState : {}),
+      const plan = buildSingleQuestionPreservedPoolState({
+        questionId,
+        questionPool: this.state.questionPool,
+        extraState,
       });
+      if (plan.action !== 'preserve') return false;
+      safeSetState(plan.statePatch);
       return true;
     };
 
-    // Keep retry timers stable across cache-tick refreshes for the same question.
-    // Otherwise we can repeatedly cancel the delayed retry before it executes.
-    const pendingRetrySig = String(this._singleQuestionBootstrapRetrySig || '').trim().toLowerCase();
-    const pendingRetryQuestionId = pendingRetrySig ? pendingRetrySig.split(':')[0] : '';
-    const hasPendingRetryForQuestion = !!(pendingRetryQuestionId && pendingRetryQuestionId === questionId);
-    if (bootstrapRetryAttempt > 0) {
-      this.clearSingleQuestionBootstrapRetry();
-    } else if (pendingRetryQuestionId && pendingRetryQuestionId !== questionId) {
+    if (sourceContextPlan.retryCleanupAction !== 'none') {
       this.clearSingleQuestionBootstrapRetry();
     }
-    this.updateSingleQuestionDebug({
-      phase: 'start',
-      runId,
-      questionId,
-      responderAddress: String(this.props.responderAddress || '').toLowerCase(),
-      bootstrapRetryAttempt,
-      pendingRetrySig: pendingRetrySig || null,
-      hasPendingRetryForQuestion,
-      questionResponsesNonce: Number(this.props.questionResponsesNonce || 0),
-      questionsCacheNonce: Number(this.props.questionsCacheNonce || 0),
-    });
+    this.updateSingleQuestionDebug(sourceContextPlan.startDebugPayload);
 
-    // Resolve slug for this single-question view (scoped)
-    const slugPinned = getSessionSlugPinnedFromProps(this.props);
-    const explicitSingleSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(this.props));
-    const explicitSingleSlugKnown = explicitSingleSlug === '' || !!resolveExplicitSessionContext(explicitSingleSlug).sessionConfig;
-    const resolvedSingleSlug = resolveSlugForIds({
-      sessionName:
-        this.props.sessionName ||
-        this.props.sessionName ||
-        (this.state.questionPool?.[0]?.sessionName) ||
-        (this.state.questionPool?.[0]?.sessionName),
-      questionId: this.props.questionID,
-      surveyId: null,
-      props: this.props,
-      network: this.props.network
-    });
-    let effectiveSingleSlug = explicitSingleSlug || resolvedSingleSlug || resolveEffectiveSlug(this.props);
-    const fetchCandidateSlugs = this.getQuestionFetchCandidateSlugs(
-      questionId,
-      effectiveSingleSlug,
-      { allowPinnedFallback: !slugPinned || bootstrapRetryAttempt > 0 || !explicitSingleSlugKnown }
-    ).slice(0, maxCandidateSlugs);
+    let effectiveSingleSlug = sourceContextPlan.effectiveSingleSlug;
+    const fetchCandidateSlugs = sourceContextPlan.fetchCandidateSlugs;
+    const hasPendingRetryForQuestion = sourceContextPlan.hasPendingRetryForQuestion;
 
-    const BLOCKED_QUESTION_IDS_SET = getBlockedQuestionIdsSet(effectiveSingleSlug);
-    if (BLOCKED_QUESTION_IDS_SET.has(questionId)) {
-      this.updateSingleQuestionDebug({
-        phase: 'blocked-question',
-        runId,
-        questionId,
-        effectiveSingleSlug: String(effectiveSingleSlug || ''),
-      });
+    if (sourceContextPlan.status === 'blocked-question') {
+      this.updateSingleQuestionDebug(sourceContextPlan.debugPayload);
       surveyLog.warn(`SurveyQuestions: Question ${questionId} is blocked; skipping.`);
-      safeSetState({
-        questionPool: [],
-        isLoadingResponse: false,
-        noResponse: true,
-        responseLookupWarning: '',
-        displayAnswerMode: true,
-      });
+      safeSetState(sourceContextPlan.statePatch);
       return;
     }
 
@@ -5544,13 +5147,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       effectiveSingleSlug,
       responderAddress: String(responderAddress || ''),
       account: String(this.props.account || ''),
-      resolveCacheState: (slug) => resolveSingleQuestionCacheState({
-        slug,
-        questionId,
-        resolveQuestionBootstrapContext: (nextSlug) => resolveQuestionBootstrapContext(this.props, nextSlug),
-        readQuestionsCacheAsync,
-        ensureQuestionsNet,
-      }),
+      resolveCacheState: getCacheStateForSlug,
       readRecentPayload: readRecentQuestionPayload,
       canUseRecentPayload: canUseRecentQuestionPayloadForAccount,
       resolveBootstrapNetworkId: (slug) => resolveQuestionBootstrapContext(this.props, slug).networkIdStr || '',
@@ -5562,108 +5159,75 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
     if (isStaleRun()) return;
 
-    if (cacheBootstrapResult.status === 'seeded-from-recent') {
-      const {
-        questionData: seededQData,
-        shouldBootstrapViewedResponse,
-        fallbackNetId,
-        cacheState: seededCacheState,
-      } = cacheBootstrapResult;
-      if (isStaleRun()) return;
+    const cacheBootstrapPlan = resolveSingleQuestionCacheBootstrapFlowPlan({ cacheBootstrapResult });
+    if (cacheBootstrapPlan.seededHydration) {
+      const { questionData: seededQData, isLoadingResponse } = cacheBootstrapPlan.seededHydration;
       this.setResponseHydrationState(
-        (prev) => ({
-          questionPool: [{ ...seededQData, id: seededQData.id }],
-          surveysResponseState: this.mergeSurveyResponseState(
-            prev.surveysResponseState ||
-              [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-            [{ ...seededQData, id: seededQData.id }],
-            0
-          ),
-          viewAddressAnswers: '',
-          parsedViewAddressAnswers: null,
-          noResponse: false,
-          isLoadingResponse: shouldBootstrapViewedResponse,
+        (prev) => buildSingleQuestionSeededHydrationState({
+          prevState: prev,
+          questionData: seededQData,
+          isLoadingResponse,
+          mergeSurveyResponseState: this.mergeSurveyResponseState,
         }),
         () => {
           this.updateJsonPreview();
           this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
         }
       );
-      if (shouldBootstrapViewedResponse) {
-        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
-          questionId,
-          attempt: bootstrapRetryAttempt,
-          reason: 'recent-payload-waiting-for-response-bootstrap',
-        });
-        this.updateSingleQuestionDebug({
-          phase: didScheduleRetry
-            ? 'recent-payload-response-bootstrap-retrying'
-            : 'recent-payload-response-bootstrap-exhausted',
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          responderAddress: String(responderAddress || '').toLowerCase(),
-          retryAttempt: bootstrapRetryAttempt,
-          didScheduleRetry: !!didScheduleRetry,
-        });
-        if (!didScheduleRetry) {
-          this.clearSingleQuestionBootstrapRetry();
-          safeSetState({
-            viewAddressAnswers: '',
-            parsedViewAddressAnswers: null,
-            noResponse: true,
-            responseLookupWarning: '',
-            isLoadingResponse: false,
-          });
-        }
-        return;
-      }
-      if (!fallbackNetId) {
-        this.updateSingleQuestionDebug({
-          phase: 'recent-payload-missing-network',
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          retryAttempt: bootstrapRetryAttempt,
-        });
-        safeSetState({ isLoadingResponse: false });
-        return;
-      }
-      if (!seededCacheState) {
-        this.updateSingleQuestionDebug({
-          phase: 'missing-cache-state',
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-        });
-        surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
-        if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
-          return;
-        }
-        safeSetState({ isLoadingResponse: false });
-        return;
-      }
     }
+    if (isStaleRun()) return;
 
-    if (cacheBootstrapResult.status === 'missing-cache-state') {
-      this.updateSingleQuestionDebug({
-        phase: 'missing-cache-state',
+    if (cacheBootstrapPlan.action === 'stop') {
+      const stopPlanContext = {
+        bootstrapRetryAttempt,
+        cacheBootstrapPlan,
+        effectiveSingleSlug: cacheBootstrapResult.target.effectiveSingleSlug,
+        questionId: cacheBootstrapResult.target.questionId,
+        responderAddress: cacheBootstrapResult.target.responderAddress,
         runId,
-        questionId,
-        effectiveSingleSlug: String(effectiveSingleSlug || ''),
-      });
-      surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
-      if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
+      };
+      const stopHandlingPlan = resolveSingleQuestionCacheBootstrapStopHandlingPlan(stopPlanContext);
+      if (stopHandlingPlan.action === 'retry') {
+        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry(stopHandlingPlan.retryRequest);
+        const retryOutcome = resolveSingleQuestionCacheBootstrapStopHandlingPlan({
+          ...stopPlanContext,
+          didScheduleRetry,
+        }).retryOutcome;
+        if (retryOutcome?.debugPayload) {
+          this.updateSingleQuestionDebug(retryOutcome.debugPayload);
+        }
+        if (retryOutcome?.shouldClearRetry) {
+          this.clearSingleQuestionBootstrapRetry();
+          safeSetState(retryOutcome.exhaustedStatePatch);
+        }
         return;
       }
-      safeSetState({ isLoadingResponse: false });
+
+      if (stopHandlingPlan.action === 'fallback') {
+        if (stopHandlingPlan.debugPayload) {
+          this.updateSingleQuestionDebug(stopHandlingPlan.debugPayload);
+        }
+        if (stopHandlingPlan.logMissingCacheState) {
+          surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
+        }
+        if (stopHandlingPlan.preserveCurrentPoolPatch) {
+          if (preserveCurrentSingleQuestionPool(stopHandlingPlan.preserveCurrentPoolPatch)) {
+            return;
+          }
+        }
+        if (stopHandlingPlan.shouldApplyFallbackStatePatch) {
+          safeSetState(stopHandlingPlan.fallbackStatePatch);
+        }
+        return;
+      }
+
       return;
     }
 
-    let qData = cacheBootstrapResult.questionData;
-    let cacheState = cacheBootstrapResult.cacheState;
+    let qData = cacheBootstrapPlan.questionData;
+    let cacheState = cacheBootstrapPlan.cacheState;
     let { netIdStr, questionsCache } = cacheState;
-    const recentPayloadForAccount = cacheBootstrapResult.recentPayloadForAccount;
+    const recentPayloadForAccount = cacheBootstrapPlan.recentPayloadForAccount;
 
     const metadataBootstrapResult = await resolveSingleQuestionMetadataBootstrap({
       questionId,
@@ -5915,15 +5479,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const decryptContext = this.buildDecryptContextSnapshot();
     const decryptAttemptId = this.startSurveyDecryptAttempt();
     this.setState(buildDecryptEditStartState());
-    const surveyIndex = decryptContext.surveyIndex;
-
-    // Align decrypt slug with draft slug (single-Q aware)
-    const slug = decryptContext.sessionSlug || this._getEffectiveDraftSlug();
-    const fallbackUserAnswers = this.state.userAnswers;
-    const fallbackSourceSlice =
-      this.state.surveysResponseState[surveyIndex] ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const previousStateSlice = this.state.surveysResponseState?.[surveyIndex] || {};
+    const {
+      surveyIndex,
+      slug,
+      fallbackUserAnswers,
+      fallbackSourceSlice,
+      previousStateSlice,
+    } = buildSurveyDecryptAttemptSourceInputsHelper({
+      decryptContext,
+      state: this.state,
+      getEffectiveDraftSlug: () => this._getEffectiveDraftSlug(),
+    });
 
     try {
       const {
@@ -5944,13 +5510,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         fallbackSourceSlice,
         previousStateSlice,
       });
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
       const {
         normalizedDecryptedSlice,
         decryptedImportanceFromEnv,
@@ -5966,13 +5530,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         opts,
         previousStateSlice,
       });
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
 
       this.finishSurveyDecryptAttempt(decryptAttemptId);
       this.setState((prevState) => this.buildSurveyDecryptSuccessState(prevState, {
@@ -5987,13 +5549,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
     } catch (error) {
       surveyLog.error('Error decrypting answers:', error);
-      if (!this.isDecryptContextCurrent(decryptContext)) {
-        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
-          this.finishSurveyDecryptAttempt(decryptAttemptId);
-          this.setState(this.buildSurveyDecryptStaleState());
-        }
-        return;
-      }
+      if (applySurveyDecryptStaleStatusHelper({
+        host: this,
+        context: decryptContext,
+        attemptId: decryptAttemptId,
+      }).shouldReturn) return;
       this.finishSurveyDecryptAttempt(decryptAttemptId);
       this.setState(buildDecryptEditFailureState(error.message));
     }
@@ -6053,29 +5613,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return false;
       }
 
-      const preparedAttempt = this.prepareQuestionDecryptAttempt({
+      const attemptStatus = startQuestionDecryptAttemptStatusHelper({
+        host: this,
         questionId: qid,
         fieldToDecrypt,
         baselineForDecrypt,
       });
-
-      if (!preparedAttempt.shouldDecrypt) {
-        return false;
-      }
-
-      const {
-        decryptSelection,
-        chainId,
-        lit,
-        opts,
-      } = preparedAttempt;
-      const {
-        keysToMark,
-        clearMode,
-      } = decryptSelection;
-
-      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
-      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
+      if (attemptStatus.shouldReturn) return attemptStatus.result;
+      decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
       const {
         decryptedStateSlice,
@@ -6089,44 +5634,33 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         ratingEnvelopes,
         account: context.account,
         providerLike: context.provider,
-        chainId,
-        lit,
-        opts,
+        chainId: attemptStatus.chainId,
+        lit: attemptStatus.lit,
+        opts: attemptStatus.opts,
       });
-      if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        return false;
-      }
-
-      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
-      this.setState((prev) => this.buildViewedResponseDecryptSuccessState(prev, {
+      const completionStatus = applyQuestionDecryptCompletionStatusHelper({
+        host: this,
+        context,
         questionId: qid,
-        clearMode,
-        didUpdate,
-        decryptedStateSlice,
-        decryptedImportance,
-        decryptedConviction,
-      }));
+        fieldToDecrypt,
+        decryptAttemptToken,
+        keysToMark: attemptStatus.keysToMark,
+        successStateKind: 'viewed',
+        successStateOptions: { questionId: qid, clearMode: attemptStatus.clearMode, didUpdate, decryptedStateSlice, decryptedImportance, decryptedConviction },
+      });
+      if (completionStatus.shouldReturn) return completionStatus.result;
 
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting viewed response ${fieldToDecrypt} for ${questionId}`, error);
-      if (!this.isDecryptContextCurrent(context)) {
-        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      this.setState((prev) => {
-        return this.buildQuestionDecryptFailureStateForAttempt(prev, qid, fieldToDecrypt, error.message, decryptAttemptToken);
+      return applyQuestionDecryptFailureStatusHelper({
+        host: this,
+        context,
+        questionId: qid,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        error,
       });
-      return false;
     }
   };
 
@@ -6189,29 +5723,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return false;
       }
 
-      const preparedAttempt = this.prepareQuestionDecryptAttempt({
+      const attemptStatus = startQuestionDecryptAttemptStatusHelper({
+        host: this,
         questionId,
         fieldToDecrypt,
         baselineForDecrypt,
       });
-      const {
-        shouldDecrypt,
-        decryptSelection,
-        chainId,
-        lit,
-        opts,
-      } = preparedAttempt;
-      const {
-        keysToMark,
-        clearMode,
-      } = decryptSelection;
-
-      if (!shouldDecrypt) {
-        return false;
-      }
-
-      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
-      this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
+      if (attemptStatus.shouldReturn) return attemptStatus.result;
+      decryptAttemptToken = attemptStatus.decryptAttemptToken;
 
       const {
         decryptedStateSlice,
@@ -6225,49 +5744,37 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         ratingEnvelopes: latestRatingEnvs,
         account: context.account,
         providerLike: context.provider,
-        chainId,
-        lit,
-        opts,
+        chainId: attemptStatus.chainId,
+        lit: attemptStatus.lit,
+        opts: attemptStatus.opts,
       });
-      if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        return false;
-      }
-
-      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
-      this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
-        surveyIndex,
+      const completionStatus = applyQuestionDecryptCompletionStatusHelper({
+        host: this,
+        context,
         questionId,
-        clearMode,
-        didUpdate,
-        baselineSlice,
-        decryptedStateSlice,
-        decryptedImportance,
-        decryptedConviction,
-      }), () => {
-        this.updateJsonPreview && this.updateJsonPreview();
-        this.persistDraftSafely && this.persistDraftSafely(0);
+        fieldToDecrypt,
+        decryptAttemptToken,
+        keysToMark: attemptStatus.keysToMark,
+        successStateKind: 'self',
+        successStateOptions: { surveyIndex, questionId, clearMode: attemptStatus.clearMode, didUpdate, baselineSlice, decryptedStateSlice, decryptedImportance, decryptedConviction },
+        onSuccessStateApplied: () => {
+          this.updateJsonPreview && this.updateJsonPreview();
+          this.persistDraftSafely && this.persistDraftSafely(0);
+        },
       });
+      if (completionStatus.shouldReturn) return completionStatus.result;
 
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
-      if (!this.isDecryptContextCurrent(context)) {
-        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
-        }
-        return false;
-      }
-      this.setState((prev) => (
-        this.buildQuestionDecryptFailureStateForAttempt(prev, questionId, fieldToDecrypt, error.message, decryptAttemptToken)
-      ));
-      return false;
+      return applyQuestionDecryptFailureStatusHelper({
+        host: this,
+        context,
+        questionId,
+        fieldToDecrypt,
+        decryptAttemptToken,
+        error,
+      });
     }
   };
 
@@ -6425,16 +5932,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  getQuadraticVoteCost = (votes) => {
-    const value = Number(votes) || 0;
-    return value * value;
-  };
-
-  getQuadraticVoteWeight = (credits) => {
-    const value = Number(credits) || 0;
-    return Math.sqrt(Math.max(0, value));
-  };
-
   /**
    * Toggle encryption for the main answer field.
    * Signature must remain: (surveyIndex, questionId, newEncryptedState)
@@ -6519,11 +6016,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
 
-
-  toggleShowJson = () => {
-    this.setState(toggleShowJsonState);
-  };
-
   toggleDisplayAnswerMode = () => {
     this.setState(
       prevState => ({
@@ -6543,15 +6035,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         this.updateJsonPreview();
       }
     );
-  };
-
-  handleUpdateResponse = async () => {
-    if (this.state.isEditing) {
-      await this.encryptAndUpload();
-      this.setState(buildResponseEditCompleteState());
-    } else {
-      this.handleDecryptEdit();
-    }
   };
 
   handleShowJsonAtBottom = () => {
@@ -7118,25 +6601,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const {
-      answer,
-      additional,
-      convictionValue,
-      importanceValue,
-      hasConvictionImportanceValue,
-      sliderMode,
-      activeSliderValue,
-      hasAdditionalContent,
-      glowAnswer,
-      glowAdditional,
-      decryptTooltip,
-      maskedAnswer,
-      maskedAdditional,
-      allowDecryptAnswer,
-      allowDecryptAdditional,
-      isAnswerDecrypting,
-      isAdditionalDecrypting,
-    } = this.getQuestionRenderDisplayState({
+    const displayState = this.getQuestionRenderDisplayState({
       questionId: question.id,
       responseSlice: currentSurveyResponseState,
     });
@@ -7170,154 +6635,38 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
     }
 
-    const commentsOpen = this.getCommentsOpen(question.id, hasAdditionalContent);
-    const handleToggleComments = () => this.toggleComments(question.id, hasAdditionalContent);
-    const footerIcons = this.renderFullQuestionFooterIcons({
-      surveyIndex,
-      question,
-      answer,
-      glowAnswer,
-      maskedAnswer,
-      hasAdditionalContent,
-      commentsOpen,
-      onToggleComments: handleToggleComments,
-    });
-    const sliderSection = this.renderFullQuestionSliderSection({
-      surveyIndex,
-      questionId: question.id,
-      sliderMode,
-      activeSliderValue,
-      convictionValue,
-      importanceValue,
-      hasConvictionImportanceValue,
-      sliderOpen,
-    });
-
-    return this.renderFullQuestionCardShell({
+    return renderSurveyQuestionsFullQuestionDisplay({
       cardKey,
       question,
       cardIcons,
-      mainContent: this.renderFullQuestionMainContent({
-        question,
-        qIndex,
-        surveyIndex,
-        answer,
-        glowAnswer,
-        maskedAnswer,
-        allowDecryptAnswer,
-        decryptTooltip,
-        isAnswerDecrypting,
-      }),
-      footerIcons,
-      sliderSection,
-      commentsSection: this.renderFullQuestionCommentsContent({
-        commentsOpen,
-        questionId: question.id,
-        qIndex,
-        surveyIndex,
-        additional,
-        glowAdditional,
-        maskedAnswer,
-        maskedAdditional,
-        allowDecryptAdditional,
-        decryptTooltip,
-        isAdditionalDecrypting,
-      }),
+      commentsOpen: this.getCommentsOpen(question.id, displayState.hasAdditionalContent),
+      displayState,
+      onToggleComments: this.toggleComments,
+      qIndex,
+      renderAdditionalDecryptControl: this.renderQuestionFieldDecryptControl,
+      renderAdditionalInput: this.renderFullQuestionAdditionalInput,
+      renderAdditionalLockControl: this.renderQuestionAdditionalLockControl,
+      renderAnswerDecryptControl: this.renderQuestionFieldDecryptControl,
+      renderFullQuestionCardShell: this.renderFullQuestionCardShell,
+      renderFullQuestionFooterIcons: this.renderFullQuestionFooterIcons,
+      renderFullQuestionSliderSection: this.renderFullQuestionSliderSection,
+      renderResponseInput: this.renderFullQuestionResponseInput,
+      sliderOpen,
+      surveyIndex,
     });
   };
 
 
-  encryptData = async (pubKeyOrOpts, extraOpts = {}) => {
-    surveyLog.log("encryptData() - invoked");
-    if (!this.props.loginComplete) {
-      this.props.toggleLoginModal(true);
-      return;
-    }
-
-    const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    const currentSurveyResponseState = this.state.surveysResponseState[surveyIndex];
-
-    if (!currentSurveyResponseState) {
-      surveyLog.error("Cannot encrypt: Survey response state is not available.");
-      return;
-    }
-
-    // Narrow down to changed qIDs and changed encrypted fields only
-    const { changedQids } = this.getChangedQidsAndFields(surveyIndex);
-    if (!changedQids || changedQids.size === 0) {
-      // Nothing changed → nothing to encrypt
-      return;
-    }
-
-    const {
-      groups: workGroups,
-      missingRecipients,
-    } = this.buildFieldEncryptionWorkGroups(currentSurveyResponseState, changedQids);
-    const hasWork = workGroups.some((group) => (
-      Object.keys(group?.slice?.answers || {}).length > 0 ||
-      Object.keys(group?.slice?.additionalComments || {}).length > 0
-    ));
-
-    if (!hasWork) {
-      // Either no encrypted fields changed or they are masked '*' (unchanged) → skip.
-      return;
-    }
-    if (missingRecipients.length > 0) {
-      this.setState(buildSubmissionErrorState(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`));
-      return;
-    }
-
-    try {
-      const baseOptions =
-        typeof pubKeyOrOpts === 'object'
-          ? { ...(pubKeyOrOpts || {}), ...(extraOpts || {}) }
-          : { ...(extraOpts || {}) };
-      const modifiedSlice = await this.encryptFieldWorkGroups({
-        workGroups,
-        baseOpts: baseOptions,
-      });
-
-      // Merge encrypted results back into the full slice, touching ONLY changed qIDs/fields.
-      const updatedSurveysResponseState = [...this.state.surveysResponseState];
-      const base = { ...(updatedSurveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      Object.keys(modifiedSlice.answers || {}).forEach((qid) => {
-        base.answers = { ...(base.answers || {}) };
-        base.answers[qid] = { ...(base.answers[qid] || {}), ...(modifiedSlice.answers[qid] || {}) };
-      });
-      Object.keys(modifiedSlice.additionalComments || {}).forEach((qid) => {
-        base.additionalComments = { ...(base.additionalComments || {}) };
-        base.additionalComments[qid] = { ...(base.additionalComments[qid] || {}), ...(modifiedSlice.additionalComments[qid] || {}) };
-      });
-
-      updatedSurveysResponseState[surveyIndex] = base;
-
-      this.setState(buildSurveysResponseStatePatch(updatedSurveysResponseState), () => {
-        const jsonData = this.prepareJsonAndHash(surveyIndex);
-        this.setState(buildJsonPreviewState(jsonData));
-      });
-    } catch (error) {
-      surveyLog.error("Encryption error:", error);
-      this.setState(buildSubmissionErrorState(error.message || 'Encryption failed.'));
-    }
-  };
-
-  buildResponseGatePolicyCacheKey = () => {
-    const isQuestionResponseFlow = !!(this.props.singleQuestionMode || this.props.isStandalone);
-    const questionId = isQuestionResponseFlow ? String(this.props.questionID || '').toLowerCase() : '';
-    const surveyId = isQuestionResponseFlow ? '' : String(this.props.surveyId || '').toLowerCase();
-    const hintedSessionSlug = getSessionSlugHintFromProps(this.props);
-    const effectiveSessionSlug = resolveEffectiveSlug(this.props);
-    const networkId = String(this.props.network?.id ?? this.props.networkChainId ?? '');
-    return [
-      isQuestionResponseFlow ? 'question' : 'survey',
-      questionId,
-      surveyId,
-      hintedSessionSlug,
-      effectiveSessionSlug,
-      networkId,
-    ].join('|');
-  };
+  buildResponseGatePolicyCacheKey = () =>
+    buildResponseGatePolicyCacheKeyFromInputs({
+      singleQuestionMode: this.props.singleQuestionMode,
+      isStandalone: this.props.isStandalone,
+      questionID: this.props.questionID,
+      surveyId: this.props.surveyId,
+      hintedSessionSlug: getSessionSlugHintFromProps(this.props),
+      effectiveSessionSlug: resolveEffectiveSlug(this.props),
+      networkId: String(this.props.network?.id ?? this.props.networkChainId ?? ''),
+    });
 
   getResponseGatePolicy = () => {
     const cacheKey = this.buildResponseGatePolicyCacheKey();
@@ -7386,8 +6735,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._responseGatePolicyCache = { key: cacheKey, cfgSignature, cfg, value: policy, ts: now };
     return policy;
   };
-
-  getResponseGateRecipientSpecs = () => this.getResponseGatePolicy().recipients;
 
   getQuestionLookupMap = () => {
     const stateQuestionPool = Array.isArray(this.state.questionPool) ? this.state.questionPool : null;
@@ -7546,7 +6893,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return Array.isArray(policy?.recipients) ? policy.recipients : [];
   };
 
-  hasDefaultResponseGateRecipients = () => this.getResponseGateRecipientSpecs().length > 0;
+  hasDefaultResponseGateRecipients = () => {
+    const recipients = this.getResponseGatePolicy()?.recipients;
+    return Array.isArray(recipients) && recipients.length > 0;
+  };
 
   getDefaultResponseEncryptionAudience = () => (
     this.hasDefaultResponseGateRecipients() ? 'gate' : 'self'
@@ -7564,8 +6914,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
       hasDefaultGateRecipients: () => this.hasDefaultResponseGateRecipients(),
     });
-
-  getDefaultResponseEncryptionEnabled = () => this.getDefaultResponseEncryptionAudience() === 'gate';
 
   buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') =>
     buildEmptyResponseFieldStateCore(questionId, fieldKey, {
@@ -8026,56 +7374,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  buildLitEncryptionOptions = (audience = 'default') => {
-    const audienceRaw = String(audience || 'default').trim().toLowerCase();
-    if (audienceRaw === 'self') {
-      return undefined;
-    }
-
-    const litHooks =
-      this.props.lit ||
-      this.props.litHooks ||
-      (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-    if (!litHooks || (!litHooks.saveKey && !litHooks.getKey && !litHooks.accessControlConditions)) {
-      return undefined;
-    }
-
-    const gatePolicy = this.getResponseGatePolicy();
-    const gateRecipients = Array.isArray(gatePolicy?.recipients) ? gatePolicy.recipients : [];
-    const base = {
-      saveKey: litHooks.saveKey,
-      getKey: litHooks.getKey,
-      ...(gatePolicy?.allowFallbackConditions && litHooks.accessControlConditions
-        ? { accessControlConditions: litHooks.accessControlConditions }
-        : {}),
-      ...(litHooks.chain ? { chain: litHooks.chain } : {}),
-    };
-
-    if (gateRecipients.length) {
-      return {
-        ...base,
-        accessControlConditions: gateRecipients[0].accessControlConditions,
-        chain: gateRecipients[0].chain,
-        recipients: gateRecipients,
-      };
-    }
-
-    if (audienceRaw === 'gate') {
-      return undefined;
-    }
-
-    // If the resource gate resolves open on-chain, do not apply default/global Lit ACLs.
-    if (!gatePolicy?.allowFallbackConditions) {
-      return undefined;
-    }
-
-    if (!base.saveKey && !base.getKey && !base.accessControlConditions) {
-      return undefined;
-    }
-
-    return base;
-  };
-
   buildLitEncryptionOptionsForRecipients = (recipients = []) => {
     const list = Array.isArray(recipients) ? recipients.filter(Boolean) : [];
     if (!list.length) return undefined;
@@ -8382,30 +7680,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
 
       // 3. Compute responder URL for post-submit UI
-      let responseUrl;
       const submittedCacheSlug = normalizeSessionSlugValue(
         receipt?.__ceSubmissionGroupKey != null
           ? receipt.__ceSubmissionGroupKey
           : submitContext.effectiveDraftSlug
       );
-      try {
-        const accountLower = (submitContext.account || '').toLowerCase();
-        if (accountLower) {
-          if (submitContext.singleQuestionMode) {
-            const qLower = (submitContext.questionID || '').toLowerCase();
-            if (qLower) {
-              responseUrl = buildQuestionRoutePath(qLower, {
-                responderAddress: accountLower,
-                sessionSlug: submittedCacheSlug,
-              });
-            }
-          } else if (!submitContext.isStandalone) {
-            const sLower = (submitContext.surveyId || '').toLowerCase();
-            if (sLower) responseUrl = `/survey/${sLower}/${accountLower}${submittedCacheSlug ? `?session=${encodeURIComponent(submittedCacheSlug)}` : ''}`;
-          }
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      responseUrl = responseUrl || window.location.pathname;
+      const responseUrl = resolveSurveyQuestionsSubmittedResponseUrl({
+        account: submitContext.account,
+        currentPathname: window.location.pathname,
+        isStandalone: submitContext.isStandalone,
+        logWarn: (message, error) => surveyLog.warn(message, error),
+        questionID: submitContext.questionID,
+        singleQuestionMode: submitContext.singleQuestionMode,
+        submissionSlug: submittedCacheSlug,
+        surveyId: submitContext.surveyId,
+      });
 
       // 4. UPDATE BASELINE & OPTIMISTIC STATE
       surveyLog.log("Setting new Baseline");
@@ -8768,8 +8057,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         mode="fullscreen"
         sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
         activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
+        onDecryptQuestion={this.handleDecryptQuestionAnswer}
+        onReloadQuestionPrompt={this.handleReloadMaskedPrompt}
         promptReloading={promptReloading}
         showImportance={true}
         provider={this.props.provider}
@@ -8779,51 +8068,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       />
     );
   };
-
-  renderSingleQuestionAnswer = (question, response, isOwnResponse) => {
-    if (!question || !response) {
-      surveyLog.warn('renderSingleQuestionAnswer: question or response is undefined');
-      return null;
-    }
-    const promptReloading = this.isQuestionFieldBusy(question.id, 'prompt');
-    return (
-      <SingleQuestionResponse
-        question={question}
-        response={response}
-        isOwnResponse={isOwnResponse}
-        canDecryptOtherResponses={this.state.canDecryptOtherResponses}
-        mode="fullscreen"
-        sessionSlug={this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props)}
-        activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-        onDecryptQuestion={(qId, fieldToDecrypt, resp) => this.handleDecryptQuestionAnswer(qId, fieldToDecrypt, resp)}
-        onReloadQuestionPrompt={(qId) => this.handleReloadMaskedPrompt(qId)}
-        promptReloading={promptReloading}
-        showImportance={true}
-        provider={this.props.provider}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionsCacheNonce={this.props.questionsCacheNonce || this.state.questionsCacheNonce}
-        sbtCacheRevision={this.props.sbtCacheRevision}
-      />
-    );
-  };
-
-
-  hasEncryptedAnswers = () => {
-    const stats =
-      (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats())
-      || null;
-    if (stats) return Number(stats.encrypted || 0) > 0;
-
-    // Fallback (should rarely run): preserve old behavior if stats unavailable
-    const idx = 0;
-    const slice = this.state.surveysResponseState?.[idx];
-    if (!slice) return false;
-    const anyEncAnswer = !!Object.values(slice.answers || {}).some(a => a && a.encrypted);
-    const anyEncAdditional = !!Object.values(slice.additionalComments || {}).some(a => a && a.encrypted);
-    return anyEncAnswer || anyEncAdditional;
-  };
-
-
 
   renderSurveyAnswers = (responses, isOwnResponse) => {
     return (
@@ -8854,29 +8098,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     bumpSurveyPerfCounter('maskedVisibilityMemoMissCount');
     bumpSurveyPerfCounter('maskedVisibilityPoolSizeOnMiss', fullQuestionPool.length);
 
-    let visibleQuestionPool = fullQuestionPool;
-    let hiddenMaskedQuestionIds = [];
-    if (!isSingleQuestionMode) {
-      visibleQuestionPool = [];
-      hiddenMaskedQuestionIds = [];
-      fullQuestionPool.forEach((question) => {
-        const masked = this.isMaskedPromptText(question?.prompt) && !question?.promptDecrypted;
-        if (!masked) {
-          visibleQuestionPool.push(question);
-          return;
-        }
-        const qid = String(question?.id || '').trim().toLowerCase();
-        if (qid) hiddenMaskedQuestionIds.push(qid);
-      });
-    }
+    const value = buildSurveyQuestionsMaskedQuestionVisibility({
+      isMaskedPromptText: this.isMaskedPromptText,
+      questionPool: fullQuestionPool,
+      singleQuestionMode: isSingleQuestionMode,
+    });
+    const { visibleQuestionPool, hiddenMaskedQuestionIds } = value;
     bumpSurveyPerfCounter('maskedVisibilityVisibleCountOnMiss', visibleQuestionPool.length);
     bumpSurveyPerfCounter('maskedVisibilityHiddenCountOnMiss', hiddenMaskedQuestionIds.length);
 
-    const value = {
-      fullQuestionPool,
-      visibleQuestionPool,
-      hiddenMaskedQuestionIds,
-    };
     const nextMemoByMode = memoByMode
       ? { ...memoByMode, [modeKey]: value }
       : { [modeKey]: value };
@@ -8888,27 +8118,33 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   render() {
     bumpSurveyPerfCounter('renderCount');
-    const surveyIndex =
-      this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-    const currentSurveyResponseState =
-      this.state.surveysResponseState && this.state.surveysResponseState.length > surveyIndex
-        ? this.state.surveysResponseState[surveyIndex]
-        : null;
-    const questionPoolReady =
-      this.state.questionPool &&
-      Array.isArray(this.state.questionPool) &&
-      this.state.questionPool.length > 0;
+    const maskedQuestionVisibility = this.getMemoizedMaskedQuestionVisibility(
+      this.state.questionPool,
+      this.props.singleQuestionMode
+    );
+    const renderReadiness = buildSurveyQuestionsRenderReadinessDescriptor({
+      displayAnswerMode: this.state.displayAnswerMode,
+      fullQuestionPool: maskedQuestionVisibility.fullQuestionPool,
+      hiddenMaskedQuestionIds: maskedQuestionVisibility.hiddenMaskedQuestionIds,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isStandalone: this.props.isStandalone,
+      parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+      questionPool: this.state.questionPool,
+      singleQuestionMode: this.props.singleQuestionMode,
+      surveyIndex: this.props.surveyIndex,
+      surveysResponseState: this.state.surveysResponseState,
+      visibleQuestionPool: maskedQuestionVisibility.visibleQuestionPool,
+    });
     const {
+      surveyIndex,
+      currentSurveyResponseState,
+      questionPoolReady,
       fullQuestionPool,
       visibleQuestionPool,
       hiddenMaskedQuestionIds,
-    } = this.getMemoizedMaskedQuestionVisibility(this.state.questionPool, this.props.singleQuestionMode);
-    const gatedEmptyStateReady =
-      !this.props.singleQuestionMode &&
-      fullQuestionPool.length > 0 &&
-      visibleQuestionPool.length === 0 &&
-      !!this.props.isQuestionCacheReady;
-    const hasHiddenMaskedQuestions = hiddenMaskedQuestionIds.length > 0;
+      gatedEmptyStateReady,
+      hasHiddenMaskedQuestions,
+    } = renderReadiness;
     const fullLoadingProgress = buildSurveyQuestionsFullLoadingProgressState({
       questionScanProgress: this.props.questionScanProgress,
       progressSlug:
@@ -8917,35 +8153,23 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         '',
     });
 
-    if (
-      !currentSurveyResponseState ||
-      (this.props.singleQuestionMode && !questionPoolReady && !this.state.displayAnswerMode) ||
-      (!this.props.singleQuestionMode && !this.props.isStandalone && !questionPoolReady && !this.state.displayAnswerMode)
-    ) {
-      if (this.state.displayAnswerMode && this.state.parsedViewAddressAnswers) {
-        // fall-through to render below
-      } else {
-        return (
-          <SurveyQuestionsLoadingState progressState={fullLoadingProgress} />
-        );
-      }
+    if (renderReadiness.shouldShowLoadingState) {
+      return (
+        <SurveyQuestionsRouteSurface
+          renderReadiness={renderReadiness}
+          loadingProgressState={fullLoadingProgress}
+        />
+      );
     }
 
     const viewingAnswers = this.state.displayAnswerMode;
-    const canBuildJsonPreview =
-      !viewingAnswers ||
-      (viewingAnswers && this.state.questionPool && Array.isArray(this.state.questionPool));
-    const jsonPreview = canBuildJsonPreview ? (this.state.jsonPreview || {}) : null;
+    const { jsonPreview } = buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview: this.state.jsonPreview,
+      questionPool: this.state.questionPool,
+      viewingAnswers,
+    });
 
-    const {
-      viewedAddressRaw,
-      viewedAddressLower,
-      shortenedViewAddress,
-      isOwnResponse,
-      isSingleQuestionView,
-      showViewAnswersButton,
-      viewAnswersButtonText,
-    } = buildSurveyQuestionsRouteViewDisplayState({
+    const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: this.props.account,
       isEditing: this.state.isEditing,
       isStandalone: this.props.isStandalone,
@@ -8957,6 +8181,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       viewAddress: this.props.viewAddress,
       viewingAnswers,
     });
+    const {
+      isOwnResponse,
+      isSingleQuestionView,
+    } = routeViewDisplayState;
 
     // Submit button label block (centralized)
     const _pendingStats = this.getPendingStatsSnapshot();
@@ -8968,26 +8196,23 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           suffix: _suffix,
           pendingStats: _pendingStats,
         });
-    const submitHasEncryptedAnswers =
-      this.state.isSubmitting &&
-      this.state.currentStep === 1
-        ? this.hasEncryptedAnswers()
-        : false;
-    const submitHasMaskedCurrentQuestionPayload =
-      !this.state.isSubmitting &&
-      this.props.singleQuestionMode
-        ? this.hasMaskedCurrentQuestionPayload()
-        : false;
+    const submitReadiness = buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: this.state.currentStep,
+      isSubmitting: this.state.isSubmitting,
+      pendingStats: _pendingStats,
+      resolveMaskedCurrentQuestionPayload: this.hasMaskedCurrentQuestionPayload,
+      singleQuestionMode: this.props.singleQuestionMode,
+    });
     const submitFooterDisplayState = buildSurveyQuestionsSubmitFooterDisplayState({
       currentStep: this.state.currentStep,
-      hasEncryptedAnswers: submitHasEncryptedAnswers,
-      hasMaskedCurrentQuestionPayload: submitHasMaskedCurrentQuestionPayload,
+      hasEncryptedAnswers: submitReadiness.hasEncryptedAnswers,
+      hasMaskedCurrentQuestionPayload: submitReadiness.hasMaskedCurrentQuestionPayload,
       isDirty: this.state.isDirty,
       isEditing: this.state.isEditing,
       isLoadingResponse: this.state.isLoadingResponse,
       isSingleQuestionView,
       isSubmitting: this.state.isSubmitting,
-      pendingEditCount: _pendingStats.total,
+      pendingEditCount: submitReadiness.pendingEditCount,
       responseUrl: this.state.responseUrl,
       singleQuestionMode: this.props.singleQuestionMode,
       startFresh: this.state.startFresh,
@@ -8997,22 +8222,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       userHasResponse: this.state.userHasResponse,
     });
 
-    const submitResponseButton = (
-      <SurveyQuestionsSubmitFooter
-        isSingleQuestionView={isSingleQuestionView}
-        isSubmitting={this.state.isSubmitting}
-        onPrimarySubmitClick={this.handlePrimarySubmitClick}
-        onRevertPendingChanges={this.handleRevertPendingChanges}
-        pendingEditCount={_pendingStats.total}
-        responseUrl={this.state.responseUrl}
-        showSubmitAux={submitFooterDisplayState.showSubmitAux}
-        submitButtonText={submitButtonText}
-        submitDisabled={submitFooterDisplayState.submitDisabled}
-        submittedIndicatorActive={submitFooterDisplayState.submittedIndicatorActive}
-        submissionError={this.state.submissionError}
-        uploadStatusText={submitFooterDisplayState.uploadStatusText}
-      />
-    );
     const { jsonForDisplay } = buildSurveyQuestionsJsonForDisplayState({
       isOwnResponse,
       jsonPreview,
@@ -9040,11 +8249,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const responseJson = jsonPanelDisplayState.showResponseJsonPanel
       ? (viewingAnswers ? jsonForDisplay : this.getResponseJson())
       : null;
-    const submittedStateActive = submitFooterDisplayState.submittedStateActive;
     const canEditQuestions = submitFooterDisplayState.canEditQuestions;
-    const hasPendingEdits = submitFooterDisplayState.hasPendingEdits;
-    const showInlineSubmit = submitFooterDisplayState.showInlineSubmit;
-    const showTopInlineSubmit = submitFooterDisplayState.showTopInlineSubmit;
+    const authoringPanelDisplayState = buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions,
+      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+      hideEmbeddedDebugUi,
+      questionPoolReady,
+      singleQuestionMode: this.props.singleQuestionMode,
+    });
     const layoutDisplayState = buildSurveyQuestionsLayoutDisplayState({
       activeTagModalTag: this.state.activeTagModalTag,
       isSingleQuestionView,
@@ -9053,15 +8265,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       styleMap: styles,
       viewingAnswers,
     });
-    const { activeTagModalTag, responseViewClassName, surveyPageClassName, topSectionClassName, useTagModal } = layoutDisplayState;
-    const hasRenderedEditableQuestions =
-      canEditQuestions &&
-      questionPoolReady &&
-      !!currentSurveyResponseState &&
-      !gatedEmptyStateReady &&
-      Array.isArray(visibleQuestionPool) &&
-      visibleQuestionPool.length > 0;
-    const renderedEditableQuestions = hasRenderedEditableQuestions
+    const authoringRouteReadiness = buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions,
+      gatedEmptyStateReady,
+      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+      questionPoolReady,
+      visibleQuestionPool,
+    });
+    const renderedEditableQuestions = authoringRouteReadiness.shouldRenderEditableQuestions
       ? visibleQuestionPool.map((question, qIndex) =>
           this.renderQuestion(question, qIndex, currentSurveyResponseState)
         )
@@ -9071,129 +8282,94 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       hiddenMaskedQuestionIds,
       lockedGateDetails,
     });
-    const submittedResponseView = (
-      <SurveyQuestionsSubmittedResponseView
-        isOwnResponse={isOwnResponse}
-        isVisible={
-          !viewingAnswers &&
-          this.state.userHasResponse &&
-          !this.state.startFresh &&
-          !this.state.isEditing
-        }
-        questionPool={this.state.questionPool}
-        questionPoolReady={questionPoolReady}
-        renderQuestionAnswer={this.renderQuestionAnswer}
-        renderSurveyAnswers={this.renderSurveyAnswers}
-        singleQuestionMode={this.props.singleQuestionMode}
-        userAnswers={this.state.userAnswers}
-      />
-    );
 
     return (
-      <div className={surveyPageClassName}>
-        <SurveyQuestionsTopStrip
-          ref={this.topRef}
-          className={topSectionClassName}
-          isDecrypting={this.state.isDecrypting}
-          isEditing={this.state.isEditing}
-          isSubmitting={this.state.isSubmitting}
-          onDecryptEdit={this.handleDecryptEdit}
-          onExitEditing={this.handleExitEditing}
-          onStartFresh={this.handleStartFresh}
-          onToggleDisplayAnswerMode={this.toggleDisplayAnswerMode}
-          responseUrl={this.state.responseUrl}
-          showUserResponseNotice={
+      <SurveyQuestionsRouteSurface
+        renderReadiness={renderReadiness}
+        loadingProgressState={fullLoadingProgress}
+        layoutDisplayState={layoutDisplayState}
+        routeViewDisplayState={routeViewDisplayState}
+        submitDisplayState={submitFooterDisplayState}
+        viewingAnswers={viewingAnswers}
+        topStripProps={{
+          topRef: this.topRef,
+          displayAnswerMode: this.state.displayAnswerMode,
+          isDecrypting: this.state.isDecrypting,
+          isEditing: this.state.isEditing,
+          isSubmitting: this.state.isSubmitting,
+          onDecryptEdit: this.handleDecryptEdit,
+          onExitEditing: this.handleExitEditing,
+          onStartFresh: this.handleStartFresh,
+          onToggleDisplayAnswerMode: this.toggleDisplayAnswerMode,
+          responseUrl: this.state.responseUrl,
+          userHasResponse: this.state.userHasResponse,
+          userResponseEncrypted: this.state.userResponseEncrypted,
+        }}
+        responseViewProps={{
+          isLoadingResponse: this.state.isLoadingResponse,
+          noResponse: this.state.noResponse,
+          parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+          questionPool: this.state.questionPool,
+          questionPoolReady,
+          renderQuestionAnswer: this.renderQuestionAnswer,
+          renderSurveyAnswers: this.renderSurveyAnswers,
+          responderAddress: this.props.responderAddress,
+          responseLookupWarning: this.state.responseLookupWarning,
+          singleQuestionMode: this.props.singleQuestionMode,
+          userAnswers: this.state.userAnswers,
+          viewAddress: this.props.viewAddress,
+        }}
+        authoringPanelProps={{
+          displayState: authoringPanelDisplayState,
+          lockedQuestionsBanner,
+          onScrollToTop: this.handleScrollToTop,
+          onShowJsonAtBottom: this.handleShowJsonAtBottom,
+          renderedEditableQuestions,
+        }}
+        submittedResponseViewProps={{
+          isOwnResponse,
+          isVisible:
+            !viewingAnswers &&
             this.state.userHasResponse &&
-            isOwnResponse &&
-            !isSingleQuestionView &&
-            this.state.displayAnswerMode
-          }
-          showViewAnswersButton={showViewAnswersButton}
-          submittedStateActive={submittedStateActive}
-          userResponseEncrypted={this.state.userResponseEncrypted}
-          viewAnswersButtonText={viewAnswersButtonText}
-        />
-
-        {viewingAnswers ? (
-          <SurveyQuestionsResponseView
-            isLoadingResponse={this.state.isLoadingResponse}
-            isOwnResponse={isOwnResponse}
-            noResponse={this.state.noResponse}
-            parsedViewAddressAnswers={this.state.parsedViewAddressAnswers}
-            questionPool={this.state.questionPool}
-            questionPoolReady={questionPoolReady}
-            renderQuestionAnswer={this.renderQuestionAnswer}
-            renderSurveyAnswers={this.renderSurveyAnswers}
-            responderAddress={this.props.responderAddress}
-            responseLookupWarning={this.state.responseLookupWarning}
-            responseViewClassName={responseViewClassName}
-            shortenedViewAddress={shortenedViewAddress}
-            singleQuestionMode={this.props.singleQuestionMode}
-            userAnswers={this.state.userAnswers}
-            viewAddress={this.props.viewAddress}
-            viewedAddressLower={viewedAddressLower}
-            viewedAddressRaw={viewedAddressRaw}
-          />
-        ) : (
-          <SurveyQuestionsAuthoringPanel
-            lockedQuestionsBanner={lockedQuestionsBanner}
-            onScrollToTop={this.handleScrollToTop}
-            onShowJsonAtBottom={this.handleShowJsonAtBottom}
-            renderedEditableQuestions={renderedEditableQuestions}
-            showBackToTopControl={canEditQuestions && !this.props.singleQuestionMode}
-            showInlineSubmit={showInlineSubmit}
-            showJsonControl={!hideEmbeddedDebugUi && canEditQuestions && !this.props.singleQuestionMode}
-            showLockedQuestionsBanner={
-              !hideEmbeddedDebugUi &&
-              canEditQuestions &&
-              questionPoolReady &&
-              !!currentSurveyResponseState
-            }
-            showTopInlineSubmit={showTopInlineSubmit}
-            submittedResponseView={submittedResponseView}
-            submitResponseButton={submitResponseButton}
-          />
-        )}
-
-        <SurveyQuestionsJsonControls
-          ref={this.bottomRef}
-          copiedQuestionsJson={this.state.copiedQuestionsJson}
-          copiedResponseJson={this.state.copiedResponseJson}
-          copiedSurveyJson={this.state.copiedSurveyJson}
-          hidden={hideEmbeddedDebugUi}
-          isStandalone={this.props.isStandalone}
-          onCopyQuestionsJson={() => this.copyJsonToClipboard(questionsJson, 'questions')}
-          onCopyResponseJson={() => this.copyJsonToClipboard(responseJson, 'response')}
-          onCopySurveyJson={() => this.copyJsonToClipboard(surveyJson, 'survey')}
-          onToggleQuestionsJson={this.toggleShowQuestionsJson}
-          onToggleResponseJson={this.toggleShowResponseJson}
-          onToggleSurveyJson={this.toggleShowSurveyJson}
-          questionJsonToggleClassName={jsonPanelDisplayState.questionJsonToggleClassName}
-          questionsJson={questionsJson}
-          renderJsonTree={this.jsonTreeDisplay}
-          responseJson={responseJson}
-          responseJsonToggleClassName={jsonPanelDisplayState.responseJsonToggleClassName}
-          showQuestionJsonControls={jsonPanelDisplayState.showQuestionJsonControls}
-          showQuestionsJson={this.state.showQuestionsJson}
-          showQuestionsJsonPanel={jsonPanelDisplayState.showQuestionsJsonPanel}
-          showResponseJson={this.state.showResponseJson}
-          showResponseJsonPanel={jsonPanelDisplayState.showResponseJsonPanel}
-          showSurveyJson={this.state.showSurveyJson}
-          showSurveyJsonPanel={jsonPanelDisplayState.showSurveyJsonPanel}
-          singleQuestionMode={this.props.singleQuestionMode}
-          surveyJson={surveyJson}
-          surveyJsonPanelClassName={jsonPanelDisplayState.surveyJsonPanelClassName}
-          surveyJsonRowClassName={jsonPanelDisplayState.surveyJsonRowClassName}
-          surveyJsonToggleClassName={jsonPanelDisplayState.surveyJsonToggleClassName}
-        />
-        {useTagModal && (
-          <TagModal
-            isOpen={!!activeTagModalTag}
-            toggle={this.closeQuestionTagModal}
-            activeTag={activeTagModalTag || null}
-          />
-        )}
-      </div>
+            !this.state.startFresh &&
+            !this.state.isEditing,
+          questionPool: this.state.questionPool,
+          questionPoolReady,
+          renderQuestionAnswer: this.renderQuestionAnswer,
+          renderSurveyAnswers: this.renderSurveyAnswers,
+          singleQuestionMode: this.props.singleQuestionMode,
+          userAnswers: this.state.userAnswers,
+        }}
+        submitFooterProps={{
+          isSingleQuestionView,
+          isSubmitting: this.state.isSubmitting,
+          onPrimarySubmitClick: this.handlePrimarySubmitClick,
+          onRevertPendingChanges: this.handleRevertPendingChanges,
+          pendingEditCount: submitReadiness.pendingEditCount,
+          responseUrl: this.state.responseUrl,
+          submitButtonText,
+          submissionError: this.state.submissionError,
+        }}
+        jsonControlsProps={buildSurveyQuestionsRouteJsonControlsProps({
+          bottomRef: this.bottomRef,
+          copiedQuestionsJson: this.state.copiedQuestionsJson,
+          copiedResponseJson: this.state.copiedResponseJson,
+          copiedSurveyJson: this.state.copiedSurveyJson,
+          copyJsonToClipboard: this.copyJsonToClipboard,
+          hidden: hideEmbeddedDebugUi,
+          jsonPanelDisplayState,
+          onToggleQuestionsJson: this.toggleShowQuestionsJson,
+          onToggleResponseJson: this.toggleShowResponseJson,
+          onToggleSurveyJson: this.toggleShowSurveyJson,
+          questionsJson,
+          renderJsonTree: this.jsonTreeDisplay,
+          responseJson,
+          surveyJson,
+        })}
+        tagModalProps={{
+          onClose: this.closeQuestionTagModal,
+        }}
+      />
     );
   }
 }

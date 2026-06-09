@@ -45,6 +45,17 @@ export const getChainName = (value: ChainIdLike): string => {
   return chain?.name || '';
 };
 
+export const getSessionWizardErrorMessage = (error: unknown, fallback = ''): string => {
+  if (error instanceof Error) return error.message || fallback;
+  if (error && typeof error === 'object') {
+    if ('message' in error) {
+      return toStr((error as { message?: unknown }).message) || fallback;
+    }
+    return fallback;
+  }
+  return toStr(error) || fallback;
+};
+
 export const formatContractLabel = (key: string): string => {
   if (CONTRACT_LABELS[key]) return CONTRACT_LABELS[key];
   if (!key) return '';

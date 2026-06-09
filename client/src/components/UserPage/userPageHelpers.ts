@@ -148,16 +148,28 @@ export type {
 export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponseStatePatch,
   buildUserPageDecryptedResponsePatch,
+  buildUserPageEncryptedVisibilityDisplayState,
+  buildUserPageEncryptedVisibilityStatusRequestPlan,
+  buildUserPageGateAccessCheckPlan,
   buildUserPageGateAccessCacheKey,
+  buildUserPageGateAccessRequestDescriptor,
+  buildUserPageGateAccessSettlementPlan,
   buildUserPageGatePendingKey,
+  buildUserPageGateRetryTimerPlan,
+  buildUserPageQuestionResponseSourceDescriptor,
+  buildUserPageResponseDecryptRequestPlan,
   buildUserPageResponseDecryptSurveyBindings,
+  buildUserPageSurveyResponseSourceDescriptor,
+  dispatchUserPageGateAccessCheckThroughPort,
   getUserPageGateResourceKeysToCheck,
   inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
   isUserPageAdditionalFieldEncrypted,
   isUserPageAnswerFieldEncrypted,
   isUserPageEncryptedResponseField,
+  isUserPageQuestionPayloadEncrypted,
   isUserPageResponsePayloadEncrypted,
   normalizeUserPageGateResourceKey,
   normalizeUserPageGateSlug,
@@ -165,6 +177,18 @@ export {
 } from './userPageGateHelpers';
 export type {
   UserPageDecryptableResponseField,
+  UserPageDecryptedResponseStatePatchResult,
+  UserPageEncryptedVisibilityDisplayState,
+  UserPageEncryptedVisibilityStatusRequestPlan,
+  UserPageGateAccessCheckPort,
+  UserPageGateAccessCheckPortRequest,
+  UserPageGateAccessDispatchResult,
+  UserPageGateAccessRequestDescriptor,
+  UserPageGateAccessSettlementPlan,
+  UserPageGateAccessStatusByResource,
+  UserPageGateRetryTimerPlan,
+  UserPageGatedResponseSourceDescriptor,
+  UserPageResponseDecryptRequestPlan,
   UserPageResponseDecryptSurveyBindings,
 } from './userPageGateHelpers';
 export {
@@ -186,6 +210,8 @@ export type {
   UserPageProfileEditVisibility,
 } from './userPageProfileDisplayHelpers';
 export {
+  buildUserPageCacheRefreshDisplayState,
+  buildUserPageCacheRefreshStatePatch,
   buildUserPageRenderLoadingState,
   buildUserPageSectionLoadingEmptyState,
   buildUserPageUncertainEmptyText,
@@ -199,6 +225,7 @@ export {
   shouldRetryUserPageQuestionData,
 } from './userPageLoadingStateHelpers';
 export type {
+  BuildUserPageCacheRefreshDisplayStateArgs,
   BuildUserPageRenderLoadingStateArgs,
   BuildUserPageSectionLoadingEmptyStateArgs,
   BuildUserPageUncertainEmptyTextArgs,
@@ -213,6 +240,7 @@ export type {
   UserPageAiActionAvailability,
   UserPageAiActionPlan,
   UserPageAnalyzeButtonDisplayState,
+  UserPageCacheRefreshDisplayState,
   UserPageCompareButtonDisplayState,
   UserPageRenderLoadingState,
   UserPageSectionLoadingEmptyState,
@@ -383,6 +411,28 @@ type ReadUserPageAnalysisCacheEntryArgs = {
   networkId?: unknown;
   now?: unknown;
 };
+type BuildUserPageAnalysisCacheReadDescriptorArgs = {
+  addressLower?: unknown;
+  fingerprint?: unknown;
+  forceRefresh?: unknown;
+  networkId?: unknown;
+  sessionSlug?: unknown;
+};
+type ReadUserPageAnalysisCacheThroughPortArgs = {
+  cacheVersion?: unknown;
+  descriptor?: UserPageAnalysisCacheReadDescriptor | null;
+  now?: unknown;
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+};
+type WriteUserPageAnalysisCacheThroughPortArgs = BuildUserPageAnalysisCacheEntryArgs & {
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+  writeCache?: UserPageAnalysisCacheWritePort | null;
+};
+type ReadUserPageAnalysisCreatedSurveyCachesThroughPortArgs = {
+  networkID?: unknown;
+  peekCache?: UserPageAnalysisCacheReadPort | null;
+  sessionSlug?: unknown;
+};
 type BuildUserPageAnalysisCacheEntryArgs = {
   addressLower?: unknown;
   aiContext?: unknown;
@@ -472,6 +522,14 @@ type BuildUserPageCacheRefreshInputSignatureArgs = {
   sourceMembershipSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageCacheRefreshRequestDescriptorArgs = BuildUserPageCacheRefreshInputSignatureArgs & {
+  bypassSignature?: unknown;
+  currentInputSignature?: unknown;
+  force?: unknown;
+  markLoading?: unknown;
+  sourceSnapshot?: unknown;
+  viewAddress?: unknown;
+};
 type BuildUserPageCacheLoadingHoldFlagsArgs = {
   force?: unknown;
   hasQuestionSources?: unknown;
@@ -486,6 +544,31 @@ type UserPageQueuedCacheRefreshFlags = {
   bypassSignature: boolean;
   force: boolean;
   markLoading: boolean;
+};
+export type UserPageCacheRefreshRequestDescriptor = {
+  action: 'missing-address' | 'skip-same-signature' | 'refresh';
+  force: boolean;
+  markLoading: boolean;
+  bypassSignature: boolean;
+  networkID: string;
+  refreshInputSignature: string;
+  sourcePresence: UserPageCacheSourcePresence;
+  viewAddressLower: string;
+} & UserPageCacheLoadingHoldFlags & {
+  hasQuestionSources: boolean;
+  hasSbtSources: boolean;
+  hasSurveySources: boolean;
+};
+export type UserPageUnifiedCacheAggregateMemoPlan = {
+  aggregateMemoKey: string;
+  aggregate: unknown;
+  canReuseAggregate: boolean;
+};
+export type UserPageSectionDeriveMemoPlan = {
+  canReuseMemo: boolean;
+  gateSnapshot: unknown;
+  result: unknown;
+  signature: string;
 };
 type UserPageResponseNonceRefreshDecision = {
   isOwnProfile: boolean;
@@ -525,6 +608,11 @@ type BuildUserPageUnifiedCacheAggregateMemoKeyArgs = {
   sourceMembershipSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageUnifiedCacheAggregateMemoPlanArgs =
+  BuildUserPageUnifiedCacheAggregateMemoKeyArgs & {
+    currentAggregateMemo?: unknown;
+    currentAggregateMemoKey?: unknown;
+  };
 type BuildUserPageResponseSectionDeriveSignatureArgs = {
   account?: unknown;
   networkID?: unknown;
@@ -534,12 +622,22 @@ type BuildUserPageResponseSectionDeriveSignatureArgs = {
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageResponseSectionDeriveMemoPlanArgs =
+  BuildUserPageResponseSectionDeriveSignatureArgs & {
+    currentMemo?: unknown;
+    force?: unknown;
+  };
 type BuildUserPageSbtSectionDeriveSignatureArgs = {
   networkID?: unknown;
   sbtCacheRevision?: unknown;
   sourceSignature?: unknown;
   viewAddressLower?: unknown;
 };
+type BuildUserPageSbtSectionDeriveMemoPlanArgs =
+  BuildUserPageSbtSectionDeriveSignatureArgs & {
+    currentMemo?: unknown;
+    force?: unknown;
+  };
 export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   version?: unknown;
   fingerprint?: unknown;
@@ -548,6 +646,43 @@ export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   address?: unknown;
   networkId?: unknown;
   result?: unknown;
+};
+export type UserPageAnalysisCacheReadDescriptor = {
+  action: 'read' | 'skip-force-refresh';
+  addressLower: string;
+  fingerprint: string;
+  networkId: string;
+  sessionSlug: string;
+};
+export type UserPageAnalysisCacheReadPort = (
+  namespace: string,
+  slug?: string,
+  options?: { clone?: boolean }
+) => unknown;
+export type UserPageAnalysisCacheWritePort = (
+  namespace: string,
+  slug?: string,
+  value?: unknown
+) => Promise<unknown>;
+export type UserPageAnalysisCacheReadPortResult = {
+  descriptor: UserPageAnalysisCacheReadDescriptor;
+  entry: UserPageAnalysisCacheEntry | null;
+  error?: unknown;
+  status: 'hit' | 'miss' | 'skipped' | 'error';
+};
+export type UserPageAnalysisCacheWritePortResult = {
+  entry: UserPageAnalysisCacheEntry | null;
+  error?: unknown;
+  payload: UserPageUnknownRecord | null;
+  status: 'written' | 'skipped' | 'error';
+};
+export type UserPageAnalysisCreatedSurveyCacheReadResult = {
+  error?: unknown;
+  networkID: string;
+  questionsCache: unknown;
+  sessionSlug: string;
+  status: 'read' | 'skipped' | 'error';
+  surveysCache: unknown;
 };
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
@@ -581,6 +716,70 @@ export const readUserPageAnalysisCacheEntry = ({
   if (String(entryRecord.address || '').toLowerCase() !== resolvedAddressLower) return null;
   if (Number(now || 0) >= Number(entryRecord.expiresAt || 0)) return null;
   return entryRecord;
+};
+
+export const buildUserPageAnalysisCacheReadDescriptor = ({
+  addressLower = '',
+  fingerprint = '',
+  forceRefresh = false,
+  networkId = '',
+  sessionSlug = '',
+}: BuildUserPageAnalysisCacheReadDescriptorArgs = {}): UserPageAnalysisCacheReadDescriptor => ({
+  action: forceRefresh ? 'skip-force-refresh' : 'read',
+  addressLower: String(addressLower || '').trim().toLowerCase(),
+  fingerprint: String(fingerprint || ''),
+  networkId: String(networkId || ''),
+  sessionSlug: String(sessionSlug || ''),
+});
+
+export const readUserPageAnalysisCacheThroughPort = ({
+  cacheVersion = 1,
+  descriptor = null,
+  now = Date.now(),
+  peekCache = null,
+}: ReadUserPageAnalysisCacheThroughPortArgs = {}): UserPageAnalysisCacheReadPortResult => {
+  const readDescriptor = descriptor || buildUserPageAnalysisCacheReadDescriptor();
+  const baseResult = {
+    descriptor: readDescriptor,
+    entry: null,
+  };
+  if (
+    readDescriptor.action !== 'read' ||
+    !readDescriptor.sessionSlug ||
+    !readDescriptor.networkId ||
+    !readDescriptor.addressLower ||
+    !readDescriptor.fingerprint ||
+    typeof peekCache !== 'function'
+  ) {
+    return {
+      ...baseResult,
+      status: 'skipped',
+    };
+  }
+  try {
+    const cacheObj = toAnalysisCacheBucket(
+      peekCache('analysisCache', readDescriptor.sessionSlug, { clone: false })
+    );
+    const entry = readUserPageAnalysisCacheEntry({
+      addressLower: readDescriptor.addressLower,
+      cacheObj,
+      cacheVersion,
+      fingerprint: readDescriptor.fingerprint,
+      networkId: readDescriptor.networkId,
+      now,
+    });
+    return {
+      ...baseResult,
+      entry,
+      status: entry ? 'hit' : 'miss',
+    };
+  } catch (error) {
+    return {
+      ...baseResult,
+      error,
+      status: 'error',
+    };
+  }
 };
 
 export const buildUserPageAnalysisCacheEntry = ({
@@ -651,6 +850,109 @@ export const buildUserPageAnalysisCacheWritePayload = ({
   networkBucket[addressKey] = addressBucket;
   next[networkKey] = networkBucket;
   return next;
+};
+
+export const writeUserPageAnalysisCacheThroughPort = async ({
+  addressLower = '',
+  aiContext = {},
+  cachedAt = Date.now(),
+  cacheVersion = 1,
+  fingerprint = '',
+  networkId = '',
+  peekCache = null,
+  result = {},
+  sessionSlug = '',
+  ttlMs = 24 * 60 * 60 * 1000,
+  writeCache = null,
+}: WriteUserPageAnalysisCacheThroughPortArgs = {}): Promise<UserPageAnalysisCacheWritePortResult> => {
+  let entry: UserPageAnalysisCacheEntry | null = null;
+  let payload: UserPageUnknownRecord | null = null;
+  if (
+    !String(sessionSlug || '') ||
+    !String(networkId || '') ||
+    !String(addressLower || '') ||
+    !String(fingerprint || '') ||
+    typeof peekCache !== 'function' ||
+    typeof writeCache !== 'function'
+  ) {
+    return {
+      entry,
+      payload,
+      status: 'skipped',
+    };
+  }
+  try {
+    entry = buildUserPageAnalysisCacheEntry({
+      addressLower,
+      aiContext,
+      cachedAt,
+      cacheVersion,
+      fingerprint,
+      networkId,
+      result,
+      sessionSlug,
+      ttlMs,
+    });
+    const current = peekCache('analysisCache', String(sessionSlug || ''), { clone: false });
+    payload = buildUserPageAnalysisCacheWritePayload({
+      addressLower,
+      cachedAt,
+      currentCache: current,
+      entry,
+      fingerprint,
+      networkId,
+    });
+    await writeCache('analysisCache', String(sessionSlug || ''), payload);
+    return {
+      entry,
+      payload,
+      status: 'written',
+    };
+  } catch (error) {
+    return {
+      entry,
+      error,
+      payload,
+      status: 'error',
+    };
+  }
+};
+
+export const readUserPageAnalysisCreatedSurveyCachesThroughPort = ({
+  networkID = '',
+  peekCache = null,
+  sessionSlug = '',
+}: ReadUserPageAnalysisCreatedSurveyCachesThroughPortArgs = {}): UserPageAnalysisCreatedSurveyCacheReadResult => {
+  const resolvedNetworkID = String(networkID || '');
+  const resolvedSessionSlug = String(sessionSlug || '');
+  const baseResult = {
+    networkID: resolvedNetworkID,
+    questionsCache: {},
+    sessionSlug: resolvedSessionSlug,
+    surveysCache: {},
+  };
+  if (!resolvedNetworkID || typeof peekCache !== 'function') {
+    return {
+      ...baseResult,
+      status: 'skipped',
+    };
+  }
+  try {
+    const surveysCache = peekCache('surveysCache', resolvedSessionSlug, { clone: false }) || {};
+    const questionsCache = peekCache('questionsCache', resolvedSessionSlug, { clone: false }) || {};
+    return {
+      ...baseResult,
+      questionsCache,
+      status: 'read',
+      surveysCache,
+    };
+  } catch (error) {
+    return {
+      ...baseResult,
+      error,
+      status: 'error',
+    };
+  }
 };
 
 export const buildUserPageNamespaceSourceMembershipSignature = ({
@@ -801,6 +1103,33 @@ export const buildUserPageUnifiedCacheAggregateMemoKey = ({
   ].join('|')
 );
 
+export const buildUserPageUnifiedCacheAggregateMemoPlan = ({
+  currentAggregateMemo = null,
+  currentAggregateMemoKey = '',
+  networkID = '',
+  questionResponsesNonce = 0,
+  sbtCacheRevision = 0,
+  sourceMembershipSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageUnifiedCacheAggregateMemoPlanArgs = {}): UserPageUnifiedCacheAggregateMemoPlan => {
+  const aggregateMemoKey = buildUserPageUnifiedCacheAggregateMemoKey({
+    networkID,
+    questionResponsesNonce,
+    sbtCacheRevision,
+    sourceMembershipSignature,
+    viewAddressLower,
+  });
+  const canReuseAggregate = !!(
+    currentAggregateMemo &&
+    String(currentAggregateMemoKey || '') === aggregateMemoKey
+  );
+  return {
+    aggregate: canReuseAggregate ? currentAggregateMemo : null,
+    aggregateMemoKey,
+    canReuseAggregate,
+  };
+};
+
 export const buildUserPageResponseSectionDeriveSignature = ({
   viewAddressLower = '',
   networkID = '',
@@ -821,6 +1150,36 @@ export const buildUserPageResponseSectionDeriveSignature = ({
   ].join('|')
 );
 
+export const buildUserPageResponseSectionDeriveMemoPlan = ({
+  account = '',
+  currentMemo = null,
+  force = false,
+  networkID = '',
+  questionResponsesNonce = 0,
+  responseGateAccessGeneration = 0,
+  responseGateAccessStatusVersion = 0,
+  sourceSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageResponseSectionDeriveMemoPlanArgs = {}): UserPageSectionDeriveMemoPlan => {
+  const signature = buildUserPageResponseSectionDeriveSignature({
+    account,
+    networkID,
+    questionResponsesNonce,
+    responseGateAccessGeneration,
+    responseGateAccessStatusVersion,
+    sourceSignature,
+    viewAddressLower,
+  });
+  const memo = toAnalysisRecord(currentMemo);
+  const canReuseMemo = !!(!force && currentMemo && memo.signature === signature);
+  return {
+    canReuseMemo,
+    gateSnapshot: canReuseMemo ? memo.gateSnapshot : null,
+    result: canReuseMemo ? memo.result : null,
+    signature,
+  };
+};
+
 export const buildUserPageSbtSectionDeriveSignature = ({
   viewAddressLower = '',
   networkID = '',
@@ -834,6 +1193,30 @@ export const buildUserPageSbtSectionDeriveSignature = ({
     String(sbtCacheRevision || 0),
   ].join('|')
 );
+
+export const buildUserPageSbtSectionDeriveMemoPlan = ({
+  currentMemo = null,
+  force = false,
+  networkID = '',
+  sbtCacheRevision = 0,
+  sourceSignature = '',
+  viewAddressLower = '',
+}: BuildUserPageSbtSectionDeriveMemoPlanArgs = {}): UserPageSectionDeriveMemoPlan => {
+  const signature = buildUserPageSbtSectionDeriveSignature({
+    networkID,
+    sbtCacheRevision,
+    sourceSignature,
+    viewAddressLower,
+  });
+  const memo = toAnalysisRecord(currentMemo);
+  const canReuseMemo = !!(!force && currentMemo && memo.signature === signature);
+  return {
+    canReuseMemo,
+    gateSnapshot: null,
+    result: canReuseMemo ? memo.result : null,
+    signature,
+  };
+};
 
 export const resolveUserPageResponseNonceRefresh = ({
   account = '',
@@ -983,6 +1366,94 @@ export const buildUserPageCacheRefreshInputSignature = ({
     String(responseGateAccessStatusVersion || 0),
     String(gateRecheckEpoch || 0),
   ].join('|');
+};
+
+export const buildUserPageCacheRefreshRequestDescriptor = ({
+  account = '',
+  bypassSignature = false,
+  currentInputSignature = '',
+  force = false,
+  gateRecheckEpoch = 0,
+  hasUncertainGateAccess = false,
+  hasUncertainUserData = false,
+  isQuestionCacheReady = false,
+  isResponsesCacheReady = false,
+  isSBTCacheReady = false,
+  isSurveyCacheReady = false,
+  markLoading = false,
+  networkID = '',
+  questionResponsesNonce = 0,
+  responseGateAccessGeneration = 0,
+  responseGateAccessStatusVersion = 0,
+  sbtCacheRevision = 0,
+  sourceSnapshot = null,
+  viewAddress = '',
+}: BuildUserPageCacheRefreshRequestDescriptorArgs = {}): UserPageCacheRefreshRequestDescriptor => {
+  const resolvedForce = !!force;
+  const resolvedMarkLoading = !!markLoading;
+  const resolvedBypassSignature = !!bypassSignature;
+  const viewAddressLower = String(viewAddress || '').toLowerCase();
+  const snapshot = toAnalysisRecord(sourceSnapshot);
+  const sourcePresence = buildUserPageCacheSourcePresence(snapshot);
+  const hasSurveySources = !!snapshot.hasSurveySources;
+  const hasQuestionSources = !!snapshot.hasQuestionSources;
+  const hasSbtSources = !!snapshot.hasSbtSources;
+  const refreshInputSignature = viewAddressLower
+    ? buildUserPageCacheRefreshInputSignature({
+      account,
+      gateRecheckEpoch,
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
+      hasUncertainGateAccess,
+      hasUncertainUserData,
+      isQuestionCacheReady,
+      isResponsesCacheReady,
+      isSBTCacheReady,
+      isSurveyCacheReady,
+      networkID,
+      questionResponsesNonce,
+      responseGateAccessGeneration,
+      responseGateAccessStatusVersion,
+      sbtCacheRevision,
+      sourceMembershipSignature: snapshot.membershipSignature,
+      viewAddressLower,
+    })
+    : '';
+  const holdFlags = buildUserPageCacheLoadingHoldFlags({
+    force: resolvedForce,
+    hasQuestionSources,
+    hasSbtSources,
+    hasSurveySources,
+    questionsReady: isQuestionCacheReady,
+    responsesReady: isResponsesCacheReady,
+    sbtReady: isSBTCacheReady,
+    surveysReady: isSurveyCacheReady,
+  });
+  const shouldSkipSameSignature = (
+    !resolvedForce &&
+    !resolvedMarkLoading &&
+    !resolvedBypassSignature &&
+    refreshInputSignature === String(currentInputSignature || '')
+  );
+  return {
+    action: !viewAddressLower
+      ? 'missing-address'
+      : shouldSkipSameSignature
+        ? 'skip-same-signature'
+        : 'refresh',
+    bypassSignature: resolvedBypassSignature,
+    force: resolvedForce,
+    hasQuestionSources,
+    hasSbtSources,
+    hasSurveySources,
+    ...holdFlags,
+    markLoading: resolvedMarkLoading,
+    networkID: String(networkID || ''),
+    refreshInputSignature,
+    sourcePresence,
+    viewAddressLower,
+  };
 };
 
 export const buildUserPageCacheLoadingHoldFlags = ({

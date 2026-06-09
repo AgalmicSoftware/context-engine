@@ -16,8 +16,6 @@ import ConnectedSurveyResults, {
   SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
   SURVEY_RESULTS_TABLE_CELL_STYLE,
   SURVEY_RESULTS_TRAILING_LABEL_STYLE,
-  buildSurveyResultsAggregatorPanelClassName,
-  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
   resolveSurveyResultsSyncDetailsStyle,
@@ -33,12 +31,17 @@ import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionRes
 import { sbtBasePath } from '../../utilities/ui/terminology.js';
 import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
 import SurveyResultsModalHeader from './SurveyResultsModalHeader';
+import SurveyResultsReportSurface from './SurveyResultsReportSurface';
 
 type TreeNode = any;
 type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
 const sessionScanScope: any = sessionScanScopeModule;
+const RESOLVABLE_TREE_COMPONENTS = new Set([
+  SurveyResultsReportSurface,
+]);
+const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
@@ -135,6 +138,13 @@ const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null 
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
+    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
+      if (!resolvedTreeComponentCache.has(current)) {
+        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
+      }
+      stack.push(resolvedTreeComponentCache.get(current));
+      continue;
+    }
     const children = current?.props?.children;
     if (children !== undefined) stack.push(children);
   }
@@ -153,6 +163,12 @@ const collectTreeNodes = (
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
+  }
   return collectTreeNodes(node?.props?.children, predicate, acc);
 };
 
@@ -186,6 +202,12 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
     return String(node).includes(text);
   }
   if (typeof node !== 'object') return false;
+  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
+    if (!resolvedTreeComponentCache.has(node)) {
+      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
+    }
+    return treeHasText(resolvedTreeComponentCache.get(node), text);
+  }
   return treeHasText(node?.props?.children, text);
 };
 
@@ -685,6 +707,132 @@ describe('SurveyResults session resolution', () => {
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('reads scoped question cache buckets without write, fetch, decrypt, or state side effects', () => {
+    const questionCachesBySlug: Record<string, any> = {
+      edge: {
+        '84532': {
+          questionsLatestBlock: 41,
+          questionResponsesLatestBlock: 42,
+          questions: {
+            q1: {
+              id: 'q1',
+              prompt: 'Ready edge question',
+              sessionSlug: 'edge',
+              type: 'freeform',
+            },
+            qpending: {
+              id: 'qpending',
+              prompt: '[encrypted]',
+              sessionSlug: 'edge',
+              __ceQuestionMetadataPending: true,
+            },
+          },
+          questionResponses: {
+            q1: {
+              '0xaaa': { answer: { value: 'Ready answer' } },
+            },
+            qpending: {
+              '0xbbb': { answer: { value: 'Pending answer' } },
+            },
+          },
+        },
+      },
+      alpha: {
+        '84532': {
+          questionsLatestBlock: 37,
+          questionResponsesLatestBlock: 39,
+          questions: {
+            q2: {
+              id: 'q2',
+              prompt: 'Ready alpha question',
+              sessionSlug: 'alpha',
+              sessionSlugExplicit: true,
+              type: 'binary',
+            },
+          },
+          questionResponses: {
+            q2: {
+              '0xccc': { answer: { value: true } },
+            },
+          },
+        },
+      },
+      beta: {
+        '84532': {
+          questionsLatestBlock: 44,
+          questionResponsesLatestBlock: 45,
+          questions: {
+            q3: {
+              id: 'q3',
+              prompt: 'Out of scope beta question',
+              sessionSlug: 'beta',
+              sessionSlugExplicit: true,
+              type: 'rating',
+            },
+          },
+          questionResponses: {
+            q3: {
+              '0xddd': { answer: { value: 5 } },
+            },
+          },
+        },
+      },
+    };
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+      if (namespace !== 'questionsCache') return {};
+      return questionCachesBySlug[String(slug)] || {};
+    });
+    const readSpy = jest.spyOn(cacheScripts, 'readCache');
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
+    const subject = createSubject({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      network: { id: 84532 },
+      viewMode: 'questions',
+    });
+    subject.getQuestionReadSlugs = jest.fn(() => ['edge', 'alpha']);
+    subject.shouldRequireAuthoritativeQuestionScope = jest.fn(() => false);
+    subject.setState = jest.fn();
+    subject.fetchResponses = jest.fn();
+    subject.handleDecryptLockedResponses = jest.fn();
+
+    const result = subject.getScopedQuestionNetworkDataSync('questions');
+
+    expect(result).toMatchObject({
+      questionsLatestBlock: 41,
+      questionResponsesLatestBlock: 42,
+      questions: {
+        q1: expect.objectContaining({
+          prompt: 'Ready edge question',
+          sessionSlug: 'edge',
+        }),
+        q2: expect.objectContaining({
+          prompt: 'Ready alpha question',
+          sessionSlug: 'alpha',
+        }),
+      },
+      questionResponses: {
+        q1: {
+          '0xaaa': { answer: { value: 'Ready answer' } },
+        },
+        q2: {
+          '0xccc': { answer: { value: true } },
+        },
+      },
+    });
+    expect(result.questions.qpending).toBeUndefined();
+    expect(result.questionResponses.qpending).toBeUndefined();
+    expect(result.questions.q3).toBeUndefined();
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(writeSpy).not.toHaveBeenCalled();
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.fetchResponses).not.toHaveBeenCalled();
+    expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
   });
 
   it('uses the route slug filter storage bucket on /session question results', () => {

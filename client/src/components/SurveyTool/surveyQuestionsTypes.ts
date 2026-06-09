@@ -52,10 +52,14 @@ export type SurveyQuestionsFullLoadingProgressState = {
 };
 
 export type SurveyQuestionsJsonPanelDisplayState = {
+  showFullSurveyJsonControls: boolean;
   showQuestionJsonControls: boolean;
+  showQuestionsJson: boolean;
   showSurveyJsonPanel: boolean;
   showQuestionsJsonPanel: boolean;
+  showResponseJson: boolean;
   showResponseJsonPanel: boolean;
+  showSurveyJson: boolean;
   surveyJsonRowClassName: string | undefined;
   surveyJsonToggleClassName: string | undefined;
   questionJsonToggleClassName: string | undefined;
@@ -65,6 +69,11 @@ export type SurveyQuestionsJsonPanelDisplayState = {
 
 export type SurveyQuestionsJsonForDisplayState = {
   jsonForDisplay: unknown;
+};
+
+export type SurveyQuestionsJsonPreviewDisplayState = {
+  canUseJsonPreview: boolean;
+  jsonPreview: unknown;
 };
 
 export type SurveyQuestionsLayoutDisplayState = {
@@ -97,6 +106,53 @@ export type SurveyQuestionsSubmitFooterDisplayState = {
   genericShowInlineSubmit: boolean;
   showInlineSubmit: boolean;
   showTopInlineSubmit: boolean;
+};
+
+export type SurveyQuestionsSubmitReadinessDescriptor = {
+  currentStep: number;
+  encryptedPendingEditCount: number;
+  hasEncryptedAnswers: boolean;
+  hasMaskedCurrentQuestionPayload: boolean;
+  isSubmitting: boolean;
+  pendingEditCount: number;
+  shouldCheckMaskedCurrentQuestionPayload: boolean;
+  singleQuestionMode: boolean;
+  uploadPhase: 'encrypting' | 'uploading';
+};
+
+export type SurveyQuestionsRenderReadinessDescriptor = {
+  surveyIndex: number;
+  currentSurveyResponseState: ResponseSlice | null;
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+  questionPoolReady: boolean;
+  gatedEmptyStateReady: boolean;
+  hasHiddenMaskedQuestions: boolean;
+  canFallThroughDisplayAnswerMode: boolean;
+  shouldShowLoadingState: boolean;
+};
+
+export type SurveyQuestionsMaskedQuestionVisibilityState = {
+  fullQuestionPool: unknown[];
+  visibleQuestionPool: unknown[];
+  hiddenMaskedQuestionIds: string[];
+};
+
+export type SurveyQuestionsAuthoringPanelDisplayState = {
+  showBackToTopControl: boolean;
+  showJsonControl: boolean;
+  showLockedQuestionsBanner: boolean;
+};
+
+export type SurveyQuestionsAuthoringRouteReadinessDescriptor = {
+  canEditQuestions: boolean;
+  gatedEmptyStateReady: boolean;
+  hasCurrentSurveyResponseState: boolean;
+  hasVisibleQuestions: boolean;
+  questionPoolReady: boolean;
+  shouldRenderEditableQuestions: boolean;
+  visibleQuestionCount: number;
 };
 
 export type SurveyQuestionsPrimarySubmitPlan = {
@@ -369,6 +425,131 @@ export const buildSurveyQuestionPoolLoadState = ({
     pendingIds,
     pendingCount,
     isIncomplete: expectedIds.length > 0 && pendingCount > 0,
+  };
+};
+
+export const isSurveyQuestionsMaskedPromptText = (prompt: unknown): boolean => (
+  String(prompt || '').trim() === '[encrypted]'
+);
+
+export const buildSurveyQuestionsMaskedQuestionVisibility = ({
+  isMaskedPromptText = isSurveyQuestionsMaskedPromptText,
+  questionPool = null,
+  singleQuestionMode = false,
+}: {
+  isMaskedPromptText?: (prompt: unknown) => boolean;
+  questionPool?: unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsMaskedQuestionVisibilityState => {
+  const fullQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const isPromptMasked = typeof isMaskedPromptText === 'function'
+    ? isMaskedPromptText
+    : isSurveyQuestionsMaskedPromptText;
+  if (singleQuestionMode) {
+    return {
+      fullQuestionPool,
+      visibleQuestionPool: fullQuestionPool,
+      hiddenMaskedQuestionIds: [],
+    };
+  }
+
+  const visibleQuestionPool: unknown[] = [];
+  const hiddenMaskedQuestionIds: string[] = [];
+  fullQuestionPool.forEach((question) => {
+    const questionRecord = question !== null && typeof question === 'object'
+      ? question as UnknownRecord
+      : {};
+    const masked = (
+      isPromptMasked(questionRecord.prompt) &&
+      !questionRecord.promptDecrypted
+    );
+    if (!masked) {
+      visibleQuestionPool.push(question);
+      return;
+    }
+    const questionId = String(questionRecord.id || '').trim().toLowerCase();
+    if (questionId) hiddenMaskedQuestionIds.push(questionId);
+  });
+
+  return {
+    fullQuestionPool,
+    visibleQuestionPool,
+    hiddenMaskedQuestionIds,
+  };
+};
+
+export const buildSurveyQuestionsRenderReadinessDescriptor = ({
+  displayAnswerMode = false,
+  fullQuestionPool = null,
+  hiddenMaskedQuestionIds = null,
+  isQuestionCacheReady = false,
+  isStandalone = false,
+  parsedViewAddressAnswers = null,
+  questionPool = null,
+  singleQuestionMode = false,
+  surveyIndex = 0,
+  surveysResponseState = null,
+  visibleQuestionPool = null,
+}: {
+  displayAnswerMode?: unknown;
+  fullQuestionPool?: unknown;
+  hiddenMaskedQuestionIds?: unknown;
+  isQuestionCacheReady?: unknown;
+  isStandalone?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  questionPool?: unknown;
+  singleQuestionMode?: unknown;
+  surveyIndex?: unknown;
+  surveysResponseState?: unknown;
+  visibleQuestionPool?: unknown;
+} = {}): SurveyQuestionsRenderReadinessDescriptor => {
+  const isSingleQuestion = !!singleQuestionMode;
+  const standalone = !!isStandalone;
+  const normalizedSurveyIndex = standalone || isSingleQuestion
+    ? 0
+    : Number(surveyIndex || 0);
+  const responses = Array.isArray(surveysResponseState) ? surveysResponseState : [];
+  const currentSurveyResponseState = responses.length > normalizedSurveyIndex
+    ? (responses[normalizedSurveyIndex] as ResponseSlice)
+    : null;
+  const normalizedQuestionPool = Array.isArray(questionPool) ? questionPool : [];
+  const normalizedFullQuestionPool = Array.isArray(fullQuestionPool)
+    ? fullQuestionPool
+    : normalizedQuestionPool;
+  const normalizedVisibleQuestionPool = Array.isArray(visibleQuestionPool)
+    ? visibleQuestionPool
+    : normalizedQuestionPool;
+  const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds)
+    ? hiddenMaskedQuestionIds.map((questionId) => String(questionId))
+    : [];
+  const questionPoolReady = normalizedQuestionPool.length > 0;
+  const canFallThroughDisplayAnswerMode = !!displayAnswerMode && !!parsedViewAddressAnswers;
+  const shouldShowLoadingState = !!(
+    (
+      !currentSurveyResponseState ||
+      (isSingleQuestion && !questionPoolReady && !displayAnswerMode) ||
+      (!isSingleQuestion && !standalone && !questionPoolReady && !displayAnswerMode)
+    ) &&
+    !canFallThroughDisplayAnswerMode
+  );
+  const gatedEmptyStateReady = !!(
+    !isSingleQuestion &&
+    normalizedFullQuestionPool.length > 0 &&
+    normalizedVisibleQuestionPool.length === 0 &&
+    isQuestionCacheReady
+  );
+
+  return {
+    surveyIndex: normalizedSurveyIndex,
+    currentSurveyResponseState,
+    fullQuestionPool: normalizedFullQuestionPool,
+    visibleQuestionPool: normalizedVisibleQuestionPool,
+    hiddenMaskedQuestionIds: normalizedHiddenMaskedQuestionIds,
+    questionPoolReady,
+    gatedEmptyStateReady,
+    hasHiddenMaskedQuestions: normalizedHiddenMaskedQuestionIds.length > 0,
+    canFallThroughDisplayAnswerMode,
+    shouldShowLoadingState,
   };
 };
 
@@ -726,6 +907,67 @@ export const buildSurveyQuestionsSubmitAuxIconClassName = (
   return className || undefined;
 };
 
+export const buildSurveyQuestionsAuthoringPanelDisplayState = ({
+  canEditQuestions = false,
+  hasCurrentSurveyResponseState = false,
+  hideEmbeddedDebugUi = false,
+  questionPoolReady = false,
+  singleQuestionMode = false,
+}: {
+  canEditQuestions?: unknown;
+  hasCurrentSurveyResponseState?: unknown;
+  hideEmbeddedDebugUi?: unknown;
+  questionPoolReady?: unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsAuthoringPanelDisplayState => {
+  const showAuthoringControls = !!canEditQuestions && !singleQuestionMode;
+  const showDebugAuthoringControls = !hideEmbeddedDebugUi && showAuthoringControls;
+
+  return {
+    showBackToTopControl: showAuthoringControls,
+    showJsonControl: showDebugAuthoringControls,
+    showLockedQuestionsBanner: !!(
+      !hideEmbeddedDebugUi &&
+      canEditQuestions &&
+      questionPoolReady &&
+      hasCurrentSurveyResponseState
+    ),
+  };
+};
+
+export const buildSurveyQuestionsAuthoringRouteReadinessDescriptor = ({
+  canEditQuestions = false,
+  gatedEmptyStateReady = false,
+  hasCurrentSurveyResponseState = false,
+  questionPoolReady = false,
+  visibleQuestionPool = [],
+}: {
+  canEditQuestions?: unknown;
+  gatedEmptyStateReady?: unknown;
+  hasCurrentSurveyResponseState?: unknown;
+  questionPoolReady?: unknown;
+  visibleQuestionPool?: unknown;
+} = {}): SurveyQuestionsAuthoringRouteReadinessDescriptor => {
+  const visibleQuestionCount = Array.isArray(visibleQuestionPool) ? visibleQuestionPool.length : 0;
+  const hasVisibleQuestions = visibleQuestionCount > 0;
+
+  return {
+    canEditQuestions: !!canEditQuestions,
+    gatedEmptyStateReady: !!gatedEmptyStateReady,
+    hasCurrentSurveyResponseState: !!hasCurrentSurveyResponseState,
+    hasVisibleQuestions,
+    questionPoolReady: !!questionPoolReady,
+    shouldRenderEditableQuestions: !!(
+      canEditQuestions &&
+      questionPoolReady &&
+      hasCurrentSurveyResponseState &&
+      !gatedEmptyStateReady &&
+      hasVisibleQuestions
+    ),
+    visibleQuestionCount,
+  };
+};
+
 export const buildSurveyQuestionsJsonPanelDisplayState = ({
   isSingleQuestionView = false,
   isStandalone = false,
@@ -744,6 +986,7 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
   styleMap?: Record<string, string>;
 } = {}): SurveyQuestionsJsonPanelDisplayState => {
   const showQuestionJsonControls = !!(singleQuestionMode || isStandalone);
+  const showFullSurveyJsonControls = !isStandalone && !singleQuestionMode;
   const showSurveyJsonPanel = !!showSurveyJson && !isStandalone && !singleQuestionMode;
   const showQuestionsJsonPanel = !!showQuestionsJson && showQuestionJsonControls;
   const showResponseJsonPanel = !!showResponseJson;
@@ -762,15 +1005,36 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
   ].filter(Boolean).join(' ') || undefined;
 
   return {
+    showFullSurveyJsonControls,
     showQuestionJsonControls,
+    showQuestionsJson: !!showQuestionsJson,
     showSurveyJsonPanel,
     showQuestionsJsonPanel,
+    showResponseJson: !!showResponseJson,
     showResponseJsonPanel,
+    showSurveyJson: !!showSurveyJson,
     surveyJsonRowClassName,
     surveyJsonToggleClassName,
     questionJsonToggleClassName,
     responseJsonToggleClassName,
     surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
+};
+
+export const buildSurveyQuestionsJsonPreviewDisplayState = ({
+  jsonPreview = null,
+  questionPool = null,
+  viewingAnswers = false,
+}: {
+  jsonPreview?: unknown;
+  questionPool?: unknown;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsJsonPreviewDisplayState => {
+  const canUseJsonPreview = !viewingAnswers || Array.isArray(questionPool);
+
+  return {
+    canUseJsonPreview,
+    jsonPreview: canUseJsonPreview ? (jsonPreview || {}) : null,
   };
 };
 
@@ -980,6 +1244,52 @@ export const buildSurveyQuestionsSubmitFooterDisplayState = ({
     genericShowInlineSubmit,
     showInlineSubmit,
     showTopInlineSubmit: showInlineSubmit && !isSingle,
+  };
+};
+
+const normalizeSubmitReadinessCount = (value: unknown): number => {
+  const count = Number(value || 0);
+  return Number.isFinite(count) ? count : 0;
+};
+
+export const buildSurveyQuestionsSubmitReadinessDescriptor = ({
+  currentStep = 0,
+  isSubmitting = false,
+  pendingStats = null,
+  resolveMaskedCurrentQuestionPayload,
+  singleQuestionMode = false,
+}: {
+  currentStep?: unknown;
+  isSubmitting?: unknown;
+  pendingStats?: { total?: unknown; encrypted?: unknown } | null;
+  resolveMaskedCurrentQuestionPayload?: () => unknown;
+  singleQuestionMode?: unknown;
+} = {}): SurveyQuestionsSubmitReadinessDescriptor => {
+  const normalizedCurrentStep = normalizeSubmitReadinessCount(currentStep);
+  const normalizedPendingStats = pendingStats || {};
+  const pendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.total);
+  const encryptedPendingEditCount = normalizeSubmitReadinessCount(normalizedPendingStats.encrypted);
+  const submitting = !!isSubmitting;
+  const isSingleQuestion = !!singleQuestionMode;
+  const shouldCheckMaskedCurrentQuestionPayload = !submitting && isSingleQuestion;
+  const hasMaskedCurrentQuestionPayload = shouldCheckMaskedCurrentQuestionPayload
+    ? !!resolveMaskedCurrentQuestionPayload?.()
+    : false;
+  const hasEncryptedAnswers =
+    submitting &&
+    normalizedCurrentStep === 1 &&
+    encryptedPendingEditCount > 0;
+
+  return {
+    currentStep: normalizedCurrentStep,
+    encryptedPendingEditCount,
+    hasEncryptedAnswers,
+    hasMaskedCurrentQuestionPayload,
+    isSubmitting: submitting,
+    pendingEditCount,
+    shouldCheckMaskedCurrentQuestionPayload,
+    singleQuestionMode: isSingleQuestion,
+    uploadPhase: hasEncryptedAnswers ? 'encrypting' : 'uploading',
   };
 };
 

@@ -1,5 +1,6 @@
 import {
   E2E_TESTIDS,
+  act,
   fireEvent,
   mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
@@ -17,6 +18,16 @@ const chooseCustomWorkerWithoutDeploy = async () => {
 const openPublishSection = async () => {
   fireEvent.click(screen.getByText('Publish').closest('button'));
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+};
+
+const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test') => {
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    draft: {
+      corsWorkerUrl: workerUrl,
+    },
+    deployComplete: true,
+    deployWorkerUrl: workerUrl,
+  }));
 };
 
 describe('SessionWizard publish boundary rendering', () => {
@@ -73,6 +84,83 @@ describe('SessionWizard publish boundary rendering', () => {
     });
     expect(screen.queryByText('Set a worker URL before uploading metadata.')).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+  });
+
+  it('keeps blank manual metadata blocked and inert without upload or registry execution', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Blank Manual Metadata Boundary Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: '   ' },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).toBeDisabled();
+    });
+    expect(screen.getByText('Set a worker URL before uploading metadata.')).toBeInTheDocument();
+
+    fireEvent.click(publishButton);
+
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+  });
+
+  it('renders parent-derived register progress during manual metadata publish', async () => {
+    const manualMetadataUri = `ar://${'c'.repeat(43)}`;
+    let resolveRegister = () => {};
+    const registerPromise = new Promise((resolve) => {
+      resolveRegister = resolve;
+    });
+    mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Manual Metadata Progress Boundary Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    const progressCard = await screen.findByTestId('ce-wizard-publish-progress');
+    expect(progressCard).toHaveTextContent('Register On-chain');
+    expect(screen.getByRole('progressbar')).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringContaining('Register On-chain')
+    );
+    expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRegister({ txs: [] });
+      await registerPromise;
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
   });
 
   it('passes manual metadata through the register boundary with pinned register args', async () => {
@@ -150,5 +238,98 @@ describe('SessionWizard publish boundary rendering', () => {
       maxPriorityFeePerGasGwei: '',
       onTxHash: expect.any(Function),
     }));
+  });
+
+  it('passes uploaded metadata through the register boundary without custom deploy execution', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const uploadedTxId = 'd'.repeat(43);
+    arweaveScripts.uploadDataToArweave.mockResolvedValue(uploadedTxId);
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    seedVerifiedWorkerCache();
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Uploaded Metadata Register Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1);
+    });
+
+    const [metadataPayload, uploadFormat, uploadOptions] = arweaveScripts.uploadDataToArweave.mock.calls[0];
+    expect(metadataPayload).toEqual(expect.objectContaining({
+      sessionName: 'Uploaded Metadata Register Boundary Session',
+      slug: 'uploaded-metadata-register-boundary-session',
+    }));
+    expect(uploadFormat).toBe('json');
+    expect(uploadOptions).toEqual(expect.objectContaining({
+      sessionSlug: 'uploaded-metadata-register-boundary-session',
+      workerUrl: expect.any(String),
+    }));
+
+    const registerArgs = mockRegisterSessionOnChain.mock.calls[0][0];
+    expect(registerArgs).toEqual(expect.objectContaining({
+      slug: 'uploaded-metadata-register-boundary-session',
+      metadataURI: `ar://${uploadedTxId}`,
+      sessionFields: expect.any(Object),
+    }));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
+  });
+
+  it('resets progress and keeps publish retryable after metadata upload failure', async () => {
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    let rejectUpload = () => {};
+    const uploadPromise = new Promise((_, reject) => {
+      rejectUpload = reject;
+    });
+    arweaveScripts.uploadDataToArweave.mockReturnValue(uploadPromise);
+    seedVerifiedWorkerCache();
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Upload Failure Boundary Session' },
+    });
+
+    const publishButton = await openPublishSection();
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+
+    fireEvent.click(publishButton);
+
+    expect(await screen.findByTestId('ce-wizard-publish-progress')).toHaveTextContent('Upload Arweave');
+
+    await act(async () => {
+      rejectUpload(new Error('Metadata upload failed upstream.'));
+      try {
+        await uploadPromise;
+      } catch (err) {
+        void err;
+      }
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Metadata upload failed upstream.')).toBeInTheDocument();
+    });
+
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('ce-wizard-publish-progress')).not.toBeInTheDocument();
+    expect(publishButton).not.toBeDisabled();
+    consoleErrorSpy.mockRestore();
   });
 });

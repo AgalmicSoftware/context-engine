@@ -32,22 +32,29 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
+  buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
+  buildSurveyQuestionsJsonPreviewDisplayState,
   buildSurveyQuestionsJsonTreeItemStyle,
   buildSurveyQuestionsLayoutDisplayState,
+  buildSurveyQuestionsMaskedQuestionVisibility,
   buildSurveyQuestionsPrimarySubmitPlan,
+  buildSurveyQuestionsRenderReadinessDescriptor,
   buildSurveyQuestionsLockAudienceGateClassName,
   buildSurveyQuestionsLockAudiencePopoverClassName,
   buildSurveyQuestionsLockAudienceToggleClassName,
   buildSurveyQuestionsRouteViewDisplayState,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionsSubmitFooterDisplayState,
+  buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
   buildViewingResponseModeState,
+  isSurveyQuestionsMaskedPromptText,
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
@@ -143,6 +150,82 @@ describe('surveyQuestionsTypes', () => {
     expect(buildSurveyQuestionsSubmitAuxIconClassName(styleMap, false)).toBe('icon');
   });
 
+  it('builds SurveyQuestions authoring panel display state without moving parent-owned actions', () => {
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: false,
+      questionPoolReady: true,
+      singleQuestionMode: false,
+    })).toEqual({
+      showBackToTopControl: true,
+      showJsonControl: true,
+      showLockedQuestionsBanner: true,
+    });
+
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: true,
+      questionPoolReady: true,
+      singleQuestionMode: false,
+    })).toEqual({
+      showBackToTopControl: true,
+      showJsonControl: false,
+      showLockedQuestionsBanner: false,
+    });
+
+    expect(buildSurveyQuestionsAuthoringPanelDisplayState({
+      canEditQuestions: true,
+      hasCurrentSurveyResponseState: true,
+      hideEmbeddedDebugUi: false,
+      questionPoolReady: true,
+      singleQuestionMode: true,
+    })).toEqual({
+      showBackToTopControl: false,
+      showJsonControl: false,
+      showLockedQuestionsBanner: true,
+    });
+  });
+
+  it('builds SurveyQuestions authoring route readiness without owning rendering', () => {
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: [{ id: 'q1' }],
+    })).toEqual({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      hasVisibleQuestions: true,
+      questionPoolReady: true,
+      shouldRenderEditableQuestions: true,
+      visibleQuestionCount: 1,
+    });
+
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: true,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: [{ id: 'q1' }],
+    }).shouldRenderEditableQuestions).toBe(false);
+
+    expect(buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions: true,
+      gatedEmptyStateReady: false,
+      hasCurrentSurveyResponseState: true,
+      questionPoolReady: true,
+      visibleQuestionPool: null,
+    })).toMatchObject({
+      hasVisibleQuestions: false,
+      shouldRenderEditableQuestions: false,
+      visibleQuestionCount: 0,
+    });
+  });
+
   it('builds SurveyQuestions full loading progress state for scan progress', () => {
     const progressState = buildSurveyQuestionsFullLoadingProgressState({
       progressSlug: 'session-a',
@@ -216,10 +299,14 @@ describe('surveyQuestionsTypes', () => {
       showSurveyJson: true,
       styleMap,
     })).toEqual({
+      showFullSurveyJsonControls: true,
       showQuestionJsonControls: false,
+      showQuestionsJson: true,
       showSurveyJsonPanel: true,
       showQuestionsJsonPanel: false,
+      showResponseJson: true,
       showResponseJsonPanel: true,
+      showSurveyJson: true,
       surveyJsonRowClassName: 'json-row',
       surveyJsonToggleClassName: undefined,
       questionJsonToggleClassName: undefined,
@@ -247,10 +334,14 @@ describe('surveyQuestionsTypes', () => {
       showSurveyJson: true,
       styleMap,
     })).toEqual({
+      showFullSurveyJsonControls: false,
       showQuestionJsonControls: true,
+      showQuestionsJson: true,
       showSurveyJsonPanel: false,
       showQuestionsJsonPanel: true,
+      showResponseJson: true,
       showResponseJsonPanel: true,
+      showSurveyJson: true,
       surveyJsonRowClassName: 'json-row single-row',
       surveyJsonToggleClassName: 'single-toggle',
       questionJsonToggleClassName: 'single-toggle question-toggle',
@@ -281,6 +372,46 @@ describe('surveyQuestionsTypes', () => {
       parsedViewAddressAnswers,
       viewingAnswers: true,
     }).jsonForDisplay).toBe(parsedViewAddressAnswers);
+  });
+
+  it('builds SurveyQuestions route JSON preview availability from route mode', () => {
+    const jsonPreview = { preview: true };
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: null,
+      viewingAnswers: false,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: [{ id: 'q1' }],
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview,
+      questionPool: null,
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: false,
+      jsonPreview: null,
+    });
+
+    expect(buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview: '',
+      questionPool: [],
+      viewingAnswers: true,
+    })).toEqual({
+      canUseJsonPreview: true,
+      jsonPreview: {},
+    });
   });
 
   it('builds SurveyQuestions JSON display fallbacks for missing responses', () => {
@@ -607,6 +738,69 @@ describe('surveyQuestionsTypes', () => {
     });
   });
 
+  it('describes submit readiness for encrypted upload status and masked single-question payloads', () => {
+    const maskedResolver = jest.fn(() => true);
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 1,
+      isSubmitting: true,
+      pendingStats: { total: 3, encrypted: 2 },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: true,
+    })).toEqual({
+      currentStep: 1,
+      encryptedPendingEditCount: 2,
+      hasEncryptedAnswers: true,
+      hasMaskedCurrentQuestionPayload: false,
+      isSubmitting: true,
+      pendingEditCount: 3,
+      shouldCheckMaskedCurrentQuestionPayload: false,
+      singleQuestionMode: true,
+      uploadPhase: 'encrypting',
+    });
+    expect(maskedResolver).not.toHaveBeenCalled();
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 0,
+      isSubmitting: false,
+      pendingStats: { total: '1', encrypted: '0' },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: true,
+    })).toEqual({
+      currentStep: 0,
+      encryptedPendingEditCount: 0,
+      hasEncryptedAnswers: false,
+      hasMaskedCurrentQuestionPayload: true,
+      isSubmitting: false,
+      pendingEditCount: 1,
+      shouldCheckMaskedCurrentQuestionPayload: true,
+      singleQuestionMode: true,
+      uploadPhase: 'uploading',
+    });
+    expect(maskedResolver).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps submit readiness unmasked outside single-question mode', () => {
+    const maskedResolver = jest.fn(() => true);
+
+    expect(buildSurveyQuestionsSubmitReadinessDescriptor({
+      currentStep: 'not-a-step',
+      isSubmitting: false,
+      pendingStats: { total: 2, encrypted: 'not-a-count' },
+      resolveMaskedCurrentQuestionPayload: maskedResolver,
+      singleQuestionMode: false,
+    })).toMatchObject({
+      currentStep: 0,
+      encryptedPendingEditCount: 0,
+      hasEncryptedAnswers: false,
+      hasMaskedCurrentQuestionPayload: false,
+      pendingEditCount: 2,
+      shouldCheckMaskedCurrentQuestionPayload: false,
+      uploadPhase: 'uploading',
+    });
+    expect(maskedResolver).not.toHaveBeenCalled();
+  });
+
   it('builds SurveyQuestions single-question submit display state without route affordances', () => {
     expect(buildSurveyQuestionsSubmitFooterDisplayState({
       hasMaskedCurrentQuestionPayload: true,
@@ -677,6 +871,102 @@ describe('surveyQuestionsTypes', () => {
       pendingIds: [],
       pendingCount: 0,
       isIncomplete: false,
+    });
+  });
+
+  it('builds masked question visibility without owning render memoization', () => {
+    const encryptedPrompt = { id: 'Q1', prompt: '[encrypted]' };
+    const decryptedPrompt = { id: 'Q2', prompt: '[encrypted]', promptDecrypted: true };
+    const plainPrompt = { id: 'Q3', prompt: 'Plain prompt' };
+    const anonymousMaskedPrompt = { prompt: '[encrypted]' };
+    const questionPool = [
+      encryptedPrompt,
+      decryptedPrompt,
+      plainPrompt,
+      anonymousMaskedPrompt,
+      null,
+    ];
+
+    expect(isSurveyQuestionsMaskedPromptText(' [encrypted] ')).toBe(true);
+    expect(isSurveyQuestionsMaskedPromptText('[Encrypted]')).toBe(false);
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: false,
+    })).toEqual({
+      fullQuestionPool: questionPool,
+      visibleQuestionPool: [decryptedPrompt, plainPrompt, null],
+      hiddenMaskedQuestionIds: ['q1'],
+    });
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      questionPool,
+      singleQuestionMode: true,
+    })).toEqual({
+      fullQuestionPool: questionPool,
+      visibleQuestionPool: questionPool,
+      hiddenMaskedQuestionIds: [],
+    });
+
+    const injectedPredicate = jest.fn((prompt) => prompt === 'LOCKED');
+    expect(buildSurveyQuestionsMaskedQuestionVisibility({
+      isMaskedPromptText: injectedPredicate,
+      questionPool: [
+        { id: 'custom', prompt: 'LOCKED' },
+        { id: 'plain', prompt: '[encrypted]' },
+      ],
+      singleQuestionMode: false,
+    })).toEqual({
+      fullQuestionPool: [
+        { id: 'custom', prompt: 'LOCKED' },
+        { id: 'plain', prompt: '[encrypted]' },
+      ],
+      visibleQuestionPool: [{ id: 'plain', prompt: '[encrypted]' }],
+      hiddenMaskedQuestionIds: ['custom'],
+    });
+    expect(injectedPredicate).toHaveBeenCalledWith('LOCKED');
+  });
+
+  it('builds render readiness while preserving display-answer fallthrough', () => {
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      displayAnswerMode: true,
+      parsedViewAddressAnswers: { answers: {} },
+      questionPool: [],
+      singleQuestionMode: true,
+      surveyIndex: 2,
+      surveysResponseState: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      surveyIndex: 0,
+      currentSurveyResponseState: null,
+      questionPoolReady: false,
+      canFallThroughDisplayAnswerMode: true,
+      shouldShowLoadingState: false,
+      gatedEmptyStateReady: false,
+      hasHiddenMaskedQuestions: false,
+    });
+  });
+
+  it('describes gated empty-state readiness from masked question visibility', () => {
+    const responseSlice = { answers: {} };
+    const descriptor = buildSurveyQuestionsRenderReadinessDescriptor({
+      fullQuestionPool: [{ id: 'q1' }, { id: 'q2' }],
+      hiddenMaskedQuestionIds: ['q1', 2],
+      isQuestionCacheReady: true,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }],
+      singleQuestionMode: false,
+      surveyIndex: 1,
+      surveysResponseState: [{ answers: { q0: 'skip' } }, responseSlice],
+      visibleQuestionPool: [],
+    });
+
+    expect(descriptor).toMatchObject({
+      surveyIndex: 1,
+      currentSurveyResponseState: responseSlice,
+      questionPoolReady: true,
+      gatedEmptyStateReady: true,
+      hasHiddenMaskedQuestions: true,
+      hiddenMaskedQuestionIds: ['q1', '2'],
+      shouldShowLoadingState: false,
     });
   });
 

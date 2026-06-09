@@ -95,6 +95,95 @@ describe('surveyQuestionsJsonDerivation', () => {
     });
   });
 
+  it('preserves gated encrypted payload shape for submitted response JSON readiness', () => {
+    const encryptedPortion = {
+      ciphertext: 'ciphertext',
+      dataToEncryptHash: 'hash',
+    };
+
+    expect(buildSubmittedResponseJson({
+      singleQuestionMode: true,
+      rawResponse: {
+        encrypted: true,
+        encryptedPortion,
+        encryptionAudience: 'gate',
+        value: '*',
+      },
+    })).toEqual({
+      encrypted: true,
+      encryptedPortion,
+      encryptionAudience: 'gate',
+      value: '*',
+      conviction: null,
+      importance: null,
+    });
+
+    expect(buildSubmittedResponseJson({
+      rawResponse: {
+        surveyId: 'survey-gated',
+        responses: [{
+          encrypted: true,
+          encryptedPortion,
+          encryptionAudience: 'gate',
+          questionId: 'q-gated',
+          value: '*',
+        }],
+      },
+    })).toEqual({
+      surveyId: 'survey-gated',
+      responses: [{
+        encrypted: true,
+        encryptedPortion,
+        encryptionAudience: 'gate',
+        questionId: 'q-gated',
+        value: '*',
+        conviction: null,
+        importance: null,
+      }],
+    });
+  });
+
+  it('preserves encrypted rating envelopes in submitted response JSON without deriving plaintext ratings', () => {
+    expect(buildSubmittedResponseJson({
+      singleQuestionMode: true,
+      rawResponse: {
+        answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+        convictionEncrypted: 'conviction-env',
+        importanceEncrypted: 'importance-env',
+        questionID: 'q-rating',
+      },
+    })).toEqual({
+      answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+      conviction: null,
+      convictionEncrypted: 'conviction-env',
+      importance: null,
+      importanceEncrypted: 'importance-env',
+      questionID: 'q-rating',
+    });
+
+    expect(buildSubmittedResponseJson({
+      rawResponse: {
+        surveyId: 'survey-rating',
+        responses: [{
+          additional: { value: '*', encrypted: true, encryptedPortion: 'note-env' },
+          convictionEncrypted: 'conviction-env',
+          importanceEncrypted: 'importance-env',
+          questionID: 'q-rating',
+        }],
+      },
+    })).toEqual({
+      surveyId: 'survey-rating',
+      responses: [{
+        additional: { value: '*', encrypted: true, encryptedPortion: 'note-env' },
+        conviction: null,
+        convictionEncrypted: 'conviction-env',
+        importance: null,
+        importanceEncrypted: 'importance-env',
+        questionID: 'q-rating',
+      }],
+    });
+  });
+
   it('expands survey question IDs into full question JSON when possible', () => {
     const survey = {
       id: 's1',

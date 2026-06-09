@@ -126,6 +126,12 @@ export {
   mergeSbtPageBurnEvidenceIntoPreservedHolderState,
   normalizeSbtPageCountMap,
   normalizeSbtPageLoadInfoOptions,
+  reconcileSbtPageHolderRefreshState,
+} from './sbtPageHolderHelpers';
+export type {
+  ReconcileSbtPageHolderRefreshStateArgs,
+  ReconciledSbtPageHolderRefreshState,
+  SbtPageHolderRefreshStateLike,
 } from './sbtPageHolderHelpers';
 export {
   buildSbtPagePasswordExportFile,
@@ -152,6 +158,7 @@ export {
   normalizeSbtPageCanonicalMetadataHref,
   resolveDisplayImageHref,
   resolveSbtPageTokenMetadataHref,
+  resolveSbtPageTokenMetadataLinkDisplayState,
 } from './sbtPageMediaHelpers';
 export {
   buildSbtPageSectionHeaderClassName,
@@ -183,24 +190,31 @@ export {
 export {
   buildSbtPageActionButtonClassName,
   resolveSbtPageActionFeedbackState,
+  resolveSbtPageAdminActionDisplayPlan,
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageBurnActionPlan,
   resolveSbtPageBurnButtonState,
   resolveSbtPageBurnStatusButtonState,
   resolveSbtPageManualClaimButtonState,
+  resolveSbtPageManualClaimActionRequest,
   resolveSbtPageMiniActionFailureState,
   resolveSbtPageMiniActionStatusDisplayState,
   resolveSbtPageMiniBurnButtonState,
   resolveSbtPageMiniBurnPermission,
+  resolveSbtPageMiniCardDisplayState,
   resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniManualClaimActionRequest,
+  resolveSbtPageMiniMintActionPlan,
   resolveSbtPageMiniMintFlowDisplayState,
   resolveSbtPageMiniMintState,
   resolveSbtPageMiniOpenMintButtonState,
   resolveSbtPageMiniTokenActionDisplayState,
   resolveSbtPageMintEndDisplayState,
   resolveSbtPageMintActionPlan,
+  resolveSbtPageMintButtonDisplayState,
   resolveSbtPageMintFlowDisplayState,
+  resolveSbtPageFullActionDisplayPlan,
   resolveSbtPageOpenMintButtonState,
   resolveSbtPagePasswordAlertState,
   resolveSbtPagePasswordGenerationButtonState,
@@ -210,6 +224,13 @@ export {
   shouldRenderSbtPageMintButton,
 } from './sbtPageActionDisplayHelpers';
 export type {
+  SbtPageAdminActionDisplayPlan,
+  SbtPageManualClaimActionRequest,
+  SbtPageManualClaimActionRequestViewKind,
+  SbtPageFullActionDisplayPlan,
+  SbtPageMiniManualClaimActionRequest,
+  SbtPageMiniManualClaimActionRequestViewKind,
+  SbtPageMiniMintActionPlan,
   SbtPageMintEndDisplayState,
 } from './sbtPageActionDisplayHelpers';
 export {
@@ -251,6 +272,7 @@ export type {
   SbtPageInfoImageLike,
 } from './sbtPageMediaHelpers';
 export {
+  resolveSbtPageHolderDisplayModel,
   resolveSbtPageHolderFilterItems,
   resolveSbtPageHolderLoadingState,
   resolveSbtPageHolderModalDisplayState,
@@ -258,11 +280,13 @@ export {
   resolveSbtPageHoldersDisplayCount,
 } from './sbtPageHolderDisplayHelpers';
 export type {
+  ResolveSbtPageHolderDisplayModelArgs,
   ResolveSbtPageHolderFilterItemsArgs,
   ResolveSbtPageHolderLoadingStateArgs,
   ResolveSbtPageHolderModalDisplayStateArgs,
   ResolveSbtPageHolderResolutionStateArgs,
   ResolveSbtPageHoldersDisplayCountArgs,
+  SbtPageHolderDisplayModel,
   SbtPageHolderFilterItems,
   SbtPageHolderLoadingState,
   SbtPageHolderModalDisplayState,
@@ -295,6 +319,29 @@ type ResolveSbtPageShouldRefreshCountsArgs = {
   forceEventFetch?: unknown;
   mintedAddresses?: unknown;
   mintedTokensOverride?: unknown;
+};
+type ResolveSbtPageRefreshLifecyclePlanArgs = {
+  eventScanTried?: unknown;
+  parentOwnsInitialRefresh?: unknown;
+  refreshOptions?: unknown;
+  shouldRefreshCounts?: unknown;
+  usingCentralHydration?: unknown;
+};
+export type SbtPageRefreshLifecyclePlan = {
+  shouldPromoteToForcedCountsRefresh: boolean;
+  shouldRunEventScanRefresh: boolean;
+};
+type ResolveSbtPageCacheRevisionReloadPlanArgs = {
+  isMounted?: unknown;
+  nextSbtAddress?: unknown;
+  nextSbtCacheRevision?: unknown;
+  prevSbtCacheRevision?: unknown;
+};
+export type SbtPageCacheRevisionReloadPlan = {
+  cacheRevisionChanged: boolean;
+  shouldReloadSbtInfo: boolean;
+  shouldResetMetaHydrationTried: boolean;
+  loadOptions: false | null;
 };
 type ResolveSbtPageOwnerLookupFallbackDecisionArgs = {
   burnedAddresses?: unknown;
@@ -358,6 +405,26 @@ type BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {
   activeAccount?: unknown;
   envelopeFingerprint?: unknown;
   metaKey?: unknown;
+};
+type BuildSbtPageEncryptedMetadataDecryptPlanArgs = {
+  activeAccount?: unknown;
+  decryptTriedByKey?: unknown;
+  hasLitKey?: unknown;
+  metaKey?: unknown;
+  sbtInfo?: unknown;
+};
+export type SbtPageEncryptedMetadataDecryptPlan = {
+  alreadyTried: boolean;
+  canAttemptDecrypt: boolean;
+  decryptKey: string;
+  descriptionEnvelope: unknown;
+  documentUrlsEnvelope: unknown;
+  envelopeFingerprint: string;
+  hasEncryptedMetadata: boolean;
+  imageEnvelope: unknown;
+  nameEnvelope: unknown;
+  shouldEnterDecryptBoundary: boolean;
+  tagsEnvelope: unknown;
 };
 type ResolveSbtPageCachedGroupPasswordHashArgs = {
   groupPasswordHash?: unknown;
@@ -472,6 +539,21 @@ type BuildSbtPageLoadInfoStartLogContextArgs = {
   preferCountsOnly?: unknown;
   sbtAddressOriginalCase?: unknown;
 };
+type ResolveSbtPageLoadInfoPendingQueuePlanArgs = {
+  forceEventFetch?: unknown;
+  pendingForce?: unknown;
+  pendingOptions?: unknown;
+  preferCountsOnly?: unknown;
+};
+type SbtPageLoadInfoPendingOptions = {
+  forceEventFetch: boolean;
+  preferCountsOnly: boolean;
+};
+export type SbtPageLoadInfoPendingQueuePlan = {
+  pendingForce: boolean;
+  pendingOptions: SbtPageLoadInfoPendingOptions;
+  shouldQueueLoad: true;
+};
 type BuildSbtPageOpenMintAutoJoinUrlArgs = {
   addressOverride?: unknown;
   basePath?: unknown;
@@ -563,6 +645,59 @@ export const buildSbtPageEncryptedEnvelopeDecryptKey = ({
 }: BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {}): string => (
   `${metaKey}:${activeAccount || ''}:${envelopeFingerprint || ''}`
 );
+
+export const buildSbtPageEncryptedMetadataDecryptPlan = ({
+  activeAccount = '',
+  decryptTriedByKey = null,
+  hasLitKey = false,
+  metaKey = '',
+  sbtInfo = {},
+}: BuildSbtPageEncryptedMetadataDecryptPlanArgs = {}): SbtPageEncryptedMetadataDecryptPlan => {
+  const info = isRecord(sbtInfo) ? sbtInfo : {};
+  const encryptedFields = isRecord(info.encryptedFields) ? info.encryptedFields : {};
+  const nameEnvelope = encryptedFields.name || info.nameEncrypted || info.encryptedName || null;
+  const descriptionEnvelope = encryptedFields.description || info.descriptionEncrypted || info.encryptedDescription || null;
+  const tagsEnvelope = encryptedFields.tags || info.tagsEncrypted || info.encryptedTags || null;
+  const documentUrlsEnvelope = encryptedFields.documentURLs || info.documentURLsEncrypted || info.docUrlsEncrypted || null;
+  const imageEnvelope = encryptedFields.image || info.imageEncrypted || info.encryptedImage || null;
+  const envelopeFingerprint = buildSbtPageEncryptedEnvelopeFingerprint({
+    nameEnvelope,
+    descriptionEnvelope,
+    tagsEnvelope,
+    documentUrlsEnvelope,
+    imageEnvelope,
+  });
+  const decryptKey = buildSbtPageEncryptedEnvelopeDecryptKey({
+    metaKey,
+    activeAccount,
+    envelopeFingerprint,
+  });
+  const alreadyTried = !!(
+    isRecord(decryptTriedByKey) &&
+    decryptTriedByKey[decryptKey]
+  );
+  const hasEncryptedMetadata = !!(
+    nameEnvelope ||
+    descriptionEnvelope ||
+    tagsEnvelope ||
+    documentUrlsEnvelope ||
+    imageEnvelope
+  );
+  const shouldEnterDecryptBoundary = hasEncryptedMetadata && !alreadyTried;
+  return {
+    alreadyTried,
+    canAttemptDecrypt: shouldEnterDecryptBoundary && !!activeAccount && !!hasLitKey,
+    decryptKey,
+    descriptionEnvelope,
+    documentUrlsEnvelope,
+    envelopeFingerprint,
+    hasEncryptedMetadata,
+    imageEnvelope,
+    nameEnvelope,
+    shouldEnterDecryptBoundary,
+    tagsEnvelope,
+  };
+};
 
 export const resolveSbtPageCachedGroupPasswordHash = ({
   groupPasswordHash = null,
@@ -686,6 +821,22 @@ export const buildSbtPageLoadInfoRequestKey = ({
   ].join('|');
 };
 
+export const resolveSbtPageCacheRevisionReloadPlan = ({
+  isMounted = false,
+  nextSbtAddress = null,
+  nextSbtCacheRevision = undefined,
+  prevSbtCacheRevision = undefined,
+}: ResolveSbtPageCacheRevisionReloadPlanArgs = {}): SbtPageCacheRevisionReloadPlan => {
+  const cacheRevisionChanged = nextSbtCacheRevision !== prevSbtCacheRevision;
+  const shouldReloadSbtInfo = cacheRevisionChanged && !!isMounted && !!nextSbtAddress;
+  return {
+    cacheRevisionChanged,
+    shouldReloadSbtInfo,
+    shouldResetMetaHydrationTried: shouldReloadSbtInfo,
+    loadOptions: shouldReloadSbtInfo ? false : null,
+  };
+};
+
 export const buildSbtPageLoadInfoStartLogContext = ({
   account = null,
   addrLower = '',
@@ -705,6 +856,23 @@ export const buildSbtPageLoadInfoStartLogContext = ({
   account: account ? String(account).toLowerCase() : null,
   networkId: network?.id ?? null,
 });
+
+export const resolveSbtPageLoadInfoPendingQueuePlan = ({
+  forceEventFetch = false,
+  pendingForce = false,
+  pendingOptions = null,
+  preferCountsOnly = false,
+}: ResolveSbtPageLoadInfoPendingQueuePlanArgs = {}): SbtPageLoadInfoPendingQueuePlan => {
+  const existingOptions = isRecord(pendingOptions) ? pendingOptions : {};
+  return {
+    pendingForce: pendingForce === true || forceEventFetch === true,
+    pendingOptions: {
+      forceEventFetch: existingOptions.forceEventFetch === true || forceEventFetch === true,
+      preferCountsOnly: existingOptions.preferCountsOnly === true || preferCountsOnly === true,
+    },
+    shouldQueueLoad: true,
+  };
+};
 
 const buildSbtPageAddressListSignature = (input: unknown): string => {
   if (!Array.isArray(input)) return '';
@@ -983,6 +1151,28 @@ export const resolveSbtPageShouldRefreshCounts = ({
     mintedTokensOverride == null
   )
 );
+
+export const resolveSbtPageRefreshLifecyclePlan = ({
+  eventScanTried = false,
+  parentOwnsInitialRefresh = false,
+  refreshOptions = null,
+  shouldRefreshCounts = false,
+  usingCentralHydration = false,
+}: ResolveSbtPageRefreshLifecyclePlanArgs = {}): SbtPageRefreshLifecyclePlan => {
+  const shouldUseCentralRefresh = (
+    !!shouldRefreshCounts &&
+    !!usingCentralHydration &&
+    !parentOwnsInitialRefresh
+  );
+  const hasForcedCountsOptions = (
+    isRecord(refreshOptions) &&
+    !!refreshOptions.forceCounts
+  );
+  return {
+    shouldPromoteToForcedCountsRefresh: shouldUseCentralRefresh && !hasForcedCountsOptions,
+    shouldRunEventScanRefresh: shouldUseCentralRefresh && !eventScanTried,
+  };
+};
 
 export const resolveSbtPageOwnerLookupFallbackDecision = ({
   burnedAddresses = [],

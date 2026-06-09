@@ -1,4 +1,5 @@
-// CPAL-side twin of workers/sessionCorsWorker/adminTypedData.mjs.
+// SPDX-License-Identifier: MPL-2.0
+// Client-side twin of workers/sessionCorsWorker/adminTypedData.mjs.
 // Keep this file in sync with the worker copy when the admin typed-data shape changes.
 
 import * as ethersModule from 'ethers';
