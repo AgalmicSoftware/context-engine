@@ -1,4 +1,7 @@
-import { normalizeSessionWizardArweaveUri } from './sessionWizardUrlSupport';
+import {
+  normalizeSessionWizardArweaveUri,
+  parseSessionWizardArweaveTxId,
+} from './sessionWizardUrlSupport';
 import {
   buildSessionWizardPublishExecutionPlan,
   resolveSessionWizardPublishProgressDisplayState,
@@ -34,6 +37,7 @@ export type SessionWizardPublishReadinessKind =
   | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
+  buildMetadataGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
   deployComplete?: boolean;
   effectiveMetadataGatewayUrl?: string;
   effectiveMetadataTxId?: string;
@@ -55,6 +59,14 @@ export type SessionWizardPublishMetadataDisplayState = {
   showArweaveTx: boolean;
   showManualMetadataUri: boolean;
   showMetadataUri: boolean;
+};
+
+export type SessionWizardPublishMetadataGatewayUrlBuilder = (txId: string) => unknown;
+
+export type SessionWizardPublishMetadataIdentityState = {
+  effectiveMetadataGatewayUrl: string;
+  effectiveMetadataTxId: string;
+  effectiveMetadataUri: string;
 };
 
 export type SessionWizardPublishActionDisplayMode = 'advanced' | 'normal';
@@ -177,6 +189,30 @@ export function resolveSessionWizardPublishRequestDescriptor({
   };
 }
 
+export function resolveSessionWizardPublishMetadataIdentityState({
+  buildGatewayUrl,
+  manualMetadataUrl = '',
+  metadataUrl = '',
+}: {
+  buildGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
+  manualMetadataUrl?: unknown;
+  metadataUrl?: unknown;
+} = {}): SessionWizardPublishMetadataIdentityState {
+  const normalizedManualMetadataUri = normalizeSessionWizardArweaveUri(manualMetadataUrl);
+  const uploadedMetadataUri = String(metadataUrl || '').trim();
+  const effectiveMetadataUri = normalizedManualMetadataUri || uploadedMetadataUri;
+  const effectiveMetadataTxId = parseSessionWizardArweaveTxId(effectiveMetadataUri);
+  const effectiveMetadataGatewayUrl = effectiveMetadataTxId && typeof buildGatewayUrl === 'function'
+    ? String(buildGatewayUrl(effectiveMetadataTxId) || '').trim()
+    : '';
+
+  return {
+    effectiveMetadataGatewayUrl,
+    effectiveMetadataTxId,
+    effectiveMetadataUri,
+  };
+}
+
 export function resolveSessionWizardPublishMetadataDisplayState({
   effectiveMetadataGatewayUrl = '',
   effectiveMetadataTxId = '',
@@ -231,9 +267,10 @@ export function resolveSessionWizardPublishActionDisplayState({
 }
 
 export function resolveSessionWizardPublishUiPlan({
+  buildMetadataGatewayUrl,
   deployComplete = false,
-  effectiveMetadataGatewayUrl = '',
-  effectiveMetadataTxId = '',
+  effectiveMetadataGatewayUrl: effectiveMetadataGatewayUrlOverride = '',
+  effectiveMetadataTxId: effectiveMetadataTxIdOverride = '',
   hasPendingDrafts = false,
   isNormalMode = false,
   publishAdvancedOpen = false,
@@ -259,9 +296,16 @@ export function resolveSessionWizardPublishUiPlan({
     publishSteps: publishExecutionPlan.steps,
     sbtsLabel,
   });
+  const publishMetadataIdentityState = resolveSessionWizardPublishMetadataIdentityState({
+    buildGatewayUrl: buildMetadataGatewayUrl,
+    manualMetadataUrl: readinessInput.manualMetadataUrl,
+    metadataUrl: readinessInput.metadataUrl,
+  });
   const publishMetadataDisplayState = resolveSessionWizardPublishMetadataDisplayState({
-    effectiveMetadataGatewayUrl,
-    effectiveMetadataTxId,
+    effectiveMetadataGatewayUrl: effectiveMetadataGatewayUrlOverride ||
+      publishMetadataIdentityState.effectiveMetadataGatewayUrl,
+    effectiveMetadataTxId: effectiveMetadataTxIdOverride ||
+      publishMetadataIdentityState.effectiveMetadataTxId,
     manualMetadataUrl: readinessInput.manualMetadataUrl,
     metadataUrl: readinessInput.metadataUrl,
   });
