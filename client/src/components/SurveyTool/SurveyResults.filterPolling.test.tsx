@@ -1392,6 +1392,30 @@ describe('SurveyResults question-mode polling and filter state', () => {
     expect(subject.state.refreshTargetSurveyBlock).toBe(0);
   });
 
+  it('ignores malformed background latest-block polling values', async () => {
+    const subject = createSubject({
+      isOpen: true,
+      provider: {},
+    });
+    subject._isMounted = true;
+    subject.getEffectiveSlug = jest.fn(() => 'edge');
+    attachStateHarness(subject);
+    jest
+      .spyOn((contractScriptsModule as any).default, 'getLatestBlockNumber')
+      .mockResolvedValue(Number.POSITIVE_INFINITY);
+
+    subject.maybeRefreshNetworkLatestBlockFromPolling();
+    await flushMicrotasks();
+
+    expect((contractScriptsModule as any).default.getLatestBlockNumber).toHaveBeenCalledWith(
+      subject.props.provider,
+      'edge'
+    );
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state.networkLatestBlock).toBe(0);
+    expect(subject._pollLatestBlockFetchInFlight).toBe(false);
+  });
+
   it('recovers refresh status writes after a nonce latest-block failure', async () => {
     const calls: string[] = [];
     const subject = createSubject({

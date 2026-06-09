@@ -2198,7 +2198,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   }
 
   maybeRefreshNetworkLatestBlockFromPolling = (): void => {
-    if ((this.state.networkLatestBlock || 0) > 0) return;
+    if (normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock) > 0) return;
     if (this._pollLatestBlockFetchInFlight) return;
     const now = Date.now();
     if (
@@ -2214,8 +2214,9 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
       .getLatestBlockNumber(this.props.provider as string | undefined, slug)
       .then((blk: unknown) => {
         if (!this._isMounted) return;
-        const parsed = Number(blk || 0);
-        if (parsed > 0 && parsed !== Number(this.state.networkLatestBlock || 0)) {
+        const parsed = normalizeSurveyResultsBlockNumber(blk);
+        const currentLatestBlock = normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock);
+        if (parsed > 0 && parsed !== currentLatestBlock) {
           this.setState(asSurveyResultsStatePatch(buildSurveyResultsNetworkLatestBlockPatch(parsed)));
         }
       })
@@ -2336,7 +2337,7 @@ pollLocalStorageForUpdates(): boolean {
     }
 
     // Keep retrying latest-block fetches even when local cache signatures are stable.
-    let netLatest = Number(this.state.networkLatestBlock || 0);
+    let netLatest = normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock);
     if (!netLatest) {
       this.maybeRefreshNetworkLatestBlockFromPolling();
       netLatest = 0;
@@ -2477,7 +2478,7 @@ if (!this.hasEffectiveNetworkId()) {
   // Cache-first results should not wait on RPC freshness. Kick the latest-block
   // lookup into the background so the modal can render cached questions/responses
   // immediately, then let the sync badge catch up when the block call resolves.
-  if (!Number(this.state.networkLatestBlock || 0)) {
+  if (!normalizeSurveyResultsBlockNumber(this.state.networkLatestBlock)) {
     this.maybeRefreshNetworkLatestBlockFromPolling();
   }
 
