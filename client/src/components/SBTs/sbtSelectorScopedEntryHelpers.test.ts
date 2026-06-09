@@ -1062,6 +1062,12 @@ describe('sbtSelector scoped entry helpers', () => {
       sbtOptions: [nextOption],
       scopeFeaturedAddresses: ['0xb'],
     });
+    expect(buildSbtSelectorOptionsStatePatch({
+      currentSbtOptions: [currentOption],
+      sbtOptions: 'bad',
+    })).toEqual({
+      sbtOptions: [],
+    });
   });
 
   it('resolves SBT detail link session slug precedence', () => {

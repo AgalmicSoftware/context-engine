@@ -435,13 +435,18 @@ type ResolveLinkedSbtSelectorScopeEntryArgs = {
   sourceSlug?: unknown;
   targetSlugSet?: ReadonlySet<string> | null;
 };
-type BuildSbtSelectorOptionsStatePatchArgs = {
+type BuildSbtSelectorOptionsStatePatchArgs<TSbtOption = unknown> = {
   currentLoadingOptions?: unknown;
   currentSbtOptions?: unknown;
   currentScopeFeaturedAddresses?: unknown;
   featuredEntries?: unknown;
   loadingOptions?: unknown;
-  sbtOptions?: unknown;
+  sbtOptions?: TSbtOption[] | unknown;
+};
+export type SbtSelectorOptionsStatePatch<TSbtOption = unknown> = {
+  loadingOptions?: boolean;
+  sbtOptions?: TSbtOption[];
+  scopeFeaturedAddresses?: string[];
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
@@ -1168,16 +1173,18 @@ export const areSbtSelectorAddressListsEqual = (left: unknown, right: unknown): 
   );
 };
 
-export const buildSbtSelectorOptionsStatePatch = ({
+export const buildSbtSelectorOptionsStatePatch = <TSbtOption = unknown>({
   currentLoadingOptions = undefined,
   currentSbtOptions = [],
   currentScopeFeaturedAddresses = [],
   featuredEntries = [],
   loadingOptions = undefined,
   sbtOptions = [],
-}: BuildSbtSelectorOptionsStatePatchArgs = {}): Record<string, unknown> => {
-  const nextPatch: Record<string, unknown> = {};
-  if (!areSbtOptionsEqual(currentSbtOptions, sbtOptions)) nextPatch.sbtOptions = sbtOptions;
+}: BuildSbtSelectorOptionsStatePatchArgs<TSbtOption> = {}): SbtSelectorOptionsStatePatch<TSbtOption> => {
+  const nextPatch: SbtSelectorOptionsStatePatch<TSbtOption> = {};
+  if (!areSbtOptionsEqual(currentSbtOptions, sbtOptions)) {
+    nextPatch.sbtOptions = Array.isArray(sbtOptions) ? sbtOptions : [];
+  }
   const scopeFeaturedAddresses = buildSbtSelectorScopeFeaturedAddresses(featuredEntries);
   const prevFeatured = Array.isArray(currentScopeFeaturedAddresses)
     ? currentScopeFeaturedAddresses
