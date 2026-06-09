@@ -3,6 +3,8 @@ import {
   normalizeSessionWizardGateIds,
   resolveSessionWizardResourceGate,
   resolveSessionWizardResourceGateIds,
+  resolveSessionWizardResourceGateSelectionState,
+  resolveSessionWizardResourceGateSelectionUpdate,
 } from './sessionWizardResourceGateSupport';
 
 describe('sessionWizardResourceGateSupport', () => {
@@ -39,6 +41,58 @@ describe('sessionWizardResourceGateSupport', () => {
     expect(normalizeSessionWizardGateIds(' gate-2 ')).toEqual(['gate-2']);
     expect(resolveSessionWizardResourceGateIds(['missing'], 'gate-2', gates)).toEqual(['gate-2']);
     expect(resolveSessionWizardResourceGateIds([], '', gates)).toEqual(['gate-1']);
+  });
+
+  it('plans resource card gate selection state from available gate options', () => {
+    expect(resolveSessionWizardResourceGateSelectionState({
+      value: [' gate-1 ', 'missing', 'gate-2'],
+      fallbackGateId: '',
+      gateOptions: [
+        { value: 'gate-1', label: 'Gate 1' },
+        { value: 'gate-2', label: 'Gate 2' },
+      ],
+    })).toEqual({
+      availableGateIds: ['gate-1', 'gate-2'],
+      disabled: false,
+      fallbackGateId: 'gate-1',
+      selectedGateIds: ['gate-1', 'gate-2'],
+    });
+  });
+
+  it('falls back when planning a resource card with no saved gate selection', () => {
+    expect(resolveSessionWizardResourceGateSelectionState({
+      value: '',
+      fallbackGateId: 'gate-2',
+      gateOptions: [
+        { value: 'gate-1', label: 'Gate 1' },
+        { value: 'gate-2', label: 'Gate 2' },
+      ],
+    })).toEqual({
+      availableGateIds: ['gate-1', 'gate-2'],
+      disabled: false,
+      fallbackGateId: 'gate-2',
+      selectedGateIds: ['gate-2'],
+    });
+  });
+
+  it('plans normalized resource gate selection updates', () => {
+    expect(resolveSessionWizardResourceGateSelectionUpdate({
+      nextIds: ['gate-1', 'missing', 'gate-2'],
+      availableGateIds: ['gate-1', 'gate-2'],
+      fallbackGateId: 'gate-1',
+    })).toEqual(['gate-1', 'gate-2']);
+
+    expect(resolveSessionWizardResourceGateSelectionUpdate({
+      nextIds: ['gate-2'],
+      availableGateIds: ['gate-1', 'gate-2'],
+      fallbackGateId: 'gate-1',
+    })).toBe('gate-2');
+
+    expect(resolveSessionWizardResourceGateSelectionUpdate({
+      nextIds: ['missing'],
+      availableGateIds: ['gate-1', 'gate-2'],
+      fallbackGateId: 'gate-1',
+    })).toBe('gate-1');
   });
 
   it('resolves resource gates and reports conflicts across multiple gates', () => {
