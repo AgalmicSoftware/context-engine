@@ -12,6 +12,7 @@ import SessionPublishBundleFallbackPanel from './SessionPublishBundleFallbackPan
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
+import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 
 type PublishSummaryItem = {
   label: string;
@@ -21,12 +22,6 @@ type PublishSummaryItem = {
 type RegisterTxEntry = {
   hash: string;
   action: string;
-};
-
-type PublishedPendingSbtLink = {
-  address: string;
-  label: string;
-  href: string;
 };
 
 export type SessionPublishSummaryProps = {
