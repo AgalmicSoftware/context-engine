@@ -31,6 +31,12 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(readDraftCache).toHaveBeenCalledTimes(1);
   });
 
+  it('returns null for corrupted non-object cache payloads', () => {
+    expect(readSessionWizardCache({ readDraftCache: jest.fn(() => 'stale') })).toBeNull();
+    expect(readSessionWizardCache({ readDraftCache: jest.fn(() => ['stale']) })).toBeNull();
+    expect(readSessionWizardCache({ readDraftCache: jest.fn(() => null) })).toBeNull();
+  });
+
   it('warns when write cache fails', () => {
     const logger = { warn: jest.fn() };
     const writeDraftCache: any = jest.fn(() => ({
