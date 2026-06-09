@@ -146,6 +146,7 @@ import {
 } from './sbtSelectorHelpers';
 import type {
   SbtNameLookupState,
+  SbtSelectorOptionsStatePatch,
   SbtSelectorScopedEntry,
 } from './sbtSelectorHelpers';
 
@@ -239,11 +240,6 @@ type EnsureLightSbtUniverse = (
   slugs: string[],
   options?: { forceExactSlugs?: boolean }
 ) => unknown;
-type SbtSelectorOptionsStatePatch = {
-  loadingOptions?: boolean;
-  sbtOptions?: SbtSelectorOption[];
-  scopeFeaturedAddresses?: string[];
-};
 type SbtSelectorOption = UnknownRecord & {
   address: string;
   chainId: number | null;
@@ -993,16 +989,22 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       targetSlugs,
     });
     if (!this._isMounted) return sbtOptions;
-    const nextPatch = buildSbtSelectorOptionsStatePatch({
+    const nextPatch: SbtSelectorOptionsStatePatch<SbtSelectorOption> = buildSbtSelectorOptionsStatePatch({
       currentLoadingOptions: this.state.loadingOptions,
       currentSbtOptions: this.state.sbtOptions,
       currentScopeFeaturedAddresses: this.state.scopeFeaturedAddresses,
       featuredEntries,
       loadingOptions,
       sbtOptions,
-    }) as SbtSelectorOptionsStatePatch;
+    });
     if (Object.keys(nextPatch).length > 0) {
-      this.setState(nextPatch as unknown as Pick<SbtSelectorState, keyof SbtSelectorState>);
+      this.setState((prevState: Readonly<SbtSelectorState>) => ({
+        loadingOptions: typeof nextPatch.loadingOptions === 'boolean'
+          ? nextPatch.loadingOptions
+          : prevState.loadingOptions,
+        sbtOptions: nextPatch.sbtOptions || prevState.sbtOptions,
+        scopeFeaturedAddresses: nextPatch.scopeFeaturedAddresses || prevState.scopeFeaturedAddresses,
+      }));
     }
     return sbtOptions;
   };
