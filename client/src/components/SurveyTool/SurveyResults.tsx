@@ -649,7 +649,7 @@ const asSurveyResultsStatePatch = (patch: unknown): SurveyResultsState => (
   patch as SurveyResultsState
 );
 const asSurveyResultsStateUpdater = (
-  updater: (prevState: SurveyResultsRecord) => unknown
+  updater: (prevState: SurveyResultsState) => unknown
 ): ((
   prevState: Readonly<SurveyResultsState>,
   props: Readonly<SurveyResultsProps>
@@ -2020,7 +2020,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   );
 
   handleDemoResultsViewSelect = (nextView: unknown = 'report'): void => {
-    this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsDemoViewSelectPatch({
+    this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsDemoViewSelectPatch({
       nextView,
       prevState,
     })));
@@ -3983,7 +3983,7 @@ handleFilteredResponses = (
 
 
 toggleQuestionSummary = (questionId: unknown): void => {
-this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
   itemKey: questionId,
   mapKey: 'activeQuestionToggles',
   prevState,
@@ -3991,7 +3991,7 @@ this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => bu
 };
 
 toggleResponse = (index: unknown): void => {
-this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
   itemKey: index,
   mapKey: 'activeToggles',
   prevState,
@@ -4688,7 +4688,7 @@ return (
     onViewQuestion={(questionId) => {
       // Use setState with a callback to guarantee the scroll happens after the render.
       // This ensures the card is expanded before we attempt to scroll to it.
-      this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+      this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsKeyedTogglePatch({
         forceValue: true,
         itemKey: questionId,
         mapKey: 'activeQuestionToggles',
@@ -4753,14 +4753,14 @@ this._scrollToQuestionRetryTimer = setTimeout(() => {
 };
 
 changeQuestionIdSort = (column: unknown): void => {
-this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsQuestionIdSortPatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsQuestionIdSortPatch({
   column,
   prevState,
 })));
 };
 
   toggleQuestionFilter = (): void => {
-this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'showQuestionFilter',
 })));
@@ -4782,7 +4782,7 @@ if (event.key === 'Enter' || event.key === ' ') {
 };
 
 toggleExportArea = (): void => {
-this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
   prevState,
   stateKey: 'exportAreaOpen',
 })));
@@ -5036,7 +5036,7 @@ const syncStatusNode = renderSurveyResultsSyncStatusPanel({
   syncDetailsOpen: !!this.state.syncDetailsOpen,
   syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
   onToggleSyncDetails: () =>
-    this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+    this.setState(asSurveyResultsStateUpdater((prevState) => buildSurveyResultsBooleanTogglePatch({
       prevState,
       stateKey: 'syncDetailsOpen',
     }))),
