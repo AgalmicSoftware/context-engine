@@ -278,7 +278,7 @@ type ApplySbtSelectorHydrationResultsArgs = {
   resolvedAggregatedSbtList?: unknown;
   results?: unknown;
 };
-type SbtSelectorComparableOption = Record<string, unknown> & {
+type SbtSelectorComparableOption = {
   address?: unknown;
   chainId?: unknown;
   image?: unknown;
@@ -457,11 +457,19 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
 );
 const MASKED_SBT_LABEL = String(getSbtMaskedFieldValue() || '').trim().toLowerCase();
 
-const asComparableSbtOption = (value: unknown): SbtSelectorComparableOption => (
-  value != null && (typeof value === 'object' || typeof value === 'function')
-    ? value as unknown as SbtSelectorComparableOption
-    : {}
-);
+const asComparableSbtOption = (value: unknown): SbtSelectorComparableOption => {
+  const record = isRecord(value) ? value : {};
+  return {
+    address: record.address,
+    chainId: record.chainId,
+    image: record.image,
+    maskedTitleHidden: record.maskedTitleHidden,
+    name: record.name,
+    selectionKey: record.selectionKey,
+    sessionName: record.sessionName,
+    sessionSlug: record.sessionSlug,
+  };
+};
 
 export const normalizeAdditionalSbtOptions = (optionsInput: unknown): NormalizedAdditionalSbtOption[] => (
   Array.isArray(optionsInput)

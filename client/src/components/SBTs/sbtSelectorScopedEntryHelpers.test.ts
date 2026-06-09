@@ -955,6 +955,7 @@ describe('sbtSelector scoped entry helpers', () => {
     expect(areSbtOptionsEqual([baseOption], [{ ...baseOption, name: 'Other' }])).toBe(false);
     expect(areSbtOptionsEqual([baseOption], [])).toBe(false);
     expect(areSbtOptionsEqual(null, undefined)).toBe(true);
+    expect(areSbtOptionsEqual([null], [{}])).toBe(true);
     expect(isUnresolvedSessionConfig({ __unresolved: true })).toBe(true);
     expect(isUnresolvedSessionConfig({ __unresolved: false })).toBe(false);
     expect(isUnresolvedSessionConfig(null)).toBe(false);
@@ -1015,6 +1016,7 @@ describe('sbtSelector scoped entry helpers', () => {
       { address: '0xf', name: 'Same', chainId: 1 },
       featuredOrder
     )).toBe(1);
+    expect(compareSbtSelectorOptions('bad', { address: '0x1' }, featuredOrder)).toBeLessThan(0);
   });
 
   it('normalizes and compares scope-featured address lists in order', () => {
