@@ -136,6 +136,22 @@ describe('surveyResultsHelpers state patches', () => {
       },
     });
     expect(buildSurveyResultsRefreshStatusWritePlan({
+      latestBlock: Number.POSITIVE_INFINITY,
+      writeNetworkLatestBlock: true,
+    })).toEqual({
+      blockedReason: '',
+      shouldWrite: true,
+      statePatch: {
+        networkLatestBlock: 0,
+        refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
+        refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
+        refreshTargetSurveyBlock: Number.POSITIVE_INFINITY,
+      },
+      target: {
+        latestBlock: Number.POSITIVE_INFINITY,
+      },
+    });
+    expect(buildSurveyResultsRefreshStatusWritePlan({
       isMounted: false,
       latestBlock: 999,
       writeNetworkLatestBlock: true,
@@ -234,6 +250,16 @@ describe('surveyResultsHelpers state patches', () => {
       },
       { kind: 'follow-up', effect: 'pollLocalStorageForUpdates' },
     ]);
+    expect(buildSurveyResultsRefreshStatusSequencePlan({
+      latestBlock: Number.POSITIVE_INFINITY,
+      writeNetworkLatestBlock: true,
+      followUpEffects: ['pollLocalStorageForUpdates'],
+    }).statePatch).toEqual({
+      networkLatestBlock: 0,
+      refreshTargetQuestionBlock: Number.POSITIVE_INFINITY,
+      refreshTargetResponseBlock: Number.POSITIVE_INFINITY,
+      refreshTargetSurveyBlock: Number.POSITIVE_INFINITY,
+    });
     expect(buildSurveyResultsFilteredQuestionsCountPatch(4)).toEqual({
       filteredQuestionsCount: 4,
     });

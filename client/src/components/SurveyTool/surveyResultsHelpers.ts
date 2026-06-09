@@ -370,7 +370,7 @@ export const buildSurveyResultsRefreshStatusSequencePlan = ({
   const refreshTargetPatch = buildSurveyResultsRefreshTargetBlocksPatch(latestBlock);
   const statePatch = writeNetworkLatestBlock === true
     ? {
-      networkLatestBlock: latestBlock,
+      ...buildSurveyResultsNetworkLatestBlockPatch(latestBlock),
       ...refreshTargetPatch,
     }
     : refreshTargetPatch;
