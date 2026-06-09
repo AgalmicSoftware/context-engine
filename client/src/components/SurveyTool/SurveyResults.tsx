@@ -279,10 +279,20 @@ const LOCAL_STORAGE_FORCE_RESCAN_EVERY = 6;
 type SurveyResultsWriteCache = (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 type SurveyResultsRecord = Record<string, unknown>;
 type SurveyResultsQuestionReadScopeContext = ReturnType<typeof resolveSurveyResultsQuestionReadScope>;
+type SurveyResultsSessionContext = ReturnType<typeof resolveSurveyResultsSessionContext>;
 type SurveyResultsScopeContextInput = {
   props?: SurveyResultsRecord;
   state?: SurveyResultsRecord;
   viewMode?: unknown;
+};
+type SurveyResultsAnalysisPayloadForAi = ReturnType<typeof buildSessionResultsAnalysisAiPayload> & {
+  eligibility: ReturnType<typeof evaluateSessionResultsAnalysisEligibility>;
+  inputSignature: string;
+};
+type SurveyResultsHtmlReportExporterMetadata = {
+  address: string;
+  chainId: number | null;
+  displayAddress: string;
 };
 type SurveyResultsSummaryAnswerField = SurveyResultsRecord & {
   encrypted?: unknown;
@@ -769,7 +779,7 @@ const hasExplicitSessionQueryPinInPath = (path: unknown = ''): boolean => {
   );
 };
 
-function applyExistingGroupPrefix(newPath: string) {
+function applyExistingGroupPrefix(newPath: string): string {
   try {
     if (hasExplicitSessionQueryPinInPath(newPath)) return newPath;
     const p = (typeof window !== 'undefined' && window.location && window.location.pathname) || '';
@@ -1263,7 +1273,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     return ''; // Default to general
   }
 
-  getEffectiveSessionContext() {
+  getEffectiveSessionContext(): SurveyResultsSessionContext {
     return resolveSurveyResultsSessionContext({
       sessionSlug: this.getEffectiveSlug(),
       resolveBySlug: getSessionConfigBySlug,
@@ -1332,7 +1342,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     return hasExplicitSessionQueryPinInPath(`${window.location.pathname || ''}${window.location.search || ''}`);
   }
 
-  buildQuestionResultsScopeResetPatch() {
+  buildQuestionResultsScopeResetPatch(): SurveyResultsRecord {
     return {
       questionResponses: {},
       aggregatorQuestionResponses: {},
@@ -1591,7 +1601,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     this.notifyFilterStateCommitted(this.state.filterState);
   }
 
-  componentDidMount() {
+  componentDidMount(): void {
     this._isMounted = true;
     this._unsubscribeCacheUpdates = subscribeCacheUpdates(this.handleManagedCacheUpdate);
     window.addEventListener('popstate', this.handleUrlChange);
@@ -1653,7 +1663,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   }
 
 
-  componentWillUnmount() {
+  componentWillUnmount(): void {
     this._isMounted = false;
     this._fetchResponsesQueued = false;
     this._fetchResponsesInFlight = false;
@@ -2140,7 +2150,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     this._localStoragePollingDelayMs = LOCAL_STORAGE_POLL_MAX_MS;
   };
 
-  startLocalStoragePolling() {
+  startLocalStoragePolling(): void {
     if (!this.props.isOpen) return;
     if (this.isDocumentHidden()) return;
     if (this._localStoragePollingIntervalId) return;
@@ -2155,7 +2165,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     }, waitMs);
   }
 
-  stopLocalStoragePolling() {
+  stopLocalStoragePolling(): void {
     if (!this._localStoragePollingIntervalId) return;
     clearTimeout(this._localStoragePollingIntervalId);
     this._localStoragePollingIntervalId = null;
@@ -2458,7 +2468,7 @@ if (this.state.viewMode === 'survey') {
 }
 };
 
-  async fetchSurveyModeResponses() {
+  async fetchSurveyModeResponses(): Promise<void> {
     const currentSurveyID = this.state.surveyId ? this.state.surveyId.toLowerCase() : null;
 
     // Use the robust slug resolver to ensure we read the correct cache
@@ -3107,7 +3117,7 @@ isHtmlReportDemoModeActive = (): boolean => (
   this.isHtmlReportDemoSession() && !!this.state.htmlReportDemoMode
 );
 
-getHtmlReportExporterMetadata = () => {
+getHtmlReportExporterMetadata = (): SurveyResultsHtmlReportExporterMetadata | null => {
 if (this.isHtmlReportDemoModeActive()) {
   return {
     address: 'demo-preview',
@@ -3296,7 +3306,7 @@ const resolved = resolveSbtDisplayLabelForSurveyResults({
 return this.getSessionResultsAnalysisSafeLabel(resolved);
 }
 
-getSessionResultsAnalysisSegmentDimensionsForExport = () => {
+getSessionResultsAnalysisSegmentDimensionsForExport = (): unknown[] => {
 const dimensions: unknown[] = [];
 const questions = this.getHtmlReportQuestionsForExport();
 
@@ -3402,7 +3412,7 @@ if (gateValues.length > 0) {
 return dimensions;
 }
 
-buildSessionResultsAnalysisPayloadForAi = () => {
+buildSessionResultsAnalysisPayloadForAi = (): SurveyResultsAnalysisPayloadForAi => {
 const sessionSlug = this.getEffectiveSlug() || '';
 const sessionName = String(this.props.sessionName || this.state.surveyTitle || sessionSlug || 'Session').trim();
 const built = buildSessionResultsAnalysisAiPayload({
