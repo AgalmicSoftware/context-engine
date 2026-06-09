@@ -68,6 +68,7 @@ import { wrapEthersJsonRpcSend } from '../../utilities/web3/rpcReadCache.js';
 import {
   getSessionWizardContractDefaults,
   getVisibleSessionWizardContractKeys,
+  resolveSessionWizardContractViewerPlan,
   resolveSessionWizardRegistryAddress,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
@@ -85,10 +86,6 @@ import {
   buildSessionWizardRegistrySessionFields,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
-import {
-  buildContractsPageHref,
-} from '../ContractPage/contractMetadata.js';
-import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import usePendingSbtDrafts, {
   normalizePendingSbtDrafts,
   type PendingSbtDraft,
@@ -4606,60 +4603,32 @@ const SessionWizard = ({
         getEnabledWorkerArweaveJwk()
       ).trim()
     : '';
-  const wizardContractViewerContracts = useMemo(() => {
-    const draftContracts: SessionContractsLike = draft?.contracts && typeof draft.contracts === 'object'
-      ? draft.contracts as SessionContractsLike
-      : {};
-    const defaults = getSessionWizardContractDefaults(registryChainId);
-    const visibleKeys = getVisibleSessionWizardContractKeys(draftContracts, defaults);
-    const resolvedChainId = Number(
-      registryChainId ||
-      draft?.networkChainId ||
-      network?.id ||
-      network?.chainId ||
-      0
-    ) || null;
-    const mergedContracts = visibleKeys.reduce<SessionContractsLike>((acc, contractKey) => {
-      const entry = draftContracts[contractKey] && typeof draftContracts[contractKey] === 'object'
-        ? draftContracts[contractKey]
-        : {};
-      const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
-      acc[contractKey] = {
-        ...entry,
-        address,
-        chainId: Number(entry.chainId || resolvedChainId || 0) || null,
-      };
-      return acc;
-    }, {});
-
-    return buildContractViewerContracts({
-      sessionContracts: mergedContracts,
-      chainId: resolvedChainId,
-      includeSessionRegistry: true,
-      includeCustomSBT: false,
-    });
-  }, [
+  const wizardContractViewerPlan = useMemo(() => resolveSessionWizardContractViewerPlan({
+    activeSessionSlug,
+    draftContracts: draft?.contracts,
+    draftNetworkChainId: draft?.networkChainId,
+    network: {
+      chainId: network?.chainId,
+      id: network?.id,
+    },
+    registryChainId,
+    resolvedActiveSessionSlug,
+    selectedContractKey: contractViewerModalState.contractKey,
+    selectorSourceSessionSlug: selectorSourceSessionConfig?.slug,
+  }), [
+    activeSessionSlug,
+    contractViewerModalState.contractKey,
     draft?.contracts,
     draft?.networkChainId,
     network?.chainId,
     network?.id,
     registryChainId,
+    resolvedActiveSessionSlug,
+    selectorSourceSessionConfig?.slug,
   ]);
-  const selectedWizardContract = useMemo(() => (
-    wizardContractViewerContracts.find(
-      (contract) => contract.key === contractViewerModalState.contractKey
-    ) || null
-  ), [contractViewerModalState.contractKey, wizardContractViewerContracts]);
-  const selectedWizardContractSessionSlug = toStr(
-    selectorSourceSessionConfig?.slug ||
-    activeSessionSlug ||
-    resolvedActiveSessionSlug ||
-    ''
-  ).trim();
-  const selectedWizardContractHref = useMemo(() => buildContractsPageHref({
-    contractKey: selectedWizardContract?.key || '',
-    sessionSlug: selectedWizardContractSessionSlug,
-  }), [selectedWizardContract?.key, selectedWizardContractSessionSlug]);
+  const wizardContractViewerContracts = wizardContractViewerPlan.contracts;
+  const selectedWizardContract = wizardContractViewerPlan.selectedContract;
+  const selectedWizardContractHref = wizardContractViewerPlan.selectedContractHref;
   const handleDismissNewSessionRequirementsBanner = useCallback(() => {
     if (newSessionBannerDismissalContextKey) {
       setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
