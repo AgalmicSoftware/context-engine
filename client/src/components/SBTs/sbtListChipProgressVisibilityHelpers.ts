@@ -4,20 +4,20 @@ import { isSbtListSyntheticNoSessionSlug } from './sbtListSessionUniverseHelpers
 export type SbtListChipProgressBooleanBySlug = Record<string, boolean | undefined>;
 
 export type SbtListChipProgressChipState = {
-  isLoading?: unknown;
+  isLoading?: boolean;
 };
 
 export type SbtListChipProgressVisibilityMeta = {
-  lastModeChangeAtMs?: unknown;
-  pendingVisible?: unknown;
-  timerId?: unknown;
-  visible?: unknown;
+  lastModeChangeAtMs?: number;
+  pendingVisible?: boolean;
+  timerId?: ReturnType<typeof setTimeout> | null;
+  visible?: boolean;
 };
 
 export type SbtListChipProgressStatus = {
-  chipRemainingText?: unknown;
-  hasLatest?: unknown;
-  progressPct?: unknown;
+  chipRemainingText?: string;
+  hasLatest?: boolean;
+  progressPct?: number;
 };
 
 export type SbtListChipProgressStyle = Record<string, string | number | undefined> & {
