@@ -1056,10 +1056,10 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
       sbtFilteredQuestionResponses: {},
       aggregatorQuestionResponses: {},
       sbtFilteredAggregatorQuestionResponses: {},
-      viewMode: this.props.viewMode || 'questions', // 'survey' or 'questions'
+      viewMode: this.props.viewMode as SurveyResultsState['viewMode'], // 'survey' or 'questions'
       filterLoading: false,
       showQuestionFilter: false,
-      filterState: toSurveyResultsRecord(this.props.filterState),
+      filterState: (this.props.filterState || {}) as SurveyResultsRecord,
       syncDetailsOpen: false,
       bookmarkedQuestionIDs: bootstrapQuestionIds,
       bookmarkedSurveyIDs: bootstrapSurveyIds,
@@ -4678,12 +4678,12 @@ return (
     onViewQuestion={(questionId) => {
       // Use setState with a callback to guarantee the scroll happens after the render.
       // This ensures the card is expanded before we attempt to scroll to it.
-      this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+      this.setState(asSurveyResultsStateUpdater((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
         forceValue: true,
         itemKey: questionId,
         mapKey: 'activeQuestionToggles',
         prevState,
-      }), () => {
+      })), () => {
         this.scrollToQuestion(questionId);
       });
     }}
