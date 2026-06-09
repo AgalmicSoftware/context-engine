@@ -5,7 +5,7 @@ description: Use when a Hermes, OpenClaw, Claude Code, or other similar agent ne
 
 # CE Telegram Agent Handoff
 
-**Skill version:** 2026-06-08 (v36)
+**Skill version:** 2026-06-08 (v37)
 
 Use this skill when acting as a Hermes, OpenClaw, Claude Code, or similar agent for a Telegram user who is, or needs to become, a participant in a Telegram-enabled Context Engine session. The worker API is for reading questions, saving drafts, directly submitting human-approved answers, and posing questions. Draft by default; submit only when the user explicitly asks or approves.
 
@@ -239,7 +239,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=36",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=37",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -256,8 +256,10 @@ make agents fall back to the Telegram bot instead of using invite onboarding.
 When surfacing Context Engine from Geo, keep the user prompt brief: one short
 description plus a single action such as `Enable Context Engine`. A blue link,
 button, or quick reply with that label counts as the user's "yes" acknowledgment;
-do not require a second confirmation unless the user asks for more detail. After
-each onboarding answer, avoid recapping the full answer set. Acknowledge briefly,
+do not require a second confirmation unless the user asks for more detail. Do
+not narrate internal setup steps such as API onboarding, bearer-token issuance,
+token length checks, endpoint names, or local storage paths. After each
+onboarding answer, avoid recapping the full answer set. Acknowledge briefly,
 ask only the next needed question, then fetch and surface a relevant CE question.
 
 Keep post-submit confirmations short too. Do not lead with implementation
@@ -291,10 +293,13 @@ whether CE may use the user's Edge profile, interests, calendar, and
 non-identifying fields (bio keywords, age bucket, country/region, role, and
 attendance week). A plain "yes" or "accept all" can approve the recommended CE
 setup; translate it into explicit onboarding answers and profile-derived
-buckets rather than asking the user to re-enter data Hermes can infer. If the
-user declines or narrows consent, persist only the approved subset. Then
-complete any relevant onboarding preferences or consent questions from the
-returned onboarding state or `GET /telegram/agent/api/onboarding`. Next call
+buckets rather than asking the user to re-enter data Hermes can infer. Treat the
+onboarding response's group and demographic fields as a storage schema, not as a
+user-facing checklist. Do not ask "Age Range / Attendance / AI Tribe /
+Contribution Role" as a raw form unless a consented profile field is missing or
+ambiguous. If the user declines or narrows consent, persist only the approved
+subset. Then complete any relevant onboarding preferences or consent questions
+from the returned onboarding state or `GET /telegram/agent/api/onboarding`. Next call
 `GET <Worker>/telegram/agent/api/questions?limit=20` with the returned token and
 surface the first relevant unanswered question directly in chat. For Claude Code or another
 low-context copied-token agent, skip onboarding by default and fetch questions
@@ -525,6 +530,14 @@ persist those normal fields; if the user declines or narrows consent, persist
 only the explicit allowed fields. After saving onboarding, immediately fetch
 `GET /telegram/agent/api/questions?limit=20` and surface the first relevant
 unanswered question rather than stopping at a settings summary.
+
+Do not turn the returned group bucket schema into a user-facing onboarding
+form. In particular, do not say that CE returned "demographic and
+categorization groups" and then ask the user to fill out Age Range,
+Attendance, AI Tribe, or Contribution Role one by one. For Edge-native agents,
+first ask permission to use authorized Edge profile/activity data; if approved,
+infer buckets from that data and ask only targeted follow-ups for missing or
+uncertain values.
 
 When the user answers yes to demographic or attendance linking, auto-fill
 aggregate buckets from any profile fields the user authorized. For attendance,
@@ -1523,7 +1536,20 @@ and draft-divergence settings remain off unless explicitly enabled. The digest
 flag stores morning/evening Edge brief preference; the host agent or digest
 runner handles delivery.
 
+For Edge-native Hermes/OpenClaw, do not present this section as a long raw form
+when a shorter consent prompt plus profile inference is available. Treat these
+items as the settings that must be persisted, not necessarily the exact words to
+show. Never expose "under the hood" token, endpoint, or storage details in the
+onboarding message.
+
 ## Changelog
+
+### 2026-06-08 (v37)
+
+- Clarified that Edge-native Hermes/OpenClaw onboarding should ask permission
+  to use authorized profile/activity data before bucket setup, treat group
+  fields as a storage schema rather than a user-facing checklist, and avoid
+  narrating token or endpoint mechanics to the user.
 
 ### 2026-06-08 (v36)
 
