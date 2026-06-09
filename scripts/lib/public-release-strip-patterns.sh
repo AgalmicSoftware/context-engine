@@ -43,7 +43,9 @@ docs/*PRD*.md
 docs/*prd*.md
 scripts/test-*.js
 scripts/test-*.ui.js
+scripts/seed-*.js
 scripts/lib/e2e
+scripts/start-playwright-server.js
 scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
@@ -120,7 +122,9 @@ video-clickthrough-local
 local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
+scripts/seed-*.js
 scripts/lib/e2e
+scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js
 scripts/vendor-cecc-ethers-bundle.js
 test/*.private.test.*

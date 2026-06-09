@@ -278,6 +278,17 @@ author_audit_output() {
     | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true
 }
 
+verify_public_release_surface() {
+  local verifier="$TEMP_CLONE/scripts/verify-public-release-surface.js"
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public release surface verifier was not found in replay output: scripts/verify-public-release-surface.js" 1
+  fi
+
+  log_info "Verifying public release surface imports."
+  node "$verifier" "$TEMP_CLONE" >&2
+}
+
 ensure_private_branch_guard() {
   if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
     fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
@@ -480,6 +491,10 @@ offending_identities=$(author_audit_output)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
   printf '%s\n' "$offending_identities" >&2
+  exit 2
+fi
+
+if ! verify_public_release_surface; then
   exit 2
 fi
 
