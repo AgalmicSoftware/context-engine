@@ -3,22 +3,40 @@ import type {
 } from './surveyResultsCacheReadinessDisplayPlan';
 
 type SurveyResultsRecord = Record<string, unknown>;
+export type SurveyResultsCacheFilterState = SurveyResultsRecord & {
+  sbtFilter?: unknown;
+};
+
+export type SurveyResultsCacheFilterInput = {
+  activeSessionSlug: string;
+  currentSurveyIdForUrl: string | null;
+  currentViewModeForUrl: string;
+  filterLoading: boolean;
+  filterState: SurveyResultsCacheFilterState;
+  isQuestionCacheReady: boolean;
+  isSBTCacheReady: boolean;
+  questionResponsesNonce: unknown;
+  questionsCacheNonce: unknown;
+  sbtCacheRevision: unknown;
+  showQuestionFilter: boolean;
+  storageKeyPrefix: string;
+};
 
 export type SurveyResultsCacheControllerSnapshotArgs = {
   activeSessionSlug?: unknown;
   aggregatorEntriesCount?: unknown;
   currentSurveyId?: unknown;
-  currentSurveyIdForUrl?: unknown;
-  currentViewModeForUrl?: unknown;
+  currentSurveyIdForUrl?: string | null;
+  currentViewModeForUrl?: string;
   filterLoading?: unknown;
-  filterState?: SurveyResultsRecord;
+  filterState?: SurveyResultsCacheFilterState;
   filteredQuestionsCount?: unknown;
   filteredResponsesCount?: unknown;
   hasRefreshQuestionMetadata?: unknown;
   hasRefreshQuestionResponses?: unknown;
   hasRefreshSurveyResponsesByID?: unknown;
-  isQuestionCacheReady?: unknown;
-  isSBTCacheReady?: unknown;
+  isQuestionCacheReady?: boolean;
+  isSBTCacheReady?: boolean;
   networkLatestBlock?: unknown;
   nowMs?: unknown;
   questionLocalBlock?: unknown;
@@ -43,20 +61,7 @@ export type SurveyResultsCacheControllerSnapshotArgs = {
 
 export type SurveyResultsCacheControllerSnapshot = {
   cacheReadinessInput: SurveyResultsCacheReadinessDisplayPlanArgs;
-  filterInput: {
-    activeSessionSlug: string;
-    currentSurveyIdForUrl: unknown;
-    currentViewModeForUrl: unknown;
-    filterLoading: boolean;
-    filterState: SurveyResultsRecord;
-    isQuestionCacheReady: unknown;
-    isSBTCacheReady: unknown;
-    questionResponsesNonce: unknown;
-    questionsCacheNonce: unknown;
-    sbtCacheRevision: unknown;
-    showQuestionFilter: boolean;
-    storageKeyPrefix: string;
-  };
+  filterInput: SurveyResultsCacheFilterInput;
   manualRefreshInput: {
     canDispatch: boolean;
     canRefreshQuestions: boolean;

@@ -6,34 +6,44 @@ import { faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 import SBTFilter from '../SBTs/SBTFilter';
 import QuestionFilter from './QuestionFilter';
 import SurveyResultsExportControls from './SurveyResultsExportControls';
+import type {
+  SurveyResultsCacheFilterInput,
+  SurveyResultsCacheFilterState,
+} from './surveyResultsCacheControllerSnapshot';
 
-type SurveyResultsFilterState = Record<string, unknown> & {
-  sbtFilter?: unknown;
-};
 type SurveyResultsQuestionFilterCallback = (
   filteredQuestionsOrCombined: unknown,
-  filterState: SurveyResultsFilterState
+  filterState: SurveyResultsCacheFilterState
 ) => void;
 type SurveyResultsSbtFilterCallback = (
   filteredResponses: unknown,
   sbtFilterState?: unknown
 ) => void;
 
-type SurveyResultsFilterExportControlsProps = {
-  activeSessionSlug: string;
+type SurveyResultsFilterExportControlsCacheProps = Pick<
+  SurveyResultsCacheFilterInput,
+  | 'activeSessionSlug'
+  | 'currentSurveyIdForUrl'
+  | 'currentViewModeForUrl'
+  | 'filterState'
+  | 'isQuestionCacheReady'
+  | 'isSBTCacheReady'
+  | 'questionResponsesNonce'
+  | 'questionsCacheNonce'
+  | 'sbtCacheRevision'
+  | 'showQuestionFilter'
+  | 'storageKeyPrefix'
+>;
+
+type SurveyResultsFilterExportControlsProps = SurveyResultsFilterExportControlsCacheProps & {
   aggregateQuestionResponses: unknown;
-  currentSurveyIdForUrl: unknown;
-  currentViewModeForUrl: unknown;
   defaultTags?: unknown;
   exportControlsDisplay: {
     exportAreaOpen?: boolean;
     exportOptions: readonly { label: string; value: string }[];
     exportTypeLabel?: string;
   };
-  filterState: SurveyResultsFilterState;
   isFilterActive: boolean;
-  isQuestionCacheReady?: unknown;
-  isSBTCacheReady?: unknown;
   network?: unknown;
   onClearFilters: React.MouseEventHandler<HTMLElement>;
   onDownload: () => void;
@@ -50,12 +60,7 @@ type SurveyResultsFilterExportControlsProps = {
   questionFilterQuestions: unknown;
   questionFilterRef: React.Ref<unknown>;
   questionResponses: unknown;
-  questionResponsesNonce?: unknown;
-  questionsCacheNonce?: unknown;
   responses: unknown;
-  sbtCacheRevision?: unknown;
-  showQuestionFilter: boolean;
-  storageKeyPrefix: string;
   styleMap: Record<string, string>;
   surveyViewMode: unknown;
   viewMode: unknown;
