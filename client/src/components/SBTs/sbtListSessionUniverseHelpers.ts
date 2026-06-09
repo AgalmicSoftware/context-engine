@@ -73,13 +73,19 @@ type ResolveSbtListChipSelectedSessionSlugsArgs = {
   selectedSlug?: unknown;
   wasSelected?: unknown;
 };
-type SbtListSessionUniverseSnapshotLike = {
+export type SbtListSessionUniverseSnapshot = {
+  fallbackEntryCount: number;
+  registryEntryCount: number;
+  registryHydrated: boolean;
+  slugs: string[];
+};
+export type SbtListSessionUniverseSnapshotLike = {
   fallbackEntryCount?: unknown;
   registryEntryCount?: unknown;
   registryHydrated?: unknown;
   slugs?: unknown;
 };
-type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext> = {
+type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext = TPrevious> = {
   nextSnapshot?: TNext;
   previousSnapshot?: TPrevious;
 };
@@ -223,13 +229,25 @@ export const resolveSbtListActionableSessionSlugs = (slugs: unknown = []): strin
   )
 );
 
-export const resolveSbtListSessionUniverseSnapshotUpdate = <
-  TPrevious = unknown,
-  TNext = unknown
->({
+export function resolveSbtListSessionUniverseSnapshotUpdate<
+  TSnapshot extends SbtListSessionUniverseSnapshotLike
+>(args: {
+  nextSnapshot: TSnapshot;
+  previousSnapshot: TSnapshot;
+}): TSnapshot;
+export function resolveSbtListSessionUniverseSnapshotUpdate<
+  TPrevious extends SbtListSessionUniverseSnapshotLike = SbtListSessionUniverseSnapshotLike,
+  TNext extends SbtListSessionUniverseSnapshotLike = TPrevious
+>(
+  args?: ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext>
+): TPrevious | TNext | undefined;
+export function resolveSbtListSessionUniverseSnapshotUpdate({
   nextSnapshot,
   previousSnapshot,
-}: ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext> = {}): TPrevious | TNext | undefined => {
+}: ResolveSbtListSessionUniverseSnapshotUpdateArgs<
+  SbtListSessionUniverseSnapshotLike,
+  SbtListSessionUniverseSnapshotLike
+> = {}): SbtListSessionUniverseSnapshotLike | undefined {
   const prev = (previousSnapshot && typeof previousSnapshot === 'object')
     ? previousSnapshot as SbtListSessionUniverseSnapshotLike
     : {};
@@ -253,7 +271,7 @@ export const resolveSbtListSessionUniverseSnapshotUpdate = <
     return previousSnapshot;
   }
   return nextSnapshot;
-};
+}
 
 export const resolveSbtListDefaultSelectedSessionSlugs = ({
   displayedSessionUniverseSlugs = [],

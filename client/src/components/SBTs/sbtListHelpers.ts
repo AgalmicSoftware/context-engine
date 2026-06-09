@@ -72,6 +72,8 @@ export {
 } from './sbtListSessionUniverseHelpers';
 export type {
   SbtListSessionUniverseOptions,
+  SbtListSessionUniverseSnapshot,
+  SbtListSessionUniverseSnapshotLike,
   SbtSessionGroupLists,
 } from './sbtListSessionUniverseHelpers';
 export {
