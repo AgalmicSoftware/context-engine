@@ -507,10 +507,12 @@ import {
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
+  buildSurveyQuestionsAuthoringRouteReadinessDescriptor,
   buildSurveyQuestionsAuthoringPanelDisplayState,
   buildSurveyQuestionsFullLoadingProgressState,
   buildSurveyQuestionsJsonForDisplayState,
   buildSurveyQuestionsJsonPanelDisplayState,
+  buildSurveyQuestionsJsonPreviewDisplayState,
   buildSurveyQuestionsLayoutDisplayState,
   buildSurveyQuestionsMaskedQuestionVisibility,
   buildSurveyQuestionsPrimarySubmitPlan,
@@ -8161,10 +8163,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }
 
     const viewingAnswers = this.state.displayAnswerMode;
-    const canBuildJsonPreview =
-      !viewingAnswers ||
-      (viewingAnswers && this.state.questionPool && Array.isArray(this.state.questionPool));
-    const jsonPreview = canBuildJsonPreview ? (this.state.jsonPreview || {}) : null;
+    const { jsonPreview } = buildSurveyQuestionsJsonPreviewDisplayState({
+      jsonPreview: this.state.jsonPreview,
+      questionPool: this.state.questionPool,
+      viewingAnswers,
+    });
 
     const routeViewDisplayState = buildSurveyQuestionsRouteViewDisplayState({
       account: this.props.account,
@@ -8262,14 +8265,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       styleMap: styles,
       viewingAnswers,
     });
-    const hasRenderedEditableQuestions =
-      canEditQuestions &&
-      questionPoolReady &&
-      !!currentSurveyResponseState &&
-      !gatedEmptyStateReady &&
-      Array.isArray(visibleQuestionPool) &&
-      visibleQuestionPool.length > 0;
-    const renderedEditableQuestions = hasRenderedEditableQuestions
+    const authoringRouteReadiness = buildSurveyQuestionsAuthoringRouteReadinessDescriptor({
+      canEditQuestions,
+      gatedEmptyStateReady,
+      hasCurrentSurveyResponseState: !!currentSurveyResponseState,
+      questionPoolReady,
+      visibleQuestionPool,
+    });
+    const renderedEditableQuestions = authoringRouteReadiness.shouldRenderEditableQuestions
       ? visibleQuestionPool.map((question, qIndex) =>
           this.renderQuestion(question, qIndex, currentSurveyResponseState)
         )

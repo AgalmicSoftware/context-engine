@@ -71,6 +71,11 @@ export type SurveyQuestionsJsonForDisplayState = {
   jsonForDisplay: unknown;
 };
 
+export type SurveyQuestionsJsonPreviewDisplayState = {
+  canUseJsonPreview: boolean;
+  jsonPreview: unknown;
+};
+
 export type SurveyQuestionsLayoutDisplayState = {
   activeTagModalTag: string;
   responseViewClassName: string | undefined;
@@ -138,6 +143,16 @@ export type SurveyQuestionsAuthoringPanelDisplayState = {
   showBackToTopControl: boolean;
   showJsonControl: boolean;
   showLockedQuestionsBanner: boolean;
+};
+
+export type SurveyQuestionsAuthoringRouteReadinessDescriptor = {
+  canEditQuestions: boolean;
+  gatedEmptyStateReady: boolean;
+  hasCurrentSurveyResponseState: boolean;
+  hasVisibleQuestions: boolean;
+  questionPoolReady: boolean;
+  shouldRenderEditableQuestions: boolean;
+  visibleQuestionCount: number;
 };
 
 export type SurveyQuestionsPrimarySubmitPlan = {
@@ -920,6 +935,39 @@ export const buildSurveyQuestionsAuthoringPanelDisplayState = ({
   };
 };
 
+export const buildSurveyQuestionsAuthoringRouteReadinessDescriptor = ({
+  canEditQuestions = false,
+  gatedEmptyStateReady = false,
+  hasCurrentSurveyResponseState = false,
+  questionPoolReady = false,
+  visibleQuestionPool = [],
+}: {
+  canEditQuestions?: unknown;
+  gatedEmptyStateReady?: unknown;
+  hasCurrentSurveyResponseState?: unknown;
+  questionPoolReady?: unknown;
+  visibleQuestionPool?: unknown;
+} = {}): SurveyQuestionsAuthoringRouteReadinessDescriptor => {
+  const visibleQuestionCount = Array.isArray(visibleQuestionPool) ? visibleQuestionPool.length : 0;
+  const hasVisibleQuestions = visibleQuestionCount > 0;
+
+  return {
+    canEditQuestions: !!canEditQuestions,
+    gatedEmptyStateReady: !!gatedEmptyStateReady,
+    hasCurrentSurveyResponseState: !!hasCurrentSurveyResponseState,
+    hasVisibleQuestions,
+    questionPoolReady: !!questionPoolReady,
+    shouldRenderEditableQuestions: !!(
+      canEditQuestions &&
+      questionPoolReady &&
+      hasCurrentSurveyResponseState &&
+      !gatedEmptyStateReady &&
+      hasVisibleQuestions
+    ),
+    visibleQuestionCount,
+  };
+};
+
 export const buildSurveyQuestionsJsonPanelDisplayState = ({
   isSingleQuestionView = false,
   isStandalone = false,
@@ -970,6 +1018,23 @@ export const buildSurveyQuestionsJsonPanelDisplayState = ({
     questionJsonToggleClassName,
     responseJsonToggleClassName,
     surveyJsonPanelClassName: isSingleQuestionView ? styleMap.singleQuestionJsonPanel : undefined,
+  };
+};
+
+export const buildSurveyQuestionsJsonPreviewDisplayState = ({
+  jsonPreview = null,
+  questionPool = null,
+  viewingAnswers = false,
+}: {
+  jsonPreview?: unknown;
+  questionPool?: unknown;
+  viewingAnswers?: unknown;
+} = {}): SurveyQuestionsJsonPreviewDisplayState => {
+  const canUseJsonPreview = !viewingAnswers || Array.isArray(questionPool);
+
+  return {
+    canUseJsonPreview,
+    jsonPreview: canUseJsonPreview ? (jsonPreview || {}) : null,
   };
 };
 
