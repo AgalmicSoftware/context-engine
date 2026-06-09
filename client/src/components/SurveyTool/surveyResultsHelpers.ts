@@ -16,10 +16,24 @@ type BuildSurveyResultsQuestionFilterCountPatchArgs = {
   props?: unknown;
   state?: unknown;
 };
+type BuildSurveyResultsLocalStoragePollPatchArgs = {
+  cachedQuestionsCount?: unknown;
+  cachedSurveyResponsesCount?: unknown;
+  networkLatestBlock?: unknown;
+  questionLocalBlock?: unknown;
+  responseLocalBlock?: unknown;
+  surveyLocalBlock?: unknown;
+};
 type BuildSurveyResultsRefreshStatusWritePlanArgs = {
   isMounted?: unknown;
   latestBlock?: unknown;
   writeNetworkLatestBlock?: unknown;
+};
+type BuildSurveyResultsViewModeResetPatchArgs = {
+  questionResultsHydrated?: unknown;
+  surveyId?: unknown;
+  surveyResultsHydrated?: unknown;
+  viewMode?: unknown;
 };
 type BuildSurveyResultsRefreshStatusSequencePlanArgs = BuildSurveyResultsRefreshStatusWritePlanArgs & {
   followUpEffects?: readonly unknown[] | unknown;
@@ -330,6 +344,59 @@ export const buildSurveyResultsUnfilteredQuestionModeHydratedPatch = ({
 
 export const buildSurveyResultsNetworkLatestBlockPatch = (networkLatestBlock: unknown) => ({
   networkLatestBlock: normalizeSurveyResultsBlockNumber(networkLatestBlock),
+});
+
+export const buildSurveyResultsViewModeResetPatch = ({
+  questionResultsHydrated = false,
+  surveyId = '',
+  surveyResultsHydrated = false,
+  viewMode = '',
+}: BuildSurveyResultsViewModeResetPatchArgs = {}) => ({
+  questionLocalBlock: 0,
+  responseLocalBlock: 0,
+  surveyLocalBlock: 0,
+  refreshTargetQuestionBlock: 0,
+  refreshTargetResponseBlock: 0,
+  refreshTargetSurveyBlock: 0,
+  questionResultsHydrated: viewMode === 'questions' ? false : questionResultsHydrated,
+  surveyResultsHydrated: viewMode === 'survey' ? false : surveyResultsHydrated,
+  demoResultsViewMode: 'raw',
+  demoResultsAtlasNodeId: null,
+  surveyId: viewMode === 'questions' ? '' : surveyId,
+});
+
+export const buildSurveyResultsSurveyIdPropChangePatch = (surveyId: unknown) => ({
+  surveyId,
+  viewMode: 'survey',
+  surveyLocalBlock: 0,
+  refreshTargetSurveyBlock: 0,
+  surveyResultsHydrated: false,
+  demoResultsViewMode: 'raw',
+  demoResultsAtlasNodeId: null,
+});
+
+export const buildSurveyResultsSurveyIdStateChangePatch = () => ({
+  surveyLocalBlock: 0,
+  refreshTargetSurveyBlock: 0,
+  surveyResultsHydrated: false,
+  demoResultsViewMode: 'raw',
+  demoResultsAtlasNodeId: null,
+});
+
+export const buildSurveyResultsLocalStoragePollPatch = ({
+  cachedQuestionsCount = 0,
+  cachedSurveyResponsesCount = 0,
+  networkLatestBlock = 0,
+  questionLocalBlock = 0,
+  responseLocalBlock = 0,
+  surveyLocalBlock = 0,
+}: BuildSurveyResultsLocalStoragePollPatchArgs = {}) => ({
+  questionLocalBlock,
+  responseLocalBlock,
+  surveyLocalBlock,
+  cachedQuestionsCount,
+  cachedSurveyResponsesCount,
+  networkLatestBlock,
 });
 
 export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown) => ({
