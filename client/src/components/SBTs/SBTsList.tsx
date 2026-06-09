@@ -12,13 +12,12 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faCog } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
 import TagModal from '../TagPage/TagModal';
-import SessionChipSelector from '../Shared/SessionChipSelector';
-import SbtListSessionUniverseSummary from './SbtListSessionUniverseSummary';
+import SbtListSessionUniversePanel from './SbtListSessionUniversePanel';
 import {
   SbtListDetailsPanel,
   SbtListMetaRow,
@@ -88,7 +87,6 @@ import {
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
-  buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
   collectSbtListLinkedScopedEntries,
   dedupeNormalizedSbtListSlugs,
@@ -188,9 +186,6 @@ type SbtListPointerEventLike = {
   shiftKey?: boolean;
   stopPropagation?: () => void;
   target?: EventTarget | null;
-};
-type SbtListHeaderActionsArgs = {
-  isOpen: boolean;
 };
 type SbtSessionUniverseSnapshot = {
   fallbackEntryCount: number;
@@ -914,7 +909,7 @@ const SBTsList = ({
     ? showAdminButtons
     : showLocalSessionSettings;
   const sessionSelectorPanelId = 'session-selector-panel';
-  const hideSessionUniverseSummary = miniaturized && viewMode === 'modal' && communityTabCompactSettings;
+  const hideSessionUniverseSummary = !!(miniaturized && viewMode === 'modal' && communityTabCompactSettings);
 
   const clearChipProgressVisibilityTimeout = useCallback((slugIn: unknown): void => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -2825,110 +2820,30 @@ const SBTsList = ({
       selectedSessionUniverseSlugs: selectedSessionUniverseSlugSet,
       sessionChipStateBySlug,
     });
-    const renderCollapsedSummary = (testId: string): React.ReactNode => (
-      <SbtListSessionUniverseSummary
-        testId={testId}
-        summarySlugs={collapsedSummarySlugs}
-        chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
-        chipLoadingStatusBySlug={chipLoadingStatusBySlug}
-        labelForSessionSlug={labelForSessionSlug}
-        buildSessionRouteHref={buildSessionRouteHref}
-        onOpenSessionChip={handleOpenSessionChip}
-      />
-    );
-
-    const renderHeaderActions = ({ isOpen }: SbtListHeaderActionsArgs): React.ReactNode => (
-      <div className={styles.sessionUniverseHeaderActions}>
-        {showUniverseSpinner && (
-          <FontAwesomeIcon
-            icon={faSpinner}
-            spin
-            className={styles.sessionUniverseSpinner}
-            data-testid="session-universe-spinner"
-          />
-        )}
-        {usesFallbackSessionSettingsToggle && (
-          <button
-            type="button"
-            className={styles.sessionUniverseSettingsButton}
-            aria-label={isOpen ? 'Hide session selector' : 'Show session selector'}
-            aria-controls={sessionSelectorPanelId}
-            aria-expanded={isOpen}
-            data-testid="session-selector-toggle"
-            onClick={() => setShowLocalSessionSettings((prev) => !prev)}
-          >
-            <FontAwesomeIcon icon={faCog} />
-          </button>
-        )}
-        {isOpen && (
-          <button
-            type="button"
-            className={styles.sessionUniverseToggle}
-            aria-label={isUniverseCollapsed ? 'Expand session universe' : 'Collapse session universe'}
-            aria-expanded={!isUniverseCollapsed}
-            onClick={() => setIsUniverseCollapsed((prev) => !prev)}
-          >
-            <FontAwesomeIcon icon={isUniverseCollapsed ? faChevronDown : faChevronUp} />
-            <span>{isUniverseCollapsed ? 'Expand' : 'Collapse'}</span>
-          </button>
-        )}
-      </div>
-    );
-
-    if (!isSessionSelectorOpen) {
-      return (
-        <div
-          className={buildSbtListSessionUniversePanelClassName({
-            baseClassName: styles.sessionUniversePanel,
-            closedClassName: styles.sessionUniversePanelClosed,
-            isClosed: true,
-          })}
-        >
-          <div className={styles.sessionUniverseHeader}>
-            <span>Sessions</span>
-            {renderHeaderActions({ isOpen: false })}
-          </div>
-          {!hideSessionUniverseSummary && renderCollapsedSummary('session-selector-summary')}
-        </div>
-      );
-    }
 
     return (
-      <div
-        className={styles.sessionUniversePanel}
-        data-testid="session-selector-panel"
-        id={sessionSelectorPanelId}
-      >
-        <div className={styles.sessionUniverseHeader}>
-          <span>Sessions</span>
-          {renderHeaderActions({ isOpen: true })}
-        </div>
-        {!hideSessionUniverseSummary && isUniverseCollapsed && renderCollapsedSummary('session-universe-collapsed-summary')}
-        {!isUniverseCollapsed && (
-          <div className={styles.sessionUniverseChips}>
-            <SessionChipSelector
-              options={sessionSelectorOptions}
-              onToggle={handleSessionChipClick}
-              onOpen={handleOpenSessionChip}
-            />
-          </div>
-        )}
-        {!isUniverseCollapsed && canShowMoreSessions && (
-          <div className={styles.sessionUniverseShowMoreRow}>
-            <button
-              type="button"
-              className={styles.sessionUniverseShowMoreButton}
-              onClick={handleShowMoreSessions}
-              disabled={showMoreSessionsLoading}
-            >
-              {showMoreSessionsLoading && (
-                <FontAwesomeIcon icon={faSpinner} spin className={styles.sessionUniverseShowMoreSpinner} />
-              )}
-              Show More Sessions ({remainingHiddenRegistrySessionSlugs.length})
-            </button>
-          </div>
-        )}
-      </div>
+      <SbtListSessionUniversePanel
+        buildSessionRouteHref={buildSessionRouteHref}
+        canShowMoreSessions={canShowMoreSessions}
+        chipLoadingStatusBySlug={chipLoadingStatusBySlug}
+        chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
+        hideSessionUniverseSummary={hideSessionUniverseSummary}
+        isOpen={isSessionSelectorOpen}
+        isUniverseCollapsed={isUniverseCollapsed}
+        labelForSessionSlug={labelForSessionSlug}
+        onOpenSessionChip={handleOpenSessionChip}
+        onShowMoreSessions={handleShowMoreSessions}
+        onToggleSessionChip={(slug) => handleSessionChipClick(slug)}
+        onToggleSessionSettings={() => setShowLocalSessionSettings((prev) => !prev)}
+        onToggleUniverseCollapsed={() => setIsUniverseCollapsed((prev) => !prev)}
+        remainingHiddenSessionCount={remainingHiddenRegistrySessionSlugs.length}
+        selectedSummarySlugs={collapsedSummarySlugs}
+        selectorPanelId={sessionSelectorPanelId}
+        sessionSelectorOptions={sessionSelectorOptions}
+        showMoreSessionsLoading={showMoreSessionsLoading}
+        showUniverseSpinner={showUniverseSpinner}
+        usesFallbackSessionSettingsToggle={usesFallbackSessionSettingsToggle}
+      />
     );
   };
 
