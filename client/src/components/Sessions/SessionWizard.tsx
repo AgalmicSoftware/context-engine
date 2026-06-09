@@ -306,6 +306,7 @@ import {
   getSessionWizardOrderedDraftEntries,
   shouldHideSessionWizardField,
   splitSessionWizardDraftEntries,
+  type SessionWizardRenderFieldOptions,
 } from './sessionWizardFieldDescriptors';
 import type {
   ChainIdLike,
@@ -526,9 +527,6 @@ type SponsoredBundleWorkerSecretStatePatch = {
 type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 type SessionHeaderFileState = File | Blob;
 type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement'];
-type SessionWizardRenderFieldOptions = {
-  forceShow?: boolean;
-};
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;

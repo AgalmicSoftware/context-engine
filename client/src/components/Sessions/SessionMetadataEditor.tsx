@@ -5,6 +5,7 @@ import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
 type SessionMetadataEditorProps = {
   isNormalMode: boolean;
@@ -16,7 +17,7 @@ type SessionMetadataEditorProps = {
   moreOptionsEntries: Array<[string, unknown]>;
   moreOptionsOpen: boolean;
   onToggleMoreOptions: () => void;
-  renderField: (key: string, value: unknown, path: string[], opts?: { forceShow?: boolean }) => React.ReactNode;
+  renderField: SessionWizardRenderField;
   draft: Record<string, unknown>;
   showJsonPreview: boolean;
   onToggleJsonPreview: () => void;

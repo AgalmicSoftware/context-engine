@@ -11,6 +11,7 @@ import SessionWizardModals from './SessionWizardModals';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
+import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
 type HeaderProps = React.ComponentProps<typeof SessionWizardHeader>;
 type IntroStatusRailProps = React.ComponentProps<typeof SessionWizardIntroStatusRail>;
@@ -146,7 +147,7 @@ export type SessionWizardShellProps = {
   registryChainOptions: HeaderProps['registryChainOptions'];
   removeEncryptionGate: EncryptionPanelBoundaryProps['removeEncryptionGate'];
   removePendingSbtDraft: EncryptionPanelBoundaryProps['removePendingSbtDraft'];
-  renderField: (key: unknown, value: unknown, path: unknown, opts?: unknown) => React.ReactNode;
+  renderField: SessionWizardRenderField;
   renderResourceCard: WorkerPanelProps['renderResourceCard'];
   renderSessionWizardInfoTooltip: SessionWizardShellRenderInfoTooltip;
   resolvedActiveSessionSlug: WorkerPanelProps['resolvedActiveSessionSlug'];
