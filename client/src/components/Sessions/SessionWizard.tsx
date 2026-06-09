@@ -292,6 +292,9 @@ import {
   buildSessionWizardGateOptions,
   normalizeSessionWizardGateIds as normalizeGateIds,
   resolveSessionWizardResourceGate as resolveResourceGate,
+  resolveSessionWizardResourceGateSelectionState,
+  resolveSessionWizardResourceGateSelectionUpdate,
+  type SessionWizardResourceGateSelectionState,
 } from './sessionWizardResourceGateSupport';
 import {
   applySessionWizardMetadataUploadGuards,
@@ -431,8 +434,7 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   bundleUrl?: string;
 };
 
-type ResourceGateSelectionState = string | string[];
-type ResourceGateMapState = Record<string, ResourceGateSelectionState>;
+type ResourceGateMapState = Record<string, SessionWizardResourceGateSelectionState>;
 
 type GateSelectionState = UnknownRecord & {
   sbts?: unknown[];
@@ -1528,10 +1530,13 @@ const SessionWizard = ({
     setResourceGateMap((prev) => {
       let changed = false;
       const next = { ...prev };
+      const fallbackGateId = toStr(defaultGateId).trim() || gateIds[0] || '';
       workerResourceKeys.forEach((key) => {
-        const desiredGateIds = normalizeGateIds(prev[key]).filter((id) => gateIds.includes(id));
-        const fallbackGateId = toStr(defaultGateId).trim() || gateIds[0] || '';
-        const resolved = desiredGateIds.length > 1 ? desiredGateIds : (desiredGateIds[0] || fallbackGateId);
+        const resolved = resolveSessionWizardResourceGateSelectionUpdate({
+          nextIds: prev[key],
+          availableGateIds: gateIds,
+          fallbackGateId,
+        });
         if (JSON.stringify(next[key]) !== JSON.stringify(resolved)) {
           next[key] = resolved;
           changed = true;
@@ -4304,7 +4309,7 @@ const SessionWizard = ({
     [encryptionGates]
   );
 
-  const updateResourceGate = (resourceKey: string, gateId: ResourceGateSelectionState) => {
+  const updateResourceGate = (resourceKey: string, gateId: SessionWizardResourceGateSelectionState) => {
     setResourceGateMap((prev) => ({
       ...prev,
       [resourceKey]: gateId,
@@ -4350,12 +4355,11 @@ const SessionWizard = ({
   };
 
   const renderResourceCard = (resourceKey: string) => {
-    const fallbackGateId = defaultGateId || resourceGateOptions[0]?.value || '';
-    const gateId = resourceGateMap[resourceKey] || fallbackGateId;
-    const resourceGateOptionValues = (resourceGateOptions || []).map((option) => option?.value).filter(Boolean);
-    const selectedGateIds = normalizeGateIds(gateId)
-      .filter((id) => resourceGateOptionValues.includes(id))
-      .filter(Boolean);
+    const resourceGateSelectionState = resolveSessionWizardResourceGateSelectionState({
+      value: resourceGateMap[resourceKey],
+      fallbackGateId: defaultGateId || resourceGateOptions[0]?.value || '',
+      gateOptions: resourceGateOptions,
+    });
     return (
       <WorkerResourceCard
         key={resourceKey}
@@ -4364,18 +4368,17 @@ const SessionWizard = ({
         tooltipText={RESOURCE_SECTION_TOOLTIPS[resourceKey] || ''}
         renderInfoTooltip={renderSessionWizardInfoTooltip}
         gateOptions={gateOptions}
-        selectedGateIds={selectedGateIds}
+        selectedGateIds={resourceGateSelectionState.selectedGateIds}
         onChangeSelectedGateIds={(nextIds: unknown) => {
-          const nextGateIds = normalizeGateIds(nextIds).filter((id) => resourceGateOptionValues.includes(id));
-          if (!nextGateIds.length) {
-            updateResourceGate(resourceKey, fallbackGateId || '');
-            return;
-          }
-          updateResourceGate(resourceKey, nextGateIds.length === 1 ? nextGateIds[0] : nextGateIds);
+          updateResourceGate(resourceKey, resolveSessionWizardResourceGateSelectionUpdate({
+            nextIds,
+            availableGateIds: resourceGateSelectionState.availableGateIds,
+            fallbackGateId: resourceGateSelectionState.fallbackGateId,
+          }));
         }}
         open={openResourceGateKey === resourceKey}
         onToggleOpen={(nextOpen) => setOpenResourceGateKey(nextOpen ? resourceKey : '')}
-        disabled={resourceGateOptions.length <= 1}
+        disabled={resourceGateSelectionState.disabled}
       >
         {renderResourceInputs(resourceKey)}
       </WorkerResourceCard>
