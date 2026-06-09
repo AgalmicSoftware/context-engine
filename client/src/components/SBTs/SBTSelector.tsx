@@ -145,7 +145,9 @@ import {
   shouldUsePropsSbtSelectorSessionConfigForSlug,
 } from './sbtSelectorHelpers';
 import type {
+  NormalizedAdditionalSbtOption,
   SbtNameLookupState,
+  SbtSelectorBuiltOption,
   SbtSelectorOptionsStatePatch,
   SbtSelectorScopedEntry,
 } from './sbtSelectorHelpers';
@@ -200,10 +202,7 @@ type SbtSelectorLooseOption = UnknownRecord & {
   sbtAddress?: unknown;
   value?: unknown;
 };
-type SbtSelectorAdditionalOption = SbtSelectorLooseOption & {
-  address: string;
-  name: unknown;
-};
+type SbtSelectorAdditionalOption = NormalizedAdditionalSbtOption;
 type SbtSelectorAsyncOption = UnknownRecord & {
   label?: React.ReactNode;
   value?: unknown;
@@ -240,17 +239,7 @@ type EnsureLightSbtUniverse = (
   slugs: string[],
   options?: { forceExactSlugs?: boolean }
 ) => unknown;
-type SbtSelectorOption = UnknownRecord & {
-  address: string;
-  chainId: number | null;
-  image: unknown;
-  maskedTitleHidden: boolean;
-  name: string;
-  selectionKey: string;
-  sessionBindingSlug?: unknown;
-  sessionName: unknown;
-  sessionSlug: string;
-};
+type SbtSelectorOption = SbtSelectorBuiltOption;
 type SbtSelectorSessionConfigSigLike = UnknownRecord & {
   __registry?: UnknownRecord & {
     chainId?: unknown;
@@ -968,7 +957,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       resolveSbtLabel: (sbtInfo, address, sessionSlug) => (
         this.resolveSbtLabel(sbtInfo, address, sessionSlug)
       ),
-    }) as SbtSelectorOption[];
+    });
   };
 
   applySbtOptions = ({
@@ -1895,7 +1884,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   normalizeAdditionalSBTOptions = (
     optionsInput: unknown = this.props.additionalSBTOptions
   ): SbtSelectorAdditionalOption[] => (
-    normalizeAdditionalSbtOptions(optionsInput) as SbtSelectorAdditionalOption[]
+    normalizeAdditionalSbtOptions(optionsInput)
   );
 
   formatOptionLabel = ({ label, image, value }: SbtSelectorLabelOption): React.ReactElement => {
