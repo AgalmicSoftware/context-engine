@@ -24,8 +24,8 @@ export type SurveyResultsDemoSurfaceProps = {
   onAtlasModalClose: () => void;
   onAtlasNodeOpen: (nodeId: unknown) => void;
   questionResponses: PolisReportProps['questionResponses'];
-  questionResponsesNonce?: PolisReportProps['questionResponsesNonce'];
-  questionScanProgress?: PolisReportProps['questionScanProgress'];
+  questionResponsesNonce?: unknown;
+  questionScanProgress?: unknown;
   viewKey?: unknown;
 };
 
@@ -57,8 +57,8 @@ const SurveyResultsDemoSurface = ({
           defaultTags={defaultTags}
           isQuestionCacheReady={isQuestionCacheReady}
           isResponsesCacheReady={isResponsesCacheReady}
-          questionScanProgress={questionScanProgress}
-          questionResponsesNonce={questionResponsesNonce}
+          questionScanProgress={questionScanProgress as PolisReportProps['questionScanProgress']}
+          questionResponsesNonce={questionResponsesNonce as PolisReportProps['questionResponsesNonce']}
           slug={activeSlug}
         />
       </div>
