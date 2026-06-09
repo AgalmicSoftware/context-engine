@@ -73,6 +73,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/vite-navigation-smoke.test.js');
   expectFile('scripts/verify-worker-bundle-sync.mjs');
   expectFile('scripts/verify-worker-bundle-sync.test.js');
+  expectFile('scripts/verify-public-release-surface.js');
+  expectFile('scripts/verify-public-release-surface.test.js');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile(publishWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');
@@ -117,6 +119,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm run lint');
   expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run test:release:client');
+  expectScriptContains('verify:release', 'npm run verify:public-release-surface');
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
