@@ -49,7 +49,7 @@ future agent negotiation.
     "version": "v6-latest-2026-06-09",
     "inviteToken": "<INSERT_TRUSTED_GEO_INVITE_TOKEN>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=37",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38",
     "sessionSlug": "agent-village-2026"
   }
 }

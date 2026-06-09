@@ -273,67 +273,55 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
     new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url),
     'utf8',
   );
+  const reference = readFileSync(
+    new URL('./skills/ce-telegram-bot-reference/SKILL.md', import.meta.url),
+    'utf8',
+  );
 
-  assert.match(source, /^# CE Telegram Agent Handoff/m);
-  assert.match(source, /\*\*Skill version:\*\* 2026-06-08 \(v37\)/);
-  assert.match(source, /Never display the token/);
-  assert.match(source, /direct-answer first/);
+  assert.match(source, /name:\s+context-engine/);
+  assert.match(source, /^# Context Engine Agent Runtime/m);
+  assert.match(source, /\*\*Skill version:\*\* 2026-06-08 \(v38\)/);
+  assert.match(source, /short runtime skill/);
+  assert.match(source, /ce-telegram-bot-reference\/SKILL\.md/);
+  assert.match(source, /Never make unauthenticated\s+question, draft, answer, vote, or results requests/);
   assert.match(source, /GET \/telegram\/agent\/api\/skill-version/);
   assert.match(source, /cache or install this Markdown skill locally/);
   assert.match(source, /not a callable tool name/);
-  assert.match(source, /Keep post-submit confirmations short/);
-  assert.match(source, /## Changelog/);
+  assert.match(source, /Do not call a tool named `ce-telegram-agent-handoff`/);
+  assert.match(source, /Trusted Geo \/ Hermes Invite Onboarding/);
+  assert.match(source, /Edge-Native Onboarding/);
   assert.match(source, /demographicLinkOptIn/);
   assert.match(source, /attendanceLinkOptIn/);
-  assert.match(source, /Attended\s+Previous Edge Events/);
   assert.match(source, /draftDivergenceOptIn/);
   assert.match(source, /topicPreferences/);
-  assert.match(source, /Interactive Client Report/);
-  assert.match(source, /\/session\/<session-slug>\/questions\/results\?telegramToken=/);
-  assert.match(source, /client-login\/exchange/);
+  assert.match(source, /Attended Previous Edge Events/);
+  assert.match(source, /group and demographic fields as a storage\s+schema/);
+  assert.match(source, /Read And Present Questions/);
+  assert.match(source, /Do not lead with raw labels like `Question \(binary, proposed\)`/);
+  assert.match(source, /Answer Shapes/);
   assert.match(source, /POST \/telegram\/agent\/api\/preferences/);
-  assert.match(source, /Non-Telegram Agent Token Flow/);
-  assert.match(source, /Install From Public Git/);
-  assert.match(source, /raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine/);
-  assert.match(source, /CE_SKILL_REF/);
-  assert.ok(source.includes('${CODEX_HOME:-$HOME/.codex}/skills/ce-telegram-agent-handoff'));
-  assert.match(source, /default token expiry is 28 days/i);
-  assert.match(source, /Authorization: Bearer ceagt_/);
-  assert.match(source, /Do not ask for `telegramUserId` or `groupChatId`/);
-  assert.match(source, /Send it on every CE\s+request as `Authorization: Bearer <token>`/);
-  assert.match(source, /Never make an unauthenticated\s+question, draft, answer, vote, or results request/);
-  assert.match(source, /do not run the full Edge-agent onboarding flow/);
-  assert.match(source, /Context Engine is\s+ready; I am fetching/);
-  assert.match(source, /Present Questions To Humans/);
-  assert.match(source, /Do not lead with raw labels like\s+`Question \(binary, proposed\)`/);
-  assert.match(source, /immediately surface\s+the first or most relevant one/);
-  assert.match(source, /do not ask whether to fetch questions, fetch\s+the skill endpoint, or "do anything else" first/);
-  assert.match(source, /Want me to do anything with this\?/);
-  assert.match(source, /How would you like to answer\?/);
-  assert.match(source, /Answer options: Agree \/ Unsure \/ Disagree/);
-  assert.match(source, /refresh_user_agent_token/);
-  assert.match(source, /POST \/telegram\/agent\/api\/questions\/next/);
-  assert.match(source, /POST \/telegram\/agent\/api\/question-queue/);
-  assert.match(source, /GET \/telegram\/agent\/api\/admin\/status/);
-  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
-  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=groups/);
-  assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
-  assert.match(source, /POST \/telegram\/agent\/api\/mini-app-launch/);
-  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
-  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
-  assert.match(source, /\/question_queue 1 3 4/);
-  assert.match(source, /allowedProfileFields/);
-  assert.match(source, /skillUpdateAvailable/);
-  assert.match(source, /questionsPerBatch/);
-  assert.match(source, /never repeat, summarize, echo, log/);
   assert.match(source, /submit: true/);
   assert.match(source, /humanApproved: true/);
   assert.match(source, /every intended answer has a returned `requestId`/);
   assert.match(source, /`myAnswer`/);
-  assert.match(source, /digestTimeOfDay/);
-  assert.match(source, /auto-fill[\s\S]*aggregate buckets/);
-  assert.match(source, /Copied-Token First Run/);
-  assert.match(source, /Claude Code, OpenClaw, Hermes/);
+  assert.match(source, /POST \/telegram\/agent\/api\/questions\/create/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=topic-map/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results\?sessionSlug=<slug>&view=groups/);
+  assert.match(source, /GET \/telegram\/agent\/api\/results-image\?sessionSlug=<slug>&view=topic-map/);
+  assert.match(source, /Digest \/ Hermes Cron Install/);
+  assert.match(source, /expected slug\s+is `context-engine`/);
+  assert.match(source, /Skill\(s\) not found and skipped: context-engine/);
+  assert.match(source, /GET \/telegram\/agent\/api\/admin\/metrics/);
+  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/plan/);
+  assert.match(source, /POST \/telegram\/agent\/api\/question-queue\/apply/);
+  assert.match(source, /## Changelog/);
+  assert.match(source, /2026-06-08 \(v38\)/);
+
+  assert.match(reference, /name:\s+ce-telegram-bot-reference/);
+  assert.match(reference, /^# CE Telegram Bot Reference/m);
+  assert.match(reference, /Detailed Context Engine Telegram bot, Mini App, admin, and operator reference/);
+  assert.match(reference, /POST \/telegram\/agent\/api\/mini-app-launch/);
+  assert.match(source, /skillUpdateAvailable/);
 });
 
 test('Telegram agent handoff skill version constant matches SKILL.md header', () => {
@@ -358,12 +346,12 @@ test('Telegram agent handoff exposes unauthenticated skill version metadata', as
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-06-08 (v37)');
-  assert.equal(body.skill, 'ce-telegram-agent-handoff');
+  assert.equal(body.version, '2026-06-08 (v38)');
+  assert.equal(body.skill, 'context-engine');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md');
   assert.equal(body.changelogUrl, 'https://example.test/skills/ce-telegram-agent-handoff/SKILL.md#changelog');
   assert.equal(body.updateAvailable, false);
-  assert.equal(body.latestVersion, '2026-06-08 (v37)');
+  assert.equal(body.latestVersion, '2026-06-08 (v38)');
   assert.equal(body.updateNote, '');
 });
 
@@ -376,7 +364,7 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/edge-2026\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
-  assert.match(location, /v=2026-06-08-v37-/);
+  assert.match(location, /v=2026-06-08-v38-/);
 });
 
 test('Telegram agent handoff wraps unexpected throws as JSON errors', async () => {
@@ -392,14 +380,14 @@ test('Telegram agent skill-version payload includes admin update flag', async ()
   await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
     version: 1,
     updateAvailable: true,
-    latestVersion: '2026-06-08 (v37)',
+    latestVersion: '2026-06-08 (v38)',
     note: 'Refresh before answering.',
     updatedAt: '2026-05-30T00:00:00.000Z',
   }));
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
-  assert.equal(payload.latestVersion, '2026-06-08 (v37)');
+  assert.equal(payload.latestVersion, '2026-06-08 (v38)');
   assert.equal(payload.updateNote, 'Refresh before answering.');
 });
 
@@ -1014,7 +1002,7 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.equal(body.ok, true);
   assert.equal(body.worker, 'https://bridge.example');
   assert.equal(body.sessionSlug, 'alpha');
-  assert.equal(body.skill, 'ce-telegram-agent-handoff');
+  assert.equal(body.skill, 'context-engine');
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
   assert.equal(loaded.ok, true);
@@ -1131,7 +1119,7 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.worker, 'https://bridge.example');
-  assert.equal(body.skill, 'ce-telegram-agent-handoff');
+  assert.equal(body.skill, 'context-engine');
   assert.equal(body.sessionSlug, 'beta');
   assert.equal(body.inviteLabel, 'Agent Village');
   assert.equal(body.inviteSource, 'geo:agent-village');
@@ -1872,7 +1860,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(privateBoundResponse.status, 200);
   assert.equal(questions.questions.length, 2);
   assert.equal(questions.questions[0].answerable, true);
-  assert.equal(questions.skillVersion, '2026-06-08 (v37)');
+  assert.equal(questions.skillVersion, '2026-06-08 (v38)');
   assert.equal(questions.skillUpdateAvailable, false);
 
   const draftResponse = await handleTelegramAgentHandoffRequest({
@@ -3401,7 +3389,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
       body: {
         telegramUserId: '42',
         sessionSlug: 'alpha',
-        latestVersion: '2026-06-08 (v37)',
+        latestVersion: '2026-06-08 (v38)',
         note: 'Refresh before answering.',
       },
     }),
@@ -3433,13 +3421,13 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatusResponse.status, 200);
   assert.equal(initialStatus.ok, true);
   assert.equal(initialStatus.updateAvailable, false);
-  assert.equal(initialStatus.version, '2026-06-08 (v37)');
+  assert.equal(initialStatus.version, '2026-06-08 (v38)');
   assert.equal(delegatedPostResponse.status, 403);
   assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
-  assert.equal(set.latestVersion, '2026-06-08 (v37)');
+  assert.equal(set.latestVersion, '2026-06-08 (v38)');
   assert.equal(flaggedStatusResponse.status, 200);
   assert.equal(flaggedStatus.updateAvailable, true);
   assert.equal(flaggedStatus.updateNote, 'Refresh before answering.');

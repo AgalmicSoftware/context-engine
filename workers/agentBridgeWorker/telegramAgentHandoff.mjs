@@ -101,9 +101,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=37';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v37)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v38)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -230,7 +230,7 @@ function skillVersionPayload(env = {}) {
   return {
     ok: true,
     version: CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
-    skill: 'ce-telegram-agent-handoff',
+    skill: 'context-engine',
     skillUrl,
     changelogUrl: `${skillUrl}#changelog`,
   };
@@ -4867,7 +4867,7 @@ async function handleMiniAppOnboardRequest({
     worker: agentBridgePublicUrl(env),
     sessionSlug: resolved.session.sessionSlug,
     expiresAt: issued.record.expiresAt,
-    skill: 'ce-telegram-agent-handoff',
+    skill: 'context-engine',
   };
   const { token: _token, ...secretFree } = response;
   assertNoSecretShape(secretFree, 'Mini App onboarding token response metadata must not serialize secrets.');
@@ -5016,7 +5016,7 @@ async function handleInviteOnboardRequest({
     ok: true,
     token: issued.token,
     worker: agentBridgePublicUrl(env),
-    skill: 'ce-telegram-agent-handoff',
+    skill: 'context-engine',
     skillUrl: agentSkillUrl(env),
     sessionSlug: resolved.session.sessionSlug,
     expiresAt: issued.record.expiresAt,
