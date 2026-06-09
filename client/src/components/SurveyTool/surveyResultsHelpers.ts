@@ -1,4 +1,5 @@
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
+import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 
 type UnknownRecord = Record<string, unknown>;
 type BuildSurveyResultsFilterLoadingUpdateArgs = {
@@ -328,7 +329,7 @@ export const buildSurveyResultsUnfilteredQuestionModeHydratedPatch = ({
 });
 
 export const buildSurveyResultsNetworkLatestBlockPatch = (networkLatestBlock: unknown) => ({
-  networkLatestBlock: Number(networkLatestBlock || 0),
+  networkLatestBlock: normalizeSurveyResultsBlockNumber(networkLatestBlock),
 });
 
 export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown) => ({
