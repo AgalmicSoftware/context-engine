@@ -29,7 +29,7 @@ type PublishedPendingSbtLink = {
   href: string;
 };
 
-type SessionPublishSummaryProps = {
+export type SessionPublishSummaryProps = {
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
   normalModePublishSummary: PublishSummaryItem[];
