@@ -602,6 +602,7 @@ const buildProvisionedSponsoredContextState = (
   const context = (value && typeof value === 'object') ? value as UnknownRecord : {};
   return {
     ...buildEmptyProvisionedSponsoredContext(),
+    ...context,
     sessionSlug: sessionRegistryUtils.normalizeSlug(context.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(context.workerUrl).trim()),
     fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(context.fields as UnknownRecord | undefined),
