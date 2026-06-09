@@ -3,6 +3,7 @@ import { getSessionContractsForChain, getSessionRegistryAddress } from '../../va
 import {
   getSessionWizardContractDefaults,
   getVisibleSessionWizardContractKeys,
+  resolveSessionWizardContractViewerPlan,
   resolveSessionWizardRegistryAddress,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
@@ -58,5 +59,63 @@ describe('sessionWizardContracts', () => {
       sbtFactory: { address: '0x222', chainId: 84532 },
       sessionRegistry: { address: '0x333', chainId: 84532 },
     });
+  });
+
+  test('contract viewer plan selects the requested contract and builds its route href', () => {
+    const plan = resolveSessionWizardContractViewerPlan({
+      draftContracts: {
+        surveys: { address: '0x111', chainId: 84532 },
+        sbtFactory: { address: '0x222', chainId: 84532 },
+        sessionRegistry: { address: '0x333', chainId: 84532 },
+      },
+      registryChainId: 84532,
+      selectedContractKey: 'surveys',
+      selectorSourceSessionSlug: 'source-session',
+      activeSessionSlug: 'active-session',
+      resolvedActiveSessionSlug: 'resolved-session',
+    });
+
+    expect(plan.resolvedChainId).toBe(84532);
+    expect(plan.selectedContract?.key).toBe('surveys');
+    expect(plan.selectedContractHref).toBe('/contracts?contract=surveys&session=source-session');
+    expect(plan.selectedContractSessionSlug).toBe('source-session');
+    expect(plan.contracts.map((contract) => contract.key)).toEqual([
+      'surveys',
+      'sbtFactory',
+      'sessionRegistry',
+    ]);
+  });
+
+  test('contract viewer plan fills visible defaults without adding the custom SBT template', () => {
+    const defaults = getSessionWizardContractDefaults(DEFAULT_CONFIG_CHAIN_ID);
+    const plan = resolveSessionWizardContractViewerPlan({
+      draftContracts: {},
+      registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+      network: { id: 84532 },
+      selectedContractKey: 'sessionRegistry',
+      activeSessionSlug: 'active-session',
+    });
+    const registryContract = plan.contracts.find((contract) => contract.key === 'sessionRegistry');
+
+    expect(plan.resolvedChainId).toBe(Number(DEFAULT_CONFIG_CHAIN_ID));
+    expect(registryContract?.addresses?.[0]?.address).toBe(defaults.sessionRegistry);
+    expect(plan.contracts.some((contract) => contract.key === 'customSBT')).toBe(false);
+    expect(plan.selectedContract?.key).toBe('sessionRegistry');
+    expect(plan.selectedContractHref).toBe('/contracts?contract=sessionRegistry&session=active-session');
+  });
+
+  test('contract viewer plan falls back to the resolved active session slug', () => {
+    const plan = resolveSessionWizardContractViewerPlan({
+      draftContracts: {
+        surveys: { address: '0x111', chainId: 84532 },
+      },
+      draftNetworkChainId: 84532,
+      selectedContractKey: 'missing',
+      resolvedActiveSessionSlug: 'resolved-session',
+    });
+
+    expect(plan.selectedContract).toBeNull();
+    expect(plan.selectedContractHref).toBe('/contracts?session=resolved-session');
+    expect(plan.selectedContractSessionSlug).toBe('resolved-session');
   });
 });

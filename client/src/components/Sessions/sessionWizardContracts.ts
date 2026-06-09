@@ -1,8 +1,36 @@
 import { getSessionContractsForChain, getSessionRegistryAddress } from '../../variables/chains.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import { buildContractsPageHref } from '../ContractPage/contractMetadata.js';
+import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
+import type {
+  ChainIdLike,
+  ContractViewerContractLike,
+  NetworkLike,
+  SessionContractLike,
+  SessionContractsLike,
+} from '../shellTypes';
 
 type VisibleSessionWizardContractKey = 'surveys' | 'sbtFactory' | 'sessionRegistry';
 type SessionWizardContractsRecord = Record<string, unknown>;
+
+type SessionWizardContractViewerPlanInput = {
+  activeSessionSlug?: unknown;
+  draftContracts?: SessionContractsLike | null;
+  draftNetworkChainId?: ChainIdLike;
+  network?: NetworkLike;
+  registryChainId?: ChainIdLike;
+  resolvedActiveSessionSlug?: unknown;
+  selectedContractKey?: unknown;
+  selectorSourceSessionSlug?: unknown;
+};
+
+type SessionWizardContractViewerPlan = {
+  contracts: ContractViewerContractLike[];
+  resolvedChainId: number | null;
+  selectedContract: ContractViewerContractLike | null;
+  selectedContractHref: string;
+  selectedContractSessionSlug: string;
+};
 
 export const SESSION_WIZARD_VISIBLE_CONTRACT_KEYS = Object.freeze([
   'surveys',
@@ -54,4 +82,68 @@ export const sanitizeSessionWizardContracts = (
     }
   });
   return nextContracts;
+};
+
+export const resolveSessionWizardContractViewerPlan = ({
+  activeSessionSlug = '',
+  draftContracts = null,
+  draftNetworkChainId = null,
+  network = null,
+  registryChainId = null,
+  resolvedActiveSessionSlug = '',
+  selectedContractKey = '',
+  selectorSourceSessionSlug = '',
+}: SessionWizardContractViewerPlanInput = {}): SessionWizardContractViewerPlan => {
+  const sessionContracts = draftContracts && typeof draftContracts === 'object'
+    ? draftContracts
+    : {};
+  const defaults = getSessionWizardContractDefaults(registryChainId);
+  const visibleKeys = getVisibleSessionWizardContractKeys(sessionContracts, defaults);
+  const resolvedChainId = Number(
+    registryChainId ||
+    draftNetworkChainId ||
+    network?.id ||
+    network?.chainId ||
+    0
+  ) || null;
+  const mergedContracts = visibleKeys.reduce<SessionContractsLike>((acc, contractKey) => {
+    const entry = sessionContracts[contractKey] && typeof sessionContracts[contractKey] === 'object'
+      ? sessionContracts[contractKey] as SessionContractLike
+      : {};
+    const address = toStr(entry.address || '').trim() || toStr(defaults?.[contractKey] || '').trim();
+    acc[contractKey] = {
+      ...entry,
+      address,
+      chainId: Number(entry.chainId || resolvedChainId || 0) || null,
+    };
+    return acc;
+  }, {});
+  const contracts = buildContractViewerContracts({
+    sessionContracts: mergedContracts,
+    chainId: resolvedChainId,
+    includeSessionRegistry: true,
+    includeCustomSBT: false,
+  });
+  const normalizedSelectedContractKey = toStr(selectedContractKey).trim();
+  const selectedContract = contracts.find(
+    (contract) => contract.key === normalizedSelectedContractKey
+  ) || null;
+  const selectedContractSessionSlug = toStr(
+    selectorSourceSessionSlug ||
+    activeSessionSlug ||
+    resolvedActiveSessionSlug ||
+    ''
+  ).trim();
+  const selectedContractHref = buildContractsPageHref({
+    contractKey: selectedContract?.key || '',
+    sessionSlug: selectedContractSessionSlug,
+  });
+
+  return {
+    contracts,
+    resolvedChainId,
+    selectedContract,
+    selectedContractHref,
+    selectedContractSessionSlug,
+  };
 };
