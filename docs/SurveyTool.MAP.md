@@ -36,7 +36,7 @@
   - `surveyQuestionsTypes.ts`: **1,237 lines**
   - `surveyToolSingleQuestionCacheBootstrapController.ts`: **604 lines**
   - `surveyToolDecryptFlow.js`: **2,015 lines**
-  - `SurveyResults.tsx`: **5,074 lines**
+  - `SurveyResults.tsx`: **5,203 lines**
   - `SurveyResultsReportSurface.tsx`: **86 lines**
   - `surveyResultsHtmlReportModalProps.ts`: **77 lines**
   - `SurveyResultsDemoSurface.tsx`: **104 lines**
