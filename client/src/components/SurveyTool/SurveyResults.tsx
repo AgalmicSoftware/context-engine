@@ -380,6 +380,7 @@ type SurveyResultsQuestionEncryptionRecord = SurveyResultsRecord & {
 type SurveyResultsQuestionWithEncryption = SurveyResultsRecord & {
   encryption?: SurveyResultsQuestionEncryptionRecord | unknown;
 };
+type SurveyResultsLatestBlockMap = Record<string, unknown>;
 type SurveyResultsSessionConfigRecord = SurveyResultsRecord & {
   __registry?: SurveyResultsRecord & { chainId?: unknown };
   networkChainId?: number | string | null;
@@ -393,7 +394,7 @@ type SurveyResultsLockedResponseKeyArgs = {
 };
 type SurveyResultsSurveyBucketRecord = SurveyResultsRecord & {
   surveyResponses?: Record<string, SurveyResultsRecord>;
-  surveyResponsesLatestBlock?: Record<string, unknown>;
+  surveyResponsesLatestBlock?: SurveyResultsLatestBlockMap;
   surveys?: Record<string, SurveyResultsRecord & { documentURLs?: unknown; questionIDs?: unknown; title?: string }>;
   surveysLatestBlock?: unknown;
 };
@@ -643,6 +644,22 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
 );
+const toSurveyResultsLatestBlockMap = (value: unknown): SurveyResultsLatestBlockMap => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as SurveyResultsLatestBlockMap
+    : {}
+);
+const normalizeSurveyResultsBlockNumber = (value: unknown): number => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const readSurveyResultsLatestBlock = (latestBlockMap: unknown, key: unknown): number => {
+  const normalizedKey = String(key || '').toLowerCase();
+  if (!normalizedKey) return 0;
+  return normalizeSurveyResultsBlockNumber(
+    toSurveyResultsLatestBlockMap(latestBlockMap)[normalizedKey]
+  );
+};
 const preserveSurveyResultsFilterStateValue = (
   value: unknown
 ): SurveyResultsFilterState => (
@@ -2337,16 +2354,10 @@ pollLocalStorageForUpdates(): boolean {
       netLatest = 0;
     }
 
-    const localQBlock = Number(questionNetCache.questionsLatestBlock || 0);
-    const localRespBlock = Number(questionNetCache.questionResponsesLatestBlock || 0);
-    const surveyResponsesLatestBlock = (
-      surveyNetCache?.surveyResponsesLatestBlock &&
-      typeof surveyNetCache.surveyResponsesLatestBlock === 'object'
-        ? surveyNetCache.surveyResponsesLatestBlock as SurveyResultsRecord
-        : {}
-    );
+    const localQBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionsLatestBlock);
+    const localRespBlock = normalizeSurveyResultsBlockNumber(questionNetCache.questionResponsesLatestBlock);
     const localSBlock = currentSurveyId
-      ? Number(surveyResponsesLatestBlock[currentSurveyId] || 0)
+      ? readSurveyResultsLatestBlock(surveyNetCache?.surveyResponsesLatestBlock, currentSurveyId)
       : 0;
 
     const coarseSignature = [
@@ -2540,10 +2551,11 @@ if (this.state.viewMode === 'survey') {
     const questionIdsSignature = questionIDsInSurvey
       .map((qid) => String(qid || '').toLowerCase())
       .join('|');
-    const surveyResponsesLatestBlock = Number(
-      surveyNetCache?.surveyResponsesLatestBlock?.[currentSurveyID] || 0
+    const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
+      surveyNetCache?.surveyResponsesLatestBlock,
+      currentSurveyID
     );
-    const surveyDefinitionLatestBlock = Number(surveyNetCache?.surveysLatestBlock || 0);
+    const surveyDefinitionLatestBlock = normalizeSurveyResultsBlockNumber(surveyNetCache?.surveysLatestBlock);
     const surveyCacheChangeNonce = Number(this._surveysCacheChangeNonce || 0);
     const questionCacheReadySignal = this.props.isQuestionCacheReady ? 1 : 0;
     const payloadRefSignature = buildSurveyRespondersPayloadRefSignature(srMap);
