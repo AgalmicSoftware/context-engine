@@ -160,6 +160,7 @@ import {
   normalizeAiModelForProvider,
   normalizeAiModels,
   normalizeAiProvider,
+  resolveSessionWizardAiModelProviderPatch,
 } from './sessionWizardAiConfig';
 import {
   buildPendingSbtSelection,
@@ -448,6 +449,11 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
   lit?: UnknownRecord;
+};
+
+type DraftAiModelsState = Record<string, UnknownRecord>;
+type DraftAiState = UnknownRecord & {
+  models?: DraftAiModelsState;
 };
 
 type SessionWizardProps = {
@@ -1562,34 +1568,39 @@ const SessionWizard = ({
     blockEndAutoRef.current = true;
   }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draft?.blockLimits?.start]);
 
+  const aiModelProviderPatch = useMemo(
+    () => resolveSessionWizardAiModelProviderPatch(draft?.ai),
+    [draft?.ai]
+  );
   useEffect(() => {
-    const fastProvider = normalizeAiProvider(draft?.ai?.models?.fast?.provider || 'openai');
-    const thinkingProvider = normalizeAiProvider(draft?.ai?.models?.thinking?.provider || 'openai');
-    const fastCurrent = toStr(draft?.ai?.models?.fast?.model).trim();
-    const thinkingCurrent = toStr(draft?.ai?.models?.thinking?.model).trim();
-    const fastNext = normalizeAiModelForProvider('fast', fastProvider, fastCurrent);
-    const thinkingNext = normalizeAiModelForProvider('thinking', thinkingProvider, thinkingCurrent);
-    if (fastNext === fastCurrent && thinkingNext === thinkingCurrent) return;
+    if (!aiModelProviderPatch.hasChanges) return;
     setDraft((prev) => {
       const next = deepClone(prev);
-      if (!next.ai || typeof next.ai !== 'object') next.ai = {};
-      if (!next.ai.models || typeof next.ai.models !== 'object') next.ai.models = {};
-      if (fastNext !== fastCurrent) {
-        if (!next.ai.models.fast || typeof next.ai.models.fast !== 'object') next.ai.models.fast = {};
-        next.ai.models.fast.model = fastNext;
+      const nextAi = (
+        next.ai && typeof next.ai === 'object' ? next.ai : {}
+      ) as DraftAiState;
+      const nextModels = (
+        nextAi.models && typeof nextAi.models === 'object' ? nextAi.models : {}
+      ) as DraftAiModelsState;
+      next.ai = nextAi;
+      nextAi.models = nextModels;
+      if (aiModelProviderPatch.models.fast !== undefined) {
+        const fastModel = (
+          nextModels.fast && typeof nextModels.fast === 'object' ? nextModels.fast : {}
+        ) as UnknownRecord;
+        fastModel.model = aiModelProviderPatch.models.fast;
+        nextModels.fast = fastModel;
       }
-      if (thinkingNext !== thinkingCurrent) {
-        if (!next.ai.models.thinking || typeof next.ai.models.thinking !== 'object') next.ai.models.thinking = {};
-        next.ai.models.thinking.model = thinkingNext;
+      if (aiModelProviderPatch.models.thinking !== undefined) {
+        const thinkingModel = (
+          nextModels.thinking && typeof nextModels.thinking === 'object' ? nextModels.thinking : {}
+        ) as UnknownRecord;
+        thinkingModel.model = aiModelProviderPatch.models.thinking;
+        nextModels.thinking = thinkingModel;
       }
       return next;
     });
-  }, [
-    draft?.ai?.models?.fast?.provider,
-    draft?.ai?.models?.fast?.model,
-    draft?.ai?.models?.thinking?.provider,
-    draft?.ai?.models?.thinking?.model,
-  ]);
+  }, [aiModelProviderPatch]);
 
   useEffect(() => {
     const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';

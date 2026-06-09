@@ -96,6 +96,51 @@ export const normalizeAiModelForProvider = (
   return options.includes(model) ? model : options[0];
 };
 
+type AiModelPatchKey = 'fast' | 'thinking';
+
+export type SessionWizardAiModelProviderPatch = {
+  hasChanges: boolean;
+  models: Partial<Record<AiModelPatchKey, string>>;
+};
+
+const isAiConfigRecord = (value: unknown): value is AnyRecord => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const readAiModelRecord = (
+  ai: unknown,
+  modelKey: AiModelPatchKey
+): AnyRecord => {
+  const aiRecord = isAiConfigRecord(ai) ? ai : {};
+  const models = isAiConfigRecord(aiRecord.models) ? aiRecord.models : {};
+  const model = models[modelKey];
+  return isAiConfigRecord(model) ? model : {};
+};
+
+export const resolveSessionWizardAiModelProviderPatch = (
+  ai: unknown
+): SessionWizardAiModelProviderPatch => {
+  const fast = readAiModelRecord(ai, 'fast');
+  const thinking = readAiModelRecord(ai, 'thinking');
+  const fastProvider = normalizeAiProvider(fast.provider || 'openai');
+  const thinkingProvider = normalizeAiProvider(thinking.provider || 'openai');
+  const fastCurrent = toStr(fast.model).trim();
+  const thinkingCurrent = toStr(thinking.model).trim();
+  const fastNext = normalizeAiModelForProvider('fast', fastProvider, fastCurrent);
+  const thinkingNext = normalizeAiModelForProvider('thinking', thinkingProvider, thinkingCurrent);
+  const models: SessionWizardAiModelProviderPatch['models'] = {};
+  if (fastNext !== fastCurrent) {
+    models.fast = fastNext;
+  }
+  if (thinkingNext !== thinkingCurrent) {
+    models.thinking = thinkingNext;
+  }
+  return {
+    hasChanges: Object.keys(models).length > 0,
+    models,
+  };
+};
+
 export const resolveSessionWizardAutoFeatureBySessionSlug = (
   metadata: AnyRecord | null | undefined
 ) => (

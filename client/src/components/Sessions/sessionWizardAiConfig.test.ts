@@ -5,6 +5,7 @@ import {
   normalizeAiModelForProvider,
   normalizeAiModels,
   normalizeAiProvider,
+  resolveSessionWizardAiModelProviderPatch,
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 
@@ -51,6 +52,32 @@ describe('sessionWizardAiConfig', () => {
       'claude-sonnet-4-5-20250929'
     );
     expect(normalizeAiModelForProvider('fast', 'openrouter', 'custom/model')).toBe('custom/model');
+  });
+
+  it('describes provider-specific ai model corrections for the wizard draft', () => {
+    expect(resolveSessionWizardAiModelProviderPatch({
+      models: {
+        fast: { provider: 'anthropic', model: 'gpt-5' },
+        thinking: { provider: 'openai', model: 'gpt-5' },
+      },
+    })).toEqual({
+      hasChanges: true,
+      models: {
+        fast: 'claude-sonnet-4-5-20250929',
+      },
+    });
+  });
+
+  it('keeps valid and custom ai model picks unchanged', () => {
+    expect(resolveSessionWizardAiModelProviderPatch({
+      models: {
+        fast: { provider: 'openai', model: 'gpt-4o-mini' },
+        thinking: { provider: 'openrouter', model: 'custom/thinking' },
+      },
+    })).toEqual({
+      hasChanges: false,
+      models: {},
+    });
   });
 
   it('prefers the explicit auto-feature field and falls back to the legacy alias', () => {
