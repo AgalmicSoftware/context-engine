@@ -95,6 +95,12 @@ function setupSourceRepo() {
     installSyncScriptFixture(sourceDir);
 
     writeFile(sourceDir, 'README.md', 'base\n');
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify({ scripts: { 'test:node': 'node scripts/public-node-test-fixture.js' } }, null, 2)}\n`,
+    );
+    writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.js'), "console.log('public node fixture passed');\n");
     commitAll(sourceDir, 'Initial public base', {
       authorDate: '2025-01-01T00:00:00Z',
       committerDate: '2025-01-01T00:00:00Z',
@@ -318,6 +324,69 @@ test('sync-public-history rejects public files that import stripped paths before
     });
     assert.equal(remoteCheck.status, 0);
     assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects public Node test failures before pushing', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'public-node-test-fixture.js'),
+      "console.error('public node fixture failed');\nprocess.exit(1);\n",
+    );
+    commitAll(sourceDir, 'Break public node fixture', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Running public release Node tests/);
+    assert.match(result.stderr, /public node fixture failed/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history links source node_modules for public Node ESM imports before pushing', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify({ scripts: { 'test:node': 'node scripts/public-node-test-fixture.mjs' } }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'public-node-test-fixture.mjs'),
+      "import { marker } from 'public-node-fixture';\nconsole.log(marker);\n",
+    );
+    commitAll(sourceDir, 'Use public node ESM fixture', {
+      authorDate: '2025-01-05T07:08:09Z',
+      committerDate: '2025-01-05T07:08:09Z',
+    });
+
+    writeFile(
+      sourceDir,
+      path.join('node_modules', 'public-node-fixture', 'package.json'),
+      `${JSON.stringify({ type: 'module', exports: './index.js' }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('node_modules', 'public-node-fixture', 'index.js'),
+      "export const marker = 'public node ESM fixture passed';\n",
+    );
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /Linking source node_modules into public test checkout/);
+    assert.match(result.stdout, /public node ESM fixture passed/);
   });
 });
 

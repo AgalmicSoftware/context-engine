@@ -289,6 +289,30 @@ verify_public_release_surface() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
+verify_public_node_tests() {
+  local node_path="$REPO_ROOT/node_modules"
+  local temp_node_path="$TEMP_CLONE/node_modules"
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public Node tests; package.json was not found in replay output." 1
+  fi
+
+  if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
+    log_info "Linking source node_modules into public test checkout."
+    ln -s "$node_path" "$temp_node_path"
+  fi
+
+  log_info "Running public release Node tests."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:node
+    else
+      npm run test:node
+    fi
+  )
+}
+
 ensure_private_branch_guard() {
   if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
     fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
@@ -495,6 +519,10 @@ if [ -n "$offending_identities" ]; then
 fi
 
 if ! verify_public_release_surface; then
+  exit 2
+fi
+
+if ! verify_public_node_tests; then
   exit 2
 fi
 
