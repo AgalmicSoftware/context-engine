@@ -102,7 +102,7 @@ export const resolveSponsoredBundleDeployReadiness = ({
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
   wizardMode?: string;
-  sponsoredBundle?: AnyRecord;
+  sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   missingWorkerSecrets?: unknown[];
@@ -200,7 +200,7 @@ export const resolveSessionWizardSponsoredAutoDeployReadiness = ({
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
   wizardMode?: string;
-  sponsoredBundle?: AnyRecord;
+  sponsoredBundle?: AnyRecord | null;
   deployForm?: AnyRecord;
   workerSecretsEnabled?: boolean;
   currentWorkerSecrets?: AnyRecord;

@@ -1,7 +1,4 @@
-// @ts-nocheck
 /** @file SessionWizard.tsx */
-// Temporary: this file is mid-migration from JSX to TSX. Keep the runtime
-// unblocked while we restore strict typing in smaller, reviewable slices.
 import { type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
@@ -11,7 +8,7 @@ import { faCaretDown, faCaretUp, faCheck, faExclamationCircle, faImage, faSpinne
 import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame, { type LockableFieldFrameProps } from './LockableFieldFrame';
-import BlockLimitsField from './BlockLimitsField';
+import BlockLimitsField, { type BlockLimitsFieldProps } from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
@@ -58,7 +55,7 @@ import {
   normalizeWorkerUrl as normalizeWorkerAuthUrl,
 } from '../../utilities/worker/workerAuth.js';
 import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
-import type { UnknownRecord } from '../../utilities/session/sessionTypes.js';
+import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
@@ -138,6 +135,8 @@ import {
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
   runSessionWizardPublishController,
+  type SessionWizardPublishWorkerSignerArgs,
+  type SessionWizardRegisterGroupArgs,
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
 import {
@@ -521,6 +520,7 @@ type SessionSlugExistsArgs = {
 
 type SessionRegistryReadContract = {
   sessionExists?: (slug: string) => Promise<boolean> | boolean;
+  sessionIdExists?: (sessionIdHex: string) => Promise<boolean> | boolean;
 };
 
 type CollapsedSectionsState = Record<string, boolean> & {
@@ -586,6 +586,25 @@ type PublishArweaveUploadOptionsInput = {
   authAccount?: unknown;
 };
 
+type SessionWizardMetadataEncryptionResult = {
+  metadata: UnknownRecord;
+  encryptedFields?: UnknownRecord;
+  onChainFields: UnknownRecord;
+};
+
+type SessionWizardEncryptionRecipient = {
+  accessControlConditions: unknown;
+  chain: string;
+};
+
+type SessionWizardEncryptionQueueEntry = {
+  key: string;
+  gateIds: string[];
+  path: string[];
+  value: unknown;
+  recipients: SessionWizardEncryptionRecipient[];
+};
+
 type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 type SessionHeaderFileState = File | Blob;
 type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement'];
@@ -593,8 +612,16 @@ type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement']
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
 const pathKey = (path: string[]): string => path.join('.');
-const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
+const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS as Readonly<Record<string, string[]>>;
 const ONCHAIN_FIELD_KEYS = new Set(Object.keys(SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS));
+
+const getSessionWizardErrorMessage = (error: unknown, fallback = ''): string => {
+  if (error instanceof Error) return error.message || fallback;
+  if (error && typeof error === 'object' && 'message' in error) {
+    return toStr((error as { message?: unknown }).message) || fallback;
+  }
+  return toStr(error) || fallback;
+};
 
 const buildProvisionedSponsoredContextState = (
   value: unknown
@@ -2588,7 +2615,7 @@ const SessionWizard = ({
     };
     const tooltipId = `gw-tip-${keyString.replace(/[^a-z0-9_-]/gi, '-')}`;
     const tooltipText = getSessionWizardFieldTooltip(currentPath, value);
-    const chainName = /chainid$/i.test(keyString) ? getChainName(value) : '';
+    const chainName = /chainid$/i.test(keyString) ? getChainName(value as ChainIdLike) : '';
     const displayLabelText = chainName ? `${displayLabel} (${chainName})` : displayLabel;
     const fieldTooltipPlacement: SessionWizardTooltipPlacement = 'right';
     const fieldTooltipControl = renderSessionWizardInfoTooltip({
@@ -2681,7 +2708,9 @@ const SessionWizard = ({
     }
 
     if (path.length === 0 && key === 'contracts') {
-      const contracts = value && typeof value === 'object' ? value : {};
+      const contracts: SessionContractsLike = value && typeof value === 'object' && !Array.isArray(value)
+        ? value as SessionContractsLike
+        : {};
       const defaults = getSessionWizardContractDefaults(registryChainId);
       const visibleKeys = getVisibleSessionWizardContractKeys(contracts, defaults);
       const isCollapsed = metadataObjectCollapsed.contracts;
@@ -2787,7 +2816,7 @@ const SessionWizard = ({
       return (
         <BlockLimitsField
           key={keyString}
-          blockLimits={value}
+          blockLimits={value as BlockLimitsFieldProps['blockLimits']}
           onStartChange={(raw) => {
             blockStartManualRef.current = true;
             updateDraftValue(['blockLimits', 'start'], raw === '' ? null : Number(raw));
@@ -2916,7 +2945,7 @@ const SessionWizard = ({
       return (
         <LockableFieldFrame key={keyString} {...fieldFrameProps}>
           <SessionHeaderField
-            value={value}
+            value={value == null ? null : toStr(value)}
             sessionHeaderMode={sessionHeaderMode}
             compactSessionHeaderMode={compactSessionHeaderMode}
             sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
@@ -2960,7 +2989,7 @@ const SessionWizard = ({
           <Input
             type="textarea"
             rows="4"
-            value={value == null ? '' : value}
+            value={toStr(value)}
             onChange={(e) => updateDraftValue(currentPath, e.target.value)}
             className={styles.textarea}
           />
@@ -2993,7 +3022,7 @@ const SessionWizard = ({
       >
         <Input
           type={isNumber ? 'number' : 'text'}
-          value={value == null ? '' : value}
+          value={value == null ? '' : (typeof value === 'number' ? value : toStr(value))}
           disabled={
             isDefaultFilterState ||
             isNetworkChainField ||
@@ -3015,11 +3044,13 @@ const SessionWizard = ({
     );
   };
 
-  const applyEncryption = async (metadata) => {
+  const applyEncryption = async (
+    metadata: UnknownRecord
+  ): Promise<SessionWizardMetadataEncryptionResult> => {
     const encryptedKeys = Object.keys(encryptedFieldGates || {}).filter((key) => key !== 'slug');
     // Testing mode: we do not remap legacy cached gate keys.
     // Only canonical `session*` field paths are encrypted from this point forward.
-    const onChainFields = {};
+    const onChainFields: UnknownRecord = {};
     // Reset any stale encryption artifacts from cached drafts before rebuilding.
     delete metadata.encryptedFields;
     delete metadata.encryptedFieldGates;
@@ -3039,9 +3070,9 @@ const SessionWizard = ({
     const chainId = Number(metadata.networkChainId || registryChainId || network?.id || 0) || null;
     const litChain = resolveLitChain({ chainId });
 
-    const encryptedFields = {};
-    const encryptedFieldGatesOut = {};
-    const encryptionQueue = [];
+    const encryptedFields: UnknownRecord = {};
+    const encryptedFieldGatesOut: UnknownRecord = {};
+    const encryptionQueue: SessionWizardEncryptionQueueEntry[] = [];
     for (const key of encryptedKeys) {
       const selectedGateIds = normalizeGateIds(encryptedFieldGates[key] ?? encryptedFieldGates?.[key])
         .map((id) => toStr(id).trim())
@@ -3051,8 +3082,8 @@ const SessionWizard = ({
       const value = getValueAtPath(metadata, path);
       if (value == null || value === '') continue;
 
-      const recipients = [];
-      const appliedGateIds = [];
+      const recipients: SessionWizardEncryptionRecipient[] = [];
+      const appliedGateIds: string[] = [];
 
       for (const gateId of selectedGateIds) {
         const gate = getGateById(gateId);
@@ -3154,7 +3185,7 @@ const SessionWizard = ({
             chainId,
             litChain,
             litNetwork: hooks?.litNetwork || null,
-            message: err?.message || err,
+            message: getSessionWizardErrorMessage(err),
           });
         }
         throw err;
@@ -3212,7 +3243,7 @@ const SessionWizard = ({
 
     metadata.encryptedFields = encryptedFields;
     metadata.encryptedFieldGates = encryptedFieldGatesOut;
-    const gatesById = allEncryptionGates.reduce((acc, gate) => {
+    const gatesById = allEncryptionGates.reduce<Record<string, UnknownRecord>>((acc, gate) => {
       const sbtAddresses = normalizeSbtSelection(gate.sbts || [])
         .map((s) => s.address)
         .filter(Boolean);
@@ -3228,7 +3259,7 @@ const SessionWizard = ({
       return acc;
     }, {});
     const gateIds = allEncryptionGates.map((gate) => gate.id);
-    const gateCounts = {};
+    const gateCounts: Record<string, number> = {};
     Object.values(encryptedFieldGatesOut || {}).forEach((value) => {
       if (!value) return;
       const ids = Array.isArray(value) ? value : [value];
@@ -3238,7 +3269,7 @@ const SessionWizard = ({
         gateCounts[gateId] = (gateCounts[gateId] || 0) + 1;
       });
     });
-    let primaryGateId = gateIds[0] || null;
+    let primaryGateId = gateIds[0] || '';
     if (primaryGateId) {
       gateIds.forEach((id) => {
         if ((gateCounts[id] || 0) > (gateCounts[primaryGateId] || 0)) {
@@ -3246,15 +3277,19 @@ const SessionWizard = ({
         }
       });
     }
-    metadata.encryption = { gates: gatesById };
+    const encryptionMetadata: UnknownRecord = { gates: gatesById };
     if (primaryGateId && gatesById[primaryGateId]) {
-      metadata.encryption.gate = gatesById[primaryGateId];
+      encryptionMetadata.gate = gatesById[primaryGateId];
     }
+    metadata.encryption = encryptionMetadata;
 
     return { metadata, encryptedFields, onChainFields };
   };
 
-  const buildMetadataPayload = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
+  const buildMetadataPayload = async ({
+    workerUrlOverride = '',
+    signerAccountOverride = '',
+  }: Partial<SessionWizardPublishWorkerSignerArgs> = {}): Promise<SessionWizardMetadataEncryptionResult> => {
     const metadata = resolveSessionWizardMetadataPayloadBase({
       draft,
       sessionId,
@@ -3292,7 +3327,7 @@ const SessionWizard = ({
           hasJwk: !!uploadAuthOptions.arweaveJwk,
           ts: new Date().toISOString(),
         });
-        let headerTxId;
+        let headerTxId: string | undefined;
         try {
           headerTxId = await arweaveScripts.uploadDataToArweave(sessionHeaderFile, format, {
             sessionConfig: metadata,
@@ -3300,11 +3335,11 @@ const SessionWizard = ({
             context: { account: authAccount, providerLike: provider, chainId: metadata.networkChainId || registryChainId },
             requestId: headerRequestId,
             ...uploadAuthOptions,
-          });
+          }) as string;
         } catch (err) {
           log.error('[arweave][ui] header upload error', {
             requestId: headerRequestId,
-            message: err?.message || err,
+            message: getSessionWizardErrorMessage(err),
             ts: new Date().toISOString(),
           });
           throw err;
@@ -3336,7 +3371,11 @@ const SessionWizard = ({
       fieldOrder: METADATA_FIELD_ORDER,
       sanitizeContracts: sanitizeSessionWizardContracts,
       normalizeAiProvider,
-      normalizeAiModels,
+      normalizeAiModels: (raw, fallbackProvider = 'openai', transcription) => normalizeAiModels(
+        raw,
+        fallbackProvider,
+        transcription as UnknownRecord | null | undefined
+      ),
       normalizeAiModelForProvider,
       defaultAiModels: DEFAULT_AI_MODELS,
     });
@@ -3348,7 +3387,10 @@ const SessionWizard = ({
     return { ...result };
   };
 
-  const handleUploadMetadata = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
+  const handleUploadMetadata = async ({
+    workerUrlOverride = '',
+    signerAccountOverride = '',
+  }: Partial<SessionWizardPublishWorkerSignerArgs> = {}) => {
     let uploadRequestId = '';
     try {
       const rawSlug = toStr(draft.slug).trim();
@@ -3366,7 +3408,7 @@ const SessionWizard = ({
       let arweaveJwk = toStr(getCurrentWorkerSecrets().arweaveJwk).trim();
       if (!arweaveJwk && !workerSecretsEnabled) {
         const resolved = await getEffectiveArweaveKey({
-          sessionConfig: draft,
+          sessionConfig: draft as unknown as SessionConfig,
           sessionSlug: draft.slug || '',
           context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
         });
@@ -3389,12 +3431,12 @@ const SessionWizard = ({
         ts: new Date().toISOString(),
       });
       const txId = await arweaveScripts.uploadDataToArweave(metadata, 'json', {
-        sessionConfig: draft,
+        sessionConfig: draft as unknown as SessionConfig,
         sessionSlug: draft.slug || '',
         context: { account: authAccount, providerLike: provider, chainId: draft.networkChainId || registryChainId },
         requestId: uploadRequestId,
         ...uploadAuthOptions,
-      });
+      }) as string;
       log.info('[arweave][ui] metadata upload success', {
         requestId: uploadRequestId,
         txId,
@@ -3410,10 +3452,10 @@ const SessionWizard = ({
     } catch (err) {
       log.error('[arweave][ui] metadata upload error', {
         requestId: uploadRequestId || null,
-        message: err?.message || err,
+        message: getSessionWizardErrorMessage(err),
         ts: new Date().toISOString(),
       });
-      const errorMessage = err?.message || 'Failed to upload metadata.';
+      const errorMessage = getSessionWizardErrorMessage(err, 'Failed to upload metadata.');
       setStatus(errorMessage);
       throw err instanceof Error ? err : new Error(errorMessage);
     }
@@ -3555,7 +3597,10 @@ const SessionWizard = ({
     return deployedDrafts;
   };
 
-  const handleRegisterGroup = async ({ metadataUriOverride, sessionFieldsOverride } = {}) => {
+  const handleRegisterGroup = async ({
+    metadataUriOverride,
+    sessionFieldsOverride,
+  }: SessionWizardRegisterGroupArgs = {}) => {
     try {
       const registerIdentityDescriptor = resolveSessionWizardRegisterIdentityDescriptor({
         draftSlug: draft.slug,
@@ -3578,7 +3623,10 @@ const SessionWizard = ({
           registrySlug,
           sessionIdHexValue,
         });
-        const registryRead = sessionRegistryUtils.getRegistryContract(registerDuplicateCheckDescriptor.chainId);
+        const registryRead = sessionRegistryUtils.getRegistryContract(
+          registerDuplicateCheckDescriptor.chainId,
+          null
+        ) as SessionRegistryReadContract | null;
         if (registryRead) {
           if (
             registerDuplicateCheckDescriptor.shouldCheckSlug &&
@@ -3600,7 +3648,7 @@ const SessionWizard = ({
           }
         }
       } catch (err) {
-        if (err?.message) throw err;
+        if (getSessionWizardErrorMessage(err)) throw err;
       }
 
       const registerPreflightDescriptor = resolveSessionWizardRegisterPreflightDescriptor({
@@ -4563,8 +4611,8 @@ const SessionWizard = ({
       ).trim()
     : '';
   const wizardContractViewerContracts = useMemo(() => {
-    const draftContracts = draft?.contracts && typeof draft.contracts === 'object'
-      ? draft.contracts
+    const draftContracts: SessionContractsLike = draft?.contracts && typeof draft.contracts === 'object'
+      ? draft.contracts as SessionContractsLike
       : {};
     const defaults = getSessionWizardContractDefaults(registryChainId);
     const visibleKeys = getVisibleSessionWizardContractKeys(draftContracts, defaults);
@@ -4575,7 +4623,7 @@ const SessionWizard = ({
       network?.chainId ||
       0
     ) || null;
-    const mergedContracts = visibleKeys.reduce((acc, contractKey) => {
+    const mergedContracts = visibleKeys.reduce<SessionContractsLike>((acc, contractKey) => {
       const entry = draftContracts[contractKey] && typeof draftContracts[contractKey] === 'object'
         ? draftContracts[contractKey]
         : {};
