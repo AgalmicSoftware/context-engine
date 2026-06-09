@@ -2,11 +2,12 @@
 import React from 'react';
 import { Button } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: string;
+  placement?: SessionWizardTooltipRenderOptions['placement'];
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;

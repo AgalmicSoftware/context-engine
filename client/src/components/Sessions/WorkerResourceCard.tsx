@@ -3,13 +3,14 @@ import React from 'react';
 import styles from './SessionWizard.module.scss';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type GateLockProps = React.ComponentProps<typeof GateMultiSelectLock>;
 
 type RenderInfoTooltip = (props: {
   id?: string;
   content?: React.ReactNode;
-  placement?: string;
+  placement?: SessionWizardTooltipRenderOptions['placement'];
   testId?: string;
   ariaLabel?: string;
 }) => React.ReactNode;

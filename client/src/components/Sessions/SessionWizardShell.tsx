@@ -10,6 +10,7 @@ import SessionWizardIntroStatusRail from './SessionWizardIntroStatusRail';
 import SessionWizardModals from './SessionWizardModals';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
+import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
 type HeaderProps = React.ComponentProps<typeof SessionWizardHeader>;
 type IntroStatusRailProps = React.ComponentProps<typeof SessionWizardIntroStatusRail>;
@@ -36,7 +37,7 @@ type SessionWizardShellRenderInfoTooltip = (options: {
   ariaLabel?: string;
   content?: React.ReactNode;
   id?: string;
-  placement?: string;
+  placement?: SessionWizardTooltipRenderOptions['placement'];
   testId?: string;
   [key: string]: unknown;
 }) => React.ReactNode;

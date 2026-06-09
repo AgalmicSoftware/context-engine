@@ -72,7 +72,7 @@ export type SessionWizardCachedState = Record<string, unknown> & {
     sessionSlug?: unknown;
     workerUrl?: unknown;
   }) | null;
-  resourceGateMap?: Record<string, string>;
+  resourceGateMap?: Record<string, string | string[]>;
   sessionId?: unknown;
   workerSecrets?: WorkerSecretsLike;
   workerSecretsEnabled?: unknown;
