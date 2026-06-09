@@ -8,6 +8,7 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
+const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 
 function writeFile(rootDir, relativePath, contents) {
@@ -39,6 +40,11 @@ test('prepare-public-release strips review artifacts and preserves the generated
       sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-release-surface.js'),
+      fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
@@ -172,6 +178,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-release-surface.js'),
+      fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 

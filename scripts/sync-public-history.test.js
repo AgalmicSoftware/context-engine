@@ -8,6 +8,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'sync-public-history.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
+const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -32,6 +33,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
     fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'verify-public-release-surface.js'),
+    fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -284,6 +290,34 @@ test('sync-public-history replays public commits, skips private-only commits, an
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\n');
+  });
+});
+
+test('sync-public-history rejects public files that import stripped paths before pushing', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const strippedImport = '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';
+    writeFile(
+      sourceDir,
+      path.join('workers', 'sessionCorsWorker', 'chipotleClient.test.mjs'),
+      `import { DEFAULT_CHIPOTLE_ACTION_CODE } from '${strippedImport}';\n`,
+    );
+    commitAll(sourceDir, 'Add public worker test with stripped import', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Public release surface verification failed/);
+    assert.match(result.stderr, /contextEngine-cc\/lib\/litChipotleActionCatalog\.mjs/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
   });
 });
 
