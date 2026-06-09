@@ -145,6 +145,7 @@ import type {
   SbtListSessionLoadingStatusBySlug,
   SbtListSessionLoadingStatusOptions,
   SbtListSessionProgressSnapshot,
+  SbtListSessionUniverseSnapshot,
 } from './sbtListHelpers';
 
 const sbtLog = createLogger('sbt');
@@ -196,12 +197,7 @@ type SbtListPointerEventLike = {
   stopPropagation?: () => void;
   target?: EventTarget | null;
 };
-type SbtSessionUniverseSnapshot = {
-  fallbackEntryCount: number;
-  registryEntryCount: number;
-  registryHydrated: boolean;
-  slugs: string[];
-};
+type SbtSessionUniverseSnapshot = SbtListSessionUniverseSnapshot;
 type SbtListLiveProgress = SbtListRealtimeProgressRecord;
 type SbtListBySlug = Record<string, SbtListItem[] | undefined>;
 type SbtListLiveProgressBySlug = SbtListRealtimeProgressBySlug;
@@ -422,7 +418,7 @@ const SBTsList = ({
       return resolveSbtListSessionUniverseSnapshotUpdate({
         nextSnapshot: next,
         previousSnapshot: prev,
-      }) as SbtSessionUniverseSnapshot;
+      });
     });
     return next;
   }, [readSessionUniverseSnapshot]);
