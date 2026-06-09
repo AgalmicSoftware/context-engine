@@ -704,20 +704,26 @@ export const buildScopeFeaturedSbtSelectorEntries = ({
   return out;
 };
 
-export const buildSbtSelectorSelectedDisplayEntries = <
+export function buildSbtSelectorSelectedDisplayEntries<
   TSelected extends Record<string, unknown> = Record<string, unknown>,
   TOption extends Record<string, unknown> = Record<string, unknown>,
->({
+>(args: BuildSbtSelectorSelectedDisplayEntriesArgs<TSelected, TOption> & {
+  selectedSbts?: TSelected[];
+}): TSelected[];
+export function buildSbtSelectorSelectedDisplayEntries(
+  args?: BuildSbtSelectorSelectedDisplayEntriesArgs
+): unknown[];
+export function buildSbtSelectorSelectedDisplayEntries({
   currentSessionSlug = '',
   resolveSbtLabel = () => '',
   sbtOptionsByAddress = new Map(),
   sbtOptionsBySelectionKey = new Map(),
   selectedSbts = [],
-}: BuildSbtSelectorSelectedDisplayEntriesArgs<TSelected, TOption> = {}): TSelected[] => (
-  (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown): TSelected => {
-    const record = isRecord(sbt) ? sbt as TSelected : {} as TSelected;
+}: BuildSbtSelectorSelectedDisplayEntriesArgs = {}): unknown[] {
+  return (Array.isArray(selectedSbts) ? selectedSbts : []).map((sbt: unknown): unknown => {
+    const record = isRecord(sbt) ? sbt : {};
     const address = String(record.address || '').toLowerCase();
-    if (!address) return sbt as TSelected;
+    if (!address) return sbt;
     const fromOptions = (
       sbtOptionsBySelectionKey.get(getSelectableSbtKey(record)) ||
       sbtOptionsByAddress.get(address)
@@ -741,9 +747,9 @@ export const buildSbtSelectorSelectedDisplayEntries = <
       sessionName: fromOptions?.sessionName || record.sessionName || null,
       sessionSlug: pickNormalizedSessionSlug(fromOptions?.sessionSlug, record.sessionSlug, currentSessionSlug),
       ...(sessionBindingSlug != null ? { sessionBindingSlug } : {}),
-    } as unknown as TSelected;
-  })
-);
+    };
+  });
+}
 
 export const shouldIncludeSbtSelectorEntryForListScope = ({
   declaredSessionSlug = null,
