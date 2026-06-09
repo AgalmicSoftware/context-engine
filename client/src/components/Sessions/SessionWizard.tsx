@@ -450,7 +450,7 @@ type EncryptionGateState = UnknownRecord & {
   mode?: string;
   chainId?: ChainIdLike | null;
   perMemberLimit?: unknown;
-  sbts?: SbtSelection[];
+  sbts?: unknown[];
 };
 
 type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
@@ -468,7 +468,9 @@ type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   featuredSBTs?: UnknownRecord[];
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
+  arweave?: UnknownRecord;
   lit?: UnknownRecord;
+  rpc?: UnknownRecord;
   sponsored?: DraftSponsoredState;
   __registry?: UnknownRecord;
 };
@@ -562,6 +564,28 @@ type ProvisionedSponsoredContextState = UnknownRecord & {
   fields: UnknownRecord;
 };
 
+type BootstrapAdminActionInput = {
+  statement?: unknown;
+  targetSlug?: unknown;
+  workerUrl?: unknown;
+  accountOverride?: unknown;
+};
+
+type TypedAdminActionInput = {
+  action?: string;
+  body?: UnknownRecord;
+  targetSlug?: unknown;
+  workerUrl?: unknown;
+  accountOverride?: unknown;
+};
+
+type PublishArweaveUploadOptionsInput = {
+  arweaveJwk?: unknown;
+  workerUrl?: unknown;
+  sessionSlug?: unknown;
+  authAccount?: unknown;
+};
+
 type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
 type SessionHeaderFileState = File | Blob;
 type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement'];
@@ -597,6 +621,27 @@ const readSessionWizardSbtMetadata = async (
   ).bind(contractScripts);
   return getSbtMetadata('none', sbtAddress, lookupContext);
 };
+
+const buildSessionWizardSignedBootstrapAdminAuth = buildSignedBootstrapAdminAuth as unknown as (
+  input: {
+    slug?: unknown;
+    workerUrl?: unknown;
+    statement?: unknown;
+    context?: UnknownRecord;
+    nonce?: unknown;
+  }
+) => Promise<UnknownRecord>;
+
+const buildSessionWizardSignedAdminActionAuth = buildSignedAdminActionAuth as unknown as (
+  input: {
+    action?: unknown;
+    slug?: unknown;
+    body?: UnknownRecord;
+    workerUrl?: unknown;
+    context?: UnknownRecord;
+    nonce?: unknown;
+  }
+) => Promise<UnknownRecord>;
 
 const SessionWizard = ({
   account,
@@ -994,9 +1039,13 @@ const SessionWizard = ({
   const pendingSbtDeployContextRef = useRef(pendingSbtDeployContextSignature);
   // Regression guard: hidden worker secrets must stay out of deferred SBT uploads
   // when the wizard is switched to user-paid mode.
-  const getEnabledWorkerArweaveJwk = (secretsIn = workerSecrets) => (
-    workerSecretsEnabled ? toStr(secretsIn?.arweaveJwk).trim() : ''
-  );
+  const getEnabledWorkerArweaveJwk = (secretsIn: unknown = workerSecrets): string => {
+    if (!workerSecretsEnabled) return '';
+    const secrets = sanitizeSessionWizardWorkerSecretsForLitMode(
+      (secretsIn && typeof secretsIn === 'object') ? secretsIn as WorkerSecretsLike : undefined
+    );
+    return toStr(secrets?.arweaveJwk).trim();
+  };
   // Regression guard: sponsored-bundle apply/restore spans async work, so these
   // helpers must read from refs instead of state dependencies. Recreating them
   // mid-apply causes the bundle loader effect to cancel before it can finish.
@@ -1759,7 +1808,9 @@ const SessionWizard = ({
     contracts: defaultSponsoredSbtLookupContext.contracts,
     registry: defaultSponsoredSbtLookupContext.__registry,
   }), [defaultSponsoredSbtAddress, defaultSponsoredSbtLookupContext]);
-  const seededDefaultSponsoredSbtAddress = toStr(encryptionGates?.[0]?.sbts?.[0]?.address || '').trim().toLowerCase();
+  const seededDefaultSponsoredSbtAddress = toStr(
+    normalizeSbtSelection(encryptionGates?.[0]?.sbts || [])[0]?.address || ''
+  ).trim().toLowerCase();
 
   useEffect(() => {
     const defaultAddr = defaultSponsoredSbtAddress;
@@ -1876,7 +1927,9 @@ const SessionWizard = ({
     }))
   ), [pendingSbtDrafts]);
 
-  const getGateById = (gateId: unknown) => getSessionWizardGateById(allEncryptionGates, gateId);
+  const getGateById = (gateId: unknown): EncryptionGateState | null => (
+    getSessionWizardGateById(allEncryptionGates, gateId) as EncryptionGateState | null
+  );
   const resolveCreateSbtTargetGateId = (requestedGateId: unknown = '') => resolveSessionWizardCreateSbtTargetGateId({
     allEncryptionGates,
     defaultGateId,
@@ -1884,7 +1937,7 @@ const SessionWizard = ({
   });
   resolveCreateSbtTargetGateIdRef.current = resolveCreateSbtTargetGateId;
   const activeCreateSbtTargetGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
-  const activeCreateSbtTargetGate = getSessionWizardGateById(allEncryptionGates, activeCreateSbtTargetGateId);
+  const activeCreateSbtTargetGate = getGateById(activeCreateSbtTargetGateId);
   const focusCreateSbtTargetGate = (gateId: unknown = '') => {
     const resolvedGateId = resolveCreateSbtTargetGateId(gateId);
     if (!resolvedGateId) return;
@@ -4031,12 +4084,30 @@ const SessionWizard = ({
   ]);
 
   const clearWorkerSecretFields = () => {
-    const aiProviders = draft?.ai?.providers || {};
+    const aiConfig = (
+      draft?.ai &&
+      typeof draft.ai === 'object' &&
+      !Array.isArray(draft.ai)
+    ) ? draft.ai as UnknownRecord : {};
+    const aiProviders = (
+      aiConfig.providers &&
+      typeof aiConfig.providers === 'object' &&
+      !Array.isArray(aiConfig.providers)
+    ) ? aiConfig.providers as UnknownRecord : {};
     Object.keys(aiProviders).forEach((key) => {
       updateDraftValue(['ai', 'providers', key, 'apiKey'], '');
       updateDraftValue(['ai', 'providers', key, 'encryptedApiKey'], '');
     });
-    const rpcProviders = draft?.rpc?.providers || {};
+    const rpcConfig = (
+      draft?.rpc &&
+      typeof draft.rpc === 'object' &&
+      !Array.isArray(draft.rpc)
+    ) ? draft.rpc as UnknownRecord : {};
+    const rpcProviders = (
+      rpcConfig.providers &&
+      typeof rpcConfig.providers === 'object' &&
+      !Array.isArray(rpcConfig.providers)
+    ) ? rpcConfig.providers as UnknownRecord : {};
     Object.keys(rpcProviders).forEach((key) => {
       updateDraftValue(['rpc', 'providers', key, 'apiKey'], '');
       updateDraftValue(['rpc', 'providers', key, 'encryptedApiKey'], '');
@@ -4058,17 +4129,22 @@ const SessionWizard = ({
   // After successful metadata upload, clear arweaveJwk from cache (skip in dev).
   const clearCachedArweaveJwkAfterUpload = () => {
     if (effectivePersistWorkerSecrets) return;
-    applyWorkerSecretsUpdate((prev) => ({ ...prev, arweaveJwk: '' }));
+    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, arweaveJwk: '' }));
   };
 
-  const signBootstrapAdminAction = async ({ statement, targetSlug, workerUrl, accountOverride = '' }) => {
-    const baseUrl = normalizeWorkerUrl(workerUrl || resolveWorkerBaseUrl());
+  const signBootstrapAdminAction = async ({
+    statement = '',
+    targetSlug = '',
+    workerUrl = '',
+    accountOverride = '',
+  }: BootstrapAdminActionInput = {}) => {
+    const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSignedBootstrapAdminAuth({
+    return buildSessionWizardSignedBootstrapAdminAuth({
       slug: normalizeSlug(targetSlug),
       workerUrl: baseUrl,
-      statement,
+      statement: toStr(statement).trim(),
       context: {
         account: authAccount,
         chainId: Number(registryChainId || draft.networkChainId || network?.id || 1) || 1,
@@ -4082,7 +4158,7 @@ const SessionWizard = ({
     workerUrl = '',
     sessionSlug = '',
     authAccount = '',
-  } = {}) => (
+  }: PublishArweaveUploadOptionsInput = {}) => (
     // Regression guard: keep session metadata/header uploads on the same
     // sponsored-JWK path as deferred SBT finalization so /new publish does not
     // fix only one Arweave leg and regress the next.
@@ -4103,12 +4179,18 @@ const SessionWizard = ({
     })
   );
 
-  const signTypedAdminAction = async ({ action = 'set-config', body = {}, targetSlug, workerUrl, accountOverride = '' }) => {
-    const baseUrl = normalizeWorkerUrl(workerUrl || resolveWorkerBaseUrl());
+  const signTypedAdminAction = async ({
+    action = 'set-config',
+    body = {},
+    targetSlug = '',
+    workerUrl = '',
+    accountOverride = '',
+  }: TypedAdminActionInput = {}) => {
+    const baseUrl = normalizeWorkerUrl(toStr(workerUrl || resolveWorkerBaseUrl()).trim());
     if (!baseUrl) throw new Error('Worker URL is missing.');
     const authAccount = toStr(accountOverride || resolvedWalletAccountRef.current || account).trim();
-    return buildSignedAdminActionAuth({
-      action,
+    return buildSessionWizardSignedAdminActionAuth({
+      action: toStr(action).trim() || 'set-config',
       slug: normalizeSlug(targetSlug),
       body,
       workerUrl: baseUrl,

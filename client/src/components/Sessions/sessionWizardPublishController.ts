@@ -132,7 +132,10 @@ export type SessionWizardPublishFailureSettlementDescriptor = {
   publishStep: number;
 };
 
-export type SessionWizardRegisterTxEntry = AnyRecord;
+export type SessionWizardRegisterTxEntry = AnyRecord & {
+  hash: string;
+  action: string;
+};
 
 export type SessionWizardRegisterTxsUpdater =
   | SessionWizardRegisterTxEntry[]
