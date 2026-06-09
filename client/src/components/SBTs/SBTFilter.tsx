@@ -95,6 +95,9 @@ import type {
 } from './sbtFilterHelpers';
 import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  bindSbtFilterRuntimePorts,
+} from './sbtFilterRuntimePorts';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
@@ -104,15 +107,12 @@ import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 
 const sbtLog = createLogger('sbt');
 const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
-const writeCacheValue = writeCache as (namespace: string, slug: string, value: unknown) => Promise<unknown>;
+const sbtFilterRuntimePorts = bindSbtFilterRuntimePorts({
+  contractScripts,
+  writeCache,
+});
+const writeCacheValue = sbtFilterRuntimePorts.writeCache;
 
-type SbtMintBurnCountsResult = UnknownRecord & {
-  burnedAddresses?: unknown;
-  burnedCountByAddress?: unknown;
-  mintedAddresses?: unknown;
-  mintedCountByAddress?: unknown;
-  ok?: unknown;
-};
 type SbtFilterQuickSbtOption = {
   address: string;
 };
@@ -145,9 +145,7 @@ type SbtFilterState = Omit<SbtFilterInitialState, 'lastAppliedFilterSnapshot'> &
   lastAppliedFilterSnapshot: unknown;
   [key: string]: unknown;
 };
-const contractScriptsBoundary = contractScripts as {
-  getSbtMintBurnCountsByAddress: (...args: unknown[]) => Promise<SbtMintBurnCountsResult>;
-};
+const contractScriptsBoundary = sbtFilterRuntimePorts.contractScripts;
 
 const HOLDER_SET_MEMO_MAX_ENTRIES = 500;
 
