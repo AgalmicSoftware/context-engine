@@ -139,8 +139,17 @@ import {
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
+  buildSurveyResultsHtmlReportAnalysisDemoReadyPatch,
+  buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch,
+  buildSurveyResultsHtmlReportAnalysisErrorPatch,
+  buildSurveyResultsHtmlReportAnalysisProgressPatch,
+  buildSurveyResultsHtmlReportDemoModePatch,
   buildSurveyResultsHtmlReportDownloadFailurePatch,
   buildSurveyResultsHtmlReportDownloadSuccessPatch,
+  buildSurveyResultsHtmlReportFormatPatch,
+  buildSurveyResultsHtmlReportModalClosePatch,
+  buildSurveyResultsHtmlReportModalOpenPatch,
+  buildSurveyResultsHtmlReportSectionTogglePatch,
   type SurveyResultsHtmlReportSectionKey,
 } from './surveyResultsExportDisplayHelpers.js';
 import {
@@ -3552,69 +3561,44 @@ return SESSION_RESULTS_ANALYSIS_SECTION_KEYS.filter((key) => keys.has(key));
 
 openHtmlReportExportModal = (): void => {
 const snapshot = this.buildSessionResultsHtmlReportSnapshot();
-this.setState({
-  htmlReportModalOpen: true,
-  htmlReportExportedAt: snapshot.exportedAt,
-  htmlReportAnalysisError: '',
-  alertMessage: '',
-});
+this.setState(buildSurveyResultsHtmlReportModalOpenPatch(snapshot.exportedAt));
 }
 
 closeHtmlReportExportModal = (): void => {
-this.setState({
-  htmlReportModalOpen: false,
-});
+this.setState(buildSurveyResultsHtmlReportModalClosePatch());
 }
 
 toggleHtmlReportSection = (key: SurveyResultsHtmlReportSectionKey): void => {
 const current = this.getHtmlReportSelectedSections();
-this.setState({
-  htmlReportSelectedSections: {
-    ...current,
-    [key]: !current[key],
-  },
-});
+this.setState(buildSurveyResultsHtmlReportSectionTogglePatch({
+  currentSections: current,
+  sectionKey: key,
+}));
 }
 
 toggleHtmlReportDemoMode = (): void => {
 const nextDemoMode = !this.state.htmlReportDemoMode;
 const currentArtifact = this.getHtmlReportAnalysisArtifact();
-this.setState({
-  htmlReportDemoMode: nextDemoMode,
-  htmlReportAnalysisArtifact: nextDemoMode
-    ? this.buildHtmlReportDemoAnalysisArtifact()
-    : currentArtifact?.model === 'demo-preview'
-      ? null
-      : currentArtifact,
-  htmlReportAnalysisError: '',
-  htmlReportSelectedSections: nextDemoMode
-    ? {
-      argumentMap: true,
-      atlas: true,
-      report: true,
-      riskMatrix: true,
-      snapshotJson: true,
-    }
-    : { ...DEFAULT_HTML_REPORT_SELECTED_SECTIONS },
-});
+this.setState(buildSurveyResultsHtmlReportDemoModePatch({
+  currentArtifact,
+  demoArtifact: nextDemoMode ? this.buildHtmlReportDemoAnalysisArtifact() : null,
+  nextDemoMode,
+}));
 }
 
 handleHtmlReportFormatChange = (format: SessionResultsExportFormat): void => {
-this.setState({ htmlReportExportFormat: format });
+this.setState(buildSurveyResultsHtmlReportFormatPatch(format));
 }
 
 generateHtmlReportAnalysisViews = async (): Promise<void> => {
 if (this.isHtmlReportDemoModeActive()) {
-  this.setState({
-    htmlReportAnalysisArtifact: this.buildHtmlReportDemoAnalysisArtifact(),
-    htmlReportAnalysisError: '',
-  });
+  this.setState(buildSurveyResultsHtmlReportAnalysisDemoReadyPatch(this.buildHtmlReportDemoAnalysisArtifact()));
   return;
 }
 if (!this.isHtmlReportExportAuthorized()) {
-  this.setState({
-    htmlReportAnalysisError: 'Connect a wallet with permission to view these results before generating analysis views.',
-  });
+  this.setState(buildSurveyResultsHtmlReportAnalysisErrorPatch(
+    'Connect a wallet with permission to view these results before generating analysis views.'
+  ));
   return;
 }
 
@@ -3625,10 +3609,10 @@ const {
   participants,
 } = this.buildSessionResultsAnalysisPayloadForAi();
 if (!eligibility.eligible) {
-  this.setState({
-    htmlReportAnalysisError: eligibility.reasons.join(' '),
-    htmlReportAnalysisInputSignature: inputSignature,
-  });
+  this.setState(buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch({
+    inputSignature,
+    reason: eligibility.reasons.join(' '),
+  }));
   return;
 }
 
@@ -3661,9 +3645,9 @@ try {
   for (let index = 0; index < missingSections.length; index += 1) {
     const section = missingSections[index];
     const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
-    this.setState({
-      htmlReportAnalysisProgress: `Generating ${label} (${index + 1}/${missingSections.length})`,
-    });
+    this.setState(buildSurveyResultsHtmlReportAnalysisProgressPatch(
+      `Generating ${label} (${index + 1}/${missingSections.length})`
+    ));
     const prompt = buildSessionResultsAnalysisPrompt(aiPayload, section);
     const rawOutput = await callAI(prompt, {
       maxTokens: HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS[section],
