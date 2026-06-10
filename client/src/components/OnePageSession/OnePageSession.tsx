@@ -16,7 +16,7 @@ import {
   faPlus,
   faSyncAlt,
 } from '@fortawesome/free-solid-svg-icons';
-import { Alert } from 'reactstrap';
+import { Alert, Card, CardBody } from 'reactstrap';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { createLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
@@ -24,6 +24,11 @@ import { ethers } from 'ethers';
 
 
 import styles from './OnePageSession.module.scss';
+// Telegram-only panels reuse the normal session card styling so the
+// telegram/cloudflare page matches the on-chain look (duplicated on purpose
+// for now; consolidate when the telegram path stabilizes).
+import surveyToolStyles from '../SurveyTool/SurveyTool.module.scss';
+import sbtListStyles from '../SBTs/SBTsList.module.scss';
 
 import LazyFallback from '../Shared/LazyFallback';
 
@@ -835,29 +840,30 @@ class OnePageSession extends Component<any, any> {
     const visible = compact ? questions.slice(0, 8) : questions;
     return (
       <div
-        className={`${styles.telegramPanel} ${compact ? styles.telegramPanelCompact : ''}`.trim()}
+        className={styles.telegramListPanel}
         data-testid="ce-session-telegram-questions"
       >
-        <div className={styles.telegramPanelHeader}>
+        <div className={styles.telegramListHeader}>
           {answerState ? (
-            <span className={styles.telegramPanelMeta}>
+            <span>
               {answerState.unansweredCount} open · {answerState.answeredCount} answered
             </span>
-          ) : <span className={styles.telegramPanelMeta}>Session questions</span>}
-          <span className={styles.telegramPanelHeaderActions}>
+          ) : <span>Session questions</span>}
+          <span className={styles.telegramListHeaderActions}>
             {compact ? (
               <button
                 type="button"
-                className={styles.telegramPanelActionButton}
+                className={styles.sectionHeaderActionButton}
                 onClick={this.handleViewAllQuestionsClick}
                 data-testid="ce-session-telegram-questions-view-all"
               >
+                <FontAwesomeIcon icon={faExpand} />
                 View All
               </button>
             ) : null}
             <button
               type="button"
-              className={styles.telegramPanelActionButton}
+              className={styles.sectionHeaderActionButton}
               onClick={() => { void this.loadTelegramAgentQuestions(true); }}
               disabled={status === 'loading'}
               data-testid="ce-session-telegram-questions-refresh"
@@ -868,40 +874,42 @@ class OnePageSession extends Component<any, any> {
           </span>
         </div>
         {status === 'error' ? (
-          <div className={styles.telegramPanelError} role="alert">
+          <div className={styles.telegramListError} role="alert">
             Could not load questions from the session worker.
           </div>
         ) : null}
         {status === 'loading' && questions.length === 0 ? (
-          <div className={styles.telegramPanelEmpty}>
+          <div className={styles.telegramListEmpty}>
             <FontAwesomeIcon icon={faSpinner} spin /> Loading questions...
           </div>
         ) : null}
         {status === 'ready' && questions.length === 0 ? (
-          <div className={styles.telegramPanelEmpty}>No questions available yet.</div>
+          <div className={styles.telegramListEmpty}>No questions available yet.</div>
         ) : null}
-        <div className={styles.telegramQuestionList}>
+        <div className={surveyToolStyles.surveyQuestions}>
           {visible.map((question: any, index: number) => (
-            <div
+            <Card
               key={question.questionId || `${question.prompt}-${index}`}
-              className={styles.telegramQuestionCard}
+              className={surveyToolStyles.questionCard}
               data-testid="ce-session-telegram-question-item"
             >
-              <div className={styles.telegramQuestionPrompt}>{question.prompt}</div>
-              <div className={styles.telegramQuestionMeta}>
-                <span className={styles.telegramTagChip}>{question.questionType}</span>
-                {question.answeredByUser ? (
-                  <span className={`${styles.telegramTagChip} ${styles.telegramTagChipSelected}`.trim()}>Answered</span>
-                ) : null}
-                {(question.tags || []).slice(0, 3).map((tag: any) => (
-                  <span key={tag} className={styles.telegramTagChip}>{tag}</span>
-                ))}
-              </div>
-            </div>
+              <CardBody>
+                <h5 className={styles.telegramQuestionPromptDark}>{question.prompt}</h5>
+                <div className={styles.telegramChipRow}>
+                  <span className={styles.telegramChipDark}>{question.questionType}</span>
+                  {question.answeredByUser ? (
+                    <span className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}>Answered</span>
+                  ) : null}
+                  {(question.tags || []).slice(0, 3).map((tag: any) => (
+                    <span key={tag} className={styles.telegramChipDark}>{tag}</span>
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
         {compact && questions.length > visible.length ? (
-          <div className={styles.telegramPanelMeta}>
+          <div className={styles.telegramListEmpty}>
             {questions.length - visible.length} more in the full view
           </div>
         ) : null}
@@ -912,24 +920,32 @@ class OnePageSession extends Component<any, any> {
   renderTelegramBucketsPanel() {
     const cards = normalizeTelegramBucketCards(this.state.telegramClientAuth?.buckets);
     return (
-      <div className={styles.telegramPanel} data-testid="ce-session-telegram-buckets">
+      <div className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
         {cards.length === 0 ? (
-          <div className={styles.telegramPanelEmpty}>No research buckets linked yet.</div>
-        ) : cards.map((card: any) => (
-          <div key={card.categoryId} className={styles.telegramBucketCard}>
-            <div className={styles.telegramBucketCategory}>{card.categoryLabel}</div>
-            <div className={styles.telegramQuestionMeta}>
-              {card.options.map((option: any) => (
-                <span
-                  key={option.optionId}
-                  className={`${styles.telegramTagChip} ${option.selected ? styles.telegramTagChipSelected : ''}`.trim()}
-                >
-                  {option.label}
-                </span>
-              ))}
-            </div>
+          <div className={styles.telegramListEmpty}>No research buckets linked yet.</div>
+        ) : (
+          <div className={sbtListStyles.standardBase}>
+            {cards.map((card: any) => (
+              <article key={card.categoryId} className={sbtListStyles.standardCardShell}>
+                <div className={sbtListStyles.standardCardBodyLink}>
+                  <div className={sbtListStyles.standardCardInfo}>
+                    <p className={sbtListStyles.standardCardName}>{card.categoryLabel}</p>
+                    <div className={styles.telegramChipRow}>
+                      {card.options.map((option: any) => (
+                        <span
+                          key={option.optionId}
+                          className={`${styles.telegramChipDark} ${option.selected ? styles.telegramChipDarkSelected : ''}`.trim()}
+                        >
+                          {option.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
-        ))}
+        )}
       </div>
     );
   }

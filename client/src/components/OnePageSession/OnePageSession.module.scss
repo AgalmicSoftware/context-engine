@@ -311,6 +311,81 @@
   gap: 8px;
 }
 
+/* Dark-native telegram list panels that sit directly on the session page
+   background, mirroring the normal SurveyTool / SBT list card look. */
+.telegramListPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.telegramListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.telegramListHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.telegramListEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.92rem;
+}
+
+.telegramListError {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 100, 120, 0.35);
+  border-radius: var(--ce-radius-8);
+  background: rgba(178, 34, 52, 0.15);
+  color: #ffb4be;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.telegramQuestionPromptDark {
+  color: var(--ce-color-white);
+  font-weight: 600;
+  margin-bottom: 10px;
+  line-height: 1.35;
+}
+
+.telegramChipRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.telegramChipDark {
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.telegramChipDarkSelected {
+  border-color: rgba(88, 214, 141, 0.55);
+  background: rgba(47, 158, 104, 0.18);
+  color: #9ff0c4;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;
