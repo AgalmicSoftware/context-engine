@@ -1,5 +1,6 @@
 import {
   buildActiveTagModalState,
+  buildAutoDecryptAttemptedState,
   buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
@@ -14,6 +15,7 @@ import {
   buildCurrentStepState,
   buildDecryptEditFailureState,
   buildDecryptEditStartState,
+  buildDecryptingByKeyState,
   buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
   buildEditingResponseModeState,
@@ -28,6 +30,7 @@ import {
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
   buildQuestionsJsonToggleState,
+  buildRenderedQuestionPayloadPoolsState,
   buildResponseEditCompleteState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
@@ -63,6 +66,7 @@ import {
   buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyUserEditResponseStatePatch,
   buildSurveyQuestionPoolLoadState,
+  buildVisiblePileQuestionsAfterPromptDecryptState,
   buildViewingResponseModeState,
   isSurveyQuestionsMaskedPromptText,
   resolveSurveyQuestionsIconGlowClassName,
@@ -1286,5 +1290,79 @@ describe('surveyQuestionsTypes', () => {
     expect(buildCopiedSurveyJsonState(1)).toEqual({
       copiedSurveyJson: true,
     });
+  });
+
+  it('builds SurveyQuestions prompt decrypt state patches', () => {
+    const deps = {
+      pickBetterQuestionPayload: (_existing, incoming) => incoming,
+      areQuestionPayloadsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
+    };
+    const renderedPatch = buildRenderedQuestionPayloadPoolsState(
+      {
+        questionPool: [{ id: 'q1', prompt: '[encrypted]' }],
+        pileQuestions: [{ id: 'q1', prompt: '[encrypted]' }, { id: 'q2', prompt: 'open' }],
+        allQuestionsForFilter: [{ id: 'q1', prompt: '[encrypted]' }],
+      },
+      'Q1',
+      { prompt: 'Decrypted prompt', promptDecrypted: true },
+      deps
+    );
+    expect(renderedPatch).toEqual({
+      questionPool: [{ id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true }],
+      pileQuestions: [
+        { id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true },
+        { id: 'q2', prompt: 'open' },
+      ],
+      allQuestionsForFilter: [{ id: 'q1', prompt: 'Decrypted prompt', promptDecrypted: true }],
+    });
+    expect(buildRenderedQuestionPayloadPoolsState(
+      { questionPool: [{ id: 'q2', prompt: 'open' }] },
+      'q1',
+      { prompt: 'unused' },
+      deps
+    )).toBeNull();
+
+    expect(buildDecryptingByKeyState({ decryptingByKey: { old: true } }, 'q1:prompt', true)).toEqual({
+      decryptingByKey: { old: true, 'q1:prompt': true },
+    });
+    expect(buildDecryptingByKeyState({ decryptingByKey: { 'q1:prompt': true } }, 'q1:prompt', false)).toEqual({
+      decryptingByKey: { 'q1:prompt': false },
+    });
+    expect(buildAutoDecryptAttemptedState({ autoDecryptAttempted: { old: true } }, 'q1:answer')).toEqual({
+      autoDecryptAttempted: { old: true, 'q1:answer': true },
+    });
+
+    const promptDeps = {
+      isFilterStateActive: () => false,
+      isMaskedPromptText: (prompt) => prompt === '[encrypted]',
+    };
+    expect(buildVisiblePileQuestionsAfterPromptDecryptState(
+      {
+        allQuestionsForFilter: [
+          { id: 'q1', prompt: 'ready', promptDecrypted: true },
+          { id: 'q2', prompt: '[encrypted]' },
+          { id: 'q3', prompt: 'open' },
+        ],
+        pileQuestions: [
+          { id: 'q1', prompt: 'ready' },
+          { id: 'q2', prompt: '[encrypted]' },
+          { id: 'q3', prompt: 'open' },
+        ],
+        activePileIndex: 2,
+        hasHiddenGatedQuestions: false,
+      },
+      promptDeps
+    )).toEqual({
+      pileQuestions: [
+        { id: 'q1', prompt: 'ready', promptDecrypted: true },
+        { id: 'q3', prompt: 'open' },
+      ],
+      hasHiddenGatedQuestions: true,
+      activePileIndex: 1,
+    });
+    expect(buildVisiblePileQuestionsAfterPromptDecryptState(
+      { allQuestionsForFilter: [{ id: 'q1', prompt: 'ready' }], isFilterActive: true },
+      promptDeps
+    )).toBeNull();
   });
 });
