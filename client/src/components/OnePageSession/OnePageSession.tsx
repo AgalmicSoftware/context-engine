@@ -30,6 +30,7 @@ import styles from './OnePageSession.module.scss';
 import sbtListStyles from '../SBTs/SBTsList.module.scss';
 import TelegramTopicMap from './TelegramTopicMap';
 import TelegramQuestionPile from './telegram/TelegramQuestionPile';
+import { SbtListStandardCard } from '../SBTs/SbtListDisplayCards';
 
 import LazyFallback from '../Shared/LazyFallback';
 
@@ -1065,49 +1066,68 @@ class OnePageSession extends Component<any, any> {
             {cards.map((card: any) => {
               const selectedOptions = card.options.filter((option: any) => option.selected);
               const selectValue = localSelections[card.categoryId] ?? (selectedOptions[0]?.optionId || '');
-              return (
-                <article key={card.categoryId} className={sbtListStyles.standardCardShell}>
-                  <div className={sbtListStyles.standardCardBodyLink}>
-                    <div className={sbtListStyles.standardCardInfo}>
-                      <p className={sbtListStyles.standardCardName}>{card.categoryLabel}</p>
-                      {/* Local-only dropdown; bucket changes still happen via the Telegram bot. */}
-                      <select
-                        className={styles.telegramBucketSelect}
-                        value={selectValue}
-                        onChange={(event: any) => {
-                          const nextValue = event?.target?.value || '';
-                          this.setState((prevState: any) => ({
-                            telegramBucketLocalSelections: {
-                              ...(prevState.telegramBucketLocalSelections || {}),
-                              [card.categoryId]: nextValue,
-                            },
-                          }));
-                        }}
-                        aria-label={`${card.categoryLabel} bucket option`}
-                        data-testid="ce-session-telegram-bucket-select"
-                      >
-                        <option value="">Select an option</option>
-                        {card.options.map((option: any) => (
-                          <option key={option.optionId} value={option.optionId}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedOptions.length > 0 ? (
-                        <div className={styles.telegramChipRow}>
-                          {selectedOptions.map((option: any) => (
-                            <span
-                              key={option.optionId}
-                              className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}
-                            >
-                              {option.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
+              const selectedLabel = selectedOptions.map((option: any) => option.label).filter(Boolean).join(', ');
+              const bucketModel = {
+                description: selectedLabel || 'Optional research bucket for aggregate filtering.',
+                imageSrc: null,
+                key: `telegram-bucket-${card.categoryId}`,
+                locked: false,
+                name: card.categoryLabel,
+                sbtAddress: `telegram-bucket-${card.categoryId}`,
+                sbtAddressLower: `telegram-bucket-${card.categoryId}`.toLowerCase(),
+                sessionSlug: this.resolveCurrentSessionSlug(),
+              };
+              const bucketDetails = (
+                <div data-testid={`ce-session-telegram-bucket-${card.categoryId}`}>
+                  {/* Local-only dropdown; bucket changes still happen via the Telegram bot. */}
+                  <select
+                    className={styles.telegramBucketSelect}
+                    value={selectValue}
+                    onChange={(event: any) => {
+                      const nextValue = event?.target?.value || '';
+                      this.setState((prevState: any) => ({
+                        telegramBucketLocalSelections: {
+                          ...(prevState.telegramBucketLocalSelections || {}),
+                          [card.categoryId]: nextValue,
+                        },
+                      }));
+                    }}
+                    aria-label={`${card.categoryLabel} bucket option`}
+                    data-testid="ce-session-telegram-bucket-select"
+                  >
+                    <option value="">Select an option</option>
+                    {card.options.map((option: any) => (
+                      <option key={option.optionId} value={option.optionId}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedOptions.length > 0 ? (
+                    <div className={styles.telegramChipRow}>
+                      {selectedOptions.map((option: any) => (
+                        <span
+                          key={option.optionId}
+                          className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}
+                        >
+                          {option.label}
+                        </span>
+                      ))}
                     </div>
-                  </div>
-                </article>
+                  ) : null}
+                </div>
+              );
+              return (
+                <SbtListStandardCard
+                  key={bucketModel.key}
+                  detailsPanel={bucketDetails}
+                  href="#"
+                  isExpanded={true}
+                  model={bucketModel}
+                  onClick={(event) => event.preventDefault()}
+                  sbtLabel="research bucket"
+                  shellClassName={`${sbtListStyles.standardCardShell} ${sbtListStyles.standardCardShellExpanded || ''}`.trim()}
+                  styles={sbtListStyles}
+                />
               );
             })}
           </div>
