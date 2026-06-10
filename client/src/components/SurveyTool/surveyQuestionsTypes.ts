@@ -461,6 +461,28 @@ export type SurveyUserResponseMissingStatePatch = {
   userAnswers: null;
 };
 
+export type SurveySingleQuestionPoolFallbackStatePatch = {
+  isLoadingResponse: boolean;
+  questionPool: unknown[];
+};
+
+export type SurveySingleQuestionRetryLoadingStatePatch = {
+  isLoadingResponse: boolean;
+};
+
+export type SurveySingleQuestionPlaceholderHydrationStatePatch = {
+  questionPool: unknown[];
+  surveysResponseState: unknown;
+  isLoadingResponse: boolean;
+  noResponse: boolean;
+  responseLookupWarning: string;
+};
+
+export type SurveySingleQuestionReadyHydrationStatePatch = {
+  questionPool: unknown[];
+  surveysResponseState: unknown;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -1393,6 +1415,67 @@ export const buildUserSurveyResponseMissingState = (): SurveyUserResponseMissing
   userResponseEncrypted: false,
   userAnswers: null,
 });
+
+export const buildSingleQuestionPoolFallbackState = (): SurveySingleQuestionPoolFallbackStatePatch => ({
+  isLoadingResponse: false,
+  questionPool: [],
+});
+
+export const buildSingleQuestionRetryLoadingState = (): SurveySingleQuestionRetryLoadingStatePatch => ({
+  isLoadingResponse: true,
+});
+
+export const buildSingleQuestionPlaceholderHydrationState = (
+  prevState: { surveysResponseState?: unknown } = {},
+  {
+    mergeSurveyResponseState,
+    placeholderQuestion,
+  }: {
+    mergeSurveyResponseState: (
+      currentState: unknown,
+      newQuestionPool: unknown,
+      surveyIndex: unknown
+    ) => unknown;
+    placeholderQuestion: unknown;
+  }
+): SurveySingleQuestionPlaceholderHydrationStatePatch => ({
+  questionPool: [placeholderQuestion],
+  surveysResponseState: mergeSurveyResponseState(
+    prevState.surveysResponseState ||
+      [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    [placeholderQuestion],
+    0
+  ),
+  isLoadingResponse: false,
+  noResponse: false,
+  responseLookupWarning: '',
+});
+
+export const buildSingleQuestionReadyHydrationState = (
+  prevState: { surveysResponseState?: unknown } = {},
+  {
+    mergeSurveyResponseState,
+    questionData,
+  }: {
+    mergeSurveyResponseState: (
+      currentState: unknown,
+      newQuestionPool: unknown,
+      surveyIndex: unknown
+    ) => unknown;
+    questionData: UnknownRecord;
+  }
+): SurveySingleQuestionReadyHydrationStatePatch => {
+  const hydratedQuestion = { ...questionData, id: questionData.id };
+  return {
+    questionPool: [hydratedQuestion],
+    surveysResponseState: mergeSurveyResponseState(
+      prevState.surveysResponseState ||
+        [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      [hydratedQuestion],
+      0
+    ),
+  };
+};
 
 export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
   isDecrypting: true,

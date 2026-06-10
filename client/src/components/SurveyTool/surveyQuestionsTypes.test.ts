@@ -45,6 +45,10 @@ import {
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
   buildShowJsonState,
+  buildSingleQuestionPlaceholderHydrationState,
+  buildSingleQuestionPoolFallbackState,
+  buildSingleQuestionReadyHydrationState,
+  buildSingleQuestionRetryLoadingState,
   buildStandaloneAuthResetState,
   buildSurveyJsonToggleState,
   buildSurveyResponseFetchLoadingState,
@@ -1723,5 +1727,61 @@ describe('surveyQuestionsTypes', () => {
       userResponseEncrypted: false,
       userAnswers: null,
     });
+  });
+
+  it('builds SurveyQuestions single-question hydration patches', () => {
+    expect(buildSingleQuestionPoolFallbackState()).toEqual({
+      isLoadingResponse: false,
+      questionPool: [],
+    });
+    expect(buildSingleQuestionRetryLoadingState()).toEqual({
+      isLoadingResponse: true,
+    });
+
+    const calls = [];
+    const mergeSurveyResponseState = (currentState, questionPool, surveyIndex) => {
+      calls.push({ currentState, questionPool, surveyIndex });
+      return [{ currentState, questionPool, surveyIndex }];
+    };
+    const placeholderQuestion = { id: 'q1', prompt: '[encrypted]' };
+    expect(buildSingleQuestionPlaceholderHydrationState(
+      {},
+      { mergeSurveyResponseState, placeholderQuestion }
+    )).toEqual({
+      questionPool: [placeholderQuestion],
+      surveysResponseState: [{
+        currentState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        questionPool: [placeholderQuestion],
+        surveyIndex: 0,
+      }],
+      isLoadingResponse: false,
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+
+    const questionData = { id: 'Q1', prompt: 'Ready' };
+    expect(buildSingleQuestionReadyHydrationState(
+      { surveysResponseState: [{ answers: { q1: 'draft' } }] },
+      { mergeSurveyResponseState, questionData }
+    )).toEqual({
+      questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+      surveysResponseState: [{
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+        surveyIndex: 0,
+      }],
+    });
+    expect(calls).toEqual([
+      {
+        currentState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        questionPool: [placeholderQuestion],
+        surveyIndex: 0,
+      },
+      {
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'Q1', prompt: 'Ready' }],
+        surveyIndex: 0,
+      },
+    ]);
   });
 });
