@@ -370,6 +370,26 @@ export type SurveyLockAudienceMenuStatePatch = {
   lockAudienceGateDetailsByQuestion: Record<string, unknown> | undefined;
 };
 
+export type SurveyRenderedQuestionPayloadPoolsStatePatch = {
+  questionPool: unknown;
+  pileQuestions: unknown;
+  allQuestionsForFilter: unknown;
+};
+
+export type SurveyDecryptingByKeyStatePatch = {
+  decryptingByKey: Record<string, unknown>;
+};
+
+export type SurveyVisiblePileQuestionsAfterPromptDecryptStatePatch = {
+  pileQuestions: unknown[];
+  hasHiddenGatedQuestions: boolean;
+  activePileIndex: number;
+};
+
+export type SurveyAutoDecryptAttemptedStatePatch = {
+  autoDecryptAttempted: Record<string, unknown>;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -729,6 +749,132 @@ export const buildLockAudienceMenuState = (
     lockAudienceGateDetailsByQuestion: nextValue ? prevState.lockAudienceGateDetailsByQuestion : {},
   };
 };
+
+export const buildRenderedQuestionPayloadPoolsState = (
+  prevState: {
+    questionPool?: unknown;
+    pileQuestions?: unknown;
+    allQuestionsForFilter?: unknown;
+  } = {},
+  questionId: unknown,
+  questionPayload: unknown,
+  deps: {
+    pickBetterQuestionPayload: (existing: unknown, incoming: unknown) => unknown;
+    areQuestionPayloadsEquivalent: (left: unknown, right: unknown) => boolean;
+  }
+): SurveyRenderedQuestionPayloadPoolsStatePatch | null => {
+  const qid = String(questionId || '').trim().toLowerCase();
+  if (!qid || !questionPayload) return null;
+
+  let didChange = false;
+  const patchList = (list: unknown) => {
+    if (!Array.isArray(list) || list.length === 0) return list;
+    return list.map((item) => {
+      const itemId = String((item as UnknownRecord | null | undefined)?.id || '').toLowerCase();
+      if (itemId !== qid) return item;
+      const picked = deps.pickBetterQuestionPayload(item, questionPayload) || questionPayload;
+      const merged = { ...(item as UnknownRecord), ...(picked as UnknownRecord), id: qid };
+      if (deps.areQuestionPayloadsEquivalent(item, merged)) {
+        return item;
+      }
+      didChange = true;
+      return merged;
+    });
+  };
+
+  const nextQuestionPool = patchList(prevState.questionPool);
+  const nextPileQuestions = patchList(prevState.pileQuestions);
+  const nextAllQuestionsForFilter = patchList(prevState.allQuestionsForFilter);
+  if (!didChange) return null;
+  return {
+    questionPool: nextQuestionPool,
+    pileQuestions: nextPileQuestions,
+    allQuestionsForFilter: nextAllQuestionsForFilter,
+  };
+};
+
+export const buildDecryptingByKeyState = (
+  prevState: { decryptingByKey?: Record<string, unknown> } = {},
+  key: unknown,
+  isDecrypting: unknown
+): SurveyDecryptingByKeyStatePatch => ({
+  decryptingByKey: {
+    ...(prevState.decryptingByKey || {}),
+    [String(key)]: !!isDecrypting,
+  },
+});
+
+export const buildVisiblePileQuestionsAfterPromptDecryptState = (
+  prevState: {
+    activePileIndex?: unknown;
+    allQuestionsForFilter?: unknown;
+    filterState?: unknown;
+    hasHiddenGatedQuestions?: unknown;
+    isFilterActive?: unknown;
+    pileQuestions?: unknown;
+  } = {},
+  deps: {
+    isFilterStateActive: (filterState: unknown) => boolean;
+    isMaskedPromptText: (prompt: unknown) => boolean;
+  }
+): SurveyVisiblePileQuestionsAfterPromptDecryptStatePatch | null => {
+  const source = Array.isArray(prevState.allQuestionsForFilter) ? prevState.allQuestionsForFilter : null;
+  if (!source || !source.length) return null;
+  const isFilterActive = !!prevState.isFilterActive || deps.isFilterStateActive(prevState.filterState);
+  if (isFilterActive) return null;
+
+  const visible = source.filter(
+    (question) => !(question && deps.isMaskedPromptText((question as UnknownRecord)?.prompt) && !(question as UnknownRecord)?.promptDecrypted)
+  );
+  const hasHidden = source.some(
+    (question) => question && deps.isMaskedPromptText((question as UnknownRecord)?.prompt) && !(question as UnknownRecord)?.promptDecrypted
+  );
+
+  const prevPile = Array.isArray(prevState.pileQuestions) ? prevState.pileQuestions : [];
+  const activePileIndex = prevState.activePileIndex as number;
+  const currentActiveId = (
+    prevPile.length > 0 && prevPile[activePileIndex]
+      ? String((prevPile[activePileIndex] as UnknownRecord | null | undefined)?.id || '').toLowerCase()
+      : ''
+  );
+  const activeIdxFromId = currentActiveId
+    ? visible.findIndex((question) => String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() === currentActiveId)
+    : -1;
+  const nextActiveIndex = activeIdxFromId >= 0
+    ? activeIdxFromId
+    : Math.min(Number(prevState.activePileIndex || 0), Math.max(visible.length - 1, 0));
+
+  const sameOrder = (
+    prevPile.length === visible.length &&
+    prevPile.every((question, idx) => (
+      String((question as UnknownRecord | null | undefined)?.id || '').toLowerCase() ===
+      String((visible[idx] as UnknownRecord | null | undefined)?.id || '').toLowerCase()
+    ))
+  );
+  if (
+    sameOrder &&
+    prevState.hasHiddenGatedQuestions === hasHidden &&
+    Number(prevState.activePileIndex || 0) === nextActiveIndex
+  ) {
+    return null;
+  }
+
+  return {
+    pileQuestions: visible,
+    hasHiddenGatedQuestions: hasHidden,
+    activePileIndex: nextActiveIndex,
+  };
+};
+
+export const buildAutoDecryptAttemptedState = (
+  prevState: { autoDecryptAttempted?: Record<string, unknown> } = {},
+  key: unknown
+): SurveyAutoDecryptAttemptedStatePatch => ({
+  autoDecryptAttempted: {
+    ...(prevState.autoDecryptAttempted || {}),
+    [String(key)]: true,
+  },
+});
 
 export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
   isDecrypting: true,
