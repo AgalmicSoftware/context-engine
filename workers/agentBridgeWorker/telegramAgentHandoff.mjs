@@ -438,6 +438,50 @@ function jsonClientLogin(request, env, data, init = {}) {
   });
 }
 
+// Token-personalized browser reads (web client results/questions panels). Uses the
+// client-login allow-list — NOT a wildcard — because responses vary per user token.
+const AGENT_BROWSER_READ_CORS_PATHS = Object.freeze([
+  '/telegram/agent/api/questions',
+  '/telegram/agent/api/results',
+]);
+
+function agentBrowserReadCorsHeaders(request, env = {}) {
+  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
+  if (!origin) return {};
+  const allowed = clientLoginAllowedOrigins(env);
+  if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
+    return null;
+  }
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-headers': 'authorization, content-type, x-ce-agent-token, x-context-engine-agent-token',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
+
+function applyAgentBrowserReadCors(request, env, response) {
+  if (!request || !response) return response;
+  if (safeString(request.method).toUpperCase() !== 'GET') return response;
+  let pathname = '';
+  try {
+    pathname = new URL(request.url).pathname;
+  } catch {
+    return response;
+  }
+  if (!AGENT_BROWSER_READ_CORS_PATHS.includes(pathname)) return response;
+  const cors = agentBrowserReadCorsHeaders(request, env);
+  if (!cors || Object.keys(cors).length === 0) return response;
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(cors)) headers.set(name, value);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function extractTelegramAgentToken(value = '') {
   const raw = safeString(value);
   if (!raw) return '';
@@ -5207,6 +5251,13 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (url.pathname === '/telegram/agent/api/session-meta') {
     return handleSessionMetaHttpRequest({ request, env });
   }
+  if (AGENT_BROWSER_READ_CORS_PATHS.includes(url.pathname) && request.method === 'OPTIONS') {
+    const cors = agentBrowserReadCorsHeaders(request, env);
+    if (cors === null) {
+      return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
+    }
+    return new Response(null, { status: 204, headers: cors || {} });
+  }
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
     const payload = await skillVersionPayloadWithFlag(env);
     return json(payload);
@@ -5377,7 +5428,10 @@ async function handleTelegramAgentHandoffRequestUnsafe({
 
 export async function handleTelegramAgentHandoffRequest(args = {}) {
   try {
-    return await handleTelegramAgentHandoffRequestUnsafe(args);
+    const response = await handleTelegramAgentHandoffRequestUnsafe(args);
+    // Browser panels need CORS on success AND auth/gate errors alike for the
+    // questions/results GET reads; applied centrally so no return path is missed.
+    return applyAgentBrowserReadCors(args.request, args.env, response);
   } catch {
     const body = { ok: false, reason: 'telegram_agent_internal_error' };
     assertNoSecretShape(body, 'Telegram agent internal error response must not serialize secrets.');
