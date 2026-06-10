@@ -142,8 +142,11 @@ import {
   isSurveyResultsStateSynced,
 } from './surveyResultsSyncHelpers.js';
 import {
+  createInitialSurveyResultsState,
+  preserveSurveyResultsFilterStateValue,
+} from './surveyResultsState';
+import {
   SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS as DEFAULT_HTML_REPORT_SELECTED_SECTIONS,
-  SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
   buildSurveyResultsDemoAnalysisArtifact,
   buildSurveyResultsExportBaseFileName,
   buildSurveyResultsExportControlsDisplayDescriptor,
@@ -180,7 +183,6 @@ import {
 } from './surveyResultsAnalysisArtifactCachePorts';
 import {
   buildSurveyResultsBookmarksCacheReadRequest,
-  selectSurveyResultsBookmarkLists,
 } from './surveyResultsBookmarkCacheReadPorts';
 import {
   runSurveyResultsAnalysisArtifactReadController,
@@ -334,7 +336,7 @@ type SurveyResultsSummaryResponseRow = SurveyResultsAggregateRow & {
 type SurveyResultsFiltersCache = SurveyResultsRecord & {
   bookmarkedFilters?: unknown;
 };
-type SurveyResultsFilterState = SurveyResultsRecord;
+export type SurveyResultsFilterState = SurveyResultsRecord;
 type SurveyResultsQuestionExportRecord = {
   id: unknown;
   options: unknown[];
@@ -551,7 +553,7 @@ type SurveyResultsDemoViewOption = {
   key: string;
   label: string;
 };
-type SurveyResultsProps = SurveyResultsRecord & {
+export type SurveyResultsProps = SurveyResultsRecord & {
   account?: string;
   activeSessionSlug?: string;
   defaultTags?: unknown[];
@@ -589,7 +591,7 @@ type SurveyResultsProps = SurveyResultsRecord & {
   surveyId?: string;
   viewMode?: string;
 };
-type SurveyResultsState = SurveyResultsRecord & {
+export type SurveyResultsState = SurveyResultsRecord & {
   activeQuestionToggles: Record<string, boolean>;
   activeToggles: Record<string, boolean>;
   aggregateQuestionResponses: Record<string, unknown[]>;
@@ -664,11 +666,6 @@ type SurveyResultsSbtDisplayLabelResolver = (args: {
 }) => string;
 const toSurveyResultsRecord = (value: unknown): SurveyResultsRecord => (
   value && typeof value === 'object' ? value as SurveyResultsRecord : {}
-);
-const preserveSurveyResultsFilterStateValue = (
-  value: unknown
-): SurveyResultsFilterState => (
-  (value || {}) as SurveyResultsFilterState
 );
 const normalizeNextSurveyResultsFilterState = (
   nextFilterState: unknown,
@@ -1071,106 +1068,11 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   constructor(props: SurveyResultsProps) {
     super(props);
 
-    const initialSlug = resolveSurveyResultsExplicitSessionSlug(props) ?? '';
-    const bookmarksReadRequest = buildSurveyResultsBookmarksCacheReadRequest({ slug: initialSlug });
-    let bookmarksCacheValue: unknown = null;
-
-    try {
-      bookmarksCacheValue = peekCacheSync(
-        bookmarksReadRequest.namespace,
-        bookmarksReadRequest.slug,
-        bookmarksReadRequest.options
-      );
-    } catch (error) {
-      surveyLog.error('[SurveyResults] Error reading bookmarksCache:', error);
-      bookmarksCacheValue = null;
-    }
-    const {
-      surveys: bootstrapSurveyIds,
-      questions: bootstrapQuestionIds,
-    } = selectSurveyResultsBookmarkLists(bookmarksCacheValue);
-
     this._syncLoadingStartedAt = null;
     this._scrollMutationObserver = null;
     this._scrollToQuestionRetryTimer = null;
 
-    this.state = {
-      responses: [],
-      sbtFilteredResponses: [],
-      csvData: '',
-      exportType: EXPORT_TYPES.CSV_QUESTIONS_AND_RESPONSES,
-      alertMessage: '',
-      loading: false,
-      surveyTitle: '',
-      surveyDocumentURLs: [],
-      surveyId: '', // This will be set from props or determined logic
-      activeQuestionToggles: {},
-      questionResponses: {},
-      sbtFilteredQuestionResponses: {},
-      aggregatorQuestionResponses: {},
-      sbtFilteredAggregatorQuestionResponses: {},
-      viewMode: this.props.viewMode as SurveyResultsState['viewMode'], // 'survey' or 'questions'
-      filterLoading: false,
-      showQuestionFilter: false,
-      filterState: preserveSurveyResultsFilterStateValue(this.props.filterState),
-      syncDetailsOpen: false,
-      bookmarkedQuestionIDs: bootstrapQuestionIds,
-      bookmarkedSurveyIDs: bootstrapSurveyIds,
-      questionIdSortBy: 'responses',
-      questionIdSortAsc: true,
-      totalQuestionsCount: 0,
-      totalResponsesCount: 0,
-      filteredResponsesCount: 0,
-      surveyViewMode: 'individuals', // aggregator vs. individuals
-      exportAreaOpen: false,
-      aggregateQuestionResponses: {},
-      questionResultsHydrated: false,
-      surveyResultsHydrated: false,
-
-      // chunk-based progress placeholders (not fully used)
-      questionPartialLoading: false,
-      questionPartialProgress: 0,
-      questionPartialTotal: 0,
-
-      responsePartialLoading: false,
-      responsePartialProgress: 0,
-      responsePartialTotal: 0,
-      networkLatestBlock: 0,
-
-      // We track local blocks for question & survey data
-      questionLocalBlock: 0,
-      responseLocalBlock: 0,
-      surveyLocalBlock: 0,
-
-      // track how many questions & responses are cached
-      cachedQuestionsCount: 0,
-      cachedSurveyResponsesCount: 0,
-
-      // block targets for manual refresh
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      refreshTargetSurveyBlock: 0,
-
-      activeToggles: {},
-      filterBookmarkedFeedback: false,
-      filteredQuestionsCount: this.props.filteredQuestionsCount === undefined ? null : this.props.filteredQuestionsCount,
-      isFilterActive: false,
-      lockedResponseDetailsOpen: false,
-      lockedResponsesDecrypting: false,
-      decryptedResponseOverrides: {},
-      demoResultsViewMode: 'raw',
-      demoResultsAtlasNodeId: null,
-      htmlReportModalOpen: false,
-      htmlReportExportedAt: '',
-      htmlReportExportFormat: SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-      htmlReportSelectedSections: { ...DEFAULT_HTML_REPORT_SELECTED_SECTIONS },
-      htmlReportAnalysisGenerating: false,
-      htmlReportAnalysisError: '',
-      htmlReportAnalysisArtifact: null,
-      htmlReportAnalysisInputSignature: '',
-      htmlReportAnalysisProgress: '',
-      htmlReportDemoMode: false,
-    };
+    this.state = createInitialSurveyResultsState(props);
 
     this.questionIdTableRef = React.createRef();
     this.questionFilterRef = React.createRef();
