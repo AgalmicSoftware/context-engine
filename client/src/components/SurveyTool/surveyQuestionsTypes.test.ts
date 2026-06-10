@@ -23,6 +23,8 @@ import {
   buildHasherState,
   buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
+  buildInitialStandaloneResponseState,
+  buildInitialSurveyResponseState,
   buildJsonPreviewState,
   buildLockAudienceGateDetailsState,
   buildLockAudienceMenuState,
@@ -30,13 +32,16 @@ import {
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
   buildQuestionsJsonToggleState,
+  buildQuestionPoolResponseMergeState,
   buildRenderedQuestionPayloadPoolsState,
   buildResponseEditCompleteState,
+  buildResponseHydrationInvalidatedState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
   buildShowJsonState,
   buildStandaloneAuthResetState,
   buildSurveyJsonToggleState,
+  buildSurveyResponseMergeState,
   buildSubmitFailureState,
   buildSubmitPreparationErrorState,
   buildSubmitSuccessState,
@@ -1364,5 +1369,84 @@ describe('surveyQuestionsTypes', () => {
       { allQuestionsForFilter: [{ id: 'q1', prompt: 'ready' }], isFilterActive: true },
       promptDeps
     )).toBeNull();
+  });
+
+  it('builds SurveyQuestions lifecycle hydration state patches', () => {
+    expect(buildResponseHydrationInvalidatedState()).toEqual({
+      isLoadingResponse: false,
+    });
+    expect(buildInitialSurveyResponseState({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+    })).toEqual({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+    });
+    expect(buildInitialStandaloneResponseState({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+      jsonPreview: '{"q1":"yes"}',
+    })).toEqual({
+      surveysResponseState: [{ answers: { q1: 'yes' } }],
+      editBaseline: { answers: { q1: 'yes' } },
+      jsonPreview: '{"q1":"yes"}',
+    });
+
+    const calls = [];
+    const mergeSurveyResponseState = (currentState, questionPool, surveyIndex) => {
+      calls.push({ currentState, questionPool, surveyIndex });
+      return [{ merged: surveyIndex, currentState, questionPool }];
+    };
+    expect(buildQuestionPoolResponseMergeState(
+      {
+        surveysResponseState: [{ answers: { q1: 'draft' } }],
+        editBaseline: { answers: { q1: 'baseline' } },
+      },
+      {
+        includeQuestionPool: true,
+        mergeSurveyResponseState,
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 2,
+      }
+    )).toEqual({
+      questionPool: [{ id: 'q1' }],
+      surveysResponseState: [{
+        merged: 2,
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q1' }],
+      }],
+      editBaseline: {
+        merged: 0,
+        currentState: [{ answers: { q1: 'baseline' } }],
+        questionPool: [{ id: 'q1' }],
+      },
+    });
+    expect(calls).toEqual([
+      {
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 2,
+      },
+      {
+        currentState: [{ answers: { q1: 'baseline' } }],
+        questionPool: [{ id: 'q1' }],
+        surveyIndex: 0,
+      },
+    ]);
+
+    expect(buildSurveyResponseMergeState(
+      { surveysResponseState: [{ answers: { q1: 'draft' } }] },
+      {
+        mergeSurveyResponseState,
+        questionPool: [{ id: 'q2' }],
+        surveyIndex: 3,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        merged: 3,
+        currentState: [{ answers: { q1: 'draft' } }],
+        questionPool: [{ id: 'q2' }],
+      }],
+    });
   });
 });
