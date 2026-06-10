@@ -30,6 +30,7 @@ import styles from './OnePageSession.module.scss';
 import sbtListStyles from '../SBTs/SBTsList.module.scss';
 import TelegramTopicMap from './TelegramTopicMap';
 import TelegramQuestionPile from './telegram/TelegramQuestionPile';
+import TelegramTokenGate from './telegram/TelegramTokenGate';
 import { SbtListStandardCard } from '../SBTs/SbtListDisplayCards';
 
 import LazyFallback from '../Shared/LazyFallback';
@@ -857,50 +858,6 @@ class OnePageSession extends Component<any, any> {
     void this.loadTelegramAgentQuestions(true);
     void this.loadTelegramAgentResults(true);
     return result;
-  }
-
-  renderTelegramTokenForm() {
-    return (
-      <form
-        className={styles.telegramTokenLoginForm}
-        onSubmit={this.handleTelegramLoginSubmit}
-        data-testid="ce-session-telegram-token-login"
-      >
-        <label className={styles.telegramTokenLoginLabel} htmlFor="ce-session-telegram-token-input">
-          Telegram bot token
-        </label>
-        <textarea
-          id="ce-session-telegram-token-input"
-          className={styles.telegramTokenLoginInput}
-          value={this.state.telegramLoginInput}
-          onChange={this.handleTelegramLoginInputChange}
-          placeholder="Paste the token or the full copied bot message"
-          rows={4}
-          autoComplete="off"
-          data-testid="ce-session-telegram-token-input"
-        />
-        {this.state.telegramLoginError ? (
-          <div className={styles.telegramTokenLoginError} role="alert">
-            {this.state.telegramLoginError}
-          </div>
-        ) : null}
-        <button
-          type="submit"
-          className={styles.telegramTokenLoginButton}
-          disabled={this.state.telegramLoginStatus === 'loading'}
-          data-testid="ce-session-telegram-token-submit"
-        >
-          {this.state.telegramLoginStatus === 'loading' ? (
-            <>
-              <FontAwesomeIcon icon={faSpinner} spin />
-              <span>Logging in...</span>
-            </>
-          ) : (
-            <span>Log in with Telegram Token</span>
-          )}
-        </button>
-      </form>
-    );
   }
 
   buildTelegramTopicMapCodexPrompt() {
@@ -3048,7 +3005,13 @@ class OnePageSession extends Component<any, any> {
                 Paste the agent token from the Context Engine Telegram bot (Onboard Agent → Copy New Agent Info) to open the interactive report.
               </span>
             </Alert>
-            {this.renderTelegramTokenForm()}
+            <TelegramTokenGate
+              loginError={this.state.telegramLoginError}
+              loginInput={this.state.telegramLoginInput}
+              loginStatus={this.state.telegramLoginStatus}
+              onInputChange={this.handleTelegramLoginInputChange}
+              onSubmit={this.handleTelegramLoginSubmit}
+            />
           </div>
         </div>
       );
@@ -3225,22 +3188,18 @@ class OnePageSession extends Component<any, any> {
         )}
 
         {telegramOnlySession && telegramClientLoggedIn && (
-          <div className={styles.telegramTokenConnectedPanel}>
-            <div className={styles.telegramTokenConnectedBar}>
-              <span>Telegram session connected</span>
-              <button
-                type="button"
-                className={styles.telegramTokenChangeButton}
-                data-testid="ce-session-telegram-change-token"
-                onClick={() => this.setState((prevState: any) => ({
-                  showTelegramTokenReentry: !prevState.showTelegramTokenReentry,
-                }))}
-              >
-                Change token
-              </button>
-            </div>
-            {this.state.showTelegramTokenReentry ? this.renderTelegramTokenForm() : null}
-          </div>
+          <TelegramTokenGate
+            connected={true}
+            loginError={this.state.telegramLoginError}
+            loginInput={this.state.telegramLoginInput}
+            loginStatus={this.state.telegramLoginStatus}
+            showReentry={this.state.showTelegramTokenReentry}
+            onInputChange={this.handleTelegramLoginInputChange}
+            onSubmit={this.handleTelegramLoginSubmit}
+            onToggleReentry={() => this.setState((prevState: any) => ({
+              showTelegramTokenReentry: !prevState.showTelegramTokenReentry,
+            }))}
+          />
         )}
 
         {/* Branding/header */}
