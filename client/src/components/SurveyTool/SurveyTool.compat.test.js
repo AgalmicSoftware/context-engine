@@ -1,7 +1,8 @@
 import SurveyTool from './SurveyTool';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
+import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
+import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { resolveSurveyToolQuestionReadCacheContext } from './surveyToolSessionResolution';
 
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 
@@ -48,19 +49,38 @@ describe('SurveyTool compatibility wiring', () => {
   });
 
   it('uses __registry.registryChainId when SurveyQuestions resolves the session chain', () => {
-    const subject = new SurveyQuestions({
-      sessionSlug: 'edge',
-      activeSessionSlug: 'edge',
-      network: { id: 8453, chainId: 8453, name: 'Base' },
-    });
-    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({
-      slug: 'edge',
-      __registry: {
-        registryChainId: 84532,
-      },
-    }));
+    const resolveBySlug = jest.fn((slug) => (
+      slug === 'edge'
+        ? {
+            slug: 'edge',
+            __registry: {
+              registryChainId: 84532,
+            },
+          }
+        : null
+    ));
 
-    expect(subject.resolveSessionChainId('edge')).toBe(84532);
+    const resolved = resolveSurveyToolQuestionReadCacheContext({
+      sessionSlug: 'edge',
+      network: { id: 8453, chainId: 8453, name: 'Base' },
+      resolveBySlug,
+    });
+
+    expect(resolved).toMatchObject({
+      sessionSlug: 'edge',
+      sessionConfig: {
+        slug: 'edge',
+        __registry: {
+          registryChainId: 84532,
+        },
+      },
+      networkId: 84532,
+      networkIdStr: '84532',
+    });
+    expect(resolveBySlug).toHaveBeenCalledWith('edge');
+    // port note: dropped direct `SurveyQuestions.resolveSessionChainId()`
+    // invocation. The exported session-resolution helper is the behavior-level
+    // chain selector that preserves the same registryChainId-over-wallet rule.
   });
 
   it('renders extracted PileViewMode through SurveyTool.tsx in pile mode', () => {
@@ -118,6 +138,20 @@ describe('SurveyTool compatibility wiring', () => {
   });
 
   it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
-    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(SurveyQuestions.prototype);
+    const { getByTestId } = renderSurveyPileViewMode({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      isQuestionCacheReady: true,
+      onFilterChange: jest.fn(),
+      runtimeStrategy: createPileViewRuntimeStrategy(),
+    });
+
+    expect(getByTestId('ce-survey-filter-toggle')).toBeInTheDocument();
+    expect(getByTestId('ce-survey-create-toggle-pile')).toBeInTheDocument();
+    // port note: dropped prototype inheritance assertion. The coordinated
+    // hooks flip intentionally removes `extends SurveyQuestions`; this guard
+    // now verifies the extracted pile surface still renders through its shared
+    // runtime wiring instead of pinning the class prototype chain.
   });
 });
