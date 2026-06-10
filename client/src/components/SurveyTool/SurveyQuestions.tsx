@@ -502,6 +502,8 @@ import {
   buildHasherState,
   buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
+  buildInitialStandaloneResponseState,
+  buildInitialSurveyResponseState,
   buildJsonPreviewState,
   buildLockAudienceGateDetailsState,
   buildLockAudienceMenuState,
@@ -509,7 +511,9 @@ import {
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
   buildQuestionsJsonToggleState,
+  buildQuestionPoolResponseMergeState,
   buildRenderedQuestionPayloadPoolsState,
+  buildResponseHydrationInvalidatedState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
   buildShowJsonState,
@@ -517,6 +521,7 @@ import {
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
   buildSurveyJsonToggleState,
+  buildSurveyResponseMergeState,
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
@@ -673,7 +678,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._fetchSingleQuestionRunId = (Number(this._fetchSingleQuestionRunId) || 0) + 1;
     this._localCacheRehydrateRunId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
     if (this._isMounted && this.state.isLoadingResponse) {
-      this.setState({ isLoadingResponse: false });
+      this.setState(buildResponseHydrationInvalidatedState());
     }
   };
 
@@ -1796,10 +1801,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         await this.fetchQuestionPool();
         const initialStates = this.initializeSurveyResponseState();
         this.setState(
-          {
+          buildInitialSurveyResponseState({
             surveysResponseState: initialStates,
             editBaseline: this.deepClone(initialStates[this.props.surveyIndex || 0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
-          },
+          }),
           async () => {
             this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
             // Quick local-cache rehydrate for non-encrypted prior answers (survey)
@@ -1819,11 +1824,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     } else { // Standalone mode (question pool passed as prop)
       const initialSlice = this.initializeSurveyResponseState();
       this.setState(
-        {
+        buildInitialStandaloneResponseState({
           surveysResponseState: initialSlice,
           editBaseline: this.deepClone(initialSlice[0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
           jsonPreview: this.prepareJsonAndHash(0),
-        },
+        }),
         () => {
           this.rehydrateDraftForRenderedIds();
           // Quick local-cache rehydrate for non-encrypted prior answers (standalone list)
@@ -2063,17 +2068,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
       if (prevState.questionPool !== this.state.questionPool) {
         this.setState(
-          (prevStateInner) => ({
-            surveysResponseState: this.mergeSurveyResponseState(
-              prevStateInner.surveysResponseState,
-              this.state.questionPool || [],
-              0
-            ),
-            editBaseline: this.mergeSurveyResponseState(
-              [prevStateInner.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-              this.state.questionPool || [],
-              0
-            )[0],
+          (prevStateInner) => buildQuestionPoolResponseMergeState(prevStateInner, {
+            mergeSurveyResponseState: this.mergeSurveyResponseState,
+            questionPool: this.state.questionPool || [],
+            surveyIndex: 0,
           }),
           () => {
             this.updateJsonPreview();
@@ -2118,12 +2116,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         } else {
           await this.fetchQuestionPool();
           this.setState(
-            (prev) => ({
-              surveysResponseState: this.mergeSurveyResponseState(
-                prev.surveysResponseState,
-                this.state.questionPool || [],
-                this.props.surveyIndex
-              ),
+            (prev) => buildSurveyResponseMergeState(prev, {
+              mergeSurveyResponseState: this.mergeSurveyResponseState,
+              questionPool: this.state.questionPool || [],
+              surveyIndex: this.props.surveyIndex,
             }),
             async () => {
               await this.fetchSurveyResponse();
@@ -2182,18 +2178,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     else {
       if (prevProps.questionPool !== this.props.questionPool) {
         this.setState(
-          (prevStateInner) => ({
+          (prevStateInner) => buildQuestionPoolResponseMergeState(prevStateInner, {
+            includeQuestionPool: true,
+            mergeSurveyResponseState: this.mergeSurveyResponseState,
             questionPool: this.props.questionPool || [],
-            surveysResponseState: this.mergeSurveyResponseState(
-              prevStateInner.surveysResponseState,
-              this.props.questionPool || [],
-              0
-            ),
-            editBaseline: this.mergeSurveyResponseState(
-              [prevStateInner.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-              this.props.questionPool || [],
-              0
-            )[0],
+            surveyIndex: 0,
           }),
           () => {
             this.updateJsonPreview();

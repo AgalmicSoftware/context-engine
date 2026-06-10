@@ -390,6 +390,29 @@ export type SurveyAutoDecryptAttemptedStatePatch = {
   autoDecryptAttempted: Record<string, unknown>;
 };
 
+export type SurveyResponseHydrationInvalidatedStatePatch = {
+  isLoadingResponse: boolean;
+};
+
+export type SurveyInitialResponseStatePatch = {
+  surveysResponseState: unknown;
+  editBaseline: unknown;
+};
+
+export type SurveyInitialStandaloneResponseStatePatch = SurveyInitialResponseStatePatch & {
+  jsonPreview: unknown;
+};
+
+export type SurveyQuestionPoolResponseMergeStatePatch = {
+  questionPool?: unknown[];
+  surveysResponseState: unknown;
+  editBaseline: unknown;
+};
+
+export type SurveyResponseMergeStatePatch = {
+  surveysResponseState: unknown;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -874,6 +897,96 @@ export const buildAutoDecryptAttemptedState = (
     ...(prevState.autoDecryptAttempted || {}),
     [String(key)]: true,
   },
+});
+
+export const buildResponseHydrationInvalidatedState = (): SurveyResponseHydrationInvalidatedStatePatch => ({
+  isLoadingResponse: false,
+});
+
+export const buildInitialSurveyResponseState = ({
+  surveysResponseState = [],
+  editBaseline = null,
+}: {
+  surveysResponseState?: unknown;
+  editBaseline?: unknown;
+} = {}): SurveyInitialResponseStatePatch => ({
+  surveysResponseState,
+  editBaseline,
+});
+
+export const buildInitialStandaloneResponseState = ({
+  surveysResponseState = [],
+  editBaseline = null,
+  jsonPreview = '',
+}: {
+  surveysResponseState?: unknown;
+  editBaseline?: unknown;
+  jsonPreview?: unknown;
+} = {}): SurveyInitialStandaloneResponseStatePatch => ({
+  surveysResponseState,
+  editBaseline,
+  jsonPreview,
+});
+
+export const buildQuestionPoolResponseMergeState = (
+  prevState: { surveysResponseState?: unknown; editBaseline?: unknown } = {},
+  {
+    includeQuestionPool = false,
+    mergeSurveyResponseState,
+    questionPool = [],
+    surveyIndex = 0,
+  }: {
+    includeQuestionPool?: boolean;
+    mergeSurveyResponseState: (
+      currentState: unknown,
+      newQuestionPool: unknown,
+      surveyIndex: unknown
+    ) => unknown;
+    questionPool?: unknown[];
+    surveyIndex?: unknown;
+  }
+): SurveyQuestionPoolResponseMergeStatePatch => {
+  const patch: SurveyQuestionPoolResponseMergeStatePatch = {
+    surveysResponseState: mergeSurveyResponseState(
+      prevState.surveysResponseState,
+      questionPool,
+      surveyIndex
+    ),
+    editBaseline: (
+      mergeSurveyResponseState(
+        [prevState.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+        questionPool,
+        0
+      ) as unknown[]
+    )[0],
+  };
+  if (includeQuestionPool) {
+    patch.questionPool = questionPool;
+  }
+  return patch;
+};
+
+export const buildSurveyResponseMergeState = (
+  prevState: { surveysResponseState?: unknown } = {},
+  {
+    mergeSurveyResponseState,
+    questionPool = [],
+    surveyIndex = 0,
+  }: {
+    mergeSurveyResponseState: (
+      currentState: unknown,
+      newQuestionPool: unknown,
+      surveyIndex: unknown
+    ) => unknown;
+    questionPool?: unknown[];
+    surveyIndex?: unknown;
+  }
+): SurveyResponseMergeStatePatch => ({
+  surveysResponseState: mergeSurveyResponseState(
+    prevState.surveysResponseState,
+    questionPool,
+    surveyIndex
+  ),
 });
 
 export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
