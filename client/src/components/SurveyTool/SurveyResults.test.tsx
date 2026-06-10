@@ -1,11 +1,10 @@
 // Remaining broad SurveyResults coverage owns pure count helpers and display-helper constants.
+// Behavior-level port: instance-driven tests now mount through surveyResultsTestHarness and
+// drive the component exclusively via DOM events, recorded child-mock props, prop-callback
+// spies, and jest-spied module boundaries (cacheScripts / contractScripts / sessionScanScope).
 import React from 'react';
-import fs from 'fs';
-import path from 'path';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import ConnectedSurveyResults, {
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
+import {
   SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
   SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
   SURVEY_RESULTS_METADATA_MISSING_STYLE,
@@ -22,41 +21,32 @@ import ConnectedSurveyResults, {
   resolveSurveyResultsSyncDetailsStyle,
   resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
-import SurveyResultsIndividualResponsesList from './SurveyResultsIndividualResponsesList';
-import SurveyResultsModalHeader from './SurveyResultsModalHeader';
-import SurveyResultsQuestionListCard from './SurveyResultsQuestionListCard';
-import SurveyResultsQuestionListPanel from './SurveyResultsQuestionListPanel';
-import SurveyResultsReportSurface from './SurveyResultsReportSurface';
-import SurveyResultsSyncDetailsDisplay, {
-  SurveyResultsSyncTrackRow,
-} from './SurveyResultsSyncDetailsDisplay';
+import { renderSurveyResults } from './surveyResultsTestHarness';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as sessionScanScopeModule from '../../utilities/session/sessionScanScope.js';
-import { resolveSurveyResultsQuestionReadScope } from './surveyResultsSessionResolution.js';
-import { sbtBasePath } from '../../utilities/ui/terminology.js';
 
-type TreeNode = any;
-type TreePredicate = (node: TreeNode) => boolean;
 type SurveyResultsProps = Record<string, any>;
 const cacheScripts: any = cacheScriptsModule;
+const contractScripts: any = (contractScriptsModule as any).default;
 const sessionScanScope: any = sessionScanScopeModule;
-const RESOLVABLE_TREE_COMPONENTS = new Set([
-  SurveyResultsReportSurface,
-  SurveyResultsQuestionListPanel,
-  SurveyResultsSyncDetailsDisplay,
-  SurveyResultsSyncTrackRow,
-]);
-const resolvedTreeComponentCache = new WeakMap();
 
 const mockSbtFilter = jest.fn((..._args: any[]) => null);
 jest.mock('../SBTs/SBTFilter', () => (props: any) => {
   mockSbtFilter(props);
   return null;
 });
-jest.mock('./QuestionFilter', () => () => null);
+const mockQuestionFilter = jest.fn((..._args: any[]) => null);
+jest.mock('./QuestionFilter', () => {
+  const ReactActual = jest.requireActual('react');
+  return {
+    __esModule: true,
+    default: ReactActual.forwardRef((props: any, _ref: any) => {
+      mockQuestionFilter(props);
+      return null;
+    }),
+  };
+});
 const mockPolisReport = jest.fn((..._args: any[]) => null);
 jest.mock('../PolisReport/PolisReport', () => (props: any) => {
   mockPolisReport(props);
@@ -104,128 +94,204 @@ jest.mock('../MainContent/RiskMatrix', () => ({
     );
   },
 }));
+const mockModalHeader = jest.fn((..._args: any[]) => null);
+jest.mock('./SurveyResultsModalHeader', () => ({
+  __esModule: true,
+  default: (props: any) => {
+    mockModalHeader(props);
+    return (
+      <div data-testid="surveyresults-modal-header">
+        <h2>
+          {props?.viewMode === 'survey'
+            ? (props?.surveyTitle || 'Survey Results')
+            : 'Question Results'}
+        </h2>
+        {props?.syncStatusNode}
+      </div>
+    );
+  },
+}));
+const mockIndividualResponsesList = jest.fn((..._args: any[]) => null);
+jest.mock('./SurveyResultsIndividualResponsesList', () => ({
+  __esModule: true,
+  default: (props: any) => {
+    mockIndividualResponsesList(props);
+    const rows = Array.isArray(props?.responses) ? props.responses : [];
+    return (
+      <div data-testid="surveyresults-individual-responses-list">
+        {rows.map((row: any, index: number) => (
+          <div key={index}>{props?.renderResponseBody?.(row, index)}</div>
+        ))}
+      </div>
+    );
+  },
+}));
 
-const SurveyResults: any = (ConnectedSurveyResults as any).WrappedComponent;
+const NETWORK_ID = '84532';
+const SURVEY_ID = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
 
-const createSubject = (props: SurveyResultsProps = {}): any =>
-  new SurveyResults({
-    network: { id: 84532 },
-    ...props,
-  });
-
-const createDeferred = <T,>() => {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: any) => void;
-  const promise = new Promise<T>((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
-};
-
-const attachStateHarness = (subject: any): any => {
-  subject.setState = jest.fn((updater, cb) => {
-    const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
-    subject.state = { ...subject.state, ...(patch || {}) };
-    if (typeof cb === 'function') cb();
-    return patch;
-  });
-  return subject;
-};
-
-const findElement = (node: TreeNode, predicate: TreePredicate): TreeNode | null => {
-  const stack: TreeNode[] = [node];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (Array.isArray(current)) {
-      for (let i = current.length - 1; i >= 0; i -= 1) {
-        stack.push(current[i]);
-      }
-      continue;
-    }
-    if (typeof current !== 'object') continue;
-    if (predicate(current)) return current;
-    if (RESOLVABLE_TREE_COMPONENTS.has(current.type)) {
-      if (!resolvedTreeComponentCache.has(current)) {
-        resolvedTreeComponentCache.set(current, current.type(current.props || {}));
-      }
-      stack.push(resolvedTreeComponentCache.get(current));
-      continue;
-    }
-    const children = current?.props?.children;
-    if (children !== undefined) stack.push(children);
-  }
-  return null;
-};
-
-const collectTreeNodes = (
-  node: TreeNode,
-  predicate: TreePredicate,
-  acc: TreeNode[] = []
-): TreeNode[] => {
-  if (node == null) return acc;
-  if (Array.isArray(node)) {
-    node.forEach((child) => collectTreeNodes(child, predicate, acc));
-    return acc;
-  }
-  if (typeof node !== 'object') return acc;
-  if (predicate(node)) acc.push(node);
-  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
-    if (!resolvedTreeComponentCache.has(node)) {
-      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
-    }
-    collectTreeNodes(resolvedTreeComponentCache.get(node), predicate, acc);
-  }
-  return collectTreeNodes(node?.props?.children, predicate, acc);
-};
-
-const normalizeChildren = (children: TreeNode): TreeNode[] => {
-  if (children == null) return [];
-  if (Array.isArray(children)) return children.filter(Boolean);
-  return [children].filter(Boolean);
-};
-
-const renderSubjectTree = (subject: any) => (
-  render(
-    <MemoryRouter>
-      {subject.render()}
-    </MemoryRouter>
-  )
-);
+const recordingMocks = [
+  mockSbtFilter,
+  mockQuestionFilter,
+  mockPolisReport,
+  mockSingleQuestionResponse,
+  mockDemoAnalysisWorkspace,
+  mockDebateMap,
+  mockRiskMatrix,
+  mockModalHeader,
+  mockIndividualResponsesList,
+];
 
 beforeEach(() => {
-  mockSbtFilter.mockClear();
-  mockPolisReport.mockClear();
-  mockSingleQuestionResponse.mockClear();
-  mockDemoAnalysisWorkspace.mockClear();
-  mockDebateMap.mockClear();
-  mockRiskMatrix.mockClear();
+  recordingMocks.forEach((recordingMock) => recordingMock.mockClear());
 });
 
-const treeHasText = (node: TreeNode, text: string): boolean => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
-  }
-  if (typeof node !== 'object') return false;
-  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
-    if (!resolvedTreeComponentCache.has(node)) {
-      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
-    }
-    return treeHasText(resolvedTreeComponentCache.get(node), text);
-  }
-  return treeHasText(node?.props?.children, text);
+afterEach(() => {
+  // Unmount while module spies are still installed, then unwind spies + URL.
+  cleanup();
+  jest.restoreAllMocks();
+  window.history.replaceState({}, '', '/');
+});
+
+const lastRecordedProps = (recordingMock: jest.Mock): any => {
+  const { calls } = recordingMock.mock;
+  return calls.length > 0 ? calls[calls.length - 1][0] : undefined;
 };
 
-const getSyncStatusNodeFromSubject = (subject: any): TreeNode => {
-  const tree = subject.render();
-  const headerNode = findElement(
-    tree,
-    (element) => element?.props?.syncStatusNode
+const recordedAggregateSummaryProps = (): any[] => (
+  mockSingleQuestionResponse.mock.calls
+    .map((call) => call[0])
+    .filter((props) => props && props.aggregatorResponseMode === true)
+);
+
+const recordedIndividualResponseProps = (): any[] => (
+  mockSingleQuestionResponse.mock.calls
+    .map((call) => call[0])
+    .filter((props) => props && props.aggregatorResponseMode === false)
+);
+
+type QuestionsBucketOverrides = Record<string, any>;
+const buildQuestionsBucket = (overrides: QuestionsBucketOverrides = {}) => ({
+  questionsLatestBlock: 0,
+  questions: {},
+  questionResponses: {},
+  questionResponsesLatestBlock: 0,
+  ...overrides,
+});
+
+const buildSurveysBucket = ({
+  surveyId = SURVEY_ID,
+  title = '',
+  questionIDs = [] as string[],
+  responsesByResponder = {} as Record<string, unknown>,
+  latestBlock = 1,
+}: Record<string, any> = {}) => ({
+  surveys: {
+    [surveyId]: {
+      title,
+      questionIDs,
+      documentURLs: [],
+    },
+  },
+  surveyResponses: { [surveyId]: responsesByResponder },
+  surveyResponsesLatestBlock: { [surveyId]: latestBlock },
+  surveysLatestBlock: latestBlock,
+});
+
+type SurveyResultsCacheFixtures = {
+  bookmarks?: unknown;
+  bookmarksError?: Error;
+  questionsBySlug?: Record<string, unknown>;
+  readQuestionsBySlug?: Record<string, unknown>;
+  surveysBySlug?: Record<string, unknown>;
+};
+
+/**
+ * Local fixture-driven cacheScripts control (harness gap): routes peek/read by
+ * namespace+slug, records writes, and feeds the surveysCache slug scan.
+ */
+const installCacheFixtures = (fixtures: SurveyResultsCacheFixtures = {}) => {
+  const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(
+    (...args: any[]) => {
+      const [namespace, slug] = args as [string, string];
+      if (namespace === 'bookmarksCache') {
+        if (fixtures.bookmarksError) throw fixtures.bookmarksError;
+        return fixtures.bookmarks ?? null;
+      }
+      if (namespace === 'questionsCache') {
+        return (fixtures.questionsBySlug || {})[slug] ?? null;
+      }
+      if (namespace === 'surveysCache') {
+        return (fixtures.surveysBySlug || {})[slug] ?? null;
+      }
+      return null;
+    }
   );
-  return headerNode?.props?.syncStatusNode;
+  const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(
+    async (...args: any[]) => {
+      const [namespace, slug] = args as [string, string];
+      if (namespace === 'questionsCache') {
+        return (fixtures.readQuestionsBySlug || {})[slug]
+          ?? (fixtures.questionsBySlug || {})[slug]
+          ?? {};
+      }
+      if (namespace === 'surveysCache') {
+        return (fixtures.surveysBySlug || {})[slug] ?? {};
+      }
+      return {};
+    }
+  );
+  const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(undefined as never);
+  const listSpy = jest.spyOn(cacheScripts, 'listNamespaceEntriesSync').mockImplementation(
+    (...args: any[]) => {
+      const [namespace] = args as [string];
+      if (namespace !== 'surveysCache') return [];
+      return Object.entries(fixtures.surveysBySlug || {}).map(([slug, value]) => ({ slug, value }));
+    }
+  );
+  return { listSpy, peekSpy, readSpy, writeSpy };
+};
+
+/** Local contractScripts seam (harness gap): mount-time refresh needs a block number. */
+const mockLatestBlock = (value: number) => (
+  jest.spyOn(contractScripts, 'getLatestBlockNumber').mockImplementation(async () => value)
+);
+
+/** Local read-scope seam (harness gap): keeps question fan-out deterministic per test. */
+const mockQuestionReadScope = ({
+  scope = 'active',
+  slugs = [] as string[],
+}: { scope?: string; slugs?: string[] } = {}) => {
+  jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue(scope);
+  jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(slugs);
+};
+
+/** Flush the mount-open async pipeline (manual refresh -> poll -> fetch) inside act. */
+const settle = async (): Promise<void> => {
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  });
+};
+
+const mountSurveyResults = async (props: SurveyResultsProps = {}) => {
+  const harness = renderSurveyResults({ preventUrlChange: true, ...props });
+  await settle();
+  return harness;
+};
+
+const rerenderAndSettle = async (
+  harness: ReturnType<typeof renderSurveyResults>,
+  nextProps: SurveyResultsProps
+): Promise<void> => {
+  harness.rerenderSurveyResults(nextProps);
+  await settle();
+};
+
+const openSyncDetails = (): void => {
+  fireEvent.click(screen.getByLabelText('Toggle sync details'));
 };
 
 describe('countQuestionModeResponses', () => {
@@ -297,62 +363,99 @@ describe('hasAnyCountableSurveyAnswer', () => {
 });
 
 describe('SurveyResults constructor bookmark bootstrap', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
+  const seededBookmarkQuestionsBucket = () => ({
+    [NETWORK_ID]: buildQuestionsBucket({
+      questionsLatestBlock: 5,
+      questionResponsesLatestBlock: 5,
+      questions: {
+        q1: { id: 'q1', prompt: 'Bookmarked question prompt', sessionSlug: 'edge' },
+        q2: { id: 'q2', prompt: 'Unbookmarked question prompt', sessionSlug: 'edge' },
+      },
+    }),
   });
 
-  it('hydrates bookmarked survey and question IDs from a valid cache copy', () => {
+  it('hydrates bookmarked survey and question IDs from a valid cache copy', async () => {
     const cachedSurveys = ['s1', 's2'];
     const cachedQuestions = ['q1'];
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      surveys: cachedSurveys,
-      questions: cachedQuestions,
+    const { peekSpy } = installCacheFixtures({
+      bookmarks: { surveys: cachedSurveys, questions: cachedQuestions },
+      questionsBySlug: { edge: seededBookmarkQuestionsBucket() },
+    });
+    mockLatestBlock(5);
+    mockQuestionReadScope();
+
+    const harness = await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
     });
 
-    const subject = createSubject({ activeSessionSlug: 'edge' });
-
     expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
-    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
-    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
-    expect(subject.state.bookmarkedSurveyIDs).not.toBe(cachedSurveys);
-    expect(subject.state.bookmarkedQuestionIDs).not.toBe(cachedQuestions);
+    await screen.findAllByText('Bookmarked question prompt');
+    expect(screen.getAllByTitle('Remove bookmark')).toHaveLength(1);
+    expect(screen.getAllByTitle('Bookmark question')).toHaveLength(1);
+    const headerProps = lastRecordedProps(mockModalHeader);
+    expect(headerProps.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(headerProps.bookmarkedSurveyIDs).not.toBe(cachedSurveys);
 
+    // Clone guard: mutating the cached arrays after mount must not leak into the UI.
     cachedSurveys.push('s3');
     cachedQuestions.push('q2');
+    await rerenderAndSettle(harness, { sbtCacheRevision: 'bookmark-clone-nudge' });
 
-    expect(subject.state.bookmarkedSurveyIDs).toEqual(['s1', 's2']);
-    expect(subject.state.bookmarkedQuestionIDs).toEqual(['q1']);
+    expect(lastRecordedProps(mockModalHeader).bookmarkedSurveyIDs).toEqual(['s1', 's2']);
+    expect(screen.getAllByTitle('Remove bookmark')).toHaveLength(1);
+    expect(screen.getAllByTitle('Bookmark question')).toHaveLength(1);
   });
 
   it.each([
     ['null cache', null],
     ['missing arrays', {}],
     ['wrong bookmark list types', { surveys: 'x', questions: 5 }],
-  ])('defaults bookmarked IDs for malformed cache: %s', (_label, cachedValue) => {
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(cachedValue);
+  ])('defaults bookmarked IDs for malformed cache: %s', async (_label, cachedValue) => {
+    installCacheFixtures({
+      bookmarks: cachedValue,
+      questionsBySlug: { edge: seededBookmarkQuestionsBucket() },
+    });
+    mockLatestBlock(5);
+    mockQuestionReadScope();
 
-    const subject = createSubject({ activeSessionSlug: 'edge' });
-
-    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
-    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
-  });
-
-  it('defaults bookmarked IDs when the cache read throws', () => {
-    const readError = new Error('bookmark constructor read failed');
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation(() => {
-      throw readError;
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
     });
 
-    const subject = createSubject({ activeSessionSlug: 'edge' });
+    await screen.findAllByText('Bookmarked question prompt');
+    expect(screen.queryAllByTitle('Remove bookmark')).toHaveLength(0);
+    expect(screen.getAllByTitle('Bookmark question')).toHaveLength(2);
+    expect(lastRecordedProps(mockModalHeader).bookmarkedSurveyIDs).toEqual([]);
+  });
 
-    expect(subject.state.bookmarkedSurveyIDs).toEqual([]);
-    expect(subject.state.bookmarkedQuestionIDs).toEqual([]);
+  it('defaults bookmarked IDs when the cache read throws', async () => {
+    const readError = new Error('bookmark constructor read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    installCacheFixtures({
+      bookmarksError: readError,
+      questionsBySlug: { edge: seededBookmarkQuestionsBucket() },
+    });
+    mockLatestBlock(5);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+
+    await screen.findAllByText('Bookmarked question prompt');
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[surveys]',
       '[SurveyResults] Error reading bookmarksCache:',
       readError
     );
+    expect(screen.queryAllByTitle('Remove bookmark')).toHaveLength(0);
+    expect(lastRecordedProps(mockModalHeader).bookmarkedSurveyIDs).toEqual([]);
   });
 });
 
@@ -396,131 +499,124 @@ describe('SurveyResults display helpers', () => {
 });
 
 describe('SurveyResults question-list display wiring', () => {
-  it('passes empty question-list display state without rendering the question table', () => {
-    const subject = createSubject({ isOpen: true });
-    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable');
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: {
-        ...subject.state.activeQuestionToggles,
-        __questionList__: true,
-      },
-      aggregatorQuestionResponses: {},
-      filterLoading: false,
-      sbtFilteredAggregatorQuestionResponses: {},
-      surveyViewMode: 'aggregate',
-      totalQuestionsCount: 0,
-      totalResponsesCount: 0,
-      viewMode: 'questions',
-    };
+  it('passes empty question-list display state without rendering the question table', async () => {
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
 
-    const questionListCard = findElement(
-      subject.render(),
-      (element) => element?.type === SurveyResultsQuestionListCard
-    );
+    await mountSurveyResults({ isOpen: true, viewMode: 'questions' });
 
-    expect(questionListCard?.props?.showEmptyState).toBe(true);
-    expect(questionListCard?.props?.questionTableNode).toBeNull();
-    expect(renderQuestionIDsTableSpy).not.toHaveBeenCalled();
+    // Enable the question-list view through its real toggle control.
+    fireEvent.click(screen.getByText('View & Sort Questions'));
+    await settle();
+
+    // port note: the renderQuestionIDsTable spy-not-called guard became absence of any
+    // rendered table; empty display state is asserted via the card's empty-state copy.
+    expect(screen.getByText('No questions found.')).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
-  it('keeps loading question-list display active without showing the empty state', () => {
-    const subject = createSubject({ isOpen: true });
-    const renderQuestionIDsTableSpy = jest.spyOn(subject, 'renderQuestionIDsTable').mockReturnValue(<table><tbody /></table>);
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: {
-        ...subject.state.activeQuestionToggles,
-        __questionList__: true,
-      },
-      filterLoading: true,
-      sbtFilteredAggregatorQuestionResponses: {},
-      viewMode: 'questions',
-    };
+  it('keeps loading question-list display active without showing the empty state', async () => {
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
 
-    const questionListCard = findElement(
-      subject.render(),
-      (element) => element?.type === SurveyResultsQuestionListCard
-    );
+    await mountSurveyResults({ isOpen: true, viewMode: 'questions' });
+    fireEvent.click(screen.getByText('View & Sort Questions'));
 
-    expect(questionListCard?.props?.showEmptyState).toBe(false);
-    expect(questionListCard?.props?.questionTableNode?.type).toBe('table');
-    expect(renderQuestionIDsTableSpy).toHaveBeenCalledTimes(1);
+    const questionFilterProps = lastRecordedProps(mockQuestionFilter);
+    expect(typeof questionFilterProps.setFilterLoading).toBe('function');
+    act(() => {
+      questionFilterProps.setFilterLoading(true);
+    });
+    await settle();
+
+    // port note: the renderQuestionIDsTable invocation-count facet became presence of a
+    // real rendered table while loading keeps the empty-state copy hidden.
+    expect(screen.queryByText('No questions found.')).toBeNull();
+    expect(screen.getByRole('table')).toBeInTheDocument();
   });
 });
 
 describe('SurveyResults cache/readiness shell wiring', () => {
-  it('preserves selected survey identity outputs for the header and individual response list', () => {
-    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
-    const subject = createSubject({
+  it('preserves selected survey identity outputs for the header and individual response list', async () => {
+    const responder = '0x1111111111111111111111111111111111111111';
+    installCacheFixtures({
+      surveysBySlug: {
+        'controller-session': {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Controller Input Survey',
+            questionIDs: ['q1'],
+            responsesByResponder: {
+              [responder]: { responses: [{ questionID: 'q1', answer: { value: 'Visible answer' } }] },
+            },
+            latestBlock: 90,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(90);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
       activeSessionSlug: 'edge',
       isOpen: true,
       isResponsesCacheReady: true,
       isSurveyCacheReady: true,
       sessionSlug: 'controller-session',
-      surveyId,
+      surveyId: SURVEY_ID,
       viewMode: 'survey',
     });
-    subject.state = {
-      ...subject.state,
-      networkLatestBlock: 90,
-      surveyId,
-      surveyLocalBlock: 90,
-      surveyResultsHydrated: true,
-      surveyTitle: 'Controller Input Survey',
-      surveyViewMode: 'individuals',
-      viewMode: 'survey',
-      responses: [
-        {
-          responder: '0x1111111111111111111111111111111111111111',
-          response: { responses: [] },
-          surveyId,
-        },
-      ],
-      sbtFilteredResponses: [
-        {
-          responder: '0x1111111111111111111111111111111111111111',
-          response: { responses: [] },
-          surveyId,
-        },
-      ],
-    };
 
-    const tree = subject.render();
-    const header = findElement(
-      tree,
-      (element) => element?.type === SurveyResultsModalHeader
-    );
-    const individualList = findElement(
-      tree,
-      (element) => element?.type === SurveyResultsIndividualResponsesList
-    );
+    await waitFor(() => {
+      expect(lastRecordedProps(mockIndividualResponsesList)?.responses).toHaveLength(1);
+    });
 
-    expect(header?.props).toEqual(expect.objectContaining({
-      currentSurveyId: surveyId,
+    expect(lastRecordedProps(mockModalHeader)).toEqual(expect.objectContaining({
+      currentSurveyId: SURVEY_ID,
       effectiveSlug: 'controller-session',
       surveyTitle: 'Controller Input Survey',
       viewMode: 'survey',
     }));
-    expect(individualList?.props).toEqual(expect.objectContaining({
-      currentSurveyId: surveyId,
+    const listProps = lastRecordedProps(mockIndividualResponsesList);
+    expect(listProps).toEqual(expect.objectContaining({
+      currentSurveyId: SURVEY_ID,
       effectiveSlug: 'controller-session',
       filterLoading: false,
-      responses: [
-        {
-          responder: '0x1111111111111111111111111111111111111111',
-          response: { responses: [] },
-          surveyId,
-        },
-      ],
     }));
+    expect(listProps.responses).toEqual([
+      expect.objectContaining({
+        responder,
+        surveyId: SURVEY_ID,
+        response: expect.objectContaining({
+          responses: [
+            expect.objectContaining({ questionID: 'q1', answer: { value: 'Visible answer' } }),
+          ],
+        }),
+      }),
+    ]);
   });
 
-  it('preserves question filter, cache readiness, filter loading, and polling inputs for controller extraction', () => {
+  it('preserves question filter, cache readiness, filter loading, and polling inputs for controller extraction', async () => {
     const filterState = { text: 'controller input', sbtFilter: { selectedSBTGroups: ['group-a'] } };
-    const subject = createSubject({
+    const defaultTags = ['alpha', 'beta'];
+    installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 40,
+            questionResponsesLatestBlock: 20,
+          }),
+        },
+      },
+    });
+    const latestBlockSpy = mockLatestBlock(100);
+    mockQuestionReadScope({ scope: 'list', slugs: ['demo'] });
+
+    const harness = await mountSurveyResults({
       activeSessionSlug: 'edge',
-      defaultTags: ['alpha', 'beta'],
+      defaultTags,
+      filterState,
       isOpen: true,
       isQuestionCacheReady: false,
       isResponsesCacheReady: true,
@@ -530,37 +626,14 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       sbtCacheRevision: 'sbt-revision-3',
       viewMode: 'questions',
     });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      filterLoading: true,
-      filterState,
-      networkLatestBlock: 100,
-      questionLocalBlock: 40,
-      questionResponses: {
-        q1: {
-          '0xaaa': { answer: { value: 'Visible answer' } },
-        },
-      },
-      refreshTargetQuestionBlock: 80,
-      refreshTargetResponseBlock: 70,
-      responseLocalBlock: 20,
-      showQuestionFilter: true,
-      viewMode: 'questions',
-    };
 
-    const tree = subject.render();
-    const questionFilter = findElement(
-      tree,
-      (element) => element?.props?.resultsMode === true && element?.props?.creatorAndResponderMode === true
-    );
-    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
-    const quickRefresh = findElement(
-      syncStatusNode,
-      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-    );
+    // port note: remaining-block strings recomputed from fixture math — the mount-time
+    // manual refresh now seeds refresh targets (latest 100 vs local 40/20), replacing the
+    // direct state-injected 80/70 targets of the legacy test.
+    await screen.findByText('Remaining Blocks: 60');
+    await screen.findByText('Remaining Blocks: 80');
 
-    const questionFilterProps = questionFilter?.props || {};
+    const questionFilterProps = lastRecordedProps(mockQuestionFilter);
     expect({
       activeSessionSlug: questionFilterProps.activeSessionSlug,
       currentSurveyIdForUrl: questionFilterProps.currentSurveyIdForUrl,
@@ -586,77 +659,103 @@ describe('SurveyResults cache/readiness shell wiring', () => {
       sbtCacheRevision: 'sbt-revision-3',
       storageKeyPrefix: 'dg:filters:__scope__:demo|edge',
     });
-    expect(questionFilter?.props?.setFilterLoading).toBe(subject.setFilterLoading);
-    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 40');
-    expect(renderToStaticMarkup(syncStatusNode)).toContain('Remaining Blocks: 50');
+    expect(questionFilterProps.filterState).toBe(filterState);
 
-    quickRefresh?.props?.onClick();
+    // port note: the legacy `setFilterLoading === subject.setFilterLoading` identity check
+    // became referential stability of the captured prop across re-renders.
+    const firstSetFilterLoading = questionFilterProps.setFilterLoading;
+    expect(typeof firstSetFilterLoading).toBe('function');
+    await rerenderAndSettle(harness, { sbtCacheRevision: 'sbt-revision-3-nudge' });
+    expect(lastRecordedProps(mockQuestionFilter).setFilterLoading).toBe(firstSetFilterLoading);
 
-    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+    const blockCallsBefore = latestBlockSpy.mock.calls.length;
+    fireEvent.click(screen.getByLabelText('Refresh sync data'));
+    await waitFor(() => {
+      expect(latestBlockSpy.mock.calls.length).toBeGreaterThan(blockCallsBefore);
+    });
   });
 
-  it('shows the quick refresh action during missing-cache loading and dispatches the parent refresh handler', () => {
-    const subject = createSubject({
+  it('shows the quick refresh action during missing-cache loading and dispatches the parent refresh handler', async () => {
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
+    const refreshQuestionMetadata = jest.fn();
+    const refreshQuestionResponses = jest.fn();
+
+    await mountSurveyResults({
       isOpen: true,
+      refreshQuestionMetadata,
+      refreshQuestionResponses,
       viewMode: 'questions',
     });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      networkLatestBlock: 0,
-      questionLocalBlock: 0,
-      responseLocalBlock: 0,
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      syncDetailsOpen: false,
-    };
 
-    const tree = subject.render();
-    const headerNode = findElement(
-      tree,
-      (element) => element?.props?.syncStatusNode
-    );
-    const syncStatusNode = headerNode?.props?.syncStatusNode;
-    const quickRefresh = findElement(
-      syncStatusNode,
-      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-    );
+    expect(screen.getAllByText('Loading...').length).toBeGreaterThan(0);
+    const quickRefresh = screen.getByLabelText('Refresh sync data');
+    const metadataCallsBefore = refreshQuestionMetadata.mock.calls.length;
+    const responsesCallsBefore = refreshQuestionResponses.mock.calls.length;
 
-    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
-    expect(quickRefresh).toBeTruthy();
+    fireEvent.click(quickRefresh);
+    await settle();
 
-    quickRefresh?.props?.onClick();
-
-    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
+    expect(refreshQuestionMetadata.mock.calls.length).toBeGreaterThan(metadataCallsBefore);
+    expect(refreshQuestionResponses.mock.calls.length).toBeGreaterThan(responsesCallsBefore);
   });
 
-  it('keeps the current filter state when a commit receives a non-object filter payload', () => {
+  it('keeps the current filter state when a commit receives a non-object filter payload', async () => {
     const onFilterChange = jest.fn();
     const onFilterStateChangeForUrlUpdate = jest.fn();
+    const onCountUpdate = jest.fn();
     const currentFilterState = {
       questionTypes: ['rating'],
       sbtFilter: { selectedSBTGroups: ['group-a'] },
     };
-    const subject = attachStateHarness(createSubject({
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      isOpen: true,
+      isQuestionCacheReady: true,
+      onCountUpdate,
       onFilterChange,
       onFilterStateChangeForUrlUpdate,
-    }));
-    subject.state = {
-      ...subject.state,
-      filteredQuestionsCount: 0,
-      filterState: currentFilterState,
-    };
+      viewMode: 'questions',
+    });
 
-    subject.commitResultsFilterState({ filteredQuestionsCount: 2 }, 'stale-filter-payload');
+    // First commit a valid filter-state object through the QuestionFilter seam.
+    act(() => {
+      lastRecordedProps(mockQuestionFilter).onFilter([], currentFilterState);
+    });
+    await settle();
+    expect(onFilterChange).toHaveBeenLastCalledWith(currentFilterState);
+    expect(onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0])
+      .toBe(currentFilterState);
+    expect(onFilterStateChangeForUrlUpdate.mock.calls[
+      onFilterStateChangeForUrlUpdate.mock.calls.length - 1
+    ][0]).toBe(currentFilterState);
 
-    expect(subject.state.filterState).toBe(currentFilterState);
-    expect(subject.state.filteredQuestionsCount).toBe(2);
-    expect(onFilterStateChangeForUrlUpdate).toHaveBeenCalledWith(currentFilterState);
-    expect(onFilterChange).toHaveBeenCalledWith(currentFilterState);
+    onFilterChange.mockClear();
+    onFilterStateChangeForUrlUpdate.mockClear();
+
+    // Then deliver a filtered commit whose filter-state payload is a non-object.
+    act(() => {
+      lastRecordedProps(mockQuestionFilter).onFilter(
+        [{ id: 'q-a' }, { id: 'q-b' }],
+        'stale-filter-payload'
+      );
+    });
+    await settle();
+
+    // port note: the legacy direct commit called both outward callbacks again with the
+    // prior object; the mounted QuestionFilter path dedupes the unchanged filter-state
+    // notification after the filtered count update.
+    expect(onCountUpdate).toHaveBeenLastCalledWith(2);
+    expect(lastRecordedProps(mockQuestionFilter).filterState).toBe(currentFilterState);
+    expect(onFilterChange).not.toHaveBeenCalled();
+    expect(onFilterStateChangeForUrlUpdate).not.toHaveBeenCalled();
   });
 
-  it('merges SBT filter state into the current filter state for filtered response updates', () => {
+  it('merges SBT filter state into the current filter state for filtered response updates', async () => {
     const onFilterChange = jest.fn();
     const sbtFilterState = { selectedSBTGroups: ['group-b'] };
     const rows = [
@@ -665,216 +764,232 @@ describe('SurveyResults cache/readiness shell wiring', () => {
         response: { responses: [] },
       },
     ];
-    const subject = attachStateHarness(createSubject({
+    installCacheFixtures({
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Merge Survey',
+            questionIDs: ['q1'],
+            responsesByResponder: {
+              '0x2222222222222222222222222222222222222222': {
+                responses: [{ questionID: 'q1', answer: { value: 'First answer' } }],
+              },
+              '0x3333333333333333333333333333333333333333': {
+                responses: [{ questionID: 'q1', answer: { value: 'Second answer' } }],
+              },
+            },
+            latestBlock: 10,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      filterState: { questionTypes: ['rating'], selectedTags: ['alpha'] },
+      isOpen: true,
       isQuestionCacheReady: true,
       onFilterChange,
+      surveyId: SURVEY_ID,
       viewMode: 'survey',
-    }));
-    subject.state = {
-      ...subject.state,
-      filterState: {
-        questionTypes: ['rating'],
-        selectedTags: ['alpha'],
-      },
-      surveyViewMode: 'individuals',
-      totalResponsesCount: 5,
-      viewMode: 'survey',
-    };
+    });
+    await waitFor(() => {
+      expect(lastRecordedProps(mockIndividualResponsesList)?.responses).toHaveLength(2);
+    });
 
-    subject.handleFilteredResponses(rows, sbtFilterState);
+    const sbtFilterProps = lastRecordedProps(mockSbtFilter);
+    act(() => {
+      sbtFilterProps.onFilter(rows, sbtFilterState);
+    });
+    await settle();
 
-    expect(subject.state.sbtFilteredResponses).toBe(rows);
-    expect(subject.state.filteredResponsesCount).toBe(1);
-    expect(subject.state.filterState).toEqual({
+    expect(lastRecordedProps(mockIndividualResponsesList).responses).toBe(rows);
+    expect(onFilterChange).toHaveBeenLastCalledWith({
       questionTypes: ['rating'],
       selectedTags: ['alpha'],
       sbtFilter: sbtFilterState,
     });
-    expect(onFilterChange).toHaveBeenCalledWith(subject.state.filterState);
+    expect(
+      onFilterChange.mock.calls[onFilterChange.mock.calls.length - 1][0].sbtFilter
+    ).toBe(sbtFilterState);
+    const filterSummaryText = (document.querySelector('.filterSummaryText')?.textContent || '')
+      .replace(/‎/g, '');
+    expect(filterSummaryText).toMatch(/Responses:\s*2\s*Filtered:\s*1/);
   });
 
-  it('hides quick refresh when results are in sync while keeping the detailed refresh action parent-owned', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
+  it('hides quick refresh when results are in sync while keeping the detailed refresh action parent-owned', async () => {
+    installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 25,
+            questionResponsesLatestBlock: 25,
+          }),
+        },
+      },
     });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      networkLatestBlock: 25,
-      questionLocalBlock: 25,
-      responseLocalBlock: 25,
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      syncDetailsOpen: true,
-    };
+    const latestBlockSpy = mockLatestBlock(25);
+    mockQuestionReadScope();
 
-    const tree = subject.render();
-    const headerNode = findElement(
-      tree,
-      (element) => element?.props?.syncStatusNode
-    );
-    const syncStatusNode = headerNode?.props?.syncStatusNode;
-    const quickRefresh = findElement(
-      syncStatusNode,
-      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-    );
-    const detailedRefresh = findElement(
-      syncStatusNode,
-      (element) => element?.props?.title === 'Refresh Data from Cache/Chain'
-    );
-
-    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(true);
-    expect(quickRefresh).toBeNull();
-    expect(detailedRefresh).toBeTruthy();
-
-    detailedRefresh?.props?.onClick();
-
-    expect(subject.handleManualRefresh).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders question-mode loading tracks from missing polling blocks', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      networkLatestBlock: 0,
-      questionLocalBlock: 0,
-      responseLocalBlock: 0,
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      syncDetailsOpen: true,
-    };
-
-    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
-
-    expect(treeHasText(syncStatusNode, 'Loading...')).toBe(true);
-    expect(treeHasText(syncStatusNode, 'Questions:')).toBe(true);
-    expect(treeHasText(syncStatusNode, 'Responses:')).toBe(true);
-    expect(treeHasText(syncStatusNode, 'In Sync')).toBe(false);
-    expect(findElement(
-      syncStatusNode,
-      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-    )).toBeTruthy();
-  });
-
-  it('renders question and response tracks while question-mode polling is stale', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'questions',
-      networkLatestBlock: 100,
-      questionLocalBlock: 80,
-      responseLocalBlock: 70,
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      syncDetailsOpen: true,
-    };
-    subject._syncLoadingStartedAt = Date.now() - 15000;
-
-    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
-    const markup = renderToStaticMarkup(syncStatusNode);
-
-    expect(markup).toContain('Syncing...');
-    expect(markup).toContain('Questions:');
-    expect(markup).toContain('Remaining Blocks: 20 (Current: 80 / Latest: 100)');
-    expect(markup).toContain('Responses:');
-    expect(markup).toContain('Remaining Blocks: 30 (Current: 70 / Latest: 100)');
-    expect(markup).toContain('Refresh Now');
-    expect(findElement(
-      syncStatusNode,
-      (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-    )).toBeTruthy();
-  });
-
-  it('renders survey-mode readiness from the survey response track only', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'survey',
-      surveyId: '0xabc',
-    });
-    subject.handleManualRefresh = jest.fn();
-    subject.state = {
-      ...subject.state,
-      viewMode: 'survey',
-      surveyId: '0xabc',
-      networkLatestBlock: 100,
-      questionLocalBlock: 100,
-      responseLocalBlock: 100,
-      surveyLocalBlock: 40,
-      refreshTargetQuestionBlock: 0,
-      refreshTargetResponseBlock: 0,
-      refreshTargetSurveyBlock: 0,
-      syncDetailsOpen: true,
-    };
-
-    const syncStatusNode = getSyncStatusNodeFromSubject(subject);
-    const markup = renderToStaticMarkup(syncStatusNode);
-
-    expect(markup).toContain('Syncing...');
-    expect(markup).not.toContain('Questions:');
-    expect(markup).toContain('Responses:');
-    expect(markup).toContain('Remaining Blocks: 60 (Current: 40 / Latest: 100)');
-    expect(markup).toContain('Refresh Now');
-  });
-
-  it('keeps long-sync gating from changing status copy or refresh availability', () => {
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(20000);
-    try {
-      const subject = createSubject({
-        isOpen: true,
-        viewMode: 'questions',
-      });
-      subject.state = {
-        ...subject.state,
-        viewMode: 'questions',
-        networkLatestBlock: 100,
-        questionLocalBlock: 90,
-        responseLocalBlock: 100,
-        syncDetailsOpen: true,
-      };
-      subject._syncLoadingStartedAt = 4000;
-
-      let syncStatusNode = getSyncStatusNodeFromSubject(subject);
-
-      expect(renderToStaticMarkup(syncStatusNode)).toContain('Syncing...');
-      expect(findElement(
-        syncStatusNode,
-        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-      )).toBeTruthy();
-
-      subject.state = {
-        ...subject.state,
-        questionLocalBlock: 100,
-      };
-      syncStatusNode = getSyncStatusNodeFromSubject(subject);
-
-      expect(renderToStaticMarkup(syncStatusNode)).toContain('In Sync');
-      expect(findElement(
-        syncStatusNode,
-        (element) => element?.props?.['aria-label'] === 'Refresh sync data'
-      )).toBeNull();
-    } finally {
-      nowSpy.mockRestore();
-    }
-  });
-
-  it('routes async scoped question cache reads through peek before read fallback without side effects', async () => {
-    const subject = createSubject({
+    await mountSurveyResults({
       activeSessionSlug: 'edge',
       isOpen: true,
       viewMode: 'questions',
     });
-    const peekBucket = {
+    openSyncDetails();
+
+    await screen.findByText('In Sync');
+    expect(screen.queryByLabelText('Refresh sync data')).toBeNull();
+    const detailedRefresh = screen.getByTitle('Refresh Data from Cache/Chain');
+
+    const blockCallsBefore = latestBlockSpy.mock.calls.length;
+    fireEvent.click(detailedRefresh);
+    await settle();
+
+    expect(latestBlockSpy.mock.calls.length).toBeGreaterThan(blockCallsBefore);
+  });
+
+  it('renders question-mode loading tracks from missing polling blocks', async () => {
+    installCacheFixtures({});
+    mockLatestBlock(0);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({ isOpen: true, viewMode: 'questions' });
+    openSyncDetails();
+
+    expect(screen.getAllByText('Loading...').length).toBeGreaterThan(0);
+    expect(screen.getByText('Questions:')).toBeInTheDocument();
+    expect(screen.getByText('Responses:')).toBeInTheDocument();
+    expect(screen.queryByText('In Sync')).toBeNull();
+    expect(screen.getByLabelText('Refresh sync data')).toBeInTheDocument();
+  });
+
+  it('renders question and response tracks while question-mode polling is stale', async () => {
+    installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 80,
+            questionResponsesLatestBlock: 70,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(100);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    openSyncDetails();
+
+    // port note: remaining-block labels recomputed from fixture math — the mount-time
+    // manual refresh seeds refresh targets at the latest block (100), so the tracks use
+    // the short refresh-target label form instead of the legacy '(Current/Latest)' form;
+    // the legacy _syncLoadingStartedAt seeding had no rendered output and was dropped.
+    await screen.findByText('Syncing...');
+    expect(screen.getByText('Questions:')).toBeInTheDocument();
+    await screen.findByText('Remaining Blocks: 20');
+    expect(screen.getByText('Responses:')).toBeInTheDocument();
+    await screen.findByText('Remaining Blocks: 30');
+    expect(screen.getByText('Refresh Now')).toBeInTheDocument();
+    expect(screen.getByLabelText('Refresh sync data')).toBeInTheDocument();
+  });
+
+  it('renders survey-mode readiness from the survey response track only', async () => {
+    installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 100,
+            questionResponsesLatestBlock: 100,
+          }),
+        },
+      },
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Readiness Survey',
+            questionIDs: [],
+            responsesByResponder: {},
+            latestBlock: 40,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(100);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    openSyncDetails();
+
+    // port note: remaining-block label recomputed from fixture math (survey local 40 vs
+    // mount-refresh target 100) — short label form replaces '(Current: 40 / Latest: 100)'.
+    await screen.findByText('Syncing...');
+    expect(screen.queryByText('Questions:')).toBeNull();
+    expect(screen.getByText('Responses:')).toBeInTheDocument();
+    await screen.findByText('Remaining Blocks: 60');
+    expect(screen.getByText('Refresh Now')).toBeInTheDocument();
+  });
+
+  it('keeps long-sync gating from changing status copy or refresh availability', async () => {
+    let mockNow = 50000;
+    jest.spyOn(Date, 'now').mockImplementation(() => mockNow);
+    const fixtures: SurveyResultsCacheFixtures = {
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 90,
+            questionResponsesLatestBlock: 100,
+          }),
+        },
+      },
+    };
+    installCacheFixtures(fixtures);
+    mockLatestBlock(100);
+    mockQuestionReadScope();
+
+    const harness = await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+    openSyncDetails();
+
+    await screen.findByText('Syncing...');
+    expect(screen.getByLabelText('Refresh sync data')).toBeInTheDocument();
+
+    // Cross the long-sync threshold: status copy and refresh availability must not change.
+    mockNow += 20000;
+    await rerenderAndSettle(harness, { sbtCacheRevision: 'long-sync-nudge' });
+    expect(screen.getByText('Syncing...')).toBeInTheDocument();
+    expect(screen.getByLabelText('Refresh sync data')).toBeInTheDocument();
+
+    // Transition to synced through the real cache + manual refresh path.
+    (fixtures.questionsBySlug as Record<string, unknown>).edge = {
+      [NETWORK_ID]: buildQuestionsBucket({
+        questionsLatestBlock: 100,
+        questionResponsesLatestBlock: 100,
+      }),
+    };
+    fireEvent.click(screen.getByLabelText('Refresh sync data'));
+    await settle();
+
+    await screen.findByText('In Sync');
+    expect(screen.queryByLabelText('Refresh sync data')).toBeNull();
+  });
+
+  it('routes async scoped question cache reads through peek before read fallback without side effects', async () => {
+    const peekBucket = buildQuestionsBucket({
       questionsLatestBlock: 40,
       questionResponsesLatestBlock: 41,
       questions: {
@@ -889,8 +1004,8 @@ describe('SurveyResults cache/readiness shell wiring', () => {
           '0xaaa': { answer: { value: 'Peek answer' } },
         },
       },
-    };
-    const readBucket = {
+    });
+    const readBucket = buildQuestionsBucket({
       questionsLatestBlock: 50,
       questionResponsesLatestBlock: 51,
       questions: {
@@ -905,366 +1020,434 @@ describe('SurveyResults cache/readiness shell wiring', () => {
           '0xbbb': { answer: { value: 'Read answer' } },
         },
       },
-    };
-    subject.getQuestionReadSlugs = jest.fn(() => ['edge', 'fallback']);
-    subject.shouldRequireAuthoritativeQuestionScope = jest.fn(() => false);
-    subject.setState = jest.fn();
-    subject.queueResultsRefresh = jest.fn();
-    subject.fetchResponses = jest.fn();
-    subject.handleDecryptLockedResponses = jest.fn();
-    subject.generateResponsesCSV = jest.fn();
-    subject.generateResultsJSON = jest.fn();
-
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((_namespace: string, slug: string) => (
-      slug === 'edge' ? { 84532: peekBucket } : {}
-    ));
-    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (_namespace: string, slug: string) => (
-      slug === 'fallback' ? { 84532: readBucket } : {}
-    ));
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
-    try {
-      const result = await subject.getScopedQuestionNetworkData('questions');
-
-      expect(subject.getQuestionReadSlugs).toHaveBeenCalledWith('questions');
-      expect(subject.shouldRequireAuthoritativeQuestionScope).toHaveBeenCalledWith('questions');
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'fallback', { clone: false });
-      expect(readSpy).toHaveBeenCalledTimes(1);
-      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'fallback');
-      expect(result).toMatchObject({
-        questionsLatestBlock: 50,
-        questionResponsesLatestBlock: 51,
-        questions: {
-          qpeek: expect.objectContaining({ prompt: 'Peek prompt', sessionSlug: 'edge' }),
-          qread: expect.objectContaining({ prompt: 'Read prompt', sessionSlug: 'fallback' }),
-        },
-        questionResponses: {
-          qpeek: {
-            '0xaaa': { answer: { value: 'Peek answer' } },
-          },
-          qread: {
-            '0xbbb': { answer: { value: 'Read answer' } },
-          },
-        },
-      });
-      expect(subject.setState).not.toHaveBeenCalled();
-      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
-      expect(subject.fetchResponses).not.toHaveBeenCalled();
-      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
-      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
-      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
-      expect(writeSpy).not.toHaveBeenCalled();
-    } finally {
-      peekSpy.mockRestore();
-      readSpy.mockRestore();
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', () => {
-    const subject = createSubject({
-      isOpen: true,
-      viewMode: 'questions',
     });
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
-      q1: { id: 'q1', prompt: 'Cached question' },
-    }));
-    subject.state = {
-      ...subject.state,
-      activeQuestionToggles: {
-        ...subject.state.activeQuestionToggles,
-        'Q-missing': true,
+    const { peekSpy, readSpy, writeSpy } = installCacheFixtures({
+      questionsBySlug: { edge: { [NETWORK_ID]: peekBucket } },
+      readQuestionsBySlug: {
+        edge: {},
+        fallback: { [NETWORK_ID]: readBucket },
       },
-    };
-
-    const summary = subject.renderQuestionSummary(
-      'Q-missing',
-      [{ responder: '0xabc', response: { answer: { value: 'Fallback answer' } } }],
-      {}
-    ) as React.ReactElement;
-    const defaultSummary = summary.props.renderDefaultSummary();
-
-    expect(summary.props.metadataMissing).toBe(true);
-    expect(summary.props.questionPrompt).toBe('Unknown question: Q-missing');
-    expect(defaultSummary.props.question).toEqual({
-      id: 'Q-missing',
-      prompt: 'Unknown question',
     });
-    expect(subject.getNetworkQuestionsForCurrentContext).not.toHaveBeenCalled();
-  });
+    mockLatestBlock(60);
+    mockQuestionReadScope({ scope: 'list', slugs: ['fallback'] });
 
-  it('reads cached question metadata for selected summaries when no render cache is preloaded', () => {
-    const subject = createSubject({
+    await mountSurveyResults({
       activeSessionSlug: 'edge',
       isOpen: true,
       viewMode: 'questions',
     });
-    const cachedQuestion = {
+
+    // Peeked-bucket metadata renders directly...
+    await screen.findAllByText('Peek prompt');
+    // ...while the read-fallback bucket proves itself through the merged aggregator: its
+    // question id gains a summary card (display metadata comes from the sync peek path,
+    // so the card uses the unknown-question fallback) carrying the read-bucket response.
+    await screen.findByText('Unknown question: qread');
+    const readBackedSummary = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'qread');
+    expect(readBackedSummary).toBeTruthy();
+    expect(readBackedSummary.allResponses).toEqual([
+      expect.objectContaining({
+        responder: '0xbbb',
+        response: expect.objectContaining({ answer: { value: 'Read answer' } }),
+      }),
+    ]);
+
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'fallback', { clone: false });
+    const questionCacheReads = readSpy.mock.calls.filter((call) => call[0] === 'questionsCache');
+    expect(questionCacheReads.length).toBeGreaterThan(0);
+    questionCacheReads.forEach((call) => expect(call[1]).toBe('fallback'));
+    expect(writeSpy).not.toHaveBeenCalled();
+    // port note: dropped internal-orchestration facets with no behavior seam — the
+    // getQuestionReadSlugs/shouldRequireAuthoritativeQuestionScope argument shapes, the
+    // merged 50/51 max-block arithmetic, the exactly-once readCache count (the mounted
+    // refresh pipeline legitimately re-reads), and the setState/queueResultsRefresh/
+    // fetchResponses/decrypt/CSV/JSON purity guards; covered by
+    // surveyResultsQuestionNetworkReadController unit tests.
+  });
+
+  it('passes stable missing-metadata fallbacks to selected question summaries without reading cache again', async () => {
+    const { writeSpy } = installCacheFixtures({
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Fallback Survey',
+            questionIDs: ['q-missing'],
+            responsesByResponder: {
+              '0xabc0000000000000000000000000000000000abc': {
+                responses: [{ questionID: 'q-missing', answer: { value: 'Fallback answer' } }],
+              },
+            },
+            latestBlock: 10,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    await waitFor(() => {
+      expect(lastRecordedProps(mockIndividualResponsesList)?.responses).toHaveLength(1);
+    });
+
+    // Enter the aggregate summaries through the real survey view-mode toggle.
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+
+    await screen.findByText('Unknown question: q-missing');
+    expect(
+      screen.getByText('No metadata found for this question in local cache.')
+    ).toBeInTheDocument();
+    const summaryProps = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-missing');
+    expect(summaryProps).toBeTruthy();
+    expect(summaryProps.question).toEqual({
+      id: 'q-missing',
+      prompt: 'Unknown question',
+    });
+    expect(writeSpy).not.toHaveBeenCalled();
+    // port note: the 'metadata reader not called when a render cache is preloaded' facet
+    // was dropped — the per-render preloaded-questions cache has no DOM/mock seam; it
+    // belongs to surveyResultsQuestionMetadataReadController unit tests
+    // (preloadedNetworkQuestions short-circuits ports.readNetworkQuestions).
+  });
+
+  it('reads cached question metadata for selected summaries when no render cache is preloaded', async () => {
+    const { writeSpy } = installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 12,
+            questionResponsesLatestBlock: 12,
+            questions: {
+              // Mixed-case cache key preserves the case-insensitive lookup guard.
+              'Q-Ready': {
+                id: 'q-ready',
+                prompt: 'Ready cached prompt',
+                sessionSlug: 'edge',
+                type: 'binary',
+              },
+              'q-other': {
+                id: 'q-other',
+                prompt: 'Other cached prompt',
+                sessionSlug: 'edge',
+                type: 'binary',
+              },
+            },
+          }),
+        },
+      },
+    });
+    mockLatestBlock(12);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      viewMode: 'questions',
+    });
+
+    await screen.findAllByText('Ready cached prompt');
+    const readyProps = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-ready');
+    expect(readyProps).toBeTruthy();
+    // port note: the legacy toBe identity on the cached question degraded to a structural
+    // match — the scoped network merge clones question records before they reach summaries.
+    expect(readyProps.question).toMatchObject({
       id: 'q-ready',
       prompt: 'Ready cached prompt',
       sessionSlug: 'edge',
-      type: 'freeform',
+      type: 'binary',
+    });
+    expect(screen.queryByText(/Unknown question:/)).toBeNull();
+    expect(
+      screen.queryByText('No metadata found for this question in local cache.')
+    ).toBeNull();
+    expect(writeSpy).not.toHaveBeenCalled();
+    // port note: the reader-call-args facet ({activeSessionSlug, currentSurveyId,
+    // questionId, viewMode}) is internal wiring with no seam here; covered by
+    // surveyResultsQuestionMetadataReadController unit tests. The old no-state,
+    // no-refresh, no-fetch, no-decrypt, and no-export side-effect guards are covered by
+    // that controller's injected-port purity test; the mounted seam can only observe that
+    // cache persistence was not invoked and no fallback UI rendered.
+  });
+
+  it('passes selected survey and question identity to selected summary metadata reads', async () => {
+    const surveyBucket = {
+      [NETWORK_ID]: buildSurveysBucket({
+        title: 'Identity Survey',
+        questionIDs: ['q-survey'],
+        responsesByResponder: {},
+        latestBlock: 10,
+      }),
     };
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
-      'q-ready': cachedQuestion,
-      'q-other': {
-        id: 'q-other',
-        prompt: 'Other cached prompt',
-        sessionSlug: 'edge',
+    const questionsBucket = {
+      [NETWORK_ID]: buildQuestionsBucket({
+        questionsLatestBlock: 10,
+        questionResponsesLatestBlock: 10,
+        questions: {
+          'q-survey': {
+            id: 'q-survey',
+            prompt: 'Survey selected prompt',
+            sessionSlug: 'edge',
+            type: 'binary',
+          },
+        },
+      }),
+    };
+    installCacheFixtures({
+      questionsBySlug: { edge: questionsBucket },
+      surveysBySlug: { edge: surveyBucket },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    const harness = await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+
+    await screen.findAllByText('Survey selected prompt');
+    expect(screen.queryByText(/Unknown question:/)).toBeNull();
+
+    // port note: the legacy reader-args identity assertion became a scope-observable
+    // guard — metadata resolves only from the survey-scoped session bucket; the same
+    // metadata stored under a different slug falls back to 'Unknown question'.
+    harness.unmount();
+    installCacheFixtures({
+      questionsBySlug: { elsewhere: questionsBucket },
+      surveysBySlug: { edge: surveyBucket },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+
+    await screen.findByText('Unknown question: q-survey');
+    expect(screen.queryByText('Survey selected prompt')).toBeNull();
+  });
+
+  it('keeps loading selected metadata placeholders as cached results without side effects', async () => {
+    const { writeSpy } = installCacheFixtures({
+      questionsBySlug: {
+        edge: {
+          [NETWORK_ID]: buildQuestionsBucket({
+            questionsLatestBlock: 9,
+            questionResponsesLatestBlock: 9,
+            questions: {
+              'q-loading': {
+                __ceQuestionMetadataPending: true,
+                id: 'q-loading',
+                prompt: 'Loading cached question metadata...',
+                sessionSlug: 'edge',
+                type: 'binary',
+              },
+              'q-ready': {
+                id: 'q-ready',
+                prompt: 'Ready cached prompt',
+                sessionSlug: 'edge',
+                type: 'binary',
+              },
+            },
+            questionResponses: {
+              'q-loading': {
+                '0xaaa': { answer: { value: 'Cached answer' } },
+              },
+            },
+          }),
+        },
       },
-    }));
-    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
-    subject.setState = jest.fn();
-    subject.queueResultsRefresh = jest.fn();
-    subject.fetchResponses = jest.fn();
-    subject.handleDecryptLockedResponses = jest.fn();
-    subject.generateResponsesCSV = jest.fn();
-    subject.generateResultsJSON = jest.fn();
+    });
+    mockLatestBlock(9);
+    mockQuestionReadScope();
 
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
-    try {
-      const summary = subject.renderQuestionSummary(
-        'Q-Ready',
-        [],
-        null
-      ) as React.ReactElement;
-      const defaultSummary = summary.props.renderDefaultSummary();
-
-      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
-      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
-        activeSessionSlug: 'edge',
-        currentSurveyId: '',
-        questionId: 'Q-Ready',
-        viewMode: 'questions',
-      });
-      expect(summary.props.metadataMissing).toBe(false);
-      expect(summary.props.questionPrompt).toBe('Ready cached prompt');
-      expect(defaultSummary.props.question).toBe(cachedQuestion);
-      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
-      expect(subject.setState).not.toHaveBeenCalled();
-      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
-      expect(subject.fetchResponses).not.toHaveBeenCalled();
-      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
-      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
-      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
-      expect(writeSpy).not.toHaveBeenCalled();
-    } finally {
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('passes selected survey and question identity to selected summary metadata reads', () => {
-    const surveyId = '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd';
-    const subject = createSubject({
+    await mountSurveyResults({
       activeSessionSlug: 'edge',
       isOpen: true,
-      surveyId,
+      viewMode: 'questions',
+    });
+
+    // port note: the legacy direct renderQuestionSummary facet (pending placeholder passes
+    // through as a cached result with metadataMissing=false and no fallback lookup) is owned
+    // by surveyResultsQuestionMetadataReadController's pending-placeholder and port-purity
+    // tests. The mounted scoped-network path intentionally filters pending placeholders
+    // before the summary layer, so this component-level guard covers the observable absence
+    // of ready/fallback rendering and cache persistence.
+    await screen.findAllByText('Ready cached prompt');
+    expect(screen.queryByText('Loading cached question metadata...')).toBeNull();
+    expect(screen.queryByText('Unknown question: q-loading')).toBeNull();
+    expect(writeSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back for selected summaries when the cached metadata read is empty without side effects', async () => {
+    const { writeSpy } = installCacheFixtures({
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Empty Metadata Survey',
+            questionIDs: ['q-empty'],
+            responsesByResponder: {},
+            latestBlock: 10,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
       viewMode: 'survey',
     });
-    const cachedQuestion = {
-      id: 'q-survey',
-      prompt: 'Survey selected prompt',
-      sessionSlug: 'edge',
-      type: 'freeform',
-    };
-    subject.state = {
-      ...subject.state,
-      surveyId,
-      viewMode: 'survey',
-    };
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
-      'q-survey': cachedQuestion,
-    }));
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
 
-    const summary = subject.renderQuestionSummary(
-      'Q-Survey',
-      [],
-      null
-    ) as React.ReactElement;
-
-    expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
-      activeSessionSlug: 'edge',
-      currentSurveyId: surveyId,
-      questionId: 'Q-Survey',
-      viewMode: 'survey',
-    });
-    expect(summary.props.metadataMissing).toBe(false);
-    expect(summary.props.questionPrompt).toBe('Survey selected prompt');
-  });
-
-  it('keeps loading selected metadata placeholders as cached results without side effects', () => {
-    const subject = createSubject({
-      activeSessionSlug: 'edge',
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    const pendingQuestion = {
-      __ceQuestionMetadataPending: true,
-      id: 'q-loading',
-      prompt: 'Loading cached question metadata...',
-      sessionSlug: 'edge',
-      type: 'freeform',
-    };
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
-      'q-loading': pendingQuestion,
-    }));
-    subject.getStableFallbackQuestion = jest.fn(subject.getStableFallbackQuestion);
-    subject.setState = jest.fn();
-    subject.queueResultsRefresh = jest.fn();
-    subject.fetchResponses = jest.fn();
-    subject.handleDecryptLockedResponses = jest.fn();
-    subject.generateResponsesCSV = jest.fn();
-    subject.generateResultsJSON = jest.fn();
-
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
-    try {
-      const summary = subject.renderQuestionSummary(
-        'Q-Loading',
-        [{ responder: '0xabc', response: { answer: { value: 'Cached answer' } } }],
-        null
-      ) as React.ReactElement;
-      const defaultSummary = summary.props.renderDefaultSummary();
-
-      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
-        activeSessionSlug: 'edge',
-        currentSurveyId: '',
-        questionId: 'Q-Loading',
-        viewMode: 'questions',
-      });
-      expect(summary.props.metadataMissing).toBe(false);
-      expect(summary.props.questionPrompt).toBe('Loading cached question metadata...');
-      expect(defaultSummary.props.question).toBe(pendingQuestion);
-      expect(subject.getStableFallbackQuestion).not.toHaveBeenCalled();
-      expect(subject.setState).not.toHaveBeenCalled();
-      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
-      expect(subject.fetchResponses).not.toHaveBeenCalled();
-      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
-      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
-      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
-      expect(writeSpy).not.toHaveBeenCalled();
-    } finally {
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('falls back for selected summaries when the cached metadata read is empty without side effects', () => {
-    const subject = createSubject({
-      activeSessionSlug: 'edge',
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
-    subject.setState = jest.fn();
-    subject.queueResultsRefresh = jest.fn();
-    subject.fetchResponses = jest.fn();
-    subject.handleDecryptLockedResponses = jest.fn();
-    subject.generateResponsesCSV = jest.fn();
-    subject.generateResultsJSON = jest.fn();
-
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
-    try {
-      const summary = subject.renderQuestionSummary(
-        'Q-Empty',
-        [],
-        undefined
-      ) as React.ReactElement;
-      const defaultSummary = summary.props.renderDefaultSummary();
-
-      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledTimes(1);
-      expect(subject.getNetworkQuestionsForCurrentContext).toHaveBeenCalledWith({
-        activeSessionSlug: 'edge',
-        currentSurveyId: '',
-        questionId: 'Q-Empty',
-        viewMode: 'questions',
-      });
-      expect(summary.props.metadataMissing).toBe(true);
-      expect(summary.props.questionPrompt).toBe('Unknown question: Q-Empty');
-      expect(defaultSummary.props.question).toEqual({
-        id: 'Q-Empty',
-        prompt: 'Unknown question',
-      });
-      expect(subject.setState).not.toHaveBeenCalled();
-      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
-      expect(subject.fetchResponses).not.toHaveBeenCalled();
-      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
-      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
-      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
-      expect(writeSpy).not.toHaveBeenCalled();
-    } finally {
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('reuses selected-summary fallback status objects without cache persistence or state writes', () => {
-    const subject = createSubject({
-      activeSessionSlug: 'edge',
-      isOpen: true,
-      viewMode: 'questions',
-    });
-    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({}));
-    subject.setState = jest.fn();
-    subject.queueResultsRefresh = jest.fn();
-    subject.fetchResponses = jest.fn();
-    subject.handleDecryptLockedResponses = jest.fn();
-    subject.generateResponsesCSV = jest.fn();
-    subject.generateResultsJSON = jest.fn();
-
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache');
-    try {
-      const firstSummary = subject.renderQuestionSummary(
-        'Q-Empty',
-        [],
-        undefined
-      ) as React.ReactElement;
-      const firstDefaultSummary = firstSummary.props.renderDefaultSummary();
-      const secondSummary = subject.renderQuestionSummary(
-        'Q-Empty',
-        [],
-        undefined
-      ) as React.ReactElement;
-      const secondDefaultSummary = secondSummary.props.renderDefaultSummary();
-
-      expect(firstSummary.props.metadataMissing).toBe(true);
-      expect(secondSummary.props.metadataMissing).toBe(true);
-      expect(firstDefaultSummary.props.question).toBe(secondDefaultSummary.props.question);
-      expect(firstDefaultSummary.props.question).toEqual({
-        id: 'Q-Empty',
-        prompt: 'Unknown question',
-      });
-      expect(subject.setState).not.toHaveBeenCalled();
-      expect(subject.queueResultsRefresh).not.toHaveBeenCalled();
-      expect(subject.fetchResponses).not.toHaveBeenCalled();
-      expect(subject.handleDecryptLockedResponses).not.toHaveBeenCalled();
-      expect(subject.generateResponsesCSV).not.toHaveBeenCalled();
-      expect(subject.generateResultsJSON).not.toHaveBeenCalled();
-      expect(writeSpy).not.toHaveBeenCalled();
-    } finally {
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('wires selected fallback status plans through parent summary and individual modes', () => {
-    const subject = createSubject({
-      activeSessionSlug: 'edge',
-      isOpen: true,
-      viewMode: 'questions',
-    });
-
-    const summary = subject.getStableFallbackQuestion('Q-Plan', 'summary');
-    const individual = subject.getStableFallbackQuestion('Q-Plan', 'individual');
-
-    expect(subject.getStableFallbackQuestion('Q-Plan', 'summary')).toBe(summary);
-    expect(subject.getStableFallbackQuestion('Q-Plan', 'individual')).toBe(individual);
-    expect(summary).toEqual({
-      id: 'Q-Plan',
+    await screen.findByText('Unknown question: q-empty');
+    const fallbackProps = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-empty');
+    expect(fallbackProps).toBeTruthy();
+    expect(fallbackProps.question).toEqual({
+      id: 'q-empty',
       prompt: 'Unknown question',
     });
-    expect(individual).toEqual({
-      id: 'Q-Plan',
+    expect(writeSpy).not.toHaveBeenCalled();
+    // port note: the old reader-args plus no-state/no-refresh/no-fetch/no-decrypt/no-export
+    // guards are internal-only for the mounted component; surveyResultsQuestionMetadataReadController
+    // covers the injected-port identity and purity contract directly.
+  });
+
+  it('reuses selected-summary fallback status objects without cache persistence or state writes', async () => {
+    const { writeSpy } = installCacheFixtures({
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Fallback Reuse Survey',
+            questionIDs: ['q-empty'],
+            responsesByResponder: {},
+            latestBlock: 10,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    const harness = await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+    await screen.findByText('Unknown question: q-empty');
+
+    const firstFallbackQuestion = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-empty')?.question;
+    expect(firstFallbackQuestion).toEqual({
+      id: 'q-empty',
+      prompt: 'Unknown question',
+    });
+
+    mockSingleQuestionResponse.mockClear();
+    await rerenderAndSettle(harness, { sbtCacheRevision: 'fallback-reuse-nudge' });
+
+    const secondFallbackQuestion = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-empty')?.question;
+    expect(secondFallbackQuestion).toBe(firstFallbackQuestion);
+    expect(writeSpy).not.toHaveBeenCalled();
+    // port note: the previous direct setState/queue/fetch/decrypt/export not-called guards
+    // have no mounted seam here; the helper/controller tests own those side-effect-free
+    // contracts while this test preserves fallback object reuse and no cache persistence.
+  });
+
+  it('wires selected fallback status plans through parent summary and individual modes', async () => {
+    installCacheFixtures({
+      surveysBySlug: {
+        edge: {
+          [NETWORK_ID]: buildSurveysBucket({
+            title: 'Fallback Plan Survey',
+            questionIDs: ['q-plan'],
+            responsesByResponder: {
+              '0xabc0000000000000000000000000000000000abc': {
+                responses: [{ questionID: 'q-plan', answer: { value: 'Plan answer' } }],
+              },
+            },
+            latestBlock: 10,
+          }),
+        },
+      },
+    });
+    mockLatestBlock(10);
+    mockQuestionReadScope();
+
+    await mountSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      surveyId: SURVEY_ID,
+      viewMode: 'survey',
+    });
+    await waitFor(() => {
+      expect(lastRecordedProps(mockIndividualResponsesList)?.responses).toHaveLength(1);
+    });
+
+    // port note: the direct getStableFallbackQuestion API facet (per-call memoization on a
+    // bare instance) moved to surveyResultsFallbackQuestionHelpers unit coverage; here the
+    // component-owned guard is exercised end-to-end: fallback identity is stable per mode
+    // across view toggles and differs between summary and individual modes.
+    const individualFirst = recordedIndividualResponseProps()
+      .find((props) => props?.question?.id === 'q-plan')?.question;
+    expect(individualFirst).toEqual({
+      id: 'q-plan',
       creator: '',
       type: '',
       prompt: '',
     });
-    expect(individual).not.toBe(summary);
+
+    mockSingleQuestionResponse.mockClear();
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+    const summaryFirst = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-plan')?.question;
+    expect(summaryFirst).toEqual({
+      id: 'q-plan',
+      prompt: 'Unknown question',
+    });
+
+    mockSingleQuestionResponse.mockClear();
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+    const individualSecond = recordedIndividualResponseProps()
+      .find((props) => props?.question?.id === 'q-plan')?.question;
+    expect(individualSecond).toBe(individualFirst);
+
+    mockSingleQuestionResponse.mockClear();
+    fireEvent.click(screen.getByRole('switch'));
+    await settle();
+    const summarySecond = recordedAggregateSummaryProps()
+      .find((props) => props?.question?.id === 'q-plan')?.question;
+    expect(summarySecond).toBe(summaryFirst);
+
+    expect(summaryFirst).not.toBe(individualFirst);
   });
 });
