@@ -10,6 +10,7 @@ import {
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
+import { __test__resetTelegramSessionMetaCache } from '../../utilities/session/telegramSessionMeta.js';
 
 const mockAdminPage = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
@@ -25,6 +26,7 @@ const mockDebateMap = jest.fn(() => null);
 const mockUserPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
+const originalFetch = global.fetch;
 
 const restoreSessionScanGlobals = () => {
   if (typeof ORIGINAL_SESSION_SCAN_SCOPE === 'undefined') {
@@ -424,6 +426,12 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
+const flushPromises = async () => {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+};
+
 const createSubject = ({
   path = '/',
   search = '',
@@ -536,6 +544,8 @@ describe('MainSite route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+    __test__resetTelegramSessionMetaCache();
+    global.fetch = originalFetch;
   });
 
   afterEach(() => {
@@ -553,6 +563,8 @@ describe('MainSite route render smoke', () => {
     restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
     window.sessionStorage.clear();
+    __test__resetTelegramSessionMetaCache();
+    global.fetch = originalFetch;
   });
 
   it('renders the wizard root for /new, canonicalizes the alias, and forwards query params', async () => {
@@ -1125,6 +1137,83 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Weyl v. Yarvin Debate');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'rxc');
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('rxc', { allowDemoFallback: true });
+  });
+
+  it('falls back to telegram session-meta for an unknown telegram-only session route', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        telegramOnly: true,
+        telegramBridgeEnabled: true,
+      }),
+    }));
+    const subject = createSubject({
+      path: '/session/agent-village-2026',
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject._mounted = true;
+
+    const { rerender } = render(subject.render());
+    await flushPromises();
+    rerender(subject.render());
+
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/telegram/agent/api/session-meta?'));
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sessionSlug=agent-village-2026'));
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'agent-village-2026');
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    expect(latestProps.sessionConfig?.telegramOnly).toBe(true);
+    expect(latestProps.sessionConfig?.sessionMode).toBe('telegram_only');
+  });
+
+  it('keeps unknown non-telegram session routes out of OnePageSession', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        telegramOnly: false,
+        telegramBridgeEnabled: false,
+      }),
+    }));
+    const subject = createSubject({
+      path: '/session/not-telegram',
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject._mounted = true;
+
+    const { rerender } = render(subject.render());
+    await flushPromises();
+    rerender(subject.render());
+
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('sessionSlug=not-telegram'));
+    expect(subject.state.telegramMetaFallbackBySlug?.['not-telegram']).toBe('not-telegram');
+    expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).not.toBeInTheDocument();
+    expect(mockOnePageSession).not.toHaveBeenCalled();
+  });
+
+  it('does not probe telegram session-meta for known registry session routes', async () => {
+    global.fetch = jest.fn();
+    const sessionConfig = buildSessionConfig({
+      slug: 'edge',
+      sessionName: 'Known Edge Session',
+    });
+    seedSessionRegistryCache(sessionConfig);
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Known Edge Session');
+    expect(global.fetch).not.toHaveBeenCalled();
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    expect(latestProps.sessionConfig?.telegramOnly).not.toBe(true);
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {

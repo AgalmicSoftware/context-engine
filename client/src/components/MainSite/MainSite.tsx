@@ -38,6 +38,7 @@ import {
 } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
+  CE_TELEGRAM_AGENT_BRIDGE_URL,
   CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
   DEFAULT_CHAIN_ID,
   DEFAULT_SESSION_SLUG,
@@ -93,7 +94,10 @@ import {
   type SessionResponseHydrationHost,
 } from '../../utilities/survey/sessionResponseHydrationController.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
-import { isTelegramOnlySessionConfig } from '../../utilities/session/telegramSessionMeta.js';
+import {
+  fetchTelegramSessionMeta,
+  isTelegramOnlySessionConfig,
+} from '../../utilities/session/telegramSessionMeta.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   initCacheManager,
@@ -723,7 +727,37 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     sessionHeaderOverrides: {},
     groupCredentials: {},
     sessionPathResolutionNonce: 0,
+    telegramMetaFallbackBySlug: {},
     isCacheManagerReady: false,
+  };
+
+  probeTelegramSessionMetaFallback = (slugIn: unknown): void => {
+    const slug = normalizeSessionSlug(slugIn);
+    if (!slug || !CE_TELEGRAM_AGENT_BRIDGE_URL) return;
+    const current = (this.state.telegramMetaFallbackBySlug || {}) as Record<string, unknown>;
+    if (current[slug] || this._telegramMetaFallbackInFlight.has(slug)) return;
+
+    this._telegramMetaFallbackInFlight.add(slug);
+    fetchTelegramSessionMeta({
+      sessionSlug: slug,
+      agentBridgeUrl: CE_TELEGRAM_AGENT_BRIDGE_URL,
+    })
+      .then((meta) => {
+        if (!this._mounted) return;
+        this.setState((prev: MainSiteState) => {
+          const previous = (prev.telegramMetaFallbackBySlug || {}) as Record<string, unknown>;
+          if (previous[slug]) return null;
+          return {
+            telegramMetaFallbackBySlug: {
+              ...previous,
+              [slug]: meta?.telegramOnly === true ? 'telegram-only' : 'not-telegram',
+            },
+          } as MainSiteStatePatch;
+        });
+      })
+      .finally(() => {
+        this._telegramMetaFallbackInFlight.delete(slug);
+      });
   };
 
   setRecordStateFromController = (
@@ -984,6 +1018,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
   _sessionRouteLightDiscoveryInFlight: Record<string, unknown> = {};
+  _telegramMetaFallbackInFlight = new Set<string>();
   _mounted = false;
   _sessionPathResolver: SessionPathResolverController = createSessionPathResolverController({
     getProvider: () => this.props.provider,
@@ -5943,7 +5978,27 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       if (typeof window !== 'undefined') window.location.replace(buildPublicRoute(base));
       return <div />;
     }
-    const sessionConfig = sessionRoute.sessionConfig;
+    let sessionConfig = sessionRoute.sessionConfig;
+
+    if (!sessionConfig && slug) {
+      const telegramMetaFallbackBySlug = (
+        this.state.telegramMetaFallbackBySlug || {}
+      ) as Record<string, unknown>;
+      if (telegramMetaFallbackBySlug[slug] === 'telegram-only') {
+        sessionConfig = {
+          slug,
+          sessionName: slug,
+          sessionMode: 'telegram_only',
+          telegramOnly: true,
+          contracts: {},
+          blockLimits: { start: null, end: null },
+          networkChainId: DEFAULT_CHAIN_ID,
+          defaultTags: [],
+          defaultSbtTags: [],
+          defaultFeaturedSBTs: [],
+        } as NonNullable<typeof sessionConfig>;
+      }
+    }
 
     if (!sessionConfig) {
       if (slug) {
@@ -5954,6 +6009,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         );
         const keepResolving = recentError && slugStatus.retryCount > 0;
         this.resolveSessionPathSlug(slug);
+        this.probeTelegramSessionMetaFallback(slug);
         if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
           return (
             <SessionLoadingSkeleton
@@ -6012,6 +6068,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const resolvedSessionInfo = this.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionName = this.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
     const resolvedSessionHeader = this.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
+    const resolvedSessionNetwork = (
+      defaultSessionNetwork ||
+      this.getDisplaySessionNetwork(sessionConfig?.slug || slug) ||
+      this.props.network ||
+      getChainById(DEFAULT_CHAIN_ID)
+    );
     const walletViewProps = composeMainSiteWalletViewProps(this.props);
     const loginViewProps = composeMainSiteLoginViewProps(this.props);
     const sessionCacheViewProps = composeMainSiteSessionCacheViewProps(this.state);
@@ -6032,10 +6094,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               defaultFeaturedSBTs={sessionConfig.defaultFeaturedSBTs || []}
               contracts={sessionConfig.contracts || {}}
               blockLimits={sessionConfig.blockLimits || { start: null, end: null }}
-              networkChainId={sessionConfig.networkChainId}
+              networkChainId={sessionConfig.networkChainId || resolvedSessionNetwork?.id || DEFAULT_CHAIN_ID}
               questionsGenPrompt={sessionConfig.questionsGenPrompt}
               {...walletViewProps}
-              network={defaultSessionNetwork}
+              network={resolvedSessionNetwork}
               {...loginViewProps}
               {...sessionCacheViewProps}
               refreshSurveyResponsesByID={this.refreshSurveyResponsesByID}
