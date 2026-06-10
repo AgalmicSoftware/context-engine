@@ -311,6 +311,8 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: '1',
       AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
       AGENT_BRIDGE_MINI_APP_URL: 'https://mini.example.test/telegram',
+      AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://contextengine.example,https://www.contextengine.example',
+      AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.contextengine.example',
       AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
       AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
       AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: '3600',
@@ -353,6 +355,14 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_URL' &&
     binding.text === 'https://mini.example.test/telegram'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS' &&
+    binding.text === 'https://contextengine.example,https://www.contextengine.example'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS' &&
+    binding.text === 'https://mini.contextengine.example'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH'

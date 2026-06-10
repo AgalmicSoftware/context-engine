@@ -334,6 +334,7 @@ Required values:
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz` so hosted clients can exchange Telegram tokens and read/write result-view cache entries. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
 | Optional trusted Geo/Hermes onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The Geo node/link carries the plaintext invite token; Hermes supplies the Telegram user id it observes and receives a normal user-scoped `ceagt_...` token from `POST /telegram/agent/api/invite/onboard` |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
@@ -727,6 +728,11 @@ Current v0 scope:
   exposing secrets. Deploy metadata includes the Cloudflare
   `global_fetch_strictly_public` compatibility flag because the live bridge
   authenticates to a session Worker over its public `workers.dev` URL.
+- Browser calls that carry Telegram client tokens use the deployed
+  `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` and
+  `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` Worker vars. Keep the production web
+  origins in that allow-list when running `deploy:apply -- --apply`; the helper
+  uploads Worker metadata from its vars map on each script deploy.
 - Payload-unavailable questions stay retryable/unanswered; true private or gated
   questions stay locked until the canonical private/gated decrypt path is
   available.
