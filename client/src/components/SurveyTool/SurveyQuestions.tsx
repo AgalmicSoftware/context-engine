@@ -479,6 +479,10 @@ import {
 } from './surveyQuestionsSubmitController.js';
 import {
   buildActiveTagModalState,
+  buildAdditionalEncryptionAudienceState,
+  buildAdditionalEncryptionToggleResponseState,
+  buildAnswerEncryptionAudienceState,
+  buildAnswerEncryptionToggleResponseState,
   buildAutoDecryptAttemptedState,
   buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
@@ -497,7 +501,9 @@ import {
   buildDecryptingByKeyState,
   buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
+  buildEditStatsState,
   buildEditingResponseModeState,
+  buildFetchedQuestionPoolState,
   buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
@@ -4536,10 +4542,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         shouldResetSubmitted ||
         shouldRelatchSubmitted
       ) {
-        const updates = { modifiedCount, encryptedModifiedCount, hasEncryptedChanges, isDirty };
-        if (shouldResetSubmitted) updates.submissionComplete = false;
-        if (shouldRelatchSubmitted) updates.submittedSinceLastEdit = true;
-        this.setState(updates);
+        this.setState(buildEditStatsState({
+          modifiedCount,
+          encryptedModifiedCount,
+          hasEncryptedChanges,
+          isDirty,
+          shouldResetSubmitted,
+          shouldRelatchSubmitted,
+        }));
       }
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   };
@@ -4746,55 +4756,16 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     );
     const pendingQuestionIds = expectedQuestionIds.filter((qid) => !loadedQuestionIds.has(qid));
 
-    const nextQuestionPoolSig = buildQuestionIdScopeSignature(questionPool);
-    this.setState((prev) => {
-      const prevQuestionPool = Array.isArray(prev?.questionPool) ? prev.questionPool : [];
-      const prevExpectedQuestionIds = Array.isArray(prev?.questionPoolExpectedIds)
-        ? prev.questionPoolExpectedIds
-        : [];
-      const prevPendingQuestionIds = Array.isArray(prev?.questionPoolPendingIds)
-        ? prev.questionPoolPendingIds
-        : [];
-      const prevQuestionPoolById = new Map();
-      prevQuestionPool.forEach((entry) => {
-        const key = normalizeQuestionIdKey(entry?.id);
-        if (!key || prevQuestionPoolById.has(key)) return;
-        prevQuestionPoolById.set(key, entry);
-      });
-
-      const mergedQuestionPool = questionPool.map((entry) => {
-        const key = normalizeQuestionIdKey(entry?.id);
-        if (!key) return entry;
-        const existing = prevQuestionPoolById.get(key);
-        if (!existing) return entry;
-        const picked = pickBetterQuestionPayload(existing, entry) || entry;
-        if (picked === existing) return existing;
-        const normalized = { ...picked, id: key };
-        return areQuestionPayloadsEquivalent(existing, normalized) ? existing : normalized;
-      });
-
-      const prevQuestionPoolSig = buildQuestionIdScopeSignature(prevQuestionPool);
-      const expectedIdsUnchanged =
-        prevExpectedQuestionIds.length === expectedQuestionIds.length &&
-        prevExpectedQuestionIds.every((qid, index) => qid === expectedQuestionIds[index]);
-      const pendingIdsUnchanged =
-        prevPendingQuestionIds.length === pendingQuestionIds.length &&
-        prevPendingQuestionIds.every((qid, index) => qid === pendingQuestionIds[index]);
-      if (prevQuestionPoolSig === nextQuestionPoolSig) {
-        const hasSemanticChange =
-          prevQuestionPool.length !== mergedQuestionPool.length ||
-          prevQuestionPool.some((entry, idx) => entry !== mergedQuestionPool[idx]);
-        if (!hasSemanticChange && expectedIdsUnchanged && pendingIdsUnchanged) {
-          bumpSurveyPerfCounter('noopSkipCount');
-          return null;
-        }
-      }
-      return {
-        questionPool: mergedQuestionPool,
-        questionPoolExpectedIds: expectedQuestionIds,
-        questionPoolPendingIds: pendingQuestionIds,
-      };
-    });
+    this.setState((prev) => buildFetchedQuestionPoolState(prev, {
+      areQuestionPayloadsEquivalent,
+      buildQuestionIdScopeSignature,
+      expectedQuestionIds,
+      normalizeQuestionIdKey,
+      onNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
+      pendingQuestionIds,
+      pickBetterQuestionPayload,
+      questionPool,
+    }));
 	  }
 
 
@@ -5868,12 +5839,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(questionId || '').toLowerCase();
     this.invalidateDiffCaches();
 
-    this.setState(prev => {
-      const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
-      while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      const plan = buildEncryptionTogglePlan(qid, 'answer', newEncryptedState, slice, {
+    this.setState(prev => buildAnswerEncryptionToggleResponseState(prev, {
+      buildEncryptionTogglePlan,
+      deps: {
         isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
         buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
         resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
@@ -5881,21 +5849,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
         buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
         normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
-      });
-
-      slice.answers = { ...(slice.answers || {}), [qid]: plan.nextFieldState };
-      if (plan.nextAdditionalState) {
-        slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextAdditionalState };
-      }
-      arr[idx] = slice;
-
-      return {
-        surveysResponseState: arr,
-        lockAudienceMenuByQuestion: plan.clearMenus ? {} : prev.lockAudienceMenuByQuestion,
-        lockAudienceGateDetailsByQuestion: plan.clearMenus ? {} : prev.lockAudienceGateDetailsByQuestion,
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
-      };
-    }, () => {
+      },
+      newEncryptedState,
+      questionId: qid,
+      surveyIndex: idx,
+    }), () => {
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely && this.persistDraftSafely();
     });
@@ -5912,12 +5870,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(questionId || '').toLowerCase();
     this.invalidateDiffCaches();
 
-    this.setState(prev => {
-      const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
-      while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-      const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      const plan = buildEncryptionTogglePlan(qid, 'additional', newEncryptedState, slice, {
+    this.setState(prev => buildAdditionalEncryptionToggleResponseState(prev, {
+      buildEncryptionTogglePlan,
+      deps: {
         isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
         buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
         resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
@@ -5925,18 +5880,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
         buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
         normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
-      });
-
-      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextFieldState };
-      arr[idx] = slice;
-
-      return {
-        surveysResponseState: arr,
-        lockAudienceMenuByQuestion: plan.clearMenus ? {} : prev.lockAudienceMenuByQuestion,
-        lockAudienceGateDetailsByQuestion: plan.clearMenus ? {} : prev.lockAudienceGateDetailsByQuestion,
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
-      };
-    }, () => {
+      },
+      newEncryptedState,
+      questionId: qid,
+      surveyIndex: idx,
+    }), () => {
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely && this.persistDraftSafely();
     });
@@ -7206,14 +7154,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!qid) return;
     this.invalidateDiffCaches();
 
-    this.setState((prev) => {
-      const arr = buildSurveyResponseStateArray({
-        prevSurveysResponseState: prev.surveysResponseState,
-        surveyIndex: idx,
-      });
-      const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      const plan = buildAnswerAudienceSelectionPlan(qid, audience, options?.gateId || '', slice, {
+    this.setState((prev) => buildAnswerEncryptionAudienceState(prev, {
+      audience,
+      buildAnswerAudienceSelectionPlan,
+      buildSurveyResponseStateArray,
+      deps: {
         isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
         buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
         resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
@@ -7221,19 +7166,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
         buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
         normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
-      });
-
-      slice.answers = { ...(slice.answers || {}), [qid]: plan.nextAnswerState };
-      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextAdditionalState };
-      arr[idx] = slice;
-
-      return {
-        surveysResponseState: arr,
-        lockAudienceMenuByQuestion: {},
-        lockAudienceGateDetailsByQuestion: {},
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
-      };
-    }, () => {
+      },
+      gateId: options?.gateId || '',
+      questionId: qid,
+      surveyIndex: idx,
+    }), () => {
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely && this.persistDraftSafely();
     });
@@ -7245,14 +7182,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!qid) return;
     this.invalidateDiffCaches();
 
-    this.setState((prev) => {
-      const arr = buildSurveyResponseStateArray({
-        prevSurveysResponseState: prev.surveysResponseState,
-        surveyIndex: idx,
-      });
-      const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-
-      const { nextAdditionalState } = buildAdditionalAudienceSelectionPlan(qid, audience, options?.gateId || '', slice, {
+    this.setState((prev) => buildAdditionalEncryptionAudienceState(prev, {
+      audience,
+      buildAdditionalAudienceSelectionPlan,
+      buildSurveyResponseStateArray,
+      deps: {
         isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
         buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
         resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
@@ -7260,18 +7194,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
         buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
         normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
-      });
-
-      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: nextAdditionalState };
-
-      arr[idx] = slice;
-      return {
-        surveysResponseState: arr,
-        lockAudienceMenuByQuestion: {},
-        lockAudienceGateDetailsByQuestion: {},
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
-      };
-    }, () => {
+      },
+      gateId: options?.gateId || '',
+      questionId: qid,
+      surveyIndex: idx,
+    }), () => {
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely && this.persistDraftSafely();
     });

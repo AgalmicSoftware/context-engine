@@ -1,5 +1,9 @@
 import {
   buildActiveTagModalState,
+  buildAdditionalEncryptionAudienceState,
+  buildAdditionalEncryptionToggleResponseState,
+  buildAnswerEncryptionAudienceState,
+  buildAnswerEncryptionToggleResponseState,
   buildAutoDecryptAttemptedState,
   buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
@@ -18,7 +22,9 @@ import {
   buildDecryptingByKeyState,
   buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
+  buildEditStatsState,
   buildEditingResponseModeState,
+  buildFetchedQuestionPoolState,
   buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
@@ -1447,6 +1453,194 @@ describe('surveyQuestionsTypes', () => {
         currentState: [{ answers: { q1: 'draft' } }],
         questionPool: [{ id: 'q2' }],
       }],
+    });
+  });
+
+  it('builds SurveyQuestions response and question-pool state patches', () => {
+    expect(buildEditStatsState({
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+      isDirty: true,
+      modifiedCount: 2,
+      shouldRelatchSubmitted: true,
+      shouldResetSubmitted: true,
+    })).toEqual({
+      modifiedCount: 2,
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+      isDirty: true,
+      submissionComplete: false,
+      submittedSinceLastEdit: true,
+    });
+
+    const poolDeps = {
+      areQuestionPayloadsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
+      buildQuestionIdScopeSignature: (pool) => (Array.isArray(pool) ? pool.map((q) => q.id).join('|') : ''),
+      normalizeQuestionIdKey: (qid) => String(qid || '').trim().toLowerCase(),
+      pickBetterQuestionPayload: (_existing, incoming) => incoming,
+    };
+    expect(buildFetchedQuestionPoolState(
+      {
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+        questionPoolExpectedIds: ['q1'],
+        questionPoolPendingIds: [],
+      },
+      {
+        ...poolDeps,
+        expectedQuestionIds: ['q1'],
+        pendingQuestionIds: ['q2'],
+        questionPool: [{ id: 'Q1', prompt: 'new' }],
+      }
+    )).toEqual({
+      questionPool: [{ id: 'q1', prompt: 'new' }],
+      questionPoolExpectedIds: ['q1'],
+      questionPoolPendingIds: ['q2'],
+    });
+    const onNoop = jest.fn();
+    expect(buildFetchedQuestionPoolState(
+      {
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+        questionPoolExpectedIds: ['q1'],
+        questionPoolPendingIds: [],
+      },
+      {
+        ...poolDeps,
+        onNoop,
+        pickBetterQuestionPayload: (existing) => existing,
+        expectedQuestionIds: ['q1'],
+        pendingQuestionIds: [],
+        questionPool: [{ id: 'q1', prompt: 'old' }],
+      }
+    )).toBeNull();
+    expect(onNoop).toHaveBeenCalledTimes(1);
+
+    const encryptionDeps = { marker: 'deps' };
+    const encryptionPlanInputs = [];
+    const buildEncryptionTogglePlan = jest.fn((qid, field, newEncryptedState, slice) => {
+      encryptionPlanInputs.push(JSON.parse(JSON.stringify(slice)));
+      return {
+        clearMenus: field === 'answer',
+        nextAdditionalState: field === 'answer' ? { inheritedFrom: qid } : undefined,
+        nextFieldState: { encrypted: newEncryptedState, field },
+      };
+    });
+    expect(buildAnswerEncryptionToggleResponseState(
+      {
+        lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+        lockAudienceMenuByQuestion: { q1: true },
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        buildEncryptionTogglePlan,
+        deps: encryptionDeps,
+        newEncryptedState: true,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toMatchObject({
+      surveysResponseState: [{
+        answers: { q1: { encrypted: true, field: 'answer' } },
+        additionalComments: { q1: { inheritedFrom: 'q1' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
+    });
+    expect(buildEncryptionTogglePlan).toHaveBeenCalledWith(
+      'q1',
+      'answer',
+      true,
+      expect.any(Object),
+      encryptionDeps
+    );
+    expect(encryptionPlanInputs[0]).toEqual({ answers: {}, additionalComments: {} });
+
+    expect(buildAdditionalEncryptionToggleResponseState(
+      {
+        lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+        lockAudienceMenuByQuestion: { q1: true },
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        buildEncryptionTogglePlan,
+        deps: encryptionDeps,
+        newEncryptedState: false,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toMatchObject({
+      surveysResponseState: [{
+        additionalComments: { q1: { encrypted: false, field: 'additional' } },
+      }],
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+      submittedSinceLastEdit: false,
+    });
+
+    const buildSurveyResponseStateArray = ({ prevSurveysResponseState }) => [...prevSurveysResponseState];
+    const answerAudiencePlanInputs = [];
+    const buildAnswerAudienceSelectionPlan = jest.fn((_qid, _audience, _gateId, slice) => {
+      answerAudiencePlanInputs.push(JSON.parse(JSON.stringify(slice)));
+      return {
+        nextAnswerState: { audience: 'group' },
+        nextAdditionalState: { inheritedAudience: 'group' },
+      };
+    });
+    expect(buildAnswerEncryptionAudienceState(
+      {
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        audience: 'group',
+        buildAnswerAudienceSelectionPlan,
+        buildSurveyResponseStateArray,
+        deps: encryptionDeps,
+        gateId: 'gate-a',
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        answers: { q1: { audience: 'group' } },
+        additionalComments: { q1: { inheritedAudience: 'group' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
+    });
+    expect(buildAnswerAudienceSelectionPlan).toHaveBeenCalledWith(
+      'q1',
+      'group',
+      'gate-a',
+      expect.any(Object),
+      encryptionDeps
+    );
+    expect(answerAudiencePlanInputs[0]).toEqual({ answers: {}, additionalComments: {} });
+
+    expect(buildAdditionalEncryptionAudienceState(
+      {
+        submittedSinceLastEdit: true,
+        surveysResponseState: [{ answers: {}, additionalComments: {} }],
+      },
+      {
+        audience: 'public',
+        buildAdditionalAudienceSelectionPlan: () => ({ nextAdditionalState: { audience: 'public' } }),
+        buildSurveyResponseStateArray,
+        deps: encryptionDeps,
+        questionId: 'q1',
+        surveyIndex: 0,
+      }
+    )).toEqual({
+      surveysResponseState: [{
+        answers: {},
+        additionalComments: { q1: { audience: 'public' } },
+      }],
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
+      submittedSinceLastEdit: false,
     });
   });
 });
