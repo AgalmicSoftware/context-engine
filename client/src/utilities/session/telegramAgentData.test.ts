@@ -1,5 +1,6 @@
 /** @file telegramAgentData.test.ts */
 import {
+  buildTelegramPolisDataset,
   fetchTelegramAgentQuestions,
   fetchTelegramAgentResults,
   isTelegramAgentAuthFailure,
@@ -205,5 +206,153 @@ describe('telegramAgentData', () => {
       { optionId: 'week_2', label: 'Week 2', selected: false },
     ]);
     expect(normalizeTelegramBucketCards(null)).toEqual([]);
+  });
+
+  it('prefers real polis vectors when available', () => {
+    const dataset = buildTelegramPolisDataset({
+      polis: {
+        status: 'ready',
+        data: {
+          hasData: true,
+          participantCount: 2,
+          questionCount: 1,
+          responseCount: 2,
+          aggregator: {
+            q1: [
+              {
+                responder: 'P1',
+                questionId: 'q1',
+                response: JSON.stringify({ type: 'binary', prompt: 'Keep going?', answer: { value: 'Agree' } }),
+              },
+            ],
+          },
+        },
+      },
+      consensus: { status: 'ready', data: { questions: [] } },
+    });
+
+    expect(dataset.synthesized).toBe(false);
+    expect(dataset.hasData).toBe(true);
+    expect(dataset.aggregator.q1[0].responder).toBe('P1');
+  });
+
+  it('synthesizes polis vectors from anonymized groups when available', () => {
+    const dataset = buildTelegramPolisDataset({
+      polis: { status: 'error', reason: 'unsupported_results_view' },
+      consensus: {
+        status: 'ready',
+        data: {
+          questions: [
+            {
+              questionId: 'q1',
+              prompt: 'Should agents disclose themselves?',
+              total: 3,
+              participants: 3,
+              counts: [
+                { label: 'Agree', count: 2 },
+                { label: 'Disagree', count: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      difference: { status: 'ready', data: { questions: [] } },
+      groups: {
+        status: 'ready',
+        data: {
+          participantCount: 3,
+          groups: [
+            {
+              groupId: 'g1',
+              label: 'Group 1',
+              size: 3,
+              topStatements: [
+                {
+                  prompt: 'Should agents disclose themselves?',
+                  cluster: { agree: 2, disagree: 1, unsure: 0, responded: 3 },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    });
+
+    expect(dataset.synthesized).toBe(true);
+    expect(dataset.hasData).toBe(true);
+    expect(dataset.participantCount).toBe(3);
+    expect(dataset.aggregator.q1.map((row) => row.responder)).toEqual(['G1-P1', 'G1-P2', 'G1-P3']);
+    expect(dataset.aggregator.q1.map((row) => JSON.parse(row.response).answer.value)).toEqual([
+      'Agree',
+      'Agree',
+      'Disagree',
+    ]);
+  });
+
+  it('synthesizes deterministic aggregate-only polis vectors and filters non-binary labels', () => {
+    const views = {
+      polis: { status: 'error', reason: 'unsupported_results_view' },
+      consensus: {
+        status: 'ready',
+        data: {
+          questions: [
+            {
+              questionId: 'q1',
+              prompt: 'Fund prototypes?',
+              total: 4,
+              participants: 4,
+              counts: [
+                { label: 'Agree', count: 2 },
+                { label: 'Disagree', count: 1 },
+                { label: 'Unsure', count: 1 },
+              ],
+            },
+            {
+              questionId: 'q-ignore',
+              prompt: 'Do you like this?',
+              total: 3,
+              participants: 3,
+              counts: [
+                { label: 'Yes', count: 2 },
+                { label: 'No', count: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      difference: {
+        status: 'ready',
+        data: {
+          questions: [
+            {
+              questionId: 'q2',
+              prompt: 'Agents should act overnight?',
+              total: 4,
+              participants: 4,
+              counts: [
+                { label: 'Agree', count: 1 },
+                { label: 'Disagree', count: 2 },
+                { label: 'Unsure', count: 1 },
+              ],
+            },
+          ],
+        },
+      },
+      groups: { status: 'disabled', reason: 'anonymized_groups_admin_disabled' },
+    };
+
+    const first = buildTelegramPolisDataset(views);
+    const second = buildTelegramPolisDataset(views);
+
+    expect(first).toEqual(second);
+    expect(first.synthesized).toBe(true);
+    expect(Object.keys(first.aggregator).sort()).toEqual(['q1', 'q2']);
+    expect(first.aggregator.q1).toHaveLength(4);
+    expect(first.aggregator.q2).toHaveLength(4);
+    expect(JSON.parse(first.aggregator.q1[0].response)).toMatchObject({
+      type: 'binary',
+      prompt: 'Fund prototypes?',
+      answer: { value: 'Agree' },
+    });
   });
 });

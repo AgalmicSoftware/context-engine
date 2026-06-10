@@ -286,6 +286,13 @@ describe('OnePageSession view gating', () => {
       if (failAgentReads) throw new Error('worker offline');
       const view = new URL(urlString).searchParams.get('view') || '';
       if (resultsByView[view]) return resultsByView[view]();
+      if (view === 'polis') {
+        return {
+          ok: false,
+          status: 400,
+          json: async () => ({ ok: false, reason: 'unsupported_results_view' }),
+        };
+      }
       if (view === 'consensus' || view === 'difference') {
         return {
           ok: true,
@@ -295,12 +302,16 @@ describe('OnePageSession view gating', () => {
             questionCount: 1,
             responseCount: 3,
             questions: [{
+              questionId: view === 'consensus' ? 'q-consensus' : 'q-difference',
               prompt: view === 'consensus' ? 'Agree on funding?' : 'Split on roadmap?',
               total: 3,
               participants: 3,
               agreementScore: 0.66,
               differenceScore: 0.2,
-              counts: [{ label: 'Yes', count: 2 }],
+              counts: [
+                { label: 'Agree', count: 2 },
+                { label: 'Disagree', count: 1 },
+              ],
             }],
           }),
         };
@@ -322,7 +333,11 @@ describe('OnePageSession view gating', () => {
               theme: 'Builders',
               size: 3,
               averageScore: 0.5,
-              topStatements: [{ prompt: 'Build more prototypes', differenceScore: 0.4 }],
+              topStatements: [{
+                prompt: 'Agree on funding?',
+                cluster: { agree: 2, disagree: 1, unsure: 0, responded: 3 },
+                differenceScore: 0.4,
+              }],
             }],
           }),
         };
@@ -577,7 +592,8 @@ describe('OnePageSession view gating', () => {
     expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
-    expect(await screen.findByText('Agree on funding?')).toBeInTheDocument();
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-report-approx')).toBeInTheDocument();
 
     const questionCallsBefore = fetchMock.mock.calls
       .filter(([url]) => String(url).includes('/telegram/agent/api/questions')).length;
@@ -734,8 +750,76 @@ describe('OnePageSession view gating', () => {
         }),
       }));
     });
+    expect(screen.queryByTestId('ce-session-telegram-report-approx')).not.toBeInTheDocument();
     // The real report replaces the aggregate card sections.
     expect(screen.queryByText('Agree on funding?')).not.toBeInTheDocument();
+  });
+
+  it('synthesizes a real polis report from aggregate rows when live vectors are unavailable', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock({
+      resultsByView: {
+        groups: () => ({
+          ok: false,
+          status: 403,
+          json: async () => ({ ok: false, reason: 'anonymized_groups_admin_disabled' }),
+        }),
+      },
+    }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-report-approx')).toHaveTextContent(/Approximate view/i);
+    await waitFor(() => {
+      const latestProps = mockPolisReport.mock.calls[mockPolisReport.mock.calls.length - 1]?.[0] || {};
+      const rows = Object.values(latestProps.questionResponses || {}).flat();
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => {
+        expect(JSON.parse(row.response)).toMatchObject({
+          type: 'binary',
+          answer: { value: expect.stringMatching(/Agree|Disagree|Unsure/) },
+        });
+      });
+    });
+    expect(screen.queryByText('Consensus')).not.toBeInTheDocument();
+    expect(screen.queryByText('Differences')).not.toBeInTheDocument();
+  });
+
+  it('synthesizes telegram polis participants from anonymized groups when available', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock());
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    await waitFor(() => {
+      const latestProps = mockPolisReport.mock.calls[mockPolisReport.mock.calls.length - 1]?.[0] || {};
+      const rows = Object.values(latestProps.questionResponses || {}).flat();
+      expect(rows.map((row) => row.responder)).toEqual(expect.arrayContaining(['G1-P1', 'G1-P2']));
+    });
   });
 
   it('offers a copyable codex topic-map prompt in telegram results', async () => {
@@ -760,6 +844,13 @@ describe('OnePageSession view gating', () => {
     expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
+    const nav = await screen.findByTestId('ce-session-results-view-nav');
+    expect(within(nav).getByRole('button', { name: /Report/i })).toBeInTheDocument();
+    expect(within(nav).getByRole('button', { name: /Debate Map/i })).toBeInTheDocument();
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-telegram-topicmap-section')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Debate Map/i }));
+
     expect(await screen.findByTestId('ce-session-telegram-topicmap-section')).toBeInTheDocument();
     expect(screen.getByTestId('ce-session-telegram-topicmap')).toBeInTheDocument();
 
@@ -777,10 +868,70 @@ describe('OnePageSession view gating', () => {
     await screen.findByText('Copied!');
   });
 
+  it('renders read-only telegram pile controls by question type', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock({
+      questions: [
+        { questionId: 'q-binary', questionType: 'binary', prompt: 'Disclose agent identity?', tags: ['norms'] },
+        {
+          questionId: 'q-multi',
+          questionType: 'multichoice',
+          prompt: 'Which tools matter?',
+          options: ['Geo', 'Index'],
+          tags: ['tools'],
+        },
+        { questionId: 'q-rating', questionType: 'rating', prompt: 'How comfortable are you?', tags: ['trust'] },
+        { questionId: 'q-freeform', questionType: 'freeform', prompt: 'How can agents help?', tags: ['agents'] },
+      ],
+    }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
+    expect(screen.getByText('How can agents help?')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agree' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Disagree' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Geo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Index' })).toBeDisabled();
+    expect(screen.getByTestId('ce-session-telegram-question-rating-controls')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Freeform response')).toBeDisabled();
+    expect(screen.queryByText('q-binary')).not.toBeInTheDocument();
+  });
+
+  it('keeps non-telegram result tabs unchanged', async () => {
+    render(<OnePageSession {...buildProps()} />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    const nav = screen.getByTestId('ce-session-results-view-nav');
+
+    expect(within(nav).getByRole('button', { name: /Report/i })).toBeInTheDocument();
+    expect(within(nav).queryByRole('button', { name: /Debate Map/i })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-telegram-topicmap-section')).not.toBeInTheDocument();
+  });
+
   it('shows per-view disabled state in telegram results', async () => {
     seedTelegramStoredCredentials();
     installFetchMock(buildTelegramAgentFetchMock({
       resultsByView: {
+        consensus: () => ({
+          ok: false,
+          status: 403,
+          json: async () => ({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }),
+        }),
+        difference: () => ({
+          ok: false,
+          status: 403,
+          json: async () => ({ ok: false, reason: 'level_3_aggregate_results_admin_disabled' }),
+        }),
         groups: () => ({
           ok: false,
           status: 403,
@@ -803,8 +954,7 @@ describe('OnePageSession view gating', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
 
-    expect(await screen.findByText('Agree on funding?')).toBeInTheDocument();
-    expect(await screen.findByText(/not enabled for this session/i)).toBeInTheDocument();
+    expect((await screen.findAllByText(/not enabled for this session/i)).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
     expect(mockPolisReport).not.toHaveBeenCalled();
   });

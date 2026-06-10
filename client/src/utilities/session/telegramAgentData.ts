@@ -8,6 +8,16 @@
 import { getTelegramAgentBridgeCredentials } from '../worker/workerAuth.js';
 
 type UnknownRecord = Record<string, unknown>;
+type TelegramPolisRow = { responder: string; questionId: string; response: string };
+type TelegramPolisAggregator = Record<string, TelegramPolisRow[]>;
+type TelegramPolisDataset = {
+  participantCount: number;
+  questionCount: number;
+  responseCount: number;
+  aggregator: TelegramPolisAggregator;
+  hasData: boolean;
+  synthesized: boolean;
+};
 
 const toRecord = (value: unknown): UnknownRecord => (
   value && typeof value === 'object' && !Array.isArray(value)
@@ -147,6 +157,7 @@ const normalizeAggregateRows = (body: UnknownRecord): UnknownRecord => ({
     .map((row) => {
       const record = toRecord(row);
       return {
+        questionId: toStr(record.questionId || record.id),
         prompt: toStr(record.prompt),
         total: toNum(record.total),
         participants: toNum(record.participants),
@@ -178,7 +189,13 @@ const normalizeGroups = (body: UnknownRecord): UnknownRecord => ({
       topStatements: (Array.isArray(record.topStatements) ? record.topStatements : [])
         .map((statement) => {
           const item = toRecord(statement);
-          return { prompt: toStr(item.prompt), differenceScore: toNum(item.differenceScore) };
+          return {
+            label: toStr(item.label),
+            prompt: toStr(item.prompt),
+            cluster: toRecord(item.cluster),
+            overall: toRecord(item.overall),
+            differenceScore: toNum(item.differenceScore),
+          };
         })
         .filter((statement) => statement.prompt)
         .slice(0, 5),
@@ -205,6 +222,141 @@ const normalizeTopicMap = (body: UnknownRecord): UnknownRecord => {
 // response }] } with `response` as the JSON string the report's matrix builder
 // parses ({ type:'binary', prompt, answer:{ value } }).
 const POLIS_BINARY_VALUES = new Set(['Agree', 'Disagree', 'Unsure']);
+const POLIS_BINARY_KEYS: Array<'agree' | 'disagree' | 'unsure'> = ['agree', 'disagree', 'unsure'];
+const POLIS_LABEL_TO_VALUE: Record<string, 'Agree' | 'Disagree' | 'Unsure'> = {
+  agree: 'Agree',
+  disagree: 'Disagree',
+  unsure: 'Unsure',
+};
+
+const emptyPolisDataset = (synthesized = false): TelegramPolisDataset => ({
+  participantCount: 0,
+  questionCount: 0,
+  responseCount: 0,
+  aggregator: {},
+  hasData: false,
+  synthesized,
+});
+
+const normalizeBinaryValue = (value: unknown): 'Agree' | 'Disagree' | 'Unsure' | '' => {
+  const raw = toStr(value);
+  if (POLIS_BINARY_VALUES.has(raw)) return raw as 'Agree' | 'Disagree' | 'Unsure';
+  return POLIS_LABEL_TO_VALUE[raw.toLowerCase()] || '';
+};
+
+const buildPolisResponse = (prompt: string, value: 'Agree' | 'Disagree' | 'Unsure') => (
+  JSON.stringify({ type: 'binary', prompt, answer: { value } })
+);
+
+const appendPolisVote = (
+  aggregator: TelegramPolisAggregator,
+  questionId: string,
+  prompt: string,
+  responder: string,
+  value: 'Agree' | 'Disagree' | 'Unsure'
+) => {
+  if (!questionId || !prompt || !responder || !value) return;
+  if (!aggregator[questionId]) aggregator[questionId] = [];
+  aggregator[questionId].push({
+    responder,
+    questionId,
+    response: buildPolisResponse(prompt, value),
+  });
+};
+
+const normalizePromptKey = (value: unknown): string => toStr(value).replace(/\s+/g, ' ').toLowerCase();
+
+const aggregateRowsFromViews = (views: UnknownRecord) => {
+  const rowsByQuestionId = new Map<string, UnknownRecord>();
+  const rowsByPrompt = new Map<string, UnknownRecord>();
+  ['consensus', 'difference'].forEach((viewKey) => {
+    const view = toRecord(views[viewKey]);
+    if (view.status !== 'ready') return;
+    const data = toRecord(view.data);
+    (Array.isArray(data.questions) ? data.questions : []).forEach((row) => {
+      const record = toRecord(row);
+      const questionId = toStr(record.questionId || record.id);
+      const prompt = toStr(record.prompt);
+      if (!prompt) return;
+      const existingByPrompt = rowsByPrompt.get(normalizePromptKey(prompt));
+      const normalized = {
+        ...record,
+        questionId: questionId || toStr(existingByPrompt?.questionId),
+        prompt,
+      };
+      if (questionId && !rowsByQuestionId.has(questionId)) rowsByQuestionId.set(questionId, normalized);
+      if (!existingByPrompt || (!toStr(existingByPrompt.questionId) && toStr(normalized.questionId))) {
+        rowsByPrompt.set(normalizePromptKey(prompt), normalized);
+      }
+    });
+  });
+  return {
+    rows: Array.from(rowsByQuestionId.values()).concat(
+      Array.from(rowsByPrompt.values()).filter((row) => !toStr(row.questionId))
+    ),
+    rowsByPrompt,
+  };
+};
+
+const binaryCountsFromAggregateRow = (row: UnknownRecord): Record<'Agree' | 'Disagree' | 'Unsure', number> | null => {
+  const counts: Record<'Agree' | 'Disagree' | 'Unsure', number> = { Agree: 0, Disagree: 0, Unsure: 0 };
+  let total = 0;
+  let sawRecognized = false;
+  let sawUnrecognizedPositive = false;
+  (Array.isArray(row.counts) ? row.counts : []).forEach((entry) => {
+    const item = toRecord(entry);
+    const value = normalizeBinaryValue(item.label);
+    const count = Math.max(0, Math.floor(toNum(item.count)));
+    if (!value) {
+      if (count > 0) sawUnrecognizedPositive = true;
+      return;
+    }
+    sawRecognized = true;
+    counts[value] += count;
+    total += count;
+  });
+  if (!sawRecognized || sawUnrecognizedPositive || total <= 0) return null;
+  return counts;
+};
+
+const voteCountsFromCluster = (cluster: UnknownRecord, groupSize: number) => {
+  const counts = {
+    Agree: Math.max(0, Math.floor(toNum(cluster.agree))),
+    Disagree: Math.max(0, Math.floor(toNum(cluster.disagree))),
+    Unsure: Math.max(0, Math.floor(toNum(cluster.unsure))),
+  };
+  const responded = Math.max(0, Math.floor(toNum(cluster.responded)));
+  const explicitTotal = counts.Agree + counts.Disagree + counts.Unsure;
+  if (responded > explicitTotal) counts.Unsure += responded - explicitTotal;
+  const overage = Math.max(0, counts.Agree + counts.Disagree + counts.Unsure - groupSize);
+  if (overage > 0) {
+    counts.Unsure = Math.max(0, counts.Unsure - overage);
+  }
+  return counts;
+};
+
+const summarizePolisAggregator = (
+  aggregator: TelegramPolisAggregator,
+  participantFallback = 0,
+  synthesized = true
+): TelegramPolisDataset => {
+  const responders = new Set<string>();
+  let responseCount = 0;
+  Object.values(aggregator).forEach((rows) => {
+    rows.forEach((row) => {
+      responders.add(row.responder);
+      responseCount += 1;
+    });
+  });
+  return {
+    participantCount: Math.max(participantFallback, responders.size),
+    questionCount: Object.keys(aggregator).length,
+    responseCount,
+    aggregator,
+    hasData: responseCount > 0,
+    synthesized,
+  };
+};
 
 const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
   const promptByQuestionId = new Map<string, string>();
@@ -240,6 +392,91 @@ const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
     aggregator,
     hasData: Object.keys(aggregator).length > 0,
   };
+};
+
+export const buildTelegramPolisDataset = (viewsInput: unknown): TelegramPolisDataset => {
+  const views = toRecord(viewsInput);
+  const polisView = toRecord(views.polis);
+  const polisData = toRecord(polisView.data);
+  if (polisView.status === 'ready' && polisData.hasData === true && Object.keys(toRecord(polisData.aggregator)).length > 0) {
+    return {
+      participantCount: toNum(polisData.participantCount),
+      questionCount: toNum(polisData.questionCount),
+      responseCount: toNum(polisData.responseCount),
+      aggregator: toRecord(polisData.aggregator) as TelegramPolisAggregator,
+      hasData: true,
+      synthesized: false,
+    };
+  }
+
+  const { rows, rowsByPrompt } = aggregateRowsFromViews(views);
+  const groupsView = toRecord(views.groups);
+  const groupsData = toRecord(groupsView.data);
+  const groups = groupsView.status === 'ready' && Array.isArray(groupsData.groups) ? groupsData.groups : [];
+  if (groups.length > 0) {
+    const aggregator: TelegramPolisAggregator = {};
+    let participantFallback = 0;
+    groups.forEach((groupInput, groupIndex) => {
+      const group = toRecord(groupInput);
+      const groupSize = Math.max(0, Math.floor(toNum(group.size)));
+      if (groupSize <= 0) return;
+      participantFallback += groupSize;
+      const responders = Array.from({ length: groupSize }, (_, index) => `G${groupIndex + 1}-P${index + 1}`);
+      (Array.isArray(group.topStatements) ? group.topStatements : []).forEach((statementInput) => {
+        const statement = toRecord(statementInput);
+        const prompt = toStr(statement.prompt);
+        const matchingRow = rowsByPrompt.get(normalizePromptKey(prompt));
+        const questionId = toStr(matchingRow?.questionId);
+        if (!questionId || !prompt) return;
+        const counts = voteCountsFromCluster(toRecord(statement.cluster), groupSize);
+        let cursor = 0;
+        ([
+          ['Agree', counts.Agree],
+          ['Disagree', counts.Disagree],
+          ['Unsure', counts.Unsure],
+        ] as Array<['Agree' | 'Disagree' | 'Unsure', number]>).forEach(([value, count]) => {
+          const capped = Math.min(count, Math.max(0, groupSize - cursor));
+          for (let index = 0; index < capped; index += 1) {
+            appendPolisVote(aggregator, questionId, prompt, responders[cursor], value);
+            cursor += 1;
+          }
+        });
+      });
+    });
+    const dataset = summarizePolisAggregator(aggregator, participantFallback, true);
+    if (dataset.hasData) return dataset;
+  }
+
+  const binaryRows = rows
+    .map((row) => ({ row, counts: binaryCountsFromAggregateRow(row) }))
+    .filter((item) => item.counts && toStr(item.row.questionId) && toStr(item.row.prompt)) as Array<{
+      row: UnknownRecord;
+      counts: Record<'Agree' | 'Disagree' | 'Unsure', number>;
+    }>;
+  if (binaryRows.length === 0) return emptyPolisDataset(true);
+  const poolSize = Math.max(
+    0,
+    ...binaryRows.map(({ row }) => Math.max(toNum(row.participants), toNum(row.total)))
+  );
+  if (poolSize <= 0) return emptyPolisDataset(true);
+
+  const aggregator: TelegramPolisAggregator = {};
+  const responders = Array.from({ length: poolSize }, (_, index) => `P${index + 1}`);
+  binaryRows.forEach(({ row, counts }, rowIndex) => {
+    const questionId = toStr(row.questionId);
+    const prompt = toStr(row.prompt);
+    // Aggregate marginals are faithful; cross-question participant assignment is
+    // fabricated because the live endpoints intentionally omit raw vectors.
+    let cursor = (rowIndex * 7) % poolSize;
+    POLIS_BINARY_KEYS.forEach((key) => {
+      const value = key === 'agree' ? 'Agree' : key === 'disagree' ? 'Disagree' : 'Unsure';
+      for (let index = 0; index < counts[value]; index += 1) {
+        appendPolisVote(aggregator, questionId, prompt, responders[cursor % poolSize], value);
+        cursor += 1;
+      }
+    });
+  });
+  return summarizePolisAggregator(aggregator, poolSize, true);
 };
 
 const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{ key: 'consensus' | 'difference' | 'groups' | 'topicMap' | 'polis'; view: string }> = [

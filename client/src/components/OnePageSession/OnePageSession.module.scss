@@ -405,6 +405,87 @@
   flex: 0 0 auto;
 }
 
+.telegramReadonlyControls {
+  margin-top: 12px;
+}
+
+.telegramReadonlyChoice,
+.telegramReadonlyOption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: default;
+  opacity: 0.8;
+}
+
+.telegramReadonlyControls .telegramReadonlyChoice + .telegramReadonlyChoice {
+  margin-left: 8px;
+}
+
+.telegramReadonlyOptionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.telegramReadonlyRating {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 700;
+}
+
+.telegramReadonlyRatingTrack {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.telegramReadonlyRatingFill {
+  width: 50%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(106, 255, 184, 0.8), rgba(53, 149, 255, 0.65));
+}
+
+.telegramReadonlyTextarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ce-radius-8);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.8);
+  resize: vertical;
+  opacity: 0.8;
+}
+
+.telegramReportApprox {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 10px;
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .telegramBucketSelect {
   max-width: 320px;
   padding: 8px 10px;

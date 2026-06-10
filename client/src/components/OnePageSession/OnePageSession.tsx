@@ -58,6 +58,7 @@ import {
   isTelegramOnlySessionConfig,
 } from '../../utilities/session/telegramSessionMeta.js';
 import {
+  buildTelegramPolisDataset,
   fetchTelegramAgentQuestions,
   fetchTelegramAgentResults,
   isTelegramAgentAuthFailure,
@@ -851,9 +852,9 @@ class OnePageSession extends Component<any, any> {
     const consensus: any = pickReady('consensus');
     const difference: any = pickReady('difference');
     const groups: any = pickReady('groups');
-    const polis: any = pickReady('polis');
+    const polis: any = buildTelegramPolisDataset(views);
     const vectors: any = {};
-    if (polis?.aggregator) {
+    if (polis?.hasData && polis?.aggregator) {
       Object.entries(polis.aggregator).forEach(([questionIdValue, rows]: any) => {
         vectors[questionIdValue] = (Array.isArray(rows) ? rows : [])
           .map((row: any) => {
@@ -955,6 +956,84 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
+  renderTelegramQuestionAnswerSurface(question: any = {}) {
+    const type = String(question.questionType || '').toLowerCase();
+    const options: string[] = Array.isArray(question.options)
+      ? question.options.map((option: any) => String(option || '').trim()).filter(Boolean)
+      : [];
+    if (type.includes('binary') || type.includes('agree') || type.includes('disagree')) {
+      return (
+        <div
+          className={`${styles.telegramReadonlyControls} ${surveyToolStyles.binaryChoice || ''}`.trim()}
+          data-testid="ce-session-telegram-question-binary-controls"
+          aria-label="Read-only binary answer options"
+        >
+          {['Agree', 'Unsure', 'Disagree'].map((label) => (
+            <button
+              key={label}
+              type="button"
+              className={styles.telegramReadonlyChoice}
+              disabled
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+    if (type.includes('rating')) {
+      return (
+        <div
+          className={`${styles.telegramReadonlyControls} ${styles.telegramReadonlyRating}`.trim()}
+          data-testid="ce-session-telegram-question-rating-controls"
+          aria-label="Read-only rating scale"
+        >
+          <span>1</span>
+          <div className={styles.telegramReadonlyRatingTrack} aria-hidden="true">
+            <div className={styles.telegramReadonlyRatingFill} />
+          </div>
+          <span>10</span>
+        </div>
+      );
+    }
+    if (type.includes('multi') || options.length > 0) {
+      return (
+        <div
+          className={`${styles.telegramReadonlyControls} ${styles.telegramReadonlyOptionGrid}`.trim()}
+          data-testid="ce-session-telegram-question-multichoice-controls"
+          aria-label="Read-only multiple choice options"
+        >
+          {options.length > 0 ? options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={styles.telegramReadonlyOption}
+              disabled
+            >
+              {option}
+            </button>
+          )) : (
+            <button type="button" className={styles.telegramReadonlyOption} disabled>
+              Select one or more
+            </button>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className={styles.telegramReadonlyControls} data-testid="ce-session-telegram-question-freeform-controls">
+        <textarea
+          className={styles.telegramReadonlyTextarea}
+          value=""
+          placeholder="Freeform response"
+          aria-label="Read-only freeform response"
+          disabled
+          readOnly
+        />
+      </div>
+    );
+  }
+
   renderTelegramQuestionsPanel({ compact = false }: any = {}) {
     const status = this.state.telegramAgentQuestionsStatus;
     const questions = this.state.telegramAgentQuestions || [];
@@ -1030,6 +1109,7 @@ class OnePageSession extends Component<any, any> {
                 </div>
                 <div className={surveyToolStyles.pileCardMainContent}>
                   <h5 className={styles.telegramQuestionPromptDark}>{question.prompt}</h5>
+                  {this.renderTelegramQuestionAnswerSurface(question)}
                 </div>
               </CardBody>
             </Card>
@@ -1124,13 +1204,21 @@ class OnePageSession extends Component<any, any> {
   renderTelegramResultsPanel() {
     const status = this.state.telegramAgentResultsStatus;
     const views: any = this.state.telegramAgentResults || null;
-    const polisData: any = views?.polis?.status === 'ready' ? (views.polis.data || null) : null;
+    const polisData: any = views ? buildTelegramPolisDataset(views) : null;
     if (polisData?.hasData) {
-      // Render the real PolisReport from worker vectors so telegram sessions get
-      // the same report UI as on-chain sessions (clusters, beeswarm, analysis).
+      // Render the real PolisReport from worker vectors or aggregate-derived
+      // approximations so telegram sessions get the same report UI as on-chain sessions.
       const auth: any = this.state.telegramClientAuth || {};
       return (
         <div data-testid="ce-session-telegram-results">
+          {polisData.synthesized ? (
+            <div
+              className={styles.telegramReportApprox}
+              data-testid="ce-session-telegram-report-approx"
+            >
+              Approximate view — rebuilt from aggregate results.
+            </div>
+          ) : null}
           <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
             <PolisReport
               onePageDemo={true}
@@ -1157,7 +1245,6 @@ class OnePageSession extends Component<any, any> {
               networkChainId={this.props.networkChainId}
             />
           </Suspense>
-          {this.renderTelegramTopicMapSection()}
         </div>
       );
     }
@@ -1236,7 +1323,6 @@ class OnePageSession extends Component<any, any> {
             ))}
           </>
         ) : null}
-        {this.renderTelegramTopicMapSection()}
       </div>
     );
   }
@@ -2985,17 +3071,6 @@ class OnePageSession extends Component<any, any> {
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     // Only show DebateHUD/CorpusViewer on the generic demo session.
     const isDemoSlug = effectiveSlug === 'demo';
-    const resultsViewMode = isDemoSlug ? this.state.resultsViewMode : 'polis';
-    const resultsViewOptions = [
-      { key: 'polis', label: 'Report', icon: '🧾' },
-      ...(isDemoSlug
-        ? [
-            { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
-            { key: 'analysis', label: 'Breakdown', icon: '📊' },
-            { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
-          ]
-        : []),
-    ];
     const basePath = readPublicUrlBasePath();
     const sectionsGridClassName = [
       styles.sectionsGrid,
@@ -3043,6 +3118,24 @@ class OnePageSession extends Component<any, any> {
     // Telegram/cloudflare combo: data lives in the worker, so questions/results/
     // groups render worker-backed panels instead of the on-chain surfaces.
     const telegramDataMode = telegramOnlySession && telegramClientLoggedIn;
+    const resultsViewMode = telegramDataMode
+      ? this.state.resultsViewMode
+      : (isDemoSlug ? this.state.resultsViewMode : 'polis');
+    const resultsViewOptions = telegramDataMode
+      ? [
+          { key: 'polis', label: 'Report', icon: '🧾' },
+          { key: 'debateMap', label: 'Debate Map', icon: '🗺️' },
+        ]
+      : [
+          { key: 'polis', label: 'Report', icon: '🧾' },
+          ...(isDemoSlug
+            ? [
+                { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
+                { key: 'analysis', label: 'Breakdown', icon: '📊' },
+                { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
+              ]
+            : []),
+        ];
     const effectiveAccount = telegramClientAuth.accountAddress || this.props.account;
     const effectiveLoginComplete = telegramClientLoggedIn || this.props.loginComplete;
 
@@ -3667,6 +3760,9 @@ class OnePageSession extends Component<any, any> {
                 <div>
                   {resultsViewMode === 'polis' && telegramDataMode && (
                     this.renderTelegramResultsPanel()
+                  )}
+                  {resultsViewMode === 'debateMap' && telegramDataMode && (
+                    this.renderTelegramTopicMapSection()
                   )}
                   {resultsViewMode === 'polis' && !telegramDataMode && (
                     <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
