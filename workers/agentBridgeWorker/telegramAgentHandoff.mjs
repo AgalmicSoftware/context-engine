@@ -443,18 +443,26 @@ function jsonClientLogin(request, env, data, init = {}) {
 const AGENT_BROWSER_READ_CORS_PATHS = Object.freeze([
   '/telegram/agent/api/questions',
   '/telegram/agent/api/results',
+  '/telegram/agent/api/preferences',
 ]);
 
-function agentBrowserReadCorsHeaders(request, env = {}) {
+const AGENT_BROWSER_CORS_METHODS_BY_PATH = Object.freeze({
+  '/telegram/agent/api/questions': ['GET'],
+  '/telegram/agent/api/results': ['GET'],
+  '/telegram/agent/api/preferences': ['POST'],
+});
+
+function agentBrowserReadCorsHeaders(request, env = {}, pathname = '') {
   const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
   if (!origin) return {};
   const allowed = clientLoginAllowedOrigins(env);
   if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
     return null;
   }
+  const allowedMethods = AGENT_BROWSER_CORS_METHODS_BY_PATH[pathname] || ['GET'];
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-methods': `${allowedMethods.join(', ')}, OPTIONS`,
     'access-control-allow-headers': 'authorization, content-type, x-ce-agent-token, x-context-engine-agent-token',
     'access-control-max-age': '600',
     vary: 'Origin',
@@ -463,7 +471,7 @@ function agentBrowserReadCorsHeaders(request, env = {}) {
 
 function applyAgentBrowserReadCors(request, env, response) {
   if (!request || !response) return response;
-  if (safeString(request.method).toUpperCase() !== 'GET') return response;
+  const methodName = safeString(request.method).toUpperCase();
   let pathname = '';
   try {
     pathname = new URL(request.url).pathname;
@@ -471,7 +479,8 @@ function applyAgentBrowserReadCors(request, env, response) {
     return response;
   }
   if (!AGENT_BROWSER_READ_CORS_PATHS.includes(pathname)) return response;
-  const cors = agentBrowserReadCorsHeaders(request, env);
+  if (!(AGENT_BROWSER_CORS_METHODS_BY_PATH[pathname] || []).includes(methodName)) return response;
+  const cors = agentBrowserReadCorsHeaders(request, env, pathname);
   if (!cors || Object.keys(cors).length === 0) return response;
   const headers = new Headers(response.headers);
   for (const [name, value] of Object.entries(cors)) headers.set(name, value);
@@ -5328,7 +5337,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return handleSessionMetaHttpRequest({ request, env });
   }
   if (AGENT_BROWSER_READ_CORS_PATHS.includes(url.pathname) && request.method === 'OPTIONS') {
-    const cors = agentBrowserReadCorsHeaders(request, env);
+    const cors = agentBrowserReadCorsHeaders(request, env, url.pathname);
     if (cors === null) {
       return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
     }

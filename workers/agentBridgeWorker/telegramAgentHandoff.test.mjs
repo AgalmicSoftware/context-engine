@@ -1599,7 +1599,7 @@ test('Telegram polis results view returns pseudonymized binary vectors', async (
   assert.equal((await jsonBody(gatedResponse)).reason, 'anonymized_groups_admin_disabled');
 });
 
-test('Telegram browser-read CORS covers questions and results GET routes', async () => {
+test('Telegram browser CORS covers question/result reads and preference submit', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
     AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
@@ -1614,7 +1614,7 @@ test('Telegram browser-read CORS covers questions and results GET routes', async
   });
   assert.equal(issued.ok, true);
 
-  for (const path of ['/telegram/agent/api/questions', '/telegram/agent/api/results']) {
+  for (const path of ['/telegram/agent/api/questions', '/telegram/agent/api/results', '/telegram/agent/api/preferences']) {
     const preflight = await handleTelegramAgentHandoffRequest({
       request: new Request(`https://bridge.example${path}`, {
         method: 'OPTIONS',
@@ -1674,6 +1674,32 @@ test('Telegram browser-read CORS covers questions and results GET routes', async
   });
   assert.equal(unauthedResponse.status, 401);
   assert.equal(unauthedResponse.headers.get('access-control-allow-origin'), 'https://client.example');
+
+  const preferencesResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/preferences', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${issued.token}`,
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        preferences: [{
+          questionId: 'q-binary',
+          answer: { questionType: 'binary', value: 'agree' },
+        }],
+        submit: true,
+        humanApproved: true,
+      }),
+    }),
+    env,
+  });
+  const preferencesBody = await jsonBody(preferencesResponse);
+  assert.equal(preferencesResponse.status, 200);
+  assert.equal(preferencesBody.ok, true);
+  assert.equal(preferencesBody.reviewRequired, false);
+  assert.equal(preferencesResponse.headers.get('access-control-allow-origin'), 'https://client.example');
 
   const agentResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/questions?sessionSlug=alpha', {
