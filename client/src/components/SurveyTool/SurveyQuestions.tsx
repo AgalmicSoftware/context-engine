@@ -478,6 +478,10 @@ import {
   runSurveyQuestionsSubmitSuccessController,
 } from './surveyQuestionsSubmitController.js';
 import {
+  applySurveyQuestionsRuntimeInitialState,
+  createInitialSurveyQuestionsState,
+} from './surveyQuestionsState.js';
+import {
   buildActiveTagModalState,
   buildAdditionalEncryptionAudienceState,
   buildAdditionalEncryptionToggleResponseState,
@@ -507,7 +511,6 @@ import {
   buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
-  buildInitialSurveyQuestionsState,
   buildInitialStandaloneResponseState,
   buildInitialSurveyResponseState,
   buildJsonPreviewState,
@@ -566,7 +569,7 @@ import {
 export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuestionsState> {
   constructor(props: SurveyQuestionsProps) {
     super(props);
-    this.state = buildInitialSurveyQuestionsState(this.props);
+    this.state = createInitialSurveyQuestionsState(this.props);
     this.bottomRef = React.createRef();
     this.topRef = React.createRef();
     this._submitGuard = false;
@@ -581,13 +584,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._decryptFieldTaskInFlight = new Map();
     this._transientTimeouts = new Set();
     this.handleDecryptEdit = this.handleDecryptEdit.bind(this);
-    const runtimeInitialState = this.getRuntimeStrategy()?.buildInitialState?.(this);
-    if (runtimeInitialState && typeof runtimeInitialState === 'object') {
-      this.state = {
-        ...this.state,
-        ...runtimeInitialState,
-      };
-    }
+    this.state = applySurveyQuestionsRuntimeInitialState(this.state, this);
   }
 
   getRuntimeStrategy = () => (
