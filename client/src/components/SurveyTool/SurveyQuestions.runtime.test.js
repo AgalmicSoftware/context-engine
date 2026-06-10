@@ -20,6 +20,49 @@ describe('SurveyQuestions runtime helpers', () => {
     window.sessionStorage?.removeItem('dg:recentQuestionPayloads');
   });
 
+  it('delegates runtime override points through the strategy bridge', async () => {
+    const strategy = {
+      buildInitialState: jest.fn(() => ({
+        showComments: { q1: true },
+      })),
+      componentDidMount: jest.fn(() => 'mounted'),
+      componentDidUpdate: jest.fn(() => 'updated'),
+      componentWillUnmount: jest.fn(() => 'unmounted'),
+      getAnsweredQuestionsCount: jest.fn(() => 3),
+      getCurrentRenderedQuestionIds: jest.fn(() => ['q1']),
+      getPendingEditStats: jest.fn(() => ({ total: 2 })),
+      render: jest.fn(() => null),
+      showTransientSubmitFeedback: jest.fn(() => 'feedback'),
+      toggleComments: jest.fn(() => 'comments'),
+    };
+    const subject = new SurveyQuestions({
+      runtimeStrategy: strategy,
+      singleQuestionMode: false,
+      isStandalone: true,
+      questionPool: [],
+    });
+
+    expect(strategy.buildInitialState).toHaveBeenCalledWith(subject);
+    expect(subject.state.showComments).toEqual({ q1: true });
+    expect(subject.componentDidMount()).toBe('mounted');
+    await expect(subject.componentDidUpdate({ previous: true }, { previous: true })).resolves.toBe('updated');
+    expect(subject.componentWillUnmount()).toBe('unmounted');
+    expect(subject.getCurrentRenderedQuestionIds()).toEqual(['q1']);
+    expect(subject.getAnsweredQuestionsCount()).toBe(3);
+    expect(subject.getPendingEditStats(7)).toEqual({ total: 2 });
+    expect(subject.showTransientSubmitFeedback('Hold', 100)).toBe('feedback');
+    expect(subject.toggleComments('q1', true)).toBe('comments');
+    expect(subject.render()).toBeNull();
+
+    expect(strategy.componentDidMount).toHaveBeenCalledWith(subject);
+    expect(strategy.componentDidUpdate).toHaveBeenCalledWith(subject, { previous: true }, { previous: true });
+    expect(strategy.componentWillUnmount).toHaveBeenCalledWith(subject);
+    expect(strategy.getPendingEditStats).toHaveBeenCalledWith(subject, 7);
+    expect(strategy.showTransientSubmitFeedback).toHaveBeenCalledWith(subject, 'Hold', 100);
+    expect(strategy.toggleComments).toHaveBeenCalledWith(subject, 'q1', true);
+    expect(strategy.render).toHaveBeenCalledWith(subject);
+  });
+
   it('runs mount-time survey draft hydration under the response hydration guard', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

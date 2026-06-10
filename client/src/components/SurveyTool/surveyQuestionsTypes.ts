@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { updateSubmittedSinceLastEdit } from './surveyToolUtils.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import type { ResponseSlice, UnknownRecord } from './surveyToolTypes.js';
@@ -10,8 +11,40 @@ import {
 export type SurveyQuestionsProps = UnknownRecord & {
   displayAnswerMode?: boolean;
   isStandalone?: boolean;
+  runtimeStrategy?: SurveyQuestionsRuntimeStrategy;
   singleQuestionMode?: boolean;
   questionPool?: unknown[];
+};
+
+export type SurveyQuestionsRuntimeEngine = UnknownRecord & {
+  props: SurveyQuestionsProps;
+  state: SurveyQuestionsState;
+  setState: (...args: unknown[]) => unknown;
+};
+
+export type SurveyQuestionsRuntimeStrategy = {
+  buildInitialState?: (engine: SurveyQuestionsRuntimeEngine) => Partial<SurveyQuestionsState> | null | undefined;
+  componentDidMount?: (engine: SurveyQuestionsRuntimeEngine) => unknown;
+  componentDidUpdate?: (
+    engine: SurveyQuestionsRuntimeEngine,
+    prevProps: SurveyQuestionsProps,
+    prevState: SurveyQuestionsState
+  ) => unknown;
+  componentWillUnmount?: (engine: SurveyQuestionsRuntimeEngine) => unknown;
+  getAnsweredQuestionsCount?: (engine: SurveyQuestionsRuntimeEngine) => number;
+  getCurrentRenderedQuestionIds?: (engine: SurveyQuestionsRuntimeEngine) => unknown[];
+  getPendingEditStats?: (engine: SurveyQuestionsRuntimeEngine, surveyIndexParam?: unknown) => unknown;
+  render?: (engine: SurveyQuestionsRuntimeEngine) => ReactNode;
+  showTransientSubmitFeedback?: (
+    engine: SurveyQuestionsRuntimeEngine,
+    message?: string,
+    durationMs?: number
+  ) => unknown;
+  toggleComments?: (
+    engine: SurveyQuestionsRuntimeEngine,
+    questionId: unknown,
+    defaultOpen?: boolean
+  ) => unknown;
 };
 
 export type SurveyQuestionPoolStatePatch = {
