@@ -370,6 +370,9 @@ export const readTelegramWorkerLogin = ({ slug, workerUrl } = {}) => {
     workerUrl: cachedWorkerUrl,
     sessionSlug: normalizedSlug,
     address,
+    buckets: login?.buckets && typeof login.buckets === 'object' && !Array.isArray(login.buckets)
+      ? login.buckets
+      : null,
     storageKey,
   };
 };
@@ -380,6 +383,7 @@ const writeTelegramWorkerLogin = ({
   workerUrl,
   sessionSlug,
   address,
+  buckets,
 } = {}) => {
   if (typeof window === 'undefined') return;
   const normalizedSlug = normalizeSessionSlug(sessionSlug);
@@ -396,6 +400,7 @@ const writeTelegramWorkerLogin = ({
       agentBridgeUrl: normalizedBridgeUrl,
       agentToken: copiedAgentToken,
       address: normalizedAddress,
+      buckets: buckets && typeof buckets === 'object' && !Array.isArray(buckets) ? buckets : null,
       updatedAt: Date.now(),
     }));
   } catch (_) {}
@@ -549,6 +554,7 @@ export const exchangeTelegramSessionToken = async ({
     workerUrl,
     sessionSlug: effectiveSlug,
     address,
+    buckets: data.buckets || null,
   });
   return {
     ...data,

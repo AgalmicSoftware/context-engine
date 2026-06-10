@@ -356,6 +356,14 @@ describe('OnePageSession view gating', () => {
     return fetchMock;
   };
 
+  const openTelegramQuestions = async () => {
+    const toggle = await screen.findByTestId('ce-session-telegram-questions-toggle');
+    if (!screen.queryByTestId('ce-session-telegram-questions')) {
+      fireEvent.click(toggle);
+    }
+    return screen.findByTestId('ce-session-telegram-questions');
+  };
+
   it('renders only one SurveyPage instance when switching from pile to full view', async () => {
     render(<OnePageSession {...buildProps()} />);
 
@@ -448,7 +456,9 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-telegram-questions')).not.toBeInTheDocument();
+    await openTelegramQuestions();
     expect(await screen.findByText('Fund the proposal?')).toBeInTheDocument();
     // Worker-backed telegram sessions must not mount the on-chain question pile,
     // and question ids stay out of the UI.
@@ -589,7 +599,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
@@ -628,7 +638,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    await openTelegramQuestions();
     expect(await screen.findByText(/could not load questions/i)).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     const refreshButton = await screen.findByTestId('ce-session-results-refresh');
@@ -737,7 +747,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
@@ -777,7 +787,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
@@ -811,7 +821,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
@@ -841,7 +851,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
     const nav = await screen.findByTestId('ce-session-results-view-nav');
@@ -895,13 +905,22 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
+    await openTelegramQuestions();
     expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
-    expect(screen.getByText('How can agents help?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Agree' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Disagree' })).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
+    expect(await screen.findByText('Which tools matter?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Geo' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Index' })).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
+    expect(await screen.findByText('How comfortable are you?')).toBeInTheDocument();
     expect(screen.getByTestId('ce-session-telegram-question-rating-controls')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
+    expect(await screen.findByText('How can agents help?')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Freeform response')).toBeDisabled();
     expect(screen.queryByText('q-binary')).not.toBeInTheDocument();
   });
@@ -950,7 +969,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
 
@@ -1012,7 +1031,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions-toggle')).toBeInTheDocument();
     const changeToken = await screen.findByTestId('ce-session-telegram-change-token');
 
     fireEvent.click(changeToken);

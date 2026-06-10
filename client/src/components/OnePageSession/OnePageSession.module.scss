@@ -397,6 +397,12 @@
   scrollbar-gutter: stable;
 }
 
+.telegramPileDeck {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
 .telegramPileCard {
   height: auto;
   min-height: 0;

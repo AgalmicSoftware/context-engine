@@ -324,6 +324,14 @@ describe('workerAuth Telegram token login', () => {
   it('exchanges a copied bot token and reuses the worker JWT without wallet auth', async () => {
     const token = `ceagt_${'B'.repeat(32)}`;
     const exp = Math.floor(Date.now() / 1000) + 3600;
+    const buckets = {
+      categories: [{
+        categoryId: 'events_attended',
+        label: 'Attendance',
+        options: [{ optionId: 'week_1', label: 'Week 1' }],
+      }],
+      selections: { events_attended: ['week_1'] },
+    };
     const fetchImpl = jest.fn(async (url, init = {}) => {
       expect(String(url)).toBe('https://bridge.example/telegram/agent/api/client-login/exchange');
       expect(JSON.parse(init.body)).toEqual({
@@ -337,6 +345,7 @@ describe('workerAuth Telegram token login', () => {
         workerUrl: 'https://session-worker.example',
         sessionSlug: 'edge',
         accountAddress: TEST_ADDRESS,
+        buckets,
       });
     });
 
@@ -369,7 +378,12 @@ describe('workerAuth Telegram token login', () => {
       agentBridgeUrl: 'https://bridge.example',
       agentToken: token,
       address: TEST_ADDRESS,
+      buckets,
     }));
+    expect(__test__workerAuthTokenCache.readTelegramWorkerLogin({
+      slug: 'edge',
+      workerUrl: 'https://session-worker.example',
+    })).toEqual(expect.objectContaining({ buckets }));
     expect(getTelegramAgentBridgeCredentials({ slug: 'edge' })).toEqual({
       token,
       agentBridgeUrl: 'https://bridge.example',

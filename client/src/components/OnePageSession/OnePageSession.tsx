@@ -12,6 +12,7 @@ import {
   faTimes,
   faImage,
   faArrowLeft,
+  faArrowRight,
   faExpand,
   faPlus,
   faSyncAlt,
@@ -384,6 +385,7 @@ class OnePageSession extends Component<any, any> {
       telegramAgentQuestionsStatus: 'idle',
       telegramAgentQuestions: [],
       telegramAgentAnswerState: null,
+      telegramQuestionPileIndex: 0,
       telegramAgentResultsStatus: 'idle',
       telegramAgentResults: null,
       telegramPolisNonce: 0,
@@ -654,7 +656,7 @@ class OnePageSession extends Component<any, any> {
           sessionSlug: cachedLogin.sessionSlug || sessionSlug,
           workerUrl: cachedLogin.workerUrl,
           exp: cachedLogin.exp,
-          buckets: null,
+          buckets: cachedLogin.buckets || null,
         },
       });
       return cachedLogin;
@@ -756,11 +758,16 @@ class OnePageSession extends Component<any, any> {
       this.setState({ telegramAgentQuestionsStatus: 'error' });
       return null;
     }
-    this.setState({
+    const questions = result.questions || [];
+    this.setState((prevState: any) => ({
       telegramAgentQuestionsStatus: 'ready',
-      telegramAgentQuestions: result.questions || [],
+      telegramAgentQuestions: questions,
       telegramAgentAnswerState: result.answerState || null,
-    });
+      telegramQuestionPileIndex: Math.min(
+        Math.max(0, Number(prevState.telegramQuestionPileIndex || 0)),
+        Math.max(0, questions.length - 1)
+      ),
+    }));
     return result;
   }
 
@@ -1038,7 +1045,19 @@ class OnePageSession extends Component<any, any> {
     const status = this.state.telegramAgentQuestionsStatus;
     const questions = this.state.telegramAgentQuestions || [];
     const answerState = this.state.telegramAgentAnswerState;
-    const visible = compact ? questions.slice(0, 8) : questions;
+    const activeIndex = Math.min(
+      Math.max(0, Number(this.state.telegramQuestionPileIndex || 0)),
+      Math.max(0, questions.length - 1)
+    );
+    const activeQuestion = questions[activeIndex] || null;
+    const setActiveIndex = (nextIndex: number) => {
+      this.setState({
+        telegramQuestionPileIndex: Math.min(
+          Math.max(0, nextIndex),
+          Math.max(0, questions.length - 1)
+        ),
+      });
+    };
     return (
       <div
         className={styles.telegramListPanel}
@@ -1051,6 +1070,33 @@ class OnePageSession extends Component<any, any> {
             </span>
           ) : <span>Session questions</span>}
           <span className={styles.telegramListHeaderActions}>
+            {questions.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className={styles.sectionHeaderActionButton}
+                  onClick={() => setActiveIndex(activeIndex - 1)}
+                  disabled={activeIndex <= 0}
+                  data-testid="ce-session-telegram-question-prev"
+                  aria-label="Previous question"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} />
+                </button>
+                <span className={styles.telegramPanelMeta}>
+                  {activeIndex + 1} / {questions.length}
+                </span>
+                <button
+                  type="button"
+                  className={styles.sectionHeaderActionButton}
+                  onClick={() => setActiveIndex(activeIndex + 1)}
+                  disabled={activeIndex >= questions.length - 1}
+                  data-testid="ce-session-telegram-question-next"
+                  aria-label="Next question"
+                >
+                  <FontAwesomeIcon icon={faArrowRight} />
+                </button>
+              </>
+            ) : null}
             {compact ? (
               <button
                 type="button"
@@ -1088,38 +1134,33 @@ class OnePageSession extends Component<any, any> {
           <div className={styles.telegramListEmpty}>No questions available yet.</div>
         ) : null}
         {/* Read-only pile-style cards (the answer flow stays in Telegram for now). */}
-        <div className={styles.telegramPileScroll}>
-          {visible.map((question: any, index: number) => (
+        <div className={styles.telegramPileDeck} data-testid="ce-session-telegram-question-pile">
+          {activeQuestion ? (
             <Card
-              key={question.questionId || `${question.prompt}-${index}`}
+              key={activeQuestion.questionId || `${activeQuestion.prompt}-${activeIndex}`}
               className={`${surveyToolStyles.pileCardInner} ${styles.telegramPileCard}`.trim()}
               data-testid="ce-session-telegram-question-item"
             >
               <CardBody className={surveyToolStyles.pileCardBody}>
                 <div className={surveyToolStyles.pileCardHeader}>
                   <div className={styles.telegramChipRow}>
-                    <span className={styles.telegramChipDark}>{question.questionType}</span>
-                    {question.answeredByUser ? (
+                    <span className={styles.telegramChipDark}>{activeQuestion.questionType}</span>
+                    {activeQuestion.answeredByUser ? (
                       <span className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}>Answered</span>
                     ) : null}
-                    {(question.tags || []).slice(0, 3).map((tag: any) => (
+                    {(activeQuestion.tags || []).slice(0, 3).map((tag: any) => (
                       <span key={tag} className={styles.telegramChipDark}>{tag}</span>
                     ))}
                   </div>
                 </div>
                 <div className={surveyToolStyles.pileCardMainContent}>
-                  <h5 className={styles.telegramQuestionPromptDark}>{question.prompt}</h5>
-                  {this.renderTelegramQuestionAnswerSurface(question)}
+                  <h5 className={styles.telegramQuestionPromptDark}>{activeQuestion.prompt}</h5>
+                  {this.renderTelegramQuestionAnswerSurface(activeQuestion)}
                 </div>
               </CardBody>
             </Card>
-          ))}
+          ) : null}
         </div>
-        {compact && questions.length > visible.length ? (
-          <div className={styles.telegramListEmpty}>
-            {questions.length - visible.length} more in the full view
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -1544,6 +1585,7 @@ class OnePageSession extends Component<any, any> {
         telegramAgentQuestionsStatus: 'idle',
         telegramAgentQuestions: [],
         telegramAgentAnswerState: null,
+        telegramQuestionPileIndex: 0,
         telegramAgentResultsStatus: 'idle',
         telegramAgentResults: null,
       });
@@ -3366,7 +3408,7 @@ class OnePageSession extends Component<any, any> {
             </div>
           </div>
 
-          {this.state.showQuestions ? (
+          {telegramDataMode ? null : this.state.showQuestions ? (
             <div
               className={styles.pileHeaderRow}
               data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}
@@ -3393,8 +3435,6 @@ class OnePageSession extends Component<any, any> {
                 </div>
               </div>
             </div>
-          ) : telegramDataMode ? (
-            this.renderTelegramQuestionsPanel({ compact: true })
           ) : (
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
@@ -3444,7 +3484,7 @@ class OnePageSession extends Component<any, any> {
         </div>
 
         {/* Questions section */}
-        {this.state.showQuestions && (
+        {!telegramDataMode && this.state.showQuestions && (
           <div className={styles.sectionContainer} ref={this.questionsSectionRef}>
             <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
 
@@ -3501,6 +3541,45 @@ class OnePageSession extends Component<any, any> {
         )}
 
         <div className={sectionsGridClassName}>
+          {/* Telegram Questions section */}
+          {telegramDataMode && (
+            <div
+              className={`${styles.sectionContainer} ${this.state.showQuestions ? styles.sectionExpanded : ''}`}
+              ref={this.questionsSectionRef}
+            >
+              <div className={styles.sectionHeaderRow}>
+                <h2
+                  onClick={this.toggleQuestions}
+                  className={styles.sectionHeader}
+                  data-testid="ce-session-telegram-questions-toggle"
+                >
+                  {this.state.showQuestions ? (
+                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                  ) : (
+                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                  )}
+                  {renderSectionHeading('Questions', 'Answer')}
+                  {this.state.showQuestions && (
+                    <div
+                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                      onClick={(e: any) => e.stopPropagation()}
+                    >
+                      <FontAwesomeIcon icon={faQuestionCircle} />
+                      <span className={styles.tooltiptext}>
+                        Questions are read-only here; answer through your Telegram agent or bot.
+                      </span>
+                    </div>
+                  )}
+                </h2>
+              </div>
+              {this.state.showQuestions && (
+                <div className={styles.miniSectionContent}>
+                  {this.renderTelegramQuestionsPanel({ compact: false })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Groups section */}
           <div className={`${styles.sectionContainer} ${this.state.showGroups ? styles.sectionExpanded : ''}`}>
             <div className={styles.sectionHeaderRow}>
