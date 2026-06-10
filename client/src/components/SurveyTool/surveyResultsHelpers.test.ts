@@ -933,6 +933,43 @@ describe('surveyResultsHelpers timestamps', () => {
     expect(normalized.responses[0]?.answer?.value).toBe('latest');
   });
 
+  it('preserves passthrough row order around deduped question answers', () => {
+    const normalized = normalizeSurveyResponsePayloadByQuestionId({
+      responses: [
+        {
+          questionID: 'q1',
+          timeStamp: '2025-01-01T00:00:00.000Z',
+          answer: { value: 'stale q1' },
+        },
+        { kind: 'intro-note' },
+        {
+          questionID: 'q2',
+          timeStamp: '2025-01-02T00:00:00.000Z',
+          answer: { value: 'q2 answer' },
+        },
+        { kind: 'between-note' },
+        {
+          questionID: 'q1',
+          timeStamp: '2025-01-03T00:00:00.000Z',
+          answer: { value: 'fresh q1' },
+        },
+        { kind: 'closing-note' },
+      ],
+    }) as {
+      responses: Array<Record<string, unknown> & { answer?: { value?: unknown } }>;
+    };
+
+    expect(normalized.responses.map((row) => row.kind || row.questionID)).toEqual([
+      'q1',
+      'intro-note',
+      'q2',
+      'between-note',
+      'closing-note',
+    ]);
+    expect(normalized.responses[0]?.answer?.value).toBe('fresh q1');
+    expect(normalized.responses[2]?.answer?.value).toBe('q2 answer');
+  });
+
   it('picks CSV timestamps from answer, payload, then row fallbacks', () => {
     const ms = pickTimestampMs(
       { answer: { timeStamp: '2025-03-01T00:00:00.000Z' } },
