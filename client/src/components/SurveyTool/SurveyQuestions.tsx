@@ -581,7 +581,20 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._decryptFieldTaskInFlight = new Map();
     this._transientTimeouts = new Set();
     this.handleDecryptEdit = this.handleDecryptEdit.bind(this);
+    const runtimeInitialState = this.getRuntimeStrategy()?.buildInitialState?.(this);
+    if (runtimeInitialState && typeof runtimeInitialState === 'object') {
+      this.state = {
+        ...this.state,
+        ...runtimeInitialState,
+      };
+    }
   }
+
+  getRuntimeStrategy = () => (
+    this.props.runtimeStrategy && typeof this.props.runtimeStrategy === 'object'
+      ? this.props.runtimeStrategy
+      : null
+  );
 
   isPortoAutoSignReady = () => {
     try {
@@ -1759,6 +1772,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   componentDidMount() {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.componentDidMount === 'function') {
+      return runtimeStrategy.componentDidMount(this);
+    }
+    return this.runDefaultComponentDidMount();
+  }
+
+  runDefaultComponentDidMount = () => {
     // Force-disable auto-decrypt on wagmi/porto at mount; also clear any in-flight state
     if (this.isAutoDecryptBlocked()) {
       this.resetBlockedAutoDecryptSweepInternals();
@@ -1851,9 +1872,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         }
       );
     }
-  }
+  };
 
   async componentDidUpdate(prevProps, prevState) {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.componentDidUpdate === 'function') {
+      return runtimeStrategy.componentDidUpdate(this, prevProps, prevState);
+    }
+    return this.runDefaultComponentDidUpdate(prevProps, prevState);
+  }
+
+  runDefaultComponentDidUpdate = async (prevProps, prevState) => {
     const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
       const propsHydrationContextChanged =
@@ -2286,10 +2315,18 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     ) {
       this.hydrateGateSbtLabels();
     }
-  }
+  };
 
 
   componentWillUnmount() {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.componentWillUnmount === 'function') {
+      return runtimeStrategy.componentWillUnmount(this);
+    }
+    return this.runDefaultComponentWillUnmount();
+  }
+
+  runDefaultComponentWillUnmount = () => {
     if (this._emptySubmitTimer) {
       clearTimeout(this._emptySubmitTimer);
       this._emptySubmitTimer = null;
@@ -2338,7 +2375,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.clearSingleQuestionBootstrapRetry();
     this._isMounted = false;
     this.invalidateResponseHydrationRuns();
-  }
+  };
 
 
 
@@ -3907,6 +3944,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   getCurrentRenderedQuestionIds = () => {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.getCurrentRenderedQuestionIds === 'function') {
+      return runtimeStrategy.getCurrentRenderedQuestionIds(this);
+    }
     const questionPool = Array.isArray(this.state?.questionPool) ? this.state.questionPool : [];
     const pileQuestions = Array.isArray(this.state?.pileQuestions) ? this.state.pileQuestions : [];
     const singleQuestionMode = !!this.props.singleQuestionMode;
@@ -4504,6 +4545,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
    * badge count and to gate submission.
    */
   getAnsweredQuestionsCount = () => {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.getAnsweredQuestionsCount === 'function') {
+      return runtimeStrategy.getAnsweredQuestionsCount(this);
+    }
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
 
     if (!this.state.surveysResponseState || !this.state.surveysResponseState[surveyIndex]) {
@@ -4612,6 +4657,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   showTransientSubmitFeedback = (message = '', durationMs = 2000) => {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.showTransientSubmitFeedback === 'function') {
+      return runtimeStrategy.showTransientSubmitFeedback(this, message, durationMs);
+    }
     if (this._emptySubmitTimer) {
       clearTimeout(this._emptySubmitTimer);
       this._emptySubmitTimer = null;
@@ -6161,6 +6210,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   toggleComments = (questionId, defaultOpen = false) => {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.toggleComments === 'function') {
+      return runtimeStrategy.toggleComments(this, questionId, defaultOpen);
+    }
     this.setState((prev) => buildCommentsToggleState(prev, questionId, defaultOpen));
   };
 
@@ -7623,9 +7676,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return result;
   };
 
-  getPendingEditStats = (surveyIndexParam) => (
-    this.computePendingEditStatsAtIndex(this.getActiveSurveyIndex(surveyIndexParam))
-  );
+  getPendingEditStats = (surveyIndexParam) => {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.getPendingEditStats === 'function') {
+      return runtimeStrategy.getPendingEditStats(this, surveyIndexParam);
+    }
+    return this.computePendingEditStatsAtIndex(this.getActiveSurveyIndex(surveyIndexParam));
+  };
 
 
 
@@ -7911,7 +7968,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return value;
   };
 
-  render() {
+  renderDefaultSurveyQuestionsRoute = () => {
     bumpSurveyPerfCounter('renderCount');
     const maskedQuestionVisibility = this.getMemoizedMaskedQuestionVisibility(
       this.state.questionPool,
@@ -8166,6 +8223,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         }}
       />
     );
+  };
+
+  render() {
+    const runtimeStrategy = this.getRuntimeStrategy();
+    if (typeof runtimeStrategy?.render === 'function') {
+      return runtimeStrategy.render(this);
+    }
+    return this.renderDefaultSurveyQuestionsRoute();
   }
 }
 
