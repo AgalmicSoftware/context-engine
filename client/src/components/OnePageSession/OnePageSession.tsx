@@ -1136,20 +1136,6 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
-  renderTelegramResultsSubsection(title: any, view: any, renderBody: any) {
-    if (!view) return null;
-    return (
-      <div className={styles.telegramResultsSection}>
-        <div className={styles.telegramResultsHeading}>{title}</div>
-        {view.status === 'disabled' ? (
-          <div className={styles.telegramPanelEmpty}>Not enabled for this session.</div>
-        ) : view.status === 'error' || view.status === 'auth' ? (
-          <div className={styles.telegramPanelEmpty}>Unavailable right now.</div>
-        ) : renderBody(view.data || {})}
-      </div>
-    );
-  }
-
   renderTelegramResultsPanel() {
     const status = this.state.telegramAgentResultsStatus;
     const views: any = this.state.telegramAgentResults || null;
@@ -1197,27 +1183,14 @@ class OnePageSession extends Component<any, any> {
         </div>
       );
     }
-    const renderAggregateRows = (data: any) => (
-      (data.questions || []).length === 0 ? (
-        <div className={styles.telegramPanelEmpty}>Not enough responses yet.</div>
-      ) : (
-        <div>
-          {(data.questions || []).slice(0, 6).map((row: any, index: number) => (
-            <div key={`${row.prompt}-${index}`} className={styles.telegramResultRow}>
-              <div className={styles.telegramQuestionPrompt}>{row.prompt}</div>
-              <div className={styles.telegramQuestionMeta}>
-                <span className={styles.telegramPanelMeta}>{row.total} responses</span>
-                {(row.counts || []).slice(0, 4).map((count: any) => (
-                  <span key={count.label} className={styles.telegramTagChip}>
-                    {count.label}: {count.count}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    );
+    const viewStates = views ? Object.values(views).map((view: any) => view?.status).filter(Boolean) : [];
+    const disabled = viewStates.includes('disabled');
+    const unavailable = viewStates.includes('error') || viewStates.includes('auth');
+    const emptyMessage = disabled
+      ? 'Results are not enabled for this session.'
+      : unavailable
+        ? 'Results are unavailable right now.'
+        : 'Not enough binary responses yet.';
     return (
       <div className={styles.telegramPanel} data-testid="ce-session-telegram-results">
         {status === 'loading' && !views ? (
@@ -1231,46 +1204,7 @@ class OnePageSession extends Component<any, any> {
           </div>
         ) : null}
         {views ? (
-          <>
-            {views.consensus?.status === 'ready' ? (
-              <div className={styles.telegramPanelMeta} data-testid="ce-session-telegram-results-summary">
-                {(views.consensus.data || {}).questionCount || 0} questions · {(views.consensus.data || {}).responseCount || 0} responses
-              </div>
-            ) : null}
-            {this.renderTelegramResultsSubsection('Consensus', views.consensus, renderAggregateRows)}
-            {this.renderTelegramResultsSubsection('Differences', views.difference, renderAggregateRows)}
-            {this.renderTelegramResultsSubsection('Groups', views.groups, (data: any) => (
-              (data.groups || []).length === 0 ? (
-                <div className={styles.telegramPanelEmpty}>No groups large enough to show yet.</div>
-              ) : (
-                <div className={styles.telegramGroupGrid}>
-                  {(data.groups || []).map((group: any, index: number) => (
-                    <div key={group.groupId || `${group.label}-${index}`} className={styles.telegramBucketCard}>
-                      <div className={styles.telegramBucketCategory}>{group.label || 'Group'}</div>
-                      {group.theme ? <div className={styles.telegramPanelMeta}>{group.theme}</div> : null}
-                      <div className={styles.telegramPanelMeta}>{group.size} participants</div>
-                      {(group.topStatements || []).slice(0, 3).map((statement: any, statementIndex: number) => (
-                        <div key={`${statement.prompt}-${statementIndex}`} className={styles.telegramQuestionPrompt}>
-                          {statement.prompt}
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )
-            ))}
-            {this.renderTelegramResultsSubsection('Topic map', views.topicMap, (data: any) => (
-              data.available !== true ? (
-                <div className={styles.telegramPanelEmpty}>Topic map not available yet.</div>
-              ) : (
-                <div className={styles.telegramQuestionMeta}>
-                  {Object.entries(data.counts || {}).map(([key, value]: any) => (
-                    <span key={key} className={styles.telegramTagChip}>{key}: {value}</span>
-                  ))}
-                </div>
-              )
-            ))}
-          </>
+          <div className={styles.telegramPanelEmpty}>{emptyMessage}</div>
         ) : null}
       </div>
     );

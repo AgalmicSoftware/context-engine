@@ -662,8 +662,8 @@ describe('OnePageSession view gating', () => {
     await waitFor(() => {
       expect(screen.getByTestId('ce-session-results-refresh')).not.toBeDisabled();
     });
-    // Per-view failures degrade to subsection-level messages, not a dead panel.
-    expect((await screen.findAllByText(/unavailable right now/i)).length).toBeGreaterThan(0);
+    // Per-view failures degrade to one report-level state, not a dead panel.
+    expect(await screen.findByText(/results are unavailable right now/i)).toBeInTheDocument();
     expect(refreshSpy).not.toHaveBeenCalled();
   });
 
@@ -1008,7 +1008,7 @@ describe('OnePageSession view gating', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
     expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
 
-    expect((await screen.findAllByText(/not enabled for this session/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/results are not enabled for this session/i)).toBeInTheDocument();
     expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
     expect(mockPolisReport).not.toHaveBeenCalled();
   });
