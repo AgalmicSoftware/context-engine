@@ -260,7 +260,7 @@ describe('OnePageSession view gating', () => {
     resultsByView = {},
     failAgentReads = false,
     exchange = null,
-  } = {}) => jest.fn(async (url) => {
+  } = {}) => jest.fn(async (url, init = {}) => {
     const urlString = String(url);
     if (urlString.includes('/telegram-topic-map/')) {
       return { ok: false, status: 404, json: async () => ({}) };
@@ -346,6 +346,20 @@ describe('OnePageSession view gating', () => {
         ok: true,
         status: 200,
         json: async () => ({ ok: true, available: false, unavailableReason: 'not_enough_responses', counts: {} }),
+      };
+    }
+    if (urlString.includes('/telegram/agent/api/preferences')) {
+      if (failAgentReads) throw new Error('worker offline');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          draftCount: 1,
+          submitRequestedCount: 1,
+          submittedCount: 1,
+          reviewRequired: false,
+        }),
       };
     }
     throw new Error(`Unexpected fetch: ${urlString}`);
@@ -878,9 +892,9 @@ describe('OnePageSession view gating', () => {
     await screen.findByText('Copied!');
   });
 
-  it('renders read-only telegram pile controls by question type', async () => {
+  it('renders interactive telegram pile controls by question type', async () => {
     seedTelegramStoredCredentials();
-    installFetchMock(buildTelegramAgentFetchMock({
+    const fetchMock = installFetchMock(buildTelegramAgentFetchMock({
       questions: [
         { questionId: 'q-binary', questionType: 'binary', prompt: 'Disclose agent identity?', tags: ['norms'] },
         {
@@ -907,13 +921,34 @@ describe('OnePageSession view gating', () => {
 
     await openTelegramQuestions();
     expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Agree' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Disagree' })).toBeDisabled();
+    expect(screen.getByTestId('ce-session-telegram-question-submit')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Agree' }));
+    expect(screen.getByRole('button', { name: 'Agree' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('ce-session-telegram-question-submit')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('ce-session-telegram-question-submit'));
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/telegram/agent/api/preferences'))).toBe(true);
+    });
+    const submitCall = fetchMock.mock.calls.find(([url]) => String(url).includes('/telegram/agent/api/preferences'));
+    expect(submitCall?.[1]?.method).toBe('POST');
+    const submitBody = JSON.parse(submitCall?.[1]?.body || '{}');
+    expect(submitBody).toMatchObject({
+      sessionSlug: 'edge',
+      submit: true,
+      humanApproved: true,
+      preferences: [{
+        questionId: 'q-binary',
+        answer: {
+          questionType: 'binary',
+          value: 'agree',
+        },
+      }],
+    });
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('Which tools matter?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Geo' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Index' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Geo' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Index' })).not.toBeDisabled();
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How comfortable are you?')).toBeInTheDocument();
@@ -921,7 +956,7 @@ describe('OnePageSession view gating', () => {
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How can agents help?')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Freeform response')).toBeDisabled();
+    expect(screen.getByPlaceholderText('Type your response')).not.toBeDisabled();
     expect(screen.queryByText('q-binary')).not.toBeInTheDocument();
   });
 

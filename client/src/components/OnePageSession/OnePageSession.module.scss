@@ -432,6 +432,19 @@
   opacity: 0.8;
 }
 
+.telegramReadonlyChoice:not(:disabled),
+.telegramReadonlyOption:not(:disabled) {
+  cursor: pointer;
+  opacity: 1;
+}
+
+.telegramAnswerChoiceSelected {
+  border-color: rgba(106, 255, 184, 0.78);
+  background: rgba(47, 158, 104, 0.28);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(106, 255, 184, 0.18);
+}
+
 .telegramReadonlyControls .telegramReadonlyChoice + .telegramReadonlyChoice {
   margin-left: 8px;
 }
@@ -465,6 +478,22 @@
   background: linear-gradient(90deg, rgba(106, 255, 184, 0.8), rgba(53, 149, 255, 0.65));
 }
 
+.telegramRatingControls {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(36px, 1fr));
+  gap: 6px;
+}
+
+.telegramRatingButton {
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .telegramReadonlyTextarea {
   width: 100%;
   min-height: 84px;
@@ -475,6 +504,58 @@
   color: rgba(255, 255, 255, 0.8);
   resize: vertical;
   opacity: 0.8;
+}
+
+.telegramFreeformTextarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  resize: vertical;
+}
+
+.telegramFreeformTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.telegramSubmitAnswerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 42px;
+  margin-top: 14px;
+  padding: 9px 16px;
+  border: 1px solid rgba(106, 255, 184, 0.62);
+  border-radius: var(--ce-radius-8);
+  background: rgba(47, 158, 104, 0.28);
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.telegramSubmitAnswerButton:disabled {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.48);
+  cursor: not-allowed;
+}
+
+.telegramAnsweredBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid rgba(106, 255, 184, 0.5);
+  border-radius: 999px;
+  color: #9ff0c4;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .telegramReportApprox {
