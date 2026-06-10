@@ -8,7 +8,9 @@ import {
   normalizeQuestionProgressSlug,
 } from './surveyToolViewState.js';
 
-export type SurveyQuestionsProps = UnknownRecord & {
+type SurveyQuestionsLegacyRecord = Record<string, any>;
+
+export type SurveyQuestionsProps = SurveyQuestionsLegacyRecord & {
   displayAnswerMode?: boolean;
   isStandalone?: boolean;
   runtimeStrategy?: SurveyQuestionsRuntimeStrategy;
@@ -16,7 +18,7 @@ export type SurveyQuestionsProps = UnknownRecord & {
   questionPool?: unknown[];
 };
 
-export type SurveyQuestionsRuntimeEngine = UnknownRecord & {
+export type SurveyQuestionsRuntimeEngine = SurveyQuestionsLegacyRecord & {
   props: SurveyQuestionsProps;
   state: SurveyQuestionsState;
   setState: (...args: unknown[]) => unknown;
@@ -516,7 +518,7 @@ export type SurveySingleQuestionReadyHydrationStatePatch = {
   surveysResponseState: unknown;
 };
 
-export type SurveyQuestionsState = UnknownRecord & {
+export type SurveyQuestionsState = SurveyQuestionsLegacyRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
   viewAddressAnswers: string;
