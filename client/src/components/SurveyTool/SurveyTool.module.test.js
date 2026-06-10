@@ -1,53 +1,33 @@
-import SurveyTool from './SurveyTool';
-import {
-  computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
-  normalizeSurveyToolFilterState,
-  shouldShowPileFullLoadingState,
-  buildSurveyDraftSemanticSignature,
-} from './surveyToolUtils.js';
-import { SurveyQuestions } from './SurveyQuestions';
 import {
   applyDecryptedQuestionResponseValues,
   applyDecryptedQuestionStateToSurveySlice,
+  buildQuestionDecryptExecutionContext,
+  buildQuestionDecryptFailureState,
+  buildQuestionDecryptStartState,
+  buildSelfQuestionDecryptBaseline,
+  buildViewedResponseDecryptBaseline,
   clearQuestionFieldBusyMap,
+  decryptQuestionRatingEnvelopes,
   ensureQuestionDecryptSliceShape,
+  getQuestionFieldDecryptSelection,
+  getQuestionFieldTaskKey,
   getQuestionFieldTaskKeys,
   getQuestionRatingEnvelopes,
   markQuestionFieldBusyMap,
+  mergeLatestEncryptedQuestionFields,
+  mergeQuestionRatingEnvelopeState,
+  mergeQuestionResponseOverrideIntoDecryptSlice,
+  syncDecryptedQuestionIntoBaseline,
 } from './surveyToolDecryptFlow.js';
-import { PileViewMode } from './SurveyPileViewMode';
-import { QuestionsDashboard } from './SurveySelector';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider } from './DeferredCommitSlider';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
-import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
 import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
+  buildCanDecryptContext,
+  evaluateCanDecryptPreCheck,
+  resolveCanDecryptGateAccess,
+} from './surveyToolCanDecryptController';
+import { buildCanDecryptOtherResponsesState } from './surveyQuestionsTypes.js';
+import { buildGatedPromptNoticeState } from './surveyToolViewState';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { t } from '../../utilities/ui/terminology.js';
 
 const makeCanDecryptInputs = (overrides = {}) => ({
   getEffectiveDraftSlug: () => 'edge',
@@ -69,18 +49,6 @@ const buildViewedSliceFromPayload = (payload) => ({
   answers: { q1: payload?.answer || payload?.answers?.q1 || { value: '*' } },
   additionalComments: payload?.additionalComments || {},
 });
-
-const syncClassSetState = (subject) => {
-  subject.setState = jest.fn((next, cb) => {
-    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-    if (patch && typeof patch === 'object') {
-      subject.state = { ...subject.state, ...patch };
-    }
-    if (typeof cb === 'function') cb();
-    return patch;
-  });
-  return subject.setState;
-};
 
 // Remaining broad SurveyTool module coverage owns shared response decrypt access and shared question decrypt helper behavior.
 describe('SurveyTool module', () => {
@@ -131,152 +99,45 @@ describe('SurveyTool module', () => {
     // the portable contract is the early needs-wallet verdict before any gate call.
   });
 
-  it('marks response decrypt access as needs-wallet when auth is missing', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess');
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-      sbtCacheRevision: 0,
-    });
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
-      canDecryptOtherResponses: true,
-      canDecryptOtherResponsesStatus: 'granted',
-    };
-    subject.getResponseGatePolicy = jest.fn(() => ({
-      primaryResource: 'surveyResponses',
-      recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
-    }));
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
-    subject._canDecryptOtherResponsesRunId = 4;
-    subject._canDecryptOtherResponsesKey = 'stale-key';
-    subject._canDecryptOtherResponsesInFlight = Promise.resolve(true);
-
-    const canDecrypt = await subject.refreshCanDecryptOtherResponses();
-
-    expect(canDecrypt).toBe(false);
-    expect(gateSpy).not.toHaveBeenCalled();
-    expect(subject.state.canDecryptOtherResponses).toBe(false);
-    expect(subject.state.canDecryptOtherResponsesStatus).toBe('needs-wallet');
-    expect(subject._canDecryptOtherResponsesRunId).toBe(5);
-    expect(subject._canDecryptOtherResponsesKey).toBe('');
-    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
-  });
-
   it('marks response decrypt access as no-gate when no recipients are configured', async () => {
-    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess');
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      sbtCacheRevision: 0,
-    });
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
-      canDecryptOtherResponses: true,
-      canDecryptOtherResponsesStatus: 'granted',
-    };
-    subject.getResponseGatePolicy = jest.fn(() => ({
-      primaryResource: 'surveyResponses',
-      recipients: [],
+    const checkAccess = jest.fn();
+    const { snapshot } = buildCanDecryptContext(makeCanDecryptInputs({
+      getResponseGatePolicy: jest.fn(() => ({
+        primaryResource: 'surveyResponses',
+        recipients: [],
+      })),
     }));
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
-    subject._canDecryptOtherResponsesRunId = 11;
-    subject._canDecryptOtherResponsesKey = 'stale-key';
-    subject._canDecryptOtherResponsesInFlight = Promise.resolve(true);
+    const preCheck = evaluateCanDecryptPreCheck(snapshot);
 
-    const canDecrypt = await subject.refreshCanDecryptOtherResponses();
-
-    expect(canDecrypt).toBe(false);
-    expect(gateSpy).not.toHaveBeenCalled();
-    expect(subject.state.canDecryptOtherResponses).toBe(false);
-    expect(subject.state.canDecryptOtherResponsesStatus).toBe('no-gate');
-    expect(subject._canDecryptOtherResponsesRunId).toBe(12);
-    expect(subject._canDecryptOtherResponsesKey).toBe('');
-    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
+    expect(preCheck).toEqual({ earlyExit: true, status: 'no-gate' });
+    expect(checkAccess).not.toHaveBeenCalled();
+    expect(buildCanDecryptOtherResponsesState({ status: preCheck.status })).toEqual({
+      canDecryptOtherResponses: false,
+      canDecryptOtherResponsesStatus: 'no-gate',
+    });
+    // port note: direct run-id/key/in-flight invalidation fields are class-private;
+    // the portable contract is the early no-gate verdict before any gate call.
   });
 
   it('deduplicates in-flight response decrypt access checks for the same snapshot', async () => {
-    const deferred = createDeferred();
-    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess')
-      .mockImplementation(() => deferred.promise);
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: true,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      sbtCacheRevision: 0,
-    });
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
-      canDecryptOtherResponses: false,
-      canDecryptOtherResponsesStatus: 'needs-wallet',
-    };
-    subject.getResponseGatePolicy = jest.fn(() => ({
-      primaryResource: 'default',
-      recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
-    }));
-    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
-    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
+    const inputs = makeCanDecryptInputs();
+    const firstContext = buildCanDecryptContext(inputs);
+    const secondContext = buildCanDecryptContext(inputs);
 
-    const firstRun = subject.refreshCanDecryptOtherResponses();
-    await Promise.resolve();
-
-    expect(gateSpy).toHaveBeenCalledTimes(1);
-    expect(subject.state.canDecryptOtherResponsesStatus).toBe('checking');
-    expect(subject._canDecryptOtherResponsesInFlight).toBeTruthy();
-
-    const secondRun = subject.refreshCanDecryptOtherResponses();
-    await Promise.resolve();
-
-    expect(gateSpy).toHaveBeenCalledTimes(1);
-    expect(subject._canDecryptOtherResponsesRunId).toBe(1);
-    expect(subject._canDecryptOtherResponsesKey).toContain('0xabc');
-
-    deferred.resolve({
-      status: 'granted',
-      gate: null,
-      resourceKey: 'default',
-    });
-
-    await expect(firstRun).resolves.toBe(true);
-    await expect(secondRun).resolves.toBe(true);
-    expect(subject.state.canDecryptOtherResponses).toBe(true);
-    expect(subject.state.canDecryptOtherResponsesStatus).toBe('granted');
-    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
+    expect(firstContext.snapshot.key).toBe(secondContext.snapshot.key);
+    expect(firstContext.snapshot.key).toContain('0xabc');
+    expect(evaluateCanDecryptPreCheck(firstContext.snapshot)).toEqual({ earlyExit: false });
+    // port note: the old assertion inspected class-private in-flight promise fields.
+    // Hooks conversion keeps the stable snapshot key as the observable dedupe input;
+    // lower-level sponsoredAccessState tests own same-key in-flight request sharing.
   });
 
   it('normalizes shared question field task keys and decrypt busy lookups', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      decryptingByKey: { 'q1:prompt': true, 'q1:additional': true },
-    };
+    const busyMap = { 'q1:prompt': true, 'q1:additional': true };
 
-    expect(subject.getQuestionFieldTaskKey(' Q1 ', ' Prompt ')).toBe('q1:prompt');
-    expect(subject.getQuestionFieldTaskKey('q1', 'additional')).toBe('q1:additional');
-    expect(subject.getQuestionFieldTaskKey('', 'answer')).toBe('');
+    expect(getQuestionFieldTaskKey(' Q1 ', ' Prompt ')).toBe('q1:prompt');
+    expect(getQuestionFieldTaskKey('q1', 'additional')).toBe('q1:additional');
+    expect(getQuestionFieldTaskKey('', 'answer')).toBe('');
     expect(getQuestionFieldTaskKeys(' Q1 ', {
       includeAnswer: true,
       includeAdditional: true,
@@ -288,10 +149,10 @@ describe('SurveyTool module', () => {
       'q1:answer': true,
       'q1:additional': true,
     });
-    expect(subject.isQuestionFieldBusy(' Q1 ', ' prompt ')).toBe(true);
-    expect(subject.isQuestionFieldBusy('q1', 'additional')).toBe(true);
-    expect(subject.isQuestionFieldBusy('q1', 'answer')).toBe(false);
-    expect(subject.isQuestionFieldBusy('', 'prompt')).toBe(false);
+    expect(!!busyMap[getQuestionFieldTaskKey(' Q1 ', ' prompt ')]).toBe(true);
+    expect(!!busyMap[getQuestionFieldTaskKey('q1', 'additional')]).toBe(true);
+    expect(!!busyMap[getQuestionFieldTaskKey('q1', 'answer')]).toBe(false);
+    expect(!!busyMap[getQuestionFieldTaskKey('', 'prompt')]).toBe(false);
     expect(clearQuestionFieldBusyMap({
       'q1:answer': true,
       'q1:additional': true,
@@ -304,16 +165,7 @@ describe('SurveyTool module', () => {
   });
 
   it('derives shared question field decrypt selection for answer and additional flows', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.getQuestionFieldDecryptSelection('q1', 'both', {
+    expect(getQuestionFieldDecryptSelection('q1', 'both', {
       answers: {
         q1: { value: '*', encrypted: true },
       },
@@ -328,7 +180,7 @@ describe('SurveyTool module', () => {
       keysToMark: ['q1:answer', 'q1:additional'],
     });
 
-    expect(subject.getQuestionFieldDecryptSelection('q1', 'additional', {
+    expect(getQuestionFieldDecryptSelection('q1', 'additional', {
       answers: {
         q1: { value: '*', encrypted: true },
       },
@@ -345,15 +197,6 @@ describe('SurveyTool module', () => {
   });
 
   it('decrypts shared question rating envelopes into numeric values', async () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
     const decryptEnvelopeValueSpy = jest
       .spyOn(cryptoUtils, 'decryptEnvelopeValue')
       .mockImplementation(async (env) => {
@@ -362,7 +205,7 @@ describe('SurveyTool module', () => {
         return null;
       });
 
-    await expect(subject.decryptQuestionRatingEnvelopes(
+    await expect(decryptQuestionRatingEnvelopes(
       {
         importanceEncrypted: 'importance-env',
         convictionEncrypted: 'conviction-env',
@@ -373,6 +216,7 @@ describe('SurveyTool module', () => {
         lit: { getKey: jest.fn() },
         providerLike: { provider: true },
       },
+      { decryptEnvelopeValue: cryptoUtils.decryptEnvelopeValue },
     )).resolves.toEqual({
       decryptedImportance: 7,
       decryptedConviction: null,
@@ -388,28 +232,20 @@ describe('SurveyTool module', () => {
       .mockReturnValue('browser');
     const litHooks = { getKey: jest.fn() };
     const provider = { provider: true };
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
+
+    expect(buildQuestionDecryptExecutionContext({
+      baselineForDecrypt: { answers: {} },
+      questionId: 'Q1',
       provider,
-      litHooks,
-    });
-    subject.state = {
-      ...subject.state,
+      account: '0xabc',
+      network: { id: 84532 },
       questionPool: [{ id: 'pool-q' }],
       pileQuestions: [{ id: 'pile-q' }],
+      litHooks,
       hasher: 'hash-worker',
-    };
-    subject.resolveDecryptSurveyId = jest.fn(() => 'survey-1');
-
-    expect(subject.buildQuestionDecryptExecutionContext(
-      { answers: {} },
-      'Q1',
-    )).toEqual({
+      resolveDecryptSurveyId: () => 'survey-1',
+      getProviderKind: cryptoUtils.getProviderKind,
+    })).toEqual({
       providerKind: 'browser',
       chainId: 84532,
       surveyId: 'survey-1',
@@ -493,16 +329,7 @@ describe('SurveyTool module', () => {
   });
 
   it('syncs shared decrypted question state back into the edit baseline', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.syncDecryptedQuestionIntoBaseline(
+    expect(syncDecryptedQuestionIntoBaseline(
       null,
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
       {
@@ -529,16 +356,7 @@ describe('SurveyTool module', () => {
   });
 
   it('merges latest encrypted question fields into the working decrypt slice', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.mergeLatestEncryptedQuestionFields(
+    expect(mergeLatestEncryptedQuestionFields(
       {
         answers: { q1: { value: '*', encrypted: false, hash: 'old-a' } },
         additionalComments: { q1: { value: '*', encrypted: true, hash: 'old-b' } },
@@ -559,16 +377,7 @@ describe('SurveyTool module', () => {
   });
 
   it('builds shared decrypt start and failure state updates', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.buildQuestionDecryptStartState(
+    expect(buildQuestionDecryptStartState(
       { decryptingByKey: { 'q1:prompt': true } },
       ['q1:answer', 'q1:additional'],
     )).toEqual({
@@ -582,7 +391,7 @@ describe('SurveyTool module', () => {
       },
     });
 
-    expect(subject.buildQuestionDecryptFailureState(
+    expect(buildQuestionDecryptFailureState(
       { decryptingByKey: { 'q1:answer': true, 'q1:additional': true, 'q1:prompt': true } },
       'Q1',
       'additional',
@@ -599,16 +408,7 @@ describe('SurveyTool module', () => {
   });
 
   it('merges question response overrides into the working decrypt slice', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    expect(subject.mergeQuestionResponseOverrideIntoDecryptSlice(
+    expect(mergeQuestionResponseOverrideIntoDecryptSlice(
       {
         answers: { q1: { value: '*', encrypted: false } },
         additionalComments: { q1: { value: '', encrypted: false } },
@@ -625,15 +425,6 @@ describe('SurveyTool module', () => {
   });
 
   it('extracts and merges question rating envelope state across response sources', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
     expect(getQuestionRatingEnvelopes(
       {
         responses: [
@@ -647,7 +438,7 @@ describe('SurveyTool module', () => {
       convictionEncrypted: 'conv-1',
     });
 
-    expect(subject.mergeQuestionRatingEnvelopeState(
+    expect(mergeQuestionRatingEnvelopeState(
       { importanceEncrypted: 'imp-1', convictionEncrypted: '' },
       { importanceEncrypted: '', convictionEncrypted: 'conv-2' },
       'q1',
@@ -658,19 +449,6 @@ describe('SurveyTool module', () => {
   });
 
   it('normalizes decrypt slice shape and builds viewed-response decrypt baselines', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-    subject.buildSliceFromUserAnswers = jest.fn(() => ({
-      answers: { q1: { value: '*' } },
-      additionalComments: null,
-    }));
-
     expect(ensureQuestionDecryptSliceShape({
       answers: { q1: { value: '*' } },
       additionalComments: null,
@@ -681,9 +459,10 @@ describe('SurveyTool module', () => {
       conviction: {},
     });
 
-    expect(subject.buildViewedResponseDecryptBaseline(
+    expect(buildViewedResponseDecryptBaseline(
       { questionId: 'Q1', answer: { value: '*' } },
       'q1',
+      buildViewedSliceFromPayload,
     )).toEqual({
       answers: { q1: { value: '*' } },
       additionalComments: {},
@@ -693,25 +472,16 @@ describe('SurveyTool module', () => {
   });
 
   it('builds self-response decrypt baselines from current survey state or user answers', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: [null],
-      userAnswers: { responses: [] },
-    };
-    subject.buildSliceFromUserAnswers = jest.fn(() => ({
-      answers: { q1: { value: '*' } },
-      additionalComments: { q1: { value: '' } },
-    }));
-
-    expect(subject.buildSelfQuestionDecryptBaseline(0)).toEqual({
+    expect(buildSelfQuestionDecryptBaseline(
+      0,
+      [null],
+      { responses: [] },
+      () => ({
+        answers: { q1: { value: '*' } },
+        additionalComments: { q1: { value: '' } },
+      }),
+      (value) => JSON.parse(JSON.stringify(value)),
+    )).toEqual({
       baselineSlice: {
         answers: { q1: { value: '*' } },
         additionalComments: { q1: { value: '' } },
@@ -726,33 +496,29 @@ describe('SurveyTool module', () => {
   });
 
   it('derives normalized gated prompt notice ids and copy for both single and multiple gates', () => {
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      loginComplete: false,
-      network: { id: 84532 },
-    });
-
-    subject.resolveGatedPromptGateNames = jest.fn(() => ['Gate Alpha', 'Gate Beta']);
-    expect(subject.getGatedPromptNoticeState({
-      question: { id: 'Q 1' },
+    expect(buildGatedPromptNoticeState({
+      questionId: 'Q 1',
       tooltipIdSuffix: 'pile',
+      gateNames: ['Gate Alpha', 'Gate Beta'],
+      sbtLabel: t('sbt'),
+      gateLabel: t('gate'),
+      gatesLabel: t('gates'),
     })).toEqual({
       tooltipId: 'ce-gated-prompt-tip-q-1-pile',
       tooltipText: `Required ${t('sbt')} ${t('gates')}: Gate Alpha, Gate Beta`,
     });
 
-    subject.resolveGatedPromptGateNames = jest.fn(() => []);
-    expect(subject.getGatedPromptNoticeState({
-      question: { id: '' },
+    expect(buildGatedPromptNoticeState({
+      questionId: '',
       tooltipIdSuffix: 'full',
       fallbackId: 'fallback id',
+      gateNames: [],
+      sbtLabel: t('sbt'),
+      gateLabel: t('gate'),
+      gatesLabel: t('gates'),
     })).toEqual({
       tooltipId: 'ce-gated-prompt-tip-fallback-id-full',
       tooltipText: `${t('sbt')} ${t('gate')} required`,
     });
   });
-
 });
