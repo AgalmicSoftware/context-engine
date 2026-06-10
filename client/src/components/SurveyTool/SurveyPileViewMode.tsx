@@ -471,9 +471,71 @@ import { SurveyQuestions } from './SurveyQuestions';
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
+export const createPileViewRuntimeStrategy = () => ({
+  getCurrentRenderedQuestionIds: (engine) => {
+    const pileQuestions = Array.isArray(engine.state?.pileQuestions) ? engine.state.pileQuestions : [];
+    const activePileIndex = Number(engine.state?.activePileIndex || 0);
+    const key = `${activePileIndex}|${pileQuestions.length}|${Number(engine._pileQuestionsGeneration || 0)}`;
+
+    if (engine._currentRenderedQuestionIdsCache && engine._currentRenderedQuestionIdsCacheKey === key) {
+      return engine._currentRenderedQuestionIdsCache;
+    }
+
+    const ids = buildRenderedQuestionIdsFromPileWindow({
+      pileQuestions,
+      activePileIndex,
+    });
+
+    engine._currentRenderedQuestionIdsCache = ids;
+    engine._currentRenderedQuestionIdsCacheKey = key;
+    return ids;
+  },
+
+  toggleComments: (engine, questionId) => (
+    engine.setState((prev) => ({
+      showComments: {
+        ...prev.showComments,
+        [questionId]: !prev.showComments[questionId],
+      },
+    }))
+  ),
+
+  getAnsweredQuestionsCount: (engine) => engine.getSubmitCount(),
+
+  getPendingEditStats: (engine) => engine.computePendingEditStatsAtIndex(0),
+
+  showTransientSubmitFeedback: (engine, message = '', durationMs = 2000) => {
+    if (engine._emptySubmitTimer) {
+      clearTimeout(engine._emptySubmitTimer);
+      engine._emptySubmitTimer = null;
+    }
+    if (engine._pileSubmitTimer) {
+      clearTimeout(engine._pileSubmitTimer);
+      engine._pileSubmitTimer = null;
+    }
+    const update = buildTransientSubmitFeedbackState({
+      message,
+      mirrorToPileSubmitText: true,
+    });
+    engine.setState(update);
+    if (!update.submissionError) return;
+    engine._emptySubmitTimer = setTimeout(() => {
+      if (!engine._isMounted) return;
+      const clearUpdate = buildClearedTransientSubmitFeedbackState({
+        mirrorToPileSubmitText: true,
+      });
+      engine.setState(clearUpdate);
+      engine._emptySubmitTimer = null;
+    }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
+  },
+});
+
 export class PileViewMode extends SurveyQuestions {
   constructor(props) {
-    super(props);
+    super({
+      ...props,
+      runtimeStrategy: props?.runtimeStrategy || createPileViewRuntimeStrategy(),
+    });
 
     // 1. Hydrate filter state from props or URL (Consume & Clear)
     let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
@@ -844,25 +906,6 @@ export class PileViewMode extends SurveyQuestions {
       if (leftSig !== rightSig) return false;
     }
     return true;
-  };
-
-  getCurrentRenderedQuestionIds = () => {
-    const pileQuestions = Array.isArray(this.state?.pileQuestions) ? this.state.pileQuestions : [];
-    const activePileIndex = Number(this.state?.activePileIndex || 0);
-    const key = `${activePileIndex}|${pileQuestions.length}|${Number(this._pileQuestionsGeneration || 0)}`;
-
-    if (this._currentRenderedQuestionIdsCache && this._currentRenderedQuestionIdsCacheKey === key) {
-      return this._currentRenderedQuestionIdsCache;
-    }
-
-    const ids = buildRenderedQuestionIdsFromPileWindow({
-      pileQuestions,
-      activePileIndex,
-    });
-
-    this._currentRenderedQuestionIdsCache = ids;
-    this._currentRenderedQuestionIdsCacheKey = key;
-    return ids;
   };
 
   isRecentRateLimit = () => {
@@ -1430,14 +1473,6 @@ export class PileViewMode extends SurveyQuestions {
     });
   }
 
-  toggleComments = (questionId) =>
-    this.setState((prev) => ({
-      showComments: {
-        ...prev.showComments,
-        [questionId]: !prev.showComments[questionId],
-      },
-    }));
-
   toggleHologramAssistant = () =>
     this.setState((prev) => ({
       showHologramAssistant: !prev.showHologramAssistant,
@@ -1463,10 +1498,6 @@ export class PileViewMode extends SurveyQuestions {
       },
     }));
   };
-
-  // Keep semantics aligned with baseline-aware changed-set
-  getAnsweredQuestionsCount = () => this.getSubmitCount();
-
 
   checkCacheAgainstBaseline = () => {
     const slug = resolveEffectiveSlug(this.props);
@@ -1918,10 +1949,6 @@ export class PileViewMode extends SurveyQuestions {
   };
 
 
-  getPendingEditStats = () => {
-    return this.computePendingEditStatsAtIndex(0);
-  };
-
   showNoPendingPileSubmitFeedback = (pileSubmitLabel = '') => {
     if (this._pileSubmitTimer) {
       clearTimeout(this._pileSubmitTimer);
@@ -1940,31 +1967,6 @@ export class PileViewMode extends SurveyQuestions {
         this._pileSubmitTimer = null;
       }, feedbackPlan.clearDelayMs);
     }, feedbackPlan.initialDelayMs);
-  };
-
-  showTransientSubmitFeedback = (message = '', durationMs = 2000) => {
-    if (this._emptySubmitTimer) {
-      clearTimeout(this._emptySubmitTimer);
-      this._emptySubmitTimer = null;
-    }
-    if (this._pileSubmitTimer) {
-      clearTimeout(this._pileSubmitTimer);
-      this._pileSubmitTimer = null;
-    }
-    const update = buildTransientSubmitFeedbackState({
-      message,
-      mirrorToPileSubmitText: true,
-    });
-    this.setState(update);
-    if (!update.submissionError) return;
-    this._emptySubmitTimer = setTimeout(() => {
-      if (!this._isMounted) return;
-      const clearUpdate = buildClearedTransientSubmitFeedbackState({
-        mirrorToPileSubmitText: true,
-      });
-      this.setState(clearUpdate);
-      this._emptySubmitTimer = null;
-    }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
   };
 
   handlePileSubmitClick = async () => {

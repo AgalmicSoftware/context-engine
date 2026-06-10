@@ -175,6 +175,46 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(subject.toggleConviction).not.toHaveBeenCalled();
   });
 
+  it('routes simple pile overrides through the runtime strategy bridge', () => {
+    jest.useFakeTimers();
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      network: { id: 1 },
+    });
+    syncClassSetState(subject);
+    subject._isMounted = true;
+    subject.computePendingEditStatsAtIndex = jest.fn(() => ({ total: 4 }));
+    subject.state = {
+      ...subject.state,
+      pileQuestions: [
+        { id: 'q0' },
+        { id: 'q1' },
+        { id: 'q2' },
+        { id: 'q3' },
+        { id: 'q4' },
+        { id: 'q5' },
+      ],
+      activePileIndex: 3,
+      showComments: {},
+    };
+
+    expect(subject.getCurrentRenderedQuestionIds()).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
+
+    subject.toggleComments('q3');
+    expect(subject.state.showComments.q3).toBe(true);
+    expect(subject.getPendingEditStats()).toEqual({ total: 4 });
+    expect(subject.getAnsweredQuestionsCount()).toBe(4);
+
+    subject.showTransientSubmitFeedback('Review pending', 100);
+    expect(subject.state.submissionError).toBe('Review pending');
+    expect(subject.state.pileSubmitTempText).toBe('Review pending');
+    jest.advanceTimersByTime(1000);
+    expect(subject.state.submissionError).toBe('');
+    expect(subject.state.pileSubmitTempText).toBeNull();
+  });
+
   it('opens listening mode from the query string and keeps the URL synchronized', () => {
     window.history.pushState({}, '', '/session/demo?foo=1&mode=listening#pile');
     const originalMatchMedia = window.matchMedia;
