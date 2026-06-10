@@ -15,20 +15,16 @@ export type SurveyQuestionsStatePatch =
   | Record<string, unknown>;
 
 export type SurveyQuestionsStateUpdate =
-  | null
   | SurveyQuestionsStatePatch
-  | ((prevState: Readonly<SurveyQuestionsState>) => SurveyQuestionsStatePatch | null);
+  | ((prevState: Readonly<SurveyQuestionsState>) => SurveyQuestionsStatePatch);
 
 export const surveyQuestionsReducer = (
   prevState: SurveyQuestionsState,
   update: SurveyQuestionsStateUpdate
-): SurveyQuestionsState => {
-  const patch = typeof update === 'function' ? update(prevState) : update;
-  return {
-    ...prevState,
-    ...(patch && typeof patch === 'object' ? patch : {}),
-  };
-};
+): SurveyQuestionsState => ({
+  ...prevState,
+  ...(typeof update === 'function' ? update(prevState) : update),
+});
 
 export const createInitialSurveyQuestionsState = (
   props: SurveyQuestionsProps = {}
