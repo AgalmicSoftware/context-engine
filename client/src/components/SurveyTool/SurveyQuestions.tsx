@@ -479,10 +479,12 @@ import {
 } from './surveyQuestionsSubmitController.js';
 import {
   buildActiveTagModalState,
+  buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
   buildBulkPromptReloadingState,
   buildCanDecryptOtherResponsesState,
+  buildCommentsToggleState,
   buildClearedSurveyQuestionPoolState,
   buildCopiedQuestionsJsonState,
   buildCopiedResponseJsonState,
@@ -491,19 +493,27 @@ import {
   buildCurrentStepState,
   buildDecryptEditFailureState,
   buildDecryptEditStartState,
+  buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
   buildEditingResponseModeState,
+  buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
   buildJsonPreviewState,
+  buildLockAudienceGateDetailsState,
+  buildLockAudienceMenuState,
+  buildLockedGateDetailsExpandedState,
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
+  buildQuestionsJsonToggleState,
   buildResponseLoadingResetState,
+  buildResponseJsonToggleState,
   buildShowJsonState,
   buildSubmitPreparationErrorState,
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
+  buildSurveyJsonToggleState,
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
@@ -4440,7 +4450,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       return;
     }
     this.setState(
-      (prev) => ({ autoDecryptEnabled: !prev.autoDecryptEnabled }),
+      buildAutoDecryptToggleState,
       () => {
         if (!this.state.autoDecryptEnabled) {
           this._autoDecQueue = [];
@@ -6018,10 +6028,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   toggleDisplayAnswerMode = () => {
     this.setState(
-      prevState => ({
-        displayAnswerMode: !prevState.displayAnswerMode,
-        isEditing: !prevState.displayAnswerMode,
-      }),
+      buildDisplayAnswerModeToggleState,
       async () => {
         if (this.state.displayAnswerMode) {
           if (this.props.singleQuestionMode && this.props.responderAddress) {
@@ -6298,11 +6305,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   toggleShowQuestionsJson = () => {
-    this.setState((prevState) => ({ showQuestionsJson: !prevState.showQuestionsJson }));
+    this.setState(buildQuestionsJsonToggleState);
   };
 
   toggleShowResponseJson = () => {
-    this.setState((prevState) => ({ showResponseJson: !prevState.showResponseJson }), () => {
+    this.setState(buildResponseJsonToggleState, () => {
       if (this.state.showResponseJson) {
         this.updateJsonPreview(true);
         return;
@@ -6315,7 +6322,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   toggleShowSurveyJson = () => {
-    this.setState((prevState) => ({ showSurveyJson: !prevState.showSurveyJson }));
+    this.setState(buildSurveyJsonToggleState);
   };
 
   getCommentsOpen = (questionId, defaultOpen = false) => {
@@ -6324,17 +6331,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   toggleComments = (questionId, defaultOpen = false) => {
-    this.setState((prev) => {
-      const current = typeof prev?.showComments?.[questionId] === 'boolean'
-        ? prev.showComments[questionId]
-        : !!defaultOpen;
-      return {
-        showComments: {
-          ...prev.showComments,
-          [questionId]: !current,
-        },
-      };
-    });
+    this.setState((prev) => buildCommentsToggleState(prev, questionId, defaultOpen));
   };
 
   getLockAudienceDisplayState = ({
@@ -7019,9 +7016,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       } else {
         this.clearGateSbtHydrationRetry();
       }
-      this.setState((prev) => ({
-        gateSbtNameRevision: Number(prev.gateSbtNameRevision || 0) + 1,
-      }));
+      this.setState(buildGateSbtNameRevisionState);
     } catch (_) {
       if (!isTargetedSbtMetadataLookupEnabled()) {
         this.clearGateSbtHydrationRetry();
@@ -7196,7 +7191,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       bulkPromptReloading={!!this.state.bulkPromptReloading}
       lockedGateDetailsExpanded={!!this.state.lockedGateDetailsExpanded}
       onDecrypt={(questionIds) => this.reloadMaskedQuestionBatch(questionIds)}
-      onToggleDetails={() => this.setState((prev) => ({ lockedGateDetailsExpanded: !prev.lockedGateDetailsExpanded }))}
+      onToggleDetails={() => this.setState(buildLockedGateDetailsExpandedState)}
     />
   );
 
@@ -7273,28 +7268,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const normalizedGateId = this.normalizeGateLabelText(
       typeof forceOpen === 'string' ? forceOpen : ''
     );
-    this.setState((prev) => {
-      const current = this.normalizeGateLabelText(prev.lockAudienceGateDetailsByQuestion?.[key] || '');
-      const nextValue = typeof forceOpen === 'string'
-        ? (current === normalizedGateId ? '' : normalizedGateId)
-        : (forceOpen ? current : '');
-      return {
-        lockAudienceGateDetailsByQuestion: nextValue ? { [key]: nextValue } : {},
-      };
-    });
+    this.setState((prev) => buildLockAudienceGateDetailsState(
+      prev,
+      key,
+      forceOpen,
+      normalizedGateId,
+      this.normalizeGateLabelText
+    ));
   };
 
   toggleLockAudienceMenu = (questionId, forceOpen = null, fieldKey = 'answer') => {
     const key = this.getLockAudienceMenuStateKey(questionId, fieldKey);
     if (!key) return;
-    this.setState((prev) => {
-      const current = !!prev.lockAudienceMenuByQuestion?.[key];
-      const nextValue = forceOpen === null ? !current : !!forceOpen;
-      return {
-        lockAudienceMenuByQuestion: nextValue ? { [key]: true } : {},
-        lockAudienceGateDetailsByQuestion: nextValue ? prev.lockAudienceGateDetailsByQuestion : {},
-      };
-    });
+    this.setState((prev) => buildLockAudienceMenuState(prev, key, forceOpen));
   };
 
   applyAnswerEncryptionAudience = (surveyIndex, questionId, audience, options = {}) => {

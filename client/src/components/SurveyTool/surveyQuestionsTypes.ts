@@ -328,6 +328,48 @@ export type SurveyHydratingPriorResponsesStatePatch = {
   isHydratingPriorResponses: boolean;
 };
 
+export type SurveyAutoDecryptToggleStatePatch = {
+  autoDecryptEnabled: boolean;
+};
+
+export type SurveyDisplayAnswerModeToggleStatePatch = {
+  displayAnswerMode: boolean;
+  isEditing: boolean;
+};
+
+export type SurveyQuestionsJsonToggleStatePatch = {
+  showQuestionsJson: boolean;
+};
+
+export type SurveyResponseJsonToggleStatePatch = {
+  showResponseJson: boolean;
+};
+
+export type SurveySurveyJsonToggleStatePatch = {
+  showSurveyJson: boolean;
+};
+
+export type SurveyCommentsToggleStatePatch = {
+  showComments: Record<string, unknown>;
+};
+
+export type SurveyGateSbtNameRevisionStatePatch = {
+  gateSbtNameRevision: number;
+};
+
+export type SurveyLockedGateDetailsExpandedStatePatch = {
+  lockedGateDetailsExpanded: boolean;
+};
+
+export type SurveyLockAudienceGateDetailsStatePatch = {
+  lockAudienceGateDetailsByQuestion: Record<string, string>;
+};
+
+export type SurveyLockAudienceMenuStatePatch = {
+  lockAudienceMenuByQuestion: Record<string, true>;
+  lockAudienceGateDetailsByQuestion: Record<string, unknown> | undefined;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -590,6 +632,103 @@ export const toggleShowJsonState = (
 ): SurveyShowJsonStatePatch => ({
   showJson: !prevState.showJson,
 });
+
+export const buildAutoDecryptToggleState = (
+  prevState: { autoDecryptEnabled?: unknown } = {}
+): SurveyAutoDecryptToggleStatePatch => ({
+  autoDecryptEnabled: !prevState.autoDecryptEnabled,
+});
+
+export const buildDisplayAnswerModeToggleState = (
+  prevState: { displayAnswerMode?: unknown } = {}
+): SurveyDisplayAnswerModeToggleStatePatch => {
+  const displayAnswerMode = !prevState.displayAnswerMode;
+  return {
+    displayAnswerMode,
+    isEditing: displayAnswerMode,
+  };
+};
+
+export const buildQuestionsJsonToggleState = (
+  prevState: { showQuestionsJson?: unknown } = {}
+): SurveyQuestionsJsonToggleStatePatch => ({
+  showQuestionsJson: !prevState.showQuestionsJson,
+});
+
+export const buildResponseJsonToggleState = (
+  prevState: { showResponseJson?: unknown } = {}
+): SurveyResponseJsonToggleStatePatch => ({
+  showResponseJson: !prevState.showResponseJson,
+});
+
+export const buildSurveyJsonToggleState = (
+  prevState: { showSurveyJson?: unknown } = {}
+): SurveySurveyJsonToggleStatePatch => ({
+  showSurveyJson: !prevState.showSurveyJson,
+});
+
+export const buildCommentsToggleState = (
+  prevState: { showComments?: Record<string, unknown> } = {},
+  questionId: unknown,
+  defaultOpen: unknown = false
+): SurveyCommentsToggleStatePatch => {
+  const key = String(questionId);
+  const current = typeof prevState?.showComments?.[key] === 'boolean'
+    ? prevState.showComments[key]
+    : !!defaultOpen;
+  return {
+    showComments: {
+      ...prevState.showComments,
+      [key]: !current,
+    },
+  };
+};
+
+export const buildGateSbtNameRevisionState = (
+  prevState: { gateSbtNameRevision?: unknown } = {}
+): SurveyGateSbtNameRevisionStatePatch => ({
+  gateSbtNameRevision: Number(prevState.gateSbtNameRevision || 0) + 1,
+});
+
+export const buildLockedGateDetailsExpandedState = (
+  prevState: { lockedGateDetailsExpanded?: unknown } = {}
+): SurveyLockedGateDetailsExpandedStatePatch => ({
+  lockedGateDetailsExpanded: !prevState.lockedGateDetailsExpanded,
+});
+
+export const buildLockAudienceGateDetailsState = (
+  prevState: { lockAudienceGateDetailsByQuestion?: Record<string, unknown> } = {},
+  key: unknown,
+  forceOpen: unknown = null,
+  normalizedGateId = '',
+  normalizeGateLabelText: (value: unknown) => string = (value) => String(value || '')
+): SurveyLockAudienceGateDetailsStatePatch => {
+  const stateKey = String(key || '');
+  const current = normalizeGateLabelText(prevState.lockAudienceGateDetailsByQuestion?.[stateKey] || '');
+  const nextValue = typeof forceOpen === 'string'
+    ? (current === normalizedGateId ? '' : normalizedGateId)
+    : (forceOpen ? current : '');
+  return {
+    lockAudienceGateDetailsByQuestion: nextValue ? { [stateKey]: nextValue } : {},
+  };
+};
+
+export const buildLockAudienceMenuState = (
+  prevState: {
+    lockAudienceMenuByQuestion?: Record<string, unknown>;
+    lockAudienceGateDetailsByQuestion?: Record<string, unknown>;
+  } = {},
+  key: unknown,
+  forceOpen: unknown = null
+): SurveyLockAudienceMenuStatePatch => {
+  const stateKey = String(key || '');
+  const current = !!prevState.lockAudienceMenuByQuestion?.[stateKey];
+  const nextValue = forceOpen === null ? !current : !!forceOpen;
+  return {
+    lockAudienceMenuByQuestion: nextValue ? { [stateKey]: true } : {},
+    lockAudienceGateDetailsByQuestion: nextValue ? prevState.lockAudienceGateDetailsByQuestion : {},
+  };
+};
 
 export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
   isDecrypting: true,
