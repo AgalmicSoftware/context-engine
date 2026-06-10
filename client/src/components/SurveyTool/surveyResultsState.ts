@@ -27,14 +27,20 @@ export const preserveSurveyResultsFilterStateValue = (
 );
 
 /**
- * State updates accepted by the survey results reducer: either a (possibly
- * partial) patch object cast to the state type, or a class-style updater fn.
- * Both shapes merge over the previous state, matching the legacy
- * `this.setState` shallow-merge semantics the builders were written against.
+ * State updates accepted by the survey results reducer: a (possibly partial)
+ * patch object, or a class-style updater fn returning one. Both shapes merge
+ * shallowly over the previous state, matching the legacy `this.setState`
+ * semantics the builders were written against — including builder patches
+ * passed without the asSurveyResultsStatePatch cast (class setState accepted
+ * Pick-style partials and index-signature records natively).
  */
+export type SurveyResultsStatePatch =
+  | Partial<SurveyResultsState>
+  | Record<string, unknown>;
+
 export type SurveyResultsStateUpdate =
-  | SurveyResultsState
-  | ((prevState: Readonly<SurveyResultsState>) => SurveyResultsState);
+  | SurveyResultsStatePatch
+  | ((prevState: Readonly<SurveyResultsState>) => SurveyResultsStatePatch);
 
 export const surveyResultsReducer = (
   prevState: SurveyResultsState,
