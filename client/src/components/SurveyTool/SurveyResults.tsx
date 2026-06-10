@@ -72,6 +72,7 @@ import {
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
+  buildSurveyResultsCommittedFilterStatePatch,
   buildSurveyResultsCsvFileNamePatch,
   buildSurveyResultsDemoAtlasOpenPatch,
   buildSurveyResultsDemoAtlasNodePatch,
@@ -83,6 +84,7 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsFilteredResponsesPatchPlan,
   buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
@@ -91,6 +93,7 @@ import {
   buildSurveyResultsNetworkLatestBlockPatch,
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
+  buildSurveyResultsQuestionFilterPatch,
   buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyIdPropChangePatch,
@@ -1548,10 +1551,10 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
     ));
     if (!filterStateChanged && !patchChanged) return;
     this.setState(
-      asSurveyResultsStatePatch({
-        ...patch,
+      asSurveyResultsStatePatch(buildSurveyResultsCommittedFilterStatePatch({
         filterState: normalizedFilterState,
-      }),
+        statePatch: patch,
+      })),
       () => this.notifyFilterStateCommitted(this.state.filterState)
     );
   }
@@ -3788,52 +3791,21 @@ handleQuestionFilter = (
     this.props.onCountUpdate(finalFilteredQCount);
   }
 
-  const statePatch: SurveyResultsRecord = {
-    filteredQuestionsCount: finalFilteredQCount,
-  };
-
-  if (!isSurveyIndividuals) {
-    const sourceMap = isSurveyAggregate
-      ? toSurveyResultsRecord(this.state.aggregateQuestionResponses)
-      : toSurveyResultsRecord(this.state.aggregatorQuestionResponses);
-    const allowedIds = new Set<string>(
-      filteredQuestions.map((q) => String(q?.id || '').toLowerCase())
-    );
-    const nextFilteredAggregator: SurveyResultsRecord = {};
-
-    Object.keys(sourceMap).forEach((qId) => {
-      if (!allowedIds.has(String(qId || '').toLowerCase())) return;
-      if (
-        filteredResponsesByQuestion &&
-        Object.prototype.hasOwnProperty.call(filteredResponsesByQuestion, qId)
-      ) {
-        const arr = filteredResponsesByQuestion[qId] || [];
-        if (Array.isArray(arr) && arr.length > 0) {
-          nextFilteredAggregator[qId] = arr;
-        }
-        return;
-      }
-      nextFilteredAggregator[qId] = sourceMap[qId];
-    });
-
-    statePatch.sbtFilteredAggregatorQuestionResponses = nextFilteredAggregator;
-    if (isSurveyAggregate) {
-      const responders = new Set<string>();
-      Object.values(nextFilteredAggregator).forEach((rows) => {
-        if (Array.isArray(rows)) {
-          rows.forEach((row: SurveyResultsRecord) => {
-            const responder = row?.responder;
-            if (typeof responder === 'string' && responder) responders.add(responder.toLowerCase());
-          });
-        }
-      });
-      statePatch.filteredResponsesCount = Math.min(responders.size, this.state.totalResponsesCount);
-    } else {
-      const networkQuestions = this.getNetworkQuestionsForCurrentContext();
-      const totalR = countQuestionModeResponses(nextFilteredAggregator, networkQuestions);
-      statePatch.filteredResponsesCount = Math.min(totalR, this.state.totalResponsesCount);
-    }
-  }
+  const sourceMap = isSurveyAggregate
+    ? this.state.aggregateQuestionResponses
+    : this.state.aggregatorQuestionResponses;
+  const networkQuestions = isSurveyIndividuals || isSurveyAggregate
+    ? {}
+    : this.getNetworkQuestionsForCurrentContext();
+  const statePatch = buildSurveyResultsQuestionFilterPatch({
+    filteredQuestions,
+    filteredResponsesByQuestion,
+    isSurveyAggregate,
+    isSurveyIndividuals,
+    networkQuestions,
+    sourceMap,
+    totalResponsesCount: this.state.totalResponsesCount,
+  });
 
   this.commitResultsFilterState(statePatch, newFilterState);
 };
@@ -3894,77 +3866,37 @@ handleFilteredResponses = (
       })
       : preserveSurveyResultsFilterStateValue(this.state.filterState);
 
-  if (this.state.viewMode === 'survey') {
-    if (this.state.surveyViewMode === 'individuals') {
-      if (Array.isArray(filteredResponses)) {
-        this.commitResultsFilterState(
-          {
-            sbtFilteredResponses: filteredResponses,
-            filteredResponsesCount: filteredResponses.length,
-          },
-          nextFilterState
-        );
-      } else {
-        surveyLog.error('Expected an array in survey mode (individuals), got:', filteredResponses);
-        this.commitResultsFilterState(
-          { sbtFilteredResponses: [], filteredResponsesCount: 0 },
-          nextFilterState
-        );
-      }
-    } else {
-      // survey aggregate
-      if (filteredResponses && typeof filteredResponses === 'object') {
-        // 🔒 prune zero-response questions to avoid reintroducing empty keys
-        const pruned: SurveyResultsRecord = {};
-        Object.entries(toSurveyResultsRecord(filteredResponses)).forEach(([k, arr]) => {
-          if (Array.isArray(arr) && arr.length > 0) pruned[k] = arr;
-        });
+  const filteredResponsesPatchPlan = buildSurveyResultsFilteredResponsesPatchPlan({
+    filteredResponses,
+    networkQuestions: (
+      this.state.viewMode !== 'survey' &&
+      filteredResponses &&
+      typeof filteredResponses === 'object'
+    )
+      ? this.getNetworkQuestionsForCurrentContext()
+      : {},
+    surveyViewMode: this.state.surveyViewMode,
+    totalResponsesCount: this.state.totalResponsesCount,
+    viewMode: this.state.viewMode,
+  });
 
-        const responders = new Set<string>();
-        Object.values(pruned).forEach((rows) => {
-          if (Array.isArray(rows)) {
-            rows.forEach((row: SurveyResultsRecord) => {
-              const responder = row?.responder;
-              if (typeof responder === 'string' && responder) responders.add(responder.toLowerCase());
-            });
-          }
-        });
-        const finalRCount = Math.min(responders.size, this.state.totalResponsesCount);
-
-        this.commitResultsFilterState(
-          {
-            sbtFilteredAggregatorQuestionResponses: pruned,
-            filteredResponsesCount: finalRCount,
-          },
-          nextFilterState
-        );
-      } else {
-        surveyLog.error('Expected aggregator object in aggregator mode, got:', filteredResponses);
-      }
-    }
-  } else {
-    // questions mode
-    if (filteredResponses && typeof filteredResponses === 'object') {
-      // 🔒 prune zero-response questions here as well
-      const pruned: SurveyResultsRecord = {};
-      Object.entries(toSurveyResultsRecord(filteredResponses)).forEach(([k, arr]) => {
-        if (Array.isArray(arr) && arr.length > 0) pruned[k] = arr;
-      });
-
-      const networkQuestions = this.getNetworkQuestionsForCurrentContext();
-      const totalR = countQuestionModeResponses(pruned, networkQuestions);
-      const finalRCount = totalR > this.state.totalResponsesCount ? this.state.totalResponsesCount : totalR;
-
-      this.commitResultsFilterState(
-        {
-          sbtFilteredAggregatorQuestionResponses: pruned,
-          filteredResponsesCount: finalRCount,
-        },
-        nextFilterState
-      );
+  if (filteredResponsesPatchPlan.status === 'invalid-array') {
+    surveyLog.error('Expected an array in survey mode (individuals), got:', filteredResponses);
+  } else if (filteredResponsesPatchPlan.status === 'invalid-aggregator') {
+    if (this.state.viewMode === 'survey') {
+      surveyLog.error('Expected aggregator object in aggregator mode, got:', filteredResponses);
     } else {
       surveyLog.error('Expected aggregator object for question mode, got:', filteredResponses);
     }
+  }
+
+  if (filteredResponsesPatchPlan.patch) {
+    this.commitResultsFilterState(
+      filteredResponsesPatchPlan.patch,
+      nextFilterState
+    );
+  } else {
+    return;
   }
 };
 
