@@ -16,6 +16,30 @@ type BuildSurveyResultsQuestionFilterCountPatchArgs = {
   props?: unknown;
   state?: unknown;
 };
+type BuildSurveyResultsCommittedFilterStatePatchArgs = {
+  filterState?: unknown;
+  statePatch?: unknown;
+};
+type BuildSurveyResultsQuestionFilterPatchArgs = {
+  filteredQuestions?: unknown;
+  filteredResponsesByQuestion?: unknown;
+  isSurveyAggregate?: unknown;
+  isSurveyIndividuals?: unknown;
+  networkQuestions?: unknown;
+  sourceMap?: unknown;
+  totalResponsesCount?: unknown;
+};
+type BuildSurveyResultsFilteredResponsesPatchArgs = {
+  filteredResponses?: unknown;
+  networkQuestions?: unknown;
+  surveyViewMode?: unknown;
+  totalResponsesCount?: unknown;
+  viewMode?: unknown;
+};
+export type SurveyResultsFilteredResponsesPatchPlan = {
+  patch: UnknownRecord | null;
+  status: 'apply' | 'invalid-aggregator' | 'invalid-array';
+};
 type BuildSurveyResultsLocalStoragePollPatchArgs = {
   cachedQuestionsCount?: unknown;
   cachedSurveyResponsesCount?: unknown;
@@ -233,6 +257,148 @@ export const buildSurveyResultsQuestionFilterCountPatch = ({
 
   if (count === stateRecord.filteredQuestionsCount) return null;
   return buildSurveyResultsFilteredQuestionsCountPatch(count);
+};
+
+const toSurveyResultsHelperRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : {}
+);
+
+const pruneSurveyResultsResponseAggregator = (value: unknown): UnknownRecord => {
+  const pruned: UnknownRecord = {};
+  Object.entries(toSurveyResultsHelperRecord(value)).forEach(([key, rows]) => {
+    if (Array.isArray(rows) && rows.length > 0) pruned[key] = rows;
+  });
+  return pruned;
+};
+
+const countSurveyResultsDistinctResponders = (aggregator: unknown): number => {
+  const responders = new Set<string>();
+  Object.values(toSurveyResultsHelperRecord(aggregator)).forEach((rows) => {
+    if (!Array.isArray(rows)) return;
+    rows.forEach((row) => {
+      const responder = toSurveyResultsHelperRecord(row).responder;
+      if (typeof responder === 'string' && responder) responders.add(responder.toLowerCase());
+    });
+  });
+  return responders.size;
+};
+
+export const buildSurveyResultsCommittedFilterStatePatch = ({
+  filterState = {},
+  statePatch = {},
+}: BuildSurveyResultsCommittedFilterStatePatchArgs = {}): UnknownRecord => ({
+  ...toSurveyResultsHelperRecord(statePatch),
+  filterState,
+});
+
+export const buildSurveyResultsQuestionFilterPatch = ({
+  filteredQuestions = [],
+  filteredResponsesByQuestion = null,
+  isSurveyAggregate = false,
+  isSurveyIndividuals = false,
+  networkQuestions = {},
+  sourceMap = {},
+  totalResponsesCount = 0,
+}: BuildSurveyResultsQuestionFilterPatchArgs = {}): UnknownRecord => {
+  const questionList = Array.isArray(filteredQuestions) ? filteredQuestions : [];
+  const finalFilteredQCount = questionList.length;
+  const statePatch: UnknownRecord = {
+    filteredQuestionsCount: finalFilteredQCount,
+  };
+
+  if (isSurveyIndividuals) return statePatch;
+
+  const sourceRecord = toSurveyResultsHelperRecord(sourceMap);
+  const filteredResponseRecord = toSurveyResultsHelperRecord(filteredResponsesByQuestion);
+  const allowedIds = new Set<string>(
+    questionList.map((question) => (
+      String(toSurveyResultsHelperRecord(question).id || '').toLowerCase()
+    ))
+  );
+  const nextFilteredAggregator: UnknownRecord = {};
+
+  Object.keys(sourceRecord).forEach((questionId) => {
+    if (!allowedIds.has(String(questionId || '').toLowerCase())) return;
+    if (filteredResponsesByQuestion && Object.prototype.hasOwnProperty.call(filteredResponseRecord, questionId)) {
+      const rows = filteredResponseRecord[questionId] || [];
+      if (Array.isArray(rows) && rows.length > 0) nextFilteredAggregator[questionId] = rows;
+      return;
+    }
+    nextFilteredAggregator[questionId] = sourceRecord[questionId];
+  });
+
+  statePatch.sbtFilteredAggregatorQuestionResponses = nextFilteredAggregator;
+  const maxResponseCount = Number(totalResponsesCount) || 0;
+  if (isSurveyAggregate) {
+    statePatch.filteredResponsesCount = Math.min(
+      countSurveyResultsDistinctResponders(nextFilteredAggregator),
+      maxResponseCount
+    );
+  } else {
+    statePatch.filteredResponsesCount = Math.min(
+      countQuestionModeResponses(
+        nextFilteredAggregator,
+        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
+      ),
+      maxResponseCount
+    );
+  }
+  return statePatch;
+};
+
+export const buildSurveyResultsFilteredResponsesPatchPlan = ({
+  filteredResponses = null,
+  networkQuestions = {},
+  surveyViewMode = '',
+  totalResponsesCount = 0,
+  viewMode = '',
+}: BuildSurveyResultsFilteredResponsesPatchArgs = {}): SurveyResultsFilteredResponsesPatchPlan => {
+  const isSurveyMode = viewMode === 'survey';
+  const isSurveyIndividuals = isSurveyMode && surveyViewMode === 'individuals';
+  if (isSurveyIndividuals) {
+    if (!Array.isArray(filteredResponses)) {
+      return {
+        patch: { sbtFilteredResponses: [], filteredResponsesCount: 0 },
+        status: 'invalid-array',
+      };
+    }
+    return {
+      patch: {
+        sbtFilteredResponses: filteredResponses,
+        filteredResponsesCount: filteredResponses.length,
+      },
+      status: 'apply',
+    };
+  }
+
+  if (!filteredResponses || typeof filteredResponses !== 'object') {
+    return {
+      patch: null,
+      status: 'invalid-aggregator',
+    };
+  }
+
+  const pruned = pruneSurveyResultsResponseAggregator(filteredResponses);
+  const maxResponseCount = Number(totalResponsesCount) || 0;
+  const filteredResponsesCount = isSurveyMode
+    ? Math.min(countSurveyResultsDistinctResponders(pruned), maxResponseCount)
+    : Math.min(
+      countQuestionModeResponses(
+        pruned,
+        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
+      ),
+      maxResponseCount
+    );
+
+  return {
+    patch: {
+      sbtFilteredAggregatorQuestionResponses: pruned,
+      filteredResponsesCount,
+    },
+    status: 'apply',
+  };
 };
 
 export const buildSurveyResultsEmptySurveyModePatch = () => ({

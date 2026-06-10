@@ -4,6 +4,7 @@ import {
   buildSurveyResultsBookmarkedQuestionIdsPatch,
   buildSurveyResultsBookmarkedSurveyIdsPatch,
   buildSurveyResultsBooleanTogglePatch,
+  buildSurveyResultsCommittedFilterStatePatch,
   buildSurveyResultsCsvFileNamePatch,
   buildSurveyResultsDemoAtlasOpenPatch,
   buildSurveyResultsDemoAtlasNodePatch,
@@ -15,6 +16,7 @@ import {
   buildSurveyResultsFilterLoadingUpdate,
   buildSurveyResultsFilteredQuestionModeHydratedPatch,
   buildSurveyResultsFilteredQuestionsCountPatch,
+  buildSurveyResultsFilteredResponsesPatchPlan,
   buildSurveyResultsIndividualResponseAggregator,
   buildSurveyResultsKeyedTogglePatch,
   buildSurveyResultsLockedResponsesDecryptCompletePatch,
@@ -24,6 +26,7 @@ import {
   buildSurveyResultsQuestionIdSortPatch,
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterQuestions,
+  buildSurveyResultsQuestionFilterPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
@@ -493,6 +496,157 @@ describe('surveyResultsHelpers state patches', () => {
     })).toEqual({
       questionIdSortBy: 'responses',
       questionIdSortAsc: true,
+    });
+  });
+
+  it('builds committed filter and question-filter state patches', () => {
+    expect(buildSurveyResultsCommittedFilterStatePatch({
+      filterState: { questionTypes: ['binary'] },
+      statePatch: { filteredQuestionsCount: 2 },
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      filterState: { questionTypes: ['binary'] },
+    });
+    expect(buildSurveyResultsCommittedFilterStatePatch({
+      filterState: { questionTypes: ['rating'] },
+      statePatch: null,
+    })).toEqual({
+      filterState: { questionTypes: ['rating'] },
+    });
+
+    const sourceMap = {
+      q1: [{ responder: '0x1', response: { answer: { value: 'source' } } }],
+      q2: [{ responder: '0x2', response: { answer: { value: 'source' } } }],
+      q3: [{ responder: '0x3', response: { answer: { value: 'omitted' } } }],
+    };
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'Q1' }, { id: 'q2' }],
+      filteredResponsesByQuestion: {
+        q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
+        q2: [],
+      },
+      networkQuestions: {
+        q1: { type: 'freeform' },
+        q2: { type: 'freeform' },
+      },
+      sourceMap,
+      totalResponsesCount: 5,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [{ responder: '0x4', response: { answer: { value: 'filtered' } } }],
+      },
+      filteredResponsesCount: 1,
+    });
+
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+      isSurveyAggregate: true,
+      sourceMap: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [{ responder: '0xBBB' }],
+      },
+      totalResponsesCount: 1,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+      sbtFilteredAggregatorQuestionResponses: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [{ responder: '0xBBB' }],
+      },
+      filteredResponsesCount: 1,
+    });
+
+    expect(buildSurveyResultsQuestionFilterPatch({
+      filteredQuestions: [{ id: 'q1' }, { id: 'q2' }],
+      isSurveyIndividuals: true,
+      sourceMap,
+      totalResponsesCount: 5,
+    })).toEqual({
+      filteredQuestionsCount: 2,
+    });
+  });
+
+  it('builds filtered response patch plans by view mode', () => {
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: [{ responder: '0x1' }],
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredResponses: [{ responder: '0x1' }],
+        filteredResponsesCount: 1,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: null,
+      surveyViewMode: 'individuals',
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredResponses: [],
+        filteredResponsesCount: 0,
+      },
+      status: 'invalid-array',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: {
+        q1: [
+          { responder: '0xAAA' },
+          { responder: '0xaaa' },
+        ],
+        q2: [],
+        q3: [{ responder: '0xBBB' }],
+      },
+      surveyViewMode: 'aggregate',
+      totalResponsesCount: 5,
+      viewMode: 'survey',
+    })).toEqual({
+      patch: {
+        sbtFilteredAggregatorQuestionResponses: {
+          q1: [
+            { responder: '0xAAA' },
+            { responder: '0xaaa' },
+          ],
+          q3: [{ responder: '0xBBB' }],
+        },
+        filteredResponsesCount: 2,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: {
+        q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
+        q2: [],
+      },
+      networkQuestions: { q1: { type: 'freeform' } },
+      totalResponsesCount: 1,
+      viewMode: 'questions',
+    })).toEqual({
+      patch: {
+        sbtFilteredAggregatorQuestionResponses: {
+          q1: [{ responder: '0x1', response: { answer: { value: 'Yes' } } }],
+        },
+        filteredResponsesCount: 1,
+      },
+      status: 'apply',
+    });
+
+    expect(buildSurveyResultsFilteredResponsesPatchPlan({
+      filteredResponses: 'invalid',
+      viewMode: 'questions',
+    })).toEqual({
+      patch: null,
+      status: 'invalid-aggregator',
     });
   });
 
