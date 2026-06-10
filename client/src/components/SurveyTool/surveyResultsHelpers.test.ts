@@ -27,6 +27,7 @@ import {
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterQuestions,
   buildSurveyResultsQuestionFilterPatch,
+  buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsRefreshTargetBlocksPatch,
   buildSurveyResultsRefreshStatusWritePlan,
@@ -512,6 +513,16 @@ describe('surveyResultsHelpers state patches', () => {
       statePatch: null,
     })).toEqual({
       filterState: { questionTypes: ['rating'] },
+    });
+    expect(buildSurveyResultsQuestionScopeResetPatch()).toEqual({
+      questionResponses: {},
+      aggregatorQuestionResponses: {},
+      sbtFilteredAggregatorQuestionResponses: {},
+      totalQuestionsCount: 0,
+      totalResponsesCount: 0,
+      filteredResponsesCount: 0,
+      filteredQuestionsCount: 0,
+      questionResultsHydrated: false,
     });
 
     const sourceMap = {
