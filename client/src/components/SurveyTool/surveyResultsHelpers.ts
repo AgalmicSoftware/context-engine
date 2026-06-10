@@ -259,6 +259,17 @@ export const buildSurveyResultsQuestionFilterCountPatch = ({
   return buildSurveyResultsFilteredQuestionsCountPatch(count);
 };
 
+export const buildSurveyResultsQuestionScopeResetPatch = () => ({
+  questionResponses: {},
+  aggregatorQuestionResponses: {},
+  sbtFilteredAggregatorQuestionResponses: {},
+  totalQuestionsCount: 0,
+  totalResponsesCount: 0,
+  filteredResponsesCount: 0,
+  filteredQuestionsCount: 0,
+  questionResultsHydrated: false,
+});
+
 const toSurveyResultsHelperRecord = (value: unknown): UnknownRecord => (
   value && typeof value === 'object' && !Array.isArray(value)
     ? value as UnknownRecord

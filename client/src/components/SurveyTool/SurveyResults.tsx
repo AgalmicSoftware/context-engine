@@ -95,6 +95,7 @@ import {
   buildSurveyResultsQuestionFilterCountPatch,
   buildSurveyResultsQuestionFilterPatch,
   buildSurveyResultsQuestionFilterQuestions,
+  buildSurveyResultsQuestionScopeResetPatch,
   buildSurveyResultsRefreshStatusSequencePlan,
   buildSurveyResultsSurveyIdPropChangePatch,
   buildSurveyResultsSurveyIdStateChangePatch,
@@ -1385,16 +1386,7 @@ class SurveyResults extends Component<SurveyResultsProps, SurveyResultsState> {
   }
 
   buildQuestionResultsScopeResetPatch(): SurveyResultsRecord {
-    return {
-      questionResponses: {},
-      aggregatorQuestionResponses: {},
-      sbtFilteredAggregatorQuestionResponses: {},
-      totalQuestionsCount: 0,
-      totalResponsesCount: 0,
-      filteredResponsesCount: 0,
-      filteredQuestionsCount: 0,
-      questionResultsHydrated: false,
-    };
+    return buildSurveyResultsQuestionScopeResetPatch();
   }
 
   buildQuestionReadScopeSignature({
