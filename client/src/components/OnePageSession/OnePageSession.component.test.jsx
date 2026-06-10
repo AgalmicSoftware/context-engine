@@ -14,6 +14,7 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { __test__resetTelegramSessionMetaCache } from '../../utilities/session/telegramSessionMeta.js';
 import { __test__workerAuthTokenCache } from '../../utilities/worker/workerAuth.js';
 
 const mockSurveyPage = jest.fn();
@@ -159,6 +160,7 @@ jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
 
 describe('OnePageSession view gating', () => {
   afterEach(() => {
+    __test__resetTelegramSessionMetaCache();
     jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -218,6 +220,39 @@ describe('OnePageSession view gating', () => {
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) => (
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`
   );
+
+  const seedTelegramStoredCredentials = ({
+    address = '0x00000000000000000000000000000000000000aa',
+    exp = Math.floor(Date.now() / 1000) + 3600,
+  } = {}) => {
+    window.localStorage.setItem(
+      __test__workerAuthTokenCache.buildTelegramWorkerLoginKey({ slug: 'edge' }),
+      JSON.stringify({
+        v: 1,
+        sessionSlug: 'edge',
+        workerUrl: 'https://session-worker.example',
+        agentBridgeUrl: 'https://bridge.example',
+        agentToken: `ceagt_${'G'.repeat(32)}`,
+        address,
+        updatedAt: Date.now(),
+      })
+    );
+    window.localStorage.setItem(
+      __test__workerAuthTokenCache.buildTokenCacheKey({
+        workerUrl: 'https://session-worker.example',
+        slug: 'edge',
+        address,
+      }),
+      JSON.stringify(__test__workerAuthTokenCache.buildTokenCacheEnvelope({
+        token: 'worker-jwt-cached',
+        exp,
+        workerUrl: 'https://session-worker.example',
+        sessionSlug: 'edge',
+        address,
+      }))
+    );
+    return { address, exp };
+  };
 
   it('renders only one SurveyPage instance when switching from pile to full view', async () => {
     render(<OnePageSession {...buildProps()} />);
@@ -310,6 +345,242 @@ describe('OnePageSession view gating', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-session-telegram-token-login')).not.toBeInTheDocument();
+  });
+
+  it('shows the token gate when session-meta reports telegram-only without the config flag', async () => {
+    const fetchMock = jest.fn(async (url) => {
+      if (String(url).includes('/telegram/agent/api/session-meta')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: 'edge',
+            telegramOnly: true,
+            telegramBridgeEnabled: true,
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${String(url)}`);
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-token-login')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
+      /Telegram-only session/i
+    );
+  });
+
+  it('ignores query-param bridge overrides when probing session-meta', async () => {
+    const sessionMetaUrls = [];
+    const fetchMock = jest.fn(async (url) => {
+      const urlString = String(url);
+      if (urlString.includes('/telegram/agent/api/session-meta')) {
+        sessionMetaUrls.push(urlString);
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: 'edge',
+            telegramOnly: true,
+            telegramBridgeEnabled: true,
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${urlString}`);
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/edge?bridge=https://attacker.example');
+
+      render(<OnePageSession
+        {...buildProps()}
+        sessionConfig={{
+          ...buildProps().sessionConfig,
+          agentBridgeUrl: 'https://bridge.example',
+        }}
+      />);
+
+      await waitFor(() => {
+        expect(sessionMetaUrls.length).toBeGreaterThan(0);
+      });
+      expect(sessionMetaUrls.every((url) => url.startsWith('https://bridge.example'))).toBe(true);
+      expect(sessionMetaUrls.some((url) => url.includes('attacker.example'))).toBe(false);
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
+  it('keeps the token gate hidden when session-meta reports not telegram-only', async () => {
+    const fetchMock = jest.fn(async (url) => {
+      if (String(url).includes('/telegram/agent/api/session-meta')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            sessionSlug: 'edge',
+            telegramOnly: false,
+            telegramBridgeEnabled: true,
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${String(url)}`);
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://bridge.example/telegram/agent/api/session-meta?sessionSlug=edge'
+      );
+    });
+    expect(screen.queryByTestId('ce-session-telegram-token-login')).toBeNull();
+  });
+
+  it('shows refresh results button after telegram login and triggers a re-fetch', async () => {
+    seedTelegramStoredCredentials();
+    const refreshSpy = jest.fn(() => Promise.resolve());
+
+    render(<OnePageSession
+      {...buildProps()}
+      refreshQuestionResponses={refreshSpy}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
+
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(refreshSpy).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ slug: 'edge', forceFull: true })
+      );
+    });
+  });
+
+  it('recovers when refresh results fails', async () => {
+    seedTelegramStoredCredentials();
+    const refreshSpy = jest.fn(() => Promise.reject(new Error('scan failed')));
+
+    render(<OnePageSession
+      {...buildProps()}
+      refreshQuestionResponses={refreshSpy}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
+
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(refreshSpy).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ slug: 'edge', forceFull: true })
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-session-results-refresh')).not.toBeDisabled();
+    });
+  });
+
+  it('reopens token entry with a clear message when the telegram token expired', async () => {
+    const fetchMock = jest.fn(async (url) => {
+      if (String(url).includes('/client-login/exchange')) {
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({
+            ok: false,
+            reason: 'agent_token_not_found',
+            action: 'refresh_user_agent_token',
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch: ${String(url)}`);
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    fireEvent.change(await screen.findByTestId('ce-session-telegram-token-input'), {
+      target: { value: `ceagt_${'A'.repeat(32)}` },
+    });
+    fireEvent.click(screen.getByTestId('ce-session-telegram-token-submit'));
+
+    expect(await screen.findByText(/token expired or was revoked/i)).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-telegram-token-input')).toBeInTheDocument();
+  });
+
+  it('lets a logged-in user open the change-token form', async () => {
+    seedTelegramStoredCredentials();
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const changeToken = await screen.findByTestId('ce-session-telegram-change-token');
+
+    fireEvent.click(changeToken);
+
+    expect(screen.getByTestId('ce-session-telegram-token-input')).toBeInTheDocument();
   });
 
   it('treats expired in-memory Telegram client auth as logged out', () => {

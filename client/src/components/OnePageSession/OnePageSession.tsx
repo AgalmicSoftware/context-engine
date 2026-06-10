@@ -14,6 +14,7 @@ import {
   faArrowLeft,
   faExpand,
   faPlus,
+  faSyncAlt,
 } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
@@ -46,6 +47,10 @@ import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { CE_TELEGRAM_AGENT_BRIDGE_URL } from '../../variables/appConfig.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
+import {
+  fetchTelegramSessionMeta,
+  isTelegramOnlySessionConfig,
+} from '../../utilities/session/telegramSessionMeta.js';
 import {
   exchangeTelegramSessionToken,
   extractTelegramSessionToken,
@@ -98,25 +103,17 @@ const getErrorMessage = (error: any, fallback = 'Unknown error') => (
     ? error.message
     : fallback
 );
+const TELEGRAM_TOKEN_EXPIRED_OR_REVOKED_MESSAGE = 'Your Telegram token expired or was revoked. Paste a fresh one from the Telegram bot (Onboard Agent → Copy New Agent Info).';
+const isTelegramAgentTokenRefreshError = (error: any) => {
+  const message = String(error?.message || '');
+  return message.includes('agent_token_not_found') || message.includes('refresh_user_agent_token');
+};
 
 const resolveAutoFeatureBySessionSlug = (metadata: any) => (
   metadata?.autoFeatureSBTsBySessionSlug !== undefined
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags
 );
-
-const isTelegramOnlySessionConfig = (metadata: unknown) => {
-  const config = toUnknownRecord(metadata);
-  const telegramConfig = toUnknownRecord(config.telegram);
-  return (
-    config.telegramOnly === true ||
-    config.telegram_only === true ||
-    config.sessionMode === 'telegram_only' ||
-    config.telegramMode === 'telegram_only' ||
-    telegramConfig.only === true ||
-    telegramConfig.mode === 'telegram_only'
-  );
-};
 
 const TELEGRAM_LOGIN_QUERY_PARAMS = [
   'telegramToken',
@@ -156,6 +153,19 @@ const resolveTelegramAgentBridgeUrl = (sessionConfig: any = {}) => {
     const globalUrl = normalizeAgentBridgeUrl((globalThis as any).CE_TELEGRAM_AGENT_BRIDGE_URL);
     if (globalUrl) return globalUrl;
   }
+  return normalizeAgentBridgeUrl(
+    config.agentBridgeWorkerUrl ||
+    config.telegramAgentBridgeUrl ||
+    config.agentBridgeUrl ||
+    telegram.agentBridgeUrl ||
+    telegram.worker ||
+    CE_TELEGRAM_AGENT_BRIDGE_URL
+  );
+};
+
+const resolveTrustedTelegramAgentBridgeUrl = (sessionConfig: any = {}) => {
+  const config = toUnknownRecord(sessionConfig);
+  const telegram = toUnknownRecord(config.telegram);
   return normalizeAgentBridgeUrl(
     config.agentBridgeWorkerUrl ||
     config.telegramAgentBridgeUrl ||
@@ -355,6 +365,9 @@ class OnePageSession extends Component<any, any> {
       telegramLoginStatus: 'idle',
       telegramLoginError: '',
       telegramClientAuth: null,
+      telegramOnlyProbe: null,
+      showTelegramTokenReentry: false,
+      resultsRefreshing: false,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -395,6 +408,10 @@ class OnePageSession extends Component<any, any> {
     this._autoMintCountdownTimer = null;
     this._autoMintParseCachedTargets = [];
     this._autoOpenResultsTimer = null;
+    this._telegramMetaProbeSeq = 0;
+    this._telegramOnlyProbeKey = '';
+    this._telegramMetaProbeStartedKey = '';
+    this._unmounted = false;
     this.originalURL = '';
 
     // refs
@@ -452,6 +469,8 @@ class OnePageSession extends Component<any, any> {
     this.handleTelegramLoginSubmit = this.handleTelegramLoginSubmit.bind(this);
     this.tryTelegramTokenLogin = this.tryTelegramTokenLogin.bind(this);
     this.restoreTelegramClientAuthFromStorage = this.restoreTelegramClientAuthFromStorage.bind(this);
+    this.probeTelegramSessionMeta = this.probeTelegramSessionMeta.bind(this);
+    this.handleRefreshResultsClick = this.handleRefreshResultsClick.bind(this);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -485,6 +504,13 @@ class OnePageSession extends Component<any, any> {
     });
   }
 
+  currentTelegramProbeKey(sessionConfig: any = this.resolveCurrentSessionConfig()) {
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    if (!sessionSlug) return '';
+    const trustedBridgeUrl = resolveTrustedTelegramAgentBridgeUrl(sessionConfig);
+    return `${trustedBridgeUrl}|${sessionSlug}`;
+  }
+
   hasTelegramClientAuth(sessionSlug: any = '') {
     const auth = this.state.telegramClientAuth || {};
     const slug = normalizeOnePageSessionSlug(sessionSlug || this.resolveCurrentSessionSlug());
@@ -496,6 +522,42 @@ class OnePageSession extends Component<any, any> {
       if (expiresAtMs <= Date.now() + skewMs) return false;
     }
     return Boolean(auth.accountAddress && auth.workerToken && (!slug || !authSlug || slug === authSlug));
+  }
+
+  isTelegramOnlySession(sessionConfig: any = {}) {
+    if (isTelegramOnlySessionConfig(sessionConfig)) return true;
+    const currentProbeKey = this.currentTelegramProbeKey(sessionConfig);
+    return (
+      this.state.telegramOnlyProbe === true &&
+      currentProbeKey &&
+      this._telegramOnlyProbeKey === currentProbeKey
+    );
+  }
+
+  async probeTelegramSessionMeta() {
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
+    if (!sessionSlug || isTelegramOnlySessionConfig(sessionConfig)) return null;
+    const trustedBridgeUrl = resolveTrustedTelegramAgentBridgeUrl(sessionConfig);
+    const probeKey = `${trustedBridgeUrl}|${sessionSlug}`;
+
+    const probeSeq = this._telegramMetaProbeSeq + 1;
+    this._telegramMetaProbeSeq = probeSeq;
+    this._telegramMetaProbeStartedKey = probeKey;
+    const meta = await fetchTelegramSessionMeta({
+      sessionSlug,
+      agentBridgeUrl: trustedBridgeUrl,
+    });
+    if (probeSeq !== this._telegramMetaProbeSeq) return null;
+
+    const telegramOnlyProbe = meta?.telegramOnly === true;
+    this._telegramOnlyProbeKey = probeKey;
+    this.setState({ telegramOnlyProbe }, () => {
+      if (telegramOnlyProbe && !this.hasTelegramClientAuth(sessionSlug)) {
+        this.restoreTelegramClientAuthFromStorage();
+      }
+    });
+    return meta;
   }
 
   handleTelegramLoginInputChange(event: any) {
@@ -535,13 +597,16 @@ class OnePageSession extends Component<any, any> {
           exp: login.exp,
           buckets: login.buckets || null,
         },
+        showTelegramTokenReentry: false,
       });
       removeTelegramLoginInputFromUrl();
       return login;
     } catch (error: any) {
       this.setState({
         telegramLoginStatus: 'error',
-        telegramLoginError: getErrorMessage(error, 'Telegram login failed.'),
+        telegramLoginError: isTelegramAgentTokenRefreshError(error)
+          ? TELEGRAM_TOKEN_EXPIRED_OR_REVOKED_MESSAGE
+          : getErrorMessage(error, 'Telegram login failed.'),
       });
       return null;
     }
@@ -551,7 +616,7 @@ class OnePageSession extends Component<any, any> {
     const sessionSlug = this.resolveCurrentSessionSlug();
     if (!sessionSlug) return null;
     const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
-    if (!isTelegramOnlySessionConfig(sessionConfig)) return null;
+    if (!this.isTelegramOnlySession(sessionConfig)) return null;
 
     const cachedLogin = readTelegramWorkerLogin({ slug: sessionSlug });
     if (cachedLogin?.token) {
@@ -595,8 +660,15 @@ class OnePageSession extends Component<any, any> {
         },
       });
       return login;
-    } catch (_) {
-      this.setState({ telegramLoginStatus: 'idle' });
+    } catch (error: any) {
+      if (isTelegramAgentTokenRefreshError(error)) {
+        this.setState({
+          telegramLoginStatus: 'error',
+          telegramLoginError: TELEGRAM_TOKEN_EXPIRED_OR_REVOKED_MESSAGE,
+        });
+      } else {
+        this.setState({ telegramLoginStatus: 'idle' });
+      }
       return null;
     }
   }
@@ -604,6 +676,68 @@ class OnePageSession extends Component<any, any> {
   handleTelegramLoginSubmit(event: any) {
     if (event && typeof event.preventDefault === 'function') event.preventDefault();
     this.tryTelegramTokenLogin();
+  }
+
+  async handleRefreshResultsClick(event: any) {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (this.state.resultsRefreshing) return;
+    this.setState({ resultsRefreshing: true });
+    try {
+      // Future auto-poll/SSE live-results would hook in here; manual refresh is intentional for now.
+      await this.props.refreshQuestionResponses?.(null, {
+        slug: this.resolveCurrentSessionSlug(),
+        forceFull: true,
+      });
+    } catch (error) {
+      demoLog.warn('OnePageSession: refresh results failed', error);
+    } finally {
+      if (!this._unmounted) this.setState({ resultsRefreshing: false });
+    }
+  }
+
+  renderTelegramTokenForm() {
+    return (
+      <form
+        className={styles.telegramTokenLoginForm}
+        onSubmit={this.handleTelegramLoginSubmit}
+        data-testid="ce-session-telegram-token-login"
+      >
+        <label className={styles.telegramTokenLoginLabel} htmlFor="ce-session-telegram-token-input">
+          Telegram bot token
+        </label>
+        <textarea
+          id="ce-session-telegram-token-input"
+          className={styles.telegramTokenLoginInput}
+          value={this.state.telegramLoginInput}
+          onChange={this.handleTelegramLoginInputChange}
+          placeholder="Paste the token or the full copied bot message"
+          rows={4}
+          autoComplete="off"
+          data-testid="ce-session-telegram-token-input"
+        />
+        {this.state.telegramLoginError ? (
+          <div className={styles.telegramTokenLoginError} role="alert">
+            {this.state.telegramLoginError}
+          </div>
+        ) : null}
+        <button
+          type="submit"
+          className={styles.telegramTokenLoginButton}
+          disabled={this.state.telegramLoginStatus === 'loading'}
+          data-testid="ce-session-telegram-token-submit"
+        >
+          {this.state.telegramLoginStatus === 'loading' ? (
+            <>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              <span>Logging in...</span>
+            </>
+          ) : (
+            <span>Log in with Telegram Token</span>
+          )}
+        </button>
+      </form>
+    );
   }
 
 
@@ -665,11 +799,16 @@ class OnePageSession extends Component<any, any> {
     } else {
       this.restoreTelegramClientAuthFromStorage();
     }
+    this.probeTelegramSessionMeta();
   }
 
 
 
   componentWillUnmount() {
+    this._unmounted = true;
+    this._telegramMetaProbeSeq += 1;
+    this._telegramOnlyProbeKey = '';
+    this._telegramMetaProbeStartedKey = '';
     if (this._autoOpenResultsTimer) {
       clearTimeout(this._autoOpenResultsTimer);
       this._autoOpenResultsTimer = null;
@@ -804,6 +943,25 @@ class OnePageSession extends Component<any, any> {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
     const slugChanged = prevSlug !== nextSlug;
+    if (slugChanged) {
+      this._telegramMetaProbeSeq += 1;
+      this._telegramOnlyProbeKey = '';
+      this._telegramMetaProbeStartedKey = '';
+      this.setState({
+        telegramOnlyProbe: null,
+        showTelegramTokenReentry: false,
+      });
+    }
+    const currentSessionConfig = this.resolveCurrentSessionConfig();
+    const currentProbeKey = this.currentTelegramProbeKey(currentSessionConfig);
+    if (
+      currentProbeKey &&
+      !isTelegramOnlySessionConfig(currentSessionConfig) &&
+      currentProbeKey !== this._telegramOnlyProbeKey &&
+      currentProbeKey !== this._telegramMetaProbeStartedKey
+    ) {
+      this.probeTelegramSessionMeta();
+    }
     const prevRouteUiState = resolveOnePageSessionRouteUiState(prevProps);
     const nextRouteUiState = resolveOnePageSessionRouteUiState(this.props);
     const routeUiPatch: Record<string, any> = {};
@@ -2361,7 +2519,7 @@ class OnePageSession extends Component<any, any> {
       styles.titleContainer,
       pileSubmitRailActive ? styles.titleContainerWithPileSubmitRail : '',
     ].filter(Boolean).join(' ');
-    const telegramOnlySession = isTelegramOnlySessionConfig(resolvedSessionConfig);
+    const telegramOnlySession = this.isTelegramOnlySession(resolvedSessionConfig);
     const telegramClientLoggedIn = telegramOnlySession && this.hasTelegramClientAuth(effectiveSlug);
     const telegramClientAuth = telegramClientLoggedIn ? (this.state.telegramClientAuth || {}) : {};
     const effectiveAccount = telegramClientAuth.accountAddress || this.props.account;
@@ -2382,48 +2540,10 @@ class OnePageSession extends Component<any, any> {
             >
               <strong>Telegram-only session</strong>
               <span>
-                Paste the token copied from the Telegram bot to open the interactive report.
+                Paste the agent token from the Context Engine Telegram bot (Onboard Agent → Copy New Agent Info) to open the interactive report.
               </span>
             </Alert>
-            <form
-              className={styles.telegramTokenLoginForm}
-              onSubmit={this.handleTelegramLoginSubmit}
-              data-testid="ce-session-telegram-token-login"
-            >
-              <label className={styles.telegramTokenLoginLabel} htmlFor="ce-session-telegram-token-input">
-                Telegram bot token
-              </label>
-              <textarea
-                id="ce-session-telegram-token-input"
-                className={styles.telegramTokenLoginInput}
-                value={this.state.telegramLoginInput}
-                onChange={this.handleTelegramLoginInputChange}
-                placeholder="Paste the token or the full copied bot message"
-                rows={4}
-                autoComplete="off"
-                data-testid="ce-session-telegram-token-input"
-              />
-              {this.state.telegramLoginError ? (
-                <div className={styles.telegramTokenLoginError} role="alert">
-                  {this.state.telegramLoginError}
-                </div>
-              ) : null}
-              <button
-                type="submit"
-                className={styles.telegramTokenLoginButton}
-                disabled={this.state.telegramLoginStatus === 'loading'}
-                data-testid="ce-session-telegram-token-submit"
-              >
-                {this.state.telegramLoginStatus === 'loading' ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin />
-                    <span>Logging in...</span>
-                  </>
-                ) : (
-                  <span>Log in with Telegram Token</span>
-                )}
-              </button>
-            </form>
+            {this.renderTelegramTokenForm()}
           </div>
         </div>
       );
@@ -2596,6 +2716,25 @@ class OnePageSession extends Component<any, any> {
                 </Alert>
               );
             })}
+          </div>
+        )}
+
+        {telegramOnlySession && telegramClientLoggedIn && (
+          <div className={styles.telegramTokenConnectedPanel}>
+            <div className={styles.telegramTokenConnectedBar}>
+              <span>Telegram session connected</span>
+              <button
+                type="button"
+                className={styles.telegramTokenChangeButton}
+                data-testid="ce-session-telegram-change-token"
+                onClick={() => this.setState((prevState: any) => ({
+                  showTelegramTokenReentry: !prevState.showTelegramTokenReentry,
+                }))}
+              >
+                Change token
+              </button>
+            </div>
+            {this.state.showTelegramTokenReentry ? this.renderTelegramTokenForm() : null}
           </div>
         )}
 
@@ -2957,6 +3096,22 @@ class OnePageSession extends Component<any, any> {
                         </button>
                       );
                     })}
+                    {telegramOnlySession && telegramClientLoggedIn && (
+                      <button
+                        type="button"
+                        onClick={this.handleRefreshResultsClick}
+                        className={styles.sectionHeaderActionButton}
+                        data-testid="ce-session-results-refresh"
+                        disabled={this.state.resultsRefreshing}
+                      >
+                        {this.state.resultsRefreshing ? (
+                          <FontAwesomeIcon icon={faSpinner} spin />
+                        ) : (
+                          <FontAwesomeIcon icon={faSyncAlt} />
+                        )}
+                        Refresh results
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={(e: any) => {

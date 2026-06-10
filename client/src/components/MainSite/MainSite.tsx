@@ -93,6 +93,7 @@ import {
   type SessionResponseHydrationHost,
 } from '../../utilities/survey/sessionResponseHydrationController.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
+import { isTelegramOnlySessionConfig } from '../../utilities/session/telegramSessionMeta.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   initCacheManager,
@@ -397,12 +398,6 @@ const SurveyPage = SurveyPageRaw as unknown as MainSiteRouteComponent;
 const SurveyTool = SurveyToolRaw as unknown as MainSiteRouteComponent;
 const TagPage = TagPageRaw as unknown as MainSiteRouteComponent;
 const UserPage = UserPageRaw as unknown as MainSiteRouteComponent;
-
-const isTelegramOnlySessionConfig = (cfg: MainSiteSessionConfigLike | null | undefined): boolean => {
-  if (!cfg || typeof cfg !== 'object') return false;
-  const mode = String(cfg.sessionMode || '').trim().toLowerCase();
-  return cfg.telegramOnly === true || mode === 'telegram_only';
-};
 
 const normalizeProfileAddress = (value: unknown): string => {
   const normalized = String(value || '').trim();

@@ -127,6 +127,35 @@
   font-weight: 600;
 }
 
+.telegramTokenConnectedPanel {
+  margin: 0 0 12px;
+}
+
+.telegramTokenConnectedBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(23, 32, 51, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
+
+.telegramTokenChangeButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #184fb8;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;
