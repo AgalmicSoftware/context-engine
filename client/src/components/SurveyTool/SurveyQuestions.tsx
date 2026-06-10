@@ -523,6 +523,10 @@ import {
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
   buildShowJsonState,
+  buildSingleQuestionPlaceholderHydrationState,
+  buildSingleQuestionPoolFallbackState,
+  buildSingleQuestionReadyHydrationState,
+  buildSingleQuestionRetryLoadingState,
   buildSubmitPreparationErrorState,
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
@@ -5134,7 +5138,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
         return;
       }
-      safeSetState({ isLoadingResponse: false, questionPool: [] });
+      safeSetState(buildSingleQuestionPoolFallbackState());
       return;
     }
 
@@ -5163,28 +5167,20 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         existingQuestionData: qData || recentPayloadForAccount || null,
       });
       if (placeholderQuestion) {
-        safeSetState((prev) => ({
-          questionPool: [placeholderQuestion],
-          surveysResponseState: this.mergeSurveyResponseState(
-            prev.surveysResponseState ||
-              [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-            [placeholderQuestion],
-            0
-          ),
-          isLoadingResponse: false,
-          noResponse: false,
-          responseLookupWarning: '',
+        safeSetState((prev) => buildSingleQuestionPlaceholderHydrationState(prev, {
+          mergeSurveyResponseState: this.mergeSurveyResponseState,
+          placeholderQuestion,
         }));
         return;
       }
       if (didScheduleRetry) {
-        safeSetState({ isLoadingResponse: true });
+        safeSetState(buildSingleQuestionRetryLoadingState());
         return;
       }
       if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
         return;
       }
-      safeSetState({ isLoadingResponse: false, questionPool: [] });
+      safeSetState(buildSingleQuestionPoolFallbackState());
       return;
     }
 
@@ -5204,14 +5200,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     // Build pool and merge state before fetching responses
     if (isStaleRun()) return;
     this.setResponseHydrationState(
-      (prev) => ({
-        questionPool: [{ ...qData, id: qData.id }],
-        surveysResponseState: this.mergeSurveyResponseState(
-          prev.surveysResponseState ||
-            [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-          [{ ...qData, id: qData.id }],
-          0
-        ),
+      (prev) => buildSingleQuestionReadyHydrationState(prev, {
+        mergeSurveyResponseState: this.mergeSurveyResponseState,
+        questionData: qData,
       }),
       async () => {
         if (isStaleRun()) return;
