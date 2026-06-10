@@ -472,6 +472,14 @@ export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./Crea
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
 export const createPileViewRuntimeStrategy = () => ({
+  componentDidMount: (engine) => engine.runPileComponentDidMount(),
+
+  componentDidUpdate: (engine, prevProps, prevState) => (
+    engine.runPileComponentDidUpdate(prevProps, prevState)
+  ),
+
+  componentWillUnmount: (engine) => engine.runPileComponentWillUnmount(),
+
   getCurrentRenderedQuestionIds: (engine) => {
     const pileQuestions = Array.isArray(engine.state?.pileQuestions) ? engine.state.pileQuestions : [];
     const activePileIndex = Number(engine.state?.activePileIndex || 0);
@@ -1153,7 +1161,7 @@ export class PileViewMode extends SurveyQuestions {
     }, Math.max(0, Number(delayMs) || 0));
   };
 
-  componentDidMount() {
+  runPileComponentDidMount = () => {
     this._isMounted = true;
     this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
     this.loadAndSortQuestions();
@@ -1169,10 +1177,10 @@ export class PileViewMode extends SurveyQuestions {
         this.setState(buildPileShowLongLoadingPatch(true));
       }
     }, 10000);
-  }
+  };
 
 
-  componentDidUpdate(prevProps, prevState) {
+  runPileComponentDidUpdate = (prevProps, prevState) => {
     const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
       this.invalidateDiffCaches();
@@ -1320,10 +1328,10 @@ export class PileViewMode extends SurveyQuestions {
 
     this.maybeRecoverUnhydratedGatedPile();
     this.syncLoadingElapsedTimer();
-  }
+  };
 
 
-  componentWillUnmount() {
+  runPileComponentWillUnmount = () => {
     try {
       if (typeof this.props.onPileSubmitRailVisibilityChange === 'function') {
         this.props.onPileSubmitRailVisibilityChange(false);
@@ -1354,8 +1362,8 @@ export class PileViewMode extends SurveyQuestions {
     this._currentPileQuestionsSignature = '0:0';
     this._currentPileQuestionsSignatureListRef = null;
     this._questionListSignatureCache = new WeakMap();
-    super.componentWillUnmount();
-  }
+    this.runDefaultComponentWillUnmount();
+  };
 
   handleViewAllFromPile = () => {
     if (this._persistTimer) {
