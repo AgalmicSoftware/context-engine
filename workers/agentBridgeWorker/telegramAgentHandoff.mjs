@@ -407,6 +407,33 @@ function jsonResultViewCache(request, env, data, init = {}) {
   });
 }
 
+function sessionMetaCorsHeaders(request, env = {}) {
+  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
+  if (!origin) return {};
+  const allowed = clientLoginAllowedOrigins(env);
+  if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
+    return null;
+  }
+  return {
+    'access-control-allow-origin': origin,
+    'access-control-allow-methods': 'GET, OPTIONS',
+    'access-control-allow-headers': 'content-type',
+    'access-control-max-age': '600',
+    vary: 'Origin',
+  };
+}
+
+function jsonSessionMeta(request, env, data, init = {}) {
+  const cors = sessionMetaCorsHeaders(request, env);
+  return json(data, {
+    ...init,
+    headers: {
+      ...(cors || {}),
+      ...(init.headers || {}),
+    },
+  });
+}
+
 function jsonClientLogin(request, env, data, init = {}) {
   const cors = clientLoginCorsHeaders(request, env);
   return json(data, {
@@ -2614,6 +2641,36 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
     }, { status: context.status || 400 });
   }
   return handleResultViewCacheRequest({ env, context, input, request });
+}
+
+async function handleSessionMetaHttpRequest({ request, env = {} } = {}) {
+  const cors = sessionMetaCorsHeaders(request, env);
+  if (cors === null) {
+    return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
+  }
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors || {} });
+  }
+  if (request.method !== 'GET') {
+    return jsonSessionMeta(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const url = new URL(request.url);
+  const sessionSlug = sanitizeSessionSlug(url.searchParams.get('sessionSlug'));
+  if (!sessionSlug) {
+    return jsonSessionMeta(request, env, { ok: false, reason: 'session_slug_required' }, { status: 400 });
+  }
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  const payload = {
+    ok: true,
+    sessionSlug,
+    telegramOnly: resolved.ok === true && resolved.session.telegramOnly === true,
+    telegramBridgeEnabled: resolved.ok === true && resolved.session.telegramBridgeEnabled === true,
+  };
+  assertNoSecretShape(payload, 'Telegram session-meta response must not serialize secrets.');
+  return jsonSessionMeta(request, env, payload, {
+    headers: { 'cache-control': 'public, max-age=60' },
+  });
 }
 
 async function buildAdminMetricsSnapshot({
@@ -5156,6 +5213,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (url.pathname === '/telegram/agent/api/result-view-cache') {
     return handleResultViewCacheHttpRequest({ request, env });
+  }
+  if (url.pathname === '/telegram/agent/api/session-meta') {
+    return handleSessionMetaHttpRequest({ request, env });
   }
   if (url.pathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
     const payload = await skillVersionPayloadWithFlag(env);
