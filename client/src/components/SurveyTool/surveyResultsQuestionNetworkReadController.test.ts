@@ -245,6 +245,57 @@ describe('surveyResultsQuestionNetworkReadController', () => {
     expect(result.result.questionResponsesLatestBlock).toBe(0);
   });
 
+  it('does not leak responses for questions outside the scoped question bucket', () => {
+    const readQuestionBucket = jest.fn(() => ({
+      questionsLatestBlock: 17,
+      questionResponsesLatestBlock: 18,
+      questions: {
+        q1: {
+          id: 'q1',
+          prompt: 'Scoped prompt',
+          sessionSlug: 'edge',
+          sessionSlugExplicit: true,
+        },
+        q2: {
+          id: 'q2',
+          prompt: 'Out of scope prompt',
+          sessionSlug: 'other',
+          sessionSlugExplicit: true,
+        },
+      },
+      questionResponses: {
+        q1: {
+          '0xAAA': { answer: { value: 'kept' } },
+        },
+        q2: {
+          '0xBBB': { answer: { value: 'dropped' } },
+        },
+      },
+    }));
+
+    const result = runSurveyResultsQuestionNetworkReadController({
+      netIdStr: 84532,
+      questionReadSlugs: ['edge'],
+      ports: {
+        readQuestionBucket,
+      },
+      requireAuthoritativeBinding: true,
+      viewMode: 'questions',
+    });
+
+    expect(result.result.questions).toEqual({
+      q1: expect.objectContaining({
+        prompt: 'Scoped prompt',
+        sessionSlug: 'edge',
+      }),
+    });
+    expect(result.result.questionResponses).toEqual({
+      q1: {
+        '0xAAA': { answer: { value: 'kept' } },
+      },
+    });
+  });
+
   it('uses the async read port only when the injected peek port misses', async () => {
     const peekBucket = {
       questionsLatestBlock: 20,
