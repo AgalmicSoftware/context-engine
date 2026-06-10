@@ -132,6 +132,7 @@ export type TelegramAgentResultsResult = {
   status?: number;
   reason?: string;
   views?: {
+    polis: TelegramAgentResultViewState;
     consensus: TelegramAgentResultViewState;
     difference: TelegramAgentResultViewState;
     groups: TelegramAgentResultViewState;
@@ -199,7 +200,50 @@ const normalizeTopicMap = (body: UnknownRecord): UnknownRecord => {
   };
 };
 
-const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{ key: 'consensus' | 'difference' | 'groups' | 'topicMap'; view: string }> = [
+// Transforms the worker's pseudonymized per-participant binary vectors into the
+// aggregator shape PolisReport consumes: { [qId]: [{ responder, questionId,
+// response }] } with `response` as the JSON string the report's matrix builder
+// parses ({ type:'binary', prompt, answer:{ value } }).
+const POLIS_BINARY_VALUES = new Set(['Agree', 'Disagree', 'Unsure']);
+
+const normalizePolisDataset = (body: UnknownRecord): UnknownRecord => {
+  const promptByQuestionId = new Map<string, string>();
+  (Array.isArray(body.questions) ? body.questions : []).forEach((question) => {
+    const record = toRecord(question);
+    const questionId = toStr(record.questionId);
+    const prompt = toStr(record.prompt);
+    if (questionId && prompt) promptByQuestionId.set(questionId, prompt);
+  });
+  const aggregator: Record<string, Array<{ responder: string; questionId: string; response: string }>> = {};
+  Object.entries(toRecord(body.responses)).forEach(([questionId, rows]) => {
+    const prompt = promptByQuestionId.get(questionId);
+    if (!prompt) return;
+    const normalizedRows = (Array.isArray(rows) ? rows : [])
+      .map((row) => {
+        const record = toRecord(row);
+        const responder = toStr(record.responder);
+        const value = toStr(record.value);
+        if (!responder || !POLIS_BINARY_VALUES.has(value)) return null;
+        return {
+          responder,
+          questionId,
+          response: JSON.stringify({ type: 'binary', prompt, answer: { value } }),
+        };
+      })
+      .filter(Boolean) as Array<{ responder: string; questionId: string; response: string }>;
+    if (normalizedRows.length > 0) aggregator[questionId] = normalizedRows;
+  });
+  return {
+    participantCount: toNum(body.participantCount),
+    questionCount: toNum(body.questionCount),
+    responseCount: toNum(body.responseCount),
+    aggregator,
+    hasData: Object.keys(aggregator).length > 0,
+  };
+};
+
+const TELEGRAM_RESULT_VIEW_REQUESTS: Array<{ key: 'consensus' | 'difference' | 'groups' | 'topicMap' | 'polis'; view: string }> = [
+  { key: 'polis', view: 'polis' },
   { key: 'consensus', view: 'consensus' },
   { key: 'difference', view: 'difference' },
   { key: 'groups', view: 'groups' },
@@ -231,6 +275,7 @@ export const fetchTelegramAgentResults = async ({
       });
       const body = toRecord(await response.json().catch(() => ({})));
       if (response.ok && body.ok === true) {
+        if (key === 'polis') return { status: 'ready', data: normalizePolisDataset(body) };
         if (key === 'groups') return { status: 'ready', data: normalizeGroups(body) };
         if (key === 'topicMap') return { status: 'ready', data: normalizeTopicMap(body) };
         return { status: 'ready', data: normalizeAggregateRows(body) };
@@ -247,10 +292,10 @@ export const fetchTelegramAgentResults = async ({
       return { status: 'error', reason: 'telegram_results_network_error' };
     }
   };
-  const [consensus, difference, groups, topicMap] = await Promise.all(
+  const [polis, consensus, difference, groups, topicMap] = await Promise.all(
     TELEGRAM_RESULT_VIEW_REQUESTS.map(fetchView)
   );
-  return { ok: true, views: { consensus, difference, groups, topicMap } };
+  return { ok: true, views: { polis, consensus, difference, groups, topicMap } };
 };
 
 export type TelegramBucketCard = {

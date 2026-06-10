@@ -1484,6 +1484,121 @@ test('Telegram session-meta validates slug and CORS preflight', async () => {
   assert.equal(arbitraryOrigin.telegramOnly, true);
 });
 
+test('Telegram polis results view returns pseudonymized binary vectors', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        resultsExposure: { anonymizedGroupsEnabled: true },
+      }],
+    }),
+  });
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'polis-submit-1',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-binary',
+      status: 'direct_submitted',
+      createdAt: '2026-12-01T10:00:00.000Z',
+      answer: { questionType: 'binary', label: 'Agree', value: 'Agree' },
+    },
+  });
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'polis-submit-2',
+      sessionSlug: 'alpha',
+      telegramUserId: '77',
+      questionId: 'q-binary',
+      status: 'direct_submitted',
+      createdAt: '2026-12-01T11:00:00.000Z',
+      answer: { questionType: 'binary', label: 'Disagree', value: 'Disagree' },
+    },
+  });
+  // Re-answer by the same participant: only the latest vote counts.
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'polis-submit-3',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-binary',
+      status: 'direct_submitted',
+      createdAt: '2026-12-01T12:00:00.000Z',
+      answer: { questionType: 'binary', label: 'Unsure', value: 'Unsure' },
+    },
+  });
+  // Freeform answers never enter the polis dataset.
+  await persistTelegramSubmitRecord({
+    env,
+    record: {
+      requestId: 'polis-submit-4',
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+      questionId: 'q-freeform',
+      status: 'direct_submitted',
+      createdAt: '2026-12-01T12:30:00.000Z',
+      answer: { questionType: 'freeform', text: 'private thoughts' },
+    },
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=polis'),
+    env,
+  });
+  const body = await jsonBody(response);
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.view, 'polis');
+  assert.equal(body.participantCount, 2);
+  assert.equal(body.questionCount, 1);
+  assert.equal(body.questions[0].questionId, 'q-binary');
+  assert.equal(body.questions[0].questionType, 'binary');
+  assert.match(body.questions[0].prompt, /fund this proposal/i);
+  const rows = body.responses['q-binary'];
+  assert.equal(rows.length, 2);
+  const values = rows.map((row) => `${row.responder}:${row.value}`).sort();
+  assert.deepEqual(values, ['P1:Unsure', 'P2:Disagree']);
+  const serialized = JSON.stringify(body);
+  assert.equal(serialized.includes('"42"'), false);
+  assert.equal(serialized.includes('"77"'), false);
+  assert.equal(serialized.includes('telegramUserId'), false);
+  assert.equal(serialized.includes('private thoughts'), false);
+
+  const gatedEnv = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        telegramOnly: true,
+        telegramGroupOpenAccess: true,
+        managedAccountSubmitAllowed: true,
+        resultsExposure: { anonymizedGroupsEnabled: false },
+      }],
+    }),
+  });
+  const gatedResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=polis'),
+    env: gatedEnv,
+  });
+  assert.equal(gatedResponse.status, 403);
+  assert.equal((await jsonBody(gatedResponse)).reason, 'anonymized_groups_admin_disabled');
+});
+
 test('Telegram browser-read CORS covers questions and results GET routes', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
@@ -2444,7 +2559,7 @@ test('Telegram agent result views enforce exposure gates and supported view list
   const unknownBody = await jsonBody(unknown);
   assert.equal(unknown.status, 400);
   assert.equal(unknownBody.reason, 'unsupported_results_view');
-  assert.deepEqual(unknownBody.supportedViews, ['topic-map', 'consensus', 'difference', 'groups']);
+  assert.deepEqual(unknownBody.supportedViews, ['topic-map', 'consensus', 'difference', 'groups', 'polis']);
 
   const unsupportedImage = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/results-image?sessionSlug=alpha&telegramUserId=42&view=difference'),

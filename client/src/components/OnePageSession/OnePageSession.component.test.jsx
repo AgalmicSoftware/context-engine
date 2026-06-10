@@ -678,6 +678,57 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByText('Join or Create')).not.toBeInTheDocument();
   });
 
+  it('renders the real polis report when the worker exposes response vectors', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock({
+      resultsByView: {
+        polis: () => ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            participantCount: 2,
+            questionCount: 1,
+            responseCount: 2,
+            questions: [{ questionId: 'q-binary', prompt: 'Fund the proposal?', questionType: 'binary' }],
+            responses: {
+              'q-binary': [
+                { responder: 'P1', value: 'Agree' },
+                { responder: 'P2', value: 'Disagree' },
+              ],
+            },
+          }),
+        }),
+      },
+    }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(mockPolisReport).toHaveBeenCalledWith(expect.objectContaining({
+        questionResponses: expect.objectContaining({
+          'q-binary': expect.arrayContaining([
+            expect.objectContaining({ responder: 'P1', questionId: 'q-binary' }),
+          ]),
+        }),
+      }));
+    });
+    // The real report replaces the aggregate card sections.
+    expect(screen.queryByText('Agree on funding?')).not.toBeInTheDocument();
+  });
+
   it('shows per-view disabled state in telegram results', async () => {
     seedTelegramStoredCredentials();
     installFetchMock(buildTelegramAgentFetchMock({

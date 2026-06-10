@@ -3898,7 +3898,7 @@ function normalizeAgentResultsView(value = '') {
   return view;
 }
 
-const AGENT_RESULTS_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'difference', 'groups'];
+const AGENT_RESULTS_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'difference', 'groups', 'polis'];
 const AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'groups'];
 
 function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
@@ -3984,6 +3984,71 @@ async function loadAgentResultsDataset({
     sourceQuestions,
     sourceRecords,
     demo,
+  };
+}
+
+// Pseudonymized per-participant binary vectors so the web client can render the
+// full PolisReport (clusters need vectors, not the aggregate counts the other
+// views return). Same exposure gate as the participant graph: this reveals the
+// identical granularity, just shaped for the client-side polis math.
+const AGENT_POLIS_BINARY_LABELS = new Set(['Agree', 'Disagree', 'Unsure']);
+
+function buildAgentPolisDataset({
+  sessionSlug = '',
+  sourceRecords = [],
+  sourceQuestions = [],
+  demo = false,
+} = {}) {
+  const binaryQuestions = consensusQuestionsForResults(sourceQuestions);
+  const binaryQuestionIds = new Set(
+    binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
+  );
+  const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter((record) => (
+    binaryQuestionIds.has(safeString(record.questionId)) &&
+    AGENT_POLIS_BINARY_LABELS.has(safeString(record.label)) &&
+    safeString(record.telegramUserId)
+  ));
+  // Latest answer per participant+question wins (records arrive createdAt-sorted).
+  const latestByParticipantQuestion = new Map();
+  for (const record of records) {
+    latestByParticipantQuestion.set(
+      `${safeString(record.telegramUserId)}|${safeString(record.questionId)}`,
+      record
+    );
+  }
+  const latestRecords = Array.from(latestByParticipantQuestion.values());
+  const participants = Array.from(new Set(latestRecords.map((record) => safeString(record.telegramUserId))));
+  const aliasById = new Map(participants.map((id, index) => [id, `P${index + 1}`]));
+  const responses = {};
+  for (const record of latestRecords) {
+    const questionIdValue = safeString(record.questionId);
+    if (!responses[questionIdValue]) responses[questionIdValue] = [];
+    responses[questionIdValue].push({
+      responder: aliasById.get(safeString(record.telegramUserId)),
+      value: safeString(record.label),
+    });
+  }
+  const questions = binaryQuestions
+    .map((question) => ({
+      questionId: safeString(question.questionId || question.id),
+      prompt: safeString(question.questionText || question.prompt || question.title),
+      questionType: 'binary',
+    }))
+    .filter((question) => question.questionId && question.prompt && responses[question.questionId]);
+  const answeredQuestionIds = new Set(questions.map((question) => question.questionId));
+  Object.keys(responses).forEach((questionIdValue) => {
+    if (!answeredQuestionIds.has(questionIdValue)) delete responses[questionIdValue];
+  });
+  return {
+    ok: true,
+    sessionSlug: safeString(sessionSlug),
+    view: 'polis',
+    demo: demo === true,
+    participantCount: participants.length,
+    questionCount: questions.length,
+    responseCount: latestRecords.length,
+    questions,
+    responses,
   };
 }
 
@@ -4115,6 +4180,17 @@ async function handleResultsRequest({
       questions: rows,
     };
     assertNoSecretShape(body, 'Telegram agent aggregate results response must not serialize secrets.');
+    return json(body, { status: 200 });
+  }
+  if (view === 'polis') {
+    if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {
+      const body = { ok: false, reason: 'anonymized_groups_admin_disabled' };
+      assertNoSecretShape(body, 'Telegram agent polis gate response must not serialize secrets.');
+      return json(body, { status: 403 });
+    }
+    const loaded = await loadAgentResultsDataset({ env, context, input });
+    const body = buildAgentPolisDataset(loaded);
+    assertNoSecretShape(body, 'Telegram agent polis dataset response must not serialize secrets.');
     return json(body, { status: 200 });
   }
   if (!demo && !anonymizedGroupsEnabledForAgent(context.session)) {

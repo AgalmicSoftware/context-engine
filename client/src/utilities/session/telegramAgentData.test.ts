@@ -126,13 +126,53 @@ describe('telegramAgentData', () => {
 
     const result = await fetchTelegramAgentResults({ sessionSlug: 'edge', fetchImpl: fetchImpl as never });
     expect(result.ok).toBe(true);
-    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
     expect(result.views?.consensus.status).toBe('ready');
     expect((result.views?.consensus.data as any).questions[0].prompt).toBe('Agree?');
     expect(result.views?.difference).toEqual({ status: 'disabled', reason: 'level_3_aggregate_results_admin_disabled' });
     expect(result.views?.groups.status).toBe('ready');
     expect((result.views?.groups.data as any).groups[0].label).toBe('Group A');
     expect((result.views?.topicMap.data as any).available).toBe(false);
+  });
+
+  it('normalizes the polis view into a PolisReport aggregator', async () => {
+    const fetchImpl = jest.fn(async (urlIn: string) => {
+      const view = new URL(String(urlIn)).searchParams.get('view');
+      if (view === 'polis') {
+        return okJson({
+          ok: true,
+          participantCount: 2,
+          questionCount: 1,
+          responseCount: 2,
+          questions: [{ questionId: 'q1', prompt: 'Fund it?', questionType: 'binary' }],
+          responses: {
+            q1: [
+              { responder: 'P1', value: 'Agree' },
+              { responder: 'P2', value: 'Banana' },
+            ],
+            'q-unknown': [{ responder: 'P1', value: 'Agree' }],
+          },
+        });
+      }
+      return errJson(403, { ok: false, reason: 'level_3_aggregate_results_admin_disabled' });
+    });
+
+    const result = await fetchTelegramAgentResults({ sessionSlug: 'edge', fetchImpl: fetchImpl as never });
+    const polis = result.views?.polis;
+    expect(polis?.status).toBe('ready');
+    const data = polis?.data as any;
+    expect(data.hasData).toBe(true);
+    expect(data.participantCount).toBe(2);
+    // Invalid values and unknown question ids are dropped.
+    expect(Object.keys(data.aggregator)).toEqual(['q1']);
+    expect(data.aggregator.q1).toHaveLength(1);
+    const row = data.aggregator.q1[0];
+    expect(row).toMatchObject({ responder: 'P1', questionId: 'q1' });
+    expect(JSON.parse(row.response)).toEqual({
+      type: 'binary',
+      prompt: 'Fund it?',
+      answer: { value: 'Agree' },
+    });
   });
 
   it('marks expired-token result views as auth failures', async () => {

@@ -379,6 +379,7 @@ class OnePageSession extends Component<any, any> {
       telegramAgentAnswerState: null,
       telegramAgentResultsStatus: 'idle',
       telegramAgentResults: null,
+      telegramPolisNonce: 0,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -774,10 +775,12 @@ class OnePageSession extends Component<any, any> {
       this.setState({ telegramAgentResultsStatus: 'error' });
       return null;
     }
-    this.setState({
+    this.setState((prevState: any) => ({
       telegramAgentResultsStatus: 'ready',
       telegramAgentResults: result.views,
-    });
+      // New nonce per load so PolisReport re-keys its analysis cache on refresh.
+      telegramPolisNonce: Number(prevState.telegramPolisNonce || 0) + 1,
+    }));
     return result;
   }
 
@@ -948,6 +951,42 @@ class OnePageSession extends Component<any, any> {
   renderTelegramResultsPanel() {
     const status = this.state.telegramAgentResultsStatus;
     const views: any = this.state.telegramAgentResults || null;
+    const polisData: any = views?.polis?.status === 'ready' ? (views.polis.data || null) : null;
+    if (polisData?.hasData) {
+      // Render the real PolisReport from worker vectors so telegram sessions get
+      // the same report UI as on-chain sessions (clusters, beeswarm, analysis).
+      const auth: any = this.state.telegramClientAuth || {};
+      return (
+        <div data-testid="ce-session-telegram-results">
+          <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+            <PolisReport
+              onePageDemo={true}
+              miniMode={true}
+              account={auth.accountAddress || this.props.account}
+              provider={this.props.provider}
+              network={this.props.network}
+              loginComplete={true}
+              questionResponses={polisData.aggregator}
+              disclaimersActive={this.state.disclaimersActive}
+              filterState={this.state.filterState}
+              sessionName={this.props.sessionName}
+              sessionHeader={this.props.sessionHeader}
+              sessionInfo={this.props.sessionInfo}
+              defaultTags={this.props.defaultTags}
+              isQuestionCacheReady={true}
+              isResponsesCacheReady={true}
+              questionScanProgress={null}
+              questionResponsesNonce={this.state.telegramPolisNonce}
+              sessionSlug={this.resolveCurrentSessionSlug()}
+              demoDataBySlug={null}
+              contracts={this.props.contracts || {}}
+              blockLimits={this.props.blockLimits || { start: null, end: null }}
+              networkChainId={this.props.networkChainId}
+            />
+          </Suspense>
+        </div>
+      );
+    }
     const renderAggregateRows = (data: any) => (
       (data.questions || []).length === 0 ? (
         <div className={styles.telegramPanelEmpty}>Not enough responses yet.</div>
