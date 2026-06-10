@@ -471,7 +471,80 @@ import { SurveyQuestions } from './SurveyQuestions';
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
+export const buildPileRuntimeInitialState = (engine) => {
+  const props = engine.props || {};
+  let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
+  if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
+    try {
+      const url = new URL(window.location.href);
+      const f = url.searchParams.get('filter');
+      if (f) {
+        initialFilterState = normalizeSurveyToolFilterState(deserializeFilterState(f));
+        // Clear from URL immediately
+        url.searchParams.delete('filter');
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch (e) {
+      surveyLog.error("PileViewMode: Error hydrating filter state", e);
+    }
+  }
+
+  const nextState = {
+    pileQuestions: [],
+    allQuestionsForFilter: [],
+    activePileIndex: 0,
+    loading: true,
+    showCreate: false,
+    showComments: {},
+    showConviction: {},
+    filterModalOpen: false,
+    surveysResponseState: [
+      {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    ],
+    isSubmitting: false,
+    submissionError: '',
+    filterState: initialFilterState, // Set initial state
+    isFilterActive: isSurveyToolFilterStateActive(initialFilterState),
+    pileSubmitTempText: null,
+    navCounterVisible: false, // Ensure this is initialized
+    showLongLoading: false,
+    hasHiddenGatedQuestions: false,
+    loadingElapsedSec: 0,
+    showHologramAssistant: false,
+    showListeningPanel: typeof window !== 'undefined'
+      ? isListeningModeQueryEnabled(window.location.search || '')
+      : false,
+  };
+  const warmSeedState = engine.buildWarmPileSeedState(props);
+  if (warmSeedState) {
+    Object.assign(nextState, warmSeedState);
+  }
+
+  engine._pileSubmitTimer = null;
+  engine._navFadeTimer = null;
+  engine.loadingTimeout = null;
+  engine._loadingElapsedTimer = null;
+  engine._loadingStartedAtMs = nextState.loading ? Date.now() : null;
+  engine._loadAndSortDebounceTimer = null;
+  engine._lastLoadAndSortResultSignature = '';
+  engine._lastInitializeResponseSig = '';
+  engine._lastNotifiedPileSubmitRailVisible = null;
+
+  // Refs for auto-scrolling to newly opened sections
+  engine.createSectionRef = React.createRef();
+  engine.listeningPanelRef = React.createRef();
+
+  return nextState;
+};
+
 export const createPileViewRuntimeStrategy = () => ({
+  buildInitialState: (engine) => buildPileRuntimeInitialState(engine),
+
   componentDidMount: (engine) => engine.runPileComponentDidMount(),
 
   componentDidUpdate: (engine, prevProps, prevState) => (
@@ -546,75 +619,6 @@ export class PileViewMode extends SurveyQuestions {
       ...props,
       runtimeStrategy: props?.runtimeStrategy || createPileViewRuntimeStrategy(),
     });
-
-    // 1. Hydrate filter state from props or URL (Consume & Clear)
-    let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
-    if (Object.keys(initialFilterState).length === 0 && typeof window !== 'undefined') {
-      try {
-        const url = new URL(window.location.href);
-        const f = url.searchParams.get('filter');
-        if (f) {
-          initialFilterState = normalizeSurveyToolFilterState(deserializeFilterState(f));
-          // Clear from URL immediately
-          url.searchParams.delete('filter');
-          window.history.replaceState({}, '', url.toString());
-        }
-      } catch (e) {
-        surveyLog.error("PileViewMode: Error hydrating filter state", e);
-      }
-    }
-
-    const nextState = {
-      ...this.state,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      loading: true,
-      showCreate: false,
-      showComments: {},
-      showConviction: {},
-      filterModalOpen: false,
-      surveysResponseState: [
-        {
-          answers: {},
-          importance: {},
-          conviction: {},
-          additionalComments: {},
-        },
-      ],
-      isSubmitting: false,
-      submissionError: '',
-      filterState: initialFilterState, // Set initial state
-      isFilterActive: isSurveyToolFilterStateActive(initialFilterState),
-      pileSubmitTempText: null,
-      navCounterVisible: false, // Ensure this is initialized
-      showLongLoading: false,
-      hasHiddenGatedQuestions: false,
-      loadingElapsedSec: 0,
-      showHologramAssistant: false,
-      showListeningPanel: typeof window !== 'undefined'
-        ? isListeningModeQueryEnabled(window.location.search || '')
-        : false,
-    };
-    const warmSeedState = this.buildWarmPileSeedState(props);
-    if (warmSeedState) {
-      Object.assign(nextState, warmSeedState);
-    }
-    this.state = nextState;
-
-    this._pileSubmitTimer = null;
-    this._navFadeTimer = null;
-    this.loadingTimeout = null;
-    this._loadingElapsedTimer = null;
-    this._loadingStartedAtMs = this.state.loading ? Date.now() : null;
-    this._loadAndSortDebounceTimer = null;
-    this._lastLoadAndSortResultSignature = '';
-    this._lastInitializeResponseSig = '';
-    this._lastNotifiedPileSubmitRailVisible = null;
-
-    // Refs for auto-scrolling to newly opened sections
-    this.createSectionRef = React.createRef();
-    this.listeningPanelRef = React.createRef();
   }
 
   buildWarmPileSeedState(propsIn = this.props) {
