@@ -480,6 +480,8 @@ export const createPileViewRuntimeStrategy = () => ({
 
   componentWillUnmount: (engine) => engine.runPileComponentWillUnmount(),
 
+  render: (engine) => engine.renderPileViewMode(),
+
   getCurrentRenderedQuestionIds: (engine) => {
     const pileQuestions = Array.isArray(engine.state?.pileQuestions) ? engine.state.pileQuestions : [];
     const activePileIndex = Number(engine.state?.activePileIndex || 0);
@@ -2539,7 +2541,7 @@ export class PileViewMode extends SurveyQuestions {
   };
 
 
-  render() {
+  renderPileViewMode = () => {
     bumpSurveyPerfCounter('renderCount');
     const {
       pileQuestions,
@@ -2784,7 +2786,7 @@ export class PileViewMode extends SurveyQuestions {
         />
       </div>
     );
-  }
+  };
 }
 
 export default PileViewMode;
