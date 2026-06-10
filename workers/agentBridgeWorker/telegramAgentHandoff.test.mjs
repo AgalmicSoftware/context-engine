@@ -1392,9 +1392,7 @@ test('Telegram client login rejects preview-user and session-mismatched tokens',
 });
 
 test('Telegram session-meta reports telegram-only status without auth', async () => {
-  const env = telegramOnlyEnv({
-    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
-  });
+  const env = telegramOnlyEnv();
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/session-meta?sessionSlug=alpha', {
       headers: { origin: 'https://client.example' },
@@ -1409,7 +1407,7 @@ test('Telegram session-meta reports telegram-only status without auth', async ()
     telegramOnly: true,
     telegramBridgeEnabled: true,
   });
-  assert.equal(response.headers.get('access-control-allow-origin'), 'https://client.example');
+  assert.equal(response.headers.get('access-control-allow-origin'), '*');
   assert.match(response.headers.get('cache-control'), /max-age=60/);
   const serialized = JSON.stringify(body);
   assert.equal(serialized.includes(env.TELEGRAM_BOT_TOKEN), false);
@@ -1423,9 +1421,7 @@ test('Telegram session-meta reports telegram-only status without auth', async ()
 });
 
 test('Telegram session-meta reports non-telegram and unknown sessions as not telegram-only', async () => {
-  const env = baseEnv({
-    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
-  });
+  const env = baseEnv();
   const alphaResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/session-meta?sessionSlug=alpha', {
       headers: { origin: 'https://client.example' },
@@ -1454,9 +1450,7 @@ test('Telegram session-meta reports non-telegram and unknown sessions as not tel
 });
 
 test('Telegram session-meta validates slug and CORS preflight', async () => {
-  const env = telegramOnlyEnv({
-    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
-  });
+  const env = telegramOnlyEnv();
   const missingResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/session-meta', {
       headers: { origin: 'https://client.example' },
@@ -1475,17 +1469,19 @@ test('Telegram session-meta validates slug and CORS preflight', async () => {
     env,
   });
   assert.equal(optionsResponse.status, 204);
-  assert.equal(optionsResponse.headers.get('access-control-allow-origin'), 'https://client.example');
+  assert.equal(optionsResponse.headers.get('access-control-allow-origin'), '*');
 
-  const deniedResponse = await handleTelegramAgentHandoffRequest({
+  const arbitraryOriginResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/session-meta?sessionSlug=alpha', {
-      headers: { origin: 'https://evil.example' },
+      headers: { origin: 'https://anywhere.example' },
     }),
     env,
   });
-  const denied = await jsonBody(deniedResponse);
-  assert.equal(deniedResponse.status, 403);
-  assert.equal(denied.reason, 'origin_not_allowed');
+  const arbitraryOrigin = await jsonBody(arbitraryOriginResponse);
+  assert.equal(arbitraryOriginResponse.status, 200);
+  assert.equal(arbitraryOriginResponse.headers.get('access-control-allow-origin'), '*');
+  assert.equal(arbitraryOrigin.ok, true);
+  assert.equal(arbitraryOrigin.telegramOnly, true);
 });
 
 test('Telegram result-view cache stores and returns data-version scoped analysis', async () => {

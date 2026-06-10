@@ -407,24 +407,17 @@ function jsonResultViewCache(request, env, data, init = {}) {
   });
 }
 
-function sessionMetaCorsHeaders(request, env = {}) {
-  const origin = safeString(request.headers.get('origin')).replace(/\/+$/, '');
-  if (!origin) return {};
-  const allowed = clientLoginAllowedOrigins(env);
-  if (!allowed.includes('*') && !allowed.includes(origin) && !isLocalClientOrigin(origin)) {
-    return null;
-  }
+function sessionMetaCorsHeaders() {
   return {
-    'access-control-allow-origin': origin,
+    'access-control-allow-origin': '*',
     'access-control-allow-methods': 'GET, OPTIONS',
     'access-control-allow-headers': 'content-type',
     'access-control-max-age': '600',
-    vary: 'Origin',
   };
 }
 
 function jsonSessionMeta(request, env, data, init = {}) {
-  const cors = sessionMetaCorsHeaders(request, env);
+  const cors = sessionMetaCorsHeaders();
   return json(data, {
     ...init,
     headers: {
@@ -2644,10 +2637,7 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
 }
 
 async function handleSessionMetaHttpRequest({ request, env = {} } = {}) {
-  const cors = sessionMetaCorsHeaders(request, env);
-  if (cors === null) {
-    return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
-  }
+  const cors = sessionMetaCorsHeaders();
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors || {} });
   }
