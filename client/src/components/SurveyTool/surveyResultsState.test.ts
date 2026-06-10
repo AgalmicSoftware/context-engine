@@ -3,7 +3,6 @@ import {
   preserveSurveyResultsFilterStateValue,
   surveyResultsReducer,
 } from './surveyResultsState';
-import type { SurveyResultsState } from './SurveyResults';
 import { SURVEY_RESULTS_EXPORT_TYPES } from './surveyResultsExportDisplayHelpers';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
@@ -16,29 +15,35 @@ const mockPeekCacheSync = peekCacheSync as jest.Mock;
 describe('surveyResultsReducer', () => {
   const baseState = createInitialSurveyResultsState({});
 
-  it('shallow-merges a patch over the previous state and returns a new object', () => {
+  it('shallow-merges a partial patch over the previous state and returns a new object', () => {
     const next = surveyResultsReducer(baseState, {
       alertMessage: 'updated',
-    } as SurveyResultsState);
+    });
     expect(next).not.toBe(baseState);
     expect(next.alertMessage).toBe('updated');
     expect(next.surveyViewMode).toBe(baseState.surveyViewMode);
     expect(Object.keys(next).sort()).toEqual(Object.keys(baseState).sort());
   });
 
+  it('accepts index-signature record patches (legacy queueStatePatch shape)', () => {
+    const recordPatch: Record<string, unknown> = { filteredResponsesCount: 3 };
+    const next = surveyResultsReducer(baseState, recordPatch);
+    expect(next.filteredResponsesCount).toBe(3);
+  });
+
   it('applies class-style updater functions against the previous state', () => {
     const seeded = surveyResultsReducer(baseState, {
       totalResponsesCount: 4,
-    } as SurveyResultsState);
+    });
     const next = surveyResultsReducer(seeded, (prev) => ({
       totalResponsesCount: (prev.totalResponsesCount as number) + 1,
-    }) as SurveyResultsState);
+    }));
     expect(next.totalResponsesCount).toBe(5);
     expect(next.surveyId).toBe(seeded.surveyId);
   });
 
   it('returns a fresh object even for an empty patch (no setState bail-out drift)', () => {
-    const next = surveyResultsReducer(baseState, {} as SurveyResultsState);
+    const next = surveyResultsReducer(baseState, {});
     expect(next).not.toBe(baseState);
     expect(next).toEqual(baseState);
   });
