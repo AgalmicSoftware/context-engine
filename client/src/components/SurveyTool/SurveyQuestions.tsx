@@ -527,6 +527,7 @@ import {
   buildStandaloneAuthResetState,
   buildSubmissionErrorState,
   buildSurveyJsonToggleState,
+  buildSurveyResponseFetchLoadingState,
   buildSurveyResponseMergeState,
   buildSurveysResponseStatePatch,
   buildSurveyAccountViewResetState,
@@ -548,6 +549,10 @@ import {
   buildSurveyUserEditResponseStatePatch,
   buildVisiblePileQuestionsAfterPromptDecryptState,
   buildViewingResponseModeState,
+  buildViewedSurveyNoResponseState,
+  buildViewedSurveyResponseState,
+  buildUserSurveyResponseFoundState,
+  buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
@@ -4803,7 +4808,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const isStale = () => !this._isMounted || this._fetchSurveyResponseRunId !== runId;
     const safe = (...args) => { if (!isStale()) this.setResponseHydrationState(...args); };
 
-    safe({ isLoadingResponse: true, responseLookupWarning: '' });
+    safe(buildSurveyResponseFetchLoadingState());
 
     // 1. View Mode (Address lookup) - Unaffected by submission state
     if (this.props.displayAnswerMode && this.props.viewAddress) {
@@ -4814,40 +4819,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         );
         if (isStale()) return;
         if (viewAnswers) {
-          safe((prev) => {
-            const merged = mergeDecryptedViewedResponse(prev.parsedViewAddressAnswers, viewAnswers);
-            return {
-              viewAddressAnswers: JSON.stringify(merged),
-              parsedViewAddressAnswers: merged,
-              noResponse: false,
-              responseLookupWarning: '',
-            };
-          });
+          safe((prev) => buildViewedSurveyResponseState(
+            prev,
+            viewAnswers,
+            mergeDecryptedViewedResponse
+          ));
         } else {
-          safe({
-            viewAddressAnswers: '',
-            parsedViewAddressAnswers: null,
-            noResponse: true,
-            responseLookupWarning: '',
-          });
+          safe(buildViewedSurveyNoResponseState());
         }
       } catch (error) {
         surveyLog.error('Error fetching survey response:', error);
         if (isStale()) return;
-        safe({
-          viewAddressAnswers: '',
-          parsedViewAddressAnswers: null,
-          noResponse: true,
-          responseLookupWarning: '',
-        });
+        safe(buildViewedSurveyNoResponseState());
       }
     } else {
-      safe({
-        viewAddressAnswers: '',
-        parsedViewAddressAnswers: null,
-        noResponse: false,
-        responseLookupWarning: '',
-      });
+      safe(buildViewedSurveyNoResponseState(false));
     }
 
     // 2. User Account Mode
@@ -4866,21 +4852,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
           // Only switch off optimistic mode if chain data matches our submitted baseline
           if (userAnswers && this.areResponsesConsistent(userAnswers, surveyIndex)) {
-             surveyLog.log("Result: New. Chain data consistent with submission. Exiting optimistic mode.");
-             const hasEncrypted = userAnswers.responses?.some(
-                (r) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion
-             );
-             safe({
-               userHasResponse: true,
-               userResponseEncrypted: !!hasEncrypted,
-               startFresh: false,
-               userAnswers: userAnswers,
-               submissionComplete: false // <--- The key reset
-             });
-             // We do NOT call prefillSurveyResponses here to avoid rebuilding baseline unnecessarily
+            surveyLog.log("Result: New. Chain data consistent with submission. Exiting optimistic mode.");
+            const hasEncrypted = userAnswers.responses?.some(
+              (r) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion
+            );
+            safe(buildUserSurveyResponseFoundState({
+              hasEncrypted,
+              resetSubmissionComplete: true,
+              userAnswers,
+            }));
+            // We do NOT call prefillSurveyResponses here to avoid rebuilding baseline unnecessarily
           } else {
-             // Chain is stale or null. Keep optimistic state.
-             surveyLog.log("Result: Stale. Chain data older than optimistic baseline. Ignoring fetch.");
+            // Chain is stale or null. Keep optimistic state.
+            surveyLog.log("Result: Stale. Chain data older than optimistic baseline. Ignoring fetch.");
           }
         }
         // Normal Path (Not in optimistic mode)
@@ -4888,23 +4872,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           const hasEncrypted = userAnswers.responses?.some(
             (r) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion
           );
-          safe({
-            userHasResponse: true,
-            userResponseEncrypted: !!hasEncrypted,
-            startFresh: false,
-            userAnswers: userAnswers,
-          });
+          safe(buildUserSurveyResponseFoundState({
+            hasEncrypted,
+            userAnswers,
+          }));
           if (!isStale()) {
             this.prefillSurveyResponses(userAnswers, { responseHydrationOwned: true });
           }
         } else {
           // Only reset to "no response" if we aren't holding an optimistic submission
           if (!this.state.submissionComplete) {
-            safe({
-              userHasResponse: false,
-              userResponseEncrypted: false,
-              userAnswers: null,
-            });
+            safe(buildUserSurveyResponseMissingState());
           }
         }
       } catch (error) {
@@ -4912,16 +4890,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         if (isStale()) return;
         // On error, if we are optimistic, we just stay optimistic.
         if (!this.state.submissionComplete) {
-            safe({
-              userHasResponse: false,
-              userResponseEncrypted: false,
-              userAnswers: null,
-            });
+          safe(buildUserSurveyResponseMissingState());
         }
       }
     }
 
-    safe({ isLoadingResponse: false });
+    safe(buildResponseHydrationInvalidatedState());
   }
 
   // Prefill single-question draft from prior response.

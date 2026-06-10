@@ -47,6 +47,7 @@ import {
   buildShowJsonState,
   buildStandaloneAuthResetState,
   buildSurveyJsonToggleState,
+  buildSurveyResponseFetchLoadingState,
   buildSurveyResponseMergeState,
   buildSubmitFailureState,
   buildSubmitPreparationErrorState,
@@ -79,6 +80,10 @@ import {
   buildSurveyQuestionPoolLoadState,
   buildVisiblePileQuestionsAfterPromptDecryptState,
   buildViewingResponseModeState,
+  buildViewedSurveyNoResponseState,
+  buildViewedSurveyResponseState,
+  buildUserSurveyResponseFoundState,
+  buildUserSurveyResponseMissingState,
   isSurveyQuestionsMaskedPromptText,
   resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
@@ -1641,6 +1646,82 @@ describe('surveyQuestionsTypes', () => {
       lockAudienceMenuByQuestion: {},
       lockAudienceGateDetailsByQuestion: {},
       submittedSinceLastEdit: false,
+    });
+  });
+
+  it('builds SurveyQuestions survey response hydration patches', () => {
+    expect(buildSurveyResponseFetchLoadingState()).toEqual({
+      isLoadingResponse: true,
+      responseLookupWarning: '',
+    });
+    expect(buildResponseHydrationInvalidatedState()).toEqual({
+      isLoadingResponse: false,
+    });
+
+    const mergeDecryptedViewedResponse = jest.fn((previous, next) => ({
+      previous,
+      next,
+      merged: true,
+    }));
+    expect(buildViewedSurveyResponseState(
+      { parsedViewAddressAnswers: { old: true } },
+      { response: 'latest' },
+      mergeDecryptedViewedResponse
+    )).toEqual({
+      viewAddressAnswers: JSON.stringify({
+        previous: { old: true },
+        next: { response: 'latest' },
+        merged: true,
+      }),
+      parsedViewAddressAnswers: {
+        previous: { old: true },
+        next: { response: 'latest' },
+        merged: true,
+      },
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+    expect(mergeDecryptedViewedResponse).toHaveBeenCalledWith(
+      { old: true },
+      { response: 'latest' }
+    );
+
+    expect(buildViewedSurveyNoResponseState()).toEqual({
+      viewAddressAnswers: '',
+      parsedViewAddressAnswers: null,
+      noResponse: true,
+      responseLookupWarning: '',
+    });
+    expect(buildViewedSurveyNoResponseState(false)).toEqual({
+      viewAddressAnswers: '',
+      parsedViewAddressAnswers: null,
+      noResponse: false,
+      responseLookupWarning: '',
+    });
+    expect(buildUserSurveyResponseFoundState({
+      hasEncrypted: 1,
+      resetSubmissionComplete: true,
+      userAnswers: { responses: [] },
+    })).toEqual({
+      userHasResponse: true,
+      userResponseEncrypted: true,
+      startFresh: false,
+      userAnswers: { responses: [] },
+      submissionComplete: false,
+    });
+    expect(buildUserSurveyResponseFoundState({
+      hasEncrypted: false,
+      userAnswers: { responses: ['plain'] },
+    })).toEqual({
+      userHasResponse: true,
+      userResponseEncrypted: false,
+      startFresh: false,
+      userAnswers: { responses: ['plain'] },
+    });
+    expect(buildUserSurveyResponseMissingState()).toEqual({
+      userHasResponse: false,
+      userResponseEncrypted: false,
+      userAnswers: null,
     });
   });
 });
