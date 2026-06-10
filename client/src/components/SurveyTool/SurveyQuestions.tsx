@@ -479,6 +479,7 @@ import {
 } from './surveyQuestionsSubmitController.js';
 import {
   buildActiveTagModalState,
+  buildAutoDecryptAttemptedState,
   buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
@@ -493,6 +494,7 @@ import {
   buildCurrentStepState,
   buildDecryptEditFailureState,
   buildDecryptEditStartState,
+  buildDecryptingByKeyState,
   buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
   buildEditingResponseModeState,
@@ -507,6 +509,7 @@ import {
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
   buildQuestionsJsonToggleState,
+  buildRenderedQuestionPayloadPoolsState,
   buildResponseLoadingResetState,
   buildResponseJsonToggleState,
   buildShowJsonState,
@@ -532,6 +535,7 @@ import {
   buildSurveyQuestionsSubmitReadinessDescriptor,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
+  buildVisiblePileQuestionsAfterPromptDecryptState,
   buildViewingResponseModeState,
   isSurveyQuestionsMaskedPromptText,
   type SurveyQuestionsProps,
@@ -2498,33 +2502,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const qid = String(questionId || '').trim().toLowerCase();
     if (!qid || !questionPayload) return;
 
-    this.setState((prev) => {
-      let didChange = false;
-      const patchList = (list) => {
-        if (!Array.isArray(list) || list.length === 0) return list;
-        return list.map((item) => {
-          const itemId = String(item?.id || '').toLowerCase();
-          if (itemId !== qid) return item;
-          const picked = pickBetterQuestionPayload(item, questionPayload) || questionPayload;
-          const merged = { ...item, ...picked, id: qid };
-          if (areQuestionPayloadsEquivalent(item, merged)) {
-            return item;
-          }
-          didChange = true;
-          return merged;
-        });
-      };
-
-      const nextQuestionPool = patchList(prev.questionPool);
-      const nextPileQuestions = patchList(prev.pileQuestions);
-      const nextAllQuestionsForFilter = patchList(prev.allQuestionsForFilter);
-      if (!didChange) return null;
-      return {
-        questionPool: nextQuestionPool,
-        pileQuestions: nextPileQuestions,
-        allQuestionsForFilter: nextAllQuestionsForFilter,
-      };
-    });
+    this.setState((prev) => buildRenderedQuestionPayloadPoolsState(prev, qid, questionPayload, {
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+    }));
   };
 
   fetchQuestionPayloadWithDeterministicContext = async (questionId, opts = {}) => {
@@ -2626,12 +2607,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!qid) return false;
     const key = this.getQuestionFieldTaskKey(qid, 'prompt');
 
-    this.setState((prev) => ({
-      decryptingByKey: {
-        ...(prev.decryptingByKey || {}),
-        [key]: true,
-      },
-    }));
+    this.setState((prev) => buildDecryptingByKeyState(prev, key, true));
 
     try {
       const preferredSlug = this._getEffectiveDraftSlug();
@@ -2645,52 +2621,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       // After a successful decrypt, refresh the visible pile cards from that source without
       // triggering a full filter/apply cycle that could wipe in-progress edits.
       if (result?.promptReady) {
-        this.setState((prev) => {
-          const source = Array.isArray(prev.allQuestionsForFilter) ? prev.allQuestionsForFilter : null;
-          if (!source || !source.length) return null;
-          const isFilterActive = !!prev.isFilterActive || isSurveyToolFilterStateActive(prev.filterState);
-          if (isFilterActive) return null;
-
-          const visible = source.filter(
-            (q) => !(q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted)
-          );
-          const hasHidden = source.some(
-            (q) => q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted
-          );
-
-          const prevPile = Array.isArray(prev.pileQuestions) ? prev.pileQuestions : [];
-          const currentActiveId = (
-            prevPile.length > 0 && prevPile[prev.activePileIndex]
-              ? String(prevPile[prev.activePileIndex]?.id || '').toLowerCase()
-              : ''
-          );
-          const activeIdxFromId = currentActiveId
-            ? visible.findIndex((q) => String(q?.id || '').toLowerCase() === currentActiveId)
-            : -1;
-          const nextActiveIndex = activeIdxFromId >= 0
-            ? activeIdxFromId
-            : Math.min(Number(prev.activePileIndex || 0), Math.max(visible.length - 1, 0));
-
-          const sameOrder = (
-            prevPile.length === visible.length &&
-            prevPile.every((q, idx) => (
-              String(q?.id || '').toLowerCase() === String(visible[idx]?.id || '').toLowerCase()
-            ))
-          );
-          if (
-            sameOrder &&
-            prev.hasHiddenGatedQuestions === hasHidden &&
-            Number(prev.activePileIndex || 0) === nextActiveIndex
-          ) {
-            return null;
-          }
-
-          return {
-            pileQuestions: visible,
-            hasHiddenGatedQuestions: hasHidden,
-            activePileIndex: nextActiveIndex,
-          };
-        });
+        this.setState((prev) => buildVisiblePileQuestionsAfterPromptDecryptState(prev, {
+          isFilterStateActive: isSurveyToolFilterStateActive,
+          isMaskedPromptText: this.isMaskedPromptText,
+        }));
       }
 
       const activePrompt = (() => {
@@ -2707,11 +2641,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
       return false;
     } finally {
-      this.setState((prev) => {
-        const next = { ...(prev.decryptingByKey || {}) };
-        next[key] = false;
-        return { decryptingByKey: next };
-      });
+      this.setState((prev) => buildDecryptingByKeyState(prev, key, false));
     }
   };
 
@@ -3562,9 +3492,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       if (did) {
         // Mark as attempted ONLY when we actually produced a decrypted value
         if (!this.state.autoDecryptAttempted?.[k]) {
-          this.setState((prev) => ({
-            autoDecryptAttempted: { ...(prev.autoDecryptAttempted || {}), [k]: true },
-          }));
+          this.setState((prev) => buildAutoDecryptAttemptedState(prev, k));
         }
         if (this._autoDecryptMaskedAttemptSignature?.[k]) {
           const nextAttemptSig = { ...(this._autoDecryptMaskedAttemptSignature || {}) };
