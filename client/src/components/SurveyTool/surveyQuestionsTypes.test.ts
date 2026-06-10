@@ -1,9 +1,11 @@
 import {
   buildActiveTagModalState,
+  buildAutoDecryptToggleState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
   buildBulkPromptReloadingState,
   buildCanDecryptOtherResponsesState,
+  buildCommentsToggleState,
   buildClearedSurveyQuestionPoolState,
   buildCopiedQuestionsJsonState,
   buildCopiedResponseJsonState,
@@ -12,18 +14,26 @@ import {
   buildCurrentStepState,
   buildDecryptEditFailureState,
   buildDecryptEditStartState,
+  buildDisplayAnswerModeToggleState,
   buildDisplayAnswerModeState,
   buildEditingResponseModeState,
+  buildGateSbtNameRevisionState,
   buildHasherState,
   buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
   buildJsonPreviewState,
+  buildLockAudienceGateDetailsState,
+  buildLockAudienceMenuState,
+  buildLockedGateDetailsExpandedState,
   buildParsedViewAddressAnswersState,
   buildPrefillQueuedAfterCacheState,
+  buildQuestionsJsonToggleState,
   buildResponseEditCompleteState,
   buildResponseLoadingResetState,
+  buildResponseJsonToggleState,
   buildShowJsonState,
   buildStandaloneAuthResetState,
+  buildSurveyJsonToggleState,
   buildSubmitFailureState,
   buildSubmitPreparationErrorState,
   buildSubmitSuccessState,
@@ -1173,6 +1183,75 @@ describe('surveyQuestionsTypes', () => {
     });
     expect(toggleShowJsonState({ showJson: true })).toEqual({
       showJson: false,
+    });
+    expect(buildAutoDecryptToggleState({ autoDecryptEnabled: false })).toEqual({
+      autoDecryptEnabled: true,
+    });
+    expect(buildAutoDecryptToggleState({ autoDecryptEnabled: true })).toEqual({
+      autoDecryptEnabled: false,
+    });
+    expect(buildDisplayAnswerModeToggleState({ displayAnswerMode: false })).toEqual({
+      displayAnswerMode: true,
+      isEditing: true,
+    });
+    expect(buildDisplayAnswerModeToggleState({ displayAnswerMode: true })).toEqual({
+      displayAnswerMode: false,
+      isEditing: false,
+    });
+    expect(buildQuestionsJsonToggleState({ showQuestionsJson: false })).toEqual({
+      showQuestionsJson: true,
+    });
+    expect(buildResponseJsonToggleState({ showResponseJson: true })).toEqual({
+      showResponseJson: false,
+    });
+    expect(buildSurveyJsonToggleState({ showSurveyJson: false })).toEqual({
+      showSurveyJson: true,
+    });
+    expect(buildCommentsToggleState({ showComments: { q1: true } }, 'q1')).toEqual({
+      showComments: { q1: false },
+    });
+    expect(buildCommentsToggleState({ showComments: {} }, 'q2', true)).toEqual({
+      showComments: { q2: false },
+    });
+    expect(buildGateSbtNameRevisionState({ gateSbtNameRevision: 2 })).toEqual({
+      gateSbtNameRevision: 3,
+    });
+    expect(buildLockedGateDetailsExpandedState({ lockedGateDetailsExpanded: false })).toEqual({
+      lockedGateDetailsExpanded: true,
+    });
+    expect(buildLockAudienceGateDetailsState(
+      { lockAudienceGateDetailsByQuestion: { q1: ' gate-a ' } },
+      'q1',
+      'gate-a',
+      'gate-a',
+      (value) => String(value || '').trim().toLowerCase()
+    )).toEqual({
+      lockAudienceGateDetailsByQuestion: {},
+    });
+    expect(buildLockAudienceGateDetailsState(
+      { lockAudienceGateDetailsByQuestion: { q1: ' Gate A ' } },
+      'q1',
+      'gate-b',
+      'gate-b',
+      (value) => String(value || '').trim().toLowerCase()
+    )).toEqual({
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-b' },
+    });
+    expect(buildLockAudienceMenuState(
+      { lockAudienceMenuByQuestion: {}, lockAudienceGateDetailsByQuestion: { q1: 'gate-a' } },
+      'q1',
+      null
+    )).toEqual({
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'gate-a' },
+    });
+    expect(buildLockAudienceMenuState(
+      { lockAudienceMenuByQuestion: { q1: true }, lockAudienceGateDetailsByQuestion: { q1: 'gate-a' } },
+      'q1',
+      null
+    )).toEqual({
+      lockAudienceMenuByQuestion: {},
+      lockAudienceGateDetailsByQuestion: {},
     });
     expect(buildPrefillQueuedAfterCacheState(true)).toEqual({
       prefillQueuedAfterCache: true,
