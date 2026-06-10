@@ -716,7 +716,6 @@ export class PileViewMode extends SurveyQuestions {
   }
 
   _pileQuestionsGeneration = 0;
-  _currentRenderedQuestionIdsCache = null;
   _currentRenderedQuestionIdsCacheKey = '';
   _questionObjectSignatureCache = new WeakMap();
   _questionListSignatureCache = new WeakMap();
