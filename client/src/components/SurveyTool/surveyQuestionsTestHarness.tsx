@@ -1,9 +1,9 @@
 /**
  * Shared RTL harness for behavior-level SurveyQuestions and PileViewMode tests.
  *
- * Test-only module: renders the SurveyQuestions/PileViewMode runtimes inside the same minimal
+ * Test-only module: renders the class components inside the same minimal
  * Provider/MemoryRouter wrapper used by the SurveyResults harness so coupled
- * headless tests can exercise DOM behavior through the hooks wrappers.
+ * headless tests can move toward DOM behavior before the class-to-hooks flip.
  */
 import React from 'react';
 import { Provider } from 'react-redux';
