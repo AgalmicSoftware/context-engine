@@ -262,6 +262,9 @@ describe('OnePageSession view gating', () => {
     exchange = null,
   } = {}) => jest.fn(async (url) => {
     const urlString = String(url);
+    if (urlString.includes('/telegram-topic-map/')) {
+      return { ok: false, status: 404, json: async () => ({}) };
+    }
     if (urlString.includes('/telegram/agent/api/session-meta')) {
       return {
         ok: true,
@@ -672,7 +675,13 @@ describe('OnePageSession view gating', () => {
 
     expect(await screen.findByTestId('ce-session-telegram-buckets')).toBeInTheDocument();
     expect(screen.getByText('Attendance')).toBeInTheDocument();
-    expect(screen.getByText('Week 1')).toBeInTheDocument();
+    // Options live in a dropdown; the current selection also renders as a chip.
+    const bucketSelect = screen.getByTestId('ce-session-telegram-bucket-select');
+    expect(bucketSelect).toHaveValue('week_1');
+    expect(within(bucketSelect).getByText('Week 2')).toBeInTheDocument();
+    expect(screen.getAllByText('Week 1').length).toBeGreaterThan(0);
+    fireEvent.change(bucketSelect, { target: { value: 'week_2' } });
+    expect(bucketSelect).toHaveValue('week_2');
     expect(screen.queryByTestId('sbts-page')).not.toBeInTheDocument();
     expect(mockSBTsPage).not.toHaveBeenCalled();
     expect(screen.queryByText('Join or Create')).not.toBeInTheDocument();
@@ -727,6 +736,45 @@ describe('OnePageSession view gating', () => {
     });
     // The real report replaces the aggregate card sections.
     expect(screen.queryByText('Agree on funding?')).not.toBeInTheDocument();
+  });
+
+  it('offers a copyable codex topic-map prompt in telegram results', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock());
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(global.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    expect(await screen.findByTestId('ce-session-telegram-topicmap-section')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-telegram-topicmap')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-session-telegram-topicmap-copy'));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledTimes(1);
+    });
+    const prompt = writeText.mock.calls[0][0];
+    expect(prompt).toContain('client/public/telegram-topic-map/edge.json');
+    expect(prompt).toContain('DATASET:');
+    expect(prompt).toContain('"sessionSlug": "edge"');
+    expect(prompt).toContain('Fund the proposal?');
+    // The stored ceagt token must never leak into the prompt.
+    expect(prompt).not.toContain('ceagt_');
+    await screen.findByText('Copied!');
   });
 
   it('shows per-view disabled state in telegram results', async () => {

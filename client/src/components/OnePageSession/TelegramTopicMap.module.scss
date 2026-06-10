@@ -1,0 +1,108 @@
+/* Local-only telegram topic map (debate-atlas circles style). */
+.topicMap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topicMapToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topicMapStatus {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.topicMapReload {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.topicMapCanvas {
+  width: 100%;
+  height: auto;
+  border-radius: var(--ce-radius-10);
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.topicMapNode {
+  cursor: pointer;
+
+  circle {
+    transition: fill-opacity 0.2s ease, stroke-width 0.2s ease;
+  }
+
+  &:hover circle {
+    fill-opacity: 0.45;
+  }
+}
+
+.topicMapNodeSelected circle {
+  fill-opacity: 0.5;
+}
+
+.topicMapLabel {
+  fill: var(--ce-color-white);
+  font-size: 15px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.topicMapSubLabel {
+  fill: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.topicMapDetail {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--ce-radius-10);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.topicMapDetailTitle {
+  color: var(--ce-color-white);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.topicMapDetailSummary {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.topicMapDetailItems {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.5;
+
+  li {
+    margin-bottom: 4px;
+  }
+}

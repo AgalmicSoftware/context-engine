@@ -29,6 +29,7 @@ import styles from './OnePageSession.module.scss';
 // for now; consolidate when the telegram path stabilizes).
 import surveyToolStyles from '../SurveyTool/SurveyTool.module.scss';
 import sbtListStyles from '../SBTs/SBTsList.module.scss';
+import TelegramTopicMap from './TelegramTopicMap';
 
 import LazyFallback from '../Shared/LazyFallback';
 
@@ -385,6 +386,8 @@ class OnePageSession extends Component<any, any> {
       telegramAgentResultsStatus: 'idle',
       telegramAgentResults: null,
       telegramPolisNonce: 0,
+      telegramBucketLocalSelections: {},
+      telegramTopicMapPromptCopied: false,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -428,6 +431,7 @@ class OnePageSession extends Component<any, any> {
     this._telegramMetaProbeSeq = 0;
     this._telegramOnlyProbeKey = '';
     this._telegramMetaProbeStartedKey = '';
+    this._topicMapCopiedTimer = null;
     this._unmounted = false;
     this.originalURL = '';
 
@@ -490,6 +494,7 @@ class OnePageSession extends Component<any, any> {
     this.handleRefreshResultsClick = this.handleRefreshResultsClick.bind(this);
     this.loadTelegramAgentQuestions = this.loadTelegramAgentQuestions.bind(this);
     this.loadTelegramAgentResults = this.loadTelegramAgentResults.bind(this);
+    this.handleCopyTopicMapPrompt = this.handleCopyTopicMapPrompt.bind(this);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -833,6 +838,123 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
+  buildTelegramTopicMapCodexPrompt() {
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    const questions = (this.state.telegramAgentQuestions || []).map((question: any) => ({
+      questionId: question.questionId,
+      prompt: question.prompt,
+      questionType: question.questionType,
+      tags: question.tags || [],
+    }));
+    const views: any = this.state.telegramAgentResults || {};
+    const pickReady = (key: string) => (views?.[key]?.status === 'ready' ? views[key].data : null);
+    const consensus: any = pickReady('consensus');
+    const difference: any = pickReady('difference');
+    const groups: any = pickReady('groups');
+    const polis: any = pickReady('polis');
+    const vectors: any = {};
+    if (polis?.aggregator) {
+      Object.entries(polis.aggregator).forEach(([questionIdValue, rows]: any) => {
+        vectors[questionIdValue] = (Array.isArray(rows) ? rows : [])
+          .map((row: any) => {
+            try {
+              return { p: row.responder, v: JSON.parse(row.response)?.answer?.value || '' };
+            } catch (_) {
+              return null;
+            }
+          })
+          .filter(Boolean);
+      });
+    }
+    const dataset = {
+      sessionSlug,
+      questions,
+      consensus: consensus?.questions || [],
+      difference: difference?.questions || [],
+      groups: groups?.groups || [],
+      vectors,
+    };
+    return [
+      'You are Codex running inside the Context Engine worktree at',
+      '/Users/charlie/Desktop/xoCortex/projects/context-engine/.codex/scratch/edge-2026',
+      '',
+      'Task: turn the telegram session dataset below into an opinion/topic map for the web client.',
+      '',
+      '1. Use ONLY the JSON dataset at the end of this prompt. Do not fetch anything, run no network calls, and never print tokens or secrets.',
+      '2. Cluster the questions/opinions into 3-8 coherent topics. Use tags, consensus/difference scores, group themes, and the per-participant vectors (vectors[questionId] = [{p: participantAlias, v: Agree|Disagree|Unsure}]) to judge which opinions belong together and how contested each topic is.',
+      `3. Write EXACTLY one file (create the directory if needed): client/public/telegram-topic-map/${sessionSlug}.json`,
+      '   Schema (valid JSON, no comments, nothing else in the file):',
+      '   {',
+      `     "sessionSlug": "${sessionSlug}",`,
+      '     "generatedAt": "<ISO 8601 timestamp>",',
+      '     "topics": [',
+      '       {',
+      '         "id": "kebab-case-id",',
+      '         "label": "Short topic name (max 4 words)",',
+      '         "summary": "1-2 sentence neutral summary of the opinion landscape for this topic",',
+      '         "size": <number of related questions/responses; drives bubble size>,',
+      '         "agreement": <0 to 1 rough agreement level across participants>,',
+      '         "items": ["related question or opinion statement", "..."]',
+      '       }',
+      '     ]',
+      '   }',
+      '4. Do not modify any other files.',
+      '5. Reply with the file path and the topic count when done.',
+      '',
+      'DATASET:',
+      JSON.stringify(dataset, null, 2),
+    ].join('\n');
+  }
+
+  async handleCopyTopicMapPrompt() {
+    const prompt = this.buildTelegramTopicMapCodexPrompt();
+    let copied = false;
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(prompt);
+        copied = true;
+      }
+    } catch (e) { demoLog.warn('OnePageSession: clipboard', e); }
+    if (!copied && typeof document !== 'undefined') {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = prompt;
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      } catch (e) { demoLog.warn('OnePageSession: clipboard fallback', e); }
+    }
+    if (copied && !this._unmounted) {
+      this.setState({ telegramTopicMapPromptCopied: true });
+      if (this._topicMapCopiedTimer) clearTimeout(this._topicMapCopiedTimer);
+      this._topicMapCopiedTimer = setTimeout(() => {
+        if (!this._unmounted) this.setState({ telegramTopicMapPromptCopied: false });
+      }, 2500);
+    }
+  }
+
+  renderTelegramTopicMapSection() {
+    return (
+      <div className={styles.telegramTopicMapSection} data-testid="ce-session-telegram-topicmap-section">
+        <div className={styles.telegramListHeader}>
+          <span>Topic map (local) — generate with Codex in this worktree, then reload.</span>
+          <span className={styles.telegramListHeaderActions}>
+            <button
+              type="button"
+              className={styles.sectionHeaderActionButton}
+              onClick={this.handleCopyTopicMapPrompt}
+              data-testid="ce-session-telegram-topicmap-copy"
+            >
+              {this.state.telegramTopicMapPromptCopied ? 'Copied!' : 'Copy Codex prompt'}
+            </button>
+          </span>
+        </div>
+        <TelegramTopicMap sessionSlug={this.resolveCurrentSessionSlug()} />
+      </div>
+    );
+  }
+
   renderTelegramQuestionsPanel({ compact = false }: any = {}) {
     const status = this.state.telegramAgentQuestionsStatus;
     const questions = this.state.telegramAgentQuestions || [];
@@ -886,23 +1008,28 @@ class OnePageSession extends Component<any, any> {
         {status === 'ready' && questions.length === 0 ? (
           <div className={styles.telegramListEmpty}>No questions available yet.</div>
         ) : null}
-        <div className={surveyToolStyles.surveyQuestions}>
+        {/* Read-only pile-style cards (the answer flow stays in Telegram for now). */}
+        <div className={styles.telegramPileScroll}>
           {visible.map((question: any, index: number) => (
             <Card
               key={question.questionId || `${question.prompt}-${index}`}
-              className={surveyToolStyles.questionCard}
+              className={`${surveyToolStyles.pileCardInner} ${styles.telegramPileCard}`.trim()}
               data-testid="ce-session-telegram-question-item"
             >
-              <CardBody>
-                <h5 className={styles.telegramQuestionPromptDark}>{question.prompt}</h5>
-                <div className={styles.telegramChipRow}>
-                  <span className={styles.telegramChipDark}>{question.questionType}</span>
-                  {question.answeredByUser ? (
-                    <span className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}>Answered</span>
-                  ) : null}
-                  {(question.tags || []).slice(0, 3).map((tag: any) => (
-                    <span key={tag} className={styles.telegramChipDark}>{tag}</span>
-                  ))}
+              <CardBody className={surveyToolStyles.pileCardBody}>
+                <div className={surveyToolStyles.pileCardHeader}>
+                  <div className={styles.telegramChipRow}>
+                    <span className={styles.telegramChipDark}>{question.questionType}</span>
+                    {question.answeredByUser ? (
+                      <span className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}>Answered</span>
+                    ) : null}
+                    {(question.tags || []).slice(0, 3).map((tag: any) => (
+                      <span key={tag} className={styles.telegramChipDark}>{tag}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className={surveyToolStyles.pileCardMainContent}>
+                  <h5 className={styles.telegramQuestionPromptDark}>{question.prompt}</h5>
                 </div>
               </CardBody>
             </Card>
@@ -919,31 +1046,61 @@ class OnePageSession extends Component<any, any> {
 
   renderTelegramBucketsPanel() {
     const cards = normalizeTelegramBucketCards(this.state.telegramClientAuth?.buckets);
+    const localSelections: any = this.state.telegramBucketLocalSelections || {};
     return (
       <div className={styles.telegramListPanel} data-testid="ce-session-telegram-buckets">
         {cards.length === 0 ? (
           <div className={styles.telegramListEmpty}>No research buckets linked yet.</div>
         ) : (
           <div className={sbtListStyles.standardBase}>
-            {cards.map((card: any) => (
-              <article key={card.categoryId} className={sbtListStyles.standardCardShell}>
-                <div className={sbtListStyles.standardCardBodyLink}>
-                  <div className={sbtListStyles.standardCardInfo}>
-                    <p className={sbtListStyles.standardCardName}>{card.categoryLabel}</p>
-                    <div className={styles.telegramChipRow}>
-                      {card.options.map((option: any) => (
-                        <span
-                          key={option.optionId}
-                          className={`${styles.telegramChipDark} ${option.selected ? styles.telegramChipDarkSelected : ''}`.trim()}
-                        >
-                          {option.label}
-                        </span>
-                      ))}
+            {cards.map((card: any) => {
+              const selectedOptions = card.options.filter((option: any) => option.selected);
+              const selectValue = localSelections[card.categoryId] ?? (selectedOptions[0]?.optionId || '');
+              return (
+                <article key={card.categoryId} className={sbtListStyles.standardCardShell}>
+                  <div className={sbtListStyles.standardCardBodyLink}>
+                    <div className={sbtListStyles.standardCardInfo}>
+                      <p className={sbtListStyles.standardCardName}>{card.categoryLabel}</p>
+                      {/* Local-only dropdown; bucket changes still happen via the Telegram bot. */}
+                      <select
+                        className={styles.telegramBucketSelect}
+                        value={selectValue}
+                        onChange={(event: any) => {
+                          const nextValue = event?.target?.value || '';
+                          this.setState((prevState: any) => ({
+                            telegramBucketLocalSelections: {
+                              ...(prevState.telegramBucketLocalSelections || {}),
+                              [card.categoryId]: nextValue,
+                            },
+                          }));
+                        }}
+                        aria-label={`${card.categoryLabel} bucket option`}
+                        data-testid="ce-session-telegram-bucket-select"
+                      >
+                        <option value="">Select an option</option>
+                        {card.options.map((option: any) => (
+                          <option key={option.optionId} value={option.optionId}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedOptions.length > 0 ? (
+                        <div className={styles.telegramChipRow}>
+                          {selectedOptions.map((option: any) => (
+                            <span
+                              key={option.optionId}
+                              className={`${styles.telegramChipDark} ${styles.telegramChipDarkSelected}`.trim()}
+                            >
+                              {option.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1000,6 +1157,7 @@ class OnePageSession extends Component<any, any> {
               networkChainId={this.props.networkChainId}
             />
           </Suspense>
+          {this.renderTelegramTopicMapSection()}
         </div>
       );
     }
@@ -1078,6 +1236,7 @@ class OnePageSession extends Component<any, any> {
             ))}
           </>
         ) : null}
+        {this.renderTelegramTopicMapSection()}
       </div>
     );
   }
@@ -1151,6 +1310,10 @@ class OnePageSession extends Component<any, any> {
     this._telegramMetaProbeSeq += 1;
     this._telegramOnlyProbeKey = '';
     this._telegramMetaProbeStartedKey = '';
+    if (this._topicMapCopiedTimer) {
+      clearTimeout(this._topicMapCopiedTimer);
+      this._topicMapCopiedTimer = null;
+    }
     if (this._autoOpenResultsTimer) {
       clearTimeout(this._autoOpenResultsTimer);
       this._autoOpenResultsTimer = null;
