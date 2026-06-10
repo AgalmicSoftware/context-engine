@@ -52,6 +52,12 @@ import {
   isTelegramOnlySessionConfig,
 } from '../../utilities/session/telegramSessionMeta.js';
 import {
+  fetchTelegramAgentQuestions,
+  fetchTelegramAgentResults,
+  isTelegramAgentAuthFailure,
+  normalizeTelegramBucketCards,
+} from '../../utilities/session/telegramAgentData.js';
+import {
   exchangeTelegramSessionToken,
   extractTelegramSessionToken,
   getTelegramAgentBridgeCredentials,
@@ -368,6 +374,11 @@ class OnePageSession extends Component<any, any> {
       telegramOnlyProbe: null,
       showTelegramTokenReentry: false,
       resultsRefreshing: false,
+      telegramAgentQuestionsStatus: 'idle',
+      telegramAgentQuestions: [],
+      telegramAgentAnswerState: null,
+      telegramAgentResultsStatus: 'idle',
+      telegramAgentResults: null,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -471,6 +482,8 @@ class OnePageSession extends Component<any, any> {
     this.restoreTelegramClientAuthFromStorage = this.restoreTelegramClientAuthFromStorage.bind(this);
     this.probeTelegramSessionMeta = this.probeTelegramSessionMeta.bind(this);
     this.handleRefreshResultsClick = this.handleRefreshResultsClick.bind(this);
+    this.loadTelegramAgentQuestions = this.loadTelegramAgentQuestions.bind(this);
+    this.loadTelegramAgentResults = this.loadTelegramAgentResults.bind(this);
   }
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
@@ -685,15 +698,87 @@ class OnePageSession extends Component<any, any> {
     this.setState({ resultsRefreshing: true });
     try {
       // Future auto-poll/SSE live-results would hook in here; manual refresh is intentional for now.
-      await this.props.refreshQuestionResponses?.(null, {
-        slug: this.resolveCurrentSessionSlug(),
-        forceFull: true,
-      });
+      if (this.isTelegramDataMode()) {
+        await Promise.all([
+          this.loadTelegramAgentQuestions(true),
+          this.loadTelegramAgentResults(true),
+        ]);
+      } else {
+        await this.props.refreshQuestionResponses?.(null, {
+          slug: this.resolveCurrentSessionSlug(),
+          forceFull: true,
+        });
+      }
     } catch (error) {
       demoLog.warn('OnePageSession: refresh results failed', error);
     } finally {
       if (!this._unmounted) this.setState({ resultsRefreshing: false });
     }
+  }
+
+  isTelegramDataMode(sessionConfig: any = this.resolveCurrentSessionConfig()) {
+    return this.isTelegramOnlySession(sessionConfig) && this.hasTelegramClientAuth();
+  }
+
+  handleTelegramAgentAuthFailure() {
+    this.setState({
+      telegramLoginStatus: 'error',
+      telegramLoginError: TELEGRAM_TOKEN_EXPIRED_OR_REVOKED_MESSAGE,
+      showTelegramTokenReentry: true,
+    });
+  }
+
+  async loadTelegramAgentQuestions(force: any = false) {
+    if (!this.isTelegramDataMode()) return null;
+    if (!force && this.state.telegramAgentQuestionsStatus !== 'idle') return null;
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
+    this.setState({ telegramAgentQuestionsStatus: 'loading' });
+    const result = await fetchTelegramAgentQuestions({
+      sessionSlug,
+      agentBridgeUrl: resolveTrustedTelegramAgentBridgeUrl(sessionConfig),
+    });
+    if (this._unmounted || sessionSlug !== this.resolveCurrentSessionSlug()) return null;
+    if (!result.ok) {
+      if (isTelegramAgentAuthFailure(result)) this.handleTelegramAgentAuthFailure();
+      this.setState({ telegramAgentQuestionsStatus: 'error' });
+      return null;
+    }
+    this.setState({
+      telegramAgentQuestionsStatus: 'ready',
+      telegramAgentQuestions: result.questions || [],
+      telegramAgentAnswerState: result.answerState || null,
+    });
+    return result;
+  }
+
+  async loadTelegramAgentResults(force: any = false) {
+    if (!this.isTelegramDataMode()) return null;
+    if (!force && this.state.telegramAgentResultsStatus !== 'idle') return null;
+    const sessionSlug = this.resolveCurrentSessionSlug();
+    const sessionConfig = this.resolveCurrentSessionConfig(sessionSlug);
+    this.setState({ telegramAgentResultsStatus: 'loading' });
+    const result = await fetchTelegramAgentResults({
+      sessionSlug,
+      agentBridgeUrl: resolveTrustedTelegramAgentBridgeUrl(sessionConfig),
+    });
+    if (this._unmounted || sessionSlug !== this.resolveCurrentSessionSlug()) return null;
+    if (!result.ok || !result.views) {
+      if (isTelegramAgentAuthFailure(result)) this.handleTelegramAgentAuthFailure();
+      this.setState({ telegramAgentResultsStatus: 'error' });
+      return null;
+    }
+    const viewStates = Object.values(result.views);
+    if (viewStates.length > 0 && viewStates.every((view: any) => view?.status === 'auth')) {
+      this.handleTelegramAgentAuthFailure();
+      this.setState({ telegramAgentResultsStatus: 'error' });
+      return null;
+    }
+    this.setState({
+      telegramAgentResultsStatus: 'ready',
+      telegramAgentResults: result.views,
+    });
+    return result;
   }
 
   renderTelegramTokenForm() {
@@ -737,6 +822,208 @@ class OnePageSession extends Component<any, any> {
           )}
         </button>
       </form>
+    );
+  }
+
+  renderTelegramQuestionsPanel({ compact = false }: any = {}) {
+    const status = this.state.telegramAgentQuestionsStatus;
+    const questions = this.state.telegramAgentQuestions || [];
+    const answerState = this.state.telegramAgentAnswerState;
+    const visible = compact ? questions.slice(0, 8) : questions;
+    return (
+      <div
+        className={`${styles.telegramPanel} ${compact ? styles.telegramPanelCompact : ''}`.trim()}
+        data-testid="ce-session-telegram-questions"
+      >
+        <div className={styles.telegramPanelHeader}>
+          {answerState ? (
+            <span className={styles.telegramPanelMeta}>
+              {answerState.unansweredCount} open · {answerState.answeredCount} answered
+            </span>
+          ) : <span className={styles.telegramPanelMeta}>Session questions</span>}
+          <span className={styles.telegramPanelHeaderActions}>
+            {compact ? (
+              <button
+                type="button"
+                className={styles.telegramPanelActionButton}
+                onClick={this.handleViewAllQuestionsClick}
+                data-testid="ce-session-telegram-questions-view-all"
+              >
+                View All
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={styles.telegramPanelActionButton}
+              onClick={() => { void this.loadTelegramAgentQuestions(true); }}
+              disabled={status === 'loading'}
+              data-testid="ce-session-telegram-questions-refresh"
+              aria-label="Refresh questions"
+            >
+              <FontAwesomeIcon icon={faSyncAlt} spin={status === 'loading'} />
+            </button>
+          </span>
+        </div>
+        {status === 'error' ? (
+          <div className={styles.telegramPanelError} role="alert">
+            Could not load questions from the session worker.
+          </div>
+        ) : null}
+        {status === 'loading' && questions.length === 0 ? (
+          <div className={styles.telegramPanelEmpty}>
+            <FontAwesomeIcon icon={faSpinner} spin /> Loading questions...
+          </div>
+        ) : null}
+        {status === 'ready' && questions.length === 0 ? (
+          <div className={styles.telegramPanelEmpty}>No questions available yet.</div>
+        ) : null}
+        <div className={styles.telegramQuestionList}>
+          {visible.map((question: any, index: number) => (
+            <div
+              key={question.questionId || `${question.prompt}-${index}`}
+              className={styles.telegramQuestionCard}
+              data-testid="ce-session-telegram-question-item"
+            >
+              <div className={styles.telegramQuestionPrompt}>{question.prompt}</div>
+              <div className={styles.telegramQuestionMeta}>
+                <span className={styles.telegramTagChip}>{question.questionType}</span>
+                {question.answeredByUser ? (
+                  <span className={`${styles.telegramTagChip} ${styles.telegramTagChipSelected}`.trim()}>Answered</span>
+                ) : null}
+                {(question.tags || []).slice(0, 3).map((tag: any) => (
+                  <span key={tag} className={styles.telegramTagChip}>{tag}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {compact && questions.length > visible.length ? (
+          <div className={styles.telegramPanelMeta}>
+            {questions.length - visible.length} more in the full view
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  renderTelegramBucketsPanel() {
+    const cards = normalizeTelegramBucketCards(this.state.telegramClientAuth?.buckets);
+    return (
+      <div className={styles.telegramPanel} data-testid="ce-session-telegram-buckets">
+        {cards.length === 0 ? (
+          <div className={styles.telegramPanelEmpty}>No research buckets linked yet.</div>
+        ) : cards.map((card: any) => (
+          <div key={card.categoryId} className={styles.telegramBucketCard}>
+            <div className={styles.telegramBucketCategory}>{card.categoryLabel}</div>
+            <div className={styles.telegramQuestionMeta}>
+              {card.options.map((option: any) => (
+                <span
+                  key={option.optionId}
+                  className={`${styles.telegramTagChip} ${option.selected ? styles.telegramTagChipSelected : ''}`.trim()}
+                >
+                  {option.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  renderTelegramResultsSubsection(title: any, view: any, renderBody: any) {
+    if (!view) return null;
+    return (
+      <div className={styles.telegramResultsSection}>
+        <div className={styles.telegramResultsHeading}>{title}</div>
+        {view.status === 'disabled' ? (
+          <div className={styles.telegramPanelEmpty}>Not enabled for this session.</div>
+        ) : view.status === 'error' || view.status === 'auth' ? (
+          <div className={styles.telegramPanelEmpty}>Unavailable right now.</div>
+        ) : renderBody(view.data || {})}
+      </div>
+    );
+  }
+
+  renderTelegramResultsPanel() {
+    const status = this.state.telegramAgentResultsStatus;
+    const views: any = this.state.telegramAgentResults || null;
+    const renderAggregateRows = (data: any) => (
+      (data.questions || []).length === 0 ? (
+        <div className={styles.telegramPanelEmpty}>Not enough responses yet.</div>
+      ) : (
+        <div>
+          {(data.questions || []).slice(0, 6).map((row: any, index: number) => (
+            <div key={`${row.prompt}-${index}`} className={styles.telegramResultRow}>
+              <div className={styles.telegramQuestionPrompt}>{row.prompt}</div>
+              <div className={styles.telegramQuestionMeta}>
+                <span className={styles.telegramPanelMeta}>{row.total} responses</span>
+                {(row.counts || []).slice(0, 4).map((count: any) => (
+                  <span key={count.label} className={styles.telegramTagChip}>
+                    {count.label}: {count.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    );
+    return (
+      <div className={styles.telegramPanel} data-testid="ce-session-telegram-results">
+        {status === 'loading' && !views ? (
+          <div className={styles.telegramPanelEmpty}>
+            <FontAwesomeIcon icon={faSpinner} spin /> Loading results...
+          </div>
+        ) : null}
+        {status === 'error' && !views ? (
+          <div className={styles.telegramPanelError} role="alert">
+            Could not load results from the session worker.
+          </div>
+        ) : null}
+        {views ? (
+          <>
+            {views.consensus?.status === 'ready' ? (
+              <div className={styles.telegramPanelMeta} data-testid="ce-session-telegram-results-summary">
+                {(views.consensus.data || {}).questionCount || 0} questions · {(views.consensus.data || {}).responseCount || 0} responses
+              </div>
+            ) : null}
+            {this.renderTelegramResultsSubsection('Consensus', views.consensus, renderAggregateRows)}
+            {this.renderTelegramResultsSubsection('Differences', views.difference, renderAggregateRows)}
+            {this.renderTelegramResultsSubsection('Groups', views.groups, (data: any) => (
+              (data.groups || []).length === 0 ? (
+                <div className={styles.telegramPanelEmpty}>No groups large enough to show yet.</div>
+              ) : (
+                <div className={styles.telegramGroupGrid}>
+                  {(data.groups || []).map((group: any, index: number) => (
+                    <div key={group.groupId || `${group.label}-${index}`} className={styles.telegramBucketCard}>
+                      <div className={styles.telegramBucketCategory}>{group.label || 'Group'}</div>
+                      {group.theme ? <div className={styles.telegramPanelMeta}>{group.theme}</div> : null}
+                      <div className={styles.telegramPanelMeta}>{group.size} participants</div>
+                      {(group.topStatements || []).slice(0, 3).map((statement: any, statementIndex: number) => (
+                        <div key={`${statement.prompt}-${statementIndex}`} className={styles.telegramQuestionPrompt}>
+                          {statement.prompt}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )
+            ))}
+            {this.renderTelegramResultsSubsection('Topic map', views.topicMap, (data: any) => (
+              data.available !== true ? (
+                <div className={styles.telegramPanelEmpty}>Topic map not available yet.</div>
+              ) : (
+                <div className={styles.telegramQuestionMeta}>
+                  {Object.entries(data.counts || {}).map(([key, value]: any) => (
+                    <span key={key} className={styles.telegramTagChip}>{key}: {value}</span>
+                  ))}
+                </div>
+              )
+            ))}
+          </>
+        ) : null}
+      </div>
     );
   }
 
@@ -950,6 +1237,11 @@ class OnePageSession extends Component<any, any> {
       this.setState({
         telegramOnlyProbe: null,
         showTelegramTokenReentry: false,
+        telegramAgentQuestionsStatus: 'idle',
+        telegramAgentQuestions: [],
+        telegramAgentAnswerState: null,
+        telegramAgentResultsStatus: 'idle',
+        telegramAgentResults: null,
       });
     }
     const currentSessionConfig = this.resolveCurrentSessionConfig();
@@ -961,6 +1253,14 @@ class OnePageSession extends Component<any, any> {
       currentProbeKey !== this._telegramMetaProbeStartedKey
     ) {
       this.probeTelegramSessionMeta();
+    }
+    if (!slugChanged && this.isTelegramDataMode(currentSessionConfig)) {
+      if (this.state.telegramAgentQuestionsStatus === 'idle') {
+        void this.loadTelegramAgentQuestions();
+      }
+      if (this.state.showResults && this.state.telegramAgentResultsStatus === 'idle') {
+        void this.loadTelegramAgentResults();
+      }
     }
     const prevRouteUiState = resolveOnePageSessionRouteUiState(prevProps);
     const nextRouteUiState = resolveOnePageSessionRouteUiState(this.props);
@@ -2522,6 +2822,9 @@ class OnePageSession extends Component<any, any> {
     const telegramOnlySession = this.isTelegramOnlySession(resolvedSessionConfig);
     const telegramClientLoggedIn = telegramOnlySession && this.hasTelegramClientAuth(effectiveSlug);
     const telegramClientAuth = telegramClientLoggedIn ? (this.state.telegramClientAuth || {}) : {};
+    // Telegram/cloudflare combo: data lives in the worker, so questions/results/
+    // groups render worker-backed panels instead of the on-chain surfaces.
+    const telegramDataMode = telegramOnlySession && telegramClientLoggedIn;
     const effectiveAccount = telegramClientAuth.accountAddress || this.props.account;
     const effectiveLoginComplete = telegramClientLoggedIn || this.props.loginComplete;
 
@@ -2779,6 +3082,8 @@ class OnePageSession extends Component<any, any> {
                 </div>
               </div>
             </div>
+          ) : telegramDataMode ? (
+            this.renderTelegramQuestionsPanel({ compact: true })
           ) : (
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
@@ -2832,6 +3137,9 @@ class OnePageSession extends Component<any, any> {
           <div className={styles.sectionContainer} ref={this.questionsSectionRef}>
             <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
 
+            {telegramDataMode ? (
+              this.renderTelegramQuestionsPanel({ compact: false })
+            ) : (
             <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
               <MemoSurveyPage
                 miniMode={true}
@@ -2875,6 +3183,7 @@ class OnePageSession extends Component<any, any> {
                 litHooks={scopedLitHooks}
               />
             </Suspense>
+            )}
 
             </div>
           </div>
@@ -2890,8 +3199,10 @@ class OnePageSession extends Component<any, any> {
                 ) : (
                   <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                 )}
-                {renderSectionHeading(t('sbts'), 'Join or Create')}
-                {this.state.showGroups && (
+                {telegramDataMode
+                  ? renderSectionHeading('Groups', 'Research Buckets')
+                  : renderSectionHeading(t('sbts'), 'Join or Create')}
+                {this.state.showGroups && !telegramDataMode && (
                   <div
                     className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
                     onClick={(e: any) => e.stopPropagation()}
@@ -2905,7 +3216,7 @@ class OnePageSession extends Component<any, any> {
                 )}
               </h2>
 
-              {this.state.showGroups && (
+              {this.state.showGroups && !telegramDataMode && (
                 <div className={styles.sectionHeaderActionsScroller}>
                   <div className={styles.sectionHeaderActions}>
                     <button
@@ -2930,7 +3241,12 @@ class OnePageSession extends Component<any, any> {
               )}
             </div>
 
-            {this.state.showGroups && (
+            {this.state.showGroups && telegramDataMode && (
+              <div className={styles.miniSectionContent}>
+                {this.renderTelegramBucketsPanel()}
+              </div>
+            )}
+            {this.state.showGroups && !telegramDataMode && (
               <div className={styles.miniSectionContent}>
                 <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                   <SBTsPage
@@ -3131,7 +3447,10 @@ class OnePageSession extends Component<any, any> {
             {this.state.showResults && (
               <div className={styles.miniSectionContent}>
                 <div>
-                  {resultsViewMode === 'polis' && (
+                  {resultsViewMode === 'polis' && telegramDataMode && (
+                    this.renderTelegramResultsPanel()
+                  )}
+                  {resultsViewMode === 'polis' && !telegramDataMode && (
                     <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                       <PolisReport
                         onePageDemo={true}

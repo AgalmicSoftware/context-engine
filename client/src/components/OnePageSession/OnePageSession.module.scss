@@ -156,6 +156,161 @@
   cursor: pointer;
 }
 
+.telegramPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(23, 32, 51, 0.12);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.86);
+  color: rgba(23, 32, 51, 0.92);
+}
+
+.telegramPanelCompact {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.telegramPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.telegramPanelHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.telegramPanelActionButton {
+  border: 1px solid rgba(23, 32, 51, 0.2);
+  border-radius: var(--ce-radius-8);
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(23, 32, 51, 0.88);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.telegramPanelMeta {
+  color: rgba(23, 32, 51, 0.66);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.telegramPanelEmpty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 4px;
+  color: rgba(23, 32, 51, 0.66);
+  font-size: 0.92rem;
+}
+
+.telegramPanelError {
+  padding: 8px 10px;
+  border: 1px solid rgba(178, 34, 52, 0.4);
+  border-radius: var(--ce-radius-8);
+  background: rgba(178, 34, 52, 0.08);
+  color: #8f1d2c;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.telegramQuestionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.telegramQuestionCard {
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.telegramQuestionPrompt {
+  color: rgba(23, 32, 51, 0.95);
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.telegramQuestionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.telegramTagChip {
+  padding: 2px 8px;
+  border: 1px solid rgba(23, 32, 51, 0.16);
+  border-radius: 999px;
+  background: rgba(23, 32, 51, 0.05);
+  color: rgba(23, 32, 51, 0.78);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.telegramTagChipSelected {
+  border-color: rgba(24, 79, 184, 0.5);
+  background: rgba(24, 79, 184, 0.12);
+  color: #15407f;
+}
+
+.telegramBucketCard {
+  padding: 10px 12px;
+  border: 1px solid rgba(23, 32, 51, 0.1);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.telegramBucketCategory {
+  color: rgba(23, 32, 51, 0.92);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.telegramResultsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.telegramResultsHeading {
+  color: rgba(23, 32, 51, 0.92);
+  font-size: 1rem;
+  font-weight: 800;
+  border-bottom: 1px solid rgba(23, 32, 51, 0.1);
+  padding-bottom: 4px;
+}
+
+.telegramResultRow {
+  padding: 8px 10px;
+  border: 1px solid rgba(23, 32, 51, 0.08);
+  border-radius: var(--ce-radius-8);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.telegramGroupGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
 .titleContainerWithPileSubmitRail {
   position: relative;
   z-index: 41;

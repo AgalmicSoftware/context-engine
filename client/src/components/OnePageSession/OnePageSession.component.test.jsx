@@ -254,6 +254,90 @@ describe('OnePageSession view gating', () => {
     return { address, exp };
   };
 
+  const buildTelegramAgentFetchMock = ({
+    questions = [{ questionId: 'q1', questionType: 'binary', prompt: 'Fund the proposal?', tags: ['governance'] }],
+    answerState = { answeredCount: 1, unansweredCount: 2, sort: 'unanswered_first' },
+    resultsByView = {},
+    failAgentReads = false,
+    exchange = null,
+  } = {}) => jest.fn(async (url) => {
+    const urlString = String(url);
+    if (urlString.includes('/telegram/agent/api/session-meta')) {
+      return {
+        ok: true,
+        json: async () => ({ ok: true, sessionSlug: 'edge', telegramOnly: true, telegramBridgeEnabled: true }),
+      };
+    }
+    if (urlString.includes('/client-login/exchange') && exchange) {
+      return exchange();
+    }
+    if (urlString.includes('/telegram/agent/api/questions')) {
+      if (failAgentReads) throw new Error('worker offline');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, sessionSlug: 'edge', answerState, questions }),
+      };
+    }
+    if (urlString.includes('/telegram/agent/api/results')) {
+      if (failAgentReads) throw new Error('worker offline');
+      const view = new URL(urlString).searchParams.get('view') || '';
+      if (resultsByView[view]) return resultsByView[view]();
+      if (view === 'consensus' || view === 'difference') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            questionCount: 1,
+            responseCount: 3,
+            questions: [{
+              prompt: view === 'consensus' ? 'Agree on funding?' : 'Split on roadmap?',
+              total: 3,
+              participants: 3,
+              agreementScore: 0.66,
+              differenceScore: 0.2,
+              counts: [{ label: 'Yes', count: 2 }],
+            }],
+          }),
+        };
+      }
+      if (view === 'groups') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            groupCount: 1,
+            suppressedGroupCount: 0,
+            participantCount: 3,
+            questionCount: 1,
+            minGroupSize: 2,
+            groups: [{
+              groupId: 'g1',
+              label: 'Group A',
+              theme: 'Builders',
+              size: 3,
+              averageScore: 0.5,
+              topStatements: [{ prompt: 'Build more prototypes', differenceScore: 0.4 }],
+            }],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, available: false, unavailableReason: 'not_enough_responses', counts: {} }),
+      };
+    }
+    throw new Error(`Unexpected fetch: ${urlString}`);
+  });
+
+  const installFetchMock = (fetchMock) => {
+    Object.defineProperty(global, 'fetch', { writable: true, value: fetchMock });
+    return fetchMock;
+  };
+
   it('renders only one SurveyPage instance when switching from pile to full view', async () => {
     render(<OnePageSession {...buildProps()} />);
 
@@ -334,16 +418,25 @@ describe('OnePageSession view gating', () => {
       }))
     );
 
+    installFetchMock(buildTelegramAgentFetchMock());
+
     render(<OnePageSession
       {...buildProps()}
       sessionConfig={{
         ...buildProps().sessionConfig,
         telegramOnly: true,
         sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
       }}
     />);
 
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByText('Fund the proposal?')).toBeInTheDocument();
+    // Worker-backed telegram sessions must not mount the on-chain question pile,
+    // and question ids stay out of the UI.
+    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
+    expect(mockSurveyPage).not.toHaveBeenCalled();
+    expect(screen.queryByText('q1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-session-telegram-token-login')).not.toBeInTheDocument();
   });
 
@@ -462,9 +555,10 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('ce-session-telegram-token-login')).toBeNull();
   });
 
-  it('shows refresh results button after telegram login and triggers a re-fetch', async () => {
+  it('shows refresh results button after telegram login and re-pulls worker data', async () => {
     seedTelegramStoredCredentials();
     const refreshSpy = jest.fn(() => Promise.resolve());
+    const fetchMock = installFetchMock(buildTelegramAgentFetchMock());
 
     render(<OnePageSession
       {...buildProps()}
@@ -477,50 +571,143 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
+    expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
+    expect(await screen.findByText('Agree on funding?')).toBeInTheDocument();
 
+    const questionCallsBefore = fetchMock.mock.calls
+      .filter(([url]) => String(url).includes('/telegram/agent/api/questions')).length;
+    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
     fireEvent.click(refreshButton);
 
     await waitFor(() => {
-      expect(refreshSpy).toHaveBeenCalledWith(
-        null,
-        expect.objectContaining({ slug: 'edge', forceFull: true })
-      );
-    });
-  });
-
-  it('recovers when refresh results fails', async () => {
-    seedTelegramStoredCredentials();
-    const refreshSpy = jest.fn(() => Promise.reject(new Error('scan failed')));
-
-    render(<OnePageSession
-      {...buildProps()}
-      refreshQuestionResponses={refreshSpy}
-      sessionConfig={{
-        ...buildProps().sessionConfig,
-        telegramOnly: true,
-        sessionMode: 'telegram_only',
-        agentBridgeUrl: 'https://bridge.example',
-      }}
-    />);
-
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
-
-    fireEvent.click(refreshButton);
-
-    await waitFor(() => {
-      expect(refreshSpy).toHaveBeenCalledWith(
-        null,
-        expect.objectContaining({ slug: 'edge', forceFull: true })
-      );
+      const questionCallsAfter = fetchMock.mock.calls
+        .filter(([url]) => String(url).includes('/telegram/agent/api/questions')).length;
+      expect(questionCallsAfter).toBeGreaterThan(questionCallsBefore);
     });
     await waitFor(() => {
       expect(screen.getByTestId('ce-session-results-refresh')).not.toBeDisabled();
     });
+    // Telegram sessions refresh from the worker, not the on-chain scan.
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+
+  it('recovers when telegram worker reads fail', async () => {
+    seedTelegramStoredCredentials();
+    const refreshSpy = jest.fn(() => Promise.resolve());
+    installFetchMock(buildTelegramAgentFetchMock({ failAgentReads: true }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      refreshQuestionResponses={refreshSpy}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    expect(await screen.findByText(/could not load questions/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    const refreshButton = await screen.findByTestId('ce-session-results-refresh');
+
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-session-results-refresh')).not.toBeDisabled();
+    });
+    // Per-view failures degrade to subsection-level messages, not a dead panel.
+    expect((await screen.findAllByText(/unavailable right now/i)).length).toBeGreaterThan(0);
+    expect(refreshSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders research buckets instead of SBT groups for telegram sessions', async () => {
+    installFetchMock(buildTelegramAgentFetchMock({
+      exchange: () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          tokenType: 'session_worker_jwt',
+          sessionSlug: 'edge',
+          accountAddress: '0x00000000000000000000000000000000000000aa',
+          workerUrl: 'https://session-worker.example',
+          workerToken: 'worker-jwt-fresh',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          buckets: {
+            categories: [{
+              categoryId: 'events_attended',
+              label: 'Attendance',
+              options: [
+                { optionId: 'week_1', label: 'Week 1' },
+                { optionId: 'week_2', label: 'Week 2' },
+              ],
+            }],
+            selections: { events_attended: ['week_1'] },
+          },
+        }),
+      }),
+    }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    fireEvent.change(await screen.findByTestId('ce-session-telegram-token-input'), {
+      target: { value: `ceagt_${'B'.repeat(32)}` },
+    });
+    fireEvent.click(screen.getByTestId('ce-session-telegram-token-submit'));
+
+    expect(await screen.findByText('Research Buckets')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Research Buckets'));
+
+    expect(await screen.findByTestId('ce-session-telegram-buckets')).toBeInTheDocument();
+    expect(screen.getByText('Attendance')).toBeInTheDocument();
+    expect(screen.getByText('Week 1')).toBeInTheDocument();
+    expect(screen.queryByTestId('sbts-page')).not.toBeInTheDocument();
+    expect(mockSBTsPage).not.toHaveBeenCalled();
+    expect(screen.queryByText('Join or Create')).not.toBeInTheDocument();
+  });
+
+  it('shows per-view disabled state in telegram results', async () => {
+    seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock({
+      resultsByView: {
+        groups: () => ({
+          ok: false,
+          status: 403,
+          json: async () => ({ ok: false, reason: 'anonymized_groups_admin_disabled' }),
+        }),
+      },
+    }));
+
+    render(<OnePageSession
+      {...buildProps()}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        telegramOnly: true,
+        sessionMode: 'telegram_only',
+        agentBridgeUrl: 'https://bridge.example',
+      }}
+    />);
+
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    expect(await screen.findByTestId('ce-session-telegram-results')).toBeInTheDocument();
+
+    expect(await screen.findByText('Agree on funding?')).toBeInTheDocument();
+    expect(await screen.findByText(/not enabled for this session/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
+    expect(mockPolisReport).not.toHaveBeenCalled();
   });
 
   it('reopens token entry with a clear message when the telegram token expired', async () => {
@@ -564,6 +751,7 @@ describe('OnePageSession view gating', () => {
 
   it('lets a logged-in user open the change-token form', async () => {
     seedTelegramStoredCredentials();
+    installFetchMock(buildTelegramAgentFetchMock());
 
     render(<OnePageSession
       {...buildProps()}
@@ -575,7 +763,7 @@ describe('OnePageSession view gating', () => {
       }}
     />);
 
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    expect(await screen.findByTestId('ce-session-telegram-questions')).toBeInTheDocument();
     const changeToken = await screen.findByTestId('ce-session-telegram-change-token');
 
     fireEvent.click(changeToken);
