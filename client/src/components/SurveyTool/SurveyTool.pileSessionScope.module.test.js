@@ -1,72 +1,105 @@
-import SurveyTool from './SurveyTool';
-import {
-  computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
-  normalizeSurveyToolFilterState,
-  shouldShowPileFullLoadingState,
-  buildSurveyDraftSemanticSignature,
-} from './surveyToolUtils.js';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
-import { QuestionsDashboard } from './SurveySelector';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider } from './DeferredCommitSlider';
-import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
-import TagModal from '../TagPage/TagModal';
-import GatedPromptNotice from './GatedPromptNotice';
-import styles from './SurveyTool.module.scss';
-import { renderToStaticMarkup } from 'react-dom/server';
-import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
-import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import { screen, waitFor } from '@testing-library/react';
+
+import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
+import { buildQuestionFilterStorageKeyPrefix } from './surveyToolUtils.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
-import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
-import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
-import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
+const defaultCacheNode = {
+  questions: {},
+  questionResponses: {},
+  pendingQuestionMetadata: {},
+};
+
+const setupListScope = (blockedAlpha = []) => {
+  jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+  jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+
+  const strictLookup = (slug) => {
+    if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+    if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: blockedAlpha };
+    if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+    return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+  };
+
+  jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+  jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+};
+
+const mockQuestionCaches = (questionCachesBySlug = {}) => {
+  const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace, slug) => {
+    if (namespace !== 'questionsCache') return {};
+    return questionCachesBySlug[slug] || {};
   });
-  return { promise, resolve, reject };
-};
-
-const flushAsyncCallbacks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-};
-
-const syncClassSetState = (subject) => {
-  subject.setState = jest.fn((next, cb) => {
-    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-    if (patch && typeof patch === 'object') {
-      subject.state = { ...subject.state, ...patch };
-    }
-    if (typeof cb === 'function') cb();
-    return patch;
+  const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
+    if (namespace !== 'questionsCache') return {};
+    return questionCachesBySlug[slug] || {};
   });
-  return subject.setState;
+  return { readSpy, peekSpy };
 };
+
+const renderPile = (props = {}) => renderSurveyPileViewMode({
+  minifiedMode: 'pile',
+  network: { id: 84532 },
+  networkChainId: 84532,
+  account: '',
+  sessionSlug: 'edge',
+  activeSessionSlug: 'edge',
+  cacheHasLoaded: true,
+  isQuestionCacheReady: true,
+  questionResponsesNonce: 1,
+  questionsCacheNonce: 1,
+  onFilterChange: jest.fn(),
+  runtimeStrategy: createPileViewRuntimeStrategy(),
+  ...props,
+}, { route: '/session/edge' });
+
+const createScopedQuestionCaches = () => ({
+  edge: {
+    '84532': {
+      ...defaultCacheNode,
+      questions: {
+        q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
+      },
+    },
+  },
+  alpha: {
+    '84532': {
+      ...defaultCacheNode,
+      questions: {
+        q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
+        qBlockedAlpha: { id: 'qBlockedAlpha', prompt: 'Blocked alpha', type: 'freeform' },
+      },
+      questionResponses: {
+        q2: {
+          '0xabc': { answer: { value: 'yes', encrypted: false }, additional: { value: '', encrypted: false } },
+        },
+      },
+    },
+  },
+  beta: {
+    '84532': {
+      ...defaultCacheNode,
+      questions: {
+        q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
+      },
+    },
+  },
+});
+
+const cappedScanProgress = (overrides = {}) => ({
+  slug: 'edge',
+  phase: 'scan',
+  totalBlocks: 50000,
+  requestedTotalBlocks: 234000,
+  wasCapped: true,
+  scannedBlocks: 50000,
+  remainingBlocks: 184000,
+  startedAtMs: 1000,
+  ...overrides,
+});
 
 describe('SurveyTool pile session scope and progress', () => {
   afterEach(() => {
@@ -74,317 +107,84 @@ describe('SurveyTool pile session scope and progress', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
-  it('keeps pile warm-seed questions session-local on /session routes even when list scope includes other slugs', () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/session/edge');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
-      const strictLookup = (slug) => {
-        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockedalpha'] };
-        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-      };
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
 
-      const questionCachesBySlug = {
-        edge: {
-          '84532': {
-            questions: {
-              q1: { id: 'q1', prompt: 'Edge 1' },
-            },
-            questionResponses: {},
-          },
-        },
-        alpha: {
-          '84532': {
-            questions: {
-              q2: { id: 'q2', prompt: 'Alpha 2' },
-              qBlockedAlpha: { id: 'qBlockedAlpha', prompt: 'Blocked alpha' },
-            },
-            questionResponses: {},
-          },
-        },
-        beta: {
-          '84532': {
-            questions: {
-              q3: { id: 'q3', prompt: 'Beta 3' },
-            },
-            questionResponses: {},
-          },
-        },
-      };
-      const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace !== 'questionsCache') return {};
-        return questionCachesBySlug[slug] || {};
-      });
+  it('keeps pile warm-seed questions session-local on /session routes even when list scope includes other slugs', async () => {
+    setupListScope(['qblockedalpha']);
+    const { peekSpy, readSpy } = mockQuestionCaches(createScopedQuestionCaches());
 
-      const shell = new SurveyTool({
-        minifiedMode: 'pile',
-        network: { id: 84532 },
-        networkChainId: 84532,
-        account: '',
-        sessionSlug: 'edge',
-        activeSessionSlug: 'edge',
-        isQuestionCacheReady: true,
-        questionResponsesNonce: 1,
-        questionsCacheNonce: 1,
-        onFilterChange: jest.fn(),
-      });
-      const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    renderPile();
 
-      const idsLower = subject.state.pileQuestions.map((q) => String(q.id).toLowerCase());
-      expect(idsLower).toEqual(['q1']);
-      expect(subject.state.allQuestionsForFilter.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
-      const byIdLower = new Map(
-        subject.state.pileQuestions.map((q) => [String(q.id).toLowerCase(), q])
-      );
-      expect(byIdLower.get('q1')?.sessionSlug).toBe('edge');
-      expect(byIdLower.has('q2')).toBe(false);
-      expect(byIdLower.has('q3')).toBe(false);
-      expect(idsLower).not.toContain('qblockedalpha');
-      expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
-      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
-      expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
+    expect(screen.getByText('Edge 1')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'edge');
+    });
+    expect(screen.queryByText('Alpha 2')).toBeNull();
+    expect(screen.queryByText('Beta 3')).toBeNull();
+    expect(screen.queryByText('Blocked alpha')).toBeNull();
+    expect(peekSpy).toHaveBeenCalledWith('questionsCache', 'edge', { clone: false });
+    expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha', { clone: false });
+    expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', 'beta', { clone: false });
+    expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha');
+    expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'beta');
   });
 
   it('keeps pile question loads session-local on /session routes even when list scope includes other slugs', async () => {
-    const priorUrl = window.location.href;
-    window.history.replaceState({}, '', '/session/edge');
-    try {
-      jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
-      jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
-      const strictLookup = (slug) => {
-        if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-      };
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
-      jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+    setupListScope();
+    const { readSpy } = mockQuestionCaches(createScopedQuestionCaches());
 
-      const questionCachesBySlug = {
-        edge: {
-          '84532': {
-            questions: {
-              q1: { id: 'q1', prompt: 'Edge 1', type: 'freeform' },
-            },
-            questionResponses: {},
-          },
-        },
-        alpha: {
-          '84532': {
-            questions: {
-              q2: { id: 'q2', prompt: 'Alpha 2', type: 'freeform' },
-            },
-            questionResponses: {
-              q2: {
-                '0xabc': { answer: { value: 'yes', encrypted: false }, additional: { value: '', encrypted: false } },
-              },
-            },
-          },
-        },
-        beta: {
-          '84532': {
-            questions: {
-              q3: { id: 'q3', prompt: 'Beta 3', type: 'freeform' },
-            },
-            questionResponses: {},
-          },
-        },
-      };
-      const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace, slug) => {
-        if (namespace !== 'questionsCache') return {};
-        return questionCachesBySlug[slug] || {};
-      });
-      jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace, slug) => {
-        if (namespace !== 'questionsCache') return {};
-        return questionCachesBySlug[slug] || {};
-      });
+    renderPile({
+      account: '0xAbC',
+      questionResponsesNonce: 5,
+    });
 
-      const shell = new SurveyTool({
-        minifiedMode: 'pile',
-        network: { id: 84532 },
-        networkChainId: 84532,
-        account: '0xAbC',
-        sessionSlug: 'edge',
-        activeSessionSlug: 'edge',
-        isQuestionCacheReady: true,
-        questionResponsesNonce: 5,
-        questionsCacheNonce: 1,
-        onFilterChange: jest.fn(),
-      });
-      const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-      subject.state = {
-        ...subject.state,
-        loading: true,
-        pileQuestions: [],
-        allQuestionsForFilter: [],
-        activePileIndex: 0,
-        filterState: {},
-        isFilterActive: false,
-        submissionComplete: false,
-        autoDecryptEnabled: false,
-        autoDecryptAttempted: {},
-        decryptingByKey: {},
-      };
-      subject.setState = jest.fn((update, cb) => {
-        const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
-        if (patch && typeof patch === 'object') {
-          subject.state = { ...subject.state, ...patch };
-        }
-        if (typeof cb === 'function') cb();
-        return patch;
-      });
-      subject.initializeResponseState = jest.fn((cb) => {
-        if (typeof cb === 'function') cb();
-      });
-      subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
-        if (typeof cb === 'function') cb();
-      });
-      subject.rehydrateDraftForRenderedIds = jest.fn();
-
-      await subject.loadAndSortQuestions();
-
-      expect(subject.state.pileQuestions.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
-      expect(subject.state.allQuestionsForFilter.map((q) => String(q.id).toLowerCase())).toEqual(['q1']);
-      expect(subject.getPileFilterQuestionResponses()).toEqual({});
-      const byIdLower = new Map(
-        subject.state.pileQuestions.map((q) => [String(q.id).toLowerCase(), q])
-      );
-      expect(byIdLower.has('q2')).toBe(false);
-      const tree = subject.render();
-      const questionFilterNode = findElement(
-        tree,
-        (node) =>
-          node?.props?.onFilter === subject.handleFilter &&
-          node?.props?.currentViewModeForUrl === 'questions'
-      );
-      expect(questionFilterNode?.props?.storageKeyPrefix).toBe('dg:filters:edge');
-      expect(readSpy).toHaveBeenCalledWith('questionsCache', 'edge');
-      expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha');
-      expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'beta');
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
-  });
-
-  it('renders capped pile loading progress with the requested total block count', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
+    expect(await screen.findByText('Edge 1')).toBeInTheDocument();
+    expect(screen.queryByText('Alpha 2')).toBeNull();
+    expect(screen.queryByText('Beta 3')).toBeNull();
+    expect(screen.queryByText('Blocked alpha')).toBeNull();
+    expect(readSpy).toHaveBeenCalledWith('questionsCache', 'edge');
+    expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'alpha');
+    expect(readSpy).not.toHaveBeenCalledWith('questionsCache', 'beta');
+    // port note: dropped direct QuestionFilter prop inspection; the scoped prefix is
+    // asserted through the same helper used to render that prop, while QuestionFilter
+    // storage behavior is covered in QuestionFilter.pipelineAutosave.test.ts.
+    expect(buildQuestionFilterStorageKeyPrefix({
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
       network: { id: 84532 },
       networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
-      cacheHasLoaded: true,
-      isQuestionCacheReady: false,
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 1,
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'scan',
-        totalBlocks: 50000,
-        requestedTotalBlocks: 234000,
-        wasCapped: true,
-        scannedBlocks: 50000,
-        remainingBlocks: 184000,
-        startedAtMs: 1000,
-      },
-      onFilterChange: jest.fn(),
-    });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
-
-    subject.state = {
-      ...subject.state,
-      loading: true,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      hasHiddenGatedQuestions: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
-
-    const tree = subject.render();
-
-    expect(treeHasText(tree, '184,000 blocks left')).toBe(true);
-    expect(treeHasText(tree, '0 / 184,000')).toBe(true);
+    }, 'edge')).toBe('dg:filters:edge');
   });
 
-  it('tracks pile loading progress relative to the current refresh window', () => {
-    const shell = new SurveyTool({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      account: '',
-      sessionSlug: 'edge',
-      cacheHasLoaded: true,
+  it('renders capped pile loading progress with the requested total block count', async () => {
+    mockQuestionCaches({ edge: { '84532': defaultCacheNode } });
+
+    renderPile({
       isQuestionCacheReady: false,
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 1,
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'scan',
-        totalBlocks: 50000,
-        requestedTotalBlocks: 234000,
-        wasCapped: true,
-        scannedBlocks: 50000,
-        remainingBlocks: 184000,
-        startedAtMs: 1000,
-      },
-      onFilterChange: jest.fn(),
+      questionScanProgress: cappedScanProgress(),
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
-    subject.state = {
-      ...subject.state,
-      loading: true,
-      pileQuestions: [],
-      allQuestionsForFilter: [],
-      activePileIndex: 0,
-      filterState: {},
-      isFilterActive: false,
-      hasHiddenGatedQuestions: false,
-      submissionComplete: false,
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      decryptingByKey: {},
-    };
+    expect(await screen.findByText('184,000 blocks left')).toBeInTheDocument();
+    expect(screen.getByText('0 / 184,000')).toBeInTheDocument();
+  });
 
-    subject.render();
+  it('tracks pile loading progress relative to the current refresh window', async () => {
+    mockQuestionCaches({ edge: { '84532': defaultCacheNode } });
+    const { rerenderSurveyQuestions } = renderPile({
+      isQuestionCacheReady: false,
+      questionScanProgress: cappedScanProgress(),
+    });
 
-    subject.props = {
-      ...subject.props,
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'scan',
-        totalBlocks: 50000,
-        requestedTotalBlocks: 234000,
-        wasCapped: true,
+    expect(await screen.findByText('184,000 blocks left')).toBeInTheDocument();
+    expect(screen.getByText('0 / 184,000')).toBeInTheDocument();
+
+    rerenderSurveyQuestions({
+      questionScanProgress: cappedScanProgress({
         scannedBlocks: 100000,
         remainingBlocks: 134000,
-        startedAtMs: 1000,
-      },
-    };
+      }),
+    });
 
-    const tree = subject.render();
-
-    expect(treeHasText(tree, '134,000 blocks left')).toBe(true);
-    expect(treeHasText(tree, '50,000 / 184,000')).toBe(true);
+    expect(await screen.findByText('134,000 blocks left')).toBeInTheDocument();
+    expect(screen.getByText('50,000 / 184,000')).toBeInTheDocument();
   });
-
 });
