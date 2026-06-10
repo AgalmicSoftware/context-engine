@@ -435,6 +435,32 @@ export type SurveyEncryptionResponseStatePatch = {
   submittedSinceLastEdit: unknown;
 };
 
+export type SurveyResponseFetchLoadingStatePatch = {
+  isLoadingResponse: boolean;
+  responseLookupWarning: string;
+};
+
+export type SurveyViewedResponseStatePatch = {
+  viewAddressAnswers: string;
+  parsedViewAddressAnswers: unknown;
+  noResponse: boolean;
+  responseLookupWarning: string;
+};
+
+export type SurveyUserResponseFoundStatePatch = {
+  userHasResponse: boolean;
+  userResponseEncrypted: boolean;
+  startFresh: boolean;
+  userAnswers: unknown;
+  submissionComplete?: boolean;
+};
+
+export type SurveyUserResponseMissingStatePatch = {
+  userHasResponse: boolean;
+  userResponseEncrypted: boolean;
+  userAnswers: null;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -1312,6 +1338,61 @@ export const buildAdditionalEncryptionAudienceState = (
     submittedSinceLastEdit: updateSubmittedSinceLastEdit(prevState.submittedSinceLastEdit, 'user_edit'),
   };
 };
+
+export const buildSurveyResponseFetchLoadingState = (): SurveyResponseFetchLoadingStatePatch => ({
+  isLoadingResponse: true,
+  responseLookupWarning: '',
+});
+
+export const buildViewedSurveyResponseState = (
+  prevState: { parsedViewAddressAnswers?: unknown } = {},
+  viewAnswers: unknown,
+  mergeDecryptedViewedResponse: (previousAnswers: unknown, nextAnswers: unknown) => unknown
+): SurveyViewedResponseStatePatch => {
+  const merged = mergeDecryptedViewedResponse(prevState.parsedViewAddressAnswers, viewAnswers);
+  return {
+    viewAddressAnswers: JSON.stringify(merged),
+    parsedViewAddressAnswers: merged,
+    noResponse: false,
+    responseLookupWarning: '',
+  };
+};
+
+export const buildViewedSurveyNoResponseState = (
+  noResponse: unknown = true
+): SurveyViewedResponseStatePatch => ({
+  viewAddressAnswers: '',
+  parsedViewAddressAnswers: null,
+  noResponse: !!noResponse,
+  responseLookupWarning: '',
+});
+
+export const buildUserSurveyResponseFoundState = ({
+  hasEncrypted = false,
+  resetSubmissionComplete = false,
+  userAnswers = null,
+}: {
+  hasEncrypted?: unknown;
+  resetSubmissionComplete?: boolean;
+  userAnswers?: unknown;
+} = {}): SurveyUserResponseFoundStatePatch => {
+  const patch: SurveyUserResponseFoundStatePatch = {
+    userHasResponse: true,
+    userResponseEncrypted: !!hasEncrypted,
+    startFresh: false,
+    userAnswers,
+  };
+  if (resetSubmissionComplete) {
+    patch.submissionComplete = false;
+  }
+  return patch;
+};
+
+export const buildUserSurveyResponseMissingState = (): SurveyUserResponseMissingStatePatch => ({
+  userHasResponse: false,
+  userResponseEncrypted: false,
+  userAnswers: null,
+});
 
 export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
   isDecrypting: true,
