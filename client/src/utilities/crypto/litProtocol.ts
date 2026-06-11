@@ -475,9 +475,7 @@ const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
   11155420: 'optimismSepolia',
 });
 
-const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({
-  optimismSepolia: 'sepolia',
-});
+const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({});
 
 const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
   Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
@@ -486,9 +484,7 @@ const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
   }, {})
 );
 
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({
-  optimismSepolia: 'Lit does not currently support OP Sepolia for SBT-gated encryption. Choose "only me" private encryption or move the gate to a supported chain such as Base Sepolia.',
-});
+const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({});
 
 const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   chipotle: 'chipotle',
