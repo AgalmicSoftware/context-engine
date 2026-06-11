@@ -57,11 +57,12 @@ The smallest design that preserves "only holders of this SBT can decrypt" is:
 
 ### Chain scope
 
-Lit v3 gate evaluation should be treated as chain-configured, not Base-specific.
-Context Engine's default E2E and deployment target is OP Sepolia (`11155420`),
-and Lit access conditions should derive their Lit chain from the session or gate
+Lit v3 gate evaluation should be treated as chain-configured across EVM chains,
+not Base-specific. Context Engine's default E2E and deployment target is OP
+Sepolia (`11155420`), but that is an application default, not a Lit limitation.
+Lit access conditions should derive their Lit chain from the session or gate
 `chainId` / `litChain` value. Base Sepolia (`84532`) remains supported for
-legacy and development compatibility, but it is not the default Lit-gated path.
+legacy and development compatibility, but it is not the default E2E path.
 
 ### v3 trust boundary
 
