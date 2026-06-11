@@ -33,7 +33,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) remains supported for legacy/dev compatibility
 - Cloudflare Workers (`sessionCorsWorker`) — CORS proxy, encryption, gating
 - Arweave (metadata/payloads and most uploaded images); some token/image reads still accept IPFS URLs
-- Lit Protocol (SBT-gated field encryption via access control conditions)
+- Lit Protocol v3 (SBT-gated field encryption via access control conditions on configured EVM chains)
 - ethers v5.7.2 — **MUST stay on v5; v6 BigInt changes break the entire codebase**
 
 ## Project map
