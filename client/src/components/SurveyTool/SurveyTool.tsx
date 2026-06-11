@@ -90,6 +90,7 @@ type SurveyToolProps = {
   surveyID?: string;
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
+  sessionConfig?: unknown;
   account?: string;
   provider?: unknown;
   loginComplete?: boolean;
@@ -318,6 +319,7 @@ const renderSurveyToolContent = ({
             loginComplete={props.loginComplete}
             loginInProgress={props.loginInProgress}
             network={props.network}
+            networkChainId={props.networkChainId}
             cache={cache}
             updateCache={updateCache}
             pubKey={pubKey}
@@ -337,6 +339,7 @@ const renderSurveyToolContent = ({
             activeSessionSlug={activeSessionSlug}
             sessionSlug={toolSessionSlug}
             sessionSlugPinned={props.sessionSlugPinned}
+            sessionConfig={props.sessionConfig}
             hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
           />
         </React.Suspense>
@@ -376,6 +379,7 @@ const renderSurveyToolContent = ({
         loginComplete={props.loginComplete}
         loginInProgress={props.loginInProgress}
         network={props.network}
+        networkChainId={props.networkChainId}
         cache={cache}
         updateCache={updateCache}
         questionID={props.questionID}
@@ -404,6 +408,7 @@ const renderSurveyToolContent = ({
         activeSessionSlug={activeSessionSlug}
         sessionSlug={toolSessionSlug}
         sessionSlugPinned={props.sessionSlugPinned}
+        sessionConfig={props.sessionConfig}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
       />
       <React.Suspense fallback={null}>

@@ -1633,6 +1633,8 @@ export class SurveySelector extends Component<any, any> {
               questionScanProgress={this.props.questionScanProgress}
               hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
               sessionSlug={this.props.sessionSlug}
+              sessionConfig={sessionConfig}
+              networkChainId={this.props.networkChainId}
             />
           </React.Suspense>
         )}
