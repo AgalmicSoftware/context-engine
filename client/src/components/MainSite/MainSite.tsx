@@ -5808,6 +5808,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
             activeSessionSlug={effectiveQuestionSlug}
             sessionSlug={effectiveQuestionSlug}
             sessionSlugPinned={questionSlugPinned}
+            sessionConfig={questionSessionCfg}
             {...questionCacheViewProps}
             refreshSurveyResponsesByID={(id: string) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug!, id)}
             refreshQuestionMetadata={() => this.refreshQuestionMetadataForGroup(effectiveQuestionSlug!)}
