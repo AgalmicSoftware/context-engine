@@ -10,10 +10,23 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { Card, CardBody } from 'reactstrap';
 
+import BinaryChoiceInput from '../../SurveyTool/BinaryChoiceInput';
+import MultichoiceQuestionInput from '../../SurveyTool/MultichoiceQuestionInput';
+import SurveyAudioFieldInput from '../../SurveyTool/SurveyAudioFieldInput';
+import CESlider from '../../Shared/CESlider';
 import type { TelegramAgentQuestion } from '../../../utilities/session/telegramAgentData';
 import type { TelegramAnswerInput } from '../../../utilities/session/telegramSessionBackend';
+import {
+  RATING_MAX,
+  RATING_MIN,
+} from '../../../utilities/survey/ratingValue';
 import styles from '../OnePageSession.module.scss';
 import surveyToolStyles from '../../SurveyTool/SurveyTool.module.scss';
+import {
+  getNormalizedUiRatingValue,
+  isSingleSelectMultichoice,
+  normalizeMultichoiceValue,
+} from '../../SurveyTool/surveyToolResponseState';
 
 type TelegramQuestionPileProps = {
   answerState?: { answeredCount?: number; unansweredCount?: number } | null;
@@ -54,11 +67,21 @@ const answerReady = (question: TelegramAgentQuestion, draft: any): boolean => {
 
 const answerPayload = (question: TelegramAgentQuestion, draft: any): TelegramAnswerInput | string | number | string[] => {
   const type = questionType(question);
-  if (type === 'binary') return { value: draft.value };
+  if (type === 'binary') return { value: String(draft.value || '').toLowerCase() };
   if (type === 'rating') return { value: Number(draft.value) };
   if (type === 'multichoice') return { values: Array.isArray(draft.values) ? draft.values : [] };
   return { text: String(draft.text || '').trim() };
 };
+
+const asPileQuestion = (question: TelegramAgentQuestion) => ({
+  id: question.questionId,
+  type: questionType(question),
+  prompt: question.prompt || 'Question',
+  options: Array.isArray(question.options) ? question.options : [],
+  singleSelect: (question as any).singleSelect,
+  singleChoice: (question as any).singleChoice,
+  oneSelectionOnly: (question as any).oneSelectionOnly,
+});
 
 export default function TelegramQuestionPile({
   answerState = null,
@@ -101,100 +124,81 @@ export default function TelegramQuestionPile({
     if (!activeQuestion) return null;
     const type = questionType(activeQuestion);
     const qid = activeQuestion.questionId;
+    const pileQuestion = asPileQuestion(activeQuestion);
     const options = Array.isArray(activeQuestion.options)
       ? activeQuestion.options.map((option) => String(option || '').trim()).filter(Boolean)
       : [];
     if (type === 'binary') {
       return (
-        <div
-          className={`${styles.telegramReadonlyControls} ${surveyToolStyles.binaryChoice || ''}`.trim()}
-          data-testid="ce-session-telegram-question-binary-controls"
-          aria-label="Binary answer options"
-        >
-          {['Agree', 'Unsure', 'Disagree'].map((label) => {
-            const value = label.toLowerCase();
-            const selected = draft.value === value;
-            return (
-              <button
-                key={label}
-                type="button"
-                className={`${styles.telegramReadonlyChoice} ${selected ? styles.telegramAnswerChoiceSelected : ''}`.trim()}
-                onClick={() => setDraft(qid, { value })}
-                aria-pressed={selected}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div data-testid="ce-session-telegram-question-binary-controls">
+          <BinaryChoiceInput
+            questionId={qid}
+            value={String(draft.value || '')}
+            inputNamePrefix="telegram-q"
+            disabled={isSubmitting}
+            onChange={(value) => setDraft(qid, { value })}
+          />
         </div>
       );
     }
     if (type === 'rating') {
+      const ratingValue = Number.isFinite(Number(draft.value))
+        ? getNormalizedUiRatingValue(draft.value)
+        : RATING_MIN;
       return (
         <div
-          className={`${styles.telegramReadonlyControls} ${styles.telegramRatingControls}`.trim()}
+          className={surveyToolStyles.ratingContainer}
           data-testid="ce-session-telegram-question-rating-controls"
-          aria-label="Rating answer options"
         >
-          {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => {
-            const selected = Number(draft.value) === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                className={`${styles.telegramRatingButton} ${selected ? styles.telegramAnswerChoiceSelected : ''}`.trim()}
-                onClick={() => setDraft(qid, { value })}
-                aria-pressed={selected}
-              >
-                {value}
-              </button>
-            );
-          })}
+          <CESlider
+            min={RATING_MIN}
+            max={RATING_MAX}
+            step={1}
+            value={ratingValue}
+            onChange={(value) => setDraft(qid, { value })}
+            disabled={isSubmitting}
+            className={surveyToolStyles.ratingSlider}
+          />
+          <span className={surveyToolStyles.ratingValueDisplay}>
+            {ratingValue}
+          </span>
         </div>
       );
     }
     if (type === 'multichoice' || options.length > 0) {
-      const selectedValues = new Set(Array.isArray(draft.values) ? draft.values : []);
       return (
         <div
-          className={`${styles.telegramReadonlyControls} ${styles.telegramReadonlyOptionGrid}`.trim()}
           data-testid="ce-session-telegram-question-multichoice-controls"
-          aria-label="Multiple choice answer options"
         >
-          {(options.length > 0 ? options : ['Other']).map((option) => {
-            const selected = selectedValues.has(option);
-            return (
-              <button
-                key={option}
-                type="button"
-                className={`${styles.telegramReadonlyOption} ${selected ? styles.telegramAnswerChoiceSelected : ''}`.trim()}
-                onClick={() => {
-                  const next = new Set(selectedValues);
-                  if (selected) next.delete(option);
-                  else next.add(option);
-                  setDraft(qid, { values: Array.from(next) });
-                }}
-                aria-pressed={selected}
-              >
-                {option}
-              </button>
-            );
-          })}
+          <MultichoiceQuestionInput
+            questionId={qid}
+            options={options.length > 0 ? options : ['Other']}
+            selectedValues={normalizeMultichoiceValue(draft.values)}
+            isSingleSelect={isSingleSelectMultichoice(pileQuestion)}
+            disabled={isSubmitting}
+            onChange={(values) => setDraft(qid, { values })}
+          />
         </div>
       );
     }
     return (
-      <div className={styles.telegramReadonlyControls} data-testid="ce-session-telegram-question-freeform-controls">
-        <textarea
-          className={styles.telegramFreeformTextarea}
+      <div data-testid="ce-session-telegram-question-freeform-controls">
+        <SurveyAudioFieldInput
+          placeholder="Your response..."
           value={String(draft.text || '')}
-          placeholder="Type your response"
-          aria-label="Freeform response"
-          onChange={(event) => setDraft(qid, { text: event.target.value })}
+          updateFunction={(value) => setDraft(qid, { text: value })}
+          toggleEncryption={() => {}}
+          disabled={isSubmitting}
+          disableEncryption
+          enableDownloads={false}
         />
       </div>
     );
-  }, [activeQuestion, draft]);
+  }, [activeQuestion, draft, isSubmitting]);
+
+  const questionContainerClass = activeQuestion
+    ? surveyToolStyles[`${questionType(activeQuestion)}QuestionContainer`] || ''
+    : '';
 
   return (
     <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
@@ -283,7 +287,9 @@ export default function TelegramQuestionPile({
           >
             <CardBody className={surveyToolStyles.pileCardBody}>
               <div className={surveyToolStyles.pileCardHeader}>
-                <span>{activeQuestion.questionType || 'question'}</span>
+                <div className={surveyToolStyles.promptTitleBlock}>
+                  <h4 id={surveyToolStyles.questionTitle}>{activeQuestion.prompt}</h4>
+                </div>
                 {isAnswered ? (
                   <span className={styles.telegramAnsweredBadge}>
                     <FontAwesomeIcon icon={faCheck} /> Answered
@@ -291,15 +297,11 @@ export default function TelegramQuestionPile({
                 ) : null}
               </div>
               <div className={surveyToolStyles.pileCardMainContent}>
-                <div className={styles.telegramQuestionPromptDark}>{activeQuestion.prompt}</div>
-                {activeQuestion.tags?.length ? (
-                  <div className={styles.telegramChipRow}>
-                    {activeQuestion.tags.map((tag) => (
-                      <span key={tag} className={styles.telegramChipDark}>{tag}</span>
-                    ))}
-                  </div>
-                ) : null}
-                {controls}
+                <div className={questionContainerClass}>
+                  {controls}
+                </div>
+              </div>
+              <div className={surveyToolStyles.pileCardFooter}>
                 <button
                   type="button"
                   className={styles.telegramSubmitAnswerButton}

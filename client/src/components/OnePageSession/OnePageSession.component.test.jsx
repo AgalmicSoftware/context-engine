@@ -922,8 +922,8 @@ describe('OnePageSession view gating', () => {
     await openTelegramQuestions();
     expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
     expect(screen.getByTestId('ce-session-telegram-question-submit')).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Agree' }));
-    expect(screen.getByRole('button', { name: 'Agree' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Agree' }));
+    expect(screen.getByRole('radio', { name: 'Agree' })).toBeChecked();
     expect(screen.getByTestId('ce-session-telegram-question-submit')).not.toBeDisabled();
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-submit'));
     await waitFor(() => {
@@ -947,8 +947,11 @@ describe('OnePageSession view gating', () => {
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('Which tools matter?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Geo' })).not.toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Index' })).not.toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Geo' })).not.toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Index' })).not.toBeDisabled();
+    expect(screen.getByTestId('ce-session-telegram-question-item')).toContainElement(
+      screen.getByTestId('ce-session-telegram-question-multichoice-controls').querySelector('#multiChoice')
+    );
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How comfortable are you?')).toBeInTheDocument();
@@ -956,7 +959,7 @@ describe('OnePageSession view gating', () => {
 
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-next'));
     expect(await screen.findByText('How can agents help?')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Type your response')).not.toBeDisabled();
+    expect(screen.getByPlaceholderText('Your response...')).not.toBeDisabled();
     expect(screen.queryByText('q-binary')).not.toBeInTheDocument();
   });
 
@@ -1182,6 +1185,14 @@ describe('OnePageSession view gating', () => {
     expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
     expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
     expect(tabletRailBlock).toBeNull();
+  });
+
+  it('keeps telegram question pile cards on the normal pile width', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toContain('.telegramPileDeck');
+    expect(scss).toContain('width: min(550px, 90vw);');
+    expect(scss).not.toContain('max-width: 720px;');
   });
 
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
