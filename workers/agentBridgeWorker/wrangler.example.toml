@@ -23,6 +23,20 @@ kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]
 
+# Optional draft lifecycle research metrics (Workers Analytics Engine).
+# When bound, the worker writes one data point per draft_created / draft_edited /
+# draft_submitted / draft_discarded event: blobs = [event, sessionSlug,
+# questionId, source, originSource, controlType, principalFingerprint],
+# doubles = [editCount, draftToSubmitMs (-1 when unknown)], index = sessionSlug.
+# Leave unbound to disable; all writes are best-effort and never block the flow.
+# principalFingerprint is an HMAC-SHA256 pseudonym of the Telegram user id and
+# requires the AGENT_BRIDGE_ANALYTICS_SALT secret; without the salt the field
+# is empty (an unsalted hash of a small id space would be reversible):
+#   npx wrangler secret put AGENT_BRIDGE_ANALYTICS_SALT
+# [[analytics_engine_datasets]]
+# binding = "AGENT_BRIDGE_ANALYTICS"
+# dataset = "ce_agent_bridge_draft_events"
+
 # Optional burst buffer for 500-user smoke/production events. When enabled,
 # submit requests are accepted into KV and queued for background settlement.
 # Create the queue separately for manual Wrangler debugging.

@@ -124,6 +124,7 @@ const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
+const ANSWER_DRAFT_VIEW_KV_PREFIX = 'telegram:answer-draft-view:';
 const RESULT_PHOTO_KV_PREFIX = 'telegram:result-photo:';
 const RESULTS_EXPOSURE_OVERRIDE_KV_PREFIX = 'telegram:results-exposure:';
 const ADMIN_DEFAULT_SESSION_KV_KEY = 'telegram:admin-default-session:v1';
@@ -145,7 +146,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=32';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=39';
 const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/edge-2026';
 const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
@@ -2626,6 +2627,299 @@ function answerDraftKey({
     : '';
 }
 
+function answerDraftViewKey({
+  normalized = {},
+  sessionSlug = '',
+  questionId: selectedQuestionId = '',
+} = {}) {
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const qid = questionIdSeedPart(selectedQuestionId || 'question');
+  return telegramUserId && slug && qid
+    ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
+    : '';
+}
+
+function answerDraftFingerprint(record = {}) {
+  return stableFingerprint({
+    answerLabel: safeString(record.answerLabel),
+    answerValue: safeString(record.answerValue),
+    controlType: safeString(record.controlType),
+  });
+}
+
+function answerDraftOrigin(record = null) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+  const origin = record.origin && typeof record.origin === 'object' && !Array.isArray(record.origin)
+    ? record.origin
+    : null;
+  if (origin) {
+    return {
+      source: safeString(origin.source) || null,
+      agentMetadata: origin.agentMetadata && typeof origin.agentMetadata === 'object' && !Array.isArray(origin.agentMetadata)
+        ? origin.agentMetadata
+        : null,
+      answerLabel: safeString(origin.answerLabel),
+      answerValue: safeString(origin.answerValue),
+      controlType: safeString(origin.controlType),
+      fingerprint: safeString(origin.fingerprint) || answerDraftFingerprint(origin),
+      savedAt: safeString(origin.savedAt) || null,
+    };
+  }
+  return {
+    source: safeString(record.source) || null,
+    agentMetadata: record.agentMetadata && typeof record.agentMetadata === 'object' && !Array.isArray(record.agentMetadata)
+      ? record.agentMetadata
+      : null,
+    answerLabel: safeString(record.answerLabel),
+    answerValue: safeString(record.answerValue),
+    controlType: safeString(record.controlType),
+    fingerprint: safeString(record.fingerprint) || answerDraftFingerprint(record),
+    savedAt: safeString(record.selectedAt) || null,
+  };
+}
+
+async function analyticsPrincipalFingerprint(env = {}, telegramUserId = '') {
+  const salt = safeString(env?.AGENT_BRIDGE_ANALYTICS_SALT);
+  const id = safeString(telegramUserId);
+  const subtle = globalThis.crypto?.subtle;
+  if (!salt || !id || !subtle) return '';
+  const encoder = new TextEncoder();
+  const key = await subtle.importKey(
+    'raw',
+    encoder.encode(salt),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const signature = await subtle.sign('HMAC', key, encoder.encode(id));
+  return Array.from(new Uint8Array(signature)).slice(0, 12)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function writeDraftLifecycleEvent(env = {}, {
+  event = '',
+  sessionSlug = '',
+  questionId = '',
+  source = '',
+  originSource = '',
+  controlType = '',
+  editCount = 0,
+  draftToSubmitMs = null,
+  telegramUserId = '',
+} = {}) {
+  try {
+    const dataset = env?.AGENT_BRIDGE_ANALYTICS;
+    if (!dataset || typeof dataset.writeDataPoint !== 'function') return false;
+    const slug = sanitizeSessionSlug(sessionSlug);
+    const principalFingerprint = await analyticsPrincipalFingerprint(env, telegramUserId);
+    dataset.writeDataPoint({
+      blobs: [
+        safeString(event).slice(0, 64),
+        slug.slice(0, 256),
+        safeString(questionId).slice(0, 256),
+        safeString(source).slice(0, 64),
+        safeString(originSource).slice(0, 64),
+        safeString(controlType).slice(0, 64),
+        principalFingerprint,
+      ],
+      doubles: [
+        Number(editCount) || 0,
+        Number.isFinite(Number(draftToSubmitMs)) && draftToSubmitMs !== null ? Number(draftToSubmitMs) : -1,
+      ],
+      indexes: [slug.slice(0, 96)],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const CANONICAL_ANSWER_KINDS = Object.freeze({
+  binary: 'binary',
+  agree_unsure_disagree: 'binary',
+  rating: 'rating',
+  rating_button: 'rating',
+  multichoice: 'multichoice',
+  multi_select_toggle: 'multichoice',
+  single_select: 'multichoice',
+  freeform: 'freeform',
+  freeform_text: 'freeform',
+});
+
+function canonicalDraftAnswerForm(record = {}) {
+  const raw = safeString(record.answerValue);
+  const parsed = safeJsonParse(raw, null);
+  const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  const type = CANONICAL_ANSWER_KINDS[lower(safeString(source?.questionType))] ||
+    CANONICAL_ANSWER_KINDS[lower(safeString(record.controlType))] ||
+    'unknown';
+  const text = safeString(source ? (source.text ?? source.value ?? '') : raw);
+  const comments = safeString(source?.comments);
+  if (type === 'binary') {
+    return { type, value: lower(safeString(source?.value) || text), comments };
+  }
+  if (type === 'rating') {
+    const candidate = source?.value ?? (text === '' ? null : text);
+    const value = candidate === null || candidate === undefined || candidate === ''
+      ? NaN
+      : Number(candidate);
+    return { type, value: Number.isFinite(value) ? value : null, comments };
+  }
+  if (type === 'multichoice') {
+    const values = Array.isArray(source?.values)
+      ? source.values.map(safeString).filter(Boolean)
+      : (text ? [text] : []);
+    return { type, values: [...new Set(values)].sort(), comments };
+  }
+  return { type, text, comments };
+}
+
+function answerDraftSemanticFingerprint(record = {}) {
+  return stableFingerprint(canonicalDraftAnswerForm(record));
+}
+
+function buildDraftDelta(origin = null, finalAnswer = null) {
+  if (!origin || !finalAnswer) return null;
+  const before = canonicalDraftAnswerForm(origin);
+  const after = canonicalDraftAnswerForm(finalAnswer);
+  const changed = stableFingerprint(before) !== stableFingerprint(after);
+  const kind = after.type !== 'unknown' ? after.type : before.type;
+  const delta = { kind, changed };
+  if (kind === 'binary') {
+    delta.stanceBefore = safeString(before.value);
+    delta.stanceAfter = safeString(after.value);
+    delta.stanceChanged = delta.stanceBefore !== delta.stanceAfter;
+  } else if (kind === 'rating') {
+    delta.ratingBefore = Number.isFinite(before.value) ? before.value : null;
+    delta.ratingAfter = Number.isFinite(after.value) ? after.value : null;
+    delta.ratingShift = delta.ratingBefore !== null && delta.ratingAfter !== null
+      ? delta.ratingAfter - delta.ratingBefore
+      : null;
+  } else if (kind === 'multichoice') {
+    const valuesBefore = Array.isArray(before.values) ? before.values : [];
+    const valuesAfter = Array.isArray(after.values) ? after.values : [];
+    delta.addedValues = valuesAfter.filter((value) => !valuesBefore.includes(value));
+    delta.removedValues = valuesBefore.filter((value) => !valuesAfter.includes(value));
+  } else {
+    const textBefore = safeString(before.text);
+    const textAfter = safeString(after.text);
+    delta.lengthBefore = textBefore.length;
+    delta.lengthAfter = textAfter.length;
+    delta.lengthDelta = textAfter.length - textBefore.length;
+    delta.textChanged = textBefore !== textAfter;
+  }
+  const commentsBefore = safeString(before.comments);
+  const commentsAfter = safeString(after.comments);
+  if (commentsBefore || commentsAfter) delta.commentsChanged = commentsBefore !== commentsAfter;
+  return delta;
+}
+
+function buildDraftProvenance({
+  draft = null,
+  submittedAt = '',
+  firstViewedAt = '',
+} = {}) {
+  if (!draft || typeof draft !== 'object' || Array.isArray(draft)) return null;
+  const origin = draft.origin && typeof draft.origin === 'object' && !Array.isArray(draft.origin)
+    ? answerDraftOrigin(draft)
+    : null;
+  const finalAnswer = {
+    answerLabel: safeString(draft.answerLabel),
+    answerValue: safeString(draft.answerValue),
+    controlType: safeString(draft.controlType),
+  };
+  const finalFingerprint = safeString(draft.fingerprint) || answerDraftFingerprint(draft);
+  const finalSemanticFingerprint = safeString(draft.semanticFingerprint) ||
+    answerDraftSemanticFingerprint(draft);
+  const originSemanticFingerprint = origin ? answerDraftSemanticFingerprint(origin) : '';
+  const agentDrafted = safeString(origin?.source) === 'agent_handoff';
+  const editedFromOrigin = origin ? originSemanticFingerprint !== finalSemanticFingerprint : null;
+  const storedAgentRevision = draft.agentRevision &&
+    typeof draft.agentRevision === 'object' && !Array.isArray(draft.agentRevision)
+    ? draft.agentRevision
+    : null;
+  const agentRevision = storedAgentRevision ||
+    (agentDrafted ? { semanticFingerprint: originSemanticFingerprint, savedAt: origin?.savedAt || null } : null);
+  const submitted = safeString(submittedAt);
+  const originSavedAtMs = origin?.savedAt ? Date.parse(origin.savedAt) : NaN;
+  const submittedAtMs = submitted ? Date.parse(submitted) : NaN;
+  const viewed = safeString(firstViewedAt);
+  const viewedAtMs = viewed ? Date.parse(viewed) : NaN;
+  const validFirstViewedAt = viewed && (
+    !Number.isFinite(originSavedAtMs) ||
+    (Number.isFinite(viewedAtMs) && viewedAtMs >= originSavedAtMs)
+  ) ? viewed : '';
+  return {
+    version: 1,
+    source: safeString(draft.source) || null,
+    origin,
+    finalAnswer,
+    finalFingerprint,
+    finalSemanticFingerprint,
+    originSemanticFingerprint: originSemanticFingerprint || null,
+    editCount: Number(draft.editCount || 0),
+    humanEditCount: Number(draft.humanEditCount || 0),
+    lastEditSource: safeString(draft.lastEditSource) || null,
+    draftSavedAt: safeString(draft.selectedAt) || null,
+    lastEditedAt: safeString(draft.lastEditedAt) || null,
+    firstViewedAt: validFirstViewedAt || null,
+    submittedAt: submitted || null,
+    agentDrafted,
+    agentRevisionSavedAt: safeString(agentRevision?.savedAt) || null,
+    editedFromOrigin,
+    editedFromAgentDraft: agentRevision
+      ? safeString(agentRevision.semanticFingerprint) !== finalSemanticFingerprint
+      : false,
+    draftToSubmitMs: Number.isFinite(originSavedAtMs) && Number.isFinite(submittedAtMs) && submittedAtMs >= originSavedAtMs
+      ? submittedAtMs - originSavedAtMs
+      : null,
+    delta: buildDraftDelta(origin, finalAnswer),
+  };
+}
+
+async function markAnswerDraftViewed({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  viewedAt = null,
+} = {}) {
+  const key = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function' || typeof kv.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const existing = safeJsonParse(await kv.get(key).catch(() => null), null);
+  const existingViewedAt = existing && typeof existing === 'object' && !Array.isArray(existing)
+    ? safeString(existing.firstViewedAt)
+    : '';
+  if (existingViewedAt) {
+    return { ok: true, key, firstViewedAt: existingViewedAt, alreadyViewed: true };
+  }
+  const record = { version: 1, firstViewedAt: safeString(viewedAt) || nowIso() };
+  await kv.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+  });
+  return { ok: true, key, firstViewedAt: record.firstViewedAt, alreadyViewed: false };
+}
+
+async function readAnswerDraftFirstViewedAt({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+} = {}) {
+  const key = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const kv = env?.AGENT_ACTION_KV;
+  if (!key || !kv || typeof kv.get !== 'function') return '';
+  const parsed = safeJsonParse(await kv.get(key).catch(() => null), null);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+    ? safeString(parsed.firstViewedAt)
+    : '';
+}
+
 async function readAnswerDraft({
   env = {},
   normalized = {},
@@ -2650,7 +2944,24 @@ async function deleteAnswerDraft({
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.delete !== 'function') {
     return { ok: false, reason: 'action_kv_delete_unavailable' };
   }
+  const viewKey = answerDraftViewKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
+    : null;
   await env.AGENT_ACTION_KV.delete(key);
+  if (viewKey) await env.AGENT_ACTION_KV.delete(viewKey).catch(() => null);
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    await writeDraftLifecycleEvent(env, {
+      event: 'draft_discarded',
+      sessionSlug: safeString(existing.sessionSlug) || sanitizeSessionSlug(sessionSlug),
+      questionId: safeString(existing.questionId) || safeString(selectedQuestionId),
+      source: safeString(existing.source),
+      originSource: safeString(existing.origin?.source),
+      controlType: safeString(existing.controlType),
+      editCount: Number(existing.editCount || 0),
+      telegramUserId: safeString(existing.telegramUserId),
+    });
+  }
   return { ok: true, key };
 }
 
@@ -2664,14 +2975,20 @@ async function persistAnswerDraft({
   controlType = '',
   submitLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
   metadata = null,
+  agentMetadata = null,
   createdAt = null,
 } = {}) {
   const key = answerDraftKey({ normalized, sessionSlug, questionId: selectedQuestionId });
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
+  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
+    : null;
+  const previous = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : null;
+  const savedAt = createdAt || nowIso();
   const record = {
-    version: 1,
+    version: 2,
     telegramUserId: safeString(normalized.user?.telegramUserId),
     chatId: safeString(normalized.chat?.chatId),
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -2681,15 +2998,48 @@ async function persistAnswerDraft({
     controlType: safeString(controlType),
     status: 'draft_saved',
     submitLane: safeString(submitLane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    selectedAt: createdAt || nowIso(),
+    selectedAt: savedAt,
   };
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     record.source = safeString(metadata.source) || null;
     record.actionMetadata = { ...metadata };
   }
+  if (agentMetadata && typeof agentMetadata === 'object' && !Array.isArray(agentMetadata)) {
+    record.agentMetadata = { ...agentMetadata };
+  }
   if (!record.telegramUserId || !record.sessionSlug || !record.questionId || !record.answerLabel) {
     return { ok: false, reason: 'answer_draft_incomplete' };
   }
+  record.fingerprint = answerDraftFingerprint(record);
+  record.semanticFingerprint = answerDraftSemanticFingerprint(record);
+  record.origin = answerDraftOrigin(previous) || {
+    source: record.source || null,
+    agentMetadata: record.agentMetadata || null,
+    answerLabel: record.answerLabel,
+    answerValue: record.answerValue,
+    controlType: record.controlType,
+    fingerprint: record.fingerprint,
+    savedAt,
+  };
+  const previousSemanticFingerprint = previous
+    ? (safeString(previous.semanticFingerprint) || answerDraftSemanticFingerprint(previous))
+    : '';
+  const contentChanged = Boolean(previous) && previousSemanticFingerprint !== record.semanticFingerprint;
+  const isAgentWrite = record.source === 'agent_handoff';
+  record.editCount = Number(previous?.editCount || 0) + (contentChanged ? 1 : 0);
+  record.lastEditedAt = contentChanged ? savedAt : (safeString(previous?.lastEditedAt) || null);
+  record.humanEditCount = Number(previous?.humanEditCount || 0) +
+    (contentChanged && !isAgentWrite ? 1 : 0);
+  record.lastEditSource = contentChanged
+    ? (record.source || null)
+    : (safeString(previous?.lastEditSource) || null);
+  const previousAgentRevision = previous?.agentRevision &&
+    typeof previous.agentRevision === 'object' && !Array.isArray(previous.agentRevision)
+    ? previous.agentRevision
+    : null;
+  record.agentRevision = isAgentWrite
+    ? { semanticFingerprint: record.semanticFingerprint, savedAt }
+    : previousAgentRevision;
   assertNoSecretShape(record, 'Telegram answer drafts must not serialize secrets.');
   const activityMetadata = buildTelegramAgentActivityMetadata({
     type: 'answer_draft',
@@ -2699,11 +3049,25 @@ async function persistAnswerDraft({
     sessionSlug: record.sessionSlug,
     questionId: record.questionId,
     telegramUserId: record.telegramUserId,
+    editCount: record.editCount,
+    originSource: record.origin?.source || '',
   });
   await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
     metadata: activityMetadata,
   });
+  if (!previous || contentChanged) {
+    await writeDraftLifecycleEvent(env, {
+      event: previous ? 'draft_edited' : 'draft_created',
+      sessionSlug: record.sessionSlug,
+      questionId: record.questionId,
+      source: safeString(record.source),
+      originSource: safeString(record.origin?.source),
+      controlType: record.controlType,
+      editCount: record.editCount,
+      telegramUserId: record.telegramUserId,
+    });
+  }
   return { ok: true, key, draft: record };
 }
 
@@ -2724,11 +3088,7 @@ async function persistTelegramSubmitRequest({
   if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
     return { ok: false, reason: 'submit_request_incomplete' };
   }
-  const answerFingerprint = stableFingerprint({
-    answerLabel: safeString(draft.answerLabel),
-    answerValue: safeString(draft.answerValue),
-    controlType: safeString(draft.controlType),
-  });
+  const answerFingerprint = answerDraftFingerprint(draft);
   const idempotencyKey = `telegram_bot_submit:${telegramUserId}:${slug}:${questionIdSeedPart(qid)}:${answerFingerprint}`;
   const requestId = buildOpaqueActionId(idempotencyKey);
   const kvKey = submitRequestKvKey(requestId);
@@ -2750,6 +3110,25 @@ async function persistTelegramSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, slug);
   const session = resolved.ok ? resolved.session : { sessionSlug: slug };
+  const submittedAt = safeString(createdAt) || nowIso();
+  const firstViewedAt = await readAnswerDraftFirstViewedAt({
+    env,
+    normalized,
+    sessionSlug: slug,
+    selectedQuestionId: qid,
+  });
+  const draftProvenance = buildDraftProvenance({ draft, submittedAt, firstViewedAt });
+  const emitSubmittedEvent = () => writeDraftLifecycleEvent(env, {
+    event: 'draft_submitted',
+    sessionSlug: slug,
+    questionId: qid,
+    source: safeString(draft.source),
+    originSource: safeString(draft.origin?.source),
+    controlType: safeString(draft.controlType),
+    editCount: Number(draft.editCount || 0),
+    draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
+    telegramUserId,
+  });
   if (telegramSubmitQueueEnabled(env)) {
     const record = buildQueuedSubmitRecord({
       session,
@@ -2779,6 +3158,7 @@ async function persistTelegramSubmitRequest({
         },
         onChainAnswer: onChainAnswerFromDraft(draft),
         answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+        draftProvenance,
         createdAt,
       },
     });
@@ -2788,6 +3168,7 @@ async function persistTelegramSubmitRequest({
       error: safeString(error?.message || error),
     }));
     if (queued.ok === true) {
+      await emitSubmittedEvent();
       return {
         ok: true,
         requestId,
@@ -2841,6 +3222,7 @@ async function persistTelegramSubmitRequest({
         controlType: safeString(draft.controlType),
       },
       answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+      draftProvenance,
       canonicalApiRequest: {
         method: 'POST',
         path: '/api/agent/responses/submit-request',
@@ -2857,6 +3239,7 @@ async function persistTelegramSubmitRequest({
     };
     assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
     await persistTelegramSubmitRecord({ env, kvKey, record });
+    if (directSubmit.ok === true) await emitSubmittedEvent();
     return directSubmit.ok === true
       ? {
         ok: true,
@@ -2898,6 +3281,7 @@ async function persistTelegramSubmitRequest({
       controlType: safeString(draft.controlType),
     },
     answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+    draftProvenance,
     canonicalApiRequest: {
       method: 'POST',
       path: '/api/agent/responses/submit-request',
@@ -2914,6 +3298,7 @@ async function persistTelegramSubmitRequest({
   };
   assertNoSecretShape(record, 'Telegram submit requests must not serialize secrets.');
   await persistTelegramSubmitRecord({ env, kvKey, record });
+  await emitSubmittedEvent();
   return {
     ok: true,
     requestId,
@@ -11037,9 +11422,12 @@ export {
   ACTION_KV_PREFIX,
   AGENT_REQUEST_KV_PREFIX,
   ANSWER_DRAFT_KV_PREFIX,
+  ANSWER_DRAFT_VIEW_KV_PREFIX,
   COMMANDS,
+  answerDraftFingerprint,
   deleteAnswerDraft,
   analyzeParticipantResultGroup,
+  buildDraftProvenance,
   buildParticipantGraph,
   consensusQuestionsForResults,
   formatCounts,
@@ -11047,6 +11435,7 @@ export {
   loadSessionPolicy,
   loadQuestionsForSession,
   latestMiniAppLaunchKey,
+  markAnswerDraftViewed,
   parseAgentOnboardingStartParam,
   parseTelegramCommandText,
   persistActionRecord,
@@ -11057,6 +11446,7 @@ export {
   questionId,
   readActionRecord,
   readAnswerDraft,
+  readAnswerDraftFirstViewedAt,
   readGroupSessionBinding,
   readLatestMiniAppLaunchPointer,
   readPrivateSessionBinding,
@@ -11069,6 +11459,7 @@ export {
   readAdminDefaultSessionOverride,
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
+  writeDraftLifecycleEvent,
   clearAgentSkillUpdateFlag,
   clearAdminDefaultSessionOverride,
   writeResultsExposureOverride,

@@ -4854,7 +4854,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=32/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/telegram\/agent\/api\/skill\?v=39/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);

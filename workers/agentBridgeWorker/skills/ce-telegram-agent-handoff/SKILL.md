@@ -5,7 +5,7 @@ description: Use when an agent needs to connect a user to Context Engine, fetch 
 
 # Context Engine Agent Runtime
 
-**Skill version:** 2026-06-08 (v38)
+**Skill version:** 2026-06-11 (v39)
 
 Use this skill when acting as Hermes, OpenClaw, Claude Code, or another
 HTTP-capable agent for a user who wants Context Engine questions, answers,
@@ -57,7 +57,7 @@ maps. Agents use it to:
 Install this short runtime skill from the stable Worker skill URL:
 
 ```bash
-hermes skills install https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38
+hermes skills install https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=39
 ```
 
 For raw public-branch installs:
@@ -107,7 +107,7 @@ The Geo node supplies:
   "contextEngine": {
     "inviteToken": "<geo invite token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=39",
     "sessionSlug": "agent-village-2026"
   }
 }
@@ -268,10 +268,16 @@ The worker accepts these common shapes inside `preferences`:
 }
 ```
 
-Use `comments` only when it adds real nuance: premise challenge, ambiguity,
-missing option, condition, concrete counterexample, or a short explanation. Do
-not restate the chosen answer, add filler, or include private identifying
-details the user did not authorize.
+Keep draft explanations concise. Use `comments` only when it adds real nuance:
+premise challenge, ambiguity, missing option, condition, concrete
+counterexample, or the single strongest short reason from the user's own
+activity. Aim under 140 characters. Do not restate the chosen answer, list
+multiple arguments, hedge, add filler, or include private identifying details
+the user did not authorize. For `freeform` answers, keep `text` to the direct
+answer in 1-3 sentences and leave `comments` empty unless a distinct one-line
+rationale adds something. If the user's `draftStyle` is `concise`, omit
+`comments` unless the stance would be unclear; `detailed` permits at most two
+sentences.
 
 ## Create Questions
 
@@ -359,8 +365,9 @@ POST /telegram/agent/api/question-queue/apply
 ```
 
 `admin/metrics` returns counts only: token mints, distinct onboarded users,
-created questions, rolling submitted answer records, drafts, draft-edit metric
-records, group proposals, distinct respondents, and session activity. When
+created questions, rolling submitted answer records, drafts, edited live
+drafts, agent-origin drafts, draft-edit metric records, group proposals,
+distinct respondents, and session activity. When
 `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` is configured, root-admin global
 metrics default to visible Telegram sessions and exclude old demo/smoke
 sessions unless `includeLegacySessions=1` is explicitly requested.
@@ -384,6 +391,20 @@ launches, group approval links, export flows, and lower-level operator details.
   Repair the payload so `submit: true` and `humanApproved: true` are at the root.
 
 ## Changelog
+
+### 2026-06-11 (v39)
+
+- Draft records preserve first-revision provenance, edit counts, human-edit
+  counts, and latest agent revision fingerprints across agent, Mini App, and
+  private-chat lanes.
+- Submit records include `draftProvenance` with origin/final plaintext,
+  semantic fingerprints, review latency, and typed deltas for binary, rating,
+  multichoice, and freeform answers.
+- Optional Workers Analytics Engine lifecycle events cover `draft_created`,
+  `draft_edited`, `draft_submitted`, and `draft_discarded` without exposing raw
+  Telegram ids.
+- Tightened concise-draft guidance: comments should be one short reason, and
+  omitted in `concise` mode unless needed for clarity.
 
 ### 2026-06-08 (v38)
 

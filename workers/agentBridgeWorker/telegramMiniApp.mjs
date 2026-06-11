@@ -87,6 +87,7 @@ import {
 } from './telegramQuestionQueue.mjs';
 import {
   analyzeParticipantResultGroup,
+  buildDraftProvenance,
   buildLocalUrlQuestionCandidates,
   buildUrlQuestionGenerationPrompt,
   buildParticipantGraph,
@@ -98,8 +99,10 @@ import {
   deleteAnswerDraft,
   formatCounts,
   loadSubmittedResultRecords,
+  markAnswerDraftViewed,
   persistActionRecord,
   persistAnswerDraft,
+  readAnswerDraftFirstViewedAt,
   questionId as readQuestionId,
   readActionRecord,
   readAnswerDraft,
@@ -111,6 +114,7 @@ import {
   normalizeGeneratedQuestionCandidates,
   bridgeOpenAiApiKey,
   withBridgeOpenAiApiKey,
+  writeDraftLifecycleEvent,
   writeResultsExposureOverride,
 } from './telegramCommands.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
@@ -1492,6 +1496,7 @@ async function loadSavedMiniAppDrafts({
   sessionSlug = '',
   questions = [],
   submittedAnswerKeys = [],
+  createdAt = null,
 } = {}) {
   const telegramUserId = safeString(auth.user?.telegramUserId);
   if (!telegramUserId) return { savedDrafts: [], draftAnswersByQuestionKey: {} };
@@ -1509,6 +1514,13 @@ async function loadSavedMiniAppDrafts({
       selectedQuestionId: question.questionId,
     });
     if (!draft || safeString(draft.status) !== 'draft_saved') return null;
+    await markAnswerDraftViewed({
+      env,
+      normalized,
+      sessionSlug: questionSessionSlug,
+      selectedQuestionId: question.questionId,
+      viewedAt: createdAt,
+    }).catch(() => null);
     return {
       question,
       draft,
@@ -1792,6 +1804,7 @@ async function buildMiniAppState({
     sessionSlug,
     questions,
     submittedAnswerKeys: submittedAnswerState.submittedAnswerKeys,
+    createdAt,
   });
   const prefilledDraftAnswersByQuestionKey = {};
   questions.forEach((question) => {
@@ -2122,6 +2135,7 @@ async function persistSubmitRequest({
   questionRef = {},
   answer = {},
   draftKey = '',
+  draft = null,
   createdAt = null,
 } = {}) {
   if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
@@ -2158,6 +2172,25 @@ async function persistSubmitRequest({
   const policy = await loadSessionPolicy(env);
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   const session = resolved.ok ? resolved.session : { sessionSlug };
+  const submittedAt = safeString(createdAt) || new Date().toISOString();
+  const firstViewedAt = draft ? await readAnswerDraftFirstViewedAt({
+    env,
+    normalized: miniAppTelegramPrincipal(auth),
+    sessionSlug,
+    selectedQuestionId: qid,
+  }) : '';
+  const draftProvenance = buildDraftProvenance({ draft, submittedAt, firstViewedAt });
+  const emitSubmittedEvent = () => writeDraftLifecycleEvent(env, {
+    event: 'draft_submitted',
+    sessionSlug,
+    questionId: qid,
+    source: safeString(draft?.source || 'mini_app'),
+    originSource: safeString(draft?.origin?.source),
+    controlType: safeString(draft?.controlType || questionRef.questionType),
+    editCount: Number(draft?.editCount || 0),
+    draftToSubmitMs: draftProvenance?.draftToSubmitMs ?? null,
+    telegramUserId,
+  });
   if (telegramSubmitQueueEnabled(env)) {
     const record = buildQueuedSubmitRecord({
       session,
@@ -2183,6 +2216,7 @@ async function persistSubmitRequest({
         answer,
         onChainAnswer: answer,
         answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+        draftProvenance,
         createdAt,
       },
     });
@@ -2192,6 +2226,7 @@ async function persistSubmitRequest({
       error: safeString(error?.message || error),
     }));
     if (queued.ok === true) {
+      await emitSubmittedEvent();
       return {
         ok: true,
         requestId,
@@ -2237,6 +2272,7 @@ async function persistSubmitRequest({
       questionIdShort: shortQuestionId(qid),
       answer,
       answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+      draftProvenance,
       canonicalApiRequest: {
         method: 'POST',
         path: '/api/agent/responses/submit-request',
@@ -2254,6 +2290,7 @@ async function persistSubmitRequest({
     };
     assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
     await persistTelegramSubmitRecord({ env, kvKey, record });
+    if (directSubmit.ok === true) await emitSubmittedEvent();
     return directSubmit.ok === true
       ? {
         ok: true,
@@ -2290,6 +2327,7 @@ async function persistSubmitRequest({
     questionIdShort: shortQuestionId(qid),
     answer,
     answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+    draftProvenance,
     canonicalApiRequest: {
       method: 'POST',
       path: '/api/agent/responses/submit-request',
@@ -2306,6 +2344,7 @@ async function persistSubmitRequest({
     createdAt,
   };
   await persistTelegramSubmitRecord({ env, kvKey, record });
+  await emitSubmittedEvent();
   return {
     ok: true,
     requestId,
@@ -2482,6 +2521,11 @@ async function handleDraftRequest({
     answerValue: JSON.stringify(normalizedAnswer.answer),
     controlType: safeString(questionRef.questionType),
     submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    metadata: {
+      source: 'mini_app',
+      endpoint: '/telegram/mini-app/api/draft',
+      submitRequested: body.submit === true,
+    },
     createdAt,
   });
   if (!saved.ok) {
@@ -2495,6 +2539,7 @@ async function handleDraftRequest({
       questionRef,
       answer: normalizedAnswer.answer,
       draftKey: saved.key,
+      draft: saved.draft,
       createdAt,
     })
     : null;

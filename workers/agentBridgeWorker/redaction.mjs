@@ -1,5 +1,5 @@
 const SECRET_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password|signingmaterial|rootsecret|demo.?key)/i;
-const SECRET_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64}|-----BEGIN [A-Z ]+PRIVATE KEY-----)/i;
+const SECRET_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|\bceagt_[A-Za-z0-9_-]{20,}\b|\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64}|-----BEGIN [A-Z ]+PRIVATE KEY-----)/i;
 const SAFE_HASH_VALUE_KEYS = new Set([
   'questionid',
   'contenthash',

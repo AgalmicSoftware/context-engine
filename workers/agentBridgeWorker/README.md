@@ -825,6 +825,40 @@ response. `POST /telegram/agent/api/group-approval-link` and
 approved Telegram groups; normal user-scoped admin tokens should use the
 in-group approval flow instead.
 
+## Draft Provenance And Research Metrics
+
+Answer drafts are research artifacts: an agent drafts an answer, the user
+reviews or edits it, and the final answer is submitted. The worker captures that
+lifecycle so later research can measure how often and how much people edit
+agent drafts before submission.
+
+- Draft records (`telegram:answer-draft:*`, version 2) preserve an `origin`
+  block with the first revision's plaintext `answerLabel`/`answerValue`,
+  `controlType`, writer `source`, optional agent metadata, fingerprint, and
+  server-stamped `savedAt`. Later overwrites keep that origin and update
+  `editCount`, `humanEditCount`, `lastEditSource`, and the latest
+  `agentRevision` fingerprint. Legacy v1 drafts are backfilled as origin on the
+  next save.
+- Edit detection compares a canonical semantic form rather than raw strings, so
+  binary, rating, multichoice, and freeform answers compare correctly across the
+  bot, Mini App, and agent handoff lanes. Multichoice selections are sorted and
+  deduped before comparison.
+- Submit records carry a `draftProvenance` block with origin and final
+  plaintext, raw and semantic fingerprints, edit counts, first view time,
+  draft-to-submit latency, agent-draft flags, and a typed delta such as stance
+  changes, rating shifts, choice additions/removals, or freeform length change.
+- The Mini App stores `firstViewedAt` on a separate
+  `telegram:answer-draft-view:*` key so view stamps cannot clobber draft
+  content. Stale view stamps older than the current draft origin are ignored.
+- If the optional `AGENT_BRIDGE_ANALYTICS` Workers Analytics Engine binding is
+  present, the worker writes best-effort `draft_created`, `draft_edited`,
+  `draft_submitted`, and `draft_discarded` events. The principal fingerprint is
+  HMAC-SHA256 keyed by `AGENT_BRIDGE_ANALYTICS_SALT`; without the salt it is
+  empty rather than an unsalted Telegram-id hash.
+- Admin metrics add live `answerDraftsEdited` and `agentDraftedAnswers` counts
+  from KV list metadata. These counts decay with the draft TTL; use Analytics
+  Engine events for historical funnels.
+
 `GET /telegram/agent/api/actions` returns mutation-oriented activity for the
 resolved user: agent-created answer drafts, pending vote recommendations,
 applied vote decisions, proposed questions, and group proposals. With a

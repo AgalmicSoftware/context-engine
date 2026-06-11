@@ -101,9 +101,9 @@ import {
 import { authenticateSessionWorker } from './onChainResponses.mjs';
 
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=38';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/telegram/agent/api/skill?v=39';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/edge-2026/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-08 (v38)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-11 (v39)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
@@ -1256,6 +1256,8 @@ function emptyAdminMetricTotals() {
     questionsCreated: 0,
     questionsAnswered: 0,
     answerDrafts: 0,
+    answerDraftsEdited: 0,
+    agentDraftedAnswers: 0,
     draftEditMetrics: 0,
     groupProposals: 0,
     sessionsWithBridgeActivity: 0,
@@ -1300,6 +1302,8 @@ function publicSessionMetric(metric = {}) {
     questionsCreated: Number(metric.questionsCreated || 0),
     questionsAnswered: Number(metric.questionsAnswered || 0),
     answerDrafts: Number(metric.answerDrafts || 0),
+    answerDraftsEdited: Number(metric.answerDraftsEdited || 0),
+    agentDraftedAnswers: Number(metric.agentDraftedAnswers || 0),
     draftEditMetrics: Number(metric.draftEditMetrics || 0),
     groupProposals: Number(metric.groupProposals || 0),
     sessionsWithBridgeActivity: 0,
@@ -1313,6 +1317,8 @@ function publicSessionMetric(metric = {}) {
     out.questionsCreated,
     out.questionsAnswered,
     out.answerDrafts,
+    out.answerDraftsEdited,
+    out.agentDraftedAnswers,
     out.draftEditMetrics,
     out.groupProposals,
   ].some((count) => count > 0) ? 1 : 0;
@@ -2779,6 +2785,14 @@ async function buildAdminMetricsSnapshot({
     totals.answerDrafts += 1;
     activitySessions.add(slug);
     incrementMetric(perSession, slug, 'answerDrafts');
+    if (Number(entry.metadata?.e) > 0) {
+      totals.answerDraftsEdited += 1;
+      incrementMetric(perSession, slug, 'answerDraftsEdited');
+    }
+    if (safeString(entry.metadata?.o) === 'agent_handoff') {
+      totals.agentDraftedAnswers += 1;
+      incrementMetric(perSession, slug, 'agentDraftedAnswers');
+    }
   }
 
   const draftEditEntries = await listMetricKvEntriesByPrefix(env, DRAFT_EDIT_METRIC_KV_PREFIX);
@@ -2917,6 +2931,8 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
       registrySessionCount: 'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
       sessionsWithBridgeActivity: 'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
       draftEditMetrics: 'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
+      answerDraftsEdited: 'Live drafts whose content changed at least once after the first save (point-in-time KV scan, decays with draft TTL).',
+      agentDraftedAnswers: 'Live drafts whose first revision was written through the agent handoff preferences endpoint.',
       metricVisibility: 'When the Telegram session created-after cutoff is configured, root-admin global metrics default to currently visible Telegram sessions. Add includeLegacySessions=1 for a historical all-session sweep.',
       questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
     },
@@ -4463,6 +4479,10 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     .filter((question) => !questionIsLocked(question) && !questionIsUnavailable(question));
   const byId = new Map(questions.map((question) => [safeString(question.questionId || question.id), question]));
   const entries = normalizePreferenceEntries(input);
+  const agentMetadata = normalizeAgentMetadata(input);
+  const hasAgentMetadata = agentMetadata && typeof agentMetadata === 'object' &&
+    Object.values(agentMetadata).some((value) => value !== null && value !== undefined && value !== '');
+  const clientSource = safeString(firstValue(input.source, input.client, input.integration)).slice(0, 120);
   const rootSubmitRequested = directSubmitRequested(input);
   const drafts = [];
   const submitted = [];
@@ -4518,8 +4538,12 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
         endpoint: '/telegram/agent/api/preferences',
         reviewRequired: !shouldSubmit,
         submitRequested: shouldSubmit,
+        ...(clientSource ? { clientSource } : {}),
       },
-      createdAt: input.createdAt || null,
+      agentMetadata: hasAgentMetadata ? agentMetadata : null,
+      // Server-stamped: origin.savedAt anchors the draftToSubmitMs research
+      // metric, so an agent-supplied createdAt must not be able to skew it.
+      createdAt: null,
     });
     if (!saved.ok) {
       skipped.push({ questionId, reason: saved.reason || 'draft_save_failed' });
