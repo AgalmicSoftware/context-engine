@@ -121,11 +121,25 @@ describe('SurveyTool compatibility wiring', () => {
   it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 11155420,
+      encryption: {
+        gates: {
+          questionResponses: {
+            type: 'sbt',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+          },
+        },
+      },
+    };
     const shell = new SurveyTool({
       singleQuestionMode: true,
       questionID: '0xquestion',
       network: { id: 11155420 },
       networkChainId: 11155420,
+      sessionSlug: 'edge',
+      sessionConfig,
       lit,
       litHooks,
     });
@@ -135,6 +149,9 @@ describe('SurveyTool compatibility wiring', () => {
 
     expect(questionsNode?.props?.lit).toBe(lit);
     expect(questionsNode?.props?.litHooks).toBe(litHooks);
+    expect(questionsNode?.props?.sessionSlug).toBe('edge');
+    expect(questionsNode?.props?.sessionConfig).toBe(sessionConfig);
+    expect(questionsNode?.props?.networkChainId).toBe(11155420);
   });
 
   it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
