@@ -127,7 +127,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
 
 - If SessionRegistry’s `docUploads` gate has at least one SBT address:
   - upload defaults to **Locked (Encrypted)** using that gate’s SBT set (Any/All).
-  - Lit contract-gated access conditions use the gate’s configured EVM chain, including OP Sepolia.
+  - Lit contract-gated access conditions use the gate’s configured EVM chain; OP Sepolia is the default E2E target, not a Lit limitation.
 - If the `docUploads` gate is empty or unavailable:
   - upload defaults to **Unlocked (Plaintext)**.
   - users can still encrypt by selecting **Custom SBT(s)** manually.
