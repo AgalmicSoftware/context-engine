@@ -220,6 +220,26 @@ describe('surveyToolFieldEncryptionController', () => {
       });
     });
 
+    it('preserves explicit gate selection even when default normalization is stale', () => {
+      const plan: AudienceSelectionPlan = buildAnswerAudienceSelectionPlan(
+        'q1',
+        'gate',
+        'questionResponses',
+        makeSlice(),
+        makeDeps({
+          normalizeResponseEncryptionAudience: () => 'self',
+          resolveFieldEncryptionGateId: () => null,
+        }),
+      );
+
+      expect(plan.nextAnswerState).toMatchObject({
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'questionResponses',
+        audienceMode: 'explicit',
+      });
+    });
+
     it('propagates to non-explicit additional', () => {
       const plan: AudienceSelectionPlan = buildAnswerAudienceSelectionPlan(
         'q1',

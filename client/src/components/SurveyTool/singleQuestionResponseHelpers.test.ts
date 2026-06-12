@@ -11,8 +11,10 @@ import {
   extractSingleQuestionOptionsFromCandidate,
   findSingleQuestionEntryAcrossGroups,
   getLatestAnsweredResponses,
+  hasLitSbtRecipientEncryptedPortion,
   isEnvelopeAesGcm256,
   normalizePromptGateMode,
+  responseHasLitSbtRecipient,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
 } from './singleQuestionResponseHelpers.js';
@@ -42,6 +44,33 @@ describe('singleQuestionResponseHelpers encrypted envelope detection', () => {
     expect(isEnvelopeAesGcm256({ v: 1, cipher: 'aes-gcm-256' })).toBe(false);
     expect(isEnvelopeAesGcm256({ v: 2, cipher: 'legacy' })).toBe(false);
     expect(isEnvelopeAesGcm256(null)).toBe(false);
+  });
+
+  it('detects Lit SBT recipients in encrypted field envelopes', () => {
+    const envelope = {
+      v: 1,
+      cipher: 'aes-gcm-256',
+      recipients: [
+        { type: 'self-eip712-v1' },
+        { type: 'lit-sbt-v1', lit: { chain: 'optimismSepolia' } },
+      ],
+    };
+
+    expect(hasLitSbtRecipientEncryptedPortion(JSON.stringify(envelope))).toBe(true);
+    expect(responseHasLitSbtRecipient({
+      answer: { encryptedPortion: JSON.stringify(envelope) },
+      additional: { encryptedPortion: '' },
+    })).toBe(true);
+  });
+
+  it('rejects encrypted envelopes without Lit SBT recipients', () => {
+    expect(hasLitSbtRecipientEncryptedPortion(JSON.stringify({
+      recipients: [{ type: 'self-eip712-v1' }],
+    }))).toBe(false);
+    expect(hasLitSbtRecipientEncryptedPortion('{bad json')).toBe(false);
+    expect(responseHasLitSbtRecipient({
+      answer: { encryptedPortion: JSON.stringify({ recipients: [] }) },
+    })).toBe(false);
   });
 });
 
