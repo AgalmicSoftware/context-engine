@@ -43,7 +43,6 @@ import {
 } from '../../variables/appConfig.js';
 import {
   getChainById,
-  getChainBlockTimeMs,
   getDefaultHttpRpc,
   getSessionRegistryAddress,
   getSessionRegistryChains,
@@ -62,7 +61,6 @@ import {
   buildSponsoredFlagFields as buildSponsoredSessionFlagFields,
 } from '../../utilities/session/sponsoredFlags.js';
 import { createLogger } from '../../utilities/logging';
-import { wrapEthersJsonRpcSend } from '../../utilities/web3/rpcReadCache.js';
 import {
   getSessionWizardContractDefaults,
   getVisibleSessionWizardContractKeys,
@@ -98,6 +96,7 @@ import useSessionWizardChromeState from './hooks/useSessionWizardChromeState';
 import useSessionWizardLiveRefs from './hooks/useSessionWizardLiveRefs';
 import useSessionWizardPublishAdvancedState from './hooks/useSessionWizardPublishAdvancedState';
 import useSessionWizardWorkerState from './hooks/useSessionWizardWorkerState';
+import useSessionWizardBlockLimits from './hooks/useSessionWizardBlockLimits';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -866,12 +865,6 @@ const SessionWizard = ({
     return buildResourceGateMap(initialGates, initialDefaultGateId || initialGateRef.current.id) as ResourceGateMapState;
   });
   const [jsonCopied, setJsonCopied] = useState(false);
-  const [latestChainBlock, setLatestChainBlock] = useState<number | null>(null);
-  const [latestBlockStatus, setLatestBlockStatus] = useState('');
-  const [blockLimitDuration, setBlockLimitDuration] = useState('');
-  const [blockLimitUnit, setBlockLimitUnit] = useState('hours');
-  const blockStartManualRef = useRef(false);
-  const blockEndAutoRef = useRef(false);
   const sessionIdRotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const adminUrlStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionIdStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1459,8 +1452,6 @@ const SessionWizard = ({
 
   useEffect(() => {
     const chainId = Number(registryChainId || 0) || 0;
-    blockStartManualRef.current = false;
-    blockEndAutoRef.current = false;
     if (!chainId) return;
     setDraft((prev) => {
       // NOTE: For now we assume session chain === registry chain; split these when they diverge.
@@ -1599,81 +1590,20 @@ const SessionWizard = ({
     });
   }, [defaultGateId, encryptionGates, registryChainId, resourceGateMap, workerResourceKeys]);
 
-  useEffect(() => {
-    const chainId = Number(registryChainId || 0) || 0;
-    if (!chainId) {
-      setLatestChainBlock(null);
-      return;
-    }
-    const rpcUrl = getDefaultHttpRpc(chainId);
-    if (!rpcUrl) {
-      setLatestChainBlock(null);
-      return;
-    }
-    let alive = true;
-    setLatestBlockStatus('Fetching latest block...');
-    // Static network avoids `detectNetwork()` overhead; rpcReadCache wraps `.send()` to dedupe/cache reads.
-    const providerRpc = new ethers.providers.JsonRpcProvider(rpcUrl, { chainId, name: `chain-${chainId}` });
-    wrapEthersJsonRpcSend(providerRpc, {
-      chainId,
-      providerKey: `sessionWizard:latestBlock:${chainId}`,
-      providerLabel: 'sessionWizard',
-      url: rpcUrl,
-    });
-    providerRpc
-      .getBlockNumber()
-      .then((blockNumber) => {
-        if (!alive) return;
-        setLatestChainBlock(blockNumber);
-        setLatestBlockStatus('');
-      })
-      .catch(() => {
-        if (!alive) return;
-        setLatestChainBlock(null);
-        setLatestBlockStatus('Unable to load latest block.');
-      });
-    return () => {
-      alive = false;
-    };
-  }, [registryChainId]);
-
-  useEffect(() => {
-    if (!latestChainBlock) return;
-    if (blockStartManualRef.current) return;
-    setDraft((prev) => {
-      const next = deepClone(prev);
-      if (!next.blockLimits || typeof next.blockLimits !== 'object') {
-        next.blockLimits = {};
-      }
-      const currentStart = Number(next.blockLimits.start);
-      if (!Number.isFinite(currentStart) || currentStart !== latestChainBlock) {
-        next.blockLimits.start = latestChainBlock;
-      }
-      return next;
-    });
-  }, [latestChainBlock]);
-
-  useEffect(() => {
-    const duration = Number(blockLimitDuration || 0);
-    const unitMs = blockLimitUnit === 'days' ? 86400000 : blockLimitUnit === 'minutes' ? 60000 : 3600000;
-    const startFromDraft = Number(draft?.blockLimits?.start);
-    const fallbackStart = Number(latestChainBlock);
-    const startBlock = (Number.isFinite(startFromDraft) && startFromDraft > 0)
-      ? startFromDraft
-      : ((Number.isFinite(fallbackStart) && fallbackStart > 0) ? fallbackStart : 0);
-    if (!startBlock || !Number.isFinite(duration) || duration <= 0) {
-      if (blockEndAutoRef.current) {
-        updateDraftValueRef.current?.(['blockLimits', 'end'], null);
-        blockEndAutoRef.current = false;
-      }
-      return;
-    }
-    const blockTimeMs = getChainBlockTimeMs(registryChainId);
-    const blocks = Math.max(1, Math.ceil((duration * unitMs) / blockTimeMs));
-    const endBlock = startBlock + blocks;
-    updateDraftValueRef.current?.(['blockLimits', 'end'], endBlock);
-    blockEndAutoRef.current = true;
-  }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draft?.blockLimits?.start]);
+  const {
+    latestChainBlock,
+    latestBlockStatus,
+    blockLimitDuration,
+    setBlockLimitDuration,
+    blockLimitUnit,
+    setBlockLimitUnit,
+    markBlockStartManual,
+  } = useSessionWizardBlockLimits<DraftState>({
+    registryChainId,
+    draftBlockLimitStart: draft?.blockLimits?.start,
+    setDraft,
+    updateDraftValueRef,
+  });
 
   const aiModelProviderPatch = useMemo(
     () => resolveSessionWizardAiModelProviderPatch(draft?.ai),
@@ -2704,7 +2634,7 @@ const SessionWizard = ({
           key={keyString}
           blockLimits={value as BlockLimitsFieldProps['blockLimits']}
           onStartChange={(raw) => {
-            blockStartManualRef.current = true;
+            markBlockStartManual();
             updateDraftValue(['blockLimits', 'start'], raw === '' ? null : Number(raw));
           }}
           blockLimitDuration={blockLimitDuration}
