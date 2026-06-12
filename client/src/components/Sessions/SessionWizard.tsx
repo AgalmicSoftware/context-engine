@@ -9,7 +9,7 @@ import styles from './SessionWizard.module.scss';
 import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame, { type LockableFieldFrameProps } from './LockableFieldFrame';
 import BlockLimitsField, { type BlockLimitsFieldProps } from './BlockLimitsField';
-import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
+import SessionHeaderField from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
@@ -17,7 +17,6 @@ import SessionWizardStorageProfileField from './SessionWizardStorageProfileField
 import type { WorkerPanelProps } from './WorkerPanel';
 import WorkerResourceCard from './WorkerResourceCard';
 import WorkerResourceInputs from './WorkerResourceInputs';
-import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   buildSbtAccessControlConditions,
@@ -56,7 +55,6 @@ import {
 } from '../../utilities/worker/workerAuth.js';
 import { resolveSbtAddressFromFactoryReceipt } from '../../utilities/web3/sbtFactoryReceipt.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -95,6 +93,7 @@ import useSessionWizardWorkerDeploy, {
   type SessionWizardWorkerDeployRuntime,
 } from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
+import useSessionHeaderPreview from './hooks/useSessionHeaderPreview';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -606,8 +605,6 @@ type SessionWizardEncryptionQueueEntry = {
   recipients: SessionWizardEncryptionRecipient[];
 };
 
-type SessionHeaderUploadStatusTone = NonNullable<SessionHeaderFieldProps['sessionHeaderUploadStatusTone']>;
-type SessionHeaderFileState = File | Blob;
 type SessionWizardTooltipPlacement = LockableFieldFrameProps['tooltipPlacement'];
 
 const log = createLogger('general');
@@ -1201,15 +1198,25 @@ const SessionWizard = ({
   const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(DEFAULT_ALLOWED_ORIGINS);
   const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
-  const [sessionHeaderMode, setSessionHeaderMode] = useState('url');
-  const [compactSessionHeaderMode, setCompactSessionHeaderMode] = useState('idle');
-  const [sessionHeaderFile, setSessionHeaderFile] = useState<SessionHeaderFileState | null>(null);
-  const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
-  const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
-  sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
-  const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
-  const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
-  const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] = useState<SessionHeaderUploadStatusTone>('default');
+  const {
+    sessionHeaderMode,
+    setSessionHeaderMode,
+    compactSessionHeaderMode,
+    setCompactSessionHeaderMode,
+    sessionHeaderFile,
+    setSessionHeaderFile,
+    sessionHeaderPreviewSrc,
+    sessionHeaderPreviewModalOpen,
+    setSessionHeaderPreviewModalOpen,
+    sessionHeaderUploadStatus,
+    sessionHeaderUploadStatusTone,
+    setSessionHeaderStatus,
+    handlePasteSessionHeaderFromClipboard,
+    handleClearSessionHeaderPreview,
+  } = useSessionHeaderPreview({
+    draftSessionHeader: draft?.sessionHeader,
+    updateDraftSessionHeader: (value) => updateDraftValue(['sessionHeader'], value),
+  });
   const [showPromptPreview, setShowPromptPreview] = useState(false);
   const [metadataObjectCollapsed, setMetadataObjectCollapsed] = useState<MetadataObjectCollapsedState>({
     contracts: true,
@@ -1237,10 +1244,6 @@ const SessionWizard = ({
     () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
     [cloudflareWorkerSbtGateMode, workerResourceKeys]
   );
-  const setSessionHeaderStatus = useCallback((text = '', tone: SessionHeaderUploadStatusTone = 'default') => {
-    setSessionHeaderUploadStatus(text);
-    setSessionHeaderUploadStatusTone(text ? tone : 'default');
-  }, []);
   useEffect(() => {
     if (wizardMode === 'advanced') return;
     setCollapsedSections((prev) => {
@@ -1728,78 +1731,6 @@ const SessionWizard = ({
       return next;
     });
   }, [aiModelProviderPatch]);
-
-  useEffect(() => {
-    const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
-    if (!sessionHeaderFile) {
-      const currentPreviewUrl = sessionHeaderPreviewUrlRef.current;
-      if (
-        currentPreviewUrl &&
-        typeof URL !== 'undefined' &&
-        typeof URL.revokeObjectURL === 'function'
-      ) {
-        URL.revokeObjectURL(currentPreviewUrl);
-      }
-      setSessionHeaderPreviewUrl('');
-      return;
-    }
-    if (!canCreateObjectUrl) return undefined;
-    const previewUrl = URL.createObjectURL(sessionHeaderFile);
-    setSessionHeaderPreviewUrl(previewUrl);
-    return () => {
-      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [sessionHeaderFile]);
-
-  const sessionHeaderPreviewSrc = useMemo(() => {
-    if (sessionHeaderMode === 'upload') {
-      return toStr(sessionHeaderPreviewUrl).trim();
-    }
-    return normalizeArweaveUrl(draft?.sessionHeader || '', {
-      contextLabel: 'session_wizard_header_preview',
-    });
-  }, [draft?.sessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
-
-  useEffect(() => {
-    if (sessionHeaderPreviewSrc) return;
-    setSessionHeaderPreviewModalOpen(false);
-  }, [sessionHeaderPreviewSrc]);
-
-  const handlePasteSessionHeaderFromClipboard = async () => {
-    const clipboardResult = await readCompactImageClipboard({
-      fileNamePrefix: 'clipboard-session-header',
-    });
-
-    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
-      setSessionHeaderMode('upload');
-      setCompactSessionHeaderMode('idle');
-      setSessionHeaderFile(clipboardResult.file);
-      setSessionHeaderStatus('');
-      return;
-    }
-
-    if (clipboardResult?.kind === 'text') {
-      setSessionHeaderMode('url');
-      setCompactSessionHeaderMode('url');
-      setSessionHeaderFile(null);
-      updateDraftValue(['sessionHeader'], clipboardResult.text);
-      setSessionHeaderStatus('');
-      return;
-    }
-
-    setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
-  };
-
-  const handleClearSessionHeaderPreview = () => {
-    setSessionHeaderPreviewModalOpen(false);
-    setSessionHeaderMode('url');
-    setCompactSessionHeaderMode('idle');
-    setSessionHeaderFile(null);
-    updateDraftValue(['sessionHeader'], '');
-    setSessionHeaderStatus('');
-  };
 
   const defaultSponsoredGateId = toStr(draft?.sponsored?.defaultGateId).trim();
   const defaultSponsoredGate = defaultSponsoredGateId ? draft?.sponsored?.gates?.[defaultSponsoredGateId] : null;
