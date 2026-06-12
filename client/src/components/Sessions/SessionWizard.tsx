@@ -101,6 +101,7 @@ import useSessionWizardNewSessionBanner from './hooks/useSessionWizardNewSession
 import useSessionWizardWorkerSyncEffects from './hooks/useSessionWizardWorkerSyncEffects';
 import useSessionWizardIdentityEffects from './hooks/useSessionWizardIdentityEffects';
 import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
+import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizardNormalModeSectionVisibility';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -4316,21 +4317,11 @@ const SessionWizard = ({
     pendingDraftCount,
     t,
   });
-  useEffect(() => {
-    if (!isNormalMode) return;
-    const visibleSectionOrder = showNormalModeWorkerStep
-      ? ['metadata', 'encryption', 'worker', 'publish']
-      : ['metadata', 'encryption', 'publish'];
-    setCollapsedSections((prev) => {
-      const firstOpenSection = visibleSectionOrder.find((key) => prev[key] === false) || 'metadata';
-      return {
-        metadata: firstOpenSection !== 'metadata',
-        encryption: firstOpenSection !== 'encryption',
-        worker: showNormalModeWorkerStep ? firstOpenSection !== 'worker' : true,
-        publish: firstOpenSection !== 'publish',
-      };
-    });
-  }, [isNormalMode, showNormalModeWorkerStep]);
+  useSessionWizardNormalModeSectionVisibility({
+    isNormalMode,
+    showNormalModeWorkerStep,
+    setCollapsedSections,
+  });
   const createSbtModalPlan = resolveSessionWizardCreateSbtModalPlan({
     createSbtModalState,
     draft,
