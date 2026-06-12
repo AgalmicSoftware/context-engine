@@ -1,7 +1,6 @@
 
 import {
   buildFieldEncryptionWorkGroups,
-  coerceDefaultGateAudienceForSubmit,
   verifyEncryptionIntegrity,
 } from './surveyToolSubmitPrepController';
 import type { SubmitPrepDeps } from './surveyToolSubmitPrepController';
@@ -38,55 +37,6 @@ const makeSlice = (overrides: Partial<TestSlice> = {}): TestSlice => ({
 });
 
 describe('surveyToolSubmitPrepController', () => {
-  describe('coerceDefaultGateAudienceForSubmit', () => {
-    it('moves changed self-audience fields to the default response gate', () => {
-      const slice = makeSlice({
-        answers: {
-          q1: { value: 'yes', encrypted: true, encryptionAudience: 'self' },
-        },
-        additionalComments: {
-          q1: { value: 'private note', encrypted: true, encryptionAudience: 'self' },
-        },
-      });
-
-      const result = coerceDefaultGateAudienceForSubmit(slice, new Set(['q1']), {
-        getEffectiveRecipientsForQid: () => ['0xGate'],
-        resolveFieldEncryptionAudience: (field) => field.encryptionAudience || 'self',
-        resolveFieldEncryptionGateId: () => 'gate-abc',
-      });
-
-      expect(result.changed).toBe(true);
-      expect(result.slice.answers?.q1).toMatchObject({
-        encrypted: true,
-        encryptionAudience: 'gate',
-        encryptionGateId: 'gate-abc',
-      });
-      expect(result.slice.additionalComments?.q1).toMatchObject({
-        encrypted: true,
-        encryptionAudience: 'gate',
-        encryptionGateId: 'gate-abc',
-      });
-      expect(slice.answers?.q1.encryptionAudience).toBe('self');
-    });
-
-    it('leaves self-audience fields unchanged without default recipients', () => {
-      const slice = makeSlice({
-        answers: {
-          q1: { value: 'yes', encrypted: true, encryptionAudience: 'self' },
-        },
-      });
-
-      const result = coerceDefaultGateAudienceForSubmit(slice, new Set(['q1']), {
-        getEffectiveRecipientsForQid: () => [],
-        resolveFieldEncryptionAudience: (field) => field.encryptionAudience || 'self',
-        resolveFieldEncryptionGateId: () => 'gate-abc',
-      });
-
-      expect(result.changed).toBe(false);
-      expect(result.slice).toBe(slice);
-    });
-  });
-
   describe('buildFieldEncryptionWorkGroups', () => {
     it('returns empty groups for empty changedQids', () => {
       const result = buildFieldEncryptionWorkGroups({}, new Set(), makeDeps());
@@ -123,6 +73,40 @@ describe('surveyToolSubmitPrepController', () => {
       expect(result.groups).toHaveLength(1);
       expect(result.groups[0].recipients).toEqual([]);
       expect(result.groups[0].qids).toContain('q1');
+    });
+
+    it('does not promote self-audience fields to gate recipients during submit prep', () => {
+      const slice = makeSlice({
+        answers: {
+          q1: { value: 'yes', encrypted: true, encryptionAudience: 'self' },
+        },
+        additionalComments: {
+          q1: { value: 'private note', encrypted: true, encryptionAudience: 'self' },
+        },
+      });
+      const getEffectiveRecipientsForField = jest.fn(() => ['0xGate']);
+
+      const result = buildFieldEncryptionWorkGroups(
+        slice,
+        new Set(['q1']),
+        makeDeps({
+          resolveFieldEncryptionAudience: (field) => field.encryptionAudience || 'self',
+          getEffectiveRecipientsForField,
+        }),
+      );
+
+      expect(getEffectiveRecipientsForField).not.toHaveBeenCalled();
+      expect(result.missingRecipients).toHaveLength(0);
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0].recipients).toEqual([]);
+      expect(result.groups[0].slice.answers.q1).toMatchObject({
+        encrypted: true,
+        encryptionAudience: 'self',
+      });
+      expect(result.groups[0].slice.additionalComments.q1).toMatchObject({
+        encrypted: true,
+        encryptionAudience: 'self',
+      });
     });
 
     it('groups gate-encrypted answer with recipients', () => {

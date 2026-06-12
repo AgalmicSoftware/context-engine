@@ -440,7 +440,6 @@ import {
 } from './surveyToolFieldEncryptionController';
 import {
   buildFieldEncryptionWorkGroups as buildFieldEncryptionWorkGroupsCore,
-  coerceDefaultGateAudienceForSubmit,
   verifyEncryptionIntegrity,
 } from './surveyToolSubmitPrepController';
 import {
@@ -7477,14 +7476,6 @@ const encryptAndUpload = async () => {
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
       let activeSlice: any = stateRef.current.surveysResponseState?.[surveyIndex] || { answers: {}, additionalComments: {}, importance: {}, conviction: {} };
-      const gateAudienceCoercion: any = coerceDefaultGateAudienceForSubmit(activeSlice, changedQids, {
-        getEffectiveRecipientsForQid: (qid: any) => getEffectiveRecipientsForQid(qid),
-        resolveFieldEncryptionAudience: (field: any, qid: any, fieldKey: any) => resolveFieldEncryptionAudience(field, qid, fieldKey),
-        resolveFieldEncryptionGateId: (field: any, qid: any, fieldKey: any) => resolveFieldEncryptionGateId(field, qid, fieldKey),
-      });
-      if (gateAudienceCoercion.changed) {
-        activeSlice = gateAudienceCoercion.slice;
-      }
 
       // Only encrypt when there are changed encrypted fields
       const pendingStats: any = resolveSurveyQuestionsSubmitPendingStats({
@@ -7494,10 +7485,7 @@ const encryptAndUpload = async () => {
         fallbackTotal: stateRef.current.modifiedCount || 0,
         fallbackEncrypted: stateRef.current.hasEncryptedChanges ? 1 : 0,
       });
-      const shouldEncrypt: any = (
-        Number(pendingStats.encrypted || 0) > 0 ||
-        gateAudienceCoercion.changed
-      ) && changedQids.size > 0;
+      const shouldEncrypt: any = Number(pendingStats.encrypted || 0) > 0 && changedQids.size > 0;
 
       if (shouldEncrypt) {
         const {
