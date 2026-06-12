@@ -97,6 +97,7 @@ import useSessionWizardLiveRefs from './hooks/useSessionWizardLiveRefs';
 import useSessionWizardPublishAdvancedState from './hooks/useSessionWizardPublishAdvancedState';
 import useSessionWizardWorkerState from './hooks/useSessionWizardWorkerState';
 import useSessionWizardBlockLimits from './hooks/useSessionWizardBlockLimits';
+import useSessionWizardNewSessionBanner from './hooks/useSessionWizardNewSessionBanner';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -261,8 +262,6 @@ import {
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
-  readSessionWizardNewSessionBannerDismissed,
-  writeSessionWizardNewSessionBannerDismissed,
 } from './sessionWizardRouteState';
 import {
   buildPublishedPendingSbtLinks,
@@ -990,10 +989,6 @@ const SessionWizard = ({
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
-  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
-    readSessionWizardNewSessionBannerDismissed()
-  ));
-  const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -4314,6 +4309,14 @@ const SessionWizard = ({
     sponsoredBundleId: initialSponsoredBundleId,
     sponsoredBundleKey: initialSponsoredBundleKey,
   });
+  const {
+    persistedNewSessionBannerDismissed,
+    newSessionBannerDismissedContext,
+    handleDismissNewSessionRequirementsBanner,
+  } = useSessionWizardNewSessionBanner({
+    hasSponsoredBundleLink,
+    newSessionBannerDismissalContextKey,
+  });
   const normalizedAppliedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current
   );
@@ -4451,16 +4454,6 @@ const SessionWizard = ({
   const wizardContractViewerContracts = wizardContractViewerPlan.contracts;
   const selectedWizardContract = wizardContractViewerPlan.selectedContract;
   const selectedWizardContractHref = wizardContractViewerPlan.selectedContractHref;
-  const handleDismissNewSessionRequirementsBanner = useCallback(() => {
-    if (newSessionBannerDismissalContextKey) {
-      setNewSessionBannerDismissedContext(newSessionBannerDismissalContextKey);
-    }
-    if (!hasSponsoredBundleLink) {
-      setPersistedNewSessionBannerDismissed(true);
-      writeSessionWizardNewSessionBannerDismissed();
-    }
-  }, [hasSponsoredBundleLink, newSessionBannerDismissalContextKey]);
-
   const sessionMetadataHeaderAccessory = wizardMode === 'advanced' ? (
     <SessionWizardSessionIdBadge
       isRegenerating={isSessionIdRegenerating}
