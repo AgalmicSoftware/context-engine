@@ -48,7 +48,6 @@ import {
   extractSingleQuestionOptionsFromCandidate,
   findSingleQuestionEntryAcrossGroups,
   getLatestAnsweredResponses,
-  responseHasLitSbtRecipient,
   isEnvelopeAesGcm256,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
@@ -684,7 +683,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       }
     }
 
-    const canDecrypt = !!isOwnResponse || !!canDecryptOtherResponses || responseHasLitSbtRecipient(response);
+    const canDecrypt = !!isOwnResponse || !!canDecryptOtherResponses;
     if (!onDecryptQuestion || !question?.id || !response || !canDecrypt) return;
 
     const target =
@@ -1106,10 +1105,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     const shouldMaskVisibleResponseForMaskedPrompt = isPromptMasked && !isAnswerEncrypted;
     const canReloadPrompt = isPromptMasked && !!id && typeof this.props.onReloadQuestionPrompt === 'function';
     const promptReloading = !!this.props.promptReloading;
-    const canDecryptThisResponse =
-      !!isOwnResponse ||
-      !!this.props.canDecryptOtherResponses ||
-      responseHasLitSbtRecipient(response);
+    const canDecryptThisResponse = !!isOwnResponse || !!this.props.canDecryptOtherResponses;
     const promptGateTooltipProps = resolvePromptGateTooltipProps({
       question,
       gateId: this.props.gateId,
