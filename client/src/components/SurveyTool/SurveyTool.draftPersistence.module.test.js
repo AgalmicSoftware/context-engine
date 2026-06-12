@@ -1,3 +1,4 @@
+import { act, waitFor } from '@testing-library/react';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import {
   buildDraftHydrationPatchForQuestion,
@@ -26,6 +27,7 @@ import {
 } from './surveyToolHydrationFlow';
 import { buildQuestionResponseHydrationPatch } from './surveyToolResponseState';
 import { buildSurveyQuestionsPrimarySubmitPlan } from './surveyQuestionsTypes';
+import { renderSurveyQuestions } from './surveyQuestionsTestHarness';
 
 const buildEmptySlice = () => ({
   answers: {},
@@ -231,39 +233,45 @@ describe('SurveyTool draft persistence', () => {
     expect(generalPlan.path).toBe('/survey/0xsurvey/0xabc');
   });
 
-  it('flushes pending standalone draft to storage on unmount', () => {
+  it('flushes pending standalone draft to storage on unmount', async () => {
+    jest.useFakeTimers();
     const key = buildSurveyDraftStorageKey({
       sessionSlug: 'edge',
       networkIdStr: '84532',
       account: '0xabc',
       surveyScope: 'questions',
     });
-    const { answersObj } = buildPersistedDraftMapsForAllowedIds({
-      allowedQuestionIds: ['q1'],
-      slice: {
-        answers: {
-          q1: { value: 'carry', encrypted: false, encryptionAudience: 'self' },
+    let runtimeEngine = null;
+    const view = renderSurveyQuestions({
+      account: '0xabc',
+      activeSessionSlug: 'edge',
+      isStandalone: true,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      runtimeStrategy: {
+        render: (engine) => {
+          runtimeEngine = engine;
+          return null;
         },
-        additionalComments: {
-          q1: { value: '', encrypted: false, encryptionAudience: 'self' },
-        },
-        importance: {},
-        conviction: {},
       },
-      baselineSlice: buildEmptySlice(),
-      resolvers: draftEntryResolvers,
-    });
-    const payload = buildPersistedDraftPayload({
-      draftContext,
-      answersObj,
-      baselineObj: {},
-      now: 60,
+      sessionSlug: 'edge',
     });
 
-    sessionStorage.setItem(key, JSON.stringify(payload));
+    await waitFor(() => expect(runtimeEngine).not.toBeNull());
+    await act(async () => {
+      runtimeEngine.handleAnswer(0, 'q1', 'carry');
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(runtimeEngine._persistTimer).toBeTruthy());
+    expect(sessionStorage.getItem(key)).toBeNull();
 
-    expect(JSON.parse(sessionStorage.getItem(key))?.answers?.q1?.value).toBe('carry');
-    // port note: dropped timer/component-unmount internals; this pins the draft payload flushed by that wrapper.
+    view.unmount();
+
+    const parsed = JSON.parse(sessionStorage.getItem(key));
+    expect(parsed?.answers?.q1?.value).toBe('carry');
+    expect(runtimeEngine._persistTimer).toBeNull();
   });
 
   it('keeps unresolved draft storage scoped to __pending__ instead of inheriting the general network key', () => {
