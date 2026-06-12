@@ -435,29 +435,32 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('routes pile submit clicks through shared submit flow before no-pending feedback when logged out', async () => {
     const encryptAndUpload = jest.fn().mockResolvedValue(undefined);
-    const showNoPendingPileSubmitFeedback = jest.fn();
-    const loginComplete = false;
     const pendingStats = { total: 0, encrypted: 0 };
-    const submitState = buildPileSubmitViewState({
-      pendingStats,
-      isSubmitting: false,
-      submittedSinceLastEdit: false,
-      submissionComplete: false,
-      pileSubmitTempText: '',
-      pileSubmitLabel: 'Submit',
-    });
+    const engine = {
+      _pileSubmitTimer: null,
+      computePendingEditStatsAtIndex: jest.fn(() => pendingStats),
+      encryptAndUpload,
+      getPendingStatsSnapshot: jest.fn(() => pendingStats),
+      props: {
+        account: '',
+        computeSubmitLabel: () => 'Submit',
+        loginComplete: false,
+      },
+      setState: jest.fn(),
+      state: {
+        isSubmitting: false,
+        pileSubmitTempText: '',
+        submittedSinceLastEdit: false,
+        submissionComplete: false,
+      },
+    };
+    createPileViewRuntimeStrategy().getPendingEditStats(engine);
 
-    if (!loginComplete) {
-      await encryptAndUpload();
-    } else if (!submitState.pileSubmittedStateActive && Number(pendingStats.total || 0) === 0) {
-      showNoPendingPileSubmitFeedback('Submit');
-    }
+    await engine.handlePileSubmitClick();
 
     expect(encryptAndUpload).toHaveBeenCalledTimes(1);
-    expect(showNoPendingPileSubmitFeedback).not.toHaveBeenCalled();
-    // port note: the old test invoked the private submit-click method. This
-    // keeps the logged-out branch decision explicit until that branch is
-    // extracted into a dedicated submit controller helper.
+    expect(engine.setState).not.toHaveBeenCalled();
+    expect(engine._pileSubmitTimer).toBeNull();
   });
 
   it('renders the pile clear-pending button only while pending changes are actionable', () => {
