@@ -1,14 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowLeft,
-  faArrowRight,
+  faCaretDown,
+  faChevronLeft,
+  faChevronRight,
   faCheck,
   faExpand,
+  faFilter,
   faSpinner,
-  faSyncAlt,
 } from '@fortawesome/free-solid-svg-icons';
-import { Card, CardBody } from 'reactstrap';
+import { Button, Card, CardBody } from 'reactstrap';
 
 import BinaryChoiceInput from '../../SurveyTool/BinaryChoiceInput';
 import MultichoiceQuestionInput from '../../SurveyTool/MultichoiceQuestionInput';
@@ -20,6 +21,7 @@ import {
   RATING_MAX,
   RATING_MIN,
 } from '../../../utilities/survey/ratingValue';
+import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import styles from '../OnePageSession.module.scss';
 import surveyToolStyles from '../../SurveyTool/SurveyTool.module.scss';
 import {
@@ -29,7 +31,6 @@ import {
 } from '../../SurveyTool/surveyToolResponseState';
 
 type TelegramQuestionPileProps = {
-  answerState?: { answeredCount?: number; unansweredCount?: number } | null;
   compact?: boolean;
   questions: TelegramAgentQuestion[];
   activeIndex: number;
@@ -38,12 +39,12 @@ type TelegramQuestionPileProps = {
   submittingQuestionId?: string;
   submitError?: string;
   onActiveIndexChange: (index: number) => void;
-  onRefresh: () => void;
   onSubmitAnswer: (question: TelegramAgentQuestion, answer: TelegramAnswerInput | string | number | string[]) => Promise<unknown> | unknown;
   onViewAll?: () => void;
 };
 
 type DraftState = Record<string, unknown>;
+type QuestionFilterMode = 'all' | 'open' | 'answered';
 
 const clampIndex = (index: number, count: number): number => (
   Math.min(Math.max(0, index), Math.max(0, count - 1))
@@ -84,7 +85,6 @@ const asPileQuestion = (question: TelegramAgentQuestion) => ({
 });
 
 export default function TelegramQuestionPile({
-  answerState = null,
   compact = false,
   questions,
   activeIndex,
@@ -93,17 +93,31 @@ export default function TelegramQuestionPile({
   submittingQuestionId = '',
   submitError = '',
   onActiveIndexChange,
-  onRefresh,
   onSubmitAnswer,
   onViewAll,
 }: TelegramQuestionPileProps): React.ReactElement {
   const [drafts, setDrafts] = useState<DraftState>({});
-  const activeQuestion = questions[clampIndex(activeIndex, questions.length)] || null;
+  const [filterMode, setFilterMode] = useState<QuestionFilterMode>('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const isQuestionAnswered = (question: TelegramAgentQuestion): boolean => (
+    Boolean(question?.answeredByUser || (question?.questionId && submittedQuestionIds.has(question.questionId)))
+  );
+  const displayedQuestions = questions.filter((question) => {
+    if (filterMode === 'open' && isQuestionAnswered(question)) return false;
+    if (filterMode === 'answered' && !isQuestionAnswered(question)) return false;
+    if (typeFilter !== 'all' && questionType(question) !== typeFilter) return false;
+    return true;
+  });
+  const activeQuestion = displayedQuestions[clampIndex(activeIndex, displayedQuestions.length)] || null;
   const draft = activeQuestion ? draftFor(drafts, activeQuestion.questionId) : {};
   const hasQuestions = questions.length > 0;
   const isSubmitting = Boolean(activeQuestion?.questionId && submittingQuestionId === activeQuestion.questionId);
-  const isAnswered = Boolean(activeQuestion?.answeredByUser || (activeQuestion?.questionId && submittedQuestionIds.has(activeQuestion.questionId)));
+  const isAnswered = Boolean(activeQuestion && isQuestionAnswered(activeQuestion));
   const canSubmit = Boolean(activeQuestion && answerReady(activeQuestion, draft) && !isSubmitting);
+  const showSubmit = Boolean(activeQuestion && (answerReady(activeQuestion, draft) || isSubmitting));
+  const filterIsActive = filterMode !== 'all' || typeFilter !== 'all';
+  const availableTypes = Array.from(new Set(questions.map(questionType).filter(Boolean))).sort();
 
   const setDraft = (questionId: string, patch: Record<string, unknown>) => {
     setDrafts((previous) => ({
@@ -118,6 +132,16 @@ export default function TelegramQuestionPile({
   const submit = async () => {
     if (!activeQuestion || !canSubmit) return;
     await onSubmitAnswer(activeQuestion, answerPayload(activeQuestion, draft));
+  };
+
+  const setQuestionFilterMode = (mode: QuestionFilterMode) => {
+    setFilterMode(mode);
+    onActiveIndexChange(0);
+  };
+
+  const setQuestionTypeFilter = (type: string) => {
+    setTypeFilter(type);
+    onActiveIndexChange(0);
   };
 
   const controls = useMemo(() => {
@@ -202,41 +226,10 @@ export default function TelegramQuestionPile({
 
   return (
     <div className={styles.telegramListPanel} data-testid="ce-session-telegram-questions">
-      <div className={styles.telegramListHeader}>
-        {answerState ? (
-          <span>
-            {answerState.unansweredCount || 0} open · {answerState.answeredCount || 0} answered
-          </span>
-        ) : <span>Session questions</span>}
-        <span className={styles.telegramListHeaderActions}>
-          {questions.length > 1 ? (
-            <>
-              <button
-                type="button"
-                className={styles.sectionHeaderActionButton}
-                onClick={() => onActiveIndexChange(clampIndex(activeIndex - 1, questions.length))}
-                disabled={activeIndex <= 0}
-                data-testid="ce-session-telegram-question-prev"
-                aria-label="Previous question"
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-              </button>
-              <span className={styles.telegramPanelMeta}>
-                {clampIndex(activeIndex, questions.length) + 1} / {questions.length}
-              </span>
-              <button
-                type="button"
-                className={styles.sectionHeaderActionButton}
-                onClick={() => onActiveIndexChange(clampIndex(activeIndex + 1, questions.length))}
-                disabled={activeIndex >= questions.length - 1}
-                data-testid="ce-session-telegram-question-next"
-                aria-label="Next question"
-              >
-                <FontAwesomeIcon icon={faArrowRight} />
-              </button>
-            </>
-          ) : null}
-          {compact && onViewAll ? (
+      {compact && onViewAll ? (
+        <div className={styles.telegramListHeader}>
+          <span>Session questions</span>
+          <span className={styles.telegramListHeaderActions}>
             <button
               type="button"
               className={styles.sectionHeaderActionButton}
@@ -246,19 +239,9 @@ export default function TelegramQuestionPile({
               <FontAwesomeIcon icon={faExpand} />
               View All
             </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.sectionHeaderActionButton}
-            onClick={onRefresh}
-            disabled={status === 'loading'}
-            data-testid="ce-session-telegram-questions-refresh"
-            aria-label="Refresh questions"
-          >
-            <FontAwesomeIcon icon={faSyncAlt} spin={status === 'loading'} />
-          </button>
-        </span>
-      </div>
+          </span>
+        </div>
+      ) : null}
 
       {status === 'error' ? (
         <div className={styles.telegramListError} role="alert">
@@ -279,45 +262,164 @@ export default function TelegramQuestionPile({
         <div className={styles.telegramListEmpty}>No questions available yet.</div>
       ) : null}
 
+      {showFilterPanel ? (
+        <div
+          className={styles.telegramPileAuxPanel}
+          data-testid="ce-session-telegram-question-filter-panel"
+        >
+          <div className={styles.telegramPileAuxTitle}>Filter questions</div>
+          <div className={styles.telegramPileFilterOptions}>
+            {(['all', 'open', 'answered'] as QuestionFilterMode[]).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                className={`${styles.telegramPileAuxChoice} ${filterMode === mode ? styles.telegramPileAuxChoiceActive : ''}`.trim()}
+                onClick={() => setQuestionFilterMode(mode)}
+                aria-pressed={filterMode === mode}
+              >
+                {mode === 'all' ? 'All' : mode === 'open' ? 'Open' : 'Answered'}
+              </button>
+            ))}
+            <select
+              className={styles.telegramPileAuxSelect}
+              value={typeFilter}
+              onChange={(event) => setQuestionTypeFilter(event.target.value)}
+              aria-label="Question type filter"
+            >
+              <option value="all">All types</option>
+              {availableTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : null}
+
+      {status === 'ready' && hasQuestions && !displayedQuestions.length ? (
+        <div className={styles.telegramListEmpty}>No questions match this filter.</div>
+      ) : null}
+
       {activeQuestion ? (
-        <div className={styles.telegramPileDeck} data-testid="ce-session-telegram-question-pile">
-          <Card
-            className={`${surveyToolStyles.pileCardInner} ${styles.telegramPileCard}`.trim()}
-            data-testid="ce-session-telegram-question-item"
-          >
-            <CardBody className={surveyToolStyles.pileCardBody}>
-              <div className={surveyToolStyles.pileCardHeader}>
-                <div className={surveyToolStyles.promptTitleBlock}>
-                  <h4 id={surveyToolStyles.questionTitle}>{activeQuestion.prompt}</h4>
+        <div
+          className={`${surveyToolStyles.pileInteractionUnit} ${styles.telegramPileFrame}`.trim()}
+          data-testid="ce-session-telegram-question-pile"
+        >
+          <div className={`${surveyToolStyles.pileCardContainer} ${styles.telegramPileDeck}`.trim()}>
+            <Card
+              className={`${surveyToolStyles.pileCardInner} ${styles.telegramPileCard}`.trim()}
+              data-testid="ce-session-telegram-question-item"
+            >
+              <CardBody className={surveyToolStyles.pileCardBody}>
+                <div className={surveyToolStyles.pileCardHeader}>
+                  <div className={surveyToolStyles.promptTitleBlock}>
+                    <h4 id={surveyToolStyles.questionTitle}>{activeQuestion.prompt}</h4>
+                  </div>
+                  {isAnswered ? (
+                    <span className={styles.telegramAnsweredBadge}>
+                      <FontAwesomeIcon icon={faCheck} /> Answered
+                    </span>
+                  ) : null}
                 </div>
-                {isAnswered ? (
-                  <span className={styles.telegramAnsweredBadge}>
-                    <FontAwesomeIcon icon={faCheck} /> Answered
-                  </span>
-                ) : null}
-              </div>
-              <div className={surveyToolStyles.pileCardMainContent}>
-                <div className={questionContainerClass}>
-                  {controls}
+                <div className={surveyToolStyles.pileCardMainContent}>
+                  <div className={questionContainerClass}>
+                    {controls}
+                  </div>
                 </div>
-              </div>
-              <div className={surveyToolStyles.pileCardFooter}>
+              </CardBody>
+            </Card>
+          </div>
+          <div className={`${surveyToolStyles.pileControls} ${styles.telegramPileControls}`.trim()}>
+            <div
+              className={`${surveyToolStyles.pileActions} ${styles.telegramPileActions}`.trim()}
+              data-testid="ce-session-telegram-question-actions"
+            >
+              <button
+                type="button"
+                className={`${surveyToolStyles.actionButton} ${(showFilterPanel || filterIsActive) ? surveyToolStyles.actionButtonActive : ''}`.trim()}
+                onClick={() => setShowFilterPanel((value) => !value)}
+                title="Filter Questions"
+                aria-label="Filter Questions"
+                aria-pressed={showFilterPanel || filterIsActive}
+                data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
+              >
+                <FontAwesomeIcon icon={faFilter} />
+              </button>
+              {onViewAll ? (
                 <button
                   type="button"
-                  className={styles.telegramSubmitAnswerButton}
-                  disabled={!canSubmit}
-                  onClick={submit}
-                  data-testid="ce-session-telegram-question-submit"
+                  className={surveyToolStyles.actionButton}
+                  onClick={onViewAll}
+                  title="View All Questions"
+                  aria-label="View All Questions"
+                  data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
                 >
-                  {isSubmitting ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin /> Submitting
-                    </>
-                  ) : isAnswered ? 'Update answer' : 'Submit answer'}
+                  <FontAwesomeIcon icon={faCaretDown} />
+                </button>
+              ) : null}
+            </div>
+            <div
+              className={[
+                surveyToolStyles.pileFooter,
+                styles.telegramPileFooter,
+                showSubmit ? '' : surveyToolStyles.pileFooterHidden,
+              ].filter(Boolean).join(' ')}
+            >
+              <Button
+                type="button"
+                className={`${surveyToolStyles.pileSubmitButton} ${styles.telegramPileSubmitButton} ${canSubmit ? surveyToolStyles.submitGlow : ''}`.trim()}
+                disabled={!canSubmit}
+                onClick={submit}
+                data-testid="ce-session-telegram-question-submit"
+              >
+                {isSubmitting ? (
+                  <FontAwesomeIcon icon={faSpinner} spin />
+                ) : (
+                  <span className={surveyToolStyles.pileSubmitButtonContent}>
+                    <span className={surveyToolStyles.pileSubmitButtonLabel}>
+                      {isAnswered ? 'Update answer' : 'Submit answer'}
+                    </span>
+                    <span className={surveyToolStyles.pileSubmitButtonTrail} aria-hidden="true">
+                      <FontAwesomeIcon icon={faChevronRight} className={surveyToolStyles.pileSubmitButtonTrailIcon} />
+                      <FontAwesomeIcon icon={faChevronRight} className={surveyToolStyles.pileSubmitButtonTrailIcon} />
+                      <FontAwesomeIcon icon={faChevronRight} className={surveyToolStyles.pileSubmitButtonTrailIcon} />
+                    </span>
+                  </span>
+                )}
+              </Button>
+            </div>
+            {displayedQuestions.length > 1 ? (
+              <div
+                className={`${surveyToolStyles.pileNav} ${styles.telegramPileNav}`.trim()}
+                data-testid="ce-session-telegram-question-nav"
+              >
+                <button
+                  type="button"
+                  className={surveyToolStyles.pileNavArrow}
+                  onClick={() => onActiveIndexChange(clampIndex(activeIndex - 1, displayedQuestions.length))}
+                  disabled={activeIndex <= 0}
+                  data-testid="ce-session-telegram-question-prev"
+                  aria-label="Previous Question"
+                >
+                  <FontAwesomeIcon icon={faChevronLeft} />
+                </button>
+                <span className={surveyToolStyles.pileNavCounterText}>
+                  {clampIndex(activeIndex, displayedQuestions.length) + 1} / {displayedQuestions.length}
+                </span>
+                <button
+                  type="button"
+                  className={surveyToolStyles.pileNavArrow}
+                  onClick={() => onActiveIndexChange(clampIndex(activeIndex + 1, displayedQuestions.length))}
+                  disabled={activeIndex >= displayedQuestions.length - 1}
+                  data-testid="ce-session-telegram-question-next"
+                  aria-label="Next Question"
+                >
+                  <FontAwesomeIcon icon={faChevronRight} />
                 </button>
               </div>
-            </CardBody>
-          </Card>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>

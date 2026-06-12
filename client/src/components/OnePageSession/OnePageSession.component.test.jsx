@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
+import surveyToolStyles from '../SurveyTool/SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
@@ -622,6 +623,12 @@ describe('OnePageSession view gating', () => {
     const questionCallsBefore = fetchMock.mock.calls
       .filter(([url]) => String(url).includes('/telegram/agent/api/questions')).length;
     const refreshButton = await screen.findByTestId('ce-session-results-refresh');
+    const resultsNav = screen.getByTestId('ce-session-results-view-nav');
+    expect(refreshButton).toHaveAccessibleName('Refresh results');
+    expect(refreshButton).toHaveClass(styles.sectionHeaderIconButton);
+    expect(refreshButton).not.toHaveClass(styles.sectionHeaderActionButton);
+    expect(within(resultsNav).queryByTestId('ce-session-results-refresh')).toBeNull();
+    expect(screen.queryByText(/^Refresh results$/i)).not.toBeInTheDocument();
     fireEvent.click(refreshButton);
 
     await waitFor(() => {
@@ -905,7 +912,7 @@ describe('OnePageSession view gating', () => {
           tags: ['tools'],
         },
         { questionId: 'q-rating', questionType: 'rating', prompt: 'How comfortable are you?', tags: ['trust'] },
-        { questionId: 'q-freeform', questionType: 'freeform', prompt: 'How can agents help?', tags: ['agents'] },
+        { questionId: 'q-freeform', questionType: 'freeform', prompt: 'How can agents help?', tags: ['agents'], answeredByUser: true },
       ],
     }));
 
@@ -921,10 +928,46 @@ describe('OnePageSession view gating', () => {
 
     await openTelegramQuestions();
     expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-session-telegram-question-submit')).toBeDisabled();
+    const telegramQuestionsHeader = screen.getByTestId('ce-session-telegram-questions-toggle');
+    expect(within(telegramQuestionsHeader).getByText('2 open · 1 answered')).toHaveClass(styles.sectionHeaderSubtitle);
+    expect(within(screen.getByTestId('ce-session-telegram-questions')).queryByText('2 open · 1 answered')).toBeNull();
+    const telegramQuestionNav = screen.getByTestId('ce-session-telegram-question-nav');
+    expect(telegramQuestionNav).toHaveClass(surveyToolStyles.pileNav);
+    expect(telegramQuestionNav).toHaveClass(styles.telegramPileNav);
+    expect(within(telegramQuestionNav).getByText('1 / 4')).toHaveClass(surveyToolStyles.pileNavCounterText);
+    expect(within(telegramQuestionNav).getByRole('button', { name: 'Next Question' })).toHaveClass(surveyToolStyles.pileNavArrow);
+    const telegramQuestionActions = screen.getByTestId('ce-session-telegram-question-actions');
+    expect(telegramQuestionActions).toHaveClass(surveyToolStyles.pileActions);
+    expect(telegramQuestionActions).toHaveClass(styles.telegramPileActions);
+    expect(within(telegramQuestionActions).getByTestId(E2E_TESTIDS.SURVEY_FILTER_TOGGLE)).toHaveClass(surveyToolStyles.actionButton);
+    expect(within(telegramQuestionActions).queryByTestId(E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE)).toBeNull();
+    expect(within(telegramQuestionActions).queryByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE)).toBeNull();
+    expect(within(telegramQuestionActions).getByTestId(E2E_TESTIDS.SURVEY_VIEW_ALL)).toHaveClass(surveyToolStyles.actionButton);
+    fireEvent.click(within(telegramQuestionActions).getByTestId(E2E_TESTIDS.SURVEY_FILTER_TOGGLE));
+    const filterPanel = await screen.findByTestId('ce-session-telegram-question-filter-panel');
+    expect(filterPanel).toHaveTextContent('Filter questions');
+    fireEvent.click(within(filterPanel).getByRole('button', { name: 'Answered' }));
+    expect(await screen.findByText('How can agents help?')).toBeInTheDocument();
+    fireEvent.click(within(filterPanel).getByRole('button', { name: 'All' }));
+    expect(await screen.findByText('Disclose agent identity?')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/telegram/agent/api/questions/create'))).toBe(false);
+    expect(screen.getByTestId('ce-session-telegram-question-prev')).not.toHaveClass(styles.sectionHeaderActionButton);
+    const telegramQuestionsRefresh = screen.getByTestId('ce-session-telegram-questions-refresh');
+    const telegramQuestionsHeaderMeta = telegramQuestionsRefresh.closest(`.${styles.sectionHeaderMeta}`);
+    expect(telegramQuestionsRefresh).toHaveClass(styles.sectionHeaderIconButton);
+    expect(within(screen.getByTestId('ce-session-telegram-questions')).queryByTestId('ce-session-telegram-questions-refresh')).toBeNull();
+    expect(telegramQuestionsHeaderMeta).not.toBeNull();
+    expect(telegramQuestionsHeaderMeta?.querySelector(`.${styles.sectionHeaderTooltip}`)).not.toBeNull();
+    const telegramSubmitButton = screen.getByTestId('ce-session-telegram-question-submit');
+    const telegramSubmitFooter = telegramSubmitButton.closest(`.${surveyToolStyles.pileFooter}`);
+    expect(telegramSubmitButton).toHaveClass(surveyToolStyles.pileSubmitButton);
+    expect(telegramSubmitButton).toHaveClass(styles.telegramPileSubmitButton);
+    expect(telegramSubmitFooter).toHaveClass(surveyToolStyles.pileFooterHidden);
+    expect(telegramSubmitButton).toBeDisabled();
     fireEvent.click(screen.getByRole('radio', { name: 'Agree' }));
     expect(screen.getByRole('radio', { name: 'Agree' })).toBeChecked();
     expect(screen.getByTestId('ce-session-telegram-question-submit')).not.toBeDisabled();
+    expect(telegramSubmitFooter).not.toHaveClass(surveyToolStyles.pileFooterHidden);
     fireEvent.click(screen.getByTestId('ce-session-telegram-question-submit'));
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/telegram/agent/api/preferences'))).toBe(true);
@@ -1191,8 +1234,23 @@ describe('OnePageSession view gating', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
 
     expect(scss).toContain('.telegramPileDeck');
+    expect(scss).toContain('.telegramPileFrame');
+    expect(scss).toContain('.telegramPileControls');
+    expect(scss).toContain('.telegramPileActions');
+    expect(scss).toContain('.telegramPileFooter');
+    expect(scss).toContain('.telegramPileNav');
     expect(scss).toContain('width: min(550px, 90vw);');
     expect(scss).not.toContain('max-width: 720px;');
+  });
+
+  it('keeps section header refresh controls icon-only', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+    const iconButtonBlock = scss.match(/\.sectionHeaderIconButton\s*{[\s\S]*?\n}/)?.[0] || '';
+
+    expect(iconButtonBlock).toContain('background: transparent;');
+    expect(iconButtonBlock).toContain('border: 0;');
+    expect(iconButtonBlock).toContain('border-radius: 50%;');
+    expect(iconButtonBlock).toContain('opacity: 0.34;');
   });
 
   it('passes hideEmbeddedDebugUi only to embedded full SurveyPage mode', async () => {
