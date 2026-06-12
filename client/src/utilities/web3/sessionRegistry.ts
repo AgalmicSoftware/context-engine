@@ -348,8 +348,8 @@ const sendWithGasFallback = async ({
   let gasLimit = fallbackGasLimit || REGISTRY_GAS_FALLBACKS.default;
   if (!preferFallbackGasLimit) {
     try {
-      const estimateValue = await estimate?.();
-      gasLimit = resolveBufferedGasLimit(estimateValue ?? 0, fallbackGasLimit);
+      const estimateValue = await (estimate as any)();
+      gasLimit = resolveBufferedGasLimit(estimateValue, fallbackGasLimit);
     } catch (estimateErr) {
       if (isExecutionRevert(estimateErr)) throw estimateErr;
     }
@@ -1163,7 +1163,7 @@ const buildSessionConfigFromRegistry = ({
   fieldsByKey,
   registryChainId,
   metadataLoadState = 'loaded',
-} = {} as AnyRecord) => {
+}: AnyRecord) => {
   const metadataObj = normalizeSessionNaming(metadata && typeof metadata === 'object' ? { ...metadata } : {}) as AnyRecord;
   const gateSnapshot = buildGateSnapshot(gatesByResource);
   const hasOnChainGateData = Object.values(gateSnapshot).some((gate) => gate.lookupStatus === 'ok');
