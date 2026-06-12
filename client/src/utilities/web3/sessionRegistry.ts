@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @file sessionRegistry.ts
@@ -349,8 +348,8 @@ const sendWithGasFallback = async ({
   let gasLimit = fallbackGasLimit || REGISTRY_GAS_FALLBACKS.default;
   if (!preferFallbackGasLimit) {
     try {
-      const estimateValue = await (estimate as any)();
-      gasLimit = resolveBufferedGasLimit(estimateValue, fallbackGasLimit);
+      const estimateValue = await estimate?.();
+      gasLimit = resolveBufferedGasLimit(estimateValue ?? 0, fallbackGasLimit);
     } catch (estimateErr) {
       if (isExecutionRevert(estimateErr)) throw estimateErr;
     }
@@ -358,32 +357,33 @@ const sendWithGasFallback = async ({
   return await send({ ...baseOverrides, gasLimit });
 };
 
-const collectErrorText = (err, depth = 0) => {
+const collectErrorText = (err: unknown, depth = 0) => {
   if (!err || depth > 4) return '';
-  const parts = [];
-  const push = (value) => {
+  const error = err as AnyRecord;
+  const parts: string[] = [];
+  const push = (value: unknown) => {
     const text = toStr(value).trim();
     if (text) parts.push(text);
   };
-  push(err?.shortMessage);
-  push(err?.message);
-  push(err?.details);
-  push(err?.cause?.shortMessage);
-  push(err?.cause?.message);
-  push(err?.cause?.details);
-  push(err?.data?.message);
-  if (err?.cause && err.cause !== err) {
-    push(collectErrorText(err.cause, depth + 1));
+  push(error?.shortMessage);
+  push(error?.message);
+  push(error?.details);
+  push(error?.cause?.shortMessage);
+  push(error?.cause?.message);
+  push(error?.cause?.details);
+  push(error?.data?.message);
+  if (error?.cause && error.cause !== err) {
+    push(collectErrorText(error.cause, depth + 1));
   }
   return parts.join('\n');
 };
 
-const isNonceError = (err) => {
+const isNonceError = (err: unknown) => {
   const msg = collectErrorText(err).toLowerCase();
   return msg.includes('nonce') && (msg.includes('too low') || msg.includes('already been used') || msg.includes('expired'));
 };
 
-const extractNextNonceFromError = (err) => {
+const extractNextNonceFromError = (err: unknown) => {
   const msg = collectErrorText(err);
   const nextNonceMatch = msg.match(/next nonce\s+(\d+)/i);
   if (nextNonceMatch) {
@@ -409,6 +409,17 @@ const sendWithNonceRetry = async ({
   txLabel = 'transaction',
   preferFallbackGasLimit = false,
   nonceTracker = null,
+}: {
+  estimate?: (() => Promise<ethers.BigNumberish>) | null;
+  send: (overrides: TxFeeOverrides) => Promise<TxLike>;
+  gasLimitOverride?: unknown;
+  signer?: AnyRecord | null;
+  txOverrides?: TxFeeOverrides | null;
+  fallbackGasLimit: ethers.BigNumberish;
+  feeFallbackChainId?: unknown;
+  txLabel?: string;
+  preferFallbackGasLimit?: boolean;
+  nonceTracker?: NonceTracker | null;
 }) => {
   let nonceOverride: number | null = null;
   const resolvePendingNonceOverride = async () => {
@@ -451,10 +462,12 @@ const sendWithNonceRetry = async ({
       if (
         nonceTracker &&
         typeof nonceTracker === 'object' &&
+        nonceOverride != null &&
         Number.isInteger(nonceOverride) &&
         nonceOverride >= 0
       ) {
-        nonceTracker.nextNonce = Math.max(Number(nonceTracker.nextNonce || 0), nonceOverride + 1);
+        const confirmedNonceOverride = Number(nonceOverride);
+        nonceTracker.nextNonce = Math.max(Number(nonceTracker.nextNonce || 0), confirmedNonceOverride + 1);
       }
       return tx;
     } catch (err) {
@@ -495,7 +508,7 @@ const sendWithNonceRetry = async ({
       const candidates = [
         nextNonceFromError,
         refreshedNonce,
-        Number.isInteger(previousNonceOverride) ? previousNonceOverride + 1 : null,
+        previousNonceOverride != null && Number.isInteger(previousNonceOverride) ? previousNonceOverride + 1 : null,
       ].filter((candidate) => Number.isInteger(candidate) && candidate >= 0);
       if (!candidates.length) {
         throw err;
@@ -595,7 +608,7 @@ const toRegistrySlug = (raw: unknown) => {
   return slug;
 };
 
-const validateRegistrySlugForWriteOrThrow = (raw) => {
+const validateRegistrySlugForWriteOrThrow = (raw: unknown) => {
   const slugValidation = validateRegistrySessionSlugForWrite(raw);
   if (!slugValidation.ok) {
     throw new Error(slugValidation.error || 'Invalid session slug.');
@@ -603,7 +616,7 @@ const validateRegistrySlugForWriteOrThrow = (raw) => {
   return slugValidation.slug;
 };
 
-const setValueAtPath = (obj, path, value) => {
+const setValueAtPath = (obj: AnyRecord, path: string[], value: unknown) => {
   let cur = obj;
   path.forEach((key: string, idx: number) => {
     if (idx === path.length - 1) {
@@ -850,7 +863,7 @@ const describeChainTarget = (chainId: unknown) => {
     : `chain ${id}`;
 };
 
-const readSignerChainId = async (signer, ethersProvider = null) => {
+const readSignerChainId = async (signer: AnyRecord | null, ethersProvider: ethers.providers.Web3Provider | null = null) => {
   try {
     if (typeof signer?.getChainId === 'function') {
       const signerChainId = Number(await signer.getChainId());
@@ -875,7 +888,15 @@ const readSignerChainId = async (signer, ethersProvider = null) => {
   return 0;
 };
 
-const assertSignerOnRegistryWriteChain = async ({ signer, ethersProvider = null, chainId }) => {
+const assertSignerOnRegistryWriteChain = async ({
+  signer,
+  ethersProvider = null,
+  chainId,
+}: {
+  signer: AnyRecord;
+  ethersProvider?: ethers.providers.Web3Provider | null;
+  chainId?: unknown;
+}) => {
   const writeChainId = Number(chainId || 0) || 0;
   const signerChainId = await readSignerChainId(signer, ethersProvider);
   if (writeChainId && !signerChainId) {
@@ -891,8 +912,8 @@ const assertSignerOnRegistryWriteChain = async ({ signer, ethersProvider = null,
   return writeChainId;
 };
 
-const isArweaveTxId = (value) => /^[a-z0-9_-]{43}$/i.test(value);
-const isArweaveGatewayHost = (host) =>
+const isArweaveTxId = (value: string) => /^[a-z0-9_-]{43}$/i.test(value);
+const isArweaveGatewayHost = (host: string) =>
   host.endsWith('arweave.net') || host.endsWith('arweave.dev') || host.endsWith('arweave.app');
 
 const decodeBase64Utf8 = (raw = '') => {
@@ -987,7 +1008,7 @@ const fetchMetadataFromArweave = async (uri: unknown, opts: AnyRecord = {}) => {
       const cacheBackend = getCacheBackendDiagnostics();
       surveysLog.warn('[sessionRegistry] metadata fetch failed', {
         txId,
-        error: err?.message || String(err),
+        error: error?.message || String(err),
         slug: debugContext.slug || null,
         chainId: debugContext.chainId || null,
         cacheBackend: cacheBackend?.persistentBackend || 'unknown',
@@ -1142,7 +1163,7 @@ const buildSessionConfigFromRegistry = ({
   fieldsByKey,
   registryChainId,
   metadataLoadState = 'loaded',
-}: AnyRecord) => {
+} = {} as AnyRecord) => {
   const metadataObj = normalizeSessionNaming(metadata && typeof metadata === 'object' ? { ...metadata } : {}) as AnyRecord;
   const gateSnapshot = buildGateSnapshot(gatesByResource);
   const hasOnChainGateData = Object.values(gateSnapshot).some((gate) => gate.lookupStatus === 'ok');
@@ -1225,80 +1246,6 @@ const buildSessionConfigFromRegistry = ({
   };
 
   return normalizeSessionNaming(nextConfig) as AnyRecord;
-};
-
-const mergeSessionFieldsIntoCachedConfig = ({
-  baseConfig,
-  session,
-  fieldsByKey,
-  registryChainId,
-}: {
-  baseConfig?: AnyRecord | null;
-  session?: AnyRecord | null;
-  fieldsByKey?: AnyRecord | null;
-  registryChainId?: number | string | null;
-}) => {
-  const base = normalizeSessionNaming(
-    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {}
-  ) as AnyRecord;
-  const registryMeta = base.__registry && typeof base.__registry === 'object'
-    ? base.__registry
-    : {};
-  const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
-  const sessionId = formatSessionId(sessionIdHex);
-  const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
-  const config: AnyRecord = {
-    ...base,
-    slug: normalizeSlug(session?.slug || base.slug),
-    ...(sessionId ? { sessionId } : {}),
-    networkChainId,
-  };
-
-  const resolvedChainId = Number(networkChainId || 0) || 0;
-  const chainContractsRaw: AnyRecord = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
-  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce<AnyRecord>((acc, key) => {
-    const value = toStr(chainContractsRaw?.[key]).trim();
-    if (!value) return acc;
-    acc[key] = { address: value, chainId: resolvedChainId };
-    return acc;
-  }, {});
-  const registryAddress = toStr(getSessionRegistryAddress(resolvedChainId)).trim();
-  if (registryAddress) {
-    chainContracts.sessionRegistry = { address: registryAddress, chainId: resolvedChainId };
-  }
-  config.contracts = mergeSessionContractMaps(chainContracts, base.contracts, config.contracts);
-
-  const fields = {
-    ...(registryMeta.fields && typeof registryMeta.fields === 'object' ? registryMeta.fields : {}),
-    ...(fieldsByKey && typeof fieldsByKey === 'object' ? fieldsByKey : {}),
-  };
-  Object.entries(FIELD_PATHS).forEach(([key, path]) => {
-    const value = toStr(fields[key] || '').trim();
-    if (!value) return;
-    if (SPONSORED_FIELD_KEY_SET.has(key)) {
-      const parsed = parseBool(value);
-      if (parsed === null) return;
-      setValueAtPath(config, path, parsed);
-      return;
-    }
-    setValueAtPath(config, path, value);
-  });
-
-  config.__registry = {
-    ...registryMeta,
-    registryChainId: Number(registryChainId || registryMeta.registryChainId || 0) || null,
-    chainId: Number(session?.chainId || registryMeta.chainId || 0) || null,
-    metadataURI: session?.metadataURI || registryMeta.metadataURI || '',
-    encryptedMetadataURI: session?.encryptedMetadataURI || registryMeta.encryptedMetadataURI || '',
-    adminAddress: session?.adminAddress || registryMeta.adminAddress || null,
-    updatedAt: session?.updatedAt || registryMeta.updatedAt || null,
-    sessionId: sessionId || registryMeta.sessionId || null,
-    sessionIdHex: sessionIdHex || registryMeta.sessionIdHex || null,
-    fields,
-    metadataLoadState: registryMeta.metadataLoadState || 'fields-only',
-  };
-
-  return normalizeSessionNaming(config);
 };
 
 const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
@@ -1945,7 +1892,7 @@ export const registerSessionOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker = { nextNonce: null };
+  const nonceTracker: NonceTracker = { nextNonce: null };
 
   // Observed Base Sepolia gas: createSession ~350k, setSessionFields ~275k; setResourceGates depends on gate count.
   // SessionRegistry requires a small creation fee to prevent spam session creation.
@@ -2155,7 +2102,7 @@ export const setSessionFieldsOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker = { nextNonce: null };
+  const nonceTracker: NonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
@@ -2314,7 +2261,7 @@ export const setResourceGatesOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker = { nextNonce: null };
+  const nonceTracker: NonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
