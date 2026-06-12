@@ -102,6 +102,7 @@ import useSessionWizardWorkerSyncEffects from './hooks/useSessionWizardWorkerSyn
 import useSessionWizardIdentityEffects from './hooks/useSessionWizardIdentityEffects';
 import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
 import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizardNormalModeSectionVisibility';
+import useSessionWizardPublishElapsed from './hooks/useSessionWizardPublishElapsed';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -1804,18 +1805,11 @@ const SessionWizard = ({
     setPendingCreateSbtLaunch(null);
   }, [account, pendingCreateSbtLaunch]);
 
-  useEffect(() => {
-    if (!publishBusy || publishStep <= 0) {
-      setPublishStepElapsedMs(0);
-      return undefined;
-    }
-    setPublishStepElapsedMs(0);
-    const startedAt = Date.now();
-    const timer = setInterval(() => {
-      setPublishStepElapsedMs(Date.now() - startedAt);
-    }, 120);
-    return () => clearInterval(timer);
-  }, [publishBusy, publishStep]);
+  useSessionWizardPublishElapsed({
+    publishBusy,
+    publishStep,
+    setPublishStepElapsedMs,
+  });
 
   useEffect(() => {
     const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
