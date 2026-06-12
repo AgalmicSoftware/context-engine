@@ -138,7 +138,7 @@ The current browser Lit runtime fans out from `client/src/utilities/crypto/litPr
 - `client/src/utilities/crypto/cryptography.ts`
 - `client/src/utilities/crypto/encryptedFields.ts`
 - `client/src/components/MainSite/litSessionConfig.ts`
-- `client/src/utilities/session/sessionMetaController.js`
+- `client/src/utilities/session/sessionMetaController.ts`
 
 ### Session metadata and MainSite
 
