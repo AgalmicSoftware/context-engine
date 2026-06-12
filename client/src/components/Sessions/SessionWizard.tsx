@@ -103,6 +103,7 @@ import useSessionWizardIdentityEffects from './hooks/useSessionWizardIdentityEff
 import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
 import useSessionWizardNormalModeSectionVisibility from './hooks/useSessionWizardNormalModeSectionVisibility';
 import useSessionWizardPublishElapsed from './hooks/useSessionWizardPublishElapsed';
+import useSessionWizardCleanupEffect from './hooks/useSessionWizardCleanupEffect';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -916,27 +917,13 @@ const SessionWizard = ({
     0
   ) || null;
 
-  useEffect(() => {
-    return () => {
-      isMountedRef.current = false;
-      if (sessionIdRotationTimerRef.current) {
-        clearTimeout(sessionIdRotationTimerRef.current);
-        sessionIdRotationTimerRef.current = null;
-      }
-      if (adminUrlStatusTimerRef.current) {
-        clearTimeout(adminUrlStatusTimerRef.current);
-        adminUrlStatusTimerRef.current = null;
-      }
-      if (sessionIdStatusTimerRef.current) {
-        clearTimeout(sessionIdStatusTimerRef.current);
-        sessionIdStatusTimerRef.current = null;
-      }
-      if (jsonCopiedTimerRef.current) {
-        clearTimeout(jsonCopiedTimerRef.current);
-        jsonCopiedTimerRef.current = null;
-      }
-    };
-  }, []);
+  useSessionWizardCleanupEffect({
+    isMountedRef,
+    sessionIdRotationTimerRef,
+    adminUrlStatusTimerRef,
+    sessionIdStatusTimerRef,
+    jsonCopiedTimerRef,
+  });
   const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
   const {
     workerMode,
