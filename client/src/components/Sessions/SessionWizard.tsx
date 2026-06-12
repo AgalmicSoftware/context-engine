@@ -100,6 +100,7 @@ import useSessionWizardBlockLimits from './hooks/useSessionWizardBlockLimits';
 import useSessionWizardNewSessionBanner from './hooks/useSessionWizardNewSessionBanner';
 import useSessionWizardWorkerSyncEffects from './hooks/useSessionWizardWorkerSyncEffects';
 import useSessionWizardIdentityEffects from './hooks/useSessionWizardIdentityEffects';
+import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -272,7 +273,6 @@ import {
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
 import {
   getSessionWizardSecretFieldTestId,
-  readSessionWizardTooltipsEnabled,
   resolveSessionHeaderImageFormat,
 } from './sessionWizardUiSupport';
 import {
@@ -667,17 +667,7 @@ const SessionWizard = ({
 }: SessionWizardProps) => {
   const reduxContext = useContext(ReactReduxContext);
   const tooltipPreferenceStore = reduxContext?.store || null;
-  const [sessionWizardTooltipsEnabled, setSessionWizardTooltipsEnabled] = useState(() => (
-    readSessionWizardTooltipsEnabled(tooltipPreferenceStore)
-  ));
-  useEffect(() => {
-    setSessionWizardTooltipsEnabled(readSessionWizardTooltipsEnabled(tooltipPreferenceStore));
-    if (typeof tooltipPreferenceStore?.subscribe !== 'function') return undefined;
-    return tooltipPreferenceStore.subscribe(() => {
-      const nextEnabled = readSessionWizardTooltipsEnabled(tooltipPreferenceStore);
-      setSessionWizardTooltipsEnabled((current) => (current === nextEnabled ? current : nextEnabled));
-    });
-  }, [tooltipPreferenceStore]);
+  const sessionWizardTooltipsEnabled = useSessionWizardTooltipPreference(tooltipPreferenceStore);
   const resolvedActiveSessionSlug = sessionRegistryUtils.normalizeSlug(
     activeSessionSlug ?? ''
   );
