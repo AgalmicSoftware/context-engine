@@ -97,6 +97,7 @@ import useSessionHeaderPreview from './hooks/useSessionHeaderPreview';
 import useSessionWizardChromeState from './hooks/useSessionWizardChromeState';
 import useSessionWizardLiveRefs from './hooks/useSessionWizardLiveRefs';
 import useSessionWizardPublishAdvancedState from './hooks/useSessionWizardPublishAdvancedState';
+import useSessionWizardWorkerState from './hooks/useSessionWizardWorkerState';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -950,47 +951,56 @@ const SessionWizard = ({
       }
     };
   }, []);
-  const [workerMode, setWorkerMode] = useState('default');
-  const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
-    typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true
-  );
-  const [persistWorkerSecrets, setPersistWorkerSecrets] = useState(() => (
-    typeof cachedWizard?.persistWorkerSecrets === 'boolean'
-      ? cachedWizard.persistWorkerSecrets
-      : DEV_PERSIST_WORKER_SECRETS
-  ));
-  const cachedDeployForm: DeployFormState = (
-    cachedWizard?.deployForm &&
-    typeof cachedWizard.deployForm === 'object' &&
-    !Array.isArray(cachedWizard.deployForm)
-  ) ? cachedWizard.deployForm as DeployFormState : {};
-  const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(CLOUDFLARE_DEPLOY_HELPER_URL));
-  const [deployForm, setDeployForm] = useState<DeployFormState>({
-    apiToken: toStr(cachedDeployForm.apiToken || '').trim(),
-    workerName: toStr(cachedDeployForm.workerName || '').trim(),
-    adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
-    accountId: toStr(cachedDeployForm.accountId || '').trim(),
-    bundleUrl: toStr(cachedDeployForm.bundleUrl || CLOUDFLARE_WORKER_BUNDLE_URL),
+  const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
+  const {
+    workerMode,
+    setWorkerMode,
+    workerSecretsEnabled,
+    setWorkerSecretsEnabled,
+    persistWorkerSecrets,
+    setPersistWorkerSecrets,
+    deployHelperUrl,
+    setDeployHelperUrl,
+    deployForm,
+    setDeployForm,
+    bundleMode,
+    setBundleMode,
+    bundleFile,
+    setBundleFile,
+    forceManualBundleFile,
+    setForceManualBundleFile,
+    normalModeBundleUrlOverride,
+    setNormalModeBundleUrlOverride,
+    deployStatus,
+    setDeployStatus,
+    deployInFlight,
+    setDeployInFlight,
+    deployComplete,
+    setDeployComplete,
+    deployWorkerUrl,
+    setDeployWorkerUrl,
+    provisionedSponsoredContext,
+    setProvisionedSponsoredContext,
+    workerSecrets,
+    setWorkerSecrets,
+    workerUrlAutoFilled,
+    setWorkerUrlAutoFilled,
+    workerAllowOrigins,
+    setWorkerAllowOrigins,
+    workerLimitPerWallet,
+    setWorkerLimitPerWallet,
+  } = useSessionWizardWorkerState<ProvisionedSponsoredContextState>({
+    cachedWizard,
+    deployHelperUrlDefault: CLOUDFLARE_DEPLOY_HELPER_URL,
+    workerBundleUrlDefault: CLOUDFLARE_WORKER_BUNDLE_URL,
+    devPersistWorkerSecrets: DEV_PERSIST_WORKER_SECRETS,
+    defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
+    buildProvisionedSponsoredContextState,
   });
-  const [bundleMode, setBundleMode] = useState(() => (toStr(CLOUDFLARE_WORKER_BUNDLE_URL) ? 'url' : 'upload'));
-  const [bundleFile, setBundleFile] = useState<File | null>(null);
-  const [forceManualBundleFile, setForceManualBundleFile] = useState(false);
-  const [normalModeBundleUrlOverride, setNormalModeBundleUrlOverride] = useState('');
-  const [deployStatus, setDeployStatus] = useState('');
-  const [deployInFlight, setDeployInFlight] = useState(false);
-  const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
-  const [deployWorkerUrl, setDeployWorkerUrl] = useState(() => normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
-  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<ProvisionedSponsoredContextState>(() => (
-    buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext)
-  ));
   const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
     readSessionWizardNewSessionBannerDismissed()
   ));
   const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
-  const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
-    const cached = cachedWizard?.workerSecrets;
-    return sanitizeSessionWizardWorkerSecretsForLitMode(cached);
-  });
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1020,7 +1030,6 @@ const SessionWizard = ({
   const prunePendingSbtSelectionsRef = useRef<null | ((addressLowerSet: Set<string>) => void)>(null);
   const clearFeaturedDraftGateAutoLinkRef = useRef<null | ((address?: unknown) => void)>(null);
   const dismissFeaturedDraftGateAutoLinkRef = useRef<null | ((args?: UnknownRecord) => void)>(null);
-  const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(() => (
     buildPendingSbtDeployContextSignature(
@@ -1182,9 +1191,6 @@ const SessionWizard = ({
       }
     });
   }, []);
-  const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
-  const [workerAllowOrigins, setWorkerAllowOrigins] = useState(DEFAULT_ALLOWED_ORIGINS);
-  const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
