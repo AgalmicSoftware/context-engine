@@ -96,6 +96,7 @@ import useSessionSlugState from './hooks/useSessionSlugState.js';
 import useSessionHeaderPreview from './hooks/useSessionHeaderPreview';
 import useSessionWizardChromeState from './hooks/useSessionWizardChromeState';
 import useSessionWizardLiveRefs from './hooks/useSessionWizardLiveRefs';
+import useSessionWizardPublishAdvancedState from './hooks/useSessionWizardPublishAdvancedState';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -758,21 +759,24 @@ const SessionWizard = ({
   const [openLockKey, setOpenLockKey] = useState('');
   const [openResourceGateKey, setOpenResourceGateKey] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [metadataUrl, setMetadataUrl] = useState('');
-  const [metadataTxId, setMetadataTxId] = useState('');
-  const [manualMetadataUrl, setManualMetadataUrl] = useState('');
-  const [manualGasLimit, setManualGasLimit] = useState(() => (
-    toStr(cachedWizard?.manualGasLimit || '1200000').trim() || '1200000'
-  ));
-  const [manualGasPriceGwei, setManualGasPriceGwei] = useState(() => (
-    toStr(cachedWizard?.manualGasPriceGwei || '').trim()
-  ));
-  const [manualMaxFeePerGasGwei, setManualMaxFeePerGasGwei] = useState(() => (
-    toStr(cachedWizard?.manualMaxFeePerGasGwei || '').trim()
-  ));
-  const [manualMaxPriorityFeePerGasGwei, setManualMaxPriorityFeePerGasGwei] = useState(() => (
-    toStr(cachedWizard?.manualMaxPriorityFeePerGasGwei || '').trim()
-  ));
+  const {
+    metadataUrl,
+    setMetadataUrl,
+    metadataTxId,
+    setMetadataTxId,
+    manualMetadataUrl,
+    setManualMetadataUrl,
+    manualGasLimit,
+    setManualGasLimit,
+    manualGasPriceGwei,
+    setManualGasPriceGwei,
+    manualMaxFeePerGasGwei,
+    setManualMaxFeePerGasGwei,
+    manualMaxPriorityFeePerGasGwei,
+    setManualMaxPriorityFeePerGasGwei,
+    publishAdvancedOpen,
+    setPublishAdvancedOpen,
+  } = useSessionWizardPublishAdvancedState({ cachedWizard });
   const [registerTxs, setRegisterTxs] = useState<SessionWizardRegisterTxEntry[]>([]);
   const [pendingOnChainFields, setPendingOnChainFields] = useState<UnknownRecord>({});
   const [status, setStatus] = useState('');
@@ -780,7 +784,6 @@ const SessionWizard = ({
   const [adminUrl, setAdminUrl] = useState('');
   const [publishedPendingSbtLinks, setPublishedPendingSbtLinks] = useState<PublishedPendingSbtLink[]>([]);
   const [adminUrlStatus, setAdminUrlStatus] = useState('');
-  const [publishAdvancedOpen, setPublishAdvancedOpen] = useState(false);
   const [publishStep, setPublishStep] = useState(0); // 0=idle, 1=deploying sbts/uploading, 2=uploading, 3=registering, 4=done
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
