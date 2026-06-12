@@ -574,7 +574,7 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
     expect(markup).not.toContain('Decrypt Answer');
   });
 
-  it('does not render decrypt for viewed Lit-gated responses without owner or other-response access', () => {
+  it('renders decrypt for viewed Lit-gated responses even before session gate context resolves', () => {
     const onDecryptQuestion = jest.fn();
     const subject = createSubject({
       question: { id: 'q1', type: 'freeform', prompt: 'Prompt' },
@@ -593,10 +593,13 @@ describe('SingleQuestionResponse encrypted answer CTA variants', () => {
     const tree = subject.renderSinglePersonView();
     const decryptButton = findElement(tree, (node) => node?.props?.children === 'Decrypt Answer');
 
-    expect(renderToStaticMarkup(tree)).not.toContain('Decrypt Answer');
-    expect(decryptButton).toBeNull();
-    subject.handleDecryptClick('answer');
-    expect(onDecryptQuestion).not.toHaveBeenCalled();
+    expect(renderToStaticMarkup(tree)).toContain('Decrypt Answer');
+    expect(decryptButton).not.toBeNull();
+    decryptButton.props.onClick();
+
+    expect(onDecryptQuestion).toHaveBeenCalledWith('q1', 'answer', expect.objectContaining({
+      answer: expect.objectContaining({ encryptedPortion: litEncryptedPortion }),
+    }));
   });
 });
 
