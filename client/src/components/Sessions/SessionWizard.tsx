@@ -99,6 +99,7 @@ import useSessionWizardWorkerState from './hooks/useSessionWizardWorkerState';
 import useSessionWizardBlockLimits from './hooks/useSessionWizardBlockLimits';
 import useSessionWizardNewSessionBanner from './hooks/useSessionWizardNewSessionBanner';
 import useSessionWizardWorkerSyncEffects from './hooks/useSessionWizardWorkerSyncEffects';
+import useSessionWizardIdentityEffects from './hooks/useSessionWizardIdentityEffects';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -1293,72 +1294,27 @@ const SessionWizard = ({
     updateDraftValueRef,
   });
 
-  useEffect(() => {
-    const desiredChain = Number(initialRegistryChainId || 0) || null;
-    if (!desiredChain) return;
-    // For now we assume session chain === registry chain; if this diverges, split these values.
-    setRegistryChainId((prev) => (Number(prev || 0) === desiredChain ? prev : desiredChain));
-  }, [initialRegistryChainId]);
+  useSessionWizardIdentityEffects<DraftState>({
+    initialRegistryChainId,
+    setRegistryChainId,
+    initialSessionId,
+    setSessionId,
+    setDraft,
+    privateSlugMode,
+    sessionId,
+    slugPinnedByPendingSbtDrafts,
+    draftSessionName: draft?.sessionName,
+    draftSlug: draft?.slug,
+    lastManualSlugRef,
+    hasPrivateSbtName,
+    lastHasPrivateSbtNameRef,
+    privateSlugModeRef,
+    togglePrivateSlugModeRef,
+  });
 
   const handleRegistryChainIdChange = useCallback((value: string | number) => {
     setRegistryChainId(Number(value || 0) || 0);
   }, []);
-
-  useEffect(() => {
-    const raw = toStr(initialSessionId).trim();
-    if (!raw) return;
-    const parsedSessionId = sessionRegistryUtils.formatSessionId(raw);
-    if (parsedSessionId) {
-      setSessionId(parsedSessionId);
-      return;
-    }
-    const desiredSlug = normalizeSlug(raw);
-    setDraft((prev) => {
-      if (toStr(prev.slug).trim()) return prev;
-      const next = deepClone(prev);
-      next.slug = desiredSlug;
-      return next;
-    });
-  }, [initialSessionId]);
-
-  useEffect(() => {
-    if (slugPinnedByPendingSbtDrafts) return;
-    if (!privateSlugMode) return;
-    const desiredSlug = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
-    if (!desiredSlug) return;
-    setDraft((prev) => {
-      if (toStr(prev.slug).trim() === desiredSlug) return prev;
-      const next = deepClone(prev);
-      next.slug = desiredSlug;
-      return next;
-    });
-  }, [privateSlugMode, sessionId, slugPinnedByPendingSbtDrafts]);
-
-  // Auto-generate slug from sessionName when not in private URL mode.
-  useEffect(() => {
-    if (slugPinnedByPendingSbtDrafts) return;
-    if (privateSlugMode) return;
-    const name = toStr(draft?.sessionName).trim();
-    if (!name) return;
-    const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48);
-    if (!autoSlug) return;
-    const currentSlug = toStr(draft?.slug).trim();
-    if (currentSlug && currentSlug === lastManualSlugRef.current && currentSlug !== autoSlug) return;
-    if (autoSlug === toStr(draft?.slug).trim()) return;
-    setDraft((prev) => {
-      const next = deepClone(prev);
-      next.slug = autoSlug;
-      return next;
-    });
-  }, [draft?.sessionName, draft?.slug, privateSlugMode, slugPinnedByPendingSbtDrafts]);
-
-  useEffect(() => {
-    const prev = lastHasPrivateSbtNameRef.current;
-    lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
-    if (!hasPrivateSbtName || prev) return;
-    if (privateSlugModeRef.current) return;
-    togglePrivateSlugModeRef.current?.();
-  }, [hasPrivateSbtName]);
 
   useEffect(() => {
     // Persist wizard state between refreshes until deploy/upload clears them.
