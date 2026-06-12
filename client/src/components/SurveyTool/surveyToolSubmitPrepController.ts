@@ -43,17 +43,6 @@ export interface EncryptionWorkGroupsResult {
   missingRecipients: string[];
 }
 
-export interface CoerceDefaultGateAudienceDeps {
-  getEffectiveRecipientsForQid: (qid: string) => unknown[];
-  resolveFieldEncryptionAudience: (field: SubmitResponseFieldState, qid: string, fieldKey: string) => string;
-  resolveFieldEncryptionGateId: (field: SubmitResponseFieldState, qid: string, fieldKey: string) => string | null;
-}
-
-export interface CoerceDefaultGateAudienceResult {
-  changed: boolean;
-  slice: SubmitPrepSlice;
-}
-
 type EncryptionBucketKey = 'answers' | 'additionalComments';
 type EncryptionFieldKey = 'answer' | 'additional';
 
@@ -61,75 +50,6 @@ type MutableEncryptionWorkGroup = {
   recipients: string[];
   qids: Set<string>;
   slice: EncryptionWorkGroup['slice'];
-};
-
-export const coerceDefaultGateAudienceForSubmit = (
-  slice: SubmitPrepSlice | null | undefined,
-  changedQids: Set<string>,
-  deps: CoerceDefaultGateAudienceDeps,
-): CoerceDefaultGateAudienceResult => {
-  const sourceSlice = slice || {};
-  let nextSlice: SubmitPrepSlice = sourceSlice;
-  let changed = false;
-
-  const ensureMutableSlice = (): SubmitPrepSlice => {
-    if (nextSlice === sourceSlice) {
-      nextSlice = {
-        ...sourceSlice,
-        answers: { ...(sourceSlice.answers || {}) },
-        additionalComments: { ...(sourceSlice.additionalComments || {}) },
-      };
-    }
-    return nextSlice;
-  };
-
-  const coerceField = (
-    qid: string,
-    fieldKey: EncryptionFieldKey,
-    bucketKey: EncryptionBucketKey,
-  ) => {
-    const bucket = sourceSlice[bucketKey] || {};
-    const field = bucket[qid];
-    if (!field || typeof field !== 'object') return;
-    if (!field.encrypted && !hasMeaningfulFieldValue(field)) return;
-
-    const recipients = deps.getEffectiveRecipientsForQid(qid);
-    if (!Array.isArray(recipients) || recipients.length === 0) return;
-
-    const audience = deps.resolveFieldEncryptionAudience(field, qid, fieldKey);
-    if (audience === 'gate') return;
-    if (audience && audience !== 'self') return;
-
-    const nextField = {
-      ...field,
-      encrypted: true,
-      encryptionAudience: 'gate',
-      encryptionGateId: deps.resolveFieldEncryptionGateId(
-        { ...field, encryptionAudience: 'gate', encrypted: true },
-        qid,
-        fieldKey,
-      ),
-    };
-    const mutable = ensureMutableSlice();
-    const mutableBucket = {
-      ...(mutable[bucketKey] || {}),
-      [qid]: nextField,
-    };
-    mutable[bucketKey] = mutableBucket;
-    changed = true;
-  };
-
-  Array.from(changedQids || []).forEach((qidRaw) => {
-    const qid = normalizeQuestionIdKey(qidRaw);
-    if (!qid) return;
-    coerceField(qid, 'answer', 'answers');
-    coerceField(qid, 'additional', 'additionalComments');
-  });
-
-  return {
-    changed,
-    slice: nextSlice,
-  };
 };
 
 export const buildFieldEncryptionWorkGroups = (
