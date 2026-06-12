@@ -355,27 +355,30 @@ describe('SurveyResults survey-mode source signature', () => {
 
   it('parses each survey responder payload once while building survey-mode views', async () => {
     const surveyId = 'survey-parse-once';
+    const responderOnePayload = JSON.stringify({
+      timeStamp: 10,
+      responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
+    });
+    const responderTwoPayload = JSON.stringify({
+      timeStamp: 20,
+      responses: [
+        { questionID: 'q1', answer: { value: 'b1' } },
+        { questionID: 'q2', answer: { value: 'b2' } },
+      ],
+    });
     const surveysCache = buildSurveyCache({
       surveyId,
       title: 'Perf Survey',
       questionIDs: ['q1', 'q2'],
       responsesByResponder: {
-        [RESPONDER_ONE]: JSON.stringify({
-          timeStamp: 10,
-          responses: [{ questionID: 'q1', answer: { value: 'a1' } }],
-        }),
-        [RESPONDER_TWO]: JSON.stringify({
-          timeStamp: 20,
-          responses: [
-            { questionID: 'q1', answer: { value: 'b1' } },
-            { questionID: 'q2', answer: { value: 'b2' } },
-          ],
-        }),
+        [RESPONDER_ONE]: responderOnePayload,
+        [RESPONDER_TWO]: responderTwoPayload,
       },
       surveyResponsesLatestBlock: 7,
       surveysLatestBlock: 9,
     });
     seedCacheReads({ surveysCache });
+    const parseSpy = jest.spyOn(JSON, 'parse');
 
     mountSurveyResults({ surveyId });
     await waitForSurveyTitle('Perf Survey');
@@ -392,7 +395,10 @@ describe('SurveyResults survey-mode source signature', () => {
     const q2Rows = getLatestAggregateRows('q2');
     expect(q2Rows).toHaveLength(1);
     expect(getAnswerValue(q2Rows[0].response)).toBe('b2');
-    // port note: parseResponse call count is an internal memoization detail with no DOM seam after hooks conversion; TASK 7 should pin one-parse-per-responder in the extracted survey hydration helper.
+    const parsedSurveyPayloads = parseSpy.mock.calls
+      .map((call) => call[0])
+      .filter((value) => value === responderOnePayload || value === responderTwoPayload);
+    expect(parsedSurveyPayloads).toEqual([responderOnePayload, responderTwoPayload]);
   });
 
   it('skips survey-mode rebuild when source signature is unchanged', async () => {
