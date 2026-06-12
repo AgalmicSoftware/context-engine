@@ -20,6 +20,7 @@ import {
   executePileQuestionSetHydration,
 } from './surveyPileResponseController';
 import { buildPileWorkspaceViewState } from './surveyPileViewState';
+import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const ACCOUNT = '0xabc';
@@ -139,19 +140,35 @@ describe('SurveyTool pile hydration and loading', () => {
     // this asserts the exported reset option that drives that cleanup.
   });
 
-  it('avoids redundant pile wrapper state updates when answering', () => {
+  it('forwards pile answers through the production runtime adapter without wrapper state updates', () => {
     const handleAnswer = jest.fn();
-    const setState = jest.fn();
-    const handleAnswerPile = (questionId, answer, options = {}) => {
-      handleAnswer(0, questionId, answer, options);
+    const engine = {
+      computePendingEditStatsAtIndex: jest.fn(() => ({ total: 0 })),
+      handleAnswer,
+      setState: jest.fn(),
     };
+    createPileViewRuntimeStrategy().getPendingEditStats(engine);
 
-    handleAnswerPile('q1', 'value');
+    engine.handleAnswerPile('q1', 'value');
 
     expect(handleAnswer).toHaveBeenCalledWith(0, 'q1', 'value', {});
-    expect(setState).not.toHaveBeenCalled();
-    // port note: `handleAnswerPile` is a thin private wrapper around the shared
-    // answer handler. No public state patch is expected from that wrapper.
+    expect(engine.setState).not.toHaveBeenCalled();
+  });
+
+  it('preserves pile answer adapter options', () => {
+    const handleAnswer = jest.fn();
+    const engine = {
+      computePendingEditStatsAtIndex: jest.fn(() => ({ total: 0 })),
+      handleAnswer,
+      setState: jest.fn(),
+    };
+    const options = { persistDraft: false };
+    createPileViewRuntimeStrategy().getPendingEditStats(engine);
+
+    engine.handleAnswerPile('q1', 'value', options);
+
+    expect(handleAnswer).toHaveBeenCalledWith(0, 'q1', 'value', options);
+    expect(engine.setState).not.toHaveBeenCalled();
   });
 
   it('passes cache-backed question responses into pile filters so responded status works in embedded pile mode', () => {
