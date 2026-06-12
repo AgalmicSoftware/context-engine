@@ -12,6 +12,8 @@ const question = {
   type: 'freeform',
   question: 'How are you?',
 };
+const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
+const responseGateAddress = '0x00000000000000000000000000000000000000aa';
 
 const renderStandaloneQuestion = () => renderSurveyQuestions({
   singleQuestionMode: false,
@@ -62,6 +64,7 @@ describe('SurveyQuestions lock audience controls', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     jest.useRealTimers();
+    window.localStorage.removeItem(REGISTRY_CACHE_KEY);
   });
 
   it('locks and opens the pile lock audience menu on first click when no default gate is configured', async () => {
@@ -173,5 +176,64 @@ describe('SurveyQuestions lock audience controls', () => {
       gateId: 'default_gate',
       label: 'test-12',
     }));
+  });
+
+  it('resolves direct-question response gates from the session registry cache', async () => {
+    window.localStorage.setItem(REGISTRY_CACHE_KEY, JSON.stringify({
+      sessions: {
+        edge: {
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          networkChainId: 11155420,
+          __registry: {
+            gateAuthority: 'onchain',
+            gatesByResource: {
+              questionResponses: {
+                lookupStatus: 'ok',
+                sbtAddresses: [responseGateAddress],
+                sbtAddress: responseGateAddress,
+                chainId: 11155420,
+                mode: 0,
+              },
+            },
+          },
+          encryption: {
+            defaultGateId: 'questionResponses',
+            primaryGateId: 'questionResponses',
+            gates: {
+              questionResponses: {
+                gateId: 'questionResponses',
+                resourceKey: 'questionResponses',
+                type: 'sbt',
+                label: 'questionResponses',
+                sbtAddresses: [responseGateAddress],
+                sbtAddress: responseGateAddress,
+                chainId: 11155420,
+                mode: 0,
+              },
+            },
+          },
+        },
+      },
+    }));
+
+    renderSurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      questionPool: [question],
+      isQuestionCacheReady: true,
+    }, {
+      route: '/question/q1?session=edge',
+    });
+    await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE))
+      .toHaveTextContent('Registry questionResponses gate');
   });
 });

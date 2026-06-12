@@ -5,6 +5,7 @@ export type ResponseFieldState = UnknownRecord & {
   encrypted?: unknown;
   encryptedPortion?: unknown;
   encryptionAudience?: unknown;
+  encryptionGateId?: unknown;
   hash?: unknown;
   value?: unknown;
 };
@@ -142,6 +143,12 @@ export const resolveFieldEncryptionAudience = (
   const qid = questionId ? String(questionId).toLowerCase() : '';
   const fieldState = asResponseFieldState(field);
   if (fieldState.encryptionAudience) {
+    if (
+      String(fieldState.encryptionAudience || '').trim().toLowerCase() === 'gate' &&
+      String(fieldState.encryptionGateId || '').trim()
+    ) {
+      return 'gate';
+    }
     return deps.normalizeAudience(fieldState.encryptionAudience, qid || null);
   }
   return qid

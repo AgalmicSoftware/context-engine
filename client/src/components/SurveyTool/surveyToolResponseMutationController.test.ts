@@ -81,6 +81,54 @@ describe('surveyToolResponseMutationController', () => {
       expect(result.resolvedAudience).toBe('gate');
       expect(result.resolvedGateId).toBe('gate-1');
     });
+
+    it('upgrades untouched plain self defaults when recipients resolve later', () => {
+      const result = resolveFieldEncryptionDefaults(
+        {
+          value: '',
+          encrypted: false,
+          encryptionAudience: 'self',
+          encryptionGateId: null,
+          encryptedPortion: '',
+          hash: '',
+        },
+        'q1',
+        'answer',
+        defaultDeps({
+          getEffectiveRecipientsForQid: () => ['addr1'],
+          resolveFieldEncryptionGateId: () => 'gate-1',
+          resolveFieldEncryptionAudience: () => 'self',
+        }),
+      );
+
+      expect(result.nextEncrypted).toBe(true);
+      expect(result.resolvedAudience).toBe('gate');
+      expect(result.resolvedGateId).toBe('gate-1');
+    });
+
+    it('preserves explicit self encryption when recipients resolve later', () => {
+      const result = resolveFieldEncryptionDefaults(
+        {
+          value: '',
+          encrypted: true,
+          encryptionAudience: 'self',
+          encryptionGateId: null,
+          encryptedPortion: '',
+          hash: '',
+        },
+        'q1',
+        'answer',
+        defaultDeps({
+          getEffectiveRecipientsForQid: () => ['addr1'],
+          resolveFieldEncryptionGateId: () => 'gate-1',
+          resolveFieldEncryptionAudience: () => 'self',
+        }),
+      );
+
+      expect(result.nextEncrypted).toBe(true);
+      expect(result.resolvedAudience).toBe('self');
+      expect(result.resolvedGateId).toBeNull();
+    });
   });
 
   describe('buildAnswerUpdatePlan', () => {
