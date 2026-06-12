@@ -98,6 +98,7 @@ import useSessionWizardPublishAdvancedState from './hooks/useSessionWizardPublis
 import useSessionWizardWorkerState from './hooks/useSessionWizardWorkerState';
 import useSessionWizardBlockLimits from './hooks/useSessionWizardBlockLimits';
 import useSessionWizardNewSessionBanner from './hooks/useSessionWizardNewSessionBanner';
+import useSessionWizardWorkerSyncEffects from './hooks/useSessionWizardWorkerSyncEffects';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -1274,11 +1275,23 @@ const SessionWizard = ({
     return `${base}-worker-${dd}${hh}${yy}`;
   };
 
-  useEffect(() => {
-    if (account && (deployForm.adminAddress === undefined || deployForm.adminAddress === null)) {
-      setDeployForm((prev) => ({ ...prev, adminAddress: account }));
-    }
-  }, [account, deployForm.adminAddress]);
+  useSessionWizardWorkerSyncEffects<DeployFormState>({
+    account,
+    deployFormAdminAddress: deployForm.adminAddress,
+    deployFormWorkerName: deployForm.workerName,
+    setDeployForm,
+    draftSessionName: draft.sessionName,
+    draftCorsWorkerUrl: draft.corsWorkerUrl,
+    buildWorkerName,
+    deployComplete,
+    deployWorkerUrl,
+    setDeployComplete,
+    wizardMode,
+    workerMode,
+    setWorkerMode,
+    setWorkerUrlAutoFilled,
+    updateDraftValueRef,
+  });
 
   useEffect(() => {
     const desiredChain = Number(initialRegistryChainId || 0) || null;
@@ -1407,43 +1420,6 @@ const SessionWizard = ({
       return next;
     });
   }, [encryptedFieldGates]);
-
-  useEffect(() => {
-    const nextName = buildWorkerName(draft.sessionName || '');
-    if (nextName && nextName !== deployForm.workerName) {
-      setDeployForm((prev) => ({ ...prev, workerName: nextName }));
-    }
-  }, [draft.sessionName, deployForm.workerName]);
-
-  useEffect(() => {
-    const defaultUrl = getSessionWizardDefaultWorkerUrl();
-    const current = toStr(draft.corsWorkerUrl).trim();
-    if (current && defaultUrl && current !== defaultUrl) {
-      setWorkerMode('custom');
-    }
-  }, [draft.corsWorkerUrl]);
-
-  useEffect(() => {
-    if (!deployComplete) return;
-    const configured = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
-    const deployed = normalizeBaseUrl(toStr(deployWorkerUrl).trim());
-    if (!configured || !deployed || configured !== deployed) {
-      setDeployComplete(false);
-    }
-  }, [draft.corsWorkerUrl, deployComplete, deployWorkerUrl]);
-
-  useEffect(() => {
-    if (wizardMode !== 'normal' || NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) return;
-    const fallbackUrl = normalizeWorkerAuthUrl(getSessionWizardDefaultWorkerUrl());
-    const configuredUrl = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
-    if (workerMode === 'default') {
-      setWorkerMode('custom');
-    }
-    if (!deployComplete && configuredUrl && fallbackUrl && configuredUrl === fallbackUrl) {
-      setWorkerUrlAutoFilled(false);
-      updateDraftValueRef.current?.(['corsWorkerUrl'], '');
-    }
-  }, [wizardMode, workerMode, draft.corsWorkerUrl, deployComplete]);
 
   useEffect(() => {
     const chainId = Number(registryChainId || 0) || 0;
