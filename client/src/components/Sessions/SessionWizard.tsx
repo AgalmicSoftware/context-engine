@@ -95,6 +95,7 @@ import useSessionWizardWorkerDeploy, {
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import useSessionHeaderPreview from './hooks/useSessionHeaderPreview';
 import useSessionWizardChromeState from './hooks/useSessionWizardChromeState';
+import useSessionWizardLiveRefs from './hooks/useSessionWizardLiveRefs';
 import SessionWizardInfoTooltip, {
   type SessionWizardTooltipRenderOptions,
 } from './SessionWizardInfoTooltip';
@@ -1918,20 +1919,26 @@ const SessionWizard = ({
     });
   }, []);
 
-  useEffect(() => {
-    draftRef.current = draft;
-  }, [draft]);
-
-  useEffect(() => {
-    deployFormRef.current = deployForm;
-  }, [deployForm]);
-
-  useEffect(() => {
-    const normalizedAccount = toStr(account).trim();
-    if (normalizedAccount) {
-      resolvedWalletAccountRef.current = normalizedAccount;
-    }
-  }, [account]);
+  useSessionWizardLiveRefs({
+    draft,
+    draftRef,
+    deployForm,
+    deployFormRef,
+    account,
+    resolvedWalletAccountRef,
+    deployComplete,
+    deployCompleteRef,
+    deployWorkerUrl,
+    deployWorkerUrlRef,
+    provisionedSponsoredContext,
+    provisionedSponsoredContextRef,
+    workerSecretsEnabled,
+    workerSecretsEnabledRef,
+    persistWorkerSecrets,
+    persistWorkerSecretsRef,
+    workerSecrets,
+    workerSecretsRef,
+  });
 
   useEffect(() => {
     if (!toStr(account).trim() || !pendingCreateSbtLaunch) return;
@@ -1952,30 +1959,6 @@ const SessionWizard = ({
     }, 120);
     return () => clearInterval(timer);
   }, [publishBusy, publishStep]);
-
-  useEffect(() => {
-    deployCompleteRef.current = deployComplete;
-  }, [deployComplete]);
-
-  useEffect(() => {
-    deployWorkerUrlRef.current = deployWorkerUrl;
-  }, [deployWorkerUrl]);
-
-  useEffect(() => {
-    provisionedSponsoredContextRef.current = provisionedSponsoredContext;
-  }, [provisionedSponsoredContext]);
-
-  useEffect(() => {
-    workerSecretsEnabledRef.current = workerSecretsEnabled;
-  }, [workerSecretsEnabled]);
-
-  useEffect(() => {
-    persistWorkerSecretsRef.current = persistWorkerSecrets;
-  }, [persistWorkerSecrets]);
-
-  useEffect(() => {
-    workerSecretsRef.current = workerSecrets;
-  }, [workerSecrets]);
 
   useEffect(() => {
     const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
